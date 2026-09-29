@@ -81,7 +81,7 @@ imported the rest of the way down, never from the top.
   vocabulary: `createUi`, the browser supply, `render`, plus
   `defineBrowserModule`. Used by `apps/ui` and every module's browser half.
 - **`@langwatch/browser-host`** — the capabilities a screen reads: session,
-  navigation, storage, feature flags, toasts, slots, **drawers**. The browser
+  navigation, storage, feature flags, toasts, **drawers**. The browser
   analogue of the closed members. Capabilities only — components live in the
   design system or in kits.
 - **`@langwatch/browser-trpc`** — the browser's wire: the derived tRPC
@@ -98,27 +98,35 @@ imported the rest of the way down, never from the top.
 A package earns existence by being framework, not feature. Feature code in
 `packages/` is a defect. The boundary is prefix-checkable: nothing `browser-*`
 in a server graph; no `process*` package in a web graph.
-Trace's query parser and content dispatchers live in `modules/trace/browser-kit`, not the contract
-(Alex, 2026-09-29).
+Trace's query language and content dispatchers are `modules/trace/query-language`, a trace-owned package,
+portable and framework-free, which trace's process, the server and any browser import; they sit in
+neither the contract nor a kit (Alex, 2026-09-29). Trace and analytics read the same trace data: that
+relationship is an open design item, and neither side takes an exemption meanwhile (Alex, 2026-09-29).
 
 ---
 
 ## 3. A module
 
-A module is one folder owning up to four workspace packages.
+A module is one folder owning up to four workspace packages, plus any portable, framework-free library its
+process and browser both import (`modules/trace/query-language`; Alex, 2026-09-29).
 `modules/catalogue.json` maps every subject to exactly one owning module.
 The owning module's process serves the subject's endpoints and runs its collection; another module's
 share crosses only as its `*Api` ops. Where main hosted a subject elsewhere (`traces.logCollection`),
 the port moves it to its owner — main decides _what_, the record decides _where_ (Alex, 2026-09-25).
 A tRPC namespace belongs to one module: a procedure main hosted under another subject's namespace
 moves into its owner's namespace and the wire path moves with it (Alex, 2026-09-25).
-Operator views over enterprise subjects (license registry, self-hosted instances) live in an enterprise
-ops module that calls the owners' `*Api`s; core ops never depends on an enterprise contract (Alex, 2026-09-25).
+Enterprise is a licence, not a separate app: enterprise modules are always installed, and a core module
+may import an enterprise contract or kit like any peer's. The enterprise owner refuses per organization
+on entitlement; a core caller never re-checks (Alex, 2026-09-29). Operator views over enterprise subjects
+(license registry, self-hosted instances) live in an enterprise ops module that calls the owners' `*Api`s
+(Alex, 2026-09-25).
 Enterprise-licensed subjects moving to their owner land in that owner's enterprise module
 (`enterprise-gateway` owns routing policy and personal virtual keys), never relicensed into core (Alex, 2026-09-25).
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
-Usage limits are a module of their own: usage owns the counters and their enforcement, and every other
-module checks a limit through its `*Api` (Alex, 2026-09-29).
+Usage is a module of its own and owns all counting: the counters, their enforcement, the warning
+thresholds, the billable-events meter projection and its table, and the trace count it takes itself.
+Entitlement keeps plans and features only; every other module checks a limit or reads a roll-up through
+`UsageApi`, and no trace-usage or billing-usage cycle forms (Alex, 2026-09-29).
 
 ```
 modules/trace/
@@ -244,11 +252,15 @@ of:
 One unowned service has one owning module: evaluation owns the langevals boundary — its endpoint,
 the S3 staging of large payloads and their config — and topic and workflow reach langevals through
 `EvaluationApi` (Alex, 2026-09-25).
-Notification owns the mailer: a module that sends mail (automation) calls `NotificationApi.sendEmail`,
-which takes optional `bcc` and `headers` (Alex, 2026-09-29).
-Presence owns the project-event fan-out: `PresenceApi.publishProjectEvent` carries the
-`"export_progress" | "simulation_updated"` channels, scenario publishes through it and reads no Redis
-of its own, and the memory tier emits locally (Alex, 2026-09-29).
+Notification owns mail outright: its config, its provider and its sending. There is no mail member;
+auth, identity, user, automation and billing send through `NotificationApi.sendEmail`, which takes
+intent (`undisclosedRecipients`, `unsubscribe: { url }`), never raw headers (Alex, 2026-09-29).
+Presence is a generic project-event fan-out: `PresenceApi.publishProjectEvent` and
+`subscribeProjectEvents` carry any channel, and each publisher owns its channel's name and schema; the
+contract carries no `EventEmitter`. Scenario and trace publish through it and keep no Redis broadcast of
+their own, notification's copy is deleted, and the memory tier emits locally (Alex, 2026-09-29).
+Langy owns its mirror project id: it stamps the mirror tier on the Langy key it creates through gateway,
+and gateway stores it on the key; no composition supplies the value (Alex, 2026-09-29).
 
 The legacy `filters` grammar (a filter field to a parameterised ClickHouse condition over `trace_summaries` and
 `stored_spans`) is trace's, as the owner of the tables it reads; analytics' filter pickers ask
@@ -343,14 +355,19 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    reaching in. Closed to values only: an `import type` / `export type` of a browser package
    crosses, because types are erased (Alex, 2026-09-27).
 2. **A kit is a leaf.** It may import contracts (any module's),
-   `design-system` and `browser-host`. It may not import its own module's
-   browser package (the rule that broke the nine cyclic web pairs), any other
-   `*-browser`, or another kit.
-3. **A kit fetches nothing.** No project-scoped queries, no `browser-trpc`.
-   Presentational components, pure hooks, shared stores; consumers wire the
-   data. A browser derives a client only from its own contract, so a consumer
-   that needs another module's data renders what that owner lends (rule 7) —
-   the model selector is lent by model-provider (Alex, 2026-09-23).
+   `design-system`, `browser-host` and `@langwatch/api/web` (its client's
+   derivation). It may not import its own module's browser package (the rule
+   that broke the nine cyclic web pairs), any other `*-browser`, or another kit.
+3. **A kit owns its module's client, store and UI for one concept** (Alex,
+   2026-09-29). It derives its client from its own contract, and the owner's
+   browser package imports that client and store from the kit rather than
+   holding a second copy; consumers render the kit. It never calls a peer's
+   procedure and never reads a `*HostApi`; a component that needs either stays
+   in its owner (rule 7). Rule 2 keeps it a leaf. The case: identity's kit holds
+   identity's `twoStepVerification` client and the requirement UI (user,
+   organization and ops render it), while the passkey, two-step and
+   sign-in-method ceremonies call auth's endpoints and so live in auth's kit
+   (Alex, 2026-09-29).
 4. **A kit is a package, not a subpath** — a subpath is invisible to the
    dependency graph, so it cannot break a cycle or be budgeted. A package
    makes every cross-module browser edge a visible, lintable manifest line.
@@ -365,6 +382,7 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    surfaces twice to honour a number. The floor exists to stop premature kits,
    not to force copy-paste where sharing is plainly already real. One consumer
    is still never enough, and two with a thin surface still dissolves.
+   Recount the consumers before calling anything one-consumer (Alex, 2026-09-29).
 6. **The floor gates a kit's EXISTENCE, not its contents** (ruled 2026-09-18).
    Once a kit is warranted and exists, it may hold a symbol with one consumer;
    creating a NEW kit still needs three. The case that forced the ruling: all
@@ -375,12 +393,13 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    sanctioned fix at all. A cycle is broken by moving that symbol into the
    owner's existing kit; where the owner has no kit, the three-consumer rule
    decides whether one is warranted, and if it is not, rule 5 still applies.
-7. **Owner UI that fetches is lent, not copied** (Alex, 2026-09-23). When another
-   module needs a component that fetches its owner's data (presence, annotation,
-   share, trace's own surfaces), the owner publishes it through its declaration's
-   `withCapabilities` slot, as `joinOffer` does, and the consumer renders what it is
-   handed. The owner keeps its UI and its data; rule 5's duplicate is for thin,
-   non-fetching surfaces only.
+7. **Lend only what a kit cannot hold, never copy it** (Alex, 2026-09-23; narrowed
+   2026-09-29 by rule 3). A component that fetches a peer's data or reads a
+   `*HostApi` is published through its owner's `withCapabilities`, as `joinOffer`
+   does, and the consumer renders what it is handed; one that fetches only its
+   owner's data moves to the owner's kit. A flow opens as the owner's drawer by
+   name: ops' SSO import opens sso's register-connection drawer (Alex, 2026-09-29).
+   Rule 5's duplicate is for thin, non-fetching surfaces only.
 
 ### 3.5 Can this be used here? Four capability layers (Alex, 2026-09-29)
 
@@ -399,7 +418,7 @@ LangWatch support" (SaaS) or "contact your administrator" (self-hosted), never w
 the permission that could fix it may be told what is missing, through a read only that permission
 answers: the explanation is never in public config or in any page's HTML for everyone.
 
-The shell's lent services (session, navigation, storage, toasts, slots, drawers) are **host
+The shell's lent services (session, navigation, storage, toasts, drawers) are **host
 services**, not capabilities (§16). Enforcement is prose for now; a lint rule follows once email is
 converted (no availability logic in `*.config.ts` projections; off states use the shared notice).
 
@@ -633,8 +652,10 @@ line, no conditional wiring. The audit log is **not** one (Alex,
 2026-09-24): every module is always installed and entitlement refuses per
 organization (§11), so the generated list installs audit-log in every
 deployment, as main recorded in every deployment. No app names it.
-Audit-log is enterprise, as it was `ee` on main: it moves to `enterprise/modules/audit-log`, while
-webhook, ops admin and demo-data stay where they are (Alex, 2026-09-29).
+Audit-log first becomes a leaf: it records and reads, and recording is never gated. Organization's
+trail read moves into it, the recent items move to project (which owns home), and
+`packages/audit-log-null` is deleted. Then it moves to `enterprise/modules/audit-log`, as it was `ee`
+on main; webhook, ops admin and demo-data stay where they are (Alex, 2026-09-29).
 
 **The worker** is the same file with `role: "worker"` and `server.run()`
 instead of `serve()`. The role decides what `boot()` hosts: jobs and
@@ -970,6 +991,8 @@ both, naming both owners — `ConfigClaimsSecretError`. Connection strings
 are secrets, so they belong at the dependency-construction seam, never in
 a config object a module reads. Every refusal in both packages is a
 `HandledError` with a stable code.
+There is one cipher: stored secrets are encrypted through the encryption member, and
+`AesGcmSecretEncryptionService` is deleted (Alex, 2026-09-29).
 
 **Three layers, and which one a value belongs to** (ruled 2026-09-18):
 
@@ -980,7 +1003,7 @@ a config object a module reads. Every refusal in both packages is a
    process's config, and the module cannot tell.
 2. **Module-shaped values live on the module's own schema** (github's
    signing key, monitor thresholds, retention days). The global object is
-   **domain-driven** (`stores`, `mail`, `deployment`, …); a module-named
+   **domain-driven** (`stores`, `deployment`, …; mail is notification's own, Alex 2026-09-29); a module-named
    slice exists only when a module truly has its own values — most have none.
 3. **Shared deployment facts are canonical leaves.** A fact several schemas
    legitimately read (`BASE_HOST`, `IS_SAAS`) is ONE exported `ConfigValue`
@@ -1037,11 +1060,12 @@ the meta tag.
 ---
 
 **Mail off is a state, not a boot failure** (Alex, 2026-09-23). With no mail provider configured the
-process boots; the mail member answers every send by skipping it with one log line naming what was
+process boots; notification answers every send by skipping it with one log line naming what was
 not sent, and the browser learns it from public config's `capabilities.email`, so a self-hosted
 install shows that email is not configured instead of silently dropping it.
-Email is a capability the process answers from its mail member (secrets included), never a config
-leaf guess: a SendGrid-only install has it. Where it is off, password reset by email is disabled
+Email is a capability notification answers from its own config and secrets, never a config leaf
+guess: a SendGrid-only install has it. Notification owns mail outright and there is no mail member
+(§3.3; Alex, 2026-09-29). Where it is off, password reset by email is disabled
 without saying why; the screen tells the user to contact support (SaaS) or their admin (self-hosted)
 (Alex, 2026-09-29).
 
@@ -1252,7 +1276,12 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
   `*-legacy.rest.ts` family, each carrying a one-line reason.
 - A branch living in a handler moves into the module as an `*Api` operation carrying that logic
   unchanged; such a one-to-one move is approved in advance. An operation that adds behaviour or a new
-  shape is still asked for (Alex, 2026-09-24).
+  shape is still asked for (Alex, 2026-09-24). `ScenarioApi.launchRun` is such a port, one-to-one with
+  main's `launchScenarioRun`, and the scenario canary calls it too (Alex, 2026-09-29).
+- A rule on what data may leave is applied by its owner before the data leaves, never by the route:
+  one project operation applies the key-visibility and internal-kind rules (main's `internal_governance`
+  projects are hidden from `GET /api/projects` only, not from `ProjectApi.listByOrganization`), and the
+  route calls it (Alex, 2026-09-29).
 - A protocol door whose logic main kept in the handler takes the raw request as one `*Api` op
   (`OtlpDoorRequest`: method, path, headers, body bytes) and returns its outcomes; the handler only renders
   them. Shared door helpers live in the protocol's framework package (`@langwatch/otlp`) (Alex, 2026-09-26).
@@ -1311,26 +1340,24 @@ Background work is a scheduled process manager on the module's pipeline, install
 hosts it, it ticks once across the fleet, and `onWake` sends the module's own intent through the outbox.
 There is no `.withJobs` and no module-level timer loop. Work that must run in every role (ADR-090's
 lease-held writer) is not background work: it stays a service the module owns. `withWorkers` is retired.
-A module reacting to a peer's event does it through a subscriber on the event owner's pipeline that sends
-the reacting module a command through its `*Api`, so the reaction lands as a durable event on the
-reacting module's own pipeline (Alex, 2026-09-25).
-When the reacting module already depends on the owner, that subscriber would be a peer cycle, so the owner
-records the fact in the same write as the change and answers it through a `find*` read on its
-`*Api`; the reacting module pulls it from a scheduled process manager on its own pipeline, stores each
-decision once keyed by the fact, and shows a fact it has not decided as awaiting. Seat changes are
-the case: licensing's `IssuedLicense.seatsRaisedFrom` and `LicensingApi.findSeatChanges`, read by
-billing's `seatInvoicing` pass every minute on `connected_billing` (Alex, 2026-09-29).
+A module reacting to a peer's event does it through a subscriber that lives in the reacting module, on
+the owner's pipeline events, and sends its own command, so the reaction lands as a durable event on the
+reacting module's own pipeline (Alex, 2026-09-25; placement Alex, 2026-09-29).
+The subscriber's edge runs from the reacting module to the owner, the same way as any read of it, so
+it never closes a cycle and needs no pull. Seat changes are the case: billing subscribes to licensing's
+seat-raised event and sends its own invoicing command; `LicensingApi.findSeatChanges` and the minute
+poll go (Alex, 2026-09-29).
 A module reading its own event-sourced state writes optimistically or tolerates eventual consistency
 with a pending answer, never a reverse read; identity's history and proposals are read through the
 eventing member's surface (Alex, 2026-09-29).
-Enterprise `nurturing` shows the 2026-09-25 subscriber rule (Alex, 2026-09-29): each owner's subscriber calls
-`NurturingApi.recordSignal` with ids and the non-personal, point-in-time facts it must pass on. No event carries
+Enterprise `nurturing` shows the subscriber rule (Alex, 2026-09-29): nurturing's own subscribers listen to
+each owner's events, which carry ids and the non-personal, point-in-time facts; no owner knows nurturing and
+`recordSignal` leaves the owners. No event carries
 personal data: where a signal needs some it carries the id (and a revision), and nurturing reads the value from
 `UserApi` at delivery and never stores it. Only the email and name leave, to Customer.io, once at sign-up; each
 identify sends only the traits that signal changes, once per source event.
-Its `nurturing -> user` read joins the peer-cycle component through user's existing foundation edges, so the
-six owner hand-overs and that read are listed in the ratchet baseline as ruled (Alex, 2026-09-29): the one
-exception to shrink-only, and they leave with the foundation cuts.
+With no owner-to-nurturing edges, its `nurturing -> user` read closes no cycle, and the ratchet baseline
+carries no exception for it (Alex, 2026-09-29).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
 projection state keeps its type from declaration to handler (Alex, 2026-09-24).
@@ -1444,8 +1471,9 @@ projection by a rebuild job in the aggregate's own ordered lane, so it cannot ra
 logged and dropped (Alex, 2026-09-29). A command job
 keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
 append (Alex, 2026-09-29).
-`packages/eventing` owns the per-tenant enqueue-rate counter, taken at enqueue, and ops reads it
-through the framework; no module scans queues for it (Alex, 2026-09-29). A tenant is parked only while
+`packages/group-queue` owns the per-tenant enqueue-rate counter, taken at enqueue, and ops reads it
+through the framework; no module scans queues or reads the `gq:parked-tenants` keys directly (Alex,
+2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
 
 A fact is recorded by its owner; delivery modules are handed it; there is no relay module (Alex,
@@ -1589,15 +1617,15 @@ invented:
   | `withConfig`                 | 1         | yes                                  |
   | `withApi`                    | 1 of 33   | `installedModuleApis`                |
   | `withCapabilities`           | 6         | `declared(name)` (`declarations.ts`) |
-  | `withSlots`                  | **0**     | built (`browser-host/src/slots.tsx`) |
   | `withFailureInterceptors`    | **0**     | built (`ui-feature-shell.tsx:162`)   |
-  | `withSeatTypeCopy`           | **0**     | built (`slots.tsx:143`)              |
   | `withFlags` · `withCommands` | **0**     | **none**                             |
   | `publishSurfaces`            | 13        | **none — superseded, below**         |
 
   Only the last row is builder surface that does nothing, and only it is
   deleted. The three above it are the opposite case and stay: their consumers
-  are built and waiting, and what they lack is declarers. That
+  are built and waiting, and what they lack is declarers. `withSlots` has
+  since gone too: slots are deleted, and a core screen renders the
+  enterprise kit (§11; Alex, 2026-09-29). That
   `withFailureInterceptors` has none is its own finding — the shell runs every
   installed interceptor over each failed mutation so that "a failure a feature
   answers application-wide is reported once, rather than by every screen that
@@ -1743,8 +1771,8 @@ invented:
   // modules/organization/browser/src/organization.web.ts
   export const organizationWeb = defineWebModule("organization")
     .withScreens({/* … */})
-    // "Where they are standing" is organization's to answer. It RUNS
-    // organization.getAll, so it is not kit-legal (rule 3) — it is declared.
+    // "Where they are standing" is organization's to answer, and its one
+    // consumer is the composition root, so it is declared, not a kit.
     .withCapabilities({
       scope: { load: () => import("./behavior/scope-capability.ts") },
     });
@@ -1757,16 +1785,16 @@ invented:
   ```
 
   The gap that forced it: a capability implementation had no legal home once a
-  browser package closed. It cannot be a kit — kit rule 3 says a kit fetches
-  nothing, and `useUiScopeReading` runs `organization.getAll` — and it cannot
-  be reached directly, because that is the side door §3.4 just shut. The two
-  rejected answers are worth naming. Exempting the composition root reopens
-  the hole: "composition root" is a door, and doors get claimed by whoever can
-  argue they are composing. Relaxing rule 3 for capabilities destroys the
-  property that makes a kit safe to depend on — a kit that may fetch is a
-  browser package with a nicer name. Declaring it instead completes the
-  sentence this section already starts: capabilities are composed by the shell
-  and reach modules through a declared `*HostApi`.
+  browser package closed. It could not be a kit, since its only consumer is the
+  composition root (rule 5), and it cannot be reached directly, because that
+  is the side door §3.4 just shut. Exempting the composition root was
+  rejected: "composition root" is a door, and doors get claimed by whoever can
+  argue they are composing. Declaring it instead completes the sentence this
+  section already starts: capabilities are composed by the shell and reach
+  modules through a declared `*HostApi`. The 2026-09-18 reading that "a kit
+  that may fetch is a browser package with a nicer name" is overturned: a kit
+  fetches its own module's data, and rule 2 keeps it a leaf (§3.4 rule 3;
+  Alex, 2026-09-29).
 
   **The slot is "what the composition root installs from this module", whether
   or not it fetches** (ruled 2026-09-18). Fetching is what makes a capability
@@ -1883,6 +1911,10 @@ a tier may do lives in the **enterprise module that holds the gate**, which may
 depend on `@langwatch/enterprise-licensing-contract` and
 `@langwatch/feature-flag-contract` and asks a core module for facts through its
 `*Api` only — a core module never grows a supply token for a tier context.
+Enterprise is a licence, not a separate app (§3): a core module imports an enterprise contract or kit
+like any peer's, the enterprise owner refuses per organization, and a core caller never re-checks
+entitlement before calling. There are no slots: a core screen renders the enterprise kit directly, and
+the shell's upgrade modal (`globalUpgradeModal`) is licensing's declared mount (Alex, 2026-09-29).
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
 `licenseEnforcement.checkLimit`, `checkAllLimits` and `reportLimitBlocked`
@@ -1890,15 +1922,16 @@ keep their wire path, but the contract and transport are organization's: it
 owns the membership rows a seat counts and already reads the plan through
 `EntitlementApi`. Licensing cannot depend on entitlement (it is entitlement's
 peer), so its members refused every call and `checkLimit` answered 500.
-A seat limit reached is organization's event; billing is told through its Api, by §9's
-subscriber on the owner's pipeline (Alex, 2026-09-28).
+A seat limit reached is organization's event; billing learns it through §9's subscriber, which lives
+in billing on organization's events (Alex, 2026-09-28; placement Alex, 2026-09-29).
 
-**Usage warnings: usage decides, billing only sends** (Alex, 2026-09-29; usage split out of
-entitlement the same day, entitlement keeps plans and features only). Usage counts
-the month once per project in the organization's meter and decides the crossed threshold;
-`BillingApi.sendUsageWarning` receives that decision with the per-project counts, and billing
+**Usage warnings: usage decides, billing only sends** (Alex, 2026-09-29). Usage owns all counting
+(§3): it takes billing's billable-events meter projection and its table, and counts traces itself.
+It counts the month once per project in the organization's meter, decides the crossed threshold and
+records it as a usage event with the per-project counts; billing learns the warning from that event,
 resolves the admins and project names, sends once per threshold a month and records it. Billing
-counts no usage and holds no `TraceApi` peer for it.
+counts nothing, reads roll-ups through `UsageApi` and holds no `TraceApi` peer for usage; no
+trace-usage or billing-usage cycle forms (Alex, 2026-09-29).
 
 **Enterprise scim owns the directory-sync state** (`ScimSyncState`, its `scim-sync` pipeline,
 guards and ledger); identity keeps none of it, and `ScimApp` builds the sync lifecycle over its
@@ -1917,6 +1950,9 @@ code slug, so clients render from the registry and never toast
 `error.message`. A 5xx subclass sets `fault` explicitly. Tests assert on
 `code`, never prose. A knowable failure surfacing as "unknown error" is a bug
 in the feature, not a gap in the error system.
+A ported code keeps main's spelling (gateway's `budget_not_found`, never `gateway_budget_not_found`),
+and a service throws a `HandledError`, never a `TRPCError` (gateway's virtual-key services with
+`routing_policy_*` and `providers_*`) (Alex, 2026-09-29).
 
 ---
 
@@ -2017,7 +2053,10 @@ into the route's own `.withDocs()` call and drop any hand-written success
 body outright; an error keeps only its status and a sentence via `errors`,
 and a response that truly needs its own schema goes through
 `documentedResponses()`, never raw JSON. · the eventing `ScheduledJob` scheduler
-(`PrismaScheduledJobStore`, `computeNextRunAt` on `Date`) — a keyed process manager (§9).
+(`PrismaScheduledJobStore`, `computeNextRunAt` on `Date`) — a keyed process manager (§9). · slots:
+`withSlots`, `UiSlots`/`uiSlots`, `useUiSlot`/`useUiSlots`, `<UiSlot>` and the `slots` host service — a
+core screen renders the enterprise kit, and a shell-wide surface is its owner's declared mount (§11;
+Alex, 2026-09-29) · a mail member (notification owns mail, §3.3) · `AesGcmSecretEncryptionService` (§6).
 
 ---
 
@@ -2042,7 +2081,7 @@ chain. New code uses the left column only.
 | `TraceModule` + `.withApi(...)`               | `TraceApp` + `.withApp(...)`                                       |
 | `<f>.module.ts` / `<f>.web.ts` file stems     | `<f>.server.ts` / `<f>.web.ts`                                     |
 | `definePipeline(...).withEvents(schemas)`     | `defineAggregate({ events: defineEvents([...type strings]) })`     |
-| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, slots, drawers) | "capabilities" (§3.5 reserves the word for the four layers) |
+| host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers) |
 | `enterprise/modules/audit-log` (§4)           | `modules/audit-log`                                                |
 
 `createProcessApp` stays the target shape. Its previous implementation, the
