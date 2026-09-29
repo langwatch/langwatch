@@ -163,6 +163,7 @@ type trackedRow struct {
 	index           int
 	base, candidate *Capture
 	diff            *Diff
+	layout          *LayoutDiff
 	written         bool
 }
 
@@ -198,6 +199,7 @@ func (tracker *findingsTracker) row(kind, key string, index int) *trackedRow {
 func (tracker *findingsTracker) onCapture(capture Capture) {
 	row := tracker.row(capture.Kind, capture.Key, capture.Index)
 	captured := capture
+	row.layout = nil
 	if capture.Side == "base" {
 		row.base = &captured
 	} else {
@@ -232,6 +234,13 @@ func (tracker *findingsTracker) tryEmit(row *trackedRow) {
 // toRow is the tracked screen in the shape Classify reads.
 func (row *trackedRow) toRow() Row {
 	verdict := Row{Kind: row.kind, Key: row.key, Index: row.index, Base: row.base, Candidate: row.candidate}
+	if row.layout == nil && row.base != nil && row.candidate != nil {
+		measured := rowLayout(row.base, row.candidate)
+		row.layout = &measured
+	}
+	if row.layout != nil {
+		verdict.Layout = *row.layout
+	}
 	if row.diff != nil {
 		verdict.Ratio, verdict.Diffed, verdict.DiffFile = row.diff.Ratio, true, row.diff.File
 	}

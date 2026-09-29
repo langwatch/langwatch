@@ -75,7 +75,7 @@ func TestFindingsStreamWhileTheRunIsStillGoing(t *testing.T) {
 			{Kind: "route", Key: "/{slug}/settings", Side: "candidate", Screenshot: "/run/candidate/routes/settings.png", Error: "net::ERR_CONNECTION_REFUSED"},
 		}
 		diffs := []Diff{
-			{Kind: "route", Key: "/{slug}/analytics", Ratio: 0.31, File: "/run/diff/analytics.png"},
+			{Kind: "route", Key: "/{slug}/analytics", Ratio: 0.06, File: "/run/diff/analytics.png"},
 		}
 		writer := &memoryFindingsWriter{}
 		modules := ModuleIndex{"analytics": "analytics"}

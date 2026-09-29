@@ -88,6 +88,36 @@ Feature: visualdiff catches regressions and reports its own coverage
       Then it is "copy", which does not fail the run
 
     @unit
+    Scenario: A collapsed layout is a layout finding whatever its words say
+      Given the candidate's panes collapse while its controls and words match the base
+      When the row is classified
+      Then it is "layout", a finding listed beside regressions
+
+    @unit
+    Scenario: A small difference in the same layout stays copy
+      Given both refs draw the same layout with a few words changed
+      When the row is classified
+      Then it is "copy"
+
+    @unit
+    Scenario: A new background color in the same layout is not a layout finding
+      Given the candidate changes only the page's background color
+      When the row is classified
+      Then it is not "layout"
+
+    @unit
+    Scenario: A large pixel difference is a layout finding whatever its words say
+      Given the pixel difference between the refs is 10% or more
+      When the row is classified
+      Then it is "layout"
+
+    @unit
+    Scenario: A page that changed size is a layout finding
+      Given the two screenshots differ in size
+      When the row is classified
+      Then it is "layout"
+
+    @unit
     Scenario: Dates, ids and relative times never read as a change
       Given two snapshots that differ only by a date, an id, a count and "3 minutes ago"
       Then the text compares equal

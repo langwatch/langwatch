@@ -33,6 +33,10 @@ when the candidate is `HEAD` and tracked files have uncommitted changes.
 Exit status is `0` for no findings, `1` for findings, `2` when the run could
 not be completed — the same ladder as `apidiff`.
 
+A run compares rendering only. No findings means both refs drew each screen
+alike, not that the screens work: nothing is exercised past the configured
+flows. summary.txt, findings.md, report.html and the PR comment all say so.
+
 ## What a run does
 
 1. Checks each ref out. On the haven path each side has one persistent
@@ -226,6 +230,7 @@ overrule it. The finding classes fail the run (exit 1):
 | `blank`             | the candidate page has no text at all, on any route or step                     |
 | `redirect`          | the candidate ends on a different path (ids masked) than the base               |
 | `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make             |
+| `layout`            | the page changed size, 5% or more of its covered area moved, or pixels differ by 10% or more |
 | `controls`          | a button, link, heading, tab or form field one side has and the other lacks     |
 | `uncovered`         | a route either ref declares that `visualdiff.yaml` neither renders nor excludes |
 
@@ -234,9 +239,16 @@ The informational classes are reported and never fail it:
 | Class              | Rule                                                                 |
 | ------------------ | -------------------------------------------------------------------- |
 | `intended-restore` | the base has no such screen, or fails, and the candidate renders one |
-| `copy`             | the same controls with different words                               |
+| `copy`             | the same controls with different words, in the same layout           |
 | `changed`          | a pixel difference over 2% none of the rules explains                |
 | `noise`            | under 2% different with nothing else wrong                           |
+
+Layout runs before the text rules, so a collapsed pane is never read as
+`copy` or `controls`. The covered area is every pixel more than one level
+from the page's dominant colour, compared in 16px blocks; a block moved when
+over 32 of its pixels changed coverage (`layout.go`). It catches what the
+pixel diff's threshold misses under a blurred dialog, and a new background
+tint moves no blocks.
 
 Text evidence comes from each screen's accessibility tree
 (`page.locator("body").ariaSnapshot()`), compared with dates, times,

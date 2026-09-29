@@ -36,6 +36,8 @@ const (
 	ClassAPIError Classification = "api-error"
 	// ClassControls is a button, link, heading, tab or form control one side has and the other lacks.
 	ClassControls Classification = "controls"
+	// ClassLayout is a page whose layout or pixels moved past a threshold, whatever its words say.
+	ClassLayout Classification = "layout"
 )
 
 // The informational classes are reported and never fail the run.
@@ -56,7 +58,7 @@ const (
 var findingClasses = map[Classification]bool{
 	ClassMissingCandidate: true, ClassMissingBase: true, ClassCaptureFailed: true, ClassBrokenBoth: true,
 	ClassRegression: true, ClassNotFound: true, ClassBlank: true, ClassRedirect: true,
-	ClassAPIError: true, ClassControls: true, ClassUncovered: true,
+	ClassAPIError: true, ClassControls: true, ClassUncovered: true, ClassLayout: true,
 }
 
 // IsFinding reports whether a class fails the run.
@@ -64,6 +66,9 @@ func (class Classification) IsFinding() bool { return findingClasses[class] }
 
 // NoiseRatio is the diff ratio below which an error-free difference is noise.
 const NoiseRatio = 0.02
+
+// LayoutPixelRatio is the diff ratio at which a screen is a layout finding.
+const LayoutPixelRatio = 0.10
 
 // Row pairs one screen's two captures.
 type Row struct {
@@ -77,6 +82,7 @@ type Row struct {
 	Ratio     float64        `json:"ratio"`
 	Diffed    bool           `json:"diffed"`
 	DiffFile  string         `json:"diffFile"`
+	Layout    LayoutDiff     `json:"layout"`
 	Class     Classification `json:"class"`
 	Why       string         `json:"why"`
 	Text      TextDiff       `json:"text"`
@@ -85,15 +91,20 @@ type Row struct {
 // Finding reports whether a row is something to look at.
 func (row Row) Finding() bool { return row.Class.IsFinding() }
 
-// NeedsPixels reports whether the verdict still waits on the pixel diff: every
-// rule but the last two is decided from the captures alone.
+// NeedsPixels reports whether the verdict still waits on the pixel diff: the
+// failure rules are decided from the captures alone, the rest are not.
 func NeedsPixels(class Classification) bool {
-	return class == ClassNoise || class == ClassChanged
+	return pixelClasses[class]
+}
+
+var pixelClasses = map[Classification]bool{
+	ClassLayout: true, ClassControls: true, ClassCopy: true, ClassNoise: true, ClassChanged: true,
 }
 
 // Classify is the one classifier. Failures run first, so a candidate that
-// throws is never read as a restore; the text rules run before the pixel
-// rules, so a missing button is never waved through as a small diff.
+// throws is never read as a restore; layout runs before the text rules, so a
+// collapsed pane is never read as different words; the text rules run before
+// the pixel rules, so a missing button is never waved through as a small diff.
 func Classify(row Row) (Classification, string) {
 	base, candidate := row.Base, row.Candidate
 	if candidate == nil {
@@ -111,12 +122,11 @@ func Classify(row Row) (Classification, string) {
 	if base.NotFound && !candidate.NotFound {
 		return ClassIntendedRestore, "the base has no such screen and the candidate renders one"
 	}
-	text := CompareText(base.AriaSnapshot, candidate.AriaSnapshot)
-	if text.ControlsChanged() {
-		return ClassControls, "controls differ: " + text.Summary()
+	if why := layoutWhy(row); why != "" {
+		return ClassLayout, why
 	}
-	if text.CopyChanged {
-		return ClassCopy, "same controls, different words"
+	if class, why := classifyText(base, candidate); class != "" {
+		return class, why
 	}
 	if !row.Diffed {
 		return ClassChanged, "no pixel diff: a screenshot is missing on one side"
@@ -125,6 +135,29 @@ func Classify(row Row) (Classification, string) {
 		return ClassNoise, fmt.Sprintf("differs by %.2f%% with no errors on either side", row.Ratio*100)
 	}
 	return ClassChanged, fmt.Sprintf("differs by %.2f%%", row.Ratio*100)
+}
+
+// classifyText is the words rule: controls one side lacks, then copy, or "".
+func classifyText(base, candidate *Capture) (Classification, string) {
+	text := CompareText(base.AriaSnapshot, candidate.AriaSnapshot)
+	if text.ControlsChanged() {
+		return ClassControls, "controls differ: " + text.Summary()
+	}
+	if text.CopyChanged {
+		return ClassCopy, "same controls, different words"
+	}
+	return "", ""
+}
+
+// layoutWhy is why a row's layout or pixels moved past a threshold, or "".
+func layoutWhy(row Row) string {
+	if row.Layout.Changed() {
+		return "layout moved: " + row.Layout.Why()
+	}
+	if row.Diffed && row.Ratio >= LayoutPixelRatio {
+		return fmt.Sprintf("layout moved: the pixels differ by %.2f%%", row.Ratio*100)
+	}
+	return ""
 }
 
 // classifyFailure is every rule that fails the run on the captures alone,

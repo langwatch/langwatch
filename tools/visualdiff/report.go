@@ -55,6 +55,7 @@ func BuildRows(captures []Capture, diffs []Diff) []Row {
 	out := make([]Row, 0, len(order))
 	for _, identity := range order {
 		row := rows[identity]
+		row.Layout = rowLayout(row.Base, row.Candidate)
 		row.Class, row.Why = Classify(*row)
 		if row.Base != nil && row.Candidate != nil {
 			row.Text = CompareText(row.Base.AriaSnapshot, row.Candidate.AriaSnapshot)
@@ -68,6 +69,14 @@ func BuildRows(captures []Capture, diffs []Diff) []Row {
 		return out[a].Ratio > out[b].Ratio
 	})
 	return out
+}
+
+// rowLayout compares a screen's two screenshots, or nothing when a side is missing.
+func rowLayout(base, candidate *Capture) LayoutDiff {
+	if base == nil || candidate == nil || base.Screenshot == "" || candidate.Screenshot == "" {
+		return LayoutDiff{}
+	}
+	return CompareLayout(base.Screenshot, candidate.Screenshot)
 }
 
 // rowKey identifies one screen across both sides.
@@ -159,7 +168,7 @@ func rowTitle(row Row) string {
 func renderMarkdown(rows []Row, meta ReportMeta) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "# Visual diff — %s vs %s\n\n", meta.BaseRef, meta.CandidateRef)
-	fmt.Fprintf(&out, "%d rows, %d findings, viewport %s.\n\n", len(rows), CountFindings(rows), meta.Viewport)
+	fmt.Fprintf(&out, "%d rows, %d findings, viewport %s; %s.\n\n", len(rows), CountFindings(rows), meta.Viewport, RenderingOnly)
 	if CountFindings(rows) == 0 {
 		return out.String()
 	}
@@ -213,7 +222,7 @@ img{width:100%;border:1px solid #eaecf0;border-radius:4px}
 
 func classColour(class Classification) string {
 	switch class {
-	case ClassRegression, ClassMissingCandidate, ClassBrokenBoth, ClassBlank, ClassNotFound, ClassCaptureFailed:
+	case ClassRegression, ClassLayout, ClassMissingCandidate, ClassBrokenBoth, ClassBlank, ClassNotFound, ClassCaptureFailed:
 		return "#b42318"
 	case ClassAPIError, ClassRedirect, ClassControls, ClassMissingBase:
 		return "#b54708"
@@ -234,6 +243,7 @@ func renderHTML(dir string, rows []Row, meta ReportMeta) string {
 		html.EscapeString(meta.BaseRef), html.EscapeString(meta.BaseURL),
 		html.EscapeString(meta.CandidateRef), html.EscapeString(meta.CandidateURL),
 		html.EscapeString(meta.Viewport), html.EscapeString(meta.StartedAt), len(rows), CountFindings(rows))
+	fmt.Fprintf(&out, "<p>%s.</p>\n", html.EscapeString(RenderingOnly))
 	for index := range rows {
 		row := &rows[index]
 		class := ""
