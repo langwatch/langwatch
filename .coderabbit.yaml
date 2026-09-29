@@ -48,6 +48,7 @@ reviews:
     - "!**/openapiLangWatch.json"
     - "!docs/llms*.txt"
     - "!sdks/typescript/src/internal/generated/**"
+    - "!sdks/python/src/langwatch/generated/**"
     - "!mcp/typescript/src/__tests__/fixtures/**"
     - "!**/__snapshots__/**"
     - "!**/__tests__/**"
