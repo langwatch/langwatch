@@ -1,0 +1,123 @@
+# Onboarding: the project step, the setup guide's day-zero state, the welcome decision and the
+# invite landing. Flows sign in as the seeded member, who already belongs to an organisation, so
+# they reach the screens a member reaches.
+# Not scripted: the welcome and guided takeover screens from sign-up to first project. They show
+# only to an account with no organisation, and no step creates one (sign-up is verification-first
+# on the branch). The invite link in the mail is absolute and `go` prefixes the side's base URL,
+# so the accept page is reached with a made-up code instead.
+# Names carry {uid}; the team slug is the seeded team's, local-dev-team.
+flows:
+  - id: onboarding-project-create
+    title: Create a project from the onboarding project screen and find it under its team
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /onboarding/local-dev-team/project
+      - action: fill
+        with:
+          testId: onboarding-project-name
+          value: vd-onb-{uid}
+      - action: click
+        with:
+          testId: onboarding-project-submit
+      - action: expect
+        with:
+          url: /vd-onb-{uid}/
+          timeout: "20000"
+      - action: go
+        with:
+          path: /settings/teams
+      - action: expect
+        with:
+          text: vd-onb-{uid}
+
+  - id: onboarding-setup-guide-day-zero
+    title: The setup guide of a project with no traces waits for the first one
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /{isolatedSlug}/setup
+      - action: expect
+        with:
+          testId: setup-first-trace-waiting
+      - action: expect
+        with:
+          testId: setup-first-trace-received
+          equals: "0"
+      - action: expect
+        with:
+          label: API key
+
+  - id: onboarding-setup-guide-first-trace-received
+    title: The setup guide of a project holding traces says they are being received
+    steps:
+      - action: go
+        with:
+          path: /{slug}/setup
+      - action: expect
+        with:
+          testId: setup-first-trace-received
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: setup-first-trace-waiting
+          equals: "0"
+
+  - id: onboarding-welcome-sends-a-member-home
+    title: A member who already belongs to an organisation is sent past the welcome screen
+    steps:
+      - action: go
+        with:
+          path: /onboarding/welcome
+      - action: expect
+        with:
+          url: '/^\/(?!onboarding).+/'
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Welcome aboard
+          equals: "0"
+
+  - id: onboarding-invite-mail-sent
+    title: Inviting a member sends the invitation mail to the address invited
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/members
+      - action: click
+        with:
+          testId: members-invite-open
+      - action: fill
+        with:
+          testId: members-invite-emails
+          value: vd-onb-{uid}@mail.langwatch.localhost
+      - action: click
+        with:
+          testId: members-invite-submit
+      - action: mail
+        with:
+          to: vd-onb-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: go
+        with:
+          path: /settings/members
+      - action: expect
+        with:
+          testId: invite-row
+          hasText: vd-onb-{uid}@mail.langwatch.localhost
+
+  - id: onboarding-invite-unknown-code-dead-end
+    title: An invite link that names no invitation shows a plain dead end to a signed-out visitor
+    steps:
+      - action: go
+        with:
+          path: /invite/accept?inviteCode=vd-none-{uid}
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: invite-dead-end
+          anonymous: "true"
+          timeout: "20000"

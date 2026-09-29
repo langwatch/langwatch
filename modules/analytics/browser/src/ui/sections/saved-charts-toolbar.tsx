@@ -80,6 +80,7 @@ function NameDialog({
               ref={field}
               value={name}
               aria-label="Chart name"
+              data-testid="saved-chart-name-input"
               onChange={(event) => setName(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") submit();
@@ -93,6 +94,7 @@ function NameDialog({
             colorPalette="orange"
             disabled={name.trim().length === 0}
             onClick={submit}
+            data-testid="saved-chart-name-submit"
           >
             Save
           </Button>
@@ -147,13 +149,18 @@ function OpenedChartMenu({
           </Button>
         </Menu.Trigger>
         <Menu.Content>
-          <Menu.Item value="rename" onClick={onRename}>
+          <Menu.Item value="rename" data-testid="saved-chart-rename" onClick={onRename}>
             Rename
           </Menu.Item>
           <Menu.Item value="save-as-new" onClick={onSaveAsNew}>
             Save as a new chart
           </Menu.Item>
-          <Menu.Item value="delete" color="red.500" onClick={() => setConfirmingDelete(true)}>
+          <Menu.Item
+            value="delete"
+            color="red.500"
+            data-testid="saved-chart-delete"
+            onClick={() => setConfirmingDelete(true)}
+          >
             Delete
           </Menu.Item>
         </Menu.Content>
@@ -218,7 +225,12 @@ export function SavedChartsToolbar({
             </Menu.Item>
           ) : (
             charts.map((chart) => (
-              <Menu.Item key={chart.id} value={chart.id} onClick={() => onOpen(chart.id)}>
+              <Menu.Item
+                key={chart.id}
+                value={chart.id}
+                data-testid={`saved-chart-open-${chart.name}`}
+                onClick={() => onOpen(chart.id)}
+              >
                 {chart.name}
               </Menu.Item>
             ))

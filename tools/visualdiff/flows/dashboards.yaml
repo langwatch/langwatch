@@ -1,0 +1,164 @@
+# Analytics dashboards: each widget kind on a dashboard, read back after a reload.
+#
+# Complements the dashboard-create, dashboard-widget-add-edit-delete and dashboard-rename-and-delete
+# flows in prompts-automations.yaml, which prove the dashboard row itself. A dashboard and a builder
+# graph on it are posted by setup, so these flows begin on the dashboard's own address.
+# Not scripted, with the reason:
+#  - a shared dashboard: nothing in the dashboard or analytics modules shares one;
+#  - a saved LangWatchQL chart placed on a dashboard, and a code widget seeded over REST: both
+#    routes are project-scoped (/api/v1/projects/:projectId/...) and no fixture carries the id.
+flows:
+  - id: dashboard-graph-edit-and-delete
+    title: Open a builder graph from its dashboard, rename it in the builder, then delete it
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-graph-setup
+        as:
+          dashId: id
+      - post: /api/graphs
+        body:
+          name: vd-graph-seeded
+          dashboardId: "{dashId}"
+          graph:
+            graphType: line
+            includePrevious: false
+            timeScale: 60
+            series:
+              - metric: metadata.trace_id
+                aggregation: cardinality
+                name: Traces
+                colorSet: orangeTones
+        as:
+          graphId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-graph-seeded
+      - action: click
+        with:
+          testId: analytics-chart-menu
+      - action: click
+        with:
+          testId: analytics-chart-edit
+      - action: fill
+        with:
+          testId: analytics-graph-title
+          value: vd-graph-{uid}
+      - action: click
+        with:
+          testId: analytics-graph-update
+      - action: expect
+        with:
+          api: /api/graphs/{graphId}
+          field: name
+          equals: vd-graph-{uid}
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-graph-{uid}
+      - action: click
+        with:
+          testId: analytics-chart-menu
+      - action: click
+        with:
+          testId: analytics-chart-delete
+      - action: expect
+        with:
+          text: vd-graph-{uid}
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          equals: "[]"
+
+  - id: dashboard-code-widget-persists
+    title: Add a code widget to a dashboard and see it again after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-widget-setup
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: click
+        with:
+          testId: analytics-add-chart
+      - action: click
+        with:
+          label: Rename New widget
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: vd-widget-{uid}
+      - action: click
+        with:
+          testId: analytics-widget-tab-queries
+      - action: click
+        with:
+          testId: analytics-widget-save
+      - action: expect
+        with:
+          text: vd-widget-{uid}
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-widget-{uid}
+      - action: expect
+        with:
+          testId: analytics-chart-menu
+          equals: "1"
+
+  - id: dashboard-graph-delete-reads-back
+    title: A dashboard's graphs, read from the API, follow a graph being deleted from its card
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-count-setup
+        as:
+          dashId: id
+      - post: /api/graphs
+        body:
+          name: vd-graph-count
+          dashboardId: "{dashId}"
+          graph:
+            graphType: line
+            includePrevious: false
+            timeScale: 60
+            series:
+              - metric: metadata.trace_id
+                aggregation: cardinality
+                name: Traces
+                colorSet: orangeTones
+        as:
+          graphId: id
+    steps:
+      - action: expect
+        with:
+          api: /api/dashboards/{dashId}
+          field: graphs
+          min: "1"
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: click
+        with:
+          testId: analytics-chart-menu
+      - action: click
+        with:
+          testId: analytics-chart-delete
+      - action: expect
+        with:
+          api: /api/dashboards/{dashId}
+          field: graphs
+          equals: "[]"

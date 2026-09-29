@@ -1,0 +1,84 @@
+# Langy, the assistant panel: open it, send a message, see the reply, come back to it in the
+# recent chats and start a new chat.
+# Needs release_langy_enabled on for the project (the orb does not draw without it) and, for the
+# reply, a model provider the langy worker can reach. A stack with neither fails the first step
+# or the reply expect: that is the finding, not a script fault. Names carry {uid}.
+flows:
+  - id: langy-send-message-and-reply
+    title: Open Langy, send a message and see it answered
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          label: Open Langy assistant
+          optional: "true"
+      - action: fill
+        with:
+          testId: langy-composer-input
+          value: Say hello to vd{uid} in one short sentence
+      - action: click
+        with:
+          testId: langy-composer-send
+      - action: expect
+        with:
+          testId: langy-user-message
+          hasText: vd{uid}
+      - action: expect
+        with:
+          testId: langy-assistant-message
+          timeout: "90000"
+
+  - id: langy-history-and-new-chat
+    title: A sent message shows in the recent chats after a reload, and New chat starts an empty one
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          label: Open Langy assistant
+          optional: "true"
+      - action: fill
+        with:
+          testId: langy-composer-input
+          value: Remember the word vd{uid}
+      - action: click
+        with:
+          testId: langy-composer-send
+      - action: expect
+        with:
+          testId: langy-user-message
+          hasText: vd{uid}
+      - action: click
+        with:
+          label: New chat
+      - action: expect
+        with:
+          testId: langy-user-message
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          label: Open Langy assistant
+          optional: "true"
+      - action: click
+        with:
+          label: Recent chats
+      - action: expect
+        with:
+          testId: langy-recent-chat
+          hasText: vd{uid}
+          timeout: "30000"
+      - action: click
+        with:
+          testId: langy-recent-chat
+          hasText: vd{uid}
+      - action: expect
+        with:
+          testId: langy-user-message
+          hasText: vd{uid}
+          timeout: "30000"

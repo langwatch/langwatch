@@ -572,6 +572,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
     >
       <Textarea
         ref={textareaRef}
+        data-testid="langy-composer-input"
         value={input}
         onChange={(e) => {
           onInputChange(e.target.value);
@@ -685,6 +686,7 @@ function SubmitTurnButton({ canSend, onSend }: { canSend: boolean; onSend: () =>
   return (
     <SendButton
       aria-label="Send"
+      data-testid="langy-composer-send"
       onClick={onSend}
       disabled={!canSend}
       background={canSend ? "orange.solid" : "bg.muted"}

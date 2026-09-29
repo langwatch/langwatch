@@ -178,6 +178,7 @@ function PlainMessage({ message }: { message: UIMessage }) {
   return (
     <Box alignSelf="flex-end" maxWidth="85%">
       <Box
+        data-testid="langy-user-message"
         paddingX={3}
         paddingY={2}
         // Dedicated tokens: on the light ground `bg.muted` and `border.muted` are
@@ -342,7 +343,7 @@ function AssistantMessage(props: MessageContentProps) {
   };
   const settledPlan = isStreaming ? null : reading.plan;
   return (
-    <HStack gap={2} align="flex-start" width="full">
+    <HStack data-testid="langy-assistant-message" gap={2} align="flex-start" width="full">
       <VStack align="stretch" gap={2.5} flex={1} minWidth={0}>
         {settledPlan ? (
           <LangyCardBoundary scope="the plan">

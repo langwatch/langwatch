@@ -83,7 +83,13 @@ const APICard: React.FC = () => {
       )}
       <Box mt={1}>
         {hasFirstMessage ? (
-          <Alert.Root status="success" variant="surface" size="sm" title="Integration configured">
+          <Alert.Root
+            status="success"
+            variant="surface"
+            size="sm"
+            title="Integration configured"
+            data-testid="setup-first-trace-received"
+          >
             <Alert.Indicator>
               <LuCheckCheck size={16} />
             </Alert.Indicator>
@@ -95,6 +101,7 @@ const APICard: React.FC = () => {
             size="sm"
             colorPalette="orange"
             title="Waiting for first trace..."
+            data-testid="setup-first-trace-waiting"
           >
             <Alert.Indicator>
               <Spinner size="sm" />

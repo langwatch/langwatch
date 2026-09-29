@@ -1,0 +1,147 @@
+# LangWatchQL workbench (/analytics/query): editor, run, result table, refusals and saved charts.
+#
+# The editor is Monaco, so a statement is typed into its container. Saved queries are the
+# workbench's saved charts; their store is a project-scoped REST route whose path needs the
+# project id no fixture carries, so persistence is read back through the Open menu after a reload.
+# Every name carries {uid}.
+flows:
+  - id: lwql-run-result-table
+    title: Run a statement and read its rows in the result table
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/query
+      - action: type
+        with:
+          testId: lwql-editor
+          text: "SELECT TraceId, TraceName FROM traces LIMIT 5"
+      - action: click
+        with:
+          testId: lwql-run
+      - action: expect
+        with:
+          testId: lwql-result-row
+          min: "1"
+          timeout: "30000"
+      - action: expect
+        with:
+          testId: lwql-result-summary
+
+  - id: lwql-bad-statement-refused
+    title: A statement naming a view that does not exist is refused in place and shows no rows
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/query
+      - action: type
+        with:
+          testId: lwql-editor
+          text: "SELECT nothing FROM vd_missing_view_{uid}"
+      - action: click
+        with:
+          testId: lwql-run
+      - action: expect
+        with:
+          count: "[role=alert]"
+          timeout: "30000"
+      - action: expect
+        with:
+          testId: lwql-result-row
+          equals: "0"
+
+  - id: lwql-saved-chart-lifecycle
+    title: Save a statement as a chart, reopen it after a reload, rename it, then delete it
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/query
+      - action: type
+        with:
+          testId: lwql-editor
+          text: "SELECT TraceId FROM traces LIMIT 3"
+      - action: click
+        with:
+          testId: lwql-run
+      - action: expect
+        with:
+          testId: lwql-result-row
+          min: "1"
+          timeout: "30000"
+      - action: click
+        with:
+          testId: save-chart
+      - action: fill
+        with:
+          testId: saved-chart-name-input
+          value: vd-lwql-{uid}
+      - action: click
+        with:
+          testId: saved-chart-name-submit
+      - action: expect
+        with:
+          testId: opened-chart-name
+          hasText: vd-lwql-{uid}
+      - action: go
+        with:
+          path: /{slug}/analytics/query
+      - action: click
+        with:
+          testId: open-saved-chart
+      - action: expect
+        with:
+          testId: saved-chart-open-vd-lwql-{uid}
+      - action: click
+        with:
+          testId: saved-chart-open-vd-lwql-{uid}
+      - action: expect
+        with:
+          testId: opened-chart-name
+          hasText: vd-lwql-{uid}
+      - action: click
+        with:
+          testId: opened-chart-actions
+      - action: click
+        with:
+          testId: saved-chart-rename
+      - action: fill
+        with:
+          testId: saved-chart-name-input
+          value: vd-lwql-{uid}-b
+      - action: click
+        with:
+          testId: saved-chart-name-submit
+      - action: go
+        with:
+          path: /{slug}/analytics/query
+      - action: click
+        with:
+          testId: open-saved-chart
+      - action: expect
+        with:
+          testId: saved-chart-open-vd-lwql-{uid}-b
+      - action: click
+        with:
+          testId: saved-chart-open-vd-lwql-{uid}-b
+      - action: click
+        with:
+          testId: opened-chart-actions
+      - action: click
+        with:
+          testId: saved-chart-delete
+      - action: click
+        with:
+          text: /^Delete$/
+      - action: expect
+        with:
+          testId: opened-chart-name
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/analytics/query
+      - action: click
+        with:
+          testId: open-saved-chart
+      - action: expect
+        with:
+          testId: saved-chart-open-vd-lwql-{uid}-b
+          equals: "0"

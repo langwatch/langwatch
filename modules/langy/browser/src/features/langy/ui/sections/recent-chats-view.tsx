@@ -531,6 +531,7 @@ function ChatRowTitleButton({
       // what a test can find the row by. It always carries the date, even
       // when the visible row leaves it to the group header above.
       aria-label={`${item.title}, ${item.dateLabel}`}
+      data-testid="langy-recent-chat"
       flex={1}
       minWidth={0}
       textAlign="left"

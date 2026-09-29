@@ -116,7 +116,10 @@ export default function ProjectOnboarding() {
           </Text>
           <Field.Root>
             <Field.Label>Project Name</Field.Label>
-            <Input {...form.register("name", { required: true })} />
+            <Input
+              data-testid="onboarding-project-name"
+              {...form.register("name", { required: true })}
+            />
           </Field.Root>
           {teams.data?.some((team) => team.projects.length > 0) && (
             <>
@@ -152,6 +155,7 @@ export default function ProjectOnboarding() {
             <Button
               colorPalette="orange"
               type="submit"
+              data-testid="onboarding-project-submit"
               disabled={createProject.isPending || createProject.isSuccess}
             >
               {submitButtonLabel(createProject)}

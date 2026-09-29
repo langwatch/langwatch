@@ -1,0 +1,59 @@
+# Instant evals: a plain-words question judged over the project's traces.
+#
+# There is no settings switch: the feature is a run over traces, started from the trace
+# explorer's search bar (an eval chip) or over REST. The judge is the deployment's classifier
+# (INSTANT_EVAL_CLASSIFIER jev, connect or null); a stack with none finishes each run with every
+# row skipped as classifier_not_configured, which the run's counters still record.
+# Cancelling a run has no UI, so it is not scripted. Names carry {uid}.
+flows:
+  - id: instant-eval-run-persists
+    title: Start a run over traces through the API and read it back from the run list
+    setup:
+      - post: /api/v1/instant-evals
+        body:
+          name: vd-instant-eval-setup
+          target: traces
+          limit: 20
+          questions:
+            - id: q1
+              kind: boolean
+              instructions: The trace has an error
+        as:
+          runId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: id
+          equals: "{runId}"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals
+          field: runs
+          contains: "{runId}"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: questions.0.kind
+          equals: boolean
+
+  - id: instant-eval-search-chip-starts-run
+    title: Type an eval chip into the trace search bar and find the run it started in the run list
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: type
+        with:
+          testId: trace-search-input
+          text: eval:"the reply mentions vd{uid}"
+          submit: "true"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals
+          field: runs
+          contains: vd{uid}
+          timeout: "45000"
