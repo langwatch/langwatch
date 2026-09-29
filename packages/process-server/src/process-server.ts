@@ -148,6 +148,7 @@ export class ProcessServer implements ProcessBoot {
           config: this.config.http as ApiHostConfig,
           production: this.production,
           executionProxyBaseUrl: this.settings.nlpServiceUrl,
+          publicBaseUrl: this.settings.baseHost,
           members,
           secrets: this.resolver.scopeTo(apiOwner.name, Object.values(apiOwner.secrets)),
           selection: transports,

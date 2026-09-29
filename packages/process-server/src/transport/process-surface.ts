@@ -12,6 +12,7 @@ export async function processSurface({
   config,
   production,
   executionProxyBaseUrl,
+  publicBaseUrl,
   members,
   secrets,
   selection,
@@ -22,6 +23,7 @@ export async function processSurface({
   config: ApiHostConfig;
   production: boolean;
   executionProxyBaseUrl: string | undefined;
+  publicBaseUrl: string | undefined;
   members: ProcessMemberSource;
   secrets: ScopedSecrets;
   selection: TransportSelection;
@@ -50,6 +52,7 @@ export async function processSurface({
     instanceAdmin,
     trustedProxies: config.trustedProxies,
     executionProxyBaseUrl,
+    publicBaseUrl,
     production,
     selection,
     sockets,

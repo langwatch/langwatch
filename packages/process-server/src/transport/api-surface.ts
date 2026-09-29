@@ -79,6 +79,8 @@ export type ApiSurfaceComposition = Readonly<{
   instanceAdmin: RestIdentity;
   trustedProxies: readonly string[] | undefined;
   executionProxyBaseUrl: string | undefined;
+  /** The deployment's public address, which a proxy in front of the API may hide from it. */
+  publicBaseUrl: string | undefined;
   production: boolean;
   selection: TransportSelection;
   /** The process's one upgrade router, where every declared socket protocol mounts. */
@@ -337,7 +339,11 @@ class ApiSurface {
   }
 
   #browserDoor(): RestIdentity {
-    return BrowserSessionIdentity.create(this.sessions, this.authz);
+    return BrowserSessionIdentity.create({
+      sessions: this.sessions,
+      authz: this.authz,
+      publicBaseUrl: this.composition.publicBaseUrl,
+    });
   }
 
   #directoryDoor(scim: ScimApi | undefined): RestIdentity {
