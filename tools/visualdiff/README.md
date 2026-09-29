@@ -10,7 +10,7 @@ mode is not a red test: it is a screen that still renders, still looks right,
 and quietly lost the endpoint behind it.
 
 ```text
-visualdiff run [-base REF] [-candidate REF] [-routes-only] [-flows a,b]
+visualdiff run [-base REF] [-candidate REF] [-routes-only] [-routes /a,/b] [-flows a,b]
                [-viewport 1440x900] [-config PATH] [-root DIR]
                [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                [-dry-run] [-keep] [-agent] [-no-haven]
@@ -18,7 +18,7 @@ visualdiff run [-base REF] [-candidate REF] [-routes-only] [-flows a,b]
                [-no-fail-fast] [-resume RUNID]
 visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E]
 visualdiff coverage [-base REF] [-candidate REF] [-config PATH]
-visualdiff gc [-kept] [-no-haven]
+visualdiff gc [-kept] [-no-haven] [-older-than 168h]
 visualdiff publish -run-dir DIR [-pr N] [-link URL] [-base REF] [-candidate REF]
 ```
 
@@ -212,6 +212,28 @@ lanes it supervises either - it resolves secrets itself and injects them into
 the processes it starts) but is worth knowing if you are chasing a monolith
 ref's crash-loop on the port-based path.
 
+## Proving a flow works
+
+A flow ends in `expect` steps; each takes exactly one form and polls up to
+`timeout` millis (10000 by default), then fails its step:
+
+```yaml
+- action: expect
+  with: { text: VD Alert }                          # visible text; role/name scope it
+- action: expect
+  with: { count: "role=row", min: "3" }             # or equals
+- action: expect
+  with: { url: /simulations/scenarios }
+- action: expect
+  with: { api: /api/triggers, contains: VD Alert }  # field, min, equals too
+```
+
+An expect failing on the candidate alone is `broken`. Each run writes
+`verdict.md` (one line per flow: works, broken, broken-both, layout-only,
+unproven, with the first failure) and `signatures.md` (log lines by shape,
+new on the candidate first). Read `verdict.md` first; open PNGs only for
+broken rows. `visualdiff done` keeps a flow's held expects as its proof.
+
 ## Classification
 
 One classifier (`classify.go`) decides every screen, for the report,
@@ -225,6 +247,7 @@ overrule it. The finding classes fail the run (exit 1):
 | `missing-base`      | the candidate captured the screen and the base never did - nothing compared                  |
 | `capture-failed`    | a side's own modules did not load, even taken again alone - the tool's failure               |
 | `broken-both`       | the route or flow step fails on both refs                                                    |
+| `broken`            | a flow's `expect` fails on the candidate and holds on the base: the feature does not work    |
 | `regression`        | the candidate fails, or logs a console error, where the base does not                        |
 | `not-found`         | the candidate shows its not-found page where the base renders the screen                     |
 | `blank`             | the candidate page has no text at all, on any route or step                                  |
@@ -352,9 +375,10 @@ never cached. `-dev-ui` keeps both sides on their dev servers. Dev-only chrome
 
 Every run first collects what dead runs left behind (`visualdiff gc` does
 the same on its own): a run directory whose `pid` names no live process
-loses its haven stacks (and with them their databases), its own worktrees
-(never the persistent `.visualdiff/worktrees`) and,
-except for the newest one whose report may still be open, its directory.
+loses its haven stacks (and with them their databases) and its own worktrees
+(never the persistent `.visualdiff/worktrees`). A run never deletes an earlier
+run's directory; only `visualdiff gc` does, for runs older than `-older-than`
+(a week by default).
 Registered `visualdiff-*` stacks no run owns are destroyed, then `git
 worktree prune` runs. A `-keep` run is left alone unless `gc -kept`.
 

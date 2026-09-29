@@ -258,6 +258,13 @@ flows:
       - action: go
         with:
           path: /{slug}/automations/alerts
+      - action: expect
+        with:
+          text: VD Alert
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: VD Alert
 
   - id: annotate-trace
     title: Add an annotation to a trace
@@ -269,6 +276,9 @@ flows:
       - action: go
         with:
           path: /{slug}/annotations
+      - action: expect
+        with:
+          text: Visual diff note
 
   - id: trace-view
     title: Open a seeded trace and read its spans
@@ -279,6 +289,12 @@ flows:
       - action: openTrace
         with:
           traceId: trace_visualdiff_0
+      - action: expect
+        with:
+          text: handle_request
+      - action: expect
+        with:
+          text: retrieve_documents
 
   - id: automation-create
     title: Create an automation using every part of its form
@@ -291,6 +307,13 @@ flows:
       - action: go
         with:
           path: /{slug}/automations/automations
+      - action: expect
+        with:
+          text: VD Automation
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: VD Automation
 
   - id: prompt-create
     title: Add a prompt and a version
@@ -301,6 +324,10 @@ flows:
       - action: go
         with:
           path: /{slug}/prompts
+      - action: expect
+        with:
+          api: /api/prompts
+          min: "1"
 
   - id: agent-testing
     title: Open agent testing and its scenarios
@@ -308,6 +335,9 @@ flows:
       - action: createScenario
         with:
           start: /{slug}/agent-testing
+      - action: expect
+        with:
+          url: /simulations/scenarios
 
   - id: pairwise
     title: Open a pairwise comparison
@@ -315,11 +345,17 @@ flows:
       - action: createPairwise
         with:
           start: /{slug}/experiments/workbench
+      - action: expect
+        with:
+          text: /comparison/i
 
   - id: experiment-create
     title: Add an experiment
     steps:
       - action: createExperiment
+      - action: expect
+        with:
+          url: /experiments
 
   - id: analytics-dashboard
     title: Build a custom analytics chart
@@ -327,6 +363,11 @@ flows:
       - action: createDashboard
         with:
           start: /{slug}/analytics/custom
+      - action: expect
+        with:
+          api: /api/dashboards
+          field: data
+          min: "1"
 
   - id: online-evaluation
     title: Walk the online-evaluation wizard
@@ -335,6 +376,9 @@ flows:
         with:
           start: /{slug}/online-evaluations
           steps: "3"
+      - action: expect
+        with:
+          url: /online-evaluations
 
   - id: trace-filters
     title: Use the trace explorer filters
@@ -355,6 +399,9 @@ flows:
         optional: true
         with:
           text: Last 24 hours
+      - action: expect
+        with:
+          url: /traces
 
   - id: project-settings
     title: Edit project and organization settings
@@ -368,3 +415,6 @@ flows:
       - action: go
         with:
           path: /settings/members
+      - action: expect
+        with:
+          text: Visual Diff

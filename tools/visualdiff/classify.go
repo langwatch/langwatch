@@ -24,6 +24,9 @@ const (
 	ClassCaptureFailed Classification = "capture-failed"
 	// ClassBrokenBoth is a route or flow step that fails on both refs.
 	ClassBrokenBoth Classification = "broken-both"
+	// ClassBroken is a flow's expect failing on the candidate where it holds on the
+	// base: the feature did not do its job.
+	ClassBroken Classification = "broken"
 	// ClassRegression is the candidate throwing, or failing a step, where the base does not.
 	ClassRegression Classification = "regression"
 	// ClassNotFound is the candidate showing its not-found page where the base renders the screen.
@@ -56,7 +59,7 @@ const (
 )
 
 var findingClasses = map[Classification]bool{
-	ClassMissingCandidate: true, ClassMissingBase: true, ClassCaptureFailed: true, ClassBrokenBoth: true,
+	ClassMissingCandidate: true, ClassMissingBase: true, ClassCaptureFailed: true, ClassBrokenBoth: true, ClassBroken: true,
 	ClassRegression: true, ClassNotFound: true, ClassBlank: true, ClassRedirect: true,
 	ClassAPIError: true, ClassControls: true, ClassUncovered: true, ClassLayout: true,
 }
@@ -167,6 +170,8 @@ func classifyFailure(row Row) (Classification, string) {
 	switch {
 	case candidate.Error != "" && base.Error != "":
 		return ClassBrokenBoth, row.Kind + " broken on both: " + head(candidate.Error)
+	case candidate.Error != "" && candidate.Expect != "":
+		return ClassBroken, "the feature does not do its job on the candidate: " + head(candidate.Error)
 	case candidate.Error != "":
 		return ClassRegression, "candidate failed where the base did not: " + head(candidate.Error)
 	case base.Error != "":

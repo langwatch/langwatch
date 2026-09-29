@@ -91,6 +91,8 @@ export interface CaptureMessage {
   ariaSnapshot: string;
   error: string;
   durationMs: number;
+  /** expect is an expect step's one-line proof (flows/expect.ts), passing or failing. */
+  expect?: string;
 }
 
 export interface DiffMessage {

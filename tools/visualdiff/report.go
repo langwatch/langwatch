@@ -31,6 +31,8 @@ type Capture struct {
 	AriaSnapshot   string   `json:"ariaSnapshot,omitempty"`
 	Error          string   `json:"error"`
 	DurationMS     int      `json:"durationMs"`
+	// Expect is an expect step's one-line proof; its Error says the expect failed.
+	Expect string `json:"expect,omitempty"`
 }
 
 // Diff is one pixel comparison, computed by the runner (which already holds
@@ -225,7 +227,7 @@ img{width:100%;border:1px solid #eaecf0;border-radius:4px}
 
 func classColour(class Classification) string {
 	switch class {
-	case ClassRegression, ClassLayout, ClassMissingCandidate, ClassBrokenBoth, ClassBlank, ClassNotFound, ClassCaptureFailed:
+	case ClassBroken, ClassRegression, ClassLayout, ClassMissingCandidate, ClassBrokenBoth, ClassBlank, ClassNotFound, ClassCaptureFailed:
 		return "#b42318"
 	case ClassAPIError, ClassRedirect, ClassControls, ClassMissingBase:
 		return "#b54708"

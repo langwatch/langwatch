@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // @scenario "gc leaves a live run, a kept run and the run doing the collecting"
@@ -30,8 +31,8 @@ func TestGCLeavesALiveRunAKeptRunAndTheCurrentRun(t *testing.T) {
 	}
 }
 
-// @scenario "The newest dead run keeps its report"
-func TestTheNewestDeadRunKeepsItsReport(t *testing.T) {
+// @scenario "A run never deletes an earlier run's report"
+func TestARunNeverDeletesAnEarlierRunsReport(t *testing.T) {
 	root := t.TempDir()
 	for _, name := range []string{"20260926-111129", "20260926-134222"} {
 		if err := os.MkdirAll(filepath.Join(root, ".visualdiff", name, "candidate"), 0o750); err != nil {
@@ -52,11 +53,31 @@ func TestTheNewestDeadRunKeepsItsReport(t *testing.T) {
 
 	plan := SelectGarbage(states, GCSelection{})
 
-	if len(plan.Runs) != 2 || plan.Runs[0].State.Name != "20260926-134222" || plan.Runs[0].RemoveDir || !plan.Runs[1].RemoveDir {
-		t.Fatalf("only the older run loses its directory: %+v", plan.Runs)
+	if len(plan.Runs) != 2 || plan.Runs[0].RemoveDir || plan.Runs[1].RemoveDir {
+		t.Fatalf("a run's own gc pass keeps every report: %+v", plan.Runs)
 	}
 	if len(plan.Runs[0].State.Worktrees) != 1 {
-		t.Fatalf("the newest run still loses its worktree: %+v", plan.Runs[0].State)
+		t.Fatalf("a dead run still loses its worktree: %+v", plan.Runs[0].State)
+	}
+}
+
+// @scenario "visualdiff gc removes only reports older than -older-than"
+func TestGCRemovesOnlyOldReports(t *testing.T) {
+	states := []RunState{
+		{Name: "20260901-000000", Dir: "/r/.visualdiff/20260901-000000"},
+		{Name: "20260928-120000", Dir: "/r/.visualdiff/20260928-120000"},
+		{Name: "handmade", Dir: "/r/.visualdiff/handmade"},
+	}
+	now := time.Date(2026, 9, 29, 12, 0, 0, 0, time.Local)
+
+	plan := SelectGarbage(states, GCSelection{RemoveOlderThan: 7 * 24 * time.Hour, Now: now})
+
+	removed := map[string]bool{}
+	for _, run := range plan.Runs {
+		removed[run.State.Name] = run.RemoveDir
+	}
+	if !removed["20260901-000000"] || removed["20260928-120000"] || removed["handmade"] {
+		t.Fatalf("only the run older than a week loses its directory: %+v", removed)
 	}
 }
 

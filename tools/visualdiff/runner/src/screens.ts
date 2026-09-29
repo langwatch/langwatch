@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { captureMessage, type Side } from "./capture";
 import { DeadlineAlarm } from "./deadline-alarm";
 import { fillPath, sideFixtures } from "./flows/context";
+import { describeExpect } from "./flows/expect";
 import { declinePasskeyOffer } from "./flows/primitives";
 import { resolveAction } from "./flows/registry";
 import { needsRecapture } from "./module-load";
@@ -191,6 +192,7 @@ export const captureFlow = async ({
   collect: Collect;
 }): Promise<void> => {
   side.drain();
+  let failed = 0;
   for (const [stepIndex, step] of flow.steps.entries()) {
     let snapshots = 0;
     const startedAt = Date.now();
@@ -219,6 +221,7 @@ export const captureFlow = async ({
           notFound: false,
           blank: await side.blank(),
           ariaSnapshot: await side.ariaSnapshot(),
+          expect: step.action === "expect" ? describeExpect(step.with ?? {}) : undefined,
         }),
       );
     };
@@ -235,10 +238,12 @@ export const captureFlow = async ({
     } catch (thrown) {
       error = step.optional === true ? "" : stepError(thrown);
     }
-    note({
-      text: `${side.name} ${flow.id} ${stepIndex} ${step.action} ${error === "" ? "ok" : error}`,
-      err: process.stderr,
-    });
+    if (error !== "") {
+      failed += 1;
+      note({ text: `${side.name} ${flow.id} ${stepIndex} ${step.action} ${error}`, err: process.stderr });
+    }
     await shoot({ label: "after", error });
   }
+  const outcome = failed === 0 ? "ok" : `${failed} failed`;
+  note({ text: `${side.name} ${flow.id}: ${flow.steps.length} steps, ${outcome}`, err: process.stderr });
 };

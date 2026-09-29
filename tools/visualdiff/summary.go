@@ -23,7 +23,7 @@ const summaryUncovered = 60
 
 // classOrder ranks classes worst-first, for the table and the top findings.
 var classOrder = []Classification{
-	ClassMissingBase, ClassMissingCandidate, ClassCaptureFailed, ClassRegression, ClassLayout, ClassBrokenBoth, ClassBlank,
+	ClassMissingBase, ClassMissingCandidate, ClassCaptureFailed, ClassBroken, ClassRegression, ClassLayout, ClassBrokenBoth, ClassBlank,
 	ClassNotFound, ClassAPIError, ClassRedirect, ClassControls, ClassUncovered,
 	ClassCopy, ClassChanged, ClassIntendedRestore, ClassNoise,
 }

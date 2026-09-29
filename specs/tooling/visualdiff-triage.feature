@@ -186,6 +186,48 @@ Feature: visualdiff catches regressions and reports its own coverage
       When the report is written
       Then findings.md names the finding and not the noise row
 
+  Rule: A flow proves its feature works, and a run says so in one file
+
+    @unit
+    Scenario: A flow's expect proves the feature did its job on both sides
+      Given a flow whose steps end in an expect (text, count, url, or an api field read with the signed-in session)
+      When the expect holds on the base and on the candidate
+      Then the flow's verdict is "works" and the expect is recorded as its proof
+
+    @unit
+    Scenario: An expect failing on the candidate alone is broken
+      Given a flow whose expect holds on the base and fails on the candidate
+      When the row is classified
+      Then it is a "broken" finding naming what the expect missed
+      And an expect failing on the base alone is "intended-restore"
+
+    @unit
+    Scenario: An expect that times out fails its step with what it missed
+      Given an expect that never holds
+      When it has polled for its timeout, with no fixed sleep
+      Then its step fails with "expect <description>: <why> after <timeout>ms"
+
+    @unit
+    Scenario: verdict.md names each flow's verdict and its first failure
+      Given a finished run
+      When it writes verdict.md
+      Then each flow has one line: works, broken, broken-both, layout-only or unproven
+      And a failing flow names its first failure: step, expect, side, and the console signature
+      And routes with a finding are listed, and the rest counted as rendered alike, never as working
+
+    @unit
+    Scenario: signatures.md splits log signatures new on the candidate from those also on the base
+      Given the stacks' logs hold warn, error and fatal lines, JSON or plain
+      When a run finishes
+      Then signatures.md groups them by shape, ids and numbers masked, with counts and where each was first seen
+      And lists those new on the candidate before those also on the base
+
+    @unit
+    Scenario: -routes and -flows re-check only what they name
+      Given a run naming some routes or flows
+      When the configuration is narrowed
+      Then only the named routes and flows are captured, an unknown name is refused, and coverage still reads every route
+
   Rule: gc removes what dead runs left behind
 
     @unit
@@ -195,10 +237,16 @@ Feature: visualdiff catches regressions and reports its own coverage
       Then none of them is selected, and their stacks are not orphans
 
     @unit
-    Scenario: The newest dead run keeps its report
+    Scenario: A run never deletes an earlier run's report
       Given two dead runs
-      When gc selects what to remove
-      Then both lose their worktrees and stacks, and only the older loses its directory
+      When the gc pass a run makes selects what to remove
+      Then both lose their worktrees and stacks, and neither loses its directory
+
+    @unit
+    Scenario: visualdiff gc removes only reports older than -older-than
+      Given dead runs started a month ago and yesterday, and a directory not named as a run time
+      When `visualdiff gc -older-than 168h` selects what to remove
+      Then only the month-old run loses its directory
 
     @unit
     Scenario: gc destroys orphan visualdiff stacks no run owns

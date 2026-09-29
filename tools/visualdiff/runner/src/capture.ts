@@ -412,6 +412,7 @@ export const captureMessage = ({
   notFound,
   blank,
   ariaSnapshot,
+  expect,
 }: {
   kind: "route" | "flow";
   key: string;
@@ -424,6 +425,7 @@ export const captureMessage = ({
   notFound: boolean;
   blank: boolean;
   ariaSnapshot: string;
+  expect?: string;
 }): CaptureMessage => {
   const drained = side.drain();
   return {
@@ -443,5 +445,6 @@ export const captureMessage = ({
     ariaSnapshot,
     error,
     durationMs,
+    ...(expect === undefined ? {} : { expect }),
   };
 };

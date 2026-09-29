@@ -37,6 +37,8 @@ type DoneEntry struct {
 	Note            string           `json:"note"`
 	Classes         []Classification `json:"classes"`
 	Forced          bool             `json:"forced,omitempty"`
+	// Proof are the flow's expects that held on both sides (FlowProof).
+	Proof []string `json:"proof,omitempty"`
 }
 
 // DoneLedger is every entry under .visualdiff/done.
@@ -157,7 +159,7 @@ func MarkDone(request DoneRequest) (DoneEntry, error) {
 		Key: DoneKey(request.Edition, request.Kind, request.Section), Edition: request.Edition, Kind: request.Kind,
 		Section: request.Section, RunID: request.RunID, BaseCommit: report.Meta.BaseCommit,
 		CandidateCommit: report.Meta.CandidateCommit, Date: request.Now.UTC(), Note: request.Note,
-		Classes: rowClasses(rows), Forced: request.Force,
+		Classes: rowClasses(rows), Forced: request.Force, Proof: FlowProof(rows),
 	}
 	if failing := failingClasses(entry.Classes); len(failing) > 0 && !request.Force {
 		return DoneEntry{}, fmt.Errorf("done: %s %s has failing classes %v in run %s; fix it, or pass -force with a note", request.Kind, request.Section, failing, request.RunID)

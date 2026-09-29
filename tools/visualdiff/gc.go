@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/havenrun"
 )
@@ -39,9 +40,9 @@ func (state RunState) Slugs() []string {
 	return []string{HavenSlug(runID, "base"), HavenSlug(runID, "candidate")}
 }
 
-// GCRun is one stale run and what gc does to it. The newest stale run keeps
-// its directory - its report is the last one a person may still be reading -
-// and loses only its worktrees and stacks.
+// GCRun is one stale run and what gc does to it. A stale run always loses its
+// worktrees and stacks; its directory (the report) goes only on an explicit
+// `visualdiff gc` and only once it is older than GCSelection.RemoveOlderThan.
 type GCRun struct {
 	State     RunState
 	RemoveDir bool
@@ -60,11 +61,27 @@ type GCSelection struct {
 	IncludeKept bool
 	// Registered are the haven slugs haven reports, for orphan detection.
 	Registered []string
+	// RemoveOlderThan is the age past which a stale run's directory goes; zero keeps every one.
+	RemoveOlderThan time.Duration
+	Now             time.Time
+}
+
+// RunTimeLayout is how a run directory is named (RunID), so its age reads from its name.
+const RunTimeLayout = "20060102-150405"
+
+// removesDir reports whether a stale run's directory is old enough to go. A
+// directory whose name is not a run time is never removed.
+func (selection GCSelection) removesDir(state RunState) bool {
+	if selection.RemoveOlderThan <= 0 {
+		return false
+	}
+	started, err := time.ParseInLocation(RunTimeLayout, state.Name, time.Local)
+	return err == nil && selection.Now.Sub(started) > selection.RemoveOlderThan
 }
 
 // SelectGarbage decides a gc pass from the run directories found. A run is
 // stale when no live process drives it and it is not a kept run (unless
-// IncludeKept). A registered visualdiff slug no protected run owns is an orphan.
+// IncludeKept). A registered visualdiff slug no run directory names is an orphan.
 func SelectGarbage(states []RunState, selection GCSelection) GCPlan {
 	sorted := append([]RunState(nil), states...)
 	sort.Slice(sorted, func(a, b int) bool { return sorted[a].Name > sorted[b].Name })
@@ -75,7 +92,7 @@ func SelectGarbage(states []RunState, selection GCSelection) GCPlan {
 			owned[slug] = true
 		}
 		if !selection.protects(state) {
-			plan.Runs = append(plan.Runs, GCRun{State: state, RemoveDir: len(plan.Runs) > 0})
+			plan.Runs = append(plan.Runs, GCRun{State: state, RemoveDir: selection.removesDir(state)})
 		}
 	}
 	for _, slug := range selection.Registered {
@@ -169,11 +186,13 @@ type GCRequest struct {
 	Root        string
 	Current     string
 	IncludeKept bool
-	UseHaven    bool
-	Run         runner
-	Environ     func() []string
-	Alive       func(pid int) bool
-	Out         io.Writer
+	// RemoveOlderThan is zero on the pass a run makes: it never deletes a report.
+	RemoveOlderThan time.Duration
+	UseHaven        bool
+	Run             runner
+	Environ         func() []string
+	Alive           func(pid int) bool
+	Out             io.Writer
 }
 
 // CollectGarbage prints what it removes, then removes it: each stale run's
@@ -186,7 +205,9 @@ func CollectGarbage(ctx context.Context, request GCRequest) error {
 	if err != nil {
 		return fmt.Errorf("gc: %w", err)
 	}
-	selection := GCSelection{Current: request.Current, IncludeKept: request.IncludeKept}
+	selection := GCSelection{
+		Current: request.Current, IncludeKept: request.IncludeKept, RemoveOlderThan: request.RemoveOlderThan, Now: time.Now(),
+	}
 	if request.UseHaven {
 		selection.Registered = request.registeredSlugs(ctx)
 	}

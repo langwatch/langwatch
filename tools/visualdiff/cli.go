@@ -177,7 +177,8 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	configPath := flags.String("config", "", "configuration file (default <root>/"+ConfigFile+")")
 	viewport := flags.String("viewport", "1440x900", "browser viewport, WIDTHxHEIGHT")
 	routesOnly := flags.Bool("routes-only", false, "capture the route list and skip the flows")
-	flowList := flags.String("flows", "", "comma-separated flow ids to run (default: all)")
+	flowList := flags.String("flows", "", "comma-separated flow ids to run; naming any route or flow runs only those")
+	routeList := flags.String("routes", "", "comma-separated routes to run, as configured; naming any route or flow runs only those")
 	basePort := flags.Int("base-port", DefaultBasePort, "first port of the base stack")
 	runDir := flags.String("run-dir", "", "directory for worktrees, logs, screenshots and the report")
 	bootTimeout := flags.Duration("boot-timeout", 20*time.Minute, "how long a stack gets to answer")
@@ -205,7 +206,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	if err != nil {
 		return nil, err
 	}
-	config, parsedViewport, err := loadRunConfig(flags, runConfigInputs{root: absoluteRoot, configPath: *configPath, flowList: *flowList, viewport: *viewport})
+	config, parsedViewport, err := loadRunConfig(flags, runConfigInputs{root: absoluteRoot, configPath: *configPath, routeList: *routeList, flowList: *flowList, viewport: *viewport})
 	if err != nil {
 		return nil, err
 	}
@@ -251,6 +252,7 @@ func runEditions(value string, noHaven bool) ([]Edition, error) {
 type runConfigInputs struct {
 	root       string
 	configPath string
+	routeList  string
 	flowList   string
 	viewport   string
 }
@@ -272,7 +274,7 @@ func loadRunConfig(flags *flag.FlagSet, inputs runConfigInputs) (*Config, Viewpo
 	if err != nil {
 		return nil, Viewport{}, err
 	}
-	config, err = config.SelectFlows(splitList(inputs.flowList))
+	config, err = config.Select(splitList(inputs.routeList), splitList(inputs.flowList))
 	if err != nil {
 		return nil, Viewport{}, err
 	}

@@ -417,7 +417,7 @@ func ResolveCoverage(ctx context.Context, request coverageRequest) (Coverage, er
 		return Coverage{}, fmt.Errorf("neither %s under %s nor %s's screens declare a route", request.baseRef, settings.BasePages, request.candidateRef)
 	}
 	return ComputeCoverage(CoverageInputs{
-		Base: base, Candidate: candidate, Routes: request.config.Routes, Excluded: settings.Excluded,
+		Base: base, Candidate: candidate, Routes: request.config.DeclaredRoutes(), Excluded: settings.Excluded,
 	}), nil
 }
 

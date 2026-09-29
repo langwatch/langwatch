@@ -65,22 +65,36 @@ func TestLoadConfigReadsRoutesAndFlows(t *testing.T) {
 	}
 }
 
-func TestSelectFlowsNarrowsAndRefusesUnknownNames(t *testing.T) {
-	config := &Config{Routes: []string{"/"}, Flows: []Flow{
+// @scenario "-routes and -flows re-check only what they name"
+func TestSelectNarrowsAndRefusesUnknownNames(t *testing.T) {
+	config := &Config{Routes: []string{"/", "/x"}, Flows: []Flow{
 		{ID: "a", Steps: []Step{{Action: "go"}}},
 		{ID: "b", Steps: []Step{{Action: "go"}}},
 	}}
 
-	narrowed, err := config.SelectFlows([]string{"b"})
+	narrowed, err := config.Select(nil, []string{"b"})
 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(narrowed.Flows) != 1 || narrowed.Flows[0].ID != "b" {
-		t.Fatalf("narrowed: %+v", narrowed.Flows)
+	if len(narrowed.Flows) != 1 || narrowed.Flows[0].ID != "b" || len(narrowed.Routes) != 0 {
+		t.Fatalf("naming a flow runs only that flow: %+v", narrowed)
 	}
-	if _, err := config.SelectFlows([]string{"nope"}); err == nil {
+	if len(narrowed.DeclaredRoutes()) != 2 {
+		t.Fatalf("coverage still sees every route: %v", narrowed.DeclaredRoutes())
+	}
+	routes, err := config.Select([]string{"/x"}, nil)
+	if err != nil || len(routes.Routes) != 1 || routes.Routes[0] != "/x" || len(routes.Flows) != 0 {
+		t.Fatalf("naming a route runs only that route: %+v %v", routes, err)
+	}
+	if kept, _ := config.Select(nil, nil); kept != config {
+		t.Fatal("naming nothing keeps everything")
+	}
+	if _, err := config.Select(nil, []string{"nope"}); err == nil {
 		t.Fatal("an unknown flow name was accepted")
+	}
+	if _, err := config.Select([]string{"/nope"}, nil); err == nil {
+		t.Fatal("an unknown route was accepted")
 	}
 }
 

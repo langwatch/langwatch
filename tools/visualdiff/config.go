@@ -93,6 +93,9 @@ type Config struct {
 	Coverage CoverageConfig    `yaml:"coverage"`
 	// Publish is what a run shows on its branch's pull request (publish.go).
 	Publish PublishConfig `yaml:"publish"`
+
+	// declared is the route list before Select narrowed it (DeclaredRoutes).
+	declared []string
 }
 
 // RunnerActions are the actions tools/visualdiff/runner implements. A flow
@@ -102,7 +105,7 @@ type Config struct {
 // pins to this list.
 var RunnerActions = []string{
 	// primitives
-	"go", "click", "fill", "select", "dismissTour", "type", "wait",
+	"go", "click", "fill", "select", "dismissTour", "type", "wait", "expect",
 	// named flow actions
 	"signIn", "createAutomation", "createEvaluation", "sendTrace", "openTrace",
 	"annotate", "editProjectSettings", "createPrompt", "createExperiment",
@@ -198,32 +201,87 @@ func validateFlow(flow Flow) error {
 			return fmt.Errorf("flow %q step %d: unknown action %q (known: %s)",
 				flow.ID, index, step.Action, strings.Join(sorted(RunnerActions), ", "))
 		}
+		if step.Action == ExpectAction {
+			if err := validateExpect(step.With); err != nil {
+				return fmt.Errorf("flow %q step %d: %w", flow.ID, index, err)
+			}
+		}
 	}
 	return nil
 }
 
-// SelectFlows narrows the configuration to the named flows, in the
-// configuration's own order. An empty selection keeps every flow.
-func (config *Config) SelectFlows(names []string) (*Config, error) {
-	if len(names) == 0 {
-		return config, nil
-	}
-	wanted := map[string]bool{}
-	for _, name := range names {
-		wanted[strings.TrimSpace(name)] = true
-	}
-	narrowed := *config
-	narrowed.Flows = nil
-	for _, flow := range config.Flows {
-		if wanted[flow.ID] {
-			narrowed.Flows = append(narrowed.Flows, flow)
-			delete(wanted, flow.ID)
+// ExpectAction is the step that proves a flow's outcome (runner/src/flows/expect.ts).
+const ExpectAction = "expect"
+
+// expectForms are what an expect checks; exactly one per step.
+var expectForms = []string{"text", "count", "url", "api"}
+
+// expectOptions qualify the form: role/name scope a text, min/equals bound a
+// count or an api field's length, field/contains pick into an api body.
+var expectOptions = []string{"role", "name", "min", "equals", "field", "contains", "timeout"}
+
+// validateExpect refuses an expect with no form, two forms, or a key the runner ignores.
+func validateExpect(with map[string]string) error {
+	forms := 0
+	for key := range with {
+		switch {
+		case slices.Contains(expectForms, key):
+			forms++
+		case !slices.Contains(expectOptions, key):
+			return fmt.Errorf("expect: unknown key %q (forms: %s; options: %s)",
+				key, strings.Join(expectForms, ", "), strings.Join(expectOptions, ", "))
 		}
 	}
-	if len(wanted) > 0 {
-		return nil, fmt.Errorf("no such flow: %s", strings.Join(sorted(keys(wanted)), ", "))
+	if forms != 1 {
+		return fmt.Errorf("expect: give exactly one of %s", strings.Join(expectForms, ", "))
+	}
+	return nil
+}
+
+// Select narrows the configuration to the named routes and flows, in the
+// configuration's own order: naming either kind runs only what is named, so a
+// re-check of one flow renders no route. Nothing named keeps everything.
+// DeclaredRoutes still answers the full list, so coverage is never narrowed.
+func (config *Config) Select(routes, flows []string) (*Config, error) {
+	if len(routes)+len(flows) == 0 {
+		return config, nil
+	}
+	narrowed := *config
+	narrowed.declared = config.DeclaredRoutes()
+	var unknown []string
+	narrowed.Routes, unknown = pick(config.Routes, routes, func(route string) string { return route })
+	if len(unknown) > 0 {
+		return nil, fmt.Errorf("no such route: %s", strings.Join(sorted(unknown), ", "))
+	}
+	narrowed.Flows, unknown = pick(config.Flows, flows, func(flow Flow) string { return flow.ID })
+	if len(unknown) > 0 {
+		return nil, fmt.Errorf("no such flow: %s", strings.Join(sorted(unknown), ", "))
 	}
 	return &narrowed, nil
+}
+
+// DeclaredRoutes is every configured route, before any -routes narrowing.
+func (config *Config) DeclaredRoutes() []string {
+	if config.declared != nil {
+		return config.declared
+	}
+	return config.Routes
+}
+
+// pick keeps the items whose name is wanted, and returns the wanted names no item has.
+func pick[T any](items []T, names []string, name func(T) string) ([]T, []string) {
+	wanted := map[string]bool{}
+	for _, value := range names {
+		wanted[strings.TrimSpace(value)] = true
+	}
+	var kept []T
+	for _, item := range items {
+		if wanted[name(item)] {
+			kept = append(kept, item)
+			delete(wanted, name(item))
+		}
+	}
+	return kept, keys(wanted)
 }
 
 func keys(set map[string]bool) []string {

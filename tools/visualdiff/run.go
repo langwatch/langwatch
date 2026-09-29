@@ -223,7 +223,7 @@ func (options *Options) fill(now func() time.Time) {
 		options.TraceCount = 6
 	}
 	if options.RunDir == "" {
-		options.RunDir = filepath.Join(options.Root, ".visualdiff", now().Format("20060102-150405"))
+		options.RunDir = filepath.Join(options.Root, ".visualdiff", now().Format(RunTimeLayout))
 	}
 	if len(options.Editions) == 0 {
 		options.Editions = []Edition{EditionEnterprise}
@@ -726,6 +726,12 @@ func (run *session) finish(result Result) (Result, error) {
 	})
 	if err := WriteSummaryFile(options.RunDir, summary); err != nil {
 		return result, fmt.Errorf("write summary: %w", err)
+	}
+	if err := WriteVerdictFile(options.RunDir, result.Rows); err != nil {
+		return result, fmt.Errorf("write verdict: %w", err)
+	}
+	if err := WriteSignaturesFile(options.RunDir); err != nil {
+		fmt.Fprintf(run.streams.Err, "signatures: %v\n", err)
 	}
 	result.Summary = summary
 	writeSummary(run.streams.Out, result, options.Agent)
