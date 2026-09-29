@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.18.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.18.0...langwatch@v3.18.1) (2026-09-29)
+
+
+### Bug Fixes
+
+* **home:** join requests card washed out by the hero glow in light mode ([#8318](https://github.com/langwatch/langwatch/issues/8318)) ([e910323](https://github.com/langwatch/langwatch/commit/e91032307fef7f8d84b438619f46368796c7fcc3))
+* **pii:** keep model and tool names out of strict name detection ([#8332](https://github.com/langwatch/langwatch/issues/8332)) ([669c666](https://github.com/langwatch/langwatch/commit/669c666f5973a75c4ae77cd48f1d6d485aafd176))
+* **selfhost:** issues found on a fresh 3.18.0 Helm install on EKS ([#8326](https://github.com/langwatch/langwatch/issues/8326)) ([e494045](https://github.com/langwatch/langwatch/commit/e494045ab02a63459a49592a203314b0f7736cee))
+* **traces:** treat codex-app-server as a codex scope in the span filter and extractor ([#8337](https://github.com/langwatch/langwatch/issues/8337)) ([6f30bbc](https://github.com/langwatch/langwatch/commit/6f30bbcbbf5e8204c7938f6aca7b500e7443bae5))
+
+
+### Documentation
+
+* **agent-testing:** one Voice Agents page, platform first, code as a hand-off ([#8122](https://github.com/langwatch/langwatch/issues/8122)) ([50f8f08](https://github.com/langwatch/langwatch/commit/50f8f08fb3bb206d10f35d7cb9a7887f8315d78b))
+
 ## [3.18.0](https://github.com/langwatch/langwatch/compare/langwatch-3.17.0...langwatch@v3.18.0) (2026-09-27)
 
 
