@@ -129,6 +129,25 @@ describe("PublicApiTriggerService.create() for Slack", () => {
     });
   });
 
+  describe("given a legacy webhook URL on a create refused for its condition", () => {
+    it("stores no connection", async () => {
+      await expect(
+        service.create({
+          projectId: "project-1",
+          actorId: "user-1",
+          input: {
+            name: "Errors to Slack",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            actionParams: { slackWebhook: WEBHOOK },
+            filters: {},
+          },
+        }),
+      ).rejects.toMatchObject({ code: "trigger_filters_required" });
+      expect(repo.rows.size).toBe(0);
+      expect(created).toBeUndefined();
+    });
+  });
+
   describe("given a legacy webhook URL", () => {
     /** @scenario "A legacy secret over the API is stored as a connection" */
     it("finds or creates a project connection and stores no secret of its own", async () => {

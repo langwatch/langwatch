@@ -202,7 +202,10 @@ export class SlackIntegrationService implements SlackConnectionReader {
     return this.toView({ row, scope, dependentAutomations: 0 });
   }
 
-  /** Rename, move or replace the secret. An absent secret keeps the stored one. */
+  /**
+   * Rename, move or replace the secret. An absent secret keeps the stored one;
+   * narrowing to one project other projects rely on needs `force`.
+   */
   async update({
     scope,
     connection,
@@ -211,6 +214,7 @@ export class SlackIntegrationService implements SlackConnectionReader {
     scopeId,
     secret,
     actorId,
+    force = false,
   }: {
     scope: SlackProjectScope;
     connection: SlackIntegration;
@@ -219,6 +223,7 @@ export class SlackIntegrationService implements SlackConnectionReader {
     scopeId?: string;
     secret?: string;
     actorId: string;
+    force?: boolean;
   }): Promise<SlackConnectionView> {
     const changes: SlackConnectionChanges = {
       ...(name === undefined ? {} : { name: name.trim() }),
@@ -242,6 +247,11 @@ export class SlackIntegrationService implements SlackConnectionReader {
         changes.secretFingerprint ?? connection.secretFingerprint,
       exceptId: connection.id,
     };
+    await this.assertNarrowingStrandsNothing({
+      connection,
+      target: guard.target,
+      force,
+    });
     if (value || scopeType !== undefined || scopeId !== undefined) {
       await this.assertSecretFree(guard);
     }
@@ -264,6 +274,32 @@ export class SlackIntegrationService implements SlackConnectionReader {
       scope,
       dependentAutomations: counts.get(row.id),
     });
+  }
+
+  /**
+   * An organization connection narrowed to one project stops delivering for
+   * every other project's automations: refused with their count until confirmed.
+   */
+  private async assertNarrowingStrandsNothing({
+    connection,
+    target,
+    force,
+  }: {
+    connection: SlackIntegration;
+    target: SlackScope;
+    force: boolean;
+  }): Promise<void> {
+    if (force || connection.scopeType !== "ORGANIZATION") return;
+    if (target.scopeType !== "PROJECT") return;
+    const counts = await this.repo.countDependentAutomations({
+      organizationId: connection.organizationId,
+      ids: [connection.id],
+      exceptProjectId: target.scopeId,
+    });
+    const dependentAutomations = counts.get(connection.id) ?? 0;
+    if (dependentAutomations > 0) {
+      throw new SlackConnectionInUseError({ dependentAutomations });
+    }
   }
 
   /** Refused while active automations use it, unless `force` confirms it. */
@@ -397,12 +433,7 @@ export class SlackIntegrationService implements SlackConnectionReader {
       };
     }
     const channel = fields.data.slackChannelId?.trim();
-    if (!channel) {
-      throw new InvalidActionParamsError(
-        "A Slack channel is required for a bot connection.",
-        "slackChannelId",
-      );
-    }
+    if (!channel) throw slackChannelRequired();
     return {
       ...rest,
       slackIntegrationId: connection.id,
@@ -427,6 +458,10 @@ export class SlackIntegrationService implements SlackConnectionReader {
       kind === "BOT" ? fields.slackBotToken : fields.slackWebhook,
     );
     if (!secret) return null;
+    // Refused before anything is stored, so a refused save leaves no connection.
+    if (kind === "BOT" && !fields.slackChannelId?.trim()) {
+      throw slackChannelRequired();
+    }
     const scope = await this.getProjectScope({ projectId });
     const { id } = await this.findOrCreateForSecret({
       organizationId: scope.organizationId,
@@ -574,6 +609,13 @@ export class SlackIntegrationService implements SlackConnectionReader {
       updatedAt: row.updatedAt,
     };
   }
+}
+
+function slackChannelRequired(): InvalidActionParamsError {
+  return new InvalidActionParamsError(
+    "A Slack channel is required for a bot connection.",
+    "slackChannelId",
+  );
 }
 
 /** The scopes a project reaches: its organization's and its own (ADR-093 §5a). */

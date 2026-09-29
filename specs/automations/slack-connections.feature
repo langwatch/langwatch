@@ -93,6 +93,15 @@ Feature: Slack connections
       When the user confirms
       Then the connection is removed
 
+    @unit
+    Scenario: Narrowing an organization connection other projects use is confirmed first
+      Given an organization connection that two automations in another project deliver through
+      When the user rescopes it to this project
+      Then it is refused with the machine-readable in-use code carrying the count of two
+      And the connection keeps its organization scope
+      When the user confirms
+      Then the connection is scoped to this project
+
     @integration
     Scenario: Deleting an unused connection is confirmed too
       Given a connection no automation delivers through

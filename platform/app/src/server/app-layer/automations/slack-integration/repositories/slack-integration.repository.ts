@@ -74,11 +74,13 @@ export interface SlackIntegrationRepository {
   delete(params: { id: string; organizationId: string }): Promise<void>;
 
   /**
-   * Active, non-deleted Slack automations in any of the organization's projects
-   * pointing at each of `ids`, keyed by connection id (absent = none).
+   * Active, non-deleted Slack automations in the organization's projects (all
+   * but `exceptProjectId` when given) pointing at each of `ids`, keyed by
+   * connection id (absent = none).
    */
   countDependentAutomations(params: {
     organizationId: string;
     ids: string[];
+    exceptProjectId?: string;
   }): Promise<Map<string, number>>;
 }

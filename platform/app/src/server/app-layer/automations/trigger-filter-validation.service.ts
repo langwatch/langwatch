@@ -1,4 +1,3 @@
-import type { PrismaClient } from "~/generated/prisma/client";
 import {
   findEvaluationFilterReferences,
   findUnkeyedFilterFields,
@@ -7,7 +6,6 @@ import {
   TriggerFilterKeyRequiredError,
   TriggerFilterMonitorRequiredError,
 } from "./errors";
-import { PrismaEvaluatorReferenceRepository } from "./repositories/evaluator-reference.prisma.repository";
 import type { EvaluatorReferenceRepository } from "./repositories/evaluator-reference.repository";
 
 /**
@@ -17,12 +15,6 @@ import type { EvaluatorReferenceRepository } from "./repositories/evaluator-refe
  */
 export class TriggerFilterValidationService {
   constructor(private readonly evaluators: EvaluatorReferenceRepository) {}
-
-  static create(prisma: PrismaClient): TriggerFilterValidationService {
-    return new TriggerFilterValidationService(
-      new PrismaEvaluatorReferenceRepository(prisma),
-    );
-  }
 
   /**
    * Ids no Evaluator carries are let through: an SDK-reported evaluation keys

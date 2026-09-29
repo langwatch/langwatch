@@ -30,10 +30,13 @@ function readFirePage(body: unknown): {
 
 /** What an automation has done, newest first. Metadata only: no trace ids and
  *  no trace content, the same contract the dashboard's fire panel reads. */
-export const triggerFiresCommand = async (
-  id: string,
-  options: { limit?: string; cursor?: string } = {},
-): Promise<CommandResult | void> => {
+export const triggerFiresCommand = async ({
+  id,
+  options = {},
+}: {
+  id: string;
+  options?: { limit?: string; cursor?: string };
+}): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const spinner = createSpinner(`Fetching fires for "${id}"...`).start();

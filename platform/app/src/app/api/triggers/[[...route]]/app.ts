@@ -26,7 +26,7 @@ import { graphAlertActionParamsSchema } from "~/server/app-layer/automations/gra
 import { PublicApiTriggerService } from "~/server/app-layer/automations/public-api-trigger.service";
 import { reportActionParamsSchema } from "~/server/app-layer/automations/report.builder";
 import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
-import { TriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.service";
+import { createTriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.wiring";
 import {
   decodeTriggerFireCursor,
   encodeTriggerFireCursor,
@@ -540,7 +540,7 @@ const triggerService = () =>
   new PublicApiTriggerService(getApp().triggers, {
     graphs: AutomationCustomGraphService.create(prisma),
     fireHistory: TriggerFireHistoryService.create(prisma),
-    filterValidation: TriggerFilterValidationService.create(prisma),
+    filterValidation: createTriggerFilterValidationService({ prisma }),
     testFire: (input) => getApp().triggerTemplates.testFire(input),
     slackConnections: createSlackIntegrationService({ prisma }),
     resolveProject: async (projectId) => {

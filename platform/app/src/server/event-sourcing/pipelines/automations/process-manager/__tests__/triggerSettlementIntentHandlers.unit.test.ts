@@ -180,6 +180,7 @@ function makeDeps(activeTrigger: TriggerSummary) {
       skipped: 0,
     }),
     handlePersistCapBreach: vi.fn().mockResolvedValue(undefined),
+    resolveSlackDestination: vi.fn().mockResolvedValue(null),
   };
   return {
     deps: deps as unknown as TriggerSettlementDispatchDeps,

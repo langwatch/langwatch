@@ -66,7 +66,7 @@ import {
 } from "~/server/app-layer/automations/report.builder";
 import { findSlackDestination } from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
 import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
-import { TriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.service";
+import { createTriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.wiring";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import { createTriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.wiring";
 import { redactTriggerForRead } from "~/server/app-layer/automations/trigger-redaction";
@@ -315,7 +315,9 @@ export const automationRouter = createTRPCRouter({
         throw toTemplateTRPCError(new TriggerFiltersRequiredError());
       }
       try {
-        await TriggerFilterValidationService.create(ctx.prisma).assertWritable({
+        await createTriggerFilterValidationService({
+          prisma: ctx.prisma,
+        }).assertWritable({
           projectId: input.projectId,
           filters: input.filters,
         });
@@ -827,7 +829,9 @@ export const automationRouter = createTRPCRouter({
         }
       }
       try {
-        await TriggerFilterValidationService.create(ctx.prisma).assertWritable({
+        await createTriggerFilterValidationService({
+          prisma: ctx.prisma,
+        }).assertWritable({
           projectId: input.projectId,
           filters: sanitized,
         });
@@ -1286,9 +1290,9 @@ export const automationRouter = createTRPCRouter({
       // when no query supersedes them.
       if (!isGraphAlert && !isReport && filterQuery === null) {
         try {
-          await TriggerFilterValidationService.create(
-            ctx.prisma,
-          ).assertWritable({
+          await createTriggerFilterValidationService({
+            prisma: ctx.prisma,
+          }).assertWritable({
             projectId: input.projectId,
             filters: input.filters,
           });

@@ -109,9 +109,9 @@ export class SlackIntegrationMissingError extends HandledError {
 }
 
 /**
- * The secret being saved is already stored in this organization as another
- * connection (ADR-093 §5a: one secret is one connection per organization). The
- * existing connection's name travels so the customer can pick it instead.
+ * The secret being saved is already stored in the scope being written, or in
+ * the organization for a project write (ADR-093 §5a: one connection per scope).
+ * The existing connection's name travels so the customer can pick it instead.
  */
 export class SlackConnectionExistsError extends HandledError {
   declare readonly code: "slack_connection_exists";

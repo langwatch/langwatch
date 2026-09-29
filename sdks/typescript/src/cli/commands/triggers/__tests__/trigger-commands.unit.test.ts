@@ -551,7 +551,7 @@ describe("triggerFiresCommand()", () => {
     it("asks for that many fires", async () => {
       mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
 
-      await triggerFiresCommand("trigger_abc", { limit: "5" });
+      await triggerFiresCommand({ id: "trigger_abc", options: { limit: "5" } });
 
       expect(mockFetch).toHaveBeenCalledWith(
         "http://localhost:5560/api/triggers/trigger_abc/fires?limit=5",
@@ -570,7 +570,10 @@ describe("triggerFiresCommand()", () => {
         }),
       });
 
-      const result = await triggerFiresCommand("trigger_abc", { limit: "1", cursor: "cursor_2" });
+      const result = await triggerFiresCommand({
+        id: "trigger_abc",
+        options: { limit: "1", cursor: "cursor_2" },
+      });
       result?.table?.();
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -587,7 +590,7 @@ describe("triggerFiresCommand()", () => {
     it("reads it as the last page", async () => {
       mockFetch.mockResolvedValue({ ok: true, json: async () => [] });
 
-      const result = await triggerFiresCommand("trigger_abc");
+      const result = await triggerFiresCommand({ id: "trigger_abc" });
 
       expect(result?.data).toEqual({ fires: [], nextCursor: null });
     });

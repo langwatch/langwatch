@@ -31,10 +31,8 @@ import {
 } from "~/server/app-layer/automations/providers/webhook/server";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import {
-  type SlackConnectionReader,
   type SlackDestinationResolver,
   slackConnectionMissingDispatchError,
-  slackDestinationResolver,
 } from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
@@ -93,11 +91,6 @@ export function createLogOverflowHandler(): IntentExecutor<LogOverflowIntent> {
   };
 }
 
-/** An unwired dispatcher knows no connections: only legacy secrets resolve. */
-const NO_CONNECTIONS: SlackConnectionReader = {
-  findUsableSecret: async () => null,
-};
-
 interface ActionParams {
   members?: string[] | null;
   slackWebhook?: string | null;
@@ -150,12 +143,8 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   }) => Promise<void>;
   /** ADR-040 §6 delivery-log writer. Optional: absent in tests. */
   recordWebhookDelivery?: WebhookDeliveryRecorder;
-  /**
-   * ADR-093 §5a: where a Slack delivery goes. Optional so a test that never
-   * dispatches to Slack need not fill it; absent resolves no connection, so
-   * only an automation's own legacy secret delivers.
-   */
-  resolveSlackDestination?: SlackDestinationResolver;
+  /** ADR-093 §5a: where a Slack delivery goes, connection or legacy secret. */
+  resolveSlackDestination: SlackDestinationResolver;
   /** ADR-031 per-trigger hourly email cap (dedupKey gates the INCR). */
   consumeEmailCapSlot: (args: {
     projectId: string;
@@ -546,10 +535,7 @@ async function dispatchNotifyDigest({
       // ADR-093 §5a: the connection's kind decides the surface. A missing
       // channel is this automation's configuration, a missing connection its
       // delivery settings', so the two failures are told apart.
-      const resolveDestination =
-        deps.resolveSlackDestination ??
-        slackDestinationResolver({ connections: NO_CONNECTIONS });
-      const destination = await resolveDestination({
+      const destination = await deps.resolveSlackDestination({
         projectId,
         actionParams: trigger.actionParams,
       });

@@ -152,4 +152,30 @@ describe("dataset slug stability", () => {
       expect(restored.archivedAt).toBeNull();
     });
   });
+
+  describe("when an archived dataset is archived again", () => {
+    it("keeps the slug and time of the first archive", async () => {
+      const dataset = await seedDataset({
+        name: `${ns} Twice`,
+        slug: `${ns}-twice`,
+      });
+      const archive = () =>
+        caller.dataset.deleteById({
+          projectId: PROJECT_ID,
+          datasetId: dataset.id,
+        });
+      const read = () =>
+        prisma.dataset.findUniqueOrThrow({
+          where: { id: dataset.id, projectId: PROJECT_ID },
+        });
+
+      await archive();
+      const first = await read();
+      await archive();
+      const second = await read();
+
+      expect(second.slug).toBe(first.slug);
+      expect(second.archivedAt).toEqual(first.archivedAt);
+    });
+  });
 });

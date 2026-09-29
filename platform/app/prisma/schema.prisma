@@ -3131,7 +3131,7 @@ model TriggerSent {
 // "last fired" / "fires in the last 30 days" / "currently firing" read counts
 // its rows. A non-fire evaluation written there would change all of those
 // answers and sit next to the claim that guards at-most-once notification.
-// This table is read-only to every existing path and cannot affect it.
+// The TriggerSent reads and the fire claim never touch this table.
 model TriggerLatestEvaluation {
   triggerId String  @id
   trigger   Trigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)

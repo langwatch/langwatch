@@ -27,7 +27,8 @@ export class FakeSlackIntegrationRepository
   implements SlackIntegrationRepository
 {
   rows = new Map<string, SlackIntegration>();
-  dependents = new Map<string, number>();
+  /** Per connection id, the project of each active automation using it. */
+  dependents = new Map<string, string[]>();
   private next = 1;
 
   async findProjectScope({ projectId }: { projectId: string }) {
@@ -130,15 +131,19 @@ export class FakeSlackIntegrationRepository
 
   async countDependentAutomations({
     ids,
+    exceptProjectId,
   }: {
     organizationId: string;
     ids: string[];
+    exceptProjectId?: string;
   }) {
-    return new Map(
-      ids.flatMap((id) => {
-        const count = this.dependents.get(id);
-        return count === undefined ? [] : [[id, count] as const];
-      }),
-    );
+    const counts = new Map<string, number>();
+    for (const id of ids) {
+      const projects = (this.dependents.get(id) ?? []).filter(
+        (projectId) => projectId !== exceptProjectId,
+      );
+      if (projects.length > 0) counts.set(id, projects.length);
+    }
+    return counts;
   }
 }

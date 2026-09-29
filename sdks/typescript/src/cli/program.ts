@@ -4183,7 +4183,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, options: { limit?: string; cursor?: string }) => {
       const { triggerFiresCommand: impl } = await import("./commands/triggers/fires.js");
-      return impl(id, options);
+      return impl({ id, options });
     },
   );
 

@@ -8,9 +8,8 @@ Feature: One automation flow with a subject choice
   its description, not its name — stay separate with their own tab and
   entry point. The wizard is three steps — Watch,
   Delivery, Review — linear to create, opening on the review overview to
-  edit. Slack becomes a project-level integration: the bot token is
-  configured once per project and rotated in one place, and the composer
-  only ever asks for a channel. On the wire, "source" survives as a
+  edit. Slack delivers through named connections, organization- or
+  project-scoped, as slack-connections.feature specifies. On the wire, "source" survives as a
   derived alias beside the unchanged kind discriminator; no screen shows
   the word.
 

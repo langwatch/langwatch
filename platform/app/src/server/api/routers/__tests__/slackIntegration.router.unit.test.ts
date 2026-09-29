@@ -248,7 +248,9 @@ describe("slackIntegrationRouter", () => {
           scopeId: "org-2",
           secret: webhook,
         }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      ).rejects.toMatchObject({
+        cause: { code: "invalid_action_params", meta: { field: "scopeId" } },
+      });
       expect(service.create).not.toHaveBeenCalled();
     });
   });
@@ -267,6 +269,21 @@ describe("slackIntegrationRouter", () => {
           secret: "https://example.com/hook",
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("refuses a replacement secret on edit, naming the secret field", async () => {
+      grants.add("project:update@project-1");
+
+      await expect(
+        caller.update({
+          projectId: "project-1",
+          id: "conn-1",
+          secret: "https://example.com/hook",
+        }),
+      ).rejects.toMatchObject({
+        cause: { code: "invalid_action_params", meta: { field: "secret" } },
+      });
+      expect(service.update).not.toHaveBeenCalled();
     });
   });
 });

@@ -158,9 +158,12 @@ export const datasetRouter = createTRPCRouter({
           projectId: input.projectId,
         },
       });
+      // Archiving twice keeps the first archive's slug and time.
+      if (!dataset) return { success: true };
+      if (!input.undo && dataset.archivedAt) return { success: true };
       // Undo restores the slug the dataset had before archiving, not one
       // re-derived from a name that may have changed since creation.
-      const liveSlug = (dataset?.slug ?? "").replace(ARCHIVED_SLUG_SUFFIX, "");
+      const liveSlug = dataset.slug.replace(ARCHIVED_SLUG_SUFFIX, "");
 
       await ctx.prisma.dataset.update({
         where: {

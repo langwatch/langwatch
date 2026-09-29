@@ -148,14 +148,19 @@ export class PrismaSlackIntegrationRepository
   async countDependentAutomations({
     organizationId,
     ids,
+    exceptProjectId,
   }: {
     organizationId: string;
     ids: string[];
+    exceptProjectId?: string;
   }): Promise<Map<string, number>> {
     const counts = new Map<string, number>();
     if (ids.length === 0) return counts;
     const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId } },
+      where: {
+        team: { organizationId },
+        ...(exceptProjectId ? { id: { not: exceptProjectId } } : {}),
+      },
       select: { id: true },
     });
     if (projects.length === 0) return counts;

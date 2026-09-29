@@ -228,32 +228,36 @@ export class PublicApiTriggerService {
           ? TriggerKind.REPORT
           : TriggerKind.AUTOMATION,
     });
-    const delivery = (await persistPublicApiActionParams({
-      action: input.action,
-      incoming: await this.connectSlackParams({
-        action: input.action,
-        projectId,
-        actorId,
-        actionParams: input.actionParams,
-      }),
-    })) as Record<string, unknown>;
+    // Every refusal comes before the delivery is persisted: a legacy Slack
+    // secret is stored as a connection there, and a refused save stores none.
+    const delivery = () =>
+      this.persistedCreateDelivery({ projectId, input, actorId });
 
     if (input.customGraphId) {
+      const rule = await this.readGraphAlert({
+        projectId,
+        action: input.action,
+        alertType: input.alertType,
+        customGraphId: input.customGraphId,
+        graphAlert: input.graphAlert,
+      });
       return this.graphAlertCreateData({
         id,
         projectId,
         input,
         customGraphId: input.customGraphId,
-        delivery,
+        rule,
+        delivery: await delivery(),
       });
     }
     if (input.report) {
+      this.readReport({ action: input.action, report: input.report });
       return this.reportCreateData({
         id,
         projectId,
         input,
         report: input.report,
-        delivery,
+        delivery: await delivery(),
         filterQuery,
       });
     }
@@ -266,6 +270,7 @@ export class PublicApiTriggerService {
       filterQuery,
       filters,
     });
+    const traceDelivery = await delivery();
     return {
       name: input.name,
       action: input.action,
@@ -275,9 +280,30 @@ export class PublicApiTriggerService {
       // the stored set is emptied and the dispatcher reads the query.
       filters: filterQuery !== null ? "{}" : JSON.stringify(filters),
       filterQuery,
-      actionParams: delivery as Prisma.InputJsonValue,
+      actionParams: traceDelivery as Prisma.InputJsonValue,
       ...this.templateColumns(input.templates),
     };
+  }
+
+  /** A create's delivery in its at-rest form, Slack pointed at a connection. */
+  private async persistedCreateDelivery({
+    projectId,
+    input,
+    actorId,
+  }: {
+    projectId: string;
+    input: PublicApiCreateInput;
+    actorId: string;
+  }): Promise<Record<string, unknown>> {
+    return (await persistPublicApiActionParams({
+      action: input.action,
+      incoming: await this.connectSlackParams({
+        action: input.action,
+        projectId,
+        actorId,
+        actionParams: input.actionParams,
+      }),
+    })) as Record<string, unknown>;
   }
 
   /** Structured conditions a query does not supersede are the condition, so
@@ -298,26 +324,21 @@ export class PublicApiTriggerService {
     await this.deps.filterValidation.assertWritable({ projectId, filters });
   }
 
-  private async graphAlertCreateData({
+  private graphAlertCreateData({
     id,
     projectId,
     input,
     customGraphId,
+    rule,
     delivery,
   }: {
     id: string;
     projectId: string;
     input: PublicApiCreateInput;
     customGraphId: string;
+    rule: GraphAlertActionParams;
     delivery: Record<string, unknown>;
-  }): Promise<Omit<Prisma.TriggerUncheckedCreateInput, "id" | "projectId">> {
-    const rule = await this.readGraphAlert({
-      projectId,
-      action: input.action,
-      alertType: input.alertType,
-      customGraphId,
-      graphAlert: input.graphAlert,
-    });
+  }): Omit<Prisma.TriggerUncheckedCreateInput, "id" | "projectId"> {
     const built = buildGraphAlertTriggerData({
       id,
       name: input.name,
@@ -355,7 +376,6 @@ export class PublicApiTriggerService {
     delivery: Record<string, unknown>;
     filterQuery: string | null;
   }): Omit<Prisma.TriggerUncheckedCreateInput, "id" | "projectId"> {
-    this.readReport({ action: input.action, report });
     const built = buildReportTriggerData({
       id,
       name: input.name,

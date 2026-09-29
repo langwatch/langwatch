@@ -2,9 +2,9 @@ import { createHmac } from "node:crypto";
 import { env } from "~/env.mjs";
 
 /**
- * Stable identity for a Slack secret without storing it in the clear. The
- * ciphertext has a random IV, so this is what makes one secret one connection
- * per organization (ADR-093 §5a). Keyed so a leaked table cannot be brute-forced.
+ * Stable identity for a Slack secret without storing it in the clear: one secret
+ * is one connection per scope (ADR-093 §5a). Keyed so a leaked table cannot be
+ * brute-forced, with the same key fallback as `utils/encryption`.
  */
 export function slackSecretFingerprint({ secret }: { secret: string }): string {
   const key = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;

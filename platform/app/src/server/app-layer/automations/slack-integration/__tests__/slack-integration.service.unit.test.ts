@@ -265,7 +265,7 @@ describe("SlackIntegrationService", () => {
   describe("listForProject()", () => {
     it("lists usable connections with how many automations use each", async () => {
       const bot = await addBot();
-      repo.dependents.set(bot.id, 2);
+      repo.dependents.set(bot.id, ["project-1", "project-2"]);
 
       const { connections } = await service.listForProject({
         projectId: "project-1",
@@ -344,6 +344,49 @@ describe("SlackIntegrationService", () => {
       });
     });
 
+    describe("given an organization connection another project's automations use", () => {
+      /** @scenario "Narrowing an organization connection other projects use is confirmed first" */
+      it("refuses narrowing with their count, then narrows once forced", async () => {
+        const bot = await addBot();
+        repo.dependents.set(bot.id, ["project-1", "project-2", "project-2"]);
+        const narrow = (force?: boolean) =>
+          service.update({
+            scope: PROJECTS["project-1"]!,
+            connection: repo.rows.get(bot.id)!,
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+            actorId: "user-1",
+            force,
+          });
+
+        await expect(narrow()).rejects.toMatchObject({
+          code: "slack_connection_in_use",
+          meta: { dependentAutomations: 2 },
+        });
+        expect(repo.rows.get(bot.id)?.scopeType).toBe("ORGANIZATION");
+
+        await expect(narrow(true)).resolves.toMatchObject({
+          scopeType: "PROJECT",
+          scopeId: "project-1",
+        });
+      });
+
+      it("narrows without asking when only this project's automations use it", async () => {
+        const bot = await addBot();
+        repo.dependents.set(bot.id, ["project-1"]);
+
+        await expect(
+          service.update({
+            scope: PROJECTS["project-1"]!,
+            connection: repo.rows.get(bot.id)!,
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+            actorId: "user-1",
+          }),
+        ).resolves.toMatchObject({ scopeType: "PROJECT" });
+      });
+    });
+
     describe("given a move into a scope that already holds its secret", () => {
       it("refuses with the connection-exists code and leaves both in place", async () => {
         const url = "https://hooks.slack.com/services/T/B/move";
@@ -383,7 +426,7 @@ describe("SlackIntegrationService", () => {
       /** @scenario "Deleting a connection in use says what stops delivering" */
       it("refuses with the count, then removes it once confirmed", async () => {
         const bot = await addBot();
-        repo.dependents.set(bot.id, 3);
+        repo.dependents.set(bot.id, ["project-1", "project-1", "project-2"]);
         const connection = repo.rows.get(bot.id)!;
 
         await expect(
@@ -601,6 +644,19 @@ describe("SlackIntegrationService", () => {
             actionParams: { slackIntegrationId: own.id },
           }),
         ).rejects.toMatchObject({ code: "slack_integration_missing" });
+      });
+    });
+
+    describe("given a legacy bot token and no channel", () => {
+      it("refuses before storing any connection", async () => {
+        await expect(
+          service.connectActionParams({
+            projectId: "project-1",
+            actorId: "user-1",
+            actionParams: { slackDelivery: "bot", slackBotToken: "xoxb-new-1" },
+          }),
+        ).rejects.toMatchObject({ code: "invalid_action_params" });
+        expect(repo.rows.size).toBe(0);
       });
     });
 

@@ -5,8 +5,8 @@
  * Transport only. Spec: specs/automations/slack-connections.feature.
  */
 
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { InvalidActionParamsError } from "~/server/app-layer/automations/errors";
 import type { SlackProjectScope } from "~/server/app-layer/automations/slack-integration/repositories/slack-integration.repository";
 import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import {
@@ -45,11 +45,10 @@ function assertReachableScope({
       ? scope.organizationId
       : scope.projectId;
   if (target.scopeId !== expected) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        "A Slack connection is scoped to this project or to its organization.",
-    });
+    throw new InvalidActionParamsError(
+      "A Slack connection is scoped to this project or to its organization.",
+      "scopeId",
+    );
   }
 }
 
@@ -171,6 +170,8 @@ export const slackIntegrationRouter = createTRPCRouter({
         scopeType: scopeTypeSchema.optional(),
         scopeId: z.string().optional(),
         secret: secretSchema.optional(),
+        /** Confirms narrowing a connection other projects deliver through. */
+        force: z.boolean().optional(),
       }),
     )
     .permission("project:view")
@@ -200,7 +201,7 @@ export const slackIntegrationRouter = createTRPCRouter({
         connection.kind === "INCOMING_WEBHOOK" &&
         !input.secret.startsWith(SLACK_WEBHOOK_PREFIX)
       ) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: webhookMessage });
+        throw new InvalidActionParamsError(webhookMessage, "secret");
       }
 
       const updated = await service.update({
@@ -210,6 +211,7 @@ export const slackIntegrationRouter = createTRPCRouter({
         ...(moves ? target : {}),
         secret: input.secret,
         actorId: ctx.session.user.id,
+        force: input.force ?? false,
       });
       return { ...updated, canManage: true };
     }),
