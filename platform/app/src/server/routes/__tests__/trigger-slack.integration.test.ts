@@ -4,11 +4,16 @@
  * stored as a connection, or a connection the project can use (ADR-093 §5a).
  */
 import { nanoid } from "nanoid";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { SlackIntegrationKind, TriggerAction } from "~/generated/prisma/client";
 import { registerRedactionProject } from "~/app/api/triggers/__tests__/trigger-redaction-fixture";
+import {
+  type SlackIntegrationKind,
+  TriggerAction,
+} from "~/generated/prisma/client";
+import { globalForApp } from "~/server/app-layer/app";
 import { slackSecretFingerprint } from "~/server/app-layer/automations/slack-integration/slack-secret-fingerprint";
+import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
 import { app } from "../misc";
@@ -31,6 +36,14 @@ const storedParams = z.object({
 describe("Feature: the narrow Slack alert endpoint takes a connection as well as a webhook URL", () => {
   const ns = `trigger-slack-${nanoid(8)}`;
   const { projectId, organizationId, headers } = registerRedactionProject(ns);
+
+  // The route's permission gate decides through the app's permissions service.
+  beforeAll(() => {
+    globalForApp.__langwatch_app = createTestApp();
+  });
+  afterAll(() => {
+    globalForApp.__langwatch_app = null;
+  });
 
   const createAlert = (body: Record<string, unknown>) =>
     app.request("/api/trigger/slack", {

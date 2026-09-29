@@ -186,7 +186,8 @@ describe("migrateSlackConnections task", () => {
       "Slack connection migration: applying.",
     ]);
     const stored = await findConnections({ organizationId });
-    expect(stored).toHaveLength(2);
+    // The bot, and the shared webhook once per project: never widened.
+    expect(stored).toHaveLength(3);
     for (const automation of [bot, ...hooks]) {
       expect(await readParams(automation)).toMatchObject({
         slackIntegrationId: expect.any(String),
@@ -290,7 +291,7 @@ describe("migrateSlackConnections task", () => {
     }
     expect(
       await findConnections({ organizationId: healthy.organization.id }),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     for (const automation of [bot, ...hooks]) {
       expect(await readParams(automation)).toMatchObject({
         slackIntegrationId: expect.any(String),

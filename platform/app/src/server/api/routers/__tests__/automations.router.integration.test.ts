@@ -19,9 +19,9 @@ import {
   vi,
 } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
-import { encrypt } from "~/utils/encryption";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { encrypt } from "~/utils/encryption";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
@@ -818,8 +818,9 @@ describe("automationRouter", () => {
         expect(createArgs.data.actionParams).toMatchObject({
           source: { kind: "traceQuery", topN: 5 },
           schedule: { cron: "0 9 * * 1", timezone: "UTC" },
-          slackWebhook: "https://hooks.slack.com/services/abc",
+          slackIntegrationId: "conn-test",
         });
+        expect(createArgs.data.actionParams).not.toHaveProperty("slackWebhook");
         expect(mockSyncReportSchedule).toHaveBeenCalledWith({
           projectId: "proj_123",
           triggerId: "report_trig",
