@@ -316,3 +316,11 @@ Feature: Evaluation service boundary
     When the evaluator request is built for langevals
     Then each context is the chunk's content, not the JSON envelope around it
     And an unmapped or empty contexts field is sent as no contexts rather than one empty string
+
+  @unit
+  Scenario: Invalid evaluator settings are refused even when generation parameters ride along
+    Given an evaluator whose settings carry a temperature
+    And the evaluator's own settings fail its settings schema
+    When the settings are parsed for dispatch on the API route
+    Then the parse fails with the schema's error
+    And the route answers 400 rather than dispatching the generation parameters alone

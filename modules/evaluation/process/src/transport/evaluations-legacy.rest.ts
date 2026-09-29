@@ -60,6 +60,7 @@ import {
   translateLegacyPairwisePayload,
 } from "../rules/evaluation-dispatch.rules.ts";
 import { buildEvaluatorCatalogue } from "../rules/evaluator-catalogue.rules.ts";
+import { parseDispatchSettings } from "../rules/evaluator-settings.rules.ts";
 
 const logger = createLogger("langwatch:evaluations-legacy");
 
@@ -819,7 +820,11 @@ async function mergeEvaluatorSettings({
       );
     }
 
-    return { settings: evaluatorSettingSchema?.parse(finalSettings) };
+    // The generated schema declares only the evaluator's own fields, so the model editor's
+    // generation parameters are put back after the parse, as a scenario run forwards them.
+    return {
+      settings: parseDispatchSettings({ schema: evaluatorSettingSchema, settings: finalSettings }),
+    };
   } catch (error) {
     logInvalid({ error, projectId, message: "invalid settings received for the evaluator" });
 
