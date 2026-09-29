@@ -199,6 +199,6 @@ func (m *Monitor) probe(ctx context.Context) {
 	m.lastSuccess = m.now()
 	m.mu.Unlock()
 	if !since.IsZero() {
-		m.logger.Warn("statusprobe_control_plane_recovered", zap.Duration("outage", m.now().Sub(since)))
+		m.logger.Info("statusprobe_control_plane_recovered", zap.Duration("outage", m.now().Sub(since)))
 	}
 }
