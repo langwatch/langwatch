@@ -195,7 +195,7 @@ Feature: Staged automation authoring drawer
 
     @integration
     Scenario: A link to an automation that does not exist says so
-      Given a link to view an automation that does not exist
+      Given a link to view an automation that does not exist or was deleted
       When the user opens it
       Then the drawer says the automation no longer exists
       And it offers no Edit button

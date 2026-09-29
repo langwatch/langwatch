@@ -752,8 +752,10 @@ export const automationRouter = createTRPCRouter({
         triggerId: input.triggerId,
         projectId: input.projectId,
       });
+      // A deleted automation reads as missing, as it does in the list.
+      if (!trigger || trigger.deleted) return null;
       // Never return the encrypted bot token to the browser (ADR-041).
-      return trigger ? redactTriggerForRead(trigger) : trigger;
+      return redactTriggerForRead(trigger);
     }),
   /**
    * Channels a bot connection can post to, for the composer's picker (ADR-093

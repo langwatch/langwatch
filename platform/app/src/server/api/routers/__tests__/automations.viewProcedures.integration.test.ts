@@ -304,4 +304,33 @@ describe("automationRouter in-depth view reads", () => {
       });
     });
   });
+  describe("given the single-automation read", () => {
+    describe("when the automation was deleted", () => {
+      it("reads as missing, as it does in the list", async () => {
+        mockTriggerFindUnique.mockResolvedValue(
+          traceAutomationRow({ deleted: true }),
+        );
+
+        await expect(
+          caller.getTriggerById({
+            projectId: PROJECT_ID,
+            triggerId: TRIGGER_ID,
+          }),
+        ).resolves.toBeNull();
+      });
+    });
+
+    describe("when the automation is live", () => {
+      it("returns it", async () => {
+        mockTriggerFindUnique.mockResolvedValue(traceAutomationRow());
+
+        await expect(
+          caller.getTriggerById({
+            projectId: PROJECT_ID,
+            triggerId: TRIGGER_ID,
+          }),
+        ).resolves.toMatchObject({ id: TRIGGER_ID, name: "Errors to Slack" });
+      });
+    });
+  });
 });

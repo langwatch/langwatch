@@ -36,7 +36,6 @@ import {
   subscribeToModelProvidersUpdated,
 } from "./modelProviderSync";
 import { shouldRetryQuery } from "./queryRetryPolicy";
-import { redactingConsole } from "./redactLoggedRequest";
 import { sseLink } from "./sseLink";
 import {
   extractAiCallFailedInfo,
@@ -144,8 +143,16 @@ function createTRPCLinks() {
       enabled: (opts) =>
         process.env.NODE_ENV === "development" ||
         (opts.direction === "down" && opts.result instanceof Error),
-      // Inputs carry header values, signing secrets and bot tokens.
-      console: redactingConsole,
+      // Operation names only: inputs and results can carry secrets.
+      logger: (opts) => {
+        if (opts.direction === "up") {
+          console.log(`>> ${opts.type} ${opts.path}`);
+          return;
+        }
+        const failed = opts.result instanceof Error;
+        const log = failed ? console.error : console.log;
+        log(`<< ${opts.type} ${opts.path} ${Math.round(opts.elapsedMs)}ms`);
+      },
     }),
     // Top layer: subscriptions ride the existing SSE link; everything else
     // goes through the WS-or-HTTP router below.
