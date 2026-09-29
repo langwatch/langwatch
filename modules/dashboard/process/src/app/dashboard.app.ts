@@ -40,15 +40,7 @@ import {
   type SavedWorkbenchChartDefinitionUpdate,
   type DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
-import {
-  FeatureFlagApi,
-  type FeatureFlagApi as FeatureFlagApiContract,
-} from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import {
-  OrganizationApi,
-  type OrganizationApi as OrganizationApiContract,
-} from "@langwatch/organization-contract";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 
 import type { DashboardRepositories } from "../repositories/dashboard.repositories.ts";
@@ -70,9 +62,7 @@ type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
   automation: typeof AutomationApi;
   projects: typeof ProjectApi;
-  featureFlags: typeof FeatureFlagApi;
   authz: typeof AuthzApi;
-  organizations: typeof OrganizationApi;
 }>;
 
 /**
@@ -119,25 +109,17 @@ class AnalyticsWorkbenchCaller implements WorkbenchCaller {
   }
 }
 
-/** Team membership from the organization peer, admin rights from authz. */
+/** Team membership from the project peer, which owns the team, and admin rights from authz. */
 class PeerDashboardAudience implements DashboardAudience {
   constructor(
     private readonly peers: Readonly<{
       projects: ProjectApiContract;
-      organizations: OrganizationApiContract;
       authz: AuthzApiContract;
     }>,
   ) {}
 
-  async isTeamMember(input: { projectId: string; userId: string }): Promise<boolean> {
-    const project = await this.peers.projects.findById(input.projectId);
-    if (!project) return false;
-
-    const teamIds = await this.peers.organizations.findMemberTeamIds({
-      organizationId: await this.peers.projects.getOrganizationId(input.projectId),
-      userId: input.userId,
-    });
-    return teamIds.includes(project.teamId);
+  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean> {
+    return this.peers.projects.isTeamMember(input);
   }
 
   isAdmin(input: { projectId: string; userId: string }): Promise<boolean> {
@@ -149,21 +131,15 @@ class PeerDashboardAudience implements DashboardAudience {
   }
 }
 
-/** `release_dashboards`, asked of the project within its organization. */
-class FeatureFlagDashboardsRollout implements DashboardsRollout {
-  constructor(
-    private readonly peers: Readonly<{
-      featureFlags: FeatureFlagApiContract;
-      projects: ProjectApiContract;
-    }>,
-  ) {}
+/**
+ * `release_dashboards`, answered by Analytics, which owns the reporting area's
+ * rollout flags — the same peer the Workbench gate is composed from.
+ */
+class AnalyticsDashboardsRollout implements DashboardsRollout {
+  constructor(private readonly analytics: AnalyticsApiContract) {}
 
-  async isDashboardsEnabled(input: { projectId: string }): Promise<boolean> {
-    return this.peers.featureFlags.isEnabled("release_dashboards", {
-      kind: "project",
-      projectId: input.projectId,
-      organizationId: await this.peers.projects.getOrganizationId(input.projectId),
-    });
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean> {
+    return this.analytics.isDashboardsEnabled(input);
   }
 }
 
@@ -173,9 +149,7 @@ export class DashboardApp implements DashboardApi {
     analytics: AnalyticsApi,
     automation: AutomationApi,
     projects: ProjectApi,
-    featureFlags: FeatureFlagApi,
     authz: AuthzApi,
-    organizations: OrganizationApi,
   };
   static readonly reads = ["publicBaseUrl"] as const;
 
@@ -233,11 +207,11 @@ export class DashboardApp implements DashboardApi {
     const analytics: AnalyticsApiContract = setup.dependencies.analytics;
     const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
-    const { projects, featureFlags, authz, organizations } = setup.dependencies;
+    const { projects, authz } = setup.dependencies;
     const dashboards = DashboardService.create({
       repository: setup.repositories.dashboards,
       workbenchAccess,
-      audience: new PeerDashboardAudience({ projects, organizations, authz }),
+      audience: new PeerDashboardAudience({ projects, authz }),
     });
 
     return new DashboardApp({
@@ -262,7 +236,7 @@ export class DashboardApp implements DashboardApi {
         projects: setup.dependencies.projects,
       },
       workbench: { access: workbenchAccess, caller: workbenchCaller },
-      rollout: new FeatureFlagDashboardsRollout({ featureFlags, projects }),
+      rollout: new AnalyticsDashboardsRollout(analytics),
       publicBaseUrl: setup.members.publicBaseUrl,
     });
   }

@@ -395,6 +395,10 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return this.#projectService.getOrganizationId(projectId);
   }
 
+  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean> {
+    return this.#projectService.isTeamMember(input);
+  }
+
   getWithTeam(id: string): Promise<ProjectWithTeam> {
     return this.#projectService.getWithTeam(id);
   }

@@ -49,6 +49,7 @@ export class TestProjectApi implements ProjectApi {
   listPaths = unsupported<ProjectApi["listPaths"]>("listPaths");
   findOrganizationId = unsupported<ProjectApi["findOrganizationId"]>("findOrganizationId");
   isPresenceEnabled = unsupported<ProjectApi["isPresenceEnabled"]>("isPresenceEnabled");
+  isTeamMember = unsupported<ProjectApi["isTeamMember"]>("isTeamMember");
   findSummaryById = unsupported<ProjectApi["findSummaryById"]>("findSummaryById");
   searchByQuery = unsupported<ProjectApi["searchByQuery"]>("searchByQuery");
   findById = unsupported<ProjectApi["findById"]>("findById");

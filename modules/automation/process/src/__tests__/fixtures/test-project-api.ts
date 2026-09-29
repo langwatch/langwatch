@@ -44,6 +44,12 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.isPresenceEnabled?.(input) ?? this.unimplemented("isPresenceEnabled");
   }
 
+  isTeamMember(
+    input: Parameters<ProjectApi["isTeamMember"]>[0],
+  ): ReturnType<ProjectApi["isTeamMember"]> {
+    return this.overrides.isTeamMember?.(input) ?? this.unimplemented("isTeamMember");
+  }
+
   findSummaryById(
     projectId: Parameters<ProjectApi["findSummaryById"]>[0],
   ): ReturnType<ProjectApi["findSummaryById"]> {
@@ -103,7 +109,10 @@ export class TestProjectApi implements ProjectApi {
   findLiveNonGovernanceIdsByOrganization(
     input: Parameters<ProjectApi["findLiveNonGovernanceIdsByOrganization"]>[0],
   ): ReturnType<ProjectApi["findLiveNonGovernanceIdsByOrganization"]> {
-    return this.overrides.findLiveNonGovernanceIdsByOrganization?.(input) ?? this.unimplemented("findLiveNonGovernanceIdsByOrganization");
+    return (
+      this.overrides.findLiveNonGovernanceIdsByOrganization?.(input) ??
+      this.unimplemented("findLiveNonGovernanceIdsByOrganization")
+    );
   }
 
   findLiveBySlug(

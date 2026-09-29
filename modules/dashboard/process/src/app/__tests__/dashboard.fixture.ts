@@ -8,9 +8,7 @@ import type {
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
-import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { vi } from "vitest";
 
@@ -50,6 +48,7 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
       followsGranularity: false,
     }),
     isWorkbenchEnabled: async () => true,
+    isDashboardsEnabled: async () => true,
     assertCustomChartPlaygroundEnabled: async () => void 0,
     resolveProtections: async () => FULLY_PERMITTED,
     resolveRunCaller: async () => ({
@@ -70,18 +69,17 @@ export function createDashboardTestAutomation(triggers: Trigger[] = []): Automat
 export const TEST_TEAM_ID = "team-1";
 export const TEST_ORGANIZATION_ID = "organization-1";
 
-export function createDashboardTestProjects(slug = "project-one"): ProjectApi {
+/** Team members are the listed ids; everyone else is outside the project's team. */
+export function createDashboardTestProjects(
+  input: Readonly<{ slug?: string; teamMemberIds?: readonly string[] }> = {},
+): ProjectApi {
+  const slug = input.slug ?? "project-one";
+  const teamMemberIds = input.teamMemberIds ?? [];
   return createApiFixture<ProjectApi>({
     findSummaryById: async () => ({ name: "Project One", slug }),
     findById: async (id: string) => ({ id, teamId: TEST_TEAM_ID }) as Project,
     getOrganizationId: async () => TEST_ORGANIZATION_ID,
-  });
-}
-
-/** `release_dashboards` for every project, on unless said otherwise. */
-export function createDashboardTestFeatureFlags(dashboardsEnabled = true): FeatureFlagApi {
-  return createApiFixture<FeatureFlagApi>({
-    isEnabled: async (flagKey) => flagKey === "release_dashboards" && dashboardsEnabled,
+    isTeamMember: async ({ userId }) => teamMemberIds.includes(userId),
   });
 }
 
@@ -93,15 +91,6 @@ export function createDashboardTestAuthz(adminIds: readonly string[] = []): Auth
   });
 }
 
-/** Members of the project's team; everyone else is only in the organisation. */
-export function createDashboardTestOrganizations(
-  teamMemberIds: readonly string[] = [],
-): OrganizationApi {
-  return createApiFixture<OrganizationApi>({
-    findMemberTeamIds: async ({ userId }) => (teamMemberIds.includes(userId) ? [TEST_TEAM_ID] : []),
-  });
-}
-
 export function createDashboardTestApp(
   input: Readonly<{
     repositories?: DashboardRepositories;
@@ -110,9 +99,7 @@ export function createDashboardTestApp(
       analytics: AnalyticsApi;
       automation: AutomationApi;
       projects: ProjectApi;
-      featureFlags: FeatureFlagApi;
       authz: AuthzApi;
-      organizations: OrganizationApi;
     }>;
   }> = {},
 ): DashboardApp {
@@ -123,9 +110,7 @@ export function createDashboardTestApp(
       analytics: input.dependencies?.analytics ?? createDashboardTestAnalytics(),
       automation: input.dependencies?.automation ?? createDashboardTestAutomation(),
       projects: input.dependencies?.projects ?? createDashboardTestProjects(),
-      featureFlags: input.dependencies?.featureFlags ?? createDashboardTestFeatureFlags(),
       authz: input.dependencies?.authz ?? createDashboardTestAuthz(),
-      organizations: input.dependencies?.organizations ?? createDashboardTestOrganizations(),
     },
     config: undefined,
     resources: new ResourceScope(),

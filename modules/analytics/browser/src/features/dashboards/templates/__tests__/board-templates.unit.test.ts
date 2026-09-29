@@ -65,6 +65,55 @@ describe("BOARD_TEMPLATES", () => {
     expect(AGENT_FLIGHT_DECK_TEMPLATE.widgets).toHaveLength(10);
   });
 
+  /** @scenario "AC4 The ten widgets in prototype order" */
+  it("orders the Flight Deck's widgets as the prototype does, full-width or paired", () => {
+    const FULL_WIDTH = new Set([
+      "Status",
+      "Throughput, latency & errors",
+      "Your coding agents",
+      "Most impactful traces",
+    ]);
+
+    expect(AGENT_FLIGHT_DECK_TEMPLATE.widgets.map(({ name }) => name)).toEqual([
+      "Status",
+      "Throughput, latency & errors",
+      "Cost efficiency",
+      "Failure intelligence",
+      "Scenario results",
+      "Quality signal",
+      "User feedback",
+      "Gateway routing",
+      "Your coding agents",
+      "Most impactful traces",
+    ]);
+
+    for (const { name, layout } of AGENT_FLIGHT_DECK_TEMPLATE.widgets) {
+      const expectedSpan = FULL_WIDTH.has(name) ? CHART_GRID_COLUMNS : CHART_GRID_COLUMNS / 2;
+      expect(layout.colSpan, name).toBe(expectedSpan);
+    }
+  });
+
+  /** @scenario "AC4 The ten widgets in prototype order" */
+  it("shows each Flight Deck widget's own subtitle in its stored code", () => {
+    const SUBTITLES: Record<string, string> = {
+      Status: "Traffic, quality, latency and cost at a glance",
+      "Throughput, latency & errors": "Correlate traffic spikes with degradation",
+      "Cost efficiency": "What the spend buys",
+      "Failure intelligence": "Top error categories in the window",
+      "Scenario results": "How much behaviour your scenario suites exercise",
+      "Quality signal": "Evaluator pass rate over time, against the error rate",
+      "User feedback": "What users think of the answers",
+      "Gateway routing": "Cost broken down by virtual key / route",
+      "Your coding agents": "Sessions, spend and success across Claude Code, Cursor and Codex",
+      "Most impactful traces":
+        "Ranked by blended impact: errors, extreme latency, cost, negative feedback",
+    };
+
+    for (const { name, definition } of AGENT_FLIGHT_DECK_TEMPLATE.widgets) {
+      expect(definition.code, name).toContain(SUBTITLES[name]);
+    }
+  });
+
   describe.each(BOARD_TEMPLATES.map((template) => [template.name, template] as const))(
     "given the %s template",
     (_, { widgets }) => {

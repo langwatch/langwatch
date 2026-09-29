@@ -11,8 +11,7 @@ import {
   createDashboardTestAnalytics,
   createDashboardTestApp,
   createDashboardTestAuthz,
-  createDashboardTestFeatureFlags,
-  createDashboardTestOrganizations,
+  createDashboardTestProjects,
 } from "./dashboard.fixture.ts";
 
 const PROJECT = "project-1";
@@ -34,17 +33,15 @@ function appWith(
   return createDashboardTestApp({
     ...(options.repositories === undefined ? {} : { repositories: options.repositories }),
     dependencies: {
-      featureFlags: createDashboardTestFeatureFlags(options.dashboardsEnabled ?? true),
       authz: createDashboardTestAuthz([ADMIN.userId]),
-      organizations: createDashboardTestOrganizations([
-        CREATOR.userId,
-        TEAMMATE.userId,
-        ADMIN.userId,
-      ]),
-      ...(options.executeLangWatchQL === undefined
-        ? {}
-        : {
-            analytics: createDashboardTestAnalytics({
+      projects: createDashboardTestProjects({
+        teamMemberIds: [CREATOR.userId, TEAMMATE.userId, ADMIN.userId],
+      }),
+      analytics: createDashboardTestAnalytics({
+        isDashboardsEnabled: async () => options.dashboardsEnabled ?? true,
+        ...(options.executeLangWatchQL === undefined
+          ? {}
+          : {
               executeLangWatchQL: async (input) => ({
                 columns: [],
                 rows: (await options.executeLangWatchQL?.(input))?.rows ?? [],
@@ -54,7 +51,7 @@ function appWith(
                 followsGranularity: false,
               }),
             }),
-          }),
+      }),
     },
   });
 }
