@@ -788,6 +788,30 @@ describe("Feature: automations over the public API express what the dashboard ex
         actionParams: expect.objectContaining({ url: WEBHOOK_URL }),
       });
     });
+
+    /** @scenario "Retargeting while keeping the stored signing secret is refused" */
+    it("names the signing secret as what has to travel", async () => {
+      const saved = await created(
+        await createTrigger({
+          name: `Retarget signed ${ns}`,
+          action: TriggerAction.SEND_WEBHOOK,
+          actionParams: { url: WEBHOOK_URL, signingSecret: "whsec-original" },
+          filters: CONDITION,
+        }),
+      );
+
+      const response = await patch(`/api/triggers/${saved.id}`, {
+        actionParams: { url: RETARGETED_URL, signingSecret: REDACTED },
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        error: "invalid_action_params",
+      });
+      expect(await storedRow(saved.id)).toMatchObject({
+        actionParams: expect.objectContaining({ url: WEBHOOK_URL }),
+      });
+    });
   });
 
   describe("when an update names a different delivery channel", () => {

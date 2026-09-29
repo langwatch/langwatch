@@ -201,8 +201,8 @@ export async function persistPublicApiActionParams({
 }
 
 /**
- * A header value authenticates against the endpoint it was issued for, so it
- * does not follow that endpoint's replacement: a save that points the
+ * A header value or signing secret authenticates against the endpoint it was
+ * issued for, so it does not follow that endpoint's replacement: a save that points the
  * automation somewhere new states the header values for the new destination.
  *
  * The dashboard says "re-enter them", which is what an author does — they can
@@ -231,6 +231,12 @@ function assertHeaderValuesTravelWithTheirDestination({
     isRecord(headers) &&
     Object.values(headers).some((value) => value === REDACTED_CREDENTIAL);
   if (keepsAStoredValue) throw new WebhookHeaderValuesRequiredError();
+  if (incoming.signingSecret === REDACTED_CREDENTIAL) {
+    throw new InvalidActionParamsError(
+      "Changing the destination means sending the signing secret with it, or null to stop signing.",
+      "signingSecret",
+    );
+  }
 }
 
 /**

@@ -312,7 +312,7 @@ Feature: Automations over the public API
 
   Rule: Header values travel with the destination they authenticate against
 
-    A header value is issued for one endpoint, so it does not follow that
+    A header value or signing secret is issued for one endpoint, so it does not follow that
     endpoint's replacement. The dashboard tells an author to re-enter the
     values; an API caller never held them, so it is told to send them — one
     call carrying the new destination and each header's value saves both.
@@ -328,6 +328,13 @@ Feature: Automations over the public API
       Given an automation that delivers to a customer endpoint with an authorization header
       When the integrator sends a new destination and asks to keep the stored header value
       Then the save is refused, saying the values have to travel with the destination
+      And the automation still delivers to the destination it had
+
+    @integration
+    Scenario: Retargeting while keeping the stored signing secret is refused
+      Given an automation that delivers to a customer endpoint with a signing secret
+      When the integrator sends a new destination and asks to keep the stored signing secret
+      Then the save is refused, naming the signing secret
       And the automation still delivers to the destination it had
 
   Rule: An automation can be exercised and inspected over the API

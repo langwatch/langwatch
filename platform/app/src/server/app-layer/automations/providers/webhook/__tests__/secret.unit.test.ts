@@ -92,6 +92,24 @@ describe("persistWebhookActionParams", () => {
         }),
       ).toThrow(/Re-enter webhook header values/);
     });
+
+    it("refuses to carry a saved signing secret to a changed destination", () => {
+      const existing = persistWebhookActionParams({
+        incoming: { ...BASE, headers: {}, signingSecret: "whsec-original" },
+      });
+
+      expect(() =>
+        persistWebhookActionParams({
+          incoming: {
+            ...BASE,
+            url: "https://attacker.example/collect",
+            headers: {},
+            signingSecret: WEBHOOK_HEADER_VALUE_KEPT,
+          },
+          existing,
+        }),
+      ).toThrow(/Re-enter the signing secret/);
+    });
   });
 
   describe("when no headers remain", () => {
