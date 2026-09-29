@@ -77,7 +77,10 @@ function selfTest() {
 
 selfTest();
 
-const files = execFileSync("git", ["ls-files", "*.ts"], { encoding: "utf8" })
+const files = execFileSync("git", ["ls-files", "*.ts"], {
+  encoding: "utf8",
+  maxBuffer: 64 * 1024 * 1024,
+})
   .split("\n")
   .filter(
     (file) =>
