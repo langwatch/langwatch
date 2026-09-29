@@ -426,9 +426,12 @@ converted (no availability logic in `*.config.ts` projections; off states use th
 instance operator, self-hosted included: the dashboard, event sourcing, the foundry, flags,
 migrations, and instance administration (users, organizations, projects, SSO connections,
 identity lookup, directory sync). **Cloud admin** (`/ops/cloud/**`) is LangWatch's own company
-tooling (subscriptions, licences, self-hosted instances, bug reports): the ops gate plus the SaaS
-deployment fact, invisible and refused elsewhere. `/ops/backoffice/**` redirects; "backoffice" is
+tooling (subscriptions, licences, self-hosted instances, bug reports): the ops gate plus ops's own
+cloud-ops capability, invisible and refused elsewhere. `/ops/backoffice/**` redirects; "backoffice" is
 a deleted name (§15).
+The capability is ops's, from its own config and secrets, never `isSaas`: ops config asks for cloud
+ops (`LANGWATCH_CLOUD_OPS`), and ops's secrets hold the licence private key, which must match the
+release's built-in public key. Asked for without a matching key refuses boot (Alex, 2026-09-29).
 
 ---
 
