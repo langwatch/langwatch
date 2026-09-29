@@ -86,6 +86,9 @@ export class ScimGroupMembershipService {
         userId,
       });
     }
+    if (input.memberIds.length > 0) {
+      await this.grants.invalidateOrganization({ organizationId: input.organizationId });
+    }
   }
 
   /**
@@ -109,6 +112,7 @@ export class ScimGroupMembershipService {
       groupId: input.groupId,
       userIds: input.userIds,
     });
+    await this.grants.invalidateOrganization({ organizationId: input.organizationId });
   }
 
   async replace(input: {

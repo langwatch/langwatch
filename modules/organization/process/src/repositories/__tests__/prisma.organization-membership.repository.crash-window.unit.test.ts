@@ -1,4 +1,4 @@
-/** Crash window between Prisma write and ledger append: member keeps old access on failure. */
+/** Crash window between Prisma write and ledger append: removal and demotion converge on retry. */
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
@@ -73,13 +73,39 @@ beforeEach(() => {
 });
 
 describe("given a member whose removal is under way", () => {
-  describe("when the grants revocation fails", () => {
-    it("keeps the membership row, so the seat outlives the grants and not the other way round", async () => {
+  describe("when the removal completes", () => {
+    /** @scenario "Removing a member retires their cached grants after the seat is gone" */
+    it("deletes the membership row before revoking the grants, so the epoch bump comes last", async () => {
+      const order: string[] = [];
       memberFindUnique.mockResolvedValue({
         role: OrganizationUserRole.MEMBER,
         disabledAt: null,
       });
-      revokeBindingsWhere.mockRejectedValue(new Error("ledger unavailable"));
+      memberDelete.mockImplementation(async () => {
+        order.push("deleteMembership");
+      });
+      revokeBindingsWhere.mockImplementation(async () => {
+        order.push("revokeGrants");
+        return 1;
+      });
+
+      await repository.deleteMember({
+        organizationId: "org_1",
+        userId: "user_a",
+        actingUserId: "user_b",
+      });
+
+      expect(order).toEqual(["deleteMembership", "revokeGrants"]);
+    });
+  });
+
+  describe("when the grants revocation fails after the seat is gone", () => {
+    it("surfaces the failure, and a retry revokes what the vanished seat left behind", async () => {
+      memberFindUnique.mockResolvedValue({
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+      });
+      revokeBindingsWhere.mockRejectedValueOnce(new Error("ledger unavailable"));
 
       await expect(
         repository.deleteMember({
@@ -88,8 +114,17 @@ describe("given a member whose removal is under way", () => {
           actingUserId: "user_b",
         }),
       ).rejects.toThrow("ledger unavailable");
+      expect(memberDelete).toHaveBeenCalled();
 
-      expect(memberDelete).not.toHaveBeenCalled();
+      memberFindUnique.mockResolvedValue(null);
+      await expect(
+        repository.deleteMember({
+          organizationId: "org_1",
+          userId: "user_a",
+          actingUserId: "user_b",
+        }),
+      ).rejects.toMatchObject({ code: "member_not_found" });
+      expect(revokeBindingsWhere).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -136,25 +171,15 @@ describe("given a member whose removal is under way", () => {
   });
 
   describe("when the transaction's locked re-check refuses a removal the advisory pre-check let through", () => {
-    it("puts back the grants it just revoked, so the survivor keeps their access", async () => {
+    it("refuses before revoking anything, so the survivor keeps their access", async () => {
       memberFindUnique.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,
         disabledAt: null,
       });
       // The unlocked pre-check outside the transaction sees two admins...
       memberCount.mockResolvedValue(2);
-      // ...but a concurrent removal of the organization's other admin has
-      // already committed by the time this one takes its locked read.
+      // ...but a concurrent removal of the other admin committed before this locked read.
       queryRaw.mockResolvedValue([{ userId: "user_a" }]);
-      roleBindingFindMany.mockResolvedValue([
-        {
-          id: "rb_1",
-          role: "ADMIN",
-          customRoleId: null,
-          scopeType: "ORGANIZATION",
-          scopeId: "org_1",
-        },
-      ]);
 
       await expect(
         repository.deleteMember({
@@ -165,22 +190,7 @@ describe("given a member whose removal is under way", () => {
       ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
 
       expect(memberDelete).not.toHaveBeenCalled();
-      expect(attachBindings).toHaveBeenCalledWith(
-        expect.objectContaining({
-          organizationId: "org_1",
-          bindings: [
-            expect.objectContaining({
-              bindingId: "rb_1",
-              principal: { userId: "user_a" },
-              role: "ADMIN",
-              customRoleId: null,
-              scopeType: "ORGANIZATION",
-              scopeId: "org_1",
-            }),
-          ],
-          onDuplicate: "skip",
-        }),
-      );
+      expect(revokeBindingsWhere).not.toHaveBeenCalled();
     });
   });
 });

@@ -148,6 +148,23 @@ describe("SCIM group access removal", () => {
     directory = directoryOver();
   });
 
+  /** @scenario "A group membership change retires the organization's cached grants" */
+  it.each(["remove", "replace"] as const)(
+    "retires the organization's cached grants after the membership goes on %s",
+    async (operation) => {
+      directory.grants.invalidateOrganization.mockImplementation(async () => {
+        directory.writes.push("invalidateOrganization");
+      });
+
+      await takeMemberOut(directory.service, operation);
+
+      expect(directory.writes.at(-1)).toBe("invalidateOrganization");
+      expect(directory.grants.invalidateOrganization).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+      });
+    },
+  );
+
   it.each(["remove", "replace", "delete"] as const)(
     "takes the member out of the group on %s",
     async (operation) => {

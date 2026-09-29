@@ -153,6 +153,11 @@ export class ScimGrantsService {
     return { attached: toAttach.length, revoked: toRevoke.length };
   }
 
+  /** A group membership is not a grant write, so its change retires the cached grants itself. */
+  async invalidateOrganization(input: { organizationId: string }): Promise<void> {
+    await this.grants.invalidateOrganization(input);
+  }
+
   /**
    * Group grants replace the direct membership grants older pushes minted, so
    * the directory's own organization-scoped grants for these people go. Only

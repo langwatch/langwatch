@@ -1495,6 +1495,14 @@ names). A subscriber there hands each fact to `WebhookApi.requestGatewayEventDel
 builds and delivers the envelope. A failed detection throws and the debit is re-driven. That is
 safe because the ledger insert skips any budget the request has already debited.
 
+Group membership history is organization's fact, not authz's (Alex, 2026-09-30). Organization
+records a member added to a group, a member removed and a group deleted as events on its own
+pipeline, and the history columns on `GroupMembership` and `Group` (`removedAt`, `deletedAt` and
+their reasons) are organization's, folded from those events. The authz grants ledger records grants
+only, so membership needs no `AuthzApi` operation. Every write that changes who may do what ends by
+retiring the organization's cached grants, through a grant write or `AuthzApi.invalidateOrganization`,
+after the row it changes and never before: removing a member deletes the seat, then revokes its grants.
+
 ### 9.1 Purge, erase and retention across modules
 
 **Cross-module purge, erase and retention are commanded by the owners** (Alex, 2026-09-29). Work
@@ -1964,6 +1972,10 @@ in the feature, not a gap in the error system.
 A ported code keeps main's spelling (gateway's `budget_not_found`, never `gateway_budget_not_found`),
 and a service throws a `HandledError`, never a `TRPCError` (gateway's virtual-key services with
 `routing_policy_*` and `providers_*`) (Alex, 2026-09-29).
+A permission denial explains itself where authz denies (Alex, 2026-09-30): authz's own denial path
+asks the engine's `explain` for the roles that would grant the permission, best-effort under a 250ms
+deadline, and puts the role labels on the `HandledError`'s `meta`; the presentation registry renders
+the sentence, and a failed or late explanation leaves the plain denial.
 
 ---
 

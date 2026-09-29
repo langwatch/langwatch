@@ -1567,57 +1567,15 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
     await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member });
 
-    // Snapshotted before the revoke below so a refusal inside the transaction —
-    // the locked re-check is the one two concurrent removals of the last two
-    // admins can actually trip, the advisory check above passes for both — can put
-    // back exactly what this call is about to take away, rather than leaving a
-    // member who keeps their seat and loses every grant it should carry.
-    const grantsBeforeRevoke = await this.prisma.roleBinding.findMany({
-      where: { organizationId, userId },
-      select: {
-        id: true,
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
-      },
+    // The seat goes before the grants, so the revocation's epoch bump is the last
+    // write and no check can cache access the removal is about to take away. A
+    // crash between the two leaves orphaned grants, which the no-member branch
+    // above revokes on retry; a refusal inside the transaction revokes nothing.
+    await this.prisma.$transaction(async (tx) => {
+      await this.deleteMembershipRow({ tx, organizationId, userId });
+      await this.archivePersonalWorkspaces({ tx, organizationId, userId });
     });
-
-    // Grants go before the membership, not after. A ledger append cannot join
-    // the Prisma transaction, so one of the two writes is always exposed to a
-    // crash: this order leaves a member who still holds their seat and none of
-    // their grants (less access, and the retry converges), where the other
-    // order left grants nobody could reach any more.
     await revokeTheirGrants();
-
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await this.deleteMembershipRow({ tx, organizationId, userId });
-        await this.archivePersonalWorkspaces({ tx, organizationId, userId });
-      });
-    } catch (error) {
-      // The locked re-check inside `deleteMembershipRow` refused this
-      // removal — a concurrent removal of the organization's other admin
-      // committed first. The grants above are already gone by then, so
-      // without this the survivor keeps their seat and holds nothing. Put
-      // back exactly the rows just revoked.
-      if (grantsBeforeRevoke.length > 0) {
-        await this.writer.attachBindings({
-          organizationId,
-          bindings: grantsBeforeRevoke.map((binding) => ({
-            bindingId: binding.id,
-            principal: { userId },
-            role: binding.role,
-            customRoleId: binding.customRoleId,
-            scopeType: binding.scopeType,
-            scopeId: binding.scopeId,
-          })),
-          actor,
-          onDuplicate: "skip",
-        });
-      }
-      throw error;
-    }
   }
 
   /**

@@ -320,6 +320,11 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
+  // 2026-09-30 port of #7532: design-only specs for ADRs 161-163, every
+  // scenario @unimplemented until the ADR is accepted and built.
+  "modules/authz/specs/access-reviews.feature",
+  "modules/authz/specs/agent-principals.feature",
+  "modules/authz/specs/authz-passports.feature",
   // 2026-09-08 api-legacy-delete: the builder this was bound through is gone
   // and the new runtime has not earned SSE back yet. Each scenario is
   // @unimplemented; the requirement stands. Remove the entry with its first

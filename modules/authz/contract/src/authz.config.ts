@@ -11,13 +11,16 @@ const blankIsAbsent = z
   .optional()
   .transform((value) => value?.trim() || void 0);
 
+const EPOCH_CACHE_OFF = new Set(["0", "false", "off", "no"]);
+
 export const authzServerConfig = Config.define((c) => ({
+  /** The L1 grants cache's kill switch: on unless 0/false/off/no, in any casing or padding. */
   epochCacheEnabled: c.env(
     "AUTHZ_EPOCH_CACHE",
     z
       .string()
       .optional()
-      .transform((value) => value === "1" || value === "true"),
+      .transform((value) => !EPOCH_CACHE_OFF.has((value ?? "").trim().toLowerCase())),
   ),
   demoProjectId: c.env("DEMO_PROJECT_ID", blankIsAbsent),
   /** The account the demo project's work is attributed to; the project is readable by everybody. */

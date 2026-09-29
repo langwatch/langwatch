@@ -115,6 +115,7 @@ function buildService(options?: {
       : vi.fn().mockResolvedValue({ attached: ["binding_1"], duplicates: [] }),
     revokeBindings: vi.fn().mockResolvedValue(undefined),
     revokeBindingsWhere: vi.fn().mockResolvedValue(0),
+    invalidateOrganization: vi.fn().mockResolvedValue(undefined),
   };
   const authzApi = createApiFixture<AuthzApi>({ ...authz, ...grants });
 
@@ -429,6 +430,57 @@ describe("OrganizationService groups", () => {
         userIds: ["outsider"],
       });
       expect(groupRepository.addMember).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a group's membership changes", () => {
+    /** @scenario "A group membership change retires the organization's cached grants" */
+    it("bumps the organization's epoch after adding a member", async () => {
+      const { service, groupRepository, grants } = buildService();
+      const order: string[] = [];
+      groupRepository.addMember.mockImplementation(async () => {
+        order.push("addMember");
+      });
+      grants.invalidateOrganization.mockImplementation(async () => {
+        order.push("invalidate");
+      });
+
+      await service.addGroupMember({ organizationId: "org_1", groupId: "group_1", userId: "u_1" });
+
+      expect(grants.invalidateOrganization).toHaveBeenCalledWith({ organizationId: "org_1" });
+      expect(order).toEqual(["addMember", "invalidate"]);
+    });
+
+    it("bumps the organization's epoch after removing a member", async () => {
+      const { service, grants } = buildService();
+
+      await service.removeGroupMember({
+        organizationId: "org_1",
+        groupId: "group_1",
+        userId: "u_1",
+      });
+
+      expect(grants.invalidateOrganization).toHaveBeenCalledWith({ organizationId: "org_1" });
+    });
+
+    it("bumps the epoch for an edit that changes members, and not for a rename alone", async () => {
+      const { service, grants } = buildService();
+      const edit = {
+        organizationId: "org_1",
+        groupId: "group_1",
+        rename: null,
+        bindingIdsToDelete: [],
+        bindingsToCreate: [],
+        memberUserIdsToAdd: [],
+        memberUserIdsToRemove: [],
+        actor: { type: "user" as const, id: "actor_1" },
+      };
+
+      await service.applyGroupEdits({ ...edit, rename: { name: "Renamed" } });
+      expect(grants.invalidateOrganization).not.toHaveBeenCalled();
+
+      await service.applyGroupEdits({ ...edit, memberUserIdsToRemove: ["u_1"] });
+      expect(grants.invalidateOrganization).toHaveBeenCalledWith({ organizationId: "org_1" });
     });
   });
 

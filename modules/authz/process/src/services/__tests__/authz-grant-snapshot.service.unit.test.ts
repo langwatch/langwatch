@@ -63,6 +63,7 @@ afterEach(() => {
 
 describe("AuthzGrantSnapshotService.collectCached", () => {
   describe("given the same caller in two organizations", () => {
+    /** @scenario "One member's held answer never answers for another" */
     it("does not serve one organization's grants for the other", async () => {
       const { service, collected } = snapshotWith({});
 
@@ -115,6 +116,7 @@ describe("AuthzGrantSnapshotService.collectCached", () => {
   });
 
   describe("given an entry older than the cache's age bound", () => {
+    /** @scenario "A held answer is never served indefinitely" */
     it("collects again, even though the epoch has not moved", async () => {
       // The epoch is the primary invalidation. This is the backstop for
       // whatever fails to bump it.
@@ -151,6 +153,7 @@ describe("AuthzGrantSnapshotService.collectCached", () => {
   });
 
   describe("given the cache is turned off", () => {
+    /** @scenario "An operator turns the grants cache off" */
     it("collects every time", async () => {
       const { service, collected } = snapshotWith({ cacheEnabled: false });
 
@@ -162,6 +165,7 @@ describe("AuthzGrantSnapshotService.collectCached", () => {
   });
 
   describe("given the epoch cannot be read", () => {
+    /** @scenario "Checks stay correct when the change signal cannot be read" */
     it("collects fresh rather than trusting whatever it already had", async () => {
       const { service, collected } = snapshotWith({ epoch: null });
 

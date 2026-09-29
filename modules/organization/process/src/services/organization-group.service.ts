@@ -204,6 +204,7 @@ export class OrganizationGroupService {
       userIds: [parsed.userId],
     });
     await this.groups.addMember(parsed);
+    await this.grants.invalidateOrganization({ organizationId: parsed.organizationId });
   }
 
   async removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
@@ -214,6 +215,7 @@ export class OrganizationGroupService {
     }
 
     await this.groups.removeMember(parsed);
+    await this.grants.invalidateOrganization({ organizationId: parsed.organizationId });
   }
 
   async listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]> {
@@ -341,6 +343,10 @@ export class OrganizationGroupService {
       memberUserIdsToAdd: memberIdsToAdd,
       memberUserIdsToRemove: [...new Set(parsed.memberUserIdsToRemove)],
     });
+    if (memberIdsToAdd.length > 0 || parsed.memberUserIdsToRemove.length > 0) {
+      // A membership is not a grant write, so it bumps the grants cache's epoch itself.
+      await this.grants.invalidateOrganization({ organizationId: parsed.organizationId });
+    }
     if (parsed.bindingsToCreate.length > 0) {
       await this.grants.attachBindings({
         organizationId: parsed.organizationId,
