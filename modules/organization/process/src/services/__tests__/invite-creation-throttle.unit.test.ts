@@ -203,10 +203,8 @@ describe("OrganizationInvitationDoorService.create", () => {
         invitations,
         joinRequests: null,
         plans: { assertCustomRolesAllowed: async () => {} } as never,
-        signals: {
-          trackServerEvent: () => {},
-          fireTeamMemberInvitedNurturing: () => {},
-        } as never,
+        signals: { trackServerEvent: () => {} } as never,
+        lifecycle: { membersInvited: () => {}, inviteAccepted: () => {} },
         creationThrottle: throttle,
         ensurePersonalWorkspace: async () => undefined,
       });

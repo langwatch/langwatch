@@ -198,7 +198,7 @@ export interface PromptApi {
     by: PromptTagCatalogPrincipal;
   }): Promise<void>;
   /** A project gained a prompt: the nurturing trail the door leaves. */
-  announceCreated(input: { projectId: string; userId?: string | null }): void;
+  announceCreated(input: { projectId: string; promptId: string; userId?: string | null }): void;
   listCopyTargets(
     input: { idOrHandle: string; projectId: string },
     by: PromptApiCaller,

@@ -88,15 +88,13 @@ export abstract class BetterAuthAnnouncements {
     organizationName: string;
   }): void;
 
-  /** Nurturing, when a new user joins an organization through its domain. */
+  /** Nurturing, when a new user joins an organization through its domain. Ids only. */
   abstract ssoAutoAddNurturing(input: {
     userId: string;
-    email: string;
-    name: string;
     organizationId: string;
     organizationName: string;
   }): void;
 
-  /** Nurturing, once per session mint. */
-  abstract sessionNurturing(input: { userId: string; hasOrganization: boolean }): void;
+  /** Nurturing, once per session a member of some organization mints. Ids only. */
+  abstract sessionNurturing(input: { userId: string }): void;
 }

@@ -66,8 +66,8 @@ export interface TasksDatabase {
 export interface TaskConnections {
   readonly database: TasksDatabase | null;
   readonly redis: RedisConnection | null;
-  /** Which organizations have their own ClickHouse, from the stores' parse of the route family. */
-  readonly dataplane: SystemMigrationsDataplane;
+  /** Which organizations have their own ClickHouse; opened only for the tasks that read it. */
+  readonly dataplane: SystemMigrationsDataplane | null;
 }
 
 export interface TaskInput {

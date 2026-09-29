@@ -127,8 +127,6 @@ const announceSsoAutoJoin = ({
 
   announcements.ssoAutoAddNurturing({
     userId: user.id,
-    email: user.email,
-    name: user.name,
     organizationId: org.id,
     organizationName: org.name,
   });
@@ -643,7 +641,8 @@ export const afterSessionCreate = async ({
   void repo
     .countOrgMembershipsForUser({ userId })
     .then((count) => {
-      announcements.sessionNurturing({ userId, hasOrganization: count > 0 });
+      // Main sent nothing for a person still onboarding, so no ghost person is made.
+      if (count > 0) announcements.sessionNurturing({ userId });
     })
     .catch((err) => {
       logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");

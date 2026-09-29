@@ -288,6 +288,11 @@ export class PromptService {
     return this.repository.countVersioned(input);
   }
 
+  /** The organization's prompts across every project, this one included when it just landed. */
+  countOrganizationVersionedPrompts(input: { organizationId: string }): Promise<number> {
+    return this.repository.countOrganizationVersioned(input);
+  }
+
   seedTagsForOrganization(input: { organizationId: string }): Promise<void> {
     return this.tagService.seedForOrganization(input);
   }

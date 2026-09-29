@@ -381,6 +381,12 @@
       "subjects": ["managed-model-provider", "managed-provider"]
     },
     {
+      "id": "nurturing",
+      "root": "enterprise/modules/nurturing",
+      "classification": "enterprise",
+      "subjects": ["nurturing", "product-milestone"]
+    },
+    {
       "id": "saas",
       "root": "enterprise/modules/saas",
       "classification": "enterprise",

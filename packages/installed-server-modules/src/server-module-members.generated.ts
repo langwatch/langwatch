@@ -65,6 +65,7 @@ export const serverModuleMembers = {
   governance: ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"],
   licensing: ["encryption", "logger", "prisma", "rateLimiter"],
   "managed-provider": [],
+  nurturing: [],
   saas: ["isSaas"],
   scim: ["eventing"],
   sso: ["isSaas", "logger", "publicBaseUrl"],

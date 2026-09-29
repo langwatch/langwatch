@@ -4,8 +4,8 @@ Feature: Customer.io nurturing integration
   So that customer nurturing workflows trigger automatically as users progress through the platform
 
   # All scenarios bound to existing tests in:
-  #   enterprise/modules/billing/process/src/__tests__/nurturing.service.unit.test.ts
-  #   enterprise/modules/billing/process/src/__tests__/nurturing.service.wiring.unit.test.ts
+  #   enterprise/modules/nurturing/process/src/services/__tests__/nurturing.service.unit.test.ts
+  #   modules/scenario/process/src/eventing/__tests__/scenario-lifecycle.pipeline.unit.test.ts
   #   [gone] ee/billing/nurturing/hooks/signupIdentification.unit.test.ts
   #   [gone] ee/billing/nurturing/hooks/featureAdoption.unit.test.ts
   #   [gone] ee/billing/nurturing/hooks/activityTracking.unit.test.ts
@@ -13,11 +13,10 @@ Feature: Customer.io nurturing integration
   #   [gone] ee/billing/nurturing/hooks/promptCreation.unit.test.ts
   #   [gone] ee/billing/nurturing/hooks/promptCreation.integration.test.ts
   #   modules/onboarding/browser/src/behavior/__tests__/use-attribution-capture.unit.test.ts
-  #   enterprise/modules/billing/process/src/app/__tests__/billing-app.unit.test.ts
 
   All scheduling, sequencing, and email delivery is owned by Customer.io.
   LangWatch nurturing hooks fire-and-forget data through the Pipelines API.
-  The application wires NurturingService only when it is configured.
+  Each owner tells the nurturing module through a subscriber on its own pipeline.
 
   # ---------------------------------------------------------------------------
   # R1: NurturingService — Customer.io API client
@@ -79,36 +78,14 @@ Feature: Customer.io nurturing integration
   # R9: Environment configuration and graceful degradation
   # ---------------------------------------------------------------------------
 
-  @integration
-  Scenario: Service is active when CUSTOMER_IO_API_KEY is configured
-    Given the app config includes a customerIoApiKey
-    When the app is initialized
-    Then getApp().nurturing is an active NurturingService instance
-
-  @unit
-  Scenario: Service is undefined when CUSTOMER_IO_API_KEY is absent
-    Given the app config has no customerIoApiKey
-    When NurturingService.create is conditionally called
-    Then nurturing is undefined
+  # With neither key a recorded signal sends nothing:
+  # enterprise/modules/nurturing/specs/nurturing.feature.
 
   @unit
   Scenario: Region defaults to EU when CUSTOMER_IO_REGION is not set
     Given a NurturingService created with no customerIoRegion
     When identifyUser is called
     Then the request is sent to the EU regional endpoint
-
-  @unit
-  Scenario: Test app passes no NurturingService
-    Given createTestApp is called
-    Then nurturing is undefined
-
-  # Billing composes the sink from its own `customerIoApiKey` secret handle (region stays config)
-  # and hands it to every signal; there is no process-wide registry.
-  @unit
-  Scenario: Billing hands its composed Customer.io sink to a created workflow's signal
-    Given billing was assembled with a Customer.io sink
-    When a created workflow is recorded
-    Then the workflow count is identified and workflow_created is tracked through that sink
 
   # ---------------------------------------------------------------------------
   # R2: Signup identification — onboarding hook
@@ -159,55 +136,8 @@ Feature: Customer.io nurturing integration
     Then the organization is created successfully
     And no Customer.io requests are made
 
-  # ---------------------------------------------------------------------------
-  # R3: Trace integration subscriber — customerIoTraceSync
-  # ---------------------------------------------------------------------------
-
-  @integration
-  Scenario: First trace identifies user with trace milestones
-    Given a project that has never received a trace
-    When the first trace is processed with sdk_language "python" and sdk_framework "openai"
-    Then the user is identified in Customer.io with has_traces true
-    And the user traits include sdk_language, sdk_framework, and first_trace_at
-
-  @integration
-  Scenario: First trace fires first_trace_integrated event
-    Given a project that has never received a trace
-    When the first trace is processed with sdk_language "python" and sdk_framework "openai"
-    Then a "first_trace_integrated" event is tracked with sdk_language, sdk_framework, and project_id
-
-  @integration
-  Scenario: First trace fires immediately without debouncing
-    Given a project that has never received a trace
-    When the first trace is processed
-    Then the Customer.io calls are made immediately without delay
-
-  # Langy's own turns trace into the project with origin "langy"; they are
-  # not the customer's traces and never reach the CRM as one.
-  @unit
-  Scenario: Langy's own turn does not reach Customer.io as a first trace
-    Given a project that has never received a trace
-    When one of Langy's own turns is processed
-    Then no Customer.io identify or track call is made
-
-  @integration
-  Scenario: Subsequent traces update count and timestamp with debouncing
-    Given a project that already has traces
-    When a new trace is processed
-    Then the user is identified in Customer.io with updated trace_count and last_trace_at
-    And the update is debounced so at most one call per project per 5 minutes
-
-  @unit
-  Scenario: Trace sync subscriber uses project-scoped job ID for debouncing
-    Given the customerIoTraceSync subscriber
-    When makeJobId is called for a project
-    Then the returned ID is "cio-trace-sync-{projectId}"
-
-  @unit
-  Scenario: Trace sync does not duplicate first-trace detection logic
-    Given the projectMetadata subscriber already tracks first trace via Project.firstMessage
-    When the customerIoTraceSync subscriber processes a trace
-    Then it reads the existing first-trace flag rather than re-detecting it
+  # R3 (Customer.io trace sync) is gone: main never registered it. The first trace
+  # reaches PostHog only: enterprise/modules/nurturing/specs/nurturing.feature.
 
   # ---------------------------------------------------------------------------
   # R6: Team and feature adoption hooks
@@ -226,19 +156,6 @@ Feature: Customer.io nurturing integration
     When the workflow is saved
     Then the user is identified in Customer.io with updated workflow_count
     And a "workflow_created" event is tracked with workflow_id and project_id
-
-  @unit
-  Scenario: Billing records a created workflow for nurturing
-    Given Customer.io nurturing is configured
-    When another module records a created workflow through billing
-    Then the user is identified in Customer.io with updated workflow_count
-    And a "workflow_created" event is tracked with workflow_id and project_id
-
-  @unit
-  Scenario: A Customer.io failure never fails recording a created workflow
-    Given Customer.io nurturing is configured and unreachable
-    When another module records a created workflow through billing
-    Then recording the workflow resolves
 
   @integration
   Scenario: Scenario creation updates scenario count and fires event

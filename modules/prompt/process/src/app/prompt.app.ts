@@ -1,5 +1,7 @@
 import { AuthzApi, type AuthzPermission, PermissionDeniedError } from "@langwatch/authz-contract";
+import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 /**
  * The prompt library's application: what its doors call.
  */
@@ -35,8 +37,13 @@ import {
   type PlaygroundStreamEvent,
   type PromptUsageCount,
 } from "@langwatch/prompt-contract";
+import { nowInstant } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  buildPromptLifecyclePipeline,
+  type PromptLifecyclePipeline,
+} from "../eventing/prompt-lifecycle.pipeline.ts";
 import type { PromptRepositories } from "../repositories/prompt.repositories.ts";
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
@@ -74,11 +81,11 @@ export interface PromptCaller {
  */
 export interface PromptInfrastructure {
   /**
-   * Fires when a project gains a prompt (write, copy or duplicate).
-   * Fire-and-forget: it may not fail a create. No deployment composes an
-   * analytics sink yet, so `create()` always uses the logged fallback over `logger`.
+   * Fires when a project gains a prompt (write, copy or sync). Fire-and-forget:
+   * it may not fail a create. Sends nurturing a `prompt_created` signal, resolving
+   * the org admin as attribution when the write carried no user (the REST/CLI door).
    */
-  afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
+  afterPromptCreated(input: { projectId: string; promptId: string; userId?: string | null }): void;
   /** Read/write engine (temporary bridge; move to repository bundle once memory twins exist). */
   prompts: PromptService;
 }
@@ -93,6 +100,8 @@ type PromptDependencies = Readonly<{
   workflow: typeof WorkflowApi;
   /** The default model a prompt created without one takes. */
   modelProviders: typeof ModelProviderApi;
+  /** Where a created prompt is told, by the lifecycle pipeline's subscriber. */
+  nurturing: typeof NurturingApi;
 }>;
 
 /**
@@ -126,6 +135,11 @@ type PromptAppDependencies = Readonly<{
    * never asked for a deep link.
    */
   publicBaseUrl: string | undefined;
+  /**
+   * The prompt's own lifecycle pipeline, whose worker subscriber tells nurturing.
+   * Absent only on the read-only twin, which announces nothing.
+   */
+  lifecycle: PromptLifecyclePipeline | undefined;
 }>;
 
 export class PromptApp implements PromptApi {
@@ -136,6 +150,7 @@ export class PromptApp implements PromptApi {
     plans: EntitlementApi,
     workflow: WorkflowApi,
     modelProviders: ModelProviderApi,
+    nurturing: NurturingApi,
   };
   /**
    * `rateLimiter` is the playground door's run counter.
@@ -162,13 +177,21 @@ export class PromptApp implements PromptApi {
    */
   static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptApp {
     const { dependencies, members } = setup;
+    const lifecycle = buildPromptLifecyclePipeline(dependencies.nurturing);
+    // Tied the knot: the callback below fires only once a request calls
+    // `announceCreated`, by which point `app` is always assigned.
+    const appRef: { current?: PromptApp } = {};
     const afterPromptCreated: PromptInfrastructure["afterPromptCreated"] = (input) => {
-      members.logger.info(
-        { projectId: input.projectId, userId: input.userId ?? null },
-        "prompt created; no product-analytics sink is composed on this process",
+      const app = appRef.current;
+      if (!app) return;
+      void app.#recordPromptCreated(input).catch((error: unknown) =>
+        members.logger.error(
+          { error, projectId: input.projectId },
+          "prompt_created nurturing signal failed",
+        ),
       );
     };
-    return new PromptApp({
+    const app = new PromptApp({
       prompts,
       projects: dependencies.projects,
       permissions: dependencies.permissions,
@@ -185,7 +208,10 @@ export class PromptApp implements PromptApi {
       library: PromptLibraryService.create({ prompts, afterPromptCreated }),
       tagCatalogue: PromptTagCatalogueService.create({ prompts }),
       publicBaseUrl: members.publicBaseUrl,
+      lifecycle,
     });
+    appRef.current = app;
+    return app;
   }
 
   /**
@@ -206,6 +232,7 @@ export class PromptApp implements PromptApi {
       }),
       tagCatalogue: PromptTagCatalogueService.create({ prompts: input.prompts }),
       publicBaseUrl: undefined,
+      lifecycle: undefined,
     });
   }
 
@@ -234,9 +261,61 @@ export class PromptApp implements PromptApi {
   }
 
   #dependencies: PromptAppDependencies;
+  #lifecycleCommands: EventingCommands<PromptLifecyclePipeline> | undefined;
 
   private constructor(dependencies: PromptAppDependencies) {
     this.#dependencies = dependencies;
+  }
+
+  /**
+   * The prompt lifecycle pipeline this module registers, built once by
+   * {@link createWithPrompts}.
+   */
+  lifecyclePipeline(): PromptLifecyclePipeline {
+    const lifecycle = this.#dependencies.lifecycle;
+    if (!lifecycle) {
+      throw new Error("The prompt reader holds no lifecycle pipeline");
+    }
+    return lifecycle;
+  }
+
+  /** Binds the built lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: EventingCommands<PromptLifecyclePipeline>): void {
+    this.#lifecycleCommands = commands;
+  }
+
+  /**
+   * Resolves attribution and the org-wide count, never failing the caller: a
+   * write through a project credential has no user, so the org admin stands
+   * in, and a read that cannot resolve either leaves the signal unsent.
+   */
+  async #recordPromptCreated(input: {
+    projectId: string;
+    promptId: string;
+    userId?: string | null;
+  }): Promise<void> {
+    const admin = await this.#dependencies.projects.resolveOrgAdmin(input.projectId).then(
+      (resolved) => resolved,
+      () => null,
+    );
+    const userId = input.userId ?? admin?.userId ?? undefined;
+    const organizationId = admin?.organizationId ?? undefined;
+    if (!userId || !organizationId) return;
+
+    const orgPromptCount = await this.#dependencies.prompts.countOrganizationVersionedPrompts({
+      organizationId,
+    });
+    if (!this.#lifecycleCommands) {
+      throw new Error("prompt_lifecycle pipeline senders are not connected yet");
+    }
+    await this.#lifecycleCommands.recordPromptCreated.send({
+      tenantId: input.projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      promptId: input.promptId,
+      projectId: input.projectId,
+      userId,
+      orgPromptCount,
+    });
   }
 
   executePlayground(input: PromptExecuteRequest): Promise<AsyncIterable<PlaygroundStreamEvent>> {
@@ -662,7 +741,7 @@ export class PromptApp implements PromptApi {
    * A project gained a prompt. Announced by the door that took the write, so a
    * peer module creating one on the caller's behalf leaves no marketing trail.
    */
-  announceCreated(input: { projectId: string; userId?: string | null }): void {
+  announceCreated(input: { projectId: string; promptId: string; userId?: string | null }): void {
     this.#dependencies.members.afterPromptCreated(input);
   }
 

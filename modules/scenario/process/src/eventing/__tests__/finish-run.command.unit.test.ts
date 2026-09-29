@@ -8,6 +8,7 @@ import {
   type FinishRunCommandData,
   type SimulationMessageSnapshotEvent,
   type SimulationProcessingEvent,
+  type SimulationRunQueuedEvent,
   type SimulationTextMessageEndEvent,
   type SimulationEventResults as SimulationResults,
 } from "@langwatch/scenario-contract";
@@ -53,6 +54,27 @@ function queuedEvent(): SimulationProcessingEvent {
       scenarioId: "scenario-1",
       batchRunId: "batch-1",
       scenarioSetId: "set-1",
+    },
+  };
+}
+
+/** A run queued against a connected agent. */
+function connectedQueuedEvent(): SimulationRunQueuedEvent {
+  return {
+    id: "event-queued",
+    type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+    version: SIMULATION_EVENT_VERSIONS.QUEUED,
+    aggregateType: "simulation_run",
+    aggregateId: "run-1",
+    tenantId: createTenantId("tenant-1"),
+    occurredAt: 1,
+    createdAt: 1,
+    data: {
+      scenarioRunId: "run-1",
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "set-1",
+      target: { type: "connected", referenceId: "agent-1" },
     },
   };
 }
@@ -112,12 +134,58 @@ describe("FinishRunCommand", () => {
       });
     });
 
+    it("carries the organization's admin and onboarding variant, for its milestone", async () => {
+      const queued = connectedQueuedEvent();
+      const loadOrganizationAdmin = vi.fn(async () => ({
+        userId: "admin-1",
+        onboardingVariant: "guided" as const,
+      }));
+      const handler = new FinishRunCommand(
+        makeDeps({ loadPriorEvents: vi.fn().mockResolvedValue([queued]), loadOrganizationAdmin }),
+      );
+
+      const events = await handler.handle(makeCommand());
+
+      expect(loadOrganizationAdmin).toHaveBeenCalledWith("tenant-1");
+      expect(events[0]!.data).toMatchObject({
+        organizationAdmin: { userId: "admin-1", onboardingVariant: "guided" },
+      });
+    });
+
+    it("finishes without the admin when it cannot be read", async () => {
+      const queued = connectedQueuedEvent();
+      const handler = new FinishRunCommand(
+        makeDeps({
+          loadPriorEvents: vi.fn().mockResolvedValue([queued]),
+          loadOrganizationAdmin: vi.fn(async () => {
+            throw new Error("project unavailable");
+          }),
+        }),
+      );
+
+      const events = await handler.handle(makeCommand());
+
+      expect(events[0]!.data).not.toHaveProperty("organizationAdmin");
+    });
+
     it("carries no target when the run never queued", async () => {
       const handler = new FinishRunCommand(makeDeps());
 
       const events = await handler.handle(makeCommand());
 
       expect(events[0]!.data).not.toHaveProperty("target");
+    });
+  });
+
+  describe("when the run was not against a connected agent", () => {
+    it("reads no organization admin", async () => {
+      const loadOrganizationAdmin = vi.fn();
+      const handler = new FinishRunCommand(makeDeps({ loadOrganizationAdmin }));
+
+      const events = await handler.handle(makeCommand());
+
+      expect(loadOrganizationAdmin).not.toHaveBeenCalled();
+      expect(events[0]!.data).not.toHaveProperty("organizationAdmin");
     });
   });
 

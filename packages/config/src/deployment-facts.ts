@@ -121,3 +121,9 @@ export const signInProviders = Config.define((c) => ({
   oidcClientId: c.env("OIDC_CLIENT_ID", publicProviderField),
   oidcIssuer: c.env("OIDC_ISSUER", publicProviderField),
 }));
+
+/** Where server-side product analytics goes: shared config no module owns (Alex, 2026-09-29). */
+export const { posthogKey, posthogHost } = Config.define((c) => ({
+  posthogKey: c.env("POSTHOG_KEY", z.string().optional()),
+  posthogHost: c.env("POSTHOG_HOST", z.string().optional()),
+}));

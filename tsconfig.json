@@ -253,6 +253,12 @@
       "path": "enterprise/modules/managed-provider/process/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/nurturing/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/nurturing/process/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/enterprise-ops/contract/tsconfig.json"
     },
     {

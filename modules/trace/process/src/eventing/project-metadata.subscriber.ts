@@ -4,6 +4,7 @@
  * first real trace. `isRealFirstIngest` guards a re-delivered first trace.
  */
 
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -32,16 +33,8 @@ export interface ProjectMetadataSubscriberDeps {
   // ADR-051: reconciliation path ensures topic clustering runs daily; safe
   // to call repeatedly as it's rate-limited.
   bootstrapTopicClustering?: (projectId: string) => Promise<void>;
-  /**
-   * The process's product-analytics sink (server-side capture, never the
-   * browser). Fire-and-forget: it must never be fatal to the ingest path.
-   */
-  recordProductEvent: (input: {
-    userId: string;
-    event: string;
-    properties?: Record<string, unknown>;
-    projectId?: string;
-  }) => void;
+  /** Told the first trace (§9); a failure is logged, never fatal to the ingest path. */
+  nurturing: Pick<NurturingApi, "recordSignal">;
   /**
    * Marks the project active for the day of this trace, once a day. Injected
    * so trace never imports billing's process package (structurally typed).
@@ -55,35 +48,76 @@ export interface ProjectMetadataSubscriberDeps {
  * with in the browser, so this server event joins the browser person.
  */
 async function trackFirstTraceIntegrated({
-  projects,
-  recordProductEvent,
+  deps,
+  source,
   tenantId,
   attrs,
 }: {
-  projects: TraceProjectMetadata;
-  recordProductEvent: ProjectMetadataSubscriberDeps["recordProductEvent"];
+  deps: ProjectMetadataSubscriberDeps;
+  source: FirstTraceSource;
   tenantId: string;
   attrs: Record<string, string>;
 }): Promise<void> {
-  const { userId } = await projects.resolveOrgAdmin(tenantId);
+  const { userId } = await deps.projects.resolveOrgAdmin(tenantId);
   if (!userId) return;
 
-  recordProductEvent({
-    userId,
-    event: "first_trace_integrated",
-    properties: {
-      sdk_language: attrs["sdk.language"] ?? "unknown",
-      sdk_framework: attrs["langwatch.sdk.framework"] ?? "unknown",
-    },
-    projectId: tenantId,
-  });
+  try {
+    await deps.nurturing.recordSignal({
+      kind: "first_trace_integrated",
+      sourceEventId: source.id,
+      tenantId,
+      occurredAt: source.occurredAt,
+      userId,
+      projectId: tenantId,
+      sdkLanguage: attrs["sdk.language"] ?? "unknown",
+      sdkFramework: attrs["langwatch.sdk.framework"] ?? "unknown",
+    });
+  } catch (error) {
+    logger.error({ tenantId, error }, "Failed to tell nurturing the first trace (non-fatal)");
+  }
 }
 
-async function syncProjectMetadata(
-  deps: ProjectMetadataSubscriberDeps,
-  tenantId: string,
-  foldState: TraceSummaryData,
-): Promise<void> {
+/** The trace event that found the project unmarked: the first trace's signal is keyed by it. */
+type FirstTraceSource = Readonly<{ id: string; occurredAt: number }>;
+
+/** A later real trace, against the org admin: main's last_trace_at update, non-fatal. */
+async function trackTraceReceived({
+  deps,
+  source,
+  tenantId,
+}: {
+  deps: ProjectMetadataSubscriberDeps;
+  source: FirstTraceSource;
+  tenantId: string;
+}): Promise<void> {
+  try {
+    const { userId } = await deps.projects.resolveOrgAdmin(tenantId);
+    if (!userId) return;
+
+    await deps.nurturing.recordSignal({
+      kind: "trace_received",
+      sourceEventId: source.id,
+      tenantId,
+      occurredAt: source.occurredAt,
+      userId,
+      projectId: tenantId,
+    });
+  } catch (error) {
+    logger.error({ tenantId, error }, "Failed to tell nurturing about a later trace (non-fatal)");
+  }
+}
+
+async function syncProjectMetadata({
+  deps,
+  source,
+  tenantId,
+  foldState,
+}: {
+  deps: ProjectMetadataSubscriberDeps;
+  source: FirstTraceSource;
+  tenantId: string;
+  foldState: TraceSummaryData;
+}): Promise<void> {
   const project = await deps.projects.findById(tenantId);
 
   if (!project) {
@@ -97,6 +131,12 @@ async function syncProjectMetadata(
   // to repair.
   await assertClusteringSchedule(deps, tenantId);
 
+  // A real trace on a project that already sent its first: main's
+  // last_trace_at update (customerIoTraceSync), keyed off the same flag.
+  if (project.firstMessage) {
+    await trackTraceReceived({ deps, source, tenantId });
+  }
+
   // Already marked — nothing to do
   if (project.firstMessage && project.integrated) {
     return;
@@ -104,6 +144,7 @@ async function syncProjectMetadata(
 
   await markFirstMessage({
     deps,
+    source,
     tenantId,
     project,
     attrs: foldState.attributes ?? {},
@@ -143,11 +184,13 @@ function detectLanguage(attrs: Record<string, string>): string {
 
 async function markFirstMessage({
   deps,
+  source,
   tenantId,
   project,
   attrs,
 }: {
   deps: ProjectMetadataSubscriberDeps;
+  source: FirstTraceSource;
   tenantId: string;
   project: { firstMessage: boolean; integrated: boolean };
   attrs: Record<string, string>;
@@ -166,12 +209,7 @@ async function markFirstMessage({
   // Fired after the metadata write commits, so a failed write retries
   // the event on the project's next trace instead of dropping it.
   if (!project.firstMessage) {
-    await trackFirstTraceIntegrated({
-      projects: deps.projects,
-      recordProductEvent: deps.recordProductEvent,
-      tenantId,
-      attrs,
-    });
+    await trackFirstTraceIntegrated({ deps, source, tenantId, attrs });
   }
 }
 
@@ -202,7 +240,7 @@ export function createProjectMetadataHandler(
     await deps.trackActiveDay?.({ projectId: tenantId, occurredAt: event.occurredAt });
 
     try {
-      await syncProjectMetadata(deps, tenantId, foldState);
+      await syncProjectMetadata({ deps, source: event, tenantId, foldState });
     } catch (error) {
       logger.error(
         {

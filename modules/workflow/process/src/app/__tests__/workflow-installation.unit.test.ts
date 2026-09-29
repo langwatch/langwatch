@@ -59,7 +59,7 @@ function process_() {
       "model-provider": createApiFixture({}, "ModelProviderApi"),
       experiment: createApiFixture({}, "ExperimentApi"),
       monitor: createApiFixture({}, "MonitorApi"),
-      billing: createApiFixture({}, "BillingApi"),
+      nurturing: createApiFixture({}, "NurturingApi"),
     });
 }
 

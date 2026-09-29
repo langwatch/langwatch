@@ -40,6 +40,7 @@ import {
 } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
@@ -61,7 +62,7 @@ import {
   type SignedInWith,
   SignInMethodPolicyService,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -81,6 +82,10 @@ import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-
 import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
+import {
+  type AuthLifecycleDefinition,
+  buildAuthLifecyclePipeline,
+} from "../eventing/auth-lifecycle.pipeline.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
@@ -90,6 +95,10 @@ import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
 import { AuthDoorService } from "../services/auth-door.service.ts";
+import {
+  AuthLifecycleNoticeService,
+  type AuthLifecycleSenders,
+} from "../services/auth-lifecycle-notice.service.ts";
 import { AuthProviderService } from "../services/auth-provider.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import {
@@ -201,6 +210,7 @@ type AuthAppPeers = Readonly<{
   apiKeys: ApiKeyApi;
   featureFlags: FeatureFlagApi;
   identity: Pick<IdentityApi, "routeSignIn" | "sendOwnAddressConfirmation">;
+  nurturing: Pick<NurturingApi, "recordSignal">;
 }>;
 
 type AuthSetup = FeatureSetup<
@@ -235,6 +245,8 @@ export class AuthApp implements AuthApiContract {
     sso: SsoApi,
     /** Whether a CLI approver may still hand out a shared project's key (`project:manage`). */
     authz: AuthzApi,
+    /** Told a person's sessions and domain auto-joins by the worker's subscriber (§9). */
+    nurturing: NurturingApi,
   };
   static readonly config = authServerConfig;
   static readonly publicConfig = authBrowserConfig.project;
@@ -284,6 +296,8 @@ export class AuthApp implements AuthApiContract {
   readonly #priorSessions: PriorSessionService;
   /** The session factors two-step verification reads, and turning it off. */
   readonly #twoStep: TwoStepVerificationService;
+  /** Where a session and a domain auto-join are recorded as auth's events. */
+  readonly #lifecycle: AuthLifecycleNoticeService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
   /** The Auth0 tenant's password change; set once the provider secrets resolve. */
@@ -376,6 +390,10 @@ export class AuthApp implements AuthApiContract {
     this.#addressConfirmation = addressConfirmation;
     this.#priorSessions = priorSessions;
     this.#twoStep = twoStep;
+    this.#lifecycle = AuthLifecycleNoticeService.create({
+      reportError: (error) =>
+        members.logger.error({ error }, "a sign-in milestone was not recorded for nurturing"),
+    });
     this.#providerAccountLinks = ProviderAccountLinkService.create({
       issuers: connectionIssuers,
       accounts: { createAccount: (row) => this.#createProviderAccount(row) },
@@ -456,6 +474,7 @@ export class AuthApp implements AuthApiContract {
         apiKeys: dependencies.apiKeys,
         featureFlags: dependencies.featureFlags,
         identity: dependencies.identity,
+        nurturing: dependencies.nurturing,
       },
       legacySsoAccess: LegacySsoAccessService.create({
         accounts: accountRows,
@@ -577,6 +596,7 @@ export class AuthApp implements AuthApiContract {
           buildBetterAuth({
             identity,
             signupAnnouncements,
+            lifecycle: app.#lifecycle,
             signInLockout: SignInLockoutService.create({
               locks: repositories.signInLocks,
               settings: repositories.signInSecurity,
@@ -623,6 +643,19 @@ export class AuthApp implements AuthApiContract {
 
       return app;
     });
+  }
+
+  lifecyclePipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): AuthLifecycleDefinition {
+    if (participation === "produce") return buildAuthLifecyclePipeline({});
+    return buildAuthLifecyclePipeline({ nurturing: this.#dependencies.nurturing });
+  }
+
+  connectLifecycle(senders: AuthLifecycleSenders): void {
+    this.#lifecycle.connect(senders);
   }
 
   retireLegacySsoAccess(

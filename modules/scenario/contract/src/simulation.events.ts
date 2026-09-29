@@ -1,3 +1,4 @@
+import { onboardingVariantSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
 import { runEvaluatorsSchema } from "./scenario-run-evaluators.ts";
@@ -134,6 +135,10 @@ export const simulationRunFinishedEventDataSchema = z.object({
    * by FinishRunCommand for a run whose events carry none.
    */
   evaluators: runEvaluatorsSchema.optional(),
+  /** The organization's admin and onboarding variant, read when a connected agent's run ends. */
+  organizationAdmin: z
+    .object({ userId: z.string(), onboardingVariant: onboardingVariantSchema.nullish() })
+    .optional(),
 });
 export type SimulationRunFinishedEventData = z.infer<typeof simulationRunFinishedEventDataSchema>;
 

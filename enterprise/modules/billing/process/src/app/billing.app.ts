@@ -27,8 +27,6 @@ import {
   getStripeEnvironmentFromNodeEnv,
   type RenewalCompletion,
   type ReportUsageForMonthCommandData,
-  type ScenarioCreatedSignal,
-  type WorkflowCreatedSignal,
   type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
   type BillingPricingModel,
@@ -56,18 +54,12 @@ import { connectedInvoicingChannels } from "../channels/connected-invoicing-chan
 import { connectedStatementMailChannels } from "../channels/connected-statement-mail-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
-import { postHogChannels } from "../channels/posthog-channels.registry.ts";
-import type { PostHogChannel } from "../channels/posthog.channel.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import {
   type BillingReportingDefinition,
   BillingReportingPipeline,
 } from "../eventing/billing-reporting.pipeline.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
-import {
-  fireScenarioCreated,
-  fireWorkflowCreated,
-} from "../rules/nurturing-feature-adoption-service.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { resourceLimitCooldown } from "../services/billing-alert-cooldown.service.ts";
@@ -95,14 +87,9 @@ import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-que
 import { LicensePurchaseDeliveryService } from "../services/license-purchase-delivery.service.ts";
 import { LicensePurchaseService } from "../services/license-purchase.service.ts";
 import { LicensingLicenseGeneratorService } from "../services/licensing-license-generator.service.ts";
-import { NurturingService } from "../services/nurturing.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
-import {
-  ScenarioCreatedSignalService,
-  type ScenarioSignalOrganizations,
-} from "../services/scenario-created-signal.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
@@ -150,7 +137,7 @@ export type ConnectedBillingPeers = Readonly<{
   licensing: ConnectedLicensing;
   operators: Pick<OpsApi, "isAdmin">;
   auditLog: Pick<AuditLogApi, "record">;
-  organizations: ConnectedCustomerPeers["organizations"] & ScenarioSignalOrganizations;
+  organizations: ConnectedCustomerPeers["organizations"];
   gateway: ConnectedCustomerPeers["gateway"];
 }>;
 
@@ -221,7 +208,6 @@ export class BillingApp
     internalSlackSubscriptionsWebhook: billingSecrets.internalSlackSubscriptionsWebhook,
     internalSlackSelfHostedWebhook: billingSecrets.internalSlackSelfHostedWebhook,
     internalSlackSignupsWebhook: billingSecrets.internalSlackSignupsWebhook,
-    customerIoApiKey: billingSecrets.customerIoApiKey,
   } as const;
   static readonly reads = ["isSaas", "nodeEnvironment", "mail", "publicBaseUrl"] as const;
 
@@ -230,17 +216,6 @@ export class BillingApp
       StripeWebhookSignatureService.create(secret),
     );
     const notices = await BillingApp.#composeNotices(setup);
-    const nurturing = await setup.secrets.into(BillingApp.secrets.customerIoApiKey, (key) =>
-      key
-        ? NurturingService.create({
-            config: { customerIoApiKey: key, customerIoRegion: setup.config.customerIoRegion },
-          })
-        : void 0,
-    );
-    const posthog = postHogChannels.live.create({
-      targets: () => setup.dependencies.operators.findProductAnalyticsTargets(),
-    });
-    setup.resources.own("Billing PostHog client", () => posthog.close());
     // Licensing holds the signing key and refuses a purchase it cannot sign.
     const licensePurchase = LicensePurchaseService.create({
       generateLicense: LicensingLicenseGeneratorService.create({
@@ -259,8 +234,6 @@ export class BillingApp
         config: setup.config,
         peers: setup.dependencies,
         stripeSecretKey,
-        nurturing,
-        posthog,
         statementMail: connectedStatementMailChannels.ses.create(setup.members.mail),
         usageWarnings: BillingApp.#composeUsageWarnings(setup, notices),
         resourceLimitAlerts: BillingApp.#composeResourceLimitAlerts(setup, notices),
@@ -350,8 +323,6 @@ export class BillingApp
     config,
     peers,
     stripeSecretKey,
-    nurturing,
-    posthog,
     statementMail,
     usageWarnings,
     resourceLimitAlerts,
@@ -375,15 +346,10 @@ export class BillingApp
       | "billableEventsMeter"
       | "tenantOrganizations"
       | "tenantOrganizationCache"
-      | "nurturingProfiles"
     >;
     config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
     peers: ConnectedBillingPeers;
     stripeSecretKey: string | undefined;
-    /** Customer.io; absent where the deployment named no key, and every signal sends nothing. */
-    nurturing?: NurturingService;
-    /** Product analytics; absent in a suite, and a milestone is tracked nowhere. */
-    posthog?: PostHogChannel;
     /** The monthly statement mail; absent, statements wait and nothing is recorded. */
     statementMail?: ConnectedStatementMailChannel;
     usageWarnings: UsageWarningService;
@@ -401,17 +367,10 @@ export class BillingApp
       facts,
       licensing: peers.licensing,
     });
-    const scenarioSignals = ScenarioCreatedSignalService.create({
-      organizations: peers.organizations,
-      posthog,
-      nurture: (input) => fireScenarioCreated({ nurturing, ...input }),
-    });
     const gate = {
       operators: peers.operators,
       auditLog: peers.auditLog,
       overview,
-      scenarioSignals,
-      nurturing,
       subscriptionPlans: SaaSPlanProviderService.create({
         subscriptions: repositories.subscriptions,
         isSaas,
@@ -478,7 +437,6 @@ export class BillingApp
             repositories,
             licensePaymentLinkId: config.licensePaymentLinkId,
             connectedBilling: billing,
-            nurturing,
           })
         : BillingApp.#undispatchedWebhook(),
       subscriptions:
@@ -662,19 +620,14 @@ export class BillingApp
     repositories,
     licensePaymentLinkId,
     connectedBilling,
-    nurturing,
   }: {
     webhook: StripeWebhookComposition;
     isSaas: boolean;
     stripeSecretKey: string;
     nodeEnvironment: string | undefined;
-    repositories: Pick<
-      BillingRepositories,
-      "webhookSubscriptions" | "webhookOrganizations" | "nurturingProfiles"
-    >;
+    repositories: Pick<BillingRepositories, "webhookSubscriptions" | "webhookOrganizations">;
     licensePaymentLinkId: string | undefined;
     connectedBilling: ConnectedBillingService;
-    nurturing: NurturingService | undefined;
   }): StripeWebhookReceiptService {
     const prices = BillingPriceCatalogue.create(
       getStripeEnvironmentFromNodeEnv(nodeEnvironment),
@@ -690,8 +643,6 @@ export class BillingApp
       host: webhook.host,
       retention: webhook.retention,
       connectedBilling,
-      nurturing,
-      nurturingProfiles: repositories.nurturingProfiles,
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
@@ -725,8 +676,6 @@ export class BillingApp
   readonly #operators: Pick<OpsApi, "isAdmin">;
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #overview: ConnectedBillingOverviewService;
-  readonly #scenarioSignals: ScenarioCreatedSignalService;
-  readonly #nurturing: NurturingService | undefined;
   readonly #subscriptionPlans: SaaSPlanProviderService;
   readonly #isSaas: boolean;
   readonly #billableEvents: BillableEventsQueryService;
@@ -742,8 +691,6 @@ export class BillingApp
     operators,
     auditLog,
     overview,
-    scenarioSignals,
-    nurturing,
     subscriptionPlans,
     isSaas,
     billableEvents,
@@ -758,8 +705,6 @@ export class BillingApp
     operators: Pick<OpsApi, "isAdmin">;
     auditLog: Pick<AuditLogApi, "record">;
     overview: ConnectedBillingOverviewService;
-    scenarioSignals: ScenarioCreatedSignalService;
-    nurturing: NurturingService | undefined;
     subscriptionPlans: SaaSPlanProviderService;
     isSaas: boolean;
     billableEvents: BillableEventsQueryService;
@@ -774,8 +719,6 @@ export class BillingApp
     this.#operators = operators;
     this.#auditLog = auditLog;
     this.#overview = overview;
-    this.#scenarioSignals = scenarioSignals;
-    this.#nurturing = nurturing;
     this.#subscriptionPlans = subscriptionPlans;
     this.#isSaas = isSaas;
     this.#billableEvents = billableEvents;
@@ -893,16 +836,6 @@ export class BillingApp
           }
         : void 0,
     });
-  }
-
-  recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void> {
-    return this.#scenarioSignals.record(input);
-  }
-
-  /** Main's workflow router fired this nurturing unawaited; its failures only log. */
-  recordWorkflowCreated(input: WorkflowCreatedSignal): Promise<void> {
-    fireWorkflowCreated({ nurturing: this.#nurturing, ...input });
-    return Promise.resolve();
   }
 
   /** Main's composite recomputed `overrideAddingLimitations` from the impersonator. */

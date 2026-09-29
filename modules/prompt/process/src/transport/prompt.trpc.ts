@@ -29,7 +29,7 @@ export const promptTrpcTransport = defineTrpcRouter(PromptApi, promptTrpc)
   .handle(async ({ app, input, actor }) => {
     const created = await app.create({ ...input.data, projectId: input.projectId }, actor);
 
-    app.announceCreated({ projectId: input.projectId, userId: actor.id });
+    app.announceCreated({ projectId: input.projectId, promptId: created.id, userId: actor.id });
 
     return created;
   })
@@ -84,7 +84,7 @@ export const promptTrpcTransport = defineTrpcRouter(PromptApi, promptTrpc)
       actor,
     );
 
-    app.announceCreated({ projectId: input.projectId, userId: actor.id });
+    app.announceCreated({ projectId: input.projectId, promptId: copied.id, userId: actor.id });
 
     return copied;
   })
@@ -97,7 +97,7 @@ export const promptTrpcTransport = defineTrpcRouter(PromptApi, promptTrpc)
       actor,
     );
 
-    app.announceCreated({ projectId: input.projectId, userId: actor.id });
+    app.announceCreated({ projectId: input.projectId, promptId: duplicated.id, userId: actor.id });
 
     return duplicated;
   })

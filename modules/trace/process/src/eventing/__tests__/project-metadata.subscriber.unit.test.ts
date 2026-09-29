@@ -11,8 +11,8 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
-/** The injected product-analytics sink; the subscriber never reaches a client itself. */
-const mockTrackServerEvent = vi.fn();
+/** Nurturing's command; the subscriber never reaches a product-analytics client itself. */
+const mockRecordSignal = vi.fn(async () => undefined);
 
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import {
@@ -150,11 +150,11 @@ describe("createProjectMetadataHandler()", () => {
   beforeEach(() => {
     logger.error.mockClear();
     logger.warn.mockClear();
-    mockTrackServerEvent.mockClear();
+    mockRecordSignal.mockClear();
     mockProjects = createMockProjectService();
     deps = {
       projects: mockProjects as any,
-      recordProductEvent: mockTrackServerEvent,
+      nurturing: { recordSignal: mockRecordSignal },
     };
   });
 
@@ -208,15 +208,16 @@ describe("createProjectMetadataHandler()", () => {
 
       await subscriber(event, createContext(tenantId, state));
 
-      expect(mockTrackServerEvent).toHaveBeenCalledTimes(1);
-      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+      expect(mockRecordSignal).toHaveBeenCalledTimes(1);
+      expect(mockRecordSignal).toHaveBeenCalledWith({
+        kind: "first_trace_integrated",
+        sourceEventId: "event-1",
+        tenantId,
+        occurredAt: event.occurredAt,
         userId: "admin-user-1",
-        event: "first_trace_integrated",
-        properties: {
-          sdk_language: "python",
-          sdk_framework: "openai",
-        },
         projectId: tenantId,
+        sdkLanguage: "python",
+        sdkFramework: "openai",
       });
     });
 
@@ -227,13 +228,8 @@ describe("createProjectMetadataHandler()", () => {
 
       await subscriber(event, createContext(tenantId, createFoldState()));
 
-      expect(mockTrackServerEvent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          properties: {
-            sdk_language: "unknown",
-            sdk_framework: "unknown",
-          },
-        }),
+      expect(mockRecordSignal).toHaveBeenCalledWith(
+        expect.objectContaining({ sdkLanguage: "unknown", sdkFramework: "unknown" }),
       );
     });
 
@@ -249,7 +245,7 @@ describe("createProjectMetadataHandler()", () => {
 
       await subscriber(event, createContext(tenantId, createFoldState()));
 
-      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+      expect(mockRecordSignal).not.toHaveBeenCalled();
     });
   });
 
@@ -357,7 +353,48 @@ describe("createProjectMetadataHandler()", () => {
 
     /** @scenario PostHog integration milestone fires only on the firstMessage transition */
     it("does not track first_trace_integrated again", async () => {
-      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+      expect(mockRecordSignal).toHaveBeenCalledTimes(1);
+      expect(mockRecordSignal).not.toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "first_trace_integrated" }),
+      );
+    });
+
+    /** @scenario "A later trace tells nurturing against the organization's admin" */
+    it("tells nurturing a later trace against the org admin", async () => {
+      expect(mockRecordSignal).toHaveBeenCalledWith({
+        kind: "trace_received",
+        sourceEventId: "event-1",
+        tenantId,
+        occurredAt: expect.any(Number),
+        userId: "admin-user-1",
+        projectId: tenantId,
+      });
+    });
+  });
+
+  describe("when a later trace resolves no org admin", () => {
+    beforeEach(() => {
+      mockProjects.findById.mockResolvedValue({
+        id: tenantId,
+        firstMessage: true,
+        integrated: true,
+      });
+      mockProjects.resolveOrgAdmin.mockResolvedValue({
+        userId: null,
+        organizationId: null,
+        firstMessage: true,
+      });
+    });
+
+    /** @scenario "A later trace in a project with no organization admin tells nurturing nothing" */
+    it("tells nurturing nothing", async () => {
+      const subscriber = createProjectMetadataHandler(deps);
+      const event = createEvent(tenantId);
+      const context = createContext(tenantId, createFoldState());
+
+      await subscriber(event, context);
+
+      expect(mockRecordSignal).not.toHaveBeenCalled();
     });
   });
 
@@ -440,7 +477,7 @@ describe("createProjectMetadataHandler()", () => {
       // The next trace retries the write and fires the event then.
       await subscriber(event, context);
 
-      expect(mockTrackServerEvent).not.toHaveBeenCalled();
+      expect(mockRecordSignal).not.toHaveBeenCalled();
     });
   });
 
@@ -457,7 +494,7 @@ describe("createProjectMetadataHandler()", () => {
       bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
       deps = {
         projects: mockProjects as any,
-        recordProductEvent: mockTrackServerEvent,
+        nurturing: { recordSignal: mockRecordSignal },
         bootstrapTopicClustering: bootstrapTopicClustering as any,
       };
     });
@@ -537,7 +574,7 @@ describe("createProjectMetadataHandler()", () => {
       it("completes the metadata write without error", async () => {
         const subscriber = createProjectMetadataHandler({
           projects: mockProjects as any,
-          recordProductEvent: mockTrackServerEvent,
+          nurturing: { recordSignal: mockRecordSignal },
         });
 
         await expect(
@@ -564,7 +601,7 @@ describe("createProjectMetadataHandler()", () => {
       bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
       deps = {
         projects: mockProjects as any,
-        recordProductEvent: mockTrackServerEvent,
+        nurturing: { recordSignal: mockRecordSignal },
         bootstrapTopicClustering: bootstrapTopicClustering as any,
       };
     });
@@ -589,7 +626,15 @@ describe("createProjectMetadataHandler()", () => {
         // The event is gated on the firstMessage transition, not on the
         // metadata write: an integrated-flag repair must not re-fire it.
         expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
-        expect(mockTrackServerEvent).not.toHaveBeenCalled();
+        expect(mockRecordSignal).not.toHaveBeenCalledWith(
+          expect.objectContaining({ kind: "first_trace_integrated" }),
+        );
+      });
+
+      it("tells nurturing a later trace, since firstMessage was already set", async () => {
+        expect(mockRecordSignal).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: "trace_received" }),
+        );
       });
     });
   });
@@ -601,7 +646,7 @@ describe("createProjectMetadataHandler()", () => {
         mockProjects.findById.mockResolvedValue(null);
         const subscriber = createProjectMetadataHandler({
           projects: mockProjects as any,
-          recordProductEvent: mockTrackServerEvent,
+          nurturing: { recordSignal: mockRecordSignal },
           bootstrapTopicClustering: bootstrapTopicClustering as any,
         });
 

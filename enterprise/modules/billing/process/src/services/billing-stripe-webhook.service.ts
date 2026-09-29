@@ -4,13 +4,11 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
-import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import {
   BillingCheckoutCompletionService,
@@ -20,7 +18,6 @@ import {
   BillingSubscriptionLifecycleService,
   type SeatRetentionRules,
 } from "./billing-subscription-lifecycle.service.ts";
-import type { NurturingService } from "./nurturing.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:webhookService");
@@ -87,7 +84,6 @@ export class EEWebhookService implements WebhookService {
   private readonly inviteApprover?: InviteApprover;
   private readonly licensePurchaseHandler?: LicensePurchaseHandler;
   private readonly licensePaymentLinkId?: string;
-  private readonly getPostHog?: () => PostHog | null;
   private readonly host: BillingWebhookHost;
   private readonly connectedBilling?: ConnectedBillingInvoiceEvents;
   private readonly bestEffort = BestEffortService.create();
@@ -102,12 +98,9 @@ export class EEWebhookService implements WebhookService {
     inviteApprover,
     licensePurchaseHandler,
     licensePaymentLinkId,
-    getPostHog,
     host,
     retention,
     connectedBilling,
-    nurturing,
-    nurturingProfiles,
   }: {
     subscriptionRepository: BillingWebhookSubscriptionRepository;
     organizationRepository: BillingWebhookOrganizationRepository;
@@ -116,12 +109,9 @@ export class EEWebhookService implements WebhookService {
     inviteApprover?: InviteApprover;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
-    getPostHog?: () => PostHog | null;
     host: BillingWebhookHost;
     retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
-    nurturing?: NurturingService;
-    nurturingProfiles?: NurturingProfileRepository;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -130,7 +120,6 @@ export class EEWebhookService implements WebhookService {
     this.inviteApprover = inviteApprover;
     this.licensePurchaseHandler = licensePurchaseHandler;
     this.licensePaymentLinkId = licensePaymentLinkId;
-    this.getPostHog = getPostHog;
     this.host = host;
     this.connectedBilling = connectedBilling;
     this.checkout = BillingCheckoutCompletionService.create({
@@ -139,11 +128,8 @@ export class EEWebhookService implements WebhookService {
       stripe,
       itemCalculator,
       inviteApprover,
-      getPostHog,
       host,
       retention,
-      nurturing,
-      nurturingProfiles,
     });
     this.lifecycle = BillingSubscriptionLifecycleService.create({
       subscriptionRepository,
@@ -152,8 +138,6 @@ export class EEWebhookService implements WebhookService {
       itemCalculator,
       host,
       retention,
-      nurturing,
-      nurturingProfiles,
     });
   }
 
@@ -165,13 +149,9 @@ export class EEWebhookService implements WebhookService {
     inviteApprover?: InviteApprover;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
-    getPostHog?: () => PostHog | null;
     host: BillingWebhookHost;
     retention: SeatRetentionRules;
     connectedBilling?: ConnectedBillingInvoiceEvents;
-    /** Customer.io and the members its has_subscription trait goes to; absent, nothing is sent. */
-    nurturing?: NurturingService;
-    nurturingProfiles?: NurturingProfileRepository;
   }): EEWebhookService {
     return new EEWebhookService(options);
   }

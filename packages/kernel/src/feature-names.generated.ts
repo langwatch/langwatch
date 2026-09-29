@@ -57,6 +57,7 @@ export const FEATURE_NAMES = [
   "governance",
   "licensing",
   "managed-provider",
+  "nurturing",
   "saas",
   "scim",
   "sso",

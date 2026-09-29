@@ -10,7 +10,7 @@ import {
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -52,7 +52,7 @@ export async function createScenarioRestTestApp(
     tabs?: Partial<ScenarioTabStore>;
     redis?: Partial<ScenarioRedis>;
     traces?: Partial<TraceApi>;
-    billing?: Partial<BillingApi>;
+    nurturing?: Partial<NurturingApi>;
     plans?: Partial<EntitlementApi>;
     featureFlags?: Partial<FeatureFlagApi>;
     projects?: Partial<ProjectApi>;
@@ -90,7 +90,7 @@ export async function createScenarioRestTestApp(
       }),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
-      billing: createApiFixture<BillingApi>(options.billing ?? {}, "Billing API"),
+      nurturing: createApiFixture<NurturingApi>(options.nurturing ?? {}, "Nurturing API"),
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
@@ -107,7 +107,6 @@ export async function createScenarioRestTestApp(
       simulations,
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
-      idempotency: { claim: async () => true },
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: createApiFixture<ResourceOwnership>(),

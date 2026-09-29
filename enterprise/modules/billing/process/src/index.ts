@@ -130,7 +130,6 @@ export type {
   LicenseUnlockedFeatures,
 } from "./services/license-purchase.service.ts";
 export type { UsageLimitEmailData } from "./services/billing-usage-notice.service.ts";
-export type { NurturingServiceOptions } from "./services/nurturing.service.ts";
 export type {
   DeploymentPlanSources,
   DeploymentPlanSourcesOptions,
@@ -143,7 +142,7 @@ export type {
   UsageSummary,
 } from "./services/usage-reporting.service.ts";
 
-// The Stripe webhook and the Customer.io lifecycle signals, moved off
+// The Stripe webhook, moved off
 // `platform/app/src/server/app-layer/billing/`.
 export type {
   LicensePurchaseHandler,
@@ -159,8 +158,6 @@ export type {
   CancelledSubscription,
   SubscriptionWithOrg,
 } from "./repositories/billing-webhook-subscription.repository.ts";
-export type { NurturingProfile } from "./repositories/nurturing-profile.repository.ts";
-export type { IntegrationMethodValue } from "./rules/nurturing-product-interest-service.rules.ts";
 export {
   runTieredFreeToSeatEventMigration,
   TieredFreeToSeatEventMigrateTask,
@@ -178,23 +175,6 @@ export {
   type DuplicateSubscriptionsReport,
 } from "./tasks/duplicate-subscriptions-report.task.ts";
 export type { SubscriptionReportRow } from "./repositories/duplicate-subscriptions-report.repository.ts";
-export {
-  createScenarioRunMilestonesSubscriber,
-  type ScenarioRunMilestonesSubscriberDeps,
-} from "./eventing/scenario-run-milestones.subscriber.ts";
-export { isConnectedAgentRunSucceeded } from "./rules/scenario-run-milestones.rules.ts";
-export {
-  ProjectActiveDayTrackerService,
-  type ProjectActiveDayTrackerDeps,
-  type ProjectActiveDaySource,
-  type ProjectAdminResolution,
-} from "./services/project-active-day-tracker.service.ts";
-export { ProjectActiveDayRepository } from "./repositories/project-active-day.repository.ts";
-export { MemoryProjectActiveDayRepository } from "./repositories/memory/memory.project-active-day.repository.ts";
-export { PostHogChannel, type PostHogEventInput } from "./channels/posthog.channel.ts";
-export { HttpPostHogChannel } from "./channels/http/http.posthog.channel.ts";
-export { MemoryPostHogChannel } from "./channels/memory/memory.posthog.channel.ts";
-export { postHogChannels } from "./channels/posthog-channels.registry.ts";
 
 // The rows this module owns, and the two tiers behind them. A process selects
 // one tier and is handed every row; it constructs no repository itself.

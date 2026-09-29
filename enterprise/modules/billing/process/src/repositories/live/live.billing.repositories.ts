@@ -11,10 +11,6 @@ import {
   type BillingOrganizationCacheRedis,
 } from "../redis/redis.billing-organization-cache.repository.ts";
 import {
-  RedisScenarioRunMilestoneClaimRepository,
-  type ScenarioRunMilestoneClaimRedis,
-} from "../redis/redis.scenario-run-milestone-claim.repository.ts";
-import {
   RedisBillingTenantOrganizationCacheRepository,
   type BillingTenantOrganizationCacheRedis,
 } from "../redis/redis.tenant-organization-cache.repository.ts";
@@ -30,16 +26,13 @@ export class LiveBillingRepositories {
   }: Readonly<{
     prisma: Parameters<typeof PostgresBillingRepositories.create>[0]["prisma"];
     clickhouse: ClickHouseQueryClient;
-    redis: BillingOrganizationCacheRedis &
-      ScenarioRunMilestoneClaimRedis &
-      BillingTenantOrganizationCacheRedis;
+    redis: BillingOrganizationCacheRedis & BillingTenantOrganizationCacheRedis;
   }>): BillingRepositories {
     return {
       ...PostgresBillingRepositories.create({ prisma }),
       billableEvents: BillableEventsClickHouseRepository.create(clickhouse),
       billableEventsMeter: BillableEventsMeterClickHouseRepository.create(clickhouse),
       organizationCache: RedisBillingOrganizationCacheRepository.create({ redis }),
-      scenarioRunMilestoneClaims: RedisScenarioRunMilestoneClaimRepository.create({ redis }),
       tenantOrganizationCache: RedisBillingTenantOrganizationCacheRepository.create({ redis }),
     };
   }

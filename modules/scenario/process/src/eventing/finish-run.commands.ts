@@ -41,7 +41,14 @@ export interface FinishRunDeps {
     scenarioId: string;
     planId: string | null;
   }) => Promise<RunEvaluators>;
+  /** The project's organization admin, read only for a connected agent's run (its milestone). */
+  loadOrganizationAdmin?: (projectId: string) => Promise<{
+    userId: string | null;
+    onboardingVariant?: NonNullable<OrganizationAdmin>["onboardingVariant"];
+  }>;
 }
+
+type OrganizationAdmin = SimulationRunFinishedEventData["organizationAdmin"];
 
 const SCHEMA = defineCommandSchema(
   SIMULATION_RUN_COMMAND_TYPES.FINISH,
@@ -148,6 +155,10 @@ export class FinishRunAdapter implements CommandHandler<
 
     const ecst = await this.backfillEcstFields(tenantIdStr, data);
     const results = buildFinishResults({ data });
+    const organizationAdmin =
+      ecst.target?.type === "connected"
+        ? await this.resolveOrganizationAdmin({ tenantId: tenantIdStr, scenarioRunId })
+        : undefined;
 
     const eventData: SimulationRunFinishedEventData = {
       scenarioRunId,
@@ -162,6 +173,7 @@ export class FinishRunAdapter implements CommandHandler<
       ...(ecst.traceIds !== undefined && { traceIds: ecst.traceIds }),
       ...(ecst.target !== undefined && { target: ecst.target }),
       ...(ecst.evaluators !== undefined && { evaluators: ecst.evaluators }),
+      ...(organizationAdmin !== undefined && { organizationAdmin }),
     };
 
     const event = EventUtils.createEvent<SimulationRunFinishedEvent>({
@@ -280,6 +292,27 @@ export class FinishRunAdapter implements CommandHandler<
       logger.warn(
         { tenantId, scenarioRunId, error },
         "Could not read the run's evaluators when it finished",
+      );
+      return undefined;
+    }
+  }
+
+  /** A failed read leaves the field off: the run still finishes, its milestone is not sent. */
+  private async resolveOrganizationAdmin({
+    tenantId,
+    scenarioRunId,
+  }: {
+    tenantId: string;
+    scenarioRunId: string;
+  }): Promise<OrganizationAdmin> {
+    if (!this.deps?.loadOrganizationAdmin) return undefined;
+    try {
+      const { userId, onboardingVariant } = await this.deps.loadOrganizationAdmin(tenantId);
+      return userId ? { userId, onboardingVariant } : undefined;
+    } catch (error) {
+      logger.warn(
+        { tenantId, scenarioRunId, error },
+        "Could not read the organization admin when the run finished",
       );
       return undefined;
     }

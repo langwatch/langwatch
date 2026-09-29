@@ -33,7 +33,9 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

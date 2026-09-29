@@ -37,6 +37,7 @@ import { metricServer } from "@langwatch/metric-process";
 import { modelProviderServer } from "@langwatch/model-provider-process";
 import { monitorServer } from "@langwatch/monitor-process";
 import { notificationServer } from "@langwatch/notification-process";
+import { nurturingServer } from "@langwatch/enterprise-nurturing-process";
 import { onboardingServer } from "@langwatch/onboarding-process";
 import { opsServer } from "@langwatch/ops-process";
 import { organizationServer } from "@langwatch/organization-process";
@@ -99,6 +100,7 @@ export const serverModules = [
   modelProviderServer,
   monitorServer,
   notificationServer,
+  nurturingServer,
   onboardingServer,
   opsServer,
   organizationServer,

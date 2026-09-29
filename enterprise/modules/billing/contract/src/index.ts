@@ -10,7 +10,6 @@ export * from "./billing.service.ts";
 export * from "./currency.trpc.ts";
 export * from "./growth-seat-event.ts";
 export * from "./notification-types.ts";
-export * from "./nurturing-types.ts";
 export * from "./plan-limits.ts";
 export * from "./plan-types.ts";
 export * from "./pricing.ts";

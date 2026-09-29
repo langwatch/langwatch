@@ -39,6 +39,7 @@ import { GroupIdentityService } from "../services/group-identity.service.ts";
 import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
 import { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
 import { InviteService } from "../services/invite.service.ts";
+import { OrganizationLifecycleNoticeService } from "../services/organization-lifecycle-notice.service.ts";
 import { PersonalWorkspaceDiagnosticsService } from "../services/personal-workspace-diagnostics.service.ts";
 import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
 import {
@@ -462,12 +463,8 @@ function organizationSignals({
 
   return {
     trackServerEvent: (input) => unsent(`the organization event "${input.event}"`),
-    fireTeamMemberInvitedNurturing: () => unsent("a team member being invited"),
-    fireInviteAcceptedNurturing: () => unsent("an invitation being accepted"),
-    fireSignupNurturing: () => unsent("somebody signing up"),
     sendSlackSignupEvent: (input) => signupAnnouncements.announce(input),
     sendHubspotSignupForm: async () => unsent("a sign-up form"),
-    recordIntegrationMethod: () => unsent("a chosen integration method"),
     reportError: (error) => {
       logger.error({ error }, "an organization surface failed");
     },
@@ -622,6 +619,9 @@ export function buildOrganizationInfrastructure(input: {
   const baseHost = input.publicBaseUrl ?? "";
   const signals = organizationSignals({ logger, signupAnnouncements: input.signupAnnouncements });
   const seatLimits = SeatLimitNoticeService.create({ signals });
+  const lifecycle = OrganizationLifecycleNoticeService.create({
+    reportError: (error) => signals.reportError(error),
+  });
 
   return {
     identities: PersonalWorkspaceIdentityService.create(),
@@ -660,6 +660,7 @@ export function buildOrganizationInfrastructure(input: {
     plans: organizationPlanGate({ plans: dependencies.entitlement }),
     signals,
     seatLimits,
+    lifecycle,
     ceremony: organizationCeremony({
       projects: dependencies.projects,
       governance: dependencies.governance,

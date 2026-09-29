@@ -38,26 +38,25 @@ function harness(
 
   const signals = {
     trackServerEvent: vi.fn(),
-    fireTeamMemberInvitedNurturing: vi.fn(),
-    fireInviteAcceptedNurturing: vi.fn(),
-    fireSignupNurturing: vi.fn(),
     sendSlackSignupEvent: vi.fn(async () => undefined),
     sendHubspotSignupForm: vi.fn(async () => undefined),
-    recordIntegrationMethod: vi.fn(),
     reportError: vi.fn(),
     ...overrides,
   };
 
   const ensurePersonalWorkspace = vi.fn(async () => undefined);
+  const lifecycle = { signedUp: vi.fn(), integrationMethodChosen: vi.fn() };
 
   return {
     ceremony,
     signals,
+    lifecycle,
     createAndAssign,
     ensurePersonalWorkspace,
     onboarding: OrganizationInitializationService.create({
       ceremony,
       signals,
+      lifecycle,
       createAndAssign,
       ensurePersonalWorkspace:
         (overrides as { ensurePersonalWorkspace?: typeof ensurePersonalWorkspace })
@@ -286,7 +285,7 @@ describe("given the sign-up succeeded", () => {
 
     /** @scenario "Nurturing receives the intent as an explicit trait" */
     it("identifies the customer to nurturing with the intent beside the questionnaire", async () => {
-      const { onboarding, signals } = harness();
+      const { onboarding, lifecycle } = harness();
       const signUpData = { terms: true };
 
       await onboarding.initialize(
@@ -294,10 +293,8 @@ describe("given the sign-up succeeded", () => {
         CALLER,
       );
 
-      expect(signals.fireSignupNurturing).toHaveBeenCalledWith({
+      expect(lifecycle.signedUp).toHaveBeenCalledWith({
         userId: CALLER.id,
-        email: CALLER.email,
-        name: CALLER.name,
         organizationId: ORGANIZATION.id,
         organizationName: ORGANIZATION.name,
         signUpData,

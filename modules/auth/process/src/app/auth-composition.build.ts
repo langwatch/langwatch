@@ -51,6 +51,7 @@ import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memo
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
 import { openingSsoProviderConfigs } from "../rules/sso-provider-config.rules.ts";
+import type { AuthLifecycleNoticeService } from "../services/auth-lifecycle-notice.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import type { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import { SsoRegisteredIssuersService } from "../services/sso-registered-issuers.service.ts";
@@ -172,16 +173,19 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
   static create({
     logger,
     signups,
+    lifecycle,
   }: {
     logger: Logger;
     signups: SignupAnnouncementService;
+    lifecycle: Pick<AuthLifecycleNoticeService, "sessionStarted" | "ssoAutoAdded">;
   }): LoggedBetterAuthAnnouncements {
-    return new LoggedBetterAuthAnnouncements(logger, signups);
+    return new LoggedBetterAuthAnnouncements(logger, signups, lifecycle);
   }
 
   private constructor(
     private readonly logger: Logger,
     private readonly signups: SignupAnnouncementService,
+    private readonly lifecycle: Pick<AuthLifecycleNoticeService, "sessionStarted" | "ssoAutoAdded">,
   ) {
     super();
   }
@@ -201,9 +205,17 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     void this.signups.announce(input).catch((error: unknown) => this.reportError(error));
   }
 
-  ssoAutoAddNurturing(): void {}
+  ssoAutoAddNurturing(input: {
+    userId: string;
+    organizationId: string;
+    organizationName: string;
+  }): void {
+    this.lifecycle.ssoAutoAdded(input);
+  }
 
-  sessionNurturing(): void {}
+  sessionNurturing(input: { userId: string }): void {
+    this.lifecycle.sessionStarted(input);
+  }
 }
 
 /**
@@ -305,6 +317,8 @@ export type BuildBetterAuthOptions = Readonly<{
   identity: BetterAuthDeploymentIdentity;
   /** Main's sign-up announcement, for a user who joins through their domain. */
   signupAnnouncements: SignupAnnouncementService;
+  /** Where a session and a domain auto-join are recorded for nurturing. */
+  lifecycle: Pick<AuthLifecycleNoticeService, "sessionStarted" | "ssoAutoAdded">;
   /** The typed client every database hook reads and writes through. */
   prisma: ProcessMembers["prisma"];
   /** The deployment's cipher, which the engine's dialing documents are kept
@@ -435,6 +449,7 @@ export async function buildBetterAuth(
     announcements: LoggedBetterAuthAnnouncements.create({
       logger,
       signups: options.signupAnnouncements,
+      lifecycle: options.lifecycle,
     }),
     shadow: OffSignInRouterShadow.create(),
     authzGrants: options.grants,

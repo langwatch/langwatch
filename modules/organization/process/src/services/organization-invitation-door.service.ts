@@ -35,6 +35,7 @@ import type {
   OrganizationSignals,
 } from "../app/organization.members.ts";
 import type { InviteCreationThrottleService } from "./invite-creation-throttle.service.ts";
+import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
 
 /** The allowance a seat refusal carries in its `meta`. */
 const seatLimitMetaSchema = z.object({
@@ -49,6 +50,8 @@ export interface OrganizationInvitationDoorDependencies {
   readonly joinRequests: OrganizationJoinRequests | null;
   readonly plans: OrganizationPlanGate;
   readonly signals: OrganizationSignals;
+  /** Where an invitation batch and an acceptance are recorded as organization's events. */
+  readonly lifecycle: Pick<OrganizationLifecycleNoticeService, "membersInvited" | "inviteAccepted">;
   /** The sender-scoped per-hour creation counter, spent before a batch is written. */
   readonly creationThrottle: Pick<InviteCreationThrottleService, "assertCreationAllowed">;
   /** Provisions the accepting person's personal workspace for this tenant. */
@@ -106,20 +109,13 @@ export class OrganizationInvitationDoorService {
 
     await this.#answerOpenJoinRequests(created.invites);
 
-    this.deps.signals.trackServerEvent({
+    this.deps.lifecycle.membersInvited({
+      organizationId: input.organizationId,
       userId: by.id,
-      event: "team_member_invited",
-      properties: { inviteCount: created.invites.length },
+      inviteIds: created.invites.map((record) => record.invite.id),
+      roles: created.invites.map((record) => record.invite.role),
+      teamMemberCount: created.organization.members.length + created.invites.length,
     });
-
-    const memberCount = created.organization.members.length + created.invites.length;
-    for (const record of created.invites) {
-      this.deps.signals.fireTeamMemberInvitedNurturing({
-        userId: by.id,
-        teamMemberCount: memberCount,
-        role: record.invite.role,
-      });
-    }
 
     return withUrls;
   }
@@ -238,11 +234,10 @@ export class OrganizationInvitationDoorService {
       })
       .catch((failure: unknown) => this.deps.signals.reportError(failure));
 
-    this.deps.signals.fireInviteAcceptedNurturing({
-      userId: by.id,
-      email: by.email,
-      name: by.name,
+    this.deps.lifecycle.inviteAccepted({
       organizationId: invite.organization.id,
+      userId: by.id,
+      inviteId: invite.id,
       organizationName: invite.organization.name,
     });
 

@@ -2,6 +2,7 @@ import type { AutomationApi } from "@langwatch/automation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -75,6 +76,7 @@ export interface TraceProcessingPeers {
   projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
   scenarios: Pick<ScenarioApi, "computeRunMetrics">;
   topics: Pick<TopicApi, "bootstrapClustering">;
+  nurturing: Pick<NurturingApi, "recordSignal">;
 }
 
 export interface TraceProcessingPipelineInput {
@@ -204,8 +206,7 @@ export class TraceProcessingRuntimeAdapter {
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
-        // No product-analytics sink is composed here; silent, as main was without one.
-        recordProductEvent: () => undefined,
+        nurturing: peers.nurturing,
       }),
       simulationMetricsSync: createSimulationMetricsSyncHandler({
         computeRunMetrics: (data) => peers.scenarios.computeRunMetrics(data),

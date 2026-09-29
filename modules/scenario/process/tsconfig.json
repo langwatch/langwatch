@@ -35,7 +35,7 @@
       "path": "../../data-retention/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+      "path": "../../../enterprise/modules/nurturing/contract/tsconfig.build.json"
     },
     {
       "path": "../../entitlement/contract/tsconfig.build.json"

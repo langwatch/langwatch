@@ -16,7 +16,14 @@ function announcementsOver(channel: SignupAnnouncementChannel) {
     publicBaseUrl: "https://app.langwatch.ai",
     logger,
   });
-  return { announcements: LoggedBetterAuthAnnouncements.create({ logger, signups }), lines };
+  return {
+    announcements: LoggedBetterAuthAnnouncements.create({
+      logger,
+      signups,
+      lifecycle: { sessionStarted: vi.fn(), ssoAutoAdded: vi.fn() },
+    }),
+    lines,
+  };
 }
 
 describe("LoggedBetterAuthAnnouncements.announceSignup()", () => {

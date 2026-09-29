@@ -1,6 +1,8 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
@@ -12,6 +14,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
+import type { PromptLifecyclePipeline } from "../../eventing/prompt-lifecycle.pipeline.ts";
 import { MemoryPromptRepositories } from "../../repositories/memory/memory.prompt.repositories.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
 import { PromptApp } from "../prompt.app.ts";
@@ -69,6 +72,7 @@ function harness() {
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
+        nurturing: createApiFixture<NurturingApi>(),
       },
       members: {
         logger: createTestLogger().logger,
@@ -308,7 +312,7 @@ describe("PromptApp.commitMessageFor", () => {
 describe("PromptApp.create", () => {
   describe("given its declared repository bundle", () => {
     it("builds a working engine over memory repositories", async () => {
-      const { logger: fakeLogger, lines } = createTestLogger();
+      const { logger: fakeLogger } = createTestLogger();
 
       const app = PromptApp.create({
         dependencies: {
@@ -320,6 +324,7 @@ describe("PromptApp.create", () => {
           plans: createApiFixture<EntitlementApi>(),
           workflow: createApiFixture<WorkflowApi>(),
           modelProviders: defaultModelFixture(),
+          nurturing: createApiFixture<NurturingApi>(),
         },
         members: {
           logger: fakeLogger,
@@ -336,13 +341,81 @@ describe("PromptApp.create", () => {
         app.getAllPrompts({ projectId: "project-1", organizationId: "org-1" }),
       ).resolves.toEqual([]);
 
-      app.announceCreated({ projectId: "project-1", userId: "user-1" });
-      expect(
-        lines.findLine(
-          "info",
-          "prompt created; no product-analytics sink is composed on this process",
-        ),
-      ).toMatchObject({ projectId: "project-1", userId: "user-1" });
+      // Announcing before the pipeline connects its senders never throws:
+      // `announceCreated` is fire-and-forget (@scenario "Prompt creation
+      // tracked regardless of whether created via platform UI or API").
+      expect(() =>
+        app.announceCreated({ projectId: "project-1", promptId: "prompt-1", userId: "user-1" }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("given its lifecycle pipeline is connected", () => {
+    /** @scenario "Prompt creation tracked regardless of whether created via platform UI or API" */
+    it("resolves the org admin and sends the count when the write carried no user", async () => {
+      const sent: unknown[] = [];
+      const commands: EventingCommands<PromptLifecyclePipeline> = {
+        recordPromptCreated: {
+          send: async (payload) => {
+            sent.push(payload);
+          },
+          sendBatch: async () => {},
+          close: async () => {},
+          waitUntilReady: async () => {},
+        },
+      };
+
+      const app = PromptApp.create({
+        dependencies: {
+          projects: createApiFixture<ProjectApi>({
+            getOrganizationId: async () => "org-1",
+            listIdsByOrganization: async () => [],
+            resolveOrgAdmin: async () => ({
+              userId: "org-admin",
+              organizationId: "org-1",
+              firstMessage: false,
+              onboardingVariant: null,
+              organizationCreatedAt: null,
+            }),
+          }),
+          permissions: createApiFixture<AuthzApi>(),
+          plans: createApiFixture<EntitlementApi>(),
+          workflow: createApiFixture<WorkflowApi>(),
+          modelProviders: defaultModelFixture(),
+          nurturing: createApiFixture<NurturingApi>(),
+        },
+        members: {
+          logger: createTestLogger().logger,
+          rateLimiter: { check: async () => ({ allowed: true }) },
+          publicBaseUrl: "https://app.langwatch.test",
+        },
+        config: undefined,
+        resources: { own: () => {}, ownService: () => {} },
+        secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+        repositories: MemoryPromptRepositories.create(),
+      });
+      app.connectLifecycleCommands(commands);
+
+      const created = await app.createPrompt({
+        projectId: "project-1",
+        organizationId: "org-1",
+        handle: "support-triage",
+        prompt: "You are a support bot.",
+      });
+
+      // The REST/CLI door announces with no user; the fire-and-forget chain
+      // runs on the microtask queue, so a flush lets it land before the assert.
+      app.announceCreated({ projectId: "project-1", promptId: created.id });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sent).toEqual([
+        expect.objectContaining({
+          promptId: created.id,
+          projectId: "project-1",
+          userId: "org-admin",
+          orgPromptCount: 1,
+        }),
+      ]);
     });
   });
 });

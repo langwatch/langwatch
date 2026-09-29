@@ -84,13 +84,15 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
       database,
       eventing: identity,
     }).build();
+    const dataplane = input.connections.dataplane;
+    if (!dataplane) throw new Error("system-migrations-pass needs the dataplane connection");
     const runner = OpsSystemMigrations.create({
       database,
       redis,
       isSaaS: () => input.config.isSaaS,
       migrations: () => migrations,
       userMigrations: () => userMigrations,
-      dataplane: input.connections.dataplane,
+      dataplane,
       newbornSweep: () => sweep.runPass(),
     });
     await SystemMigrationsPassTask.create({

@@ -1,3 +1,4 @@
+import { onboardingVariantSchema } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
 import { simulationEventSchema } from "./simulation.events.ts";
@@ -18,6 +19,8 @@ export const scenarioCreatedEventDataSchema = z.object({
   projectId: z.string(),
   userId: z.string(),
   scenarioCount: z.number().int().nonnegative(),
+  /** Where the onboarding experiment put the organization; absent before it. */
+  onboardingVariant: onboardingVariantSchema.nullish(),
 });
 export type ScenarioCreatedEventData = z.infer<typeof scenarioCreatedEventDataSchema>;
 

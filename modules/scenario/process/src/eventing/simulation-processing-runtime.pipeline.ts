@@ -1,7 +1,9 @@
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { EventingParticipation, PriorEventsRead, ResourceOwnership } from "@langwatch/kernel";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   loadRunAttachments,
   SCENARIO_WORKER,
@@ -50,6 +52,12 @@ export interface SimulationGradingPeers {
   evaluations: Pick<EvaluationApi, "runEvaluator" | "reportEvaluation">;
 }
 
+/** Where a finished run reads its admin, counts the organization's runs, and tells nurturing. */
+export interface SimulationMilestonePeers {
+  projects: Pick<ProjectApi, "resolveOrgAdmin" | "listIdsByOrganization">;
+  nurturing: Pick<NurturingApi, "recordSignal">;
+}
+
 /** Grading reads the run's spans whole, as main's worker did: no viewer redaction. */
 const GRADING_PROTECTIONS: Protections = {
   canSeeCosts: true,
@@ -86,6 +94,7 @@ export class SimulationProcessingRuntimeAdapter {
       snapshotUpdates: SnapshotUpdateBroadcastSubscriberDeps;
       executor: ScenarioExecutorService;
       grading: SimulationGradingPeers;
+      milestones: SimulationMilestonePeers;
     },
   ) {}
 
@@ -100,6 +109,7 @@ export class SimulationProcessingRuntimeAdapter {
     snapshotUpdates: SnapshotUpdateBroadcastSubscriberDeps;
     executor: ScenarioExecutorService;
     grading: SimulationGradingPeers;
+    milestones: SimulationMilestonePeers;
   }): SimulationProcessingRuntimeAdapter {
     return new SimulationProcessingRuntimeAdapter(input);
   }
@@ -130,6 +140,8 @@ export class SimulationProcessingRuntimeAdapter {
       finishRunCommand: new FinishRunCommand({
         loadPriorEvents,
         loadRunAttachments: loadAttachments,
+        loadOrganizationAdmin: (projectId) =>
+          this.input.milestones.projects.resolveOrgAdmin(projectId),
       }),
       recordEvaluationsCommand: new RecordEvaluationsCommand({ loadPriorEvents }),
       computeRunMetricsCommand: new ComputeRunMetricsCommand({
@@ -161,6 +173,12 @@ export class SimulationProcessingRuntimeAdapter {
       snapshotUpdateBroadcast: this.input.snapshotUpdates,
       suiteRunSync: this.input.suiteRuns,
       traceMetricsSync: { computeRunMetrics: (data) => commands.computeRunMetrics(data) },
+      scenarioRunSucceededNurturing: this.input.milestones.nurturing,
+      simulationRunFinishedNurturing: {
+        projects: this.input.milestones.projects,
+        simulations,
+        nurturing: this.input.milestones.nurturing,
+      },
       retention: {
         resolve: (tenantId) => retention.getResolvedForProject({ projectId: tenantId }),
       },

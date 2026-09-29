@@ -27,11 +27,8 @@ import type {
   BillingWebhookSubscriptionRepository,
   SubscriptionWithOrg,
 } from "../repositories/billing-webhook-subscription.repository.ts";
-import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
-import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { BestEffortService } from "./best-effort.service.ts";
-import type { NurturingService } from "./nurturing.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
@@ -52,9 +49,6 @@ type BillingSubscriptionLifecycleOptions = {
   host: BillingWebhookHost;
   /** Data-retention's rules, which a first seat activation stamps at the platform default. */
   retention: SeatRetentionRules;
-  /** Customer.io and the members its has_subscription trait goes to; absent, nothing is sent. */
-  nurturing?: NurturingService;
-  nurturingProfiles?: NurturingProfileRepository;
 };
 
 /** The two data-retention operations seat provisioning reads and writes. */
@@ -71,8 +65,6 @@ export class BillingSubscriptionLifecycleService {
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
   private readonly retention: SeatRetentionRules;
-  private readonly nurturing?: NurturingService;
-  private readonly nurturingProfiles?: NurturingProfileRepository;
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
@@ -82,8 +74,6 @@ export class BillingSubscriptionLifecycleService {
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
     this.retention = options.retention;
-    this.nurturing = options.nurturing;
-    this.nurturingProfiles = options.nurturingProfiles;
   }
 
   async handleSubscriptionDeleted({
@@ -135,16 +125,6 @@ export class BillingSubscriptionLifecycleService {
       },
     });
 
-    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
-      existingSubscription.organizationId,
-    );
-    fireSubscriptionSync({
-      nurturing: this.nurturing,
-      profiles: this.nurturingProfiles,
-      organizationId: existingSubscription.organizationId,
-      hasSubscription: !!remainingActive,
-    });
-
     // Cancellation deliberately leaves the org's retention policies in place
     // until the paid-retention feature is released.
   }
@@ -186,16 +166,6 @@ export class BillingSubscriptionLifecycleService {
    */
   private async cancelSubscriptionRecord(existing: BillingSubscriptionRecord): Promise<void> {
     await this.subscriptionRepository.cancel({ id: existing.id });
-
-    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
-      existing.organizationId,
-    );
-    fireSubscriptionSync({
-      nurturing: this.nurturing,
-      profiles: this.nurturingProfiles,
-      organizationId: existing.organizationId,
-      hasSubscription: !!remainingActive,
-    });
   }
 
   /** Reconciles the seat and event quantities Stripe now reports, and notifies on activation. */
@@ -347,13 +317,6 @@ export class BillingSubscriptionLifecycleService {
             startDate: updatedSubscription.startDate,
             ...planQuantitiesOf(updatedSubscription),
           }),
-      });
-
-      fireSubscriptionSync({
-        nurturing: this.nurturing,
-        profiles: this.nurturingProfiles,
-        organizationId: updatedSubscription.organizationId,
-        hasSubscription: true,
       });
     }
   }

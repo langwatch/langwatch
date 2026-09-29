@@ -9,7 +9,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -50,7 +50,7 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
       }),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
-      billing: createApiFixture<BillingApi>(),
+      nurturing: createApiFixture<NurturingApi>(),
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
@@ -71,7 +71,6 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
       simulations: createApiFixture<SimulationService>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
-      idempotency: { claim: async () => true },
     },
   });
 }

@@ -237,15 +237,3 @@ Feature: Workflow service boundary
     Given the workflow module is installed from its declared members alone
     When the project's workflows are listed with their copy lineage
     Then the list answers instead of failing on a member the process never supplied
-
-  @unit
-  Scenario: A created workflow is announced to billing for nurturing
-    Given a person creates a workflow in a project
-    When the create has landed
-    Then billing is told the person, the project, the workflow and the project's workflow count
-
-  @unit
-  Scenario: A failed announcement never fails the workflow create
-    Given billing refuses the announcement of a created workflow
-    When the workflow is created
-    Then the failure is logged against the project and the create is not failed

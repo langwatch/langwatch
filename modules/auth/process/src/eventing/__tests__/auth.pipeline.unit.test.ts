@@ -34,7 +34,7 @@ describe("given auth's eventing declaration", () => {
   describe("when the module is declared", () => {
     /** @scenario "Finished lock-out rows are cleared a day after they settle" */
     it("carries the hourly reap onto the installable module", () => {
-      expect(authServer.eventing).toBe(authEventing);
+      expect(authServer.eventing?.pipeline).toContain(SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME);
       expect(authEventing.pipeline).toBe(SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME);
       expect(SIGN_IN_LOCK_REAP_INTERVAL_MS).toBe(HOUR_MS);
     });

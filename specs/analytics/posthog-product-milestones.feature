@@ -137,17 +137,17 @@ Feature: PostHog product milestones
     When another signal arrives the same day
     Then nothing is tracked
 
-  # Billing sends its server-side milestones (scenario_created today) through ops' product-analytics
-  # target, as main's trackServerEvent did through POSTHOG_KEY.
+  # Nurturing sends the server-side milestones through POSTHOG_KEY and POSTHOG_HOST, shared
+  # deployment config, as main's trackServerEvent did.
   @unit
-  Scenario: Billing's milestones send nothing where the deployment named no PostHog key
-    Given a deployment whose ops config names no product-analytics target
-    When billing tracks a milestone
+  Scenario: Nurturing's milestones send nothing where the deployment named no PostHog key
+    Given a deployment that names no PostHog target
+    When nurturing tracks a milestone
     Then no PostHog client is built and nothing is sent
     And closing the channel succeeds
 
   @unit
-  Scenario: Billing reads ops' PostHog target on its first milestone, not at boot
-    Given billing composed its PostHog channel
+  Scenario: Nurturing builds its PostHog client on its first milestone, not at boot
+    Given nurturing composed its PostHog channel
     When two milestones are tracked
-    Then ops' targets were read once, on the first
+    Then the targets were read once, on the first

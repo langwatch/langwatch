@@ -1260,6 +1260,14 @@ records the fact in the same write as the change and answers it through a `find*
 decision once keyed by the fact, and shows a fact it has not decided as awaiting. Seat changes are
 the case: licensing's `IssuedLicense.seatsRaisedFrom` and `LicensingApi.findSeatChanges`, read by
 billing's `seatInvoicing` pass every minute on `connected_billing` (Alex, 2026-09-29).
+Enterprise `nurturing` shows the 2026-09-25 subscriber rule (Alex, 2026-09-29): each owner's subscriber calls
+`NurturingApi.recordSignal` with ids and the non-personal, point-in-time facts it must pass on. No event carries
+personal data: where a signal needs some it carries the id (and a revision), and nurturing reads the value from
+`UserApi` at delivery and never stores it. Only the email and name leave, to Customer.io, once at sign-up; each
+identify sends only the traits that signal changes, once per source event.
+Its `nurturing -> user` read joins the peer-cycle component through user's existing foundation edges, so the
+six owner hand-overs and that read are listed in the ratchet baseline as ruled (Alex, 2026-09-29): the one
+exception to shrink-only, and they leave with the foundation cuts.
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
 projection state keeps its type from declaration to handler (Alex, 2026-09-24).

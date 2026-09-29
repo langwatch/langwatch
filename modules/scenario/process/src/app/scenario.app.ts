@@ -8,7 +8,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { BillingApi } from "@langwatch/enterprise-billing-contract";
+import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -205,6 +205,8 @@ export interface ScenarioAppDependencies {
   failures: ScenarioFailureHandlerService;
   scenarioTabs: ScenarioTabRegistry;
   users: UserApi;
+  /** The onboarding variant a created scenario records, for its milestone. */
+  projects: Pick<ProjectApi, "resolveOrgAdmin" | "listIdsByOrganization">;
   /** The project's `simulation_updated` frames. */
   updates: SimulationUpdateStreamService;
   /** Reads results as atoms and folds them into the Results tab's views. */
@@ -252,8 +254,8 @@ export const scenarioAppDependencyTokens = {
   presence: PresenceApi,
   auditLog: AuditLogApi,
   traces: TraceApi,
-  /** Where a created scenario is announced, for product analytics and nurturing. */
-  billing: BillingApi,
+  /** Where a created scenario is told, for product analytics and nurturing. */
+  nurturing: NurturingApi,
   /** The platform default a simulation run row is stamped with, read per write. */
   retention: DataRetentionApi,
   /** Where a suite set's scenario runs are recorded against their suite run. */
@@ -300,7 +302,6 @@ type ScenarioProcessMembers = Readonly<{
       limit?: { requests: number; seconds: number },
     ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number }>>;
   }>;
-  idempotency: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
   /** Broadcasts and cancel signals across the fleet; absent in a memory process. */
   redis: ScenarioRedis | null;
   publicBaseUrl: string | undefined;
@@ -333,7 +334,6 @@ export class ScenarioApp implements ScenarioApi {
     "clickhouse",
     "encryption",
     "rateLimiter",
-    "idempotency",
     "redis",
     "publicBaseUrl",
     "scenarioChildBundle",
@@ -461,6 +461,7 @@ export class ScenarioApp implements ScenarioApi {
         maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
       }),
       connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),
+      projects: peers.projects,
       scenarios,
       simulations,
       prefetcher: ScenarioExecutionPrefetcherService.create({
@@ -517,10 +518,7 @@ export class ScenarioApp implements ScenarioApi {
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,
         recordings: voiceRecordingChannels.live.create(),
       }),
-      lifecycle: buildScenarioLifecyclePipeline({
-        announce: (signal) => setup.dependencies.billing.recordScenarioCreated(signal),
-        claim: (key, ttlSeconds) => setup.members.idempotency.claim(key, ttlSeconds),
-      }),
+      lifecycle: buildScenarioLifecyclePipeline(setup.dependencies.nurturing),
       simulationCommands,
       simulationProcessing: SimulationProcessingRuntimeAdapter.create({
         runs: setup.repositories.simulationRunProcessing,
@@ -554,6 +552,10 @@ export class ScenarioApp implements ScenarioApi {
             runEvaluator: (input) => setup.dependencies.evaluations.runEvaluator(input),
             reportEvaluation: (data) => setup.dependencies.evaluations.reportEvaluation(data),
           },
+        },
+        milestones: {
+          projects: setup.dependencies.projects,
+          nurturing: setup.dependencies.nurturing,
         },
         executor: ScenarioExecutorService.create({
           voiceNonces,
@@ -792,9 +794,15 @@ export class ScenarioApp implements ScenarioApi {
     userId: string;
   }): void {
     const { scenario, projectId, userId } = input;
-    void this.#dependencies.scenarios
-      .count({ projectId })
-      .then((scenarioCount) => {
+    const onboardingVariant = Promise.resolve(projectId)
+      .then((id) => this.#dependencies.projects.resolveOrgAdmin(id))
+      .then(
+        (admin) => admin.onboardingVariant,
+        // A variant that cannot be read leaves the milestone without it, as before the experiment.
+        () => null,
+      );
+    void Promise.all([this.#dependencies.scenarios.count({ projectId }), onboardingVariant])
+      .then(([scenarioCount, variant]) => {
         if (!this.#lifecycleCommands) {
           throw new Error("scenario_lifecycle pipeline senders are not connected yet");
         }
@@ -805,6 +813,7 @@ export class ScenarioApp implements ScenarioApi {
           projectId,
           userId,
           scenarioCount,
+          onboardingVariant: variant,
         });
       })
       .catch((error: unknown) => {

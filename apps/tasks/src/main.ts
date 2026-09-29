@@ -5,7 +5,6 @@ import { bootNodeExecutable, configureLogger, createLogger } from "@langwatch/ob
 import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
 import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
-import { clickhouseMigrate } from "./clickhouse-migrate.ts";
 import {
   resolveTasksConfig,
   resolveTasksEnvironment,
@@ -15,21 +14,27 @@ import {
   type TasksConfig,
 } from "./config.ts";
 import { openTasksDatabase } from "./database.ts";
-import { lwqlProvision } from "./lwql-provision.ts";
-import { lwqlRenderAccessConfig } from "./lwql-render-access-config.ts";
-import { prismaMigrate } from "./prisma-migrate.ts";
-import { storageSeed } from "./storage-seed/storage-seed.ts";
-import { openSystemMigrationsDataplane } from "./system-migrations-dataplane.ts";
-import { systemMigrationsPass } from "./system-migrations-pass.ts";
 
-const tasks = new Map<string, (input: TaskInput) => Promise<void>>([
-  ["prisma-migrate", prismaMigrate],
-  ["clickhouse-migrate", clickhouseMigrate],
-  ["lwql-provision", lwqlProvision],
-  ["lwql-render-access-config", lwqlRenderAccessConfig],
-  ["system-migrations-pass", systemMigrationsPass],
-  ["storage-seed", storageSeed],
+type TaskRun = (input: TaskInput) => Promise<void>;
+
+// Each task loads its own graph when it runs, so a seed never pays for the migration pass.
+const tasks = new Map<string, () => Promise<TaskRun>>([
+  ["prisma-migrate", async () => (await import("./prisma-migrate.ts")).prismaMigrate],
+  ["clickhouse-migrate", async () => (await import("./clickhouse-migrate.ts")).clickhouseMigrate],
+  ["lwql-provision", async () => (await import("./lwql-provision.ts")).lwqlProvision],
+  [
+    "lwql-render-access-config",
+    async () => (await import("./lwql-render-access-config.ts")).lwqlRenderAccessConfig,
+  ],
+  [
+    "system-migrations-pass",
+    async () => (await import("./system-migrations-pass.ts")).systemMigrationsPass,
+  ],
+  ["storage-seed", async () => (await import("./storage-seed/storage-seed.ts")).storageSeed],
 ]);
+
+/** Tasks that read the per-organization ClickHouse routing. */
+const DATAPLANE_TASKS = new Set(["system-migrations-pass"]);
 
 /** Tasks that never touch the migration database, so never wait on its advisory lock. */
 const LOCK_FREE_TASKS = new Set(["system-migrations-pass", "lwql-render-access-config"]);
@@ -43,8 +48,9 @@ export async function runTasks(argv: readonly string[], input: TaskInput): Promi
     const logger = createLogger("langwatch:tasks");
     for (const name of argv) {
       input.signal.throwIfAborted();
-      const task = tasks.get(name);
-      if (!task) throw new Error(`Unknown task: ${name}`);
+      const load = tasks.get(name);
+      if (!load) throw new Error(`Unknown task: ${name}`);
+      const task = await load();
       logger.info({ task: name }, "task starting");
       await task(input);
       input.signal.throwIfAborted();
@@ -64,7 +70,13 @@ export async function runTasks(argv: readonly string[], input: TaskInput): Promi
  * The runner's one secrets seam: each connection string lives only inside the
  * closure `into` hands it to, and what escapes is the connector built there.
  */
-async function openConnections(config: TasksConfig): Promise<TaskConnections> {
+async function openConnections({
+  config,
+  argv,
+}: {
+  config: TasksConfig;
+  argv: readonly string[];
+}): Promise<TaskConnections> {
   const chain = SecretsChain.start({ environment: process.env }).withEnv().withFile();
   const resolver = SecretsResolver.over(chain);
   const declared = Object.values(tasksSecrets);
@@ -78,7 +90,11 @@ async function openConnections(config: TasksConfig): Promise<TaskConnections> {
   const redis = await secrets.into(tasksSecrets.redisUrl, (url) =>
     url === undefined ? null : new RedisConnectionService().connect({ url }),
   );
-  const dataplane = await openSystemMigrationsDataplane(secrets);
+  const dataplane = argv.some((name) => DATAPLANE_TASKS.has(name))
+    ? await (
+        await import("./system-migrations-dataplane.ts")
+      ).openSystemMigrationsDataplane(secrets)
+    : null;
 
   resolver.seal();
 
@@ -107,7 +123,7 @@ async function main(): Promise<void> {
   const source = { ...process.env };
   const environment = resolveTasksEnvironment(source);
   const config = resolveTasksConfig(source);
-  const connections = await openConnections(config);
+  const connections = await openConnections({ config, argv });
   try {
     await runTasks(argv, {
       config,

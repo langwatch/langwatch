@@ -25,17 +25,17 @@ const restLogger = createLogger("langwatch:api:prompts");
 export class PromptLibraryService {
   static create(options: {
     prompts: PromptService;
-    afterPromptCreated: (input: { projectId: string }) => void;
+    afterPromptCreated: (input: { projectId: string; promptId: string }) => void;
   }): PromptLibraryService {
     return new PromptLibraryService(options);
   }
 
   readonly #prompts: PromptService;
-  readonly #afterPromptCreated: (input: { projectId: string }) => void;
+  readonly #afterPromptCreated: (input: { projectId: string; promptId: string }) => void;
 
   private constructor(options: {
     prompts: PromptService;
-    afterPromptCreated: (input: { projectId: string }) => void;
+    afterPromptCreated: (input: { projectId: string; promptId: string }) => void;
   }) {
     this.#prompts = options.prompts;
     this.#afterPromptCreated = options.afterPromptCreated;
@@ -107,7 +107,7 @@ export class PromptLibraryService {
         organizationId: data.organizationId,
       });
 
-      this.#afterPromptCreated({ projectId: data.projectId });
+      this.#afterPromptCreated({ projectId: data.projectId, promptId: created.id });
 
       return answered;
     } catch (error: unknown) {
@@ -161,7 +161,9 @@ export class PromptLibraryService {
         "Successfully synced prompt",
       );
 
-      if (syncResult.action === "created") this.#afterPromptCreated({ projectId });
+      if (syncResult.action === "created" && syncResult.prompt) {
+        this.#afterPromptCreated({ projectId, promptId: syncResult.prompt.id });
+      }
 
       return syncResult;
     } catch (error: unknown) {

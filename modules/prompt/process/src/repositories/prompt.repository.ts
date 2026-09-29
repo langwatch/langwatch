@@ -78,6 +78,9 @@ export abstract class LlmConfigRepository {
   /** The project's own prompts, not deleted, holding at least one version. */
   abstract countVersioned(input: { projectId: string }): Promise<number>;
 
+  /** The organization's prompts across every project, not deleted, holding at least one version. */
+  abstract countOrganizationVersioned(input: { organizationId: string }): Promise<number>;
+
   abstract isHandleUnique(params: {
     handle: string;
     projectId: string;

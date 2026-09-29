@@ -5,6 +5,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -50,6 +51,7 @@ export function buildPromptApp(prompts: PromptService): PromptApp {
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
+        nurturing: createApiFixture<NurturingApi>(),
       },
       members: {
         logger: createLogger("prompt-rest-test"),

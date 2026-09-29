@@ -24,6 +24,8 @@ export {
   langevalsStagingTtlSeconds,
   langwatchDefaultModel,
   LOCAL_GATEWAY_URL,
+  posthogHost,
+  posthogKey,
   SAAS_GATEWAY_URL,
   signInProviders,
   telemetryExporterEndpoint,

@@ -9,6 +9,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { StudioWorkflow, Workflow } from "@langwatch/workflow-contract";
 
 import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
+import { buildWorkflowLifecyclePipeline } from "../../eventing/workflow-lifecycle.pipeline.ts";
 import {
   WorkflowRowRepository,
   type WorkflowRowDraft,
@@ -104,7 +105,6 @@ const noStudioRuns: WorkflowStudioRuns = {
 };
 
 const silentSignals: WorkflowSignals = {
-  workflowCreated: () => void 0,
   failed: () => void 0,
 };
 
@@ -133,6 +133,7 @@ export function createWorkflowTestInfrastructure(
     codeCompletions: noCodeCompletions,
     studioRuns: noStudioRuns,
     signals: silentSignals,
+    lifecycle: buildWorkflowLifecyclePipeline({ recordSignal: async () => void 0 }),
     ...overrides,
   };
 }

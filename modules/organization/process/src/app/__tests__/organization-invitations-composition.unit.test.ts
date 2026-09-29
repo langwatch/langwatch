@@ -26,6 +26,7 @@ import type { InviteCreationThrottleService } from "../../services/invite-creati
 import { InviteSendThrottleService } from "../../services/invite-send-throttle.service.ts";
 import { InviteService } from "../../services/invite.service.ts";
 import { OrganizationInvitationDoorService } from "../../services/organization-invitation-door.service.ts";
+import type { OrganizationLifecycleNoticeService } from "../../services/organization-lifecycle-notice.service.ts";
 import { SeatLimitNoticeService } from "../../services/seat-limit-notice.service.ts";
 import { InviteServiceOrganizationInvitations } from "../organization-composition.build.ts";
 import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
@@ -374,6 +375,10 @@ function doorWithFullSeats(seatsFull: Readonly<{ members: number; membersLite: n
     joinRequests: null,
     plans: createApiFixture<OrganizationPlanGate>(),
     signals,
+    lifecycle: createApiFixture<OrganizationLifecycleNoticeService>({
+      membersInvited: () => {},
+      inviteAccepted: () => {},
+    }),
     creationThrottle: createApiFixture<InviteCreationThrottleService>({
       assertCreationAllowed: async () => {},
     }),

@@ -1,7 +1,7 @@
-import type { ScenarioCreatedSignal } from "@langwatch/enterprise-billing-contract";
+import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 /**
  * A created scenario is recorded on scenario's own pipeline, and the worker's
- * subscriber announces it to billing. @see specs/analytics/posthog-guided-onboarding.feature
+ * subscriber tells nurturing. @see specs/features/customer-io-nurturing-integration.feature
  */
 import { createTenantId, type EventingCommandSender } from "@langwatch/eventing";
 import {
@@ -76,7 +76,17 @@ describe("the scenario lifecycle pipeline", () => {
 
   describe("when a scenario is created through the app", () => {
     it("sends the command with how many scenarios the project now holds", async () => {
-      const { app } = await createScenarioRestTestApp();
+      const { app } = await createScenarioRestTestApp({
+        projects: {
+          resolveOrgAdmin: async () => ({
+            userId: "admin-1",
+            organizationId: "org-1",
+            firstMessage: false,
+            onboardingVariant: "guided",
+            organizationCreatedAt: null,
+          }),
+        },
+      });
       const { sender, sent } = recordingSender();
       app.connectLifecycleCommands({ recordScenarioCreated: sender });
 
@@ -96,34 +106,59 @@ describe("the scenario lifecycle pipeline", () => {
         projectId: PROJECT_ID,
         userId: "user-1",
         scenarioCount: 1,
+        onboardingVariant: "guided",
       });
       expect(sent[1]).toMatchObject({ scenarioCount: 2 });
+    });
+
+    it("records no variant when the organization's cannot be read, and still records the scenario", async () => {
+      const { app } = await createScenarioRestTestApp();
+      const { sender, sent } = recordingSender();
+      app.connectLifecycleCommands({ recordScenarioCreated: sender });
+
+      await app.create(
+        { projectId: PROJECT_ID, name: "Login", situation: "logs in", criteria: [], labels: [] },
+        { id: "user-1", label: "user" },
+      );
+
+      await vi.waitFor(() => expect(sent).toHaveLength(1));
+      expect(sent[0]).toMatchObject({ scenarioCount: 1, onboardingVariant: null });
     });
   });
 
   describe("when the worker's subscriber handles scenario_created", () => {
-    it("announces the scenario to billing", async () => {
-      const announced: ScenarioCreatedSignal[] = [];
+    /** @scenario "Scenario creation updates scenario count and fires event" */
+    it("tells nurturing the scenario with the event it came from", async () => {
+      const recorded: NurturingSignal[] = [];
       const { app } = await createScenarioRestTestApp({
-        billing: {
-          recordScenarioCreated: async (input) => {
-            announced.push(input);
+        nurturing: {
+          recordSignal: async (input) => {
+            recorded.push(input);
           },
         },
       });
       const subscriber = app.lifecyclePipeline().eventSubscribers.get("scenarioCreatedNurturing");
       if (!subscriber) throw new Error("the pipeline declares no nurturing subscriber");
+      const event = createdEvent();
 
-      await subscriber.handle(createdEvent(), { tenantId: PROJECT_ID, aggregateId: "scenario-1" });
+      await subscriber.handle(event, { tenantId: PROJECT_ID, aggregateId: "scenario-1" });
 
-      expect(announced).toEqual([signal]);
+      expect(recorded).toEqual([
+        {
+          kind: "scenario_created",
+          sourceEventId: event.id,
+          tenantId: PROJECT_ID,
+          occurredAt: 1_700_000_000_000,
+          ...signal,
+        },
+      ]);
     });
 
-    it("lets a billing failure reach the queue, which records it", async () => {
+    it("lets a nurturing failure reach the queue, which retries it", async () => {
       const { app } = await createScenarioRestTestApp({
-        billing: {
-          recordScenarioCreated: async () => {
-            throw new Error("billing unavailable");
+        nurturing: {
+          recordSignal: async () => {
+            throw new Error("nurturing unavailable");
           },
         },
       });
@@ -132,7 +167,7 @@ describe("the scenario lifecycle pipeline", () => {
 
       await expect(
         subscriber.handle(createdEvent(), { tenantId: PROJECT_ID, aggregateId: "scenario-1" }),
-      ).rejects.toThrow("billing unavailable");
+      ).rejects.toThrow("nurturing unavailable");
     });
   });
 });

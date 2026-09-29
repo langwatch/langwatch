@@ -41,10 +41,7 @@ function door(options: { customRolesAllowed: boolean }) {
 
   const invitations = createApiFixture<OrganizationInvitations>({ create });
   const plans = createApiFixture<OrganizationPlanGate>({ assertCustomRolesAllowed });
-  const signals = createApiFixture<OrganizationSignals>({
-    trackServerEvent: vi.fn(),
-    fireTeamMemberInvitedNurturing: vi.fn(),
-  });
+  const signals = createApiFixture<OrganizationSignals>({ trackServerEvent: vi.fn() });
 
   return {
     create,
@@ -54,6 +51,7 @@ function door(options: { customRolesAllowed: boolean }) {
       joinRequests: null,
       plans,
       signals,
+      lifecycle: { membersInvited: vi.fn(), inviteAccepted: vi.fn() },
       creationThrottle: { assertCreationAllowed: async () => {} },
       ensurePersonalWorkspace: vi.fn(async () => undefined),
     }),

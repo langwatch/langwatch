@@ -5,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -45,6 +46,7 @@ function buildCaller(options: { manageable: readonly string[] }) {
         plans: createApiFixture<EntitlementApi>(),
         workflow: createApiFixture<WorkflowApi>(),
         modelProviders: defaultModelFixture(),
+        nurturing: createApiFixture<NurturingApi>(),
       },
       members: {
         logger: createLogger("prompt-tag-cascade-test"),

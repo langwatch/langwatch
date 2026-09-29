@@ -34,6 +34,7 @@
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/enterprise-sso-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",

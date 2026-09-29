@@ -32,6 +32,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",

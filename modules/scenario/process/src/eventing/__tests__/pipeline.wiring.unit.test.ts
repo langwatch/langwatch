@@ -73,6 +73,12 @@ function build() {
     snapshotUpdateBroadcast: {} as never,
     suiteRunSync: {} as never,
     traceMetricsSync: {} as never,
+    scenarioRunSucceededNurturing: { recordSignal: async () => void 0 },
+    simulationRunFinishedNurturing: {
+      projects: { resolveOrgAdmin: noop as never, listIdsByOrganization: noop as never },
+      simulations,
+      nurturing: { recordSignal: async () => void 0 },
+    },
   });
 }
 

@@ -4,6 +4,7 @@ import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthUnavailableError } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
  * The module composes the deployment's ONE Better Auth instance, and the
@@ -87,6 +88,7 @@ async function appFor(
         },
       }),
       authz: createApiFixture<AuthzApi>({}),
+      nurturing: createApiFixture<NurturingApi>(),
       auditLog: createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),

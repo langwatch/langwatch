@@ -4,6 +4,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { cliAccessTokenKey } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -58,6 +59,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>({}),
+      nurturing: createApiFixture<NurturingApi>(),
       auditLog: createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
       }),

@@ -8,6 +8,7 @@ import type { OrganizationCaller, OrganizationIntent } from "@langwatch/organiza
 import { OnboardingProjectNotCreatedError } from "@langwatch/organization-contract";
 
 import type { OrganizationCeremony, OrganizationSignals } from "../app/organization.members.ts";
+import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
 
 /**
  * The intent that ends on the personal portal rather than in a project.
@@ -20,6 +21,11 @@ const CODING_AGENT_INTENT = "AGENT_GOVERNANCE";
 export interface OrganizationInitializationDependencies {
   readonly ceremony: OrganizationCeremony;
   readonly signals: OrganizationSignals;
+  /** Where the sign-up is recorded as organization's event, for nurturing. */
+  readonly lifecycle: Pick<
+    OrganizationLifecycleNoticeService,
+    "signedUp" | "integrationMethodChosen"
+  >;
   createAndAssign(
     input: Readonly<{
       orgName?: string | undefined;
@@ -86,10 +92,8 @@ export class OrganizationInitializationService {
 
       await this.#announce({ input, organizationName: created.organization.name, by });
 
-      this.deps.signals.fireSignupNurturing({
+      this.deps.lifecycle.signedUp({
         userId: by.id,
-        email: by.email ?? null,
-        name: by.name ?? null,
         organizationId: created.organization.id,
         organizationName: created.organization.name,
         signUpData: input.signUpData,
@@ -113,7 +117,7 @@ export class OrganizationInitializationService {
   }
 
   recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void {
-    this.deps.signals.recordIntegrationMethod(input);
+    this.deps.lifecycle.integrationMethodChosen(input);
   }
 
   /**

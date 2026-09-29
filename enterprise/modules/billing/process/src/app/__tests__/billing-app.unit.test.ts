@@ -3,16 +3,10 @@ import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
 import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
-import {
-  registerNoNurturingSink,
-  registerNurturingSink,
-  settle,
-  wiring,
-} from "../../services/__tests__/support/nurturing-harness.ts";
 import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
@@ -93,7 +87,6 @@ function billingApp({
     config: { bankDetails: undefined, licensePaymentLinkId: undefined },
     peers: registry.peers,
     stripeSecretKey,
-    nurturing: wiring().nurturing,
     webhook: {
       signing: StripeWebhookSignatureService.create(webhookSecret),
       host: MemoryBillingWebhookHostChannel.create(),
@@ -370,49 +363,6 @@ describe("the subscription door BillingApp serves", () => {
         code: "not_found",
         httpStatus: 404,
       });
-    });
-  });
-});
-
-describe("the created workflow BillingApp records", () => {
-  afterEach(() => registerNoNurturingSink());
-
-  const workflow = {
-    userId: "user-1",
-    projectId: "project-1",
-    workflowId: "workflow-1",
-    workflowCount: 2,
-  };
-
-  describe("given Customer.io nurturing is configured", () => {
-    /** @scenario "Billing records a created workflow for nurturing" */
-    /** @scenario "Billing hands its composed Customer.io sink to a created workflow's signal" */
-    it("identifies the workflow count and tracks workflow_created", async () => {
-      const sink = registerNurturingSink();
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
-
-      await app.recordWorkflowCreated(workflow);
-      await settle();
-
-      expect(sink.sentTo("/identify")[0]).toMatchObject({
-        userId: "user-1",
-        traits: { workflow_count: 2 },
-      });
-      expect(sink.sentTo("/track")[0]).toMatchObject({
-        event: "workflow_created",
-        properties: { workflow_id: "workflow-1", project_id: "project-1" },
-      });
-    });
-  });
-
-  describe("given Customer.io is unreachable", () => {
-    /** @scenario "A Customer.io failure never fails recording a created workflow" */
-    it("resolves, as main's unawaited hook did", async () => {
-      registerNurturingSink({ failing: true });
-      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
-
-      await expect(app.recordWorkflowCreated(workflow)).resolves.toBeUndefined();
-      await settle();
     });
   });
 });

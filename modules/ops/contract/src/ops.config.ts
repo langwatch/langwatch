@@ -1,4 +1,10 @@
-import { Config, environmentOneOrTrueSchema, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  environmentOneOrTrueSchema,
+  posthogHost,
+  posthogKey,
+  type ConfigOf,
+} from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { z } from "zod";
 
@@ -27,10 +33,7 @@ export const opsConfig = Config.define((c) => ({
       .optional()
       .transform((value) => !BACKUP_METRICS_OFF_VALUES.has((value ?? "").trim().toLowerCase())),
   ),
-  productAnalytics: {
-    key: c.env("POSTHOG_KEY", z.string().optional()),
-    host: c.env("POSTHOG_HOST", z.string().optional()),
-  },
+  productAnalytics: { key: posthogKey, host: posthogHost },
 }));
 
 export type OpsServerConfig = ConfigOf<typeof opsConfig>;

@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/enterprise-nurturing-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Enterprise nurturing contracts: the lifecycle and product-milestone signals every emitter records.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/config": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -235,6 +235,25 @@ function buildSimulationProcessingProducerPipeline(input: {
       computeRunMetrics: () =>
         Promise.reject(producerOnly(processName, "compute a run's trace metrics")),
     },
+    scenarioRunSucceededNurturing: {
+      recordSignal: () =>
+        Promise.reject(producerOnly(processName, "tell nurturing a scenario run succeeded")),
+    },
+    simulationRunFinishedNurturing: {
+      projects: {
+        resolveOrgAdmin: () =>
+          Promise.reject(producerOnly(processName, "resolve a run's organization admin")),
+        listIdsByOrganization: () =>
+          Promise.reject(producerOnly(processName, "list an organization's projects")),
+      },
+      simulations: {
+        countUsage: () => Promise.reject(producerOnly(processName, "count an organization's runs")),
+      },
+      nurturing: {
+        recordSignal: () =>
+          Promise.reject(producerOnly(processName, "tell nurturing a run finished")),
+      },
+    },
   });
 }
 

@@ -12,10 +12,7 @@ import { MemoryBillingWebhookSubscriptionRepository } from "./memory.billing-web
 import { MemoryBillingStore } from "./memory.billing.store.ts";
 import { MemoryConnectedBillingRepository } from "./memory.connected-billing.repository.ts";
 import { MemoryDuplicateSubscriptionsReportRepository } from "./memory.duplicate-subscriptions-report.repository.ts";
-import { MemoryNurturingProfileRepository } from "./memory.nurturing-profile.repository.ts";
 import { MemoryOrganizationPricingRepository } from "./memory.organization-pricing.repository.ts";
-import { MemoryProjectActiveDayRepository } from "./memory.project-active-day.repository.ts";
-import { MemoryScenarioRunMilestoneClaimRepository } from "./memory.scenario-run-milestone-claim.repository.ts";
 import { MemorySeatEventSubscriptionRepository } from "./memory.seat-event-subscription.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "./memory.subscription.repository.ts";
 import { MemoryBillingTenantOrganizationCacheRepository } from "./memory.tenant-organization-cache.repository.ts";
@@ -27,8 +24,8 @@ export class MemoryBillingRepositories {
 
   static create(): BillingRepositories {
     // One store behind every row, the way one Postgres schema serves the
-    // Prisma tier: a subscription written here is what the report, the pricing
-    // and the nurturing rows answer from.
+    // Prisma tier: a subscription written here is what the report, and the pricing
+    // answer from.
     const store = MemoryBillingStore.create();
     const subscriptions = MemoryBillingSubscriptionRepository.create(store);
 
@@ -38,13 +35,10 @@ export class MemoryBillingRepositories {
       checkpoints: MemoryBillingCheckpointRepository.create(store),
       connectedBilling: MemoryConnectedBillingRepository.create(store),
       duplicateSubscriptionsReports: MemoryDuplicateSubscriptionsReportRepository.create(store),
-      nurturingProfiles: MemoryNurturingProfileRepository.create(store),
       organizations: MemoryBillingOrganizationRepository.create(store),
       organizationCache: MemoryBillingOrganizationCacheRepository.create(),
       organizationPricing: MemoryOrganizationPricingRepository.create(store),
-      projectActiveDays: MemoryProjectActiveDayRepository.create(),
       reportOrganizations: MemoryBillingReportOrganizationRepository.create(store),
-      scenarioRunMilestoneClaims: MemoryScenarioRunMilestoneClaimRepository.create(),
       seatEventSubscriptions: MemorySeatEventSubscriptionRepository.create(store),
       subscriptions,
       tenantOrganizations: MemoryBillingTenantOrganizationRepository.create(store),

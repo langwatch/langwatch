@@ -27,22 +27,6 @@ import type { RenewalCompletion } from "./connected-billing.ts";
  */
 export type BillingStaff = Readonly<{ id: string; email?: string | null | undefined }>;
 
-/** A scenario somebody wrote, and how many the project holds now. */
-export type ScenarioCreatedSignal = Readonly<{
-  userId: string;
-  projectId: string;
-  scenarioId: string;
-  scenarioCount: number;
-}>;
-
-/** A workflow somebody created, and how many the project holds now. */
-export type WorkflowCreatedSignal = Readonly<{
-  userId: string;
-  projectId: string;
-  workflowId: string;
-  workflowCount: number;
-}>;
-
 /**
  * What the billing module answers other modules: invoice billing for a
  * connected self-hosted customer (ADR-156 section 7). Every operation refuses
@@ -85,13 +69,6 @@ export interface BillingApi {
   invoicePendingSeatChanges(): Promise<void>;
   /** The daily tick: monthly statements and due renewals. Cloud only. */
   runConnectedBillingTick(): Promise<void>;
-  /**
-   * The `scenario_created` product event, tagged with the onboarding the
-   * organization went through, and the nurturing count behind it.
-   */
-  recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void>;
-  /** Nurturing learns the project's workflow count and the `workflow_created` event. */
-  recordWorkflowCreated(input: WorkflowCreatedSignal): Promise<void>;
   /**
    * The plan an organization's active subscription grants on LangWatch Cloud, with the
    * subscription's own limit overrides; the free plan where none is active or off Cloud.

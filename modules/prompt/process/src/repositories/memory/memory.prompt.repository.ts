@@ -76,6 +76,18 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     ).length;
   }
 
+  async countOrganizationVersioned({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
+    const versioned = new Set([...this.#state.versions.values()].map((row) => row.configId));
+    return [...this.#state.configs.values()].filter(
+      (row) =>
+        row.organizationId === organizationId && row.deletedAt === null && versioned.has(row.id),
+    ).length;
+  }
+
   async findOrganizationIdForProject(projectId: string): Promise<string> {
     const config = [...this.#state.configs.values()].find((row) => row.projectId === projectId);
     if (!config) {

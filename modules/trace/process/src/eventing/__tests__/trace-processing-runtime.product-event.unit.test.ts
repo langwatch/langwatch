@@ -83,6 +83,7 @@ function compose() {
         }),
       }),
       topics: createApiFixture<Peers["topics"]>({ bootstrapClustering: async () => undefined }),
+      nurturing: createApiFixture<Peers["nurturing"]>({ recordSignal: async () => undefined }),
     }),
     repositories: MemoryTraceRepositories.create(),
     canonicalisation: TraceCanonicalisationService.create(),

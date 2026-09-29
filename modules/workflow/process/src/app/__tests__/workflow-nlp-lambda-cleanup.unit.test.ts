@@ -7,7 +7,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -57,7 +57,7 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: members.datasets,
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
-      billing: createApiFixture<BillingApi>({}, "BillingApi"),
+      nurturing: createApiFixture<NurturingApi>({}, "NurturingApi"),
     },
     config: {
       stagingThresholdBytes: undefined,

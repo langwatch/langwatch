@@ -10,7 +10,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -67,7 +67,6 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       decrypt: (value: string) => value,
     })
     .withMember("rateLimiter", { check: async () => ({ allowed: true }) })
-    .withMember("idempotency", { claim: async () => true })
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("nlpServiceUrl", undefined)
     .withMember("nlpCodeBlockTimeoutSeconds", undefined)
@@ -98,7 +97,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       }),
       "audit-log": createApiFixture<AuditLogApi>(),
       trace: createApiFixture<TraceApi>(),
-      billing: createApiFixture<BillingApi>(),
+      nurturing: createApiFixture<NurturingApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),
       suite: createApiFixture<SuiteApi>(),
       evaluation: createApiFixture<EvaluationApi>(),

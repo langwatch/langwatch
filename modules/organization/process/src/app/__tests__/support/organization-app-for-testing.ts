@@ -6,6 +6,7 @@ import type { ShareApi } from "@langwatch/share-contract";
 import type { OrganizationSeatRepository } from "../../../repositories/organization-seat.repository.ts";
 import type { InviteCreationThrottleService } from "../../../services/invite-creation-throttle.service.ts";
 import type { MemberProvenanceService } from "../../../services/member-provenance.service.ts";
+import type { OrganizationLifecycleNoticeService } from "../../../services/organization-lifecycle-notice.service.ts";
 import type { PersonalTeamScopeReader } from "../../../services/personal-team-scope.service.ts";
 import type { SeatLimitNoticeService } from "../../../services/seat-limit-notice.service.ts";
 import {
@@ -49,6 +50,7 @@ export function organizationAppForTesting(setup: {
     plans: createApiFixture<OrganizationPlanGate>({}, "organization plan gate"),
     signals: createApiFixture<OrganizationSignals>({}, "organization signals"),
     seatLimits: createApiFixture<SeatLimitNoticeService>({}, "seat-limit notices"),
+    lifecycle: createApiFixture<OrganizationLifecycleNoticeService>({}, "lifecycle notices"),
     ceremony: createApiFixture<OrganizationCeremony>({}, "sign-up ceremony"),
     directory: createApiFixture<OrganizationDirectory>({}, "identity directory"),
     settingsSecrets: createApiFixture<OrganizationSettingsSecret>({}, "settings cipher"),

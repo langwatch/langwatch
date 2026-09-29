@@ -33,7 +33,15 @@ import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
 import { QueueRunCommand } from "./queue-run.commands.ts";
 import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
+import {
+  createScenarioRunSucceededNurturingSubscriber,
+  type ScenarioRunSucceededNurturingDeps,
+} from "./scenario-run-succeeded-nurturing.subscriber.ts";
 import { SimulationProcessingCommandsAdapter } from "./simulation-processing.commands.ts";
+import {
+  createSimulationRunFinishedNurturingSubscriber,
+  type SimulationRunFinishedNurturingDeps,
+} from "./simulation-run-finished-nurturing.subscriber.ts";
 import {
   SimulationRunMetricsMapProjection,
   type SimulationRunMetricsProjectionRecord,
@@ -73,6 +81,10 @@ export interface SimulationProcessingPipelineDeps {
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
   suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
+  /** Where a connected agent's successful run is told, for nurturing. */
+  scenarioRunSucceededNurturing: ScenarioRunSucceededNurturingDeps;
+  /** Where every finished run is told, for nurturing's organization-wide milestone. */
+  simulationRunFinishedNurturing: SimulationRunFinishedNurturingDeps;
   /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
   retention?: RetentionPolicyResolver;
 }
@@ -117,6 +129,14 @@ function buildSimulationProcessingPipelineDefinition(
     .withEventSubscriber(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
+    )
+    .withEventSubscriber(
+      "scenarioRunSucceededNurturing",
+      createScenarioRunSucceededNurturingSubscriber(deps.scenarioRunSucceededNurturing),
+    )
+    .withEventSubscriber(
+      "simulationRunFinishedNurturing",
+      createSimulationRunFinishedNurturingSubscriber(deps.simulationRunFinishedNurturing),
     )
     .withProcessManager(deps.scenarioRunExecution.name, deps.scenarioRunExecution.process)
     .withProcessManager(deps.scenarioEvaluations.name, deps.scenarioEvaluations.process)

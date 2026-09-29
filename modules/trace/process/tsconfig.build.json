@@ -77,6 +77,9 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/nurturing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {

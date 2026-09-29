@@ -2,7 +2,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -59,7 +59,7 @@ async function harness() {
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
-      billing: createApiFixture<BillingApi>(),
+      nurturing: createApiFixture<NurturingApi>(),
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
@@ -80,7 +80,6 @@ async function harness() {
       simulations: simulations as SimulationService,
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
-      idempotency: { claim: async () => true },
     },
   });
 
@@ -390,7 +389,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           presence: createApiFixture<PresenceApi>(),
           auditLog: createApiFixture<AuditLogApi>(),
           traces: createApiFixture<TraceApi>(),
-          billing: createApiFixture<BillingApi>(),
+          nurturing: createApiFixture<NurturingApi>(),
           retention: createApiFixture<DataRetentionApi>(),
           suites: createApiFixture<SuiteApi>(),
           ...scenarioExecutorPeers(),
@@ -410,7 +409,6 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           simulations: undefined as never,
           encryption: createApiFixture<Encryption>(),
           rateLimiter: { check: async () => ({ allowed: true }) },
-          idempotency: { claim: async () => true },
         },
       });
 
@@ -437,7 +435,7 @@ describe("given a process that supplies no simulations member but does read Clic
         presence: createApiFixture<PresenceApi>(),
         auditLog: createApiFixture<AuditLogApi>(),
         traces: createApiFixture<TraceApi>(),
-        billing: createApiFixture<BillingApi>(),
+        nurturing: createApiFixture<NurturingApi>(),
         retention: createApiFixture<DataRetentionApi>(),
         suites: createApiFixture<SuiteApi>(),
         ...scenarioExecutorPeers(),
@@ -461,7 +459,6 @@ describe("given a process that supplies no simulations member but does read Clic
         simulations: undefined as never,
         encryption: createApiFixture<Encryption>(),
         rateLimiter: { check: async () => ({ allowed: true }) },
-        idempotency: { claim: async () => true },
       },
     });
 

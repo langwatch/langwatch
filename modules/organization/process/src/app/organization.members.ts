@@ -400,33 +400,6 @@ export interface OrganizationSignals {
       properties?: Readonly<Record<string, unknown>>;
     }>,
   ): void;
-  fireTeamMemberInvitedNurturing(
-    input: Readonly<{ userId: string; teamMemberCount: number; role: string }>,
-  ): void;
-  fireInviteAcceptedNurturing(
-    input: Readonly<{
-      userId: string;
-      email: string;
-      name?: string | null;
-      organizationId: string;
-      organizationName: string;
-    }>,
-  ): void;
-  // A property of function type rather than method shorthand: a test holds
-  // a mock built to this interface and asserts on this member via
-  // `expect(...).toHaveBeenCalledWith`, which is unsafe against a
-  // method-shorthand member under `unbound-method`.
-  fireSignupNurturing: (
-    input: Readonly<{
-      userId: string;
-      email: string | null;
-      name: string | null;
-      organizationId: string;
-      organizationName: string;
-      signUpData?: Record<string, unknown> | undefined;
-      primaryIntent?: string | undefined;
-    }>,
-  ) => void;
   // sendSlackSignupEvent, sendHubspotSignupForm and reportError below are
   // properties of function type rather than method shorthand: tests hold a
   // mock built to this interface and assert on these members via
@@ -450,7 +423,6 @@ export interface OrganizationSignals {
       signUpData?: Record<string, unknown> | undefined;
     }>,
   ) => Promise<void>;
-  recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void;
   /** Never fatal: every caller of this is already on a non-fatal branch. */
   reportError: (
     error: unknown,

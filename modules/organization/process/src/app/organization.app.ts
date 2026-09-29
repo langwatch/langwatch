@@ -8,6 +8,7 @@ import {
 } from "@langwatch/authz-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
@@ -125,6 +126,10 @@ import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
+import {
+  buildOrganizationLifecyclePipeline,
+  type OrganizationLifecycleDefinition,
+} from "../eventing/organization-lifecycle.pipeline.ts";
 import type { RecordSeatLimitReachedCommandData } from "../eventing/seat-limit.events.ts";
 import {
   buildSeatLimitPipeline,
@@ -141,6 +146,10 @@ import { OrganizationGroupScopeService } from "../services/organization-group-sc
 import { OrganizationInitializationService } from "../services/organization-initialization.service.ts";
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
 import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
+import type {
+  OrganizationLifecycleNoticeService,
+  OrganizationLifecycleSenders,
+} from "../services/organization-lifecycle-notice.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
@@ -268,6 +277,8 @@ export type OrganizationInfrastructure = Readonly<{
   signals: OrganizationSignals;
   /** Where a reached seat limit is recorded as this module's event (§9). */
   seatLimits: SeatLimitNoticeService;
+  /** Where a sign-up, an invitation batch and an acceptance are recorded (§9). */
+  lifecycle: OrganizationLifecycleNoticeService;
   ceremony: OrganizationCeremony;
   directory: OrganizationDirectory;
   /** The demo organization's person and project, or empty strings when unset. */
@@ -307,6 +318,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     governance: GovernanceRestApi,
     /** Told of a reached seat limit by this module's own subscriber, as §9 rules. */
     billing: BillingApi,
+    /** Told of a sign-up, an invitation batch and an acceptance by this module's subscriber. */
+    nurturing: NurturingApi,
   };
   /** Named raw: the process answers these two, no store carries them. */
   static readonly reads = [
@@ -396,6 +409,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
     application.#members = members;
     application.#billing = setup.dependencies.billing;
+    application.#nurturing = setup.dependencies.nurturing;
     application.#licenseLimits = LicenseLimitService.create({
       seats: members.seats,
       notices: members.seatLimits,
@@ -425,6 +439,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
           joinRequests: members.joinRequests,
           plans: members.plans,
           signals: members.signals,
+          lifecycle: members.lifecycle,
           creationThrottle: members.inviteCreationThrottle,
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
@@ -438,6 +453,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     application.#initialization = OrganizationInitializationService.create({
       ceremony: members.ceremony,
       signals: members.signals,
+      lifecycle: members.lifecycle,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
@@ -500,6 +516,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
           joinRequests: members.joinRequests,
           plans: members.plans,
           signals: members.signals,
+          lifecycle: members.lifecycle,
           creationThrottle: members.inviteCreationThrottle,
           ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
         })
@@ -513,6 +530,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     application.#initialization = OrganizationInitializationService.create({
       ceremony: members.ceremony,
       signals: members.signals,
+      lifecycle: members.lifecycle,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
       ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
     });
@@ -532,6 +550,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   #licenseLimits!: LicenseLimitService;
   /** The peer the worker's seat-limit subscriber tells; absent only in a test's app. */
   #billing: Pick<BillingApi, "notifyResourceLimitReached"> | undefined;
+  /** The peer the worker's lifecycle subscriber tells; absent only in a test's app. */
+  #nurturing: Pick<NurturingApi, "recordSignal"> | undefined;
   #visibility!: OrganizationVisibilityService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
@@ -1477,6 +1497,20 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }): SeatLimitDefinition {
     if (participation === "produce") return buildSeatLimitPipeline({});
     return buildSeatLimitPipeline({ billing: this.#billing });
+  }
+
+  /** organization_lifecycle for this role: the worker also tells nurturing (§9). */
+  lifecyclePipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): OrganizationLifecycleDefinition {
+    if (participation === "produce") return buildOrganizationLifecyclePipeline({});
+    return buildOrganizationLifecyclePipeline({ nurturing: this.#nurturing });
+  }
+
+  connectLifecycle(senders: OrganizationLifecycleSenders): void {
+    this.#members.lifecycle.connect(senders);
   }
 
   connectSeatLimit(

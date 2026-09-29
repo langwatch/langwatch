@@ -6,6 +6,7 @@ import {
 import { defineServerModule } from "@langwatch/kernel";
 
 import { WorkflowApp } from "#app/workflow.app";
+import { workflowLifecycleEventing } from "#eventing/workflow-lifecycle.pipeline";
 import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-cleanup.pipeline";
 import { workflowRepositories } from "#repositories/workflow-repositories.registry";
 import {
@@ -33,6 +34,7 @@ export const workflowServer = defineServerModule("workflow")
     workflowStudioRest,
   )
   .withEventing(workflowNlpLambdaCleanupEventing)
+  .withEventing(workflowLifecycleEventing)
   .withTransportFacts(({ dependencies }) => [
     bindRestMiddleware(workflowStudioSession, (context) => {
       const caller = browserCallerOfRequest(context.req.raw);

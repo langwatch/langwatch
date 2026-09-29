@@ -10,9 +10,7 @@ import { PrismaBillingWebhookOrganizationRepository } from "./prisma.billing-web
 import { PrismaBillingWebhookSubscriptionRepository } from "./prisma.billing-webhook-subscription.repository.ts";
 import { PrismaConnectedBillingRepository } from "./prisma.connected-billing.repository.ts";
 import { PrismaDuplicateSubscriptionsReportRepository } from "./prisma.duplicate-subscriptions-report.repository.ts";
-import { PrismaNurturingProfileRepository } from "./prisma.nurturing-profile.repository.ts";
 import { PrismaOrganizationPricingRepository } from "./prisma.organization-pricing.repository.ts";
-import { PrismaProjectActiveDayRepository } from "./prisma.project-active-day.repository.ts";
 import { PrismaSeatEventSubscriptionRepository } from "./prisma.seat-event-subscription.repository.ts";
 import { PrismaBillingSubscriptionRepository } from "./prisma.subscription.repository.ts";
 import { PrismaBillingTenantOrganizationRepository } from "./prisma.tenant-organization.repository.ts";
@@ -35,10 +33,8 @@ export class PostgresBillingRepositories {
       duplicateSubscriptionsReports: PrismaDuplicateSubscriptionsReportRepository.create({
         database: prisma,
       }),
-      nurturingProfiles: PrismaNurturingProfileRepository.create(prisma),
       organizations: PrismaBillingOrganizationRepository.create(prisma),
       organizationPricing: PrismaOrganizationPricingRepository.create(prisma),
-      projectActiveDays: PrismaProjectActiveDayRepository.create(prisma),
       reportOrganizations: PrismaBillingReportOrganizationRepository.create(prisma),
       seatEventSubscriptions: PrismaSeatEventSubscriptionRepository.create(prisma),
       subscriptions,

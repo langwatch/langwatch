@@ -7,21 +7,16 @@ import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
  * the annual billing threshold.
  */
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
-import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
-import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service.ts";
-import { BestEffortService } from "./best-effort.service.ts";
 import {
   BillingSubscriptionLifecycleService,
   type SeatRetentionRules,
 } from "./billing-subscription-lifecycle.service.ts";
-import type { NurturingService } from "./nurturing.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
@@ -44,12 +39,8 @@ type BillingCheckoutCompletionOptions = {
     prices: StripePriceMap;
   };
   inviteApprover?: InviteApprover;
-  getPostHog?: () => PostHog | null;
   host: BillingWebhookHost;
   retention: SeatRetentionRules;
-  /** Customer.io and the members its has_subscription trait goes to; absent, nothing is sent. */
-  nurturing?: NurturingService;
-  nurturingProfiles?: NurturingProfileRepository;
 };
 
 export class BillingCheckoutCompletionService {
@@ -60,9 +51,7 @@ export class BillingCheckoutCompletionService {
   private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
   private readonly organizationRepository: BillingWebhookOrganizationRepository;
   private readonly inviteApprover?: InviteApprover;
-  private readonly getPostHog?: () => PostHog | null;
   private readonly host: BillingWebhookHost;
-  private readonly bestEffort = BestEffortService.create();
   private readonly annualThreshold: AnnualEventsBillingThresholdService;
   private readonly lifecycle: BillingSubscriptionLifecycleService;
 
@@ -70,7 +59,6 @@ export class BillingCheckoutCompletionService {
     this.subscriptionRepository = options.subscriptionRepository;
     this.organizationRepository = options.organizationRepository;
     this.inviteApprover = options.inviteApprover;
-    this.getPostHog = options.getPostHog;
     this.host = options.host;
     this.annualThreshold = AnnualEventsBillingThresholdService.create({
       stripe: options.stripe,
@@ -83,8 +71,6 @@ export class BillingCheckoutCompletionService {
       itemCalculator: options.itemCalculator,
       host: options.host,
       retention: options.retention,
-      nurturing: options.nurturing,
-      nurturingProfiles: options.nurturingProfiles,
     });
   }
 
@@ -92,7 +78,6 @@ export class BillingCheckoutCompletionService {
     event,
     subscriptionId,
     customerId,
-    organizationId,
   }: {
     event: Stripe.Event & { type: "checkout.session.completed" };
     subscriptionId: string;
@@ -123,53 +108,6 @@ export class BillingCheckoutCompletionService {
 
       return;
     }
-
-    if (organizationId) {
-      await this.bestEffort.run({
-        label: "checkout analytics",
-        context: { eventId: event.id, organizationId },
-        effect: () =>
-          this.emitCheckoutAnalytics({
-            checkoutSession,
-            subscriptionId,
-            organizationId,
-          }),
-      });
-    }
-  }
-
-  private emitCheckoutAnalytics({
-    checkoutSession,
-    subscriptionId,
-    organizationId,
-  }: {
-    checkoutSession: Stripe.Checkout.Session;
-    subscriptionId: string;
-    organizationId: string;
-  }): void {
-    const posthog = this.getPostHog?.() ?? null;
-    if (!posthog) {
-      return;
-    }
-
-    posthog.capture({
-      distinctId: organizationId,
-      event: "subscription_created",
-      properties: {
-        subscriptionId,
-        $groups: { organization: organizationId },
-      },
-    });
-    posthog.groupIdentify({
-      groupType: "organization",
-      groupKey: organizationId,
-      properties: {
-        subscriptionCreatedAt: Temporal.Instant.fromEpochMilliseconds(
-          checkoutSession.created * 1000,
-        ).toString({ fractionalSecondDigits: 3 }),
-        hasActiveSubscription: true,
-      },
-    });
   }
 
   async handleCheckoutCompleted({

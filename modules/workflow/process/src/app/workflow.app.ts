@@ -11,9 +11,9 @@ import {
  * operation serves a browser session, an API key and a background job alike.
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
-import { BillingApi } from "@langwatch/enterprise-billing-contract";
+import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
-import type { StaticPipelineDefinition } from "@langwatch/eventing";
+import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -86,6 +86,10 @@ import {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
 } from "../channels/http/http.workflow-studio-stream.channel.ts";
+import {
+  buildWorkflowLifecyclePipeline,
+  type WorkflowLifecyclePipeline,
+} from "../eventing/workflow-lifecycle.pipeline.ts";
 import { buildNlpLambdaCleanupPipeline } from "../eventing/workflow-nlp-lambda-cleanup.pipeline.ts";
 import type { WorkflowLineageRepository } from "../repositories/workflow-lineage.repository.ts";
 import {
@@ -231,12 +235,6 @@ export interface WorkflowStudioRuns {
 
 /** Where a product signal and an unexpected failure go. */
 export interface WorkflowSignals {
-  workflowCreated(input: {
-    userId: string;
-    workflowCount: number;
-    workflowId: string;
-    projectId: string;
-  }): void;
   failed(error: unknown, context: Readonly<{ projectId?: string }>): void;
 }
 
@@ -312,6 +310,8 @@ export interface WorkflowInfrastructure {
   codeCompletions: WorkflowCodeCompletions;
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
+  /** The workflow's own lifecycle pipeline, whose worker subscriber tells nurturing. */
+  lifecycle: WorkflowLifecyclePipeline;
   /**
    * The account the studio's engines are deployed into, for the daily sweep.
    * Absent where the deployment fronts the engine with no Lambdas at all,
@@ -475,8 +475,8 @@ export class WorkflowApp implements WorkflowApi {
     experiments: ExperimentApi,
     /** The monitors an archived workflow's evaluators back, deleted with it. */
     monitors: MonitorApi,
-    /** Where a created workflow is announced, for nurturing. */
-    billing: BillingApi,
+    /** Where a created workflow is told, by the lifecycle pipeline's subscriber. */
+    nurturing: NurturingApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -562,13 +562,13 @@ export class WorkflowApp implements WorkflowApi {
         }),
       }),
       publications: publicationsOf(setup.repositories.lineage),
-      signals: WorkflowSignalsService.create({
-        announce: (input) => setup.dependencies.billing.recordWorkflowCreated(input),
-      }),
+      signals: WorkflowSignalsService.create(),
+      lifecycle: buildWorkflowLifecyclePipeline(setup.dependencies.nurturing),
     });
   }
 
   #members: WorkflowInfrastructure;
+  #lifecycleCommands: EventingCommands<WorkflowLifecyclePipeline> | undefined;
   #studioVersions: WorkflowStudioVersionService;
   #studioCopies: WorkflowStudioCopyService;
   #publication: WorkflowPublicationService;
@@ -687,8 +687,8 @@ export class WorkflowApp implements WorkflowApi {
 
   /**
    * Creates a workflow and its first version, attributed to its caller, and
-   * fires the product signal a project's new workflow raises. Attribution is
-   * here because who wrote a version is a property of the act, not the door.
+   * records it on the lifecycle pipeline. Attribution is here because who
+   * wrote a version is a property of the act, not the door.
    */
   async create(
     input: Omit<CreateWorkflowCommand, "authorId">,
@@ -696,9 +696,40 @@ export class WorkflowApp implements WorkflowApi {
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
     const created = await this.#members.workflows.create({ ...input, authorId: by.id });
 
-    this.#announceCreated({ workflowId: created.workflow.id, projectId: input.projectId, by });
+    this.#recordCreated({ workflowId: created.workflow.id, projectId: input.projectId, by });
 
     return created;
+  }
+
+  /** Records the create with the project's workflow count, never failing or delaying it. */
+  #recordCreated(input: { workflowId: string; projectId: string; by: WorkflowCaller }): void {
+    const { workflowId, projectId, by } = input;
+    void this.#members.workflows
+      .list({ projectId })
+      .then((workflows) => {
+        if (!this.#lifecycleCommands) {
+          throw new Error("workflow_lifecycle pipeline senders are not connected yet");
+        }
+        return this.#lifecycleCommands.recordWorkflowCreated.send({
+          tenantId: projectId,
+          occurredAt: nowInstant().epochMilliseconds,
+          workflowId,
+          projectId,
+          userId: by.id,
+          workflowCount: workflows.length,
+        });
+      })
+      .catch((error: unknown) => this.#members.signals.failed(error, { projectId }));
+  }
+
+  /** The workflow lifecycle pipeline this module registers, built once by {@link create}. */
+  lifecyclePipeline(): WorkflowLifecyclePipeline {
+    return this.#members.lifecycle;
+  }
+
+  /** Binds the built lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: EventingCommands<WorkflowLifecyclePipeline>): void {
+    this.#lifecycleCommands = commands;
   }
 
   /** Copies a workflow into another project, attributed to its caller. */
@@ -1262,26 +1293,6 @@ export class WorkflowApp implements WorkflowApi {
     }
 
     await NlpLambdaCleanupService.create({ fleet, logger }).sweep();
-  }
-
-  /**
-   * Fire-and-forget: the count is read after the write landed, and a failure
-   * to count must never fail the create that already succeeded.
-   */
-  #announceCreated(input: { workflowId: string; projectId: string; by: WorkflowCaller }): void {
-    void this.#members.workflows
-      .list({ projectId: input.projectId })
-      .then((workflows) => {
-        this.#members.signals.workflowCreated({
-          userId: input.by.id,
-          workflowCount: workflows.length,
-          workflowId: input.workflowId,
-          projectId: input.projectId,
-        });
-      })
-      .catch((error: unknown) => {
-        this.#members.signals.failed(error, { projectId: input.projectId });
-      });
   }
 
   // ── the platform's own links ──────────────────────────────────────────────

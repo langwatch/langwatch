@@ -61,6 +61,7 @@
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/data-retention-process": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",

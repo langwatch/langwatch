@@ -21,7 +21,13 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/nurturing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
