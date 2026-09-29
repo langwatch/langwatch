@@ -262,6 +262,12 @@ jobs:
       # preinstalled Google Chrome via channel (E2E_BROWSER_CHANNEL below) and
       # video recording is off in CI, so no ffmpeg binary is needed.
 
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built
 
@@ -276,7 +282,7 @@ jobs:
         run: pnpm task clickhouse-migrate
 
       # The browser bundle only. apps/api and apps/worker run from source
-      # through tsx and have no build of their own.
+      # through node and have no build of their own.
       - name: Build browser bundle
         run: pnpm run build:types && NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
 

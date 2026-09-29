@@ -32,7 +32,7 @@ var notCodeInputs = map[string]bool{
 // codeServices are the services whose files a TypeScript build does read.
 var codeServices = []string{"services/langevals/ts-integration", "services/langyworker"}
 
-// ensureBuiltTargets are where dev/scripts/ensure-built.mjs takes its lock; a
+// ensureBuiltTargets are where `pnpm run ensure:built` takes its lock; a
 // lock a killed build left makes every later prepare wait 180s per target.
 var ensureBuiltTargets = []string{"sdks/typescript", "mcp/typescript", "packages/ksuid", "packages/mail"}
 
@@ -125,7 +125,7 @@ func keyed(layout Layout, spec commandSpec, inputs string) string {
 }
 
 func isEnsureBuilt(spec commandSpec) bool {
-	return len(spec.args) > 0 && strings.HasSuffix(spec.args[len(spec.args)-1], "ensure-built.mjs")
+	return len(spec.args) == 2 && spec.args[0] == "run" && spec.args[1] == "ensure:built"
 }
 
 // stepFile is where a persistent worktree records step index's last key.

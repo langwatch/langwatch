@@ -18,7 +18,7 @@
     }
   },
   "scripts": {
-    "predev": "node ../../dev/scripts/ensure-built.mjs",
+    "predev": "bash ../../dev/scripts/devscripts.sh ensure-built",
     "dev": "vite --configLoader runner",
     "build": "NODE_ENV=production vite build --configLoader runner",
     "typecheck": "tsc -b tsconfig.test.json",
@@ -137,7 +137,6 @@
     "jsdom": "catalog:",
     "nanoid": "^6.0.0",
     "playwright": "catalog:",
-    "tsx": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

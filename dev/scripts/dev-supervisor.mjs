@@ -49,7 +49,7 @@ const WATCH_IGNORE_PATTERNS = [
   /(^|\/)\.tmp-[^/]+(\/|$)/,
   // A build tool bundling its own config beside it: tsup writes
   // `tsup.config.bundled_<hash>.mjs` and vite `vite.config.ts.timestamp-<n>.mjs`,
-  // then deletes it. `ensure-built.mjs` runs on every lane's predev and every
+  // then deletes it. `ensure:built` runs on every lane's predev and every
   // scoped test, so on a shared checkout one session's build bounced another's
   // api. specs/setup/dev-process-topology.feature.
   /(^|\/)[^/]*\.config\.bundled_[^/]*\.mjs$/,

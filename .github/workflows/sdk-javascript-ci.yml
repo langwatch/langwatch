@@ -288,6 +288,12 @@ jobs:
       - name: Build mcp-server
         run: pnpm --filter @langwatch/mcp-server run build
 
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
       - name: Prepare LangWatch files
         working-directory: .
         run: pnpm start:prepare:files && pnpm ensure:built

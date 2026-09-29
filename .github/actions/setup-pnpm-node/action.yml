@@ -72,6 +72,15 @@ runs:
         cache-dependency-path: ${{ inputs.cache-dependency-path }}
         registry-url: ${{ inputs.registry-url }}
 
+    # The dev scripts (generate:modules, sync:references, ensure:built, and the
+    # apps' predev/pretest hooks) are Go: dev/scripts/devscripts.sh runs them.
+    - name: Setup Go
+      if: inputs.install != ''
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache-dependency-path: go.sum
+
     # node-gyp is no longer bundled on PATH under Node-24 + npm-11, so any
     # native-module install lifecycle script (e.g. node-pty's prebuild fallback
     # in mcp-server and skills) ELIFECYCLEs with "sh: 1: node-gyp: not found".

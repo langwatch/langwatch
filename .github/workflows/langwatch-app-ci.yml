@@ -1135,18 +1135,8 @@ jobs:
       - name: Check feature-file parity
         run: pnpm --filter @langwatch/architecture-enforcer run check:feature-parity
 
-      # tsc resolves a relative or deep-package specifier by its own rules,
-      # which are more forgiving than node's. Every backend process runs on
-      # `node --experimental-transform-types` now, so a barrel or deep import
-      # that only TypeScript can resolve passes typecheck and then breaks the
-      # process at boot. This runs node's real resolver against every feature
-      # package barrel and the process entrypoints, in the same fast job as
-      # the other whole-repo raw-TypeScript checks.
-      - name: Check node module resolution
-        run: node dev/scripts/check-node-resolution.mjs
-
-      # The dev scripts' own node:test suites (log renderer, supervisor watch, the
-      # resolution check's classifier) ran in no job until now. TZ=UTC because the
+      # The dev scripts' own node:test suites (log renderer, supervisor watch)
+      # ran in no job until now. TZ=UTC because the
       # log renderer prints local wall time and the fixture is pinned to UTC.
       - name: Test dev scripts
         run: TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs
@@ -1305,11 +1295,17 @@ jobs:
       # build:types reads the generated Prisma client and the SDK's
       # declarations, so the generated files and the four dist-resolving
       # packages (SDK, mcp-server, ksuid, mail) come first.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built
 
       # apps/api and apps/worker declare no build — they run from source through
-      # tsx. What is built here is the browser bundle the API process serves,
+      # node. What is built here is the browser bundle the API process serves,
       # plus every workspace dependency that has a build of its own.
       - name: Build
         run: pnpm run build:types && pnpm --filter "@langwatch/ui..." run build

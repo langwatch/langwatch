@@ -18,13 +18,13 @@
   "scripts": {
     "start": "pnpm -s run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate clickhouse-migrate lwql-provision system-migrations-pass",
-    "predev": "node ../../dev/scripts/ensure-built.mjs",
+    "predev": "bash ../../dev/scripts/devscripts.sh ensure-built",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "typecheck": "tsc -b tsconfig.test.json",
-    "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
+    "pretest": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail",
     "test": "vitest run",
-    "pretest:unit": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
-    "pretest:integration": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
+    "pretest:unit": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail",
+    "pretest:integration": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {

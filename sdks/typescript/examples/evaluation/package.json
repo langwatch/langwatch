@@ -7,10 +7,10 @@
   "author": "LangWatch",
   "type": "module",
   "scripts": {
-    "start": "tsx src/index.ts",
-    "start:with-evaluator": "tsx src/with-evaluator.ts",
-    "start:multi-target": "tsx src/multi-target.ts",
-    "start:guardrail": "tsx src/guardrail.ts"
+    "start": "node src/index.ts",
+    "start:with-evaluator": "node src/with-evaluator.ts",
+    "start:multi-target": "node src/multi-target.ts",
+    "start:guardrail": "node src/guardrail.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.6",
@@ -19,8 +19,7 @@
     "@opentelemetry/sdk-node": "^0.217.0",
     "ai": "^5.0.8",
     "dotenv": "^16.6.1",
-    "langwatch": "file:../../",
-    "tsx": "^4.19.0"
+    "langwatch": "file:../../"
   },
   "overrides": {
     "@grpc/grpc-js": ">=1.14.4",

@@ -69,7 +69,7 @@ derive_dev_ports
 
 # Fail fast if any port we'd bind to is already taken (a stale `pnpm dev`,
 # Docker exposing the same port, …). Without this we'd only discover the
-# conflict half a minute later, after Vite and tsx finish booting.
+# conflict half a minute later, after Vite and node finish booting.
 "$HERE/check-ports.sh"
 
 # Auto-derive REDIS_DB_INDEX from the PORT slot so each worktree lands on its
@@ -288,7 +288,7 @@ NAMES_STR=$(
 # A lane that exits non-zero takes the stack down with its error as the last
 # thing printed. Restarting it (`--restart-tries -1`) turned a config refusal
 # into an endless reboot loop that scrolled the cause off the screen; the
-# lanes that reload on file changes (vite, tsx watch, air) do that themselves.
+# lanes that reload on file changes (vite, node --watch, air) do that themselves.
 exec pnpm -s exec concurrently \
   --kill-others-on-fail \
   --names "$NAMES_STR" \

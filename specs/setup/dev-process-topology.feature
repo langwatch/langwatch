@@ -135,7 +135,7 @@ Feature: The local development process topology
 
   # tsup and vite bundle their own config into a temp file beside it
   # (`tsup.config.bundled_<hash>.mjs`) and delete it when the build ends. It is
-  # not source, nothing imports it, and `ensure-built.mjs` runs on every lane's
+  # not source, nothing imports it, and `ensure:built` runs on every lane's
   # predev and every scoped test — so on a shared checkout one session's build
   # restarted another session's api, once per build.
   @unit

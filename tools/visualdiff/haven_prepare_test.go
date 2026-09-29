@@ -44,7 +44,7 @@ func TestAFreshWorktreeIsPreparedBeforeItsStackBoots(t *testing.T) {
 				"git worktree add --detach /repos/langwatch/.visualdiff/run/base origin/main",
 				"env -u CI pnpm install --frozen-lockfile",
 				"pnpm run start:prepare:files",
-				"node dev/scripts/ensure-built.mjs",
+				"pnpm run ensure:built",
 				"haven up --agent --detach",
 			}
 			if got := argvList(base); !equalStrings(got, want) {
@@ -62,7 +62,7 @@ func TestAFreshWorktreeIsPreparedBeforeItsStackBoots(t *testing.T) {
 				for _, want := range []string{
 					"env -u CI pnpm install --frozen-lockfile",
 					"pnpm run start:prepare:files",
-					"node dev/scripts/ensure-built.mjs",
+					"pnpm run ensure:built",
 					"copy .env files exit=ok (copied 3)",
 				} {
 					if !strings.Contains(out, want) {
@@ -90,7 +90,7 @@ func TestAMonolithWorktreeRunsOnlyThePrismaClientBeforeHaven(t *testing.T) {
 	}
 	modular := HavenPrepareCommands(LayoutModular)
 	findCommand(t, modular, "pnpm", "run", "start:prepare:files")
-	findCommand(t, modular, "node", "dev/scripts/ensure-built.mjs")
+	findCommand(t, modular, "pnpm", "run", "ensure:built")
 }
 
 // @scenario "A tracked dotenv file is never overwritten"

@@ -1,3 +1,17 @@
+# ── Stage 0: the dev-script binary ──────────────────────────────────
+# generate:modules, sync:references and ensure:built are Go (cmd/devscripts,
+# stdlib only). Built here so the builder carries the binary and no Go
+# toolchain, and so this layer caches until those two directories change.
+# `go mod download` is skipped on purpose: the binary imports no module.
+FROM golang:1.27.1-alpine AS devscripts
+WORKDIR /src
+COPY go.mod go.sum ./
+COPY cmd/devscripts ./cmd/devscripts
+COPY tools/devscripts ./tools/devscripts
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 go build -o /out/devscripts ./cmd/devscripts
+
 # ── Stage 1: build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
@@ -104,10 +118,13 @@ COPY apps/api ./apps/api
 COPY apps/ui ./apps/ui
 COPY apps/tasks ./apps/tasks
 COPY apps/scenario-child ./apps/scenario-child
-# What `start:prepare:files` and `ensure:built` read: the generator scripts, the
+# What `start:prepare:files` and `ensure:built` read: the generator scripts (and
+# their Go binary, below), the
 # OpenAPI document the SDK derives its REST client from, and the web declarations
 # project the browser packages reference.
 COPY dev/scripts ./dev/scripts
+# dev/scripts/devscripts.sh runs this binary when Go is not on PATH.
+COPY --from=devscripts /out/devscripts /app/.bin/devscripts/devscripts
 COPY dev/tsconfig.web-declarations.json ./dev/tsconfig.web-declarations.json
 COPY specs/api-reference/openapi-document.json ./specs/api-reference/openapi-document.json
 # The trailing `...` on each filter makes pnpm build each application's
@@ -117,11 +134,11 @@ COPY specs/api-reference/openapi-document.json ./specs/api-reference/openapi-doc
 # to exist before vite resolves it, and `@langwatch/hosted-mcp-process` imports
 # `@langwatch/mcp-server`, whose dist the API needs at boot. Both are reached
 # through the api/worker filters, not the ui one. apps/api declares no `build`
-# of its own and runs from source through tsx; apps/worker declares none either
+# of its own and runs from source through node; apps/worker declares none either
 # now — the pre-compiled scenario child is its own app, @langwatch/scenario-child,
 # reached through the worker filter's `...`. The worker runs from source, but the child is a fresh
 # process per simulation, so it is spawned as `node` on that bundle rather than
-# `pnpm exec tsx` on a TypeScript tree (tsx is a devDependency and the --prod
+# `pnpm exec` on a TypeScript tree (the --prod
 # install below drops it, so the bundle is the only supported path in an image).
 # @see specs/scenarios/pre-compiled-child-process.feature
 # `build:types` first: the module contracts' declarations now come from one
@@ -229,13 +246,13 @@ COPY --from=builder /app/packages ./packages
 # members outside packages/ since the tree rename.
 COPY --from=builder /app/modules ./modules
 COPY --from=builder /app/enterprise ./enterprise
-# The worker executable runs from source through tsx, the way apps/api does. The
+# The worker executable runs from source through node, the way apps/api does. The
 # child it spawns is its own app, built into apps/scenario-child/dist.
 COPY --from=builder /app/apps/worker ./apps/worker
 COPY --from=builder /app/apps/scenario-child ./apps/scenario-child
-# The task runner. Runs from source through tsx, like apps/api and apps/worker.
+# The task runner. Runs from source through node, like apps/api and apps/worker.
 COPY --from=builder /app/apps/tasks ./apps/tasks
-# Same: run from source through tsx. The boot command below runs both schema
+# Same: run from source through node. The boot command below runs both schema
 # migrations from here before anything serves.
 COPY --from=builder /app/apps/api ./apps/api
 # The browser half. Whole, not just dist/client: apps/api imports
@@ -255,7 +272,7 @@ EXPOSE 5560
 SHELL ["/bin/bash", "-c"]
 
 # The boot chain lives in apps/api, not here: `pnpm -s run start` is
-# `start:prepare:db && tsx src/main.ts`, and start:prepare:db runs
+# `start:prepare:db && node src/main.ts`, and start:prepare:db runs
 # the three tasks from apps/tasks in order — prisma-migrate (packages/prisma-
 # client's history), clickhouse-migrate (the goose runner, TTL reconciler and
 # ClickHouse SQL, now packages/clickhouse-migrations'), and lwql-provision. Written

@@ -45,7 +45,7 @@ type PrepareStep struct {
 // start:prepare:files, on origin/main) already builds the SDK and the MCP
 // server inline, so it needs no separate build step; the modular layout's
 // does not - only each application's own predev hook runs
-// dev/scripts/ensure-built.mjs, and nothing here can rely on a
+// the ensure:built script, and nothing here can rely on a
 // haven-supervised lane's predev having already run before an earlier
 // prepare step imports the same dist. Both layouts run
 // `pnpm run start:prepare:files` unchanged: the script name is the same on
@@ -57,7 +57,7 @@ func PrepareCommands(layout Layout) []PrepareStep {
 		{Name: "pnpm", Args: []string{"run", "start:prepare:files"}},
 	}
 	if layout == LayoutModular {
-		steps = append(steps, PrepareStep{Name: "node", Args: []string{"dev/scripts/ensure-built.mjs"}})
+		steps = append(steps, PrepareStep{Name: "pnpm", Args: []string{"run", "ensure:built"}})
 	}
 	return steps
 }

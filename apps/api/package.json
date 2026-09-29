@@ -18,14 +18,14 @@
   "scripts": {
     "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate clickhouse-migrate lwql-provision system-migrations-pass",
     "start": "pnpm -s run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
-    "predev": "node ../../dev/scripts/ensure-built.mjs",
+    "predev": "bash ../../dev/scripts/devscripts.sh ensure-built",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "typecheck": "tsc -b tsconfig.test.json",
-    "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
+    "pretest": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail",
     "test": "vitest run",
-    "pretest:unit": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
+    "pretest:unit": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail",
     "test:stress": "vitest run --exclude '**/node_modules/**' src/__tests__/collector.stress.test.ts",
-    "openapi:check": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail && vitest run src/__tests__/openapi-document-drift.integration.test.ts"
+    "openapi:check": "bash ../../dev/scripts/devscripts.sh ensure-built @langwatch/mail && vitest run src/__tests__/openapi-document-drift.integration.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "catalog:",

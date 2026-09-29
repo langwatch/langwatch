@@ -193,6 +193,12 @@ jobs:
       # single root workspace, so "Install pnpm dependencies (workspace)"
       # above already covers it. Same redundancy that was removed from
       # npx-server-publish.yml.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
       - name: Build langwatch app (vite + scenario + mcp + generated types)
         run: pnpm start:prepare:files && pnpm ensure:built && pnpm run build:types && pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." run build
         env:
@@ -269,7 +275,7 @@ jobs:
           # (workspace)" step above left $GITHUB_WORKSPACE/node_modules on
           # disk. An install_dir nested under $GITHUB_WORKSPACE would still
           # have carried that as an ancestor and could silently satisfy a
-          # module the tarball forgot to ship, masking the exact tsx
+          # module the tarball forgot to ship, masking the exact loader
           # alias-skip bug this job exists to catch. $RUNNER_TEMP is a
           # sibling of the checkout, matching what a real npx cache dir
           # looks like.

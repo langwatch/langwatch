@@ -437,7 +437,8 @@ describe("the repo is a single pnpm workspace", () => {
   });
 
   describe("when the applications are started from a fresh clone", () => {
-    const ensureBuilt = "dev/scripts/ensure-built.mjs";
+    const ensureBuilt = "dev/scripts/devscripts.sh ensure-built";
+    const ensureBuiltSource = "tools/devscripts/ensurebuilt.go";
 
     /** @scenario A fresh clone starts the applications without a manual build step */
     it("hooks the bundle build onto every application's dev script", () => {
@@ -446,7 +447,7 @@ describe("the repo is a single pnpm workspace", () => {
         expect(scripts.dev).toBeDefined();
         expect(scripts.predev).toContain(ensureBuilt);
       }
-      expect(existsSync(join(repoRoot, ensureBuilt))).toBe(true);
+      expect(existsSync(join(repoRoot, "dev/scripts/devscripts.sh"))).toBe(true);
     });
 
     /** @scenario A fresh clone starts the applications without a manual build step */
@@ -463,7 +464,7 @@ describe("the repo is a single pnpm workspace", () => {
 
     /** @scenario A stale SDK build is rebuilt before the browser application starts */
     it("decides by comparing the bundle against the source it was built from", () => {
-      const source = readFileSync(join(repoRoot, ensureBuilt), "utf8");
+      const source = readFileSync(join(repoRoot, ensureBuiltSource), "utf8");
 
       // Named entry points, not directories: a half-written `dist` passes a
       // directory check and fails minutes later inside a dependency scan.
@@ -471,7 +472,7 @@ describe("the repo is a single pnpm workspace", () => {
       expect(source).toContain("dist/index.mjs");
       expect(source).toContain("mcp/typescript");
       expect(source).toContain("dist/index.js");
-      expect(source).toMatch(/mtime/);
+      expect(source).toMatch(/ModTime/);
     });
   });
 });

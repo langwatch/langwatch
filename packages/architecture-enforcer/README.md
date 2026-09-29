@@ -28,9 +28,9 @@ so a missing input never reads as a clean tree.
 Source lives under `src/policies/`, one file per policy or per small family
 sharing one concept (`frontend/browser-packages.ts`), still one registered
 entry per function. Shared tree-reading lives in `src/workspace/` (the snapshot,
-the module graph, the repository layout, the anchors); the two tools that are
-not policies (`check-feature-parity.ts`, `sync-tsconfig-references.mjs`) live in
-`src/tools/`.
+the module graph, the repository layout, the anchors); the tool that is
+not a policy (`check-feature-parity.ts`) lives in `src/tools/`. The project-reference
+writer is the Go `sync-references` subcommand of `cmd/devscripts`.
 
 `--no-declarations` (library: `declarations: false`) drops the `declarations`
 entry before running: it reads the `.d.ts` files `tsc -b` wrote, so it needs a

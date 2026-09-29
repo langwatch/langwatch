@@ -24,16 +24,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "catalog:",
-    "@langwatch/egress": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
-    "@sendgrid/mail": "catalog:",
-    "nodemailer": "catalog:",
     "react": "catalog:",
-    "undici": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -43,7 +38,6 @@
     "@langwatch/design-system-internal": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
-    "@types/nodemailer": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",

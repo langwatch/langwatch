@@ -186,7 +186,7 @@ jobs:
       # postinstall hook — see apps/server/src/services/node-deps.ts.
       # The browser bundle plus every workspace build the two Node processes
       # need (the SDK dist and mcp/typescript's). apps/api and apps/worker
-      # declare no build of their own — they run from source through tsx, and
+      # declare no build of their own — they run from source through node, and
       # the tarball ships that source.
       - name: Build langwatch app (vite + sdk + mcp + generated types)
         run: >
@@ -233,8 +233,8 @@ jobs:
             # process serves this directory.
             "package/app/apps/ui/dist/client/index.html"
             # The three Node processes, as SOURCE. None is bundled any more —
-            # each declares `tsx` as a production dependency and its `start`
-            # (or `task`) script runs the entry point through it, so what the
+            # each runs from source through node: its `start`
+            # (or `task`) script runs the entry point, so what the
             # tarball has to carry is the entry point and the tree it imports.
             "package/app/apps/api/src/main.ts"
             "package/app/apps/worker/src/main.ts"
@@ -266,8 +266,8 @@ jobs:
             "package/app/feature-map.json"
             # The app's prepare step imports the skills front-matter helper
             # (scripts/generate-langy-skills.ts) when a tree rebuilds. The
-            # source is .ts (tsx resolves the .js import specifier back to
-            # it); the tarball never ships a compiled .js, so asserting .js
+            # source is .ts (the import specifier names the .ts file;
+            # the tarball never ships a compiled .js, so asserting .js
             # here always failed even on a correctly packaged tarball.
             "package/app/skills/_lib/frontmatter.ts"
           )

@@ -82,7 +82,7 @@ func TestEachSideReusesOneWorktreeBetweenRuns(t *testing.T) {
 	if got := fake.matching("start:prepare:files"); len(got) != 0 {
 		t.Errorf("unchanged code had its generated files written again: %v", got)
 	}
-	if got := fake.matching("ensure-built.mjs"); len(got) != 2 {
+	if got := fake.matching("ensure:built"); len(got) != 2 {
 		t.Errorf("ensure-built, which checks itself, runs every time: %v", got)
 	}
 	if dirExists(lock) {

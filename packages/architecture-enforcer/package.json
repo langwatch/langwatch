@@ -31,7 +31,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/dev-scripts": "workspace:*",
     "@types/js-yaml": "catalog:",
     "@types/node": "catalog:",
     "js-yaml": "catalog:",

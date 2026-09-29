@@ -68,7 +68,7 @@ func TestAFreshWorktreeIsPreparedBeforeItsStackBoots(t *testing.T) {
 				want := []string{
 					"env -u CI pnpm install --frozen-lockfile",
 					"pnpm run start:prepare:files",
-					"node dev/scripts/ensure-built.mjs",
+					"pnpm run ensure:built",
 				}
 				for _, dir := range []string{mainDir, branchDir} {
 					var got []string
@@ -88,7 +88,7 @@ func TestAFreshWorktreeIsPreparedBeforeItsStackBoots(t *testing.T) {
 				for _, want := range []string{
 					"env -u CI pnpm install --frozen-lockfile",
 					"pnpm run start:prepare:files",
-					"node dev/scripts/ensure-built.mjs",
+					"pnpm run ensure:built",
 					"copy .env files exit=ok (copied 1)",
 				} {
 					if !strings.Contains(out, want) {

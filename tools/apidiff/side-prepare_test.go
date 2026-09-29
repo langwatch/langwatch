@@ -55,7 +55,7 @@ func TestEachTreeIsPreparedOnceForItsOwnLayout(t *testing.T) {
 	if err := state.prepareTrees(context.Background()); err != nil {
 		t.Fatalf("prepareTrees: %v", err)
 	}
-	wantBranch := "env -u CI pnpm install --frozen-lockfile\npnpm run start:prepare:files\nnode dev/scripts/ensure-built.mjs"
+	wantBranch := "env -u CI pnpm install --frozen-lockfile\npnpm run start:prepare:files\npnpm run ensure:built"
 	if got := strings.Join(recorder.in(branchDir), "\n"); got != wantBranch {
 		t.Errorf("branch prepare ran\n%s\nwant\n%s", got, wantBranch)
 	}

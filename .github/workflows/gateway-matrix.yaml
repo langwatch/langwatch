@@ -139,7 +139,7 @@ jobs:
       LW_GATEWAY_INTERNAL_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_INTERNAL_SECRET }}
       LW_GATEWAY_JWT_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_JWT_SECRET }}
       LW_VIRTUAL_KEY_PEPPER: ${{ secrets.MATRIX_LW_VIRTUAL_KEY_PEPPER }}
-      # VK secrets minted by `pnpm tsx scripts/seed-governance-refactor-dogfood.ts`
+      # VK secrets minted by `node scripts/seed-governance-refactor-dogfood.ts`
       # against the long-lived matrix project — capture the script's
       # final block once + paste into GH org secrets, not regenerate
       # per-run (the seed mints fresh VKs only on first invocation per

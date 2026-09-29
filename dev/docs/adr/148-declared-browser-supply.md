@@ -46,7 +46,7 @@ Measured on this branch.
 The generated catalogue path is unwired, and it cannot wire itself.
 `modules/catalogue.json` carries **54** features. **41** have a
 `web/package.json`. **0** have `web/src/<id>.web.ts`, which is what
-`dev/scripts/generate-modules.mjs` looks for, so `webModules` is `[]` and stays
+`tools/devscripts/generatemodules.go` looks for, so `webModules` is `[]` and stays
 `[]`. The generator also requires `web/src/index.ts`; **16** web packages have
 one, and `annotation-web` - the one module already converted - is not among them,
 because `ui-web-public-entry` makes a web package's entries flat and closed and

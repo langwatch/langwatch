@@ -96,7 +96,7 @@ jobs:
       # fresh checkout (TS6305). Their graph reaches eventing and observability,
       # which import the built SDK and the generated Prisma client.
       - name: Generate Prisma client and build the SDK
-        run: pnpm --filter @langwatch/prisma-client prisma:generate && node dev/scripts/ensure-built.mjs langwatch
+        run: pnpm --filter @langwatch/prisma-client prisma:generate && bash dev/scripts/devscripts.sh ensure-built langwatch
 
       - name: Run typecheck
         run: pnpm -w exec tsc -b mcp/typescript
@@ -125,7 +125,7 @@ jobs:
       # The vendored scenario package the scenario tests load resolves
       # `langwatch` to the workspace SDK, whose exports point at its dist.
       - name: Build the SDK
-        run: node dev/scripts/ensure-built.mjs langwatch
+        run: bash dev/scripts/devscripts.sh ensure-built langwatch
 
       - name: Run tests
         # Fork and Dependabot PRs don't receive repository secrets, so a
