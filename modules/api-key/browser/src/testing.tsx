@@ -51,6 +51,7 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
   readonly lookups: string[] = [];
   readonly approvals: CliDeviceApproval[] = [];
   readonly denials: string[] = [];
+  signOuts = 0;
 
   constructor(
     private readonly options: {
@@ -152,6 +153,10 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
 
   recordLeadSourceIfAbsent(source: string): void {
     this.leadSources.push(source);
+  }
+
+  signOut(): void {
+    this.signOuts += 1;
   }
 
   openPlatformDrawer(request: {

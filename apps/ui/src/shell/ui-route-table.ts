@@ -201,7 +201,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   },
 
   // Top-level pages
-  { path: "/authorize", page: "pages/authorize" },
   {
     // The admin CRUD UI became the Backoffice module inside Ops (#3247,
     // #3245). The singular resource names it served are the only thing that
@@ -224,7 +223,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
     },
   },
-  { path: "/mcp/authorize", page: "pages/mcp/authorize" },
   { path: "/share/:id", page: "pages/share/[id]" },
   // Public — no auth required; token in query-string is the authorisation
   { path: "/unsubscribe", page: "pages/unsubscribe" },
@@ -259,6 +257,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       // Outside it the landing screen threw for want of a host, which is how a
       // signed-in reader met an error page at the front door.
       { path: "/", page: "pages/index" },
+      // Both draw the project switcher the chrome hosts, as main wrapped them
+      // in DashboardLayout; outside the chrome they lost header and sidebar.
+      { path: "/authorize", page: "pages/authorize" },
+      { path: "/mcp/authorize", page: "pages/mcp/authorize" },
       // Settings, wrapped in the same Langy layout as the project routes
       // (keyed by the AMBIENT project), so the panel survives hopping between
       // a project page and settings instead of vanishing.

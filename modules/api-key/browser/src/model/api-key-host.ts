@@ -176,6 +176,9 @@ export abstract class ApiKeyHostApi {
     params?: Readonly<Record<string, string | undefined>>;
   }): void;
 
+  /** Ends the session and leaves for the sign-in door. */
+  abstract signOut(): void;
+
   /** Asks the application whether a device code is still pending. */
   abstract lookupDeviceCode(userCode: string): Promise<CliDeviceCodeLookup>;
 

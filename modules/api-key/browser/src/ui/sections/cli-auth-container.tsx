@@ -8,14 +8,18 @@ import {
   Center,
   Container,
   HStack,
+  IconButton,
   Skeleton,
   SkeletonText,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { LogOut } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 
+import { useApiKeyHost } from "../../model/api-key-host.ts";
 import { FullLogo } from "../elements/full-logo.tsx";
 
 const MotionBox = motion.create(Box);
@@ -73,6 +77,7 @@ export function CliAuthContainer({
   subTitle?: string;
   loading?: boolean;
 }>): React.ReactElement {
+  const host = useApiKeyHost();
   return (
     // "stable both-edges" keeps the reserved scrollbar gutter symmetric so
     // the card column stays visually centered even with always-visible
@@ -86,6 +91,22 @@ export function CliAuthContainer({
       overflowY="auto"
     >
       <CliAuthMeshBackground />
+
+      <Box position="fixed" top={3} right={3} zIndex={99}>
+        <Tooltip content="Sign out">
+          <IconButton
+            variant="ghost"
+            size="sm"
+            borderRadius="full"
+            aria-label="Sign out"
+            color="fg.subtle"
+            _hover={{ bg: "bg.muted", color: "fg" }}
+            onClick={() => host.signOut()}
+          >
+            <LogOut size={16} />
+          </IconButton>
+        </Tooltip>
+      </Box>
 
       <Container
         width="full"

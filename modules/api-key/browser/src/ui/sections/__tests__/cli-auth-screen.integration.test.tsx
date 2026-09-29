@@ -140,6 +140,16 @@ describe("given a pending device code", () => {
     });
   });
 
+  describe("when the reader wants to leave", () => {
+    it("offers a sign out button that ends the session", async () => {
+      const user = userEvent.setup();
+      const host = hostFor();
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await user.click(await screen.findByRole("button", { name: "Sign out" }));
+      expect(host.signOuts).toBe(1);
+    });
+  });
+
   describe("when the user confirms the code", () => {
     /** @scenario confirming the code reveals the access selection */
     it("hides the code section and shows the access selection", async () => {

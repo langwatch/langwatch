@@ -157,6 +157,10 @@ class CapabilityApiKeyHost extends ApiKeyHostApi {
     return ok;
   }
 
+  signOut(): void {
+    if (typeof window !== "undefined") window.location.assign("/api/auth/logout");
+  }
+
   recordLeadSourceIfAbsent(source: string): void {
     if (typeof window === "undefined") return;
     try {
