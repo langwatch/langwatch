@@ -81,11 +81,8 @@ export const createAutomation: Action = async (context) => {
     // Choosing the type re-renders the form, so it comes before the name.
     await optionalClick(context, "Act on each matching trace");
   }
-  await fillField({
-    context,
-    target: "Flag failing traces",
-    value: argument({ context, name: "name" }),
-  });
+  // By its label: the placeholder names an example, and each kind shows its own.
+  await fillField({ context, target: "/^Name$/", value: argument({ context, name: "name" }) });
   const cadence = context.args.cadence;
   if (cadence !== undefined) await chooseOption({ context, option: cadence });
   const settleWindow = context.args.settleWindow;
@@ -188,8 +185,18 @@ export const createPairwise: Action = async (context) => {
     path: argument({ context, name: "start", fallback: "/{slug}/experiments/workbench" }),
   });
   await context.snapshot("workbench");
-  await optionalClick(context, "/(Compare|Pairwise|New comparison)/");
-  await context.snapshot("comparison");
+  // A comparison is a target: the targets header's Add opens the type picker it sits in.
+  await context.side.page
+    .getByText("Prompts or Agents", { exact: true })
+    .locator("xpath=..")
+    .getByRole("button", { name: /^\s*Add\b/ })
+    .first()
+    .click({ timeout: 6000 });
+  await context.snapshot("target types");
+  await clickText({ context, text: String.raw`/^\s*Comparison/` });
+  await context.snapshot("comparisons");
+  await clickText({ context, text: "New Comparison" });
+  await context.snapshot("comparison editor");
 };
 
 export const createScenario: Action = async (context) => {

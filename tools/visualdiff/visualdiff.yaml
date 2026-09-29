@@ -66,6 +66,9 @@ coverage:
       reason: declared by the candidate only, and the ingestion source it opens is created only through the governance tRPC; no REST route creates one on either ref
 
 routes:
+  # The landing first, alone, right after sign-in: it follows the product the
+  # session last visited, which concurrent pages would otherwise race to set.
+  - /
   - /{slug}
   - /{slug}/agents
   - /{slug}/agent-testing
@@ -104,7 +107,6 @@ routes:
   - /{slug}/simulations/scenarios
   - /{slug}/traces
   - /{slug}/workflows
-  - /
   - /me
   - /me/configure
   - /me/devices

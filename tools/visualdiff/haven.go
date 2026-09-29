@@ -281,10 +281,8 @@ func (run *session) havenPrepare(ctx context.Context, stack Stack) error {
 		return fmt.Errorf("copy env for %s: %w", stack.Name, err)
 	}
 	fmt.Fprintf(run.streams.Err, "%s: prepare: copy .env files exit=ok (copied %d)\n", stack.Name, copied)
-	if stack.Layout == LayoutMonolith && stack.HavenSlug != "" {
-		if err := havenrun.PinDotenvOrigin(stack.Dir, havenrun.AppOrigin(stack.HavenSlug)); err != nil {
-			return fmt.Errorf("pin origin for %s: %w", stack.Name, err)
-		}
+	if err := pinMonolithDotenv(stack); err != nil {
+		return err
 	}
 	substituted, err := EnsureGatewaySecrets(stack.Dir, run.runID)
 	if err != nil {
@@ -310,6 +308,21 @@ func (run *session) havenPrepare(ctx context.Context, stack Stack) error {
 		return nil
 	}
 	return recordPrepared(stack.Dir, key)
+}
+
+// pinMonolithDotenv writes what a monolith base's app must read from its own
+// .env, which it reloads with override after haven's overlay.
+func pinMonolithDotenv(stack Stack) error {
+	if stack.Layout != LayoutMonolith || stack.HavenSlug == "" {
+		return nil
+	}
+	if err := havenrun.PinDotenvOrigin(stack.Dir, havenrun.AppOrigin(stack.HavenSlug)); err != nil {
+		return fmt.Errorf("pin origin for %s: %w", stack.Name, err)
+	}
+	if err := PinMonolithDotenv(stack.Dir); err != nil {
+		return fmt.Errorf("pin monolith env for %s: %w", stack.Name, err)
+	}
+	return nil
 }
 
 // preparedAlready reports a persistent worktree whose last finished prepare
