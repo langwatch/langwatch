@@ -104,7 +104,7 @@ const readOnce = async (context: ActionContext): Promise<string> => {
   if (args.api !== undefined) {
     const response = await page.request.get(
       side.baseUrl + fillPath({ path: args.api, slug: context.slug }),
-      { headers: { "X-Auth-Token": context.credential.projectKey }, failOnStatusCode: false },
+      { headers: { "X-Auth-Token": context.credential.projectKey }, failOnStatusCode: false, ignoreHTTPSErrors: true },
     );
     if (!response.ok()) return `answered ${response.status()}`;
     return judgeBody({ body: await response.json().catch(() => undefined), args });
