@@ -17,8 +17,9 @@ import {
   parseVirtualKeyConfig,
   virtualKeyConfigSchema,
   translateExternalIdConflict,
+  VirtualKeyRevokedError,
+  VirtualKeyScopesRequiredError,
 } from "@langwatch/gateway-contract";
-import { TRPCError } from "@trpc/server";
 
 import {
   type GatewayPersistenceTransaction,
@@ -111,10 +112,7 @@ export class VirtualKeyProvisioningService {
 
   async create(input: CreateVirtualKeyInput): Promise<CreatedVirtualKey> {
     if (input.scopes.length === 0) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "At least one scope is required",
-      });
+      throw new VirtualKeyScopesRequiredError();
     }
 
     const config = virtualKeyConfigSchema.parse({
@@ -250,10 +248,7 @@ export class VirtualKeyProvisioningService {
   async update(input: UpdateVirtualKeyInput): Promise<VirtualKeyWithScopes> {
     const existing = await this.validation.ownedForMutation(input.id, input.organizationId);
     if (existing.status === "REVOKED") {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Cannot update a revoked virtual key",
-      });
+      throw new VirtualKeyRevokedError("Cannot update a revoked virtual key");
     }
 
     const plan = await this.planUpdate({ input, existing });
@@ -334,10 +329,7 @@ export class VirtualKeyProvisioningService {
   }): Promise<VirtualKeyWithScopes> {
     if (input.scopes) {
       if (input.scopes.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "At least one scope is required",
-        });
+        throw new VirtualKeyScopesRequiredError();
       }
 
       await this.repository.replaceScopes(input.id, input.scopes, tx);

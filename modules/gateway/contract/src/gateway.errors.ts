@@ -105,7 +105,7 @@ export class VirtualKeyNotFoundError extends HandledError {
   }
 }
 
-/** A revoked virtual key cannot be rotated: revocation is terminal, no secret left to roll. */
+/** A revoked key cannot be rotated, updated, enabled or disabled; revocation is terminal. */
 export class VirtualKeyRevokedError extends HandledError {
   declare readonly code: "bad_request";
 
@@ -142,10 +142,10 @@ export class VirtualKeyExpiryInPastError extends HandledError {
 
 /** A gateway budget the caller asked for isn't there. */
 export class GatewayBudgetNotFoundError extends HandledError {
-  declare readonly code: "gateway_budget_not_found";
+  declare readonly code: "budget_not_found";
 
   constructor() {
-    super("gateway_budget_not_found", "Budget not found", {
+    super("budget_not_found", "Budget not found", {
       httpStatus: 404,
       fault: "customer",
     });
@@ -446,5 +446,109 @@ export class GatewaySpendSourceUnavailableError extends HandledError {
       { httpStatus: 412, fault: "platform" },
     );
     this.name = "GatewaySpendSourceUnavailableError";
+  }
+}
+
+/** A virtual key was written with no scope, so nothing could ever reach it. */
+export class VirtualKeyScopesRequiredError extends HandledError {
+  declare readonly code: "bad_request";
+
+  constructor() {
+    super("bad_request", "At least one scope is required", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "VirtualKeyScopesRequiredError";
+  }
+}
+
+/** Routing mode POLICY was chosen without saying which routing policy. */
+export class VirtualKeyRoutingPolicyRequiredError extends HandledError {
+  declare readonly code: "routing_policy_required";
+
+  constructor() {
+    super(
+      "routing_policy_required",
+      "routing_policy_required: routingMode POLICY needs a routingPolicyId",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "VirtualKeyRoutingPolicyRequiredError";
+  }
+}
+
+/** A routing policy was named on a key whose routing mode does not use one. */
+export class VirtualKeyRoutingPolicyConflictError extends HandledError {
+  declare readonly code: "routing_policy_conflict";
+
+  constructor(routingMode: string) {
+    super(
+      "routing_policy_conflict",
+      `routing_policy_conflict: routingMode ${routingMode} cannot carry a routingPolicyId`,
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "VirtualKeyRoutingPolicyConflictError";
+  }
+}
+
+/** An empty provider allow-list would leave a key that can serve nothing. */
+export class VirtualKeyProvidersAllowedEmptyError extends HandledError {
+  declare readonly code: "providers_allowed_empty";
+
+  constructor() {
+    super(
+      "providers_allowed_empty",
+      "providers_allowed_empty: select at least one provider, or allow all providers",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "VirtualKeyProvidersAllowedEmptyError";
+  }
+}
+
+/** A provider the key's ownership does not reach was put on its allow-list. */
+export class VirtualKeyProvidersNotInScopeError extends HandledError {
+  declare readonly code: "providers_not_in_scope";
+
+  constructor(providerIds: readonly string[]) {
+    super("providers_not_in_scope", `providers_not_in_scope: ${providerIds.join(", ")}`, {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "VirtualKeyProvidersNotInScopeError";
+  }
+}
+
+/** A key named a routing policy that does not exist. */
+export class GatewayRoutingPolicyNotFoundError extends HandledError {
+  declare readonly code: "not_found";
+
+  constructor(routingPolicyId: string) {
+    super("not_found", `Routing policy ${routingPolicyId} not found`, {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "GatewayRoutingPolicyNotFoundError";
+  }
+}
+
+/** A key named a routing policy that belongs to another organization. */
+export class GatewayRoutingPolicyForeignError extends HandledError {
+  declare readonly code: "forbidden";
+
+  constructor() {
+    super("forbidden", "Routing policy belongs to a different organization than the virtual key", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "GatewayRoutingPolicyForeignError";
+  }
+}
+
+/** An organization id named no organization. */
+export class GatewayOrganizationNotFoundError extends HandledError {
+  declare readonly code: "not_found";
+
+  constructor() {
+    super("not_found", "organization not found", { httpStatus: 404, fault: "customer" });
+    this.name = "GatewayOrganizationNotFoundError";
   }
 }

@@ -425,6 +425,12 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 404
     And the body is the canonical error envelope with code "budget_not_found"
 
+  @integration @rest @budgets
+  Scenario: A cycle anchor on a window that never rolls is refused
+    When I create a budget with window "manual" or "total" and a cycle_anchor_at
+    Then the response status is 400
+    And error.code is "gateway_budget_cycle_anchor_invalid" and meta.window names the window
+
   @unit @budgets
   Scenario: A budget amount converts to nano-USD without float drift
     Given a budget limit stored as `Decimal(18,6)`

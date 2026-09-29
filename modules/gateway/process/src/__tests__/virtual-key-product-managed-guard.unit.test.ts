@@ -62,7 +62,7 @@ describe("VirtualKeyService product-managed guard", () => {
       const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
       await expect(sut.update({ ...mutationInput, name: "renamed" })).rejects.toMatchObject({
-        code: "NOT_FOUND",
+        code: "virtual_key_not_found",
       });
     });
 
@@ -70,7 +70,7 @@ describe("VirtualKeyService product-managed guard", () => {
       const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
       await expect(sut.rotate(mutationInput)).rejects.toMatchObject({
-        code: "NOT_FOUND",
+        code: "virtual_key_not_found",
       });
     });
 
@@ -78,7 +78,7 @@ describe("VirtualKeyService product-managed guard", () => {
       const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
       await expect(sut.revoke(mutationInput)).rejects.toMatchObject({
-        code: "NOT_FOUND",
+        code: "virtual_key_not_found",
       });
     });
   });

@@ -4,9 +4,8 @@
  * a paused key resumes exactly as it was.
  */
 
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
+import { VirtualKeyRevokedError, type VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
-import { TRPCError } from "@trpc/server";
 
 import {
   type GatewayAudit,
@@ -243,10 +242,7 @@ export class VirtualKeyStatusService {
     }
 
     if (existing.status === "REVOKED") {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "A revoked key cannot be disabled; revocation is terminal.",
-      });
+      throw new VirtualKeyRevokedError("A revoked key cannot be disabled; revocation is terminal.");
     }
 
     const before = VirtualKeyValidationService.serialiseForAudit(existing);
@@ -309,10 +305,7 @@ export class VirtualKeyStatusService {
     }
 
     if (existing.status === "REVOKED") {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "A revoked key cannot be enabled; mint a new key instead.",
-      });
+      throw new VirtualKeyRevokedError("A revoked key cannot be enabled; mint a new key instead.");
     }
 
     const before = VirtualKeyValidationService.serialiseForAudit(existing);

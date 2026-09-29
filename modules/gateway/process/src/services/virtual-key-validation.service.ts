@@ -19,11 +19,17 @@ import {
   GatewayTraceProjectAmbiguousError,
   GatewayTraceProjectRequiredError,
   GatewayTraceProjectUnknownError,
+  GatewayRoutingPolicyForeignError,
+  GatewayRoutingPolicyNotFoundError,
   VirtualKeyExpiryInPastError,
+  VirtualKeyNotFoundError,
+  VirtualKeyProvidersAllowedEmptyError,
+  VirtualKeyProvidersNotInScopeError,
+  VirtualKeyRoutingPolicyConflictError,
+  VirtualKeyRoutingPolicyRequiredError,
 } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
-import { TRPCError } from "@trpc/server";
 
 import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
@@ -154,17 +160,11 @@ export class VirtualKeyValidationService {
   ): VirtualKeyRoutingMode {
     const mode = requested ?? (routingPolicyId ? "POLICY" : "NONE");
     if (mode === "POLICY" && !routingPolicyId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "routing_policy_required: routingMode POLICY needs a routingPolicyId",
-      });
+      throw new VirtualKeyRoutingPolicyRequiredError();
     }
 
     if (mode !== "POLICY" && routingPolicyId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `routing_policy_conflict: routingMode ${mode} cannot carry a routingPolicyId`,
-      });
+      throw new VirtualKeyRoutingPolicyConflictError(mode);
     }
 
     return mode;
@@ -181,10 +181,7 @@ export class VirtualKeyValidationService {
     }
 
     if (providersAllowed.length === 0) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "providers_allowed_empty: select at least one provider, or allow all providers",
-      });
+      throw new VirtualKeyProvidersAllowedEmptyError();
     }
   }
 
@@ -278,15 +275,12 @@ export class VirtualKeyValidationService {
   /**
    * Loads a key for mutation. Product-managed keys are rejected here rather
    * than in each caller, so `update` / `rotate` / `revoke` cannot drift apart
-   * — NOT_FOUND for the same reason `findById` returns null.
+   * — the same not-found answer `findById` gives.
    */
   async ownedForMutation(id: string, organizationId: string): Promise<VirtualKeyWithScopes> {
     const existing = await this.repository.findById({ id, organizationId });
     if (!existing || VirtualKeyValidationService.isProductManaged(existing)) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Virtual key not found",
-      });
+      throw new VirtualKeyNotFoundError();
     }
 
     return existing;
@@ -360,10 +354,7 @@ export class VirtualKeyValidationService {
     const reachableIds = new Set(reachable.map((mp) => mp.id));
     const unreachable = providersAllowed.filter((id) => !reachableIds.has(id));
     if (unreachable.length > 0) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `providers_not_in_scope: ${unreachable.join(", ")}`,
-      });
+      throw new VirtualKeyProvidersNotInScopeError(unreachable);
     }
   }
 
@@ -373,17 +364,11 @@ export class VirtualKeyValidationService {
   ): Promise<void> {
     const policy = await this.repository.findRoutingPolicyOwner({ routingPolicyId });
     if (!policy) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: `Routing policy ${routingPolicyId} not found`,
-      });
+      throw new GatewayRoutingPolicyNotFoundError(routingPolicyId);
     }
 
     if (policy.organizationId !== organizationId) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Routing policy belongs to a different organization than the virtual key",
-      });
+      throw new GatewayRoutingPolicyForeignError();
     }
   }
 }

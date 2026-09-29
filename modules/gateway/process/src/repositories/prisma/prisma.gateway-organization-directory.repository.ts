@@ -1,5 +1,5 @@
+import { GatewayOrganizationNotFoundError } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { TRPCError } from "@trpc/server";
 
 /** The client slice the organization/group tenancy reads below touch. */
 export type GatewayOrganizationDirectoryDatabase = Pick<
@@ -22,7 +22,7 @@ export class PrismaGatewayOrganizationDirectoryRepository {
       where: { id: organizationId },
     });
     if (!organization) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "organization not found" });
+      throw new GatewayOrganizationNotFoundError();
     }
   }
 

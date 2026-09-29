@@ -335,10 +335,10 @@ describe("a legacy project key's organization-wide gateway writes", () => {
         "PATCH",
         "/budgets/budget_b",
         { name: "mine" },
-        "gateway_budget_not_found",
+        "budget_not_found",
       ],
-      ["archives a budget", "DELETE", "/budgets/budget_b", undefined, "gateway_budget_not_found"],
-      ["resets a budget", "POST", "/budgets/budget_b/reset", {}, "gateway_budget_not_found"],
+      ["archives a budget", "DELETE", "/budgets/budget_b", undefined, "budget_not_found"],
+      ["resets a budget", "POST", "/budgets/budget_b/reset", {}, "budget_not_found"],
       [
         "updates a cache rule",
         "PATCH",

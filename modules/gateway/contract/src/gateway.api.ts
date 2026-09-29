@@ -554,7 +554,7 @@ export interface GatewayApi extends GatewayInternalProtocol {
     scopeTypes?: readonly string[] | undefined;
     externalId?: string | undefined;
   }): Promise<GatewayBudgetPageWithHealth>;
-  /** One budget with live health; throws `gateway_budget_not_found` outside this organization. */
+  /** One budget with live health; throws `budget_not_found` outside this organization. */
   getBudgetWithHealth(input: { id: string; organizationId: string }): Promise<GatewayBudgetHealth>;
   /** Whether any active key could produce traffic against this budget's own scope target. */
   budgetScopeReach(input: {
