@@ -83,7 +83,7 @@ Parallel tracks; staff in any order capacity allows.
 | # | Needs | What ships | Impact when it lands |
 |---|---|---|---|
 | D09 | D05, D08 | The per-customer migration wizard with both-connections grace and the legacy callback shim (R9) | Each enterprise moves at its own pace with rollback built in; nobody reconfigures their IdP under pressure |
-| D10 | D09 program exit: zero ACTIVE legacy connections (provider config, webhook, shim, secrets, QA login); ADR-143's own gate for the password service specifically (decoupled — see ADR-143) | Deletion: provider config, password service, webhook, shim, secrets, QA login | Auth0 spend and code hit zero. This is the program's DONE signal — customer-paced, not a scheduled milestone |
+| D10 | D09 program exit: zero ACTIVE legacy connections (provider config, webhook, shim, secrets, QA login); ADR-143's own gate for the `auth0|...` cohort's calls into the password service; deleting the password service file may land earlier on that gate, or may still need D09, pending ADR-143's Open Question | Deletion: provider config, password service, webhook, shim, secrets, QA login | Auth0 spend and code hit zero. This is the program's DONE signal — customer-paced, not a scheduled milestone |
 
 # Sequencing rationale
 

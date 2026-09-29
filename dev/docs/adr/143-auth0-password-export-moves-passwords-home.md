@@ -83,7 +83,13 @@ called today from `CredentialAccountService.setFirstPassword` and
 a parallel "imported password" store — matched by the Auth0 `user_id` against
 the existing `Account(provider: "auth0", providerAccountId: user_id)` row,
 not by email (case-sensitivity-ambiguous, and not a unique key on this
-table). A password imported this way is not a second kind of password; the
+table). One exception to "a user who has none": passkey sign-up writes a
+`credential` Account with a NULL password as a recovery placeholder, and the
+unique `(provider, providerAccountId)` index means a second row cannot be
+created beside it. For that user the import sets the password on the
+placeholder through `updateAccountPassword`, the seam `changePassword`
+already uses. A user whose `credential` row already holds a password is
+skipped. A password imported this way is not a second kind of password; the
 moment it lands, it is indistinguishable from one a native LangWatch user set,
 and every existing read path — `PasswordHasherPort.matches`, better-auth's own
 `/sign-in/email` — verifies it exactly the same way, with no branch anywhere
@@ -104,9 +110,8 @@ record's algorithm and only write bcrypt rows (`password_hash`, or
 `custom_password_hash.algorithm === "bcrypt"`) into the columns above.**
 Every other algorithm is a residual: excluded from this cutover, logged with a
 count (never the hash value), and left on the live Auth0 fallback in §2 —
-sized before landing, because a hidden-behind-bcrypt-assumption crypto bug is
-not a class of mistake this codebase tolerates quietly (`CLAUDE.md`: "Be
-careful not to introduce security vulnerabilities"). If that residual is
+sized before landing, because a crypto bug hidden behind a bcrypt assumption
+would surface only as customers told their correct password is wrong. If that residual is
 large enough to matter, it is a follow-up (rehash-on-next-successful-login
 against Auth0 while it is still live, or a second export request with
 `algorithm=bcrypt` forced at Auth0's end) rather than a blocker to this ADR —
@@ -263,7 +268,8 @@ settled without whoever owns the D10 exit-gate review confirming it.
   run locally by an operator against prod (`DATABASE_URL=... APPLY=1 pnpm tsx
   scripts/ops/import-auth0-password-hashes.ts`), never as a deployed task.
   Dry-run by default; filters to bcrypt rows per §1's algorithm residual;
-  writes through `PrismaCredentialAccountRepository.createCredentialAccount`.
+  writes through `PrismaCredentialAccountRepository.createCredentialAccount`,
+  or `.updateAccountPassword` for a passkey placeholder row.
 - `dev/docs/identity-platform/D09-auth0-customer-migrations.md`,
   `D10-auth0-deletion.md`, `delivery-plan.md` — amended alongside this ADR.
 - `specs/settings/change-password-auth0.feature` — the existing behavioral

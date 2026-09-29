@@ -15,14 +15,19 @@
  * `Account(provider: "auth0", providerAccountId: user_id)` row this
  * deployment already holds for that identity — not by email, which is
  * case-sensitivity-ambiguous and not a unique key on this table. A record
- * naming no such Account (created after the export, or never signed up here),
- * or naming a user who already holds a `credential` Account (already
- * imported, or already carries a native password), is skipped and counted.
+ * naming no such Account (created after the export, or never signed up here)
+ * is skipped and counted. A user who already holds a `credential` Account
+ * with a real password (already imported, or already changed their password
+ * here) is also skipped; one whose `credential` Account is a passkey
+ * placeholder (NULL password — a real, currently-shipping state written by
+ * passkey sign-up) has that row given the imported password instead of being
+ * treated as already-credentialed.
  *
  * Writes through `PrismaCredentialAccountRepository.createCredentialAccount`
- * — the exact seam `CredentialAccountService.setFirstPassword` and
- * `openCredentialAccount` already write a `credential` Account through, with
- * the `issuer` column better-auth's own lookup requires. No SQL is hand-rolled
+ * (new row) or `.updateAccountPassword` (passkey placeholder) — the same two
+ * seams `CredentialAccountService.setFirstPassword`, `openCredentialAccount`
+ * and `changePassword` already write a `credential` Account through, with the
+ * `issuer` column better-auth's own lookup requires. No SQL is hand-rolled
  * here, and no other table is touched.
  *
  * DRY-RUN BY DEFAULT: reports what it would do and writes nothing. Re-run
@@ -64,6 +69,7 @@
 import { createInterface } from "node:readline/promises";
 import { readFileSync } from "node:fs";
 import { PrismaClient } from "~/generated/prisma/client";
+import { redactUrl } from "~/server/clickhouse/goose";
 import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import { PrismaCredentialAccountRepository } from "~/server/app-layer/identity/repositories/credential-account.prisma.repository";
 
@@ -101,8 +107,15 @@ interface Auth0ExportRecord {
   custom_password_hash?: Auth0CustomPasswordHash;
 }
 
-/** `$2a$`, `$2b$` or `$2y$` — the three live bcrypt prefixes. */
-const BCRYPT_PREFIX = /^\$2[aby]\$/;
+/**
+ * A complete bcrypt hash: `$2a$`/`$2b$`/`$2y$`, a two-digit cost, and the
+ * 53-character salt+digest. Checked in full, not just the prefix — Node's
+ * `Buffer.from(str, "hex" | "base64")` decodes invalid input silently rather
+ * than throwing, so a truncated or malformed `custom_password_hash` value
+ * would otherwise pass a prefix-only check and reach `bcrypt.compare` as
+ * plausible-looking garbage.
+ */
+const BCRYPT_SHAPE = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 
 function parseExport(raw: string): Auth0ExportRecord[] {
   const trimmed = raw.trim();
@@ -139,27 +152,20 @@ function decodeHashValue(hash: Auth0HashValue): string {
 function bcryptHashOf(record: Auth0ExportRecord): string | null {
   if (
     typeof record.password_hash === "string" &&
-    BCRYPT_PREFIX.test(record.password_hash)
+    BCRYPT_SHAPE.test(record.password_hash)
   ) {
     return record.password_hash;
   }
-  if (record.custom_password_hash?.algorithm === "bcrypt") {
+  if (record.custom_password_hash?.algorithm.toLowerCase() === "bcrypt") {
     const decoded = decodeHashValue(record.custom_password_hash.hash);
-    return BCRYPT_PREFIX.test(decoded) ? decoded : null;
+    return BCRYPT_SHAPE.test(decoded) ? decoded : null;
   }
   return null;
 }
 
 /** Prints only host/database from the URL — never credentials, never the raw string. */
 async function confirmApply(databaseUrl: string): Promise<void> {
-  let target = "<DATABASE_URL did not parse as a URL>";
-  try {
-    const url = new URL(databaseUrl);
-    target = `${url.host}${url.pathname}`;
-  } catch {
-    // leave the placeholder — never print the raw value, which may carry credentials
-  }
-  console.log(`About to WRITE credential rows into ${target}.`);
+  console.log(`About to WRITE credential rows into ${redactUrl(databaseUrl)}.`);
   if (SKIP_CONFIRM) return;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const answer = await rl.question('Type "yes" to continue: ');
@@ -190,52 +196,79 @@ async function main(): Promise<void> {
   let noAccountSkipped = 0;
   let alreadyCredentialedSkipped = 0;
   let imported = 0;
+  let errored = 0;
   const nonBcryptUserIds: string[] = [];
   const noAccountUserIds: string[] = [];
+  const erroredUserIds: string[] = [];
 
   for (const record of records) {
-    const auth0UserId = auth0UserIdOf(record);
-    if (!auth0UserId) {
-      noIdSkipped++;
-      continue;
-    }
+    try {
+      const auth0UserId = auth0UserIdOf(record);
+      if (!auth0UserId) {
+        noIdSkipped++;
+        continue;
+      }
 
-    const hash = bcryptHashOf(record);
-    if (!hash) {
-      nonBcryptSkipped++;
-      nonBcryptUserIds.push(auth0UserId);
-      continue;
-    }
+      const hash = bcryptHashOf(record);
+      if (!hash) {
+        nonBcryptSkipped++;
+        nonBcryptUserIds.push(auth0UserId);
+        continue;
+      }
 
-    const account = await prisma.account.findFirst({
-      where: { provider: "auth0", providerAccountId: auth0UserId },
-      select: { userId: true },
-    });
-    if (!account) {
-      noAccountSkipped++;
-      noAccountUserIds.push(auth0UserId);
-      continue;
-    }
-
-    const existingCredential = await prisma.account.findFirst({
-      where: { userId: account.userId, provider: "credential" },
-      select: { id: true },
-    });
-    if (existingCredential) {
-      alreadyCredentialedSkipped++;
-      continue;
-    }
-
-    if (APPLY) {
-      await credentials.createCredentialAccount({
-        userId: account.userId,
-        passwordHash: hash,
+      const account = await prisma.account.findFirst({
+        where: { provider: "auth0", providerAccountId: auth0UserId },
+        select: { userId: true },
       });
-      console.log(`  [OK]  auth0|${auth0UserId} -> credential written`);
-    } else {
-      console.log(`  [DRY] auth0|${auth0UserId} -> would write a credential`);
+      if (!account) {
+        noAccountSkipped++;
+        noAccountUserIds.push(auth0UserId);
+        continue;
+      }
+
+      const existingCredential = await credentials.findCredentialAccount({
+        userId: account.userId,
+      });
+      if (existingCredential && existingCredential.passwordHash !== null) {
+        alreadyCredentialedSkipped++;
+        continue;
+      }
+
+      // A passkey sign-up leaves a placeholder `credential` Account with a
+      // NULL password (createPasskeyCredentialPlaceholder) — the unique
+      // (provider, providerAccountId) index means that row already occupies
+      // this user's slot, so it is updated in place rather than re-created.
+      if (existingCredential) {
+        if (APPLY) {
+          await credentials.updateAccountPassword({
+            userId: account.userId,
+            accountId: existingCredential.id,
+            passwordHash: hash,
+          });
+          console.log(`  [OK]  ${auth0UserId} -> passkey placeholder given a password`);
+        } else {
+          console.log(
+            `  [DRY] ${auth0UserId} -> would give the passkey placeholder a password`,
+          );
+        }
+      } else {
+        if (APPLY) {
+          await credentials.createCredentialAccount({
+            userId: account.userId,
+            passwordHash: hash,
+          });
+          console.log(`  [OK]  ${auth0UserId} -> credential written`);
+        } else {
+          console.log(`  [DRY] ${auth0UserId} -> would write a credential`);
+        }
+      }
+      imported++;
+    } catch (err) {
+      errored++;
+      const auth0UserId = auth0UserIdOf(record) ?? "<no user_id>";
+      erroredUserIds.push(auth0UserId);
+      console.error(`  [ERROR] ${auth0UserId} -> ${String(err)}`);
     }
-    imported++;
   }
 
   console.log("\nSummary:");
@@ -244,6 +277,7 @@ async function main(): Promise<void> {
   console.log(`  skipped, non-bcrypt algorithm:     ${nonBcryptSkipped}`);
   console.log(`  skipped, no matching account:      ${noAccountSkipped}`);
   console.log(`  skipped, already has a password:   ${alreadyCredentialedSkipped}`);
+  console.log(`  errored:                           ${errored}`);
   const importedLabel = APPLY
     ? `  imported:                          ${imported}`
     : `  would import:                       ${imported}`;
@@ -253,11 +287,15 @@ async function main(): Promise<void> {
     console.log(
       "\nNon-bcrypt residual — still on live Auth0, needs a follow-up (auth0 user ids):",
     );
-    for (const id of nonBcryptUserIds) console.log(`  auth0|${id}`);
+    for (const id of nonBcryptUserIds) console.log(`  ${id}`);
   }
   if (noAccountUserIds.length > 0) {
     console.log("\nNo matching Account in this deployment (auth0 user ids):");
-    for (const id of noAccountUserIds) console.log(`  auth0|${id}`);
+    for (const id of noAccountUserIds) console.log(`  ${id}`);
+  }
+  if (erroredUserIds.length > 0) {
+    console.log("\nErrored — needs investigation (auth0 user ids):");
+    for (const id of erroredUserIds) console.log(`  ${id}`);
   }
 
   await prisma.$disconnect();
