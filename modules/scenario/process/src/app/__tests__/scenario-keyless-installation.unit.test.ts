@@ -47,7 +47,6 @@ function keylessEncryption() {
       encryptionKey: "",
       secrets: {},
       rateLimit: { requests: 60, seconds: 60 },
-      mail: { provider: "off" },
     },
   }).read("encryption");
 }

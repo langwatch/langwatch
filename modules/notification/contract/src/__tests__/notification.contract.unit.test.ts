@@ -45,4 +45,15 @@ describe("Notification contract", () => {
       }),
     ).toThrow(ZodError);
   });
+
+  it("refuses a replyless tag that could break out of the no-reply address", () => {
+    expect(() =>
+      sendEmailCommandSchema.parse({
+        to: "ada@example.com",
+        subject: "hi",
+        html: "<p>hi</p>",
+        replyless: { tag: "x@evil.test>\r\nBcc: all@acme.test" },
+      }),
+    ).toThrow(ZodError);
+  });
 });

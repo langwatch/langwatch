@@ -4,19 +4,15 @@
  * administrator, linking the gateway's budgets page on this deployment.
  * @see specs/ai-governance/cli-wrappers/request-increase.feature, modules/user/specs/user.feature
  */
-import { EmailDelivery, type EmailContent } from "@langwatch/mail";
+import type { EmailContent, MailSender } from "@langwatch/mail";
 import { UserBudgetRequestNotDeliveredError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { budgetRequestMailer } from "../user-composition.build.ts";
 import { createUserTestApp, createUserTestInfrastructure } from "./user.fixture.ts";
 
-class RecordingMailer extends EmailDelivery {
+class RecordingMailer implements MailSender {
   readonly sent: EmailContent[] = [];
-
-  defaultFrom(): string {
-    return "LangWatch <contact@langwatch.test>";
-  }
 
   async send(content: EmailContent): Promise<unknown> {
     this.sent.push(content);

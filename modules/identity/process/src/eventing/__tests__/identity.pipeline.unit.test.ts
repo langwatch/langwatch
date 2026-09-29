@@ -9,7 +9,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
@@ -69,7 +69,6 @@ async function installed() {
   })
     .withModules([withMemoryRepositories(identityServer)])
     .withMembers({
-      mail: createApiFixture<EmailDelivery>(),
       adminEmails: [],
       publicBaseUrl: undefined,
       isSaas: false,
@@ -88,6 +87,7 @@ async function installed() {
       "audit-log": createApiFixture<AuditLogApi>(),
       licensing: createApiFixture<LicensingApi>(),
       scim: createApiFixture<ScimApi>(),
+      notification: createApiFixture<NotificationService>(),
     })
     .boot();
   const definition = registered[0];

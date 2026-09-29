@@ -83,7 +83,6 @@ export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickH
     idempotency: { claim: async () => true },
     rateLimiter: { check: async () => ({ allowed: true }) },
     eventing,
-    mail: unreachable<ProcessMembers["mail"]>("mail"),
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,

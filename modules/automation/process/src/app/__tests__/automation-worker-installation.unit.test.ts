@@ -20,8 +20,9 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { type Mail, memoryStores } from "@langwatch/process-stores";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -72,7 +73,7 @@ type Installed = Readonly<{
   dataset?: DatasetApi;
   annotation?: AnnotationApi;
   authz?: AuthzApi;
-  mail?: Mail;
+  notification?: NotificationService;
   logger?: ReturnType<typeof createTestLogger>["logger"];
 }>;
 
@@ -94,7 +95,6 @@ function process(role: "api" | "worker", eventing: EventSourcing, installed: Ins
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("isSaas", false)
     .withMember("logging", installed.logger ?? createTestLogger().logger)
-    .withMember("mail", installed.mail ?? createApiFixture<Mail>())
     .provide({
       analytics: createApiFixture<AnalyticsApi>(),
       monitor: createApiFixture<MonitorApi>(),
@@ -107,6 +107,7 @@ function process(role: "api" | "worker", eventing: EventSourcing, installed: Ins
       dataset: installed.dataset ?? createApiFixture<DatasetApi>(),
       annotation: installed.annotation ?? createApiFixture<AnnotationApi>(),
       authz: installed.authz ?? createApiFixture<AuthzApi>(),
+      notification: installed.notification ?? createApiFixture<NotificationService>(),
     });
 }
 
@@ -158,17 +159,14 @@ describe("given the automation module installed on the api role", () => {
   });
 });
 
-type SentMail = Parameters<Mail["send"]>[0];
-
-function capturingMail(): { mail: Mail; sent: SentMail[] } {
-  const sent: SentMail[] = [];
-  const mail: Mail = {
-    send: async (message) => {
+function capturingMail(): { notification: NotificationService; sent: SendEmailCommand[] } {
+  const sent: SendEmailCommand[] = [];
+  const notification = createApiFixture<NotificationService>({
+    sendEmail: async (message) => {
       sent.push(message);
     },
-    defaultFrom: () => "LangWatch <no-reply@langwatch.test>",
-  };
-  return { mail, sent };
+  });
+  return { notification, sent };
 }
 
 function tracesHolding(traceIds: string[]): TraceApi {
@@ -241,8 +239,8 @@ describe("given a memory-tier worker settling a match end to end", () => {
   describe("when a settled window is notified through the pipeline's own intent handler", () => {
     /** @scenario "A settled match reaches its recipients from this process" */
     it("mails the digest from this deployment's host, claims the send and stamps the run", async () => {
-      const { mail, sent } = capturingMail();
-      const worker = await settlingWorker({ mail, trace: tracesHolding(["trace-1"]) });
+      const { notification, sent } = capturingMail();
+      const worker = await settlingWorker({ notification, trace: tracesHolding(["trace-1"]) });
       await worker.automations.create(automation("SEND_EMAIL", { members: ["ops@acme.test"] }));
       const window = { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 };
 
@@ -250,7 +248,7 @@ describe("given a memory-tier worker settling a match end to end", () => {
       await worker.run("notifyDigest", window);
 
       expect(sent).toHaveLength(1);
-      expect(sent[0]?.bcc).toEqual(["ops@acme.test"]);
+      expect(sent[0]).toMatchObject({ to: "ops@acme.test", replyless: {} });
       expect(sent[0]?.html).toContain("https://app.langwatch.test");
       expect(await worker.lastRunAt()).toBeGreaterThan(0);
       await worker.runtime.stop();
@@ -405,10 +403,10 @@ async function breachedWorker(input: {
   filters: CreateTriggerCommand["filters"];
   countTracesInLastDay: TraceApi["countTracesInLastDay"];
 }) {
-  const { mail, sent } = capturingMail();
+  const { notification, sent } = capturingMail();
   const appended: string[] = [];
   const worker = await settlingWorker({
-    mail,
+    notification,
     entitlement: planWithCeiling(1),
     authz: organizationOf([
       { email: "admin@acme.test", role: "ADMIN" },

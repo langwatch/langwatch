@@ -87,8 +87,8 @@ export const automationServer = defineServerModule("automation")
  * together so signing them differently could honour an unissued link.
  */
 export type AutomationMailEnvelope = Readonly<{
-  /** The `To:` a trigger's mail is addressed to, with recipients in bcc. */
-  noReplyAddressFor(input: { defaultFrom: string; triggerId: string }): string;
+  /** The tag of the no-reply `To:` notification hides a trigger's recipients behind. */
+  noReplyTagFor(triggerId: string): string;
   /** The signed token the unsubscribe footer's link carries. */
   signUnsubscribeToken(payload: UnsubscribeTokenPayload): string;
 }>;
@@ -110,7 +110,7 @@ export function createAutomationMailEnvelope(input: {
   });
 
   return {
-    noReplyAddressFor: (address) => addresses.addressFor(address),
+    noReplyTagFor: (triggerId) => addresses.tagFor(triggerId),
     signUnsubscribeToken: (payload) => tokens.sign(payload),
   };
 }

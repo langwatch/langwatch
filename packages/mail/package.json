@@ -2,7 +2,7 @@
   "name": "@langwatch/mail",
   "version": "0.1.0",
   "private": true,
-  "description": "The outbound mail gateways LangWatch sends through, and the transactional messages the identity and organization surfaces send.",
+  "description": "The transactional messages LangWatch sends, rendered here and sent through notification.",
   "files": [
     "dist",
     "src"
@@ -15,11 +15,6 @@
       "types": "./dist/typecheck/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./gateway": {
-      "types": "./dist/typecheck/gateway.d.ts",
-      "import": "./dist/gateway.js",
-      "default": "./dist/gateway.js"
     }
   },
   "scripts": {

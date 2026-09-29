@@ -186,7 +186,6 @@ describe("AutomationGraphActivityService", () => {
           encryptionKey: "",
           secrets: {},
           rateLimit: { requests: 60, seconds: 60 },
-          mail: { provider: "off" },
         },
       }).read("encryption");
       const { adapter, delivery } = compose({ triggers: [slackTriggerRow()] }, { crypto: keyless });

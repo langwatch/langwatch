@@ -1,4 +1,4 @@
-import { sendAddressConfirmationEmail, type EmailDelivery } from "@langwatch/mail";
+import { sendAddressConfirmationEmail, type MailSender } from "@langwatch/mail";
 
 import {
   type AddressConfirmation,
@@ -7,15 +7,12 @@ import {
 
 /** Main's address confirmation over the process's mail member; mail off skips it with one line. */
 export class SesAddressConfirmationMailChannel extends AddressConfirmationMailChannel {
-  static create(input: {
-    mailer: EmailDelivery;
-    baseUrl: string;
-  }): SesAddressConfirmationMailChannel {
+  static create(input: { mailer: MailSender; baseUrl: string }): SesAddressConfirmationMailChannel {
     return new SesAddressConfirmationMailChannel(input.mailer, input.baseUrl);
   }
 
   private constructor(
-    private readonly mailer: EmailDelivery,
+    private readonly mailer: MailSender,
     private readonly baseUrl: string,
   ) {
     super();

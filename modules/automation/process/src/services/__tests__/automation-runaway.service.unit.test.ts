@@ -1,5 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import { EmailDelivery } from "@langwatch/mail";
+import type { MailSender } from "@langwatch/mail";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,10 +7,7 @@ import { MemoryAutomationContainmentClaimRepository } from "../../repositories/m
 import { AutomationRunawayMetricsNullService } from "../automation-runaway-metrics-null.service.ts";
 import { AutomationRunawayService } from "../automation-runaway.service.ts";
 
-class NoopMailer extends EmailDelivery {
-  defaultFrom(): string {
-    return "LangWatch <contact@langwatch.ai>";
-  }
+class NoopMailer implements MailSender {
   send(): Promise<unknown> {
     return Promise.resolve(undefined);
   }

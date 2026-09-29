@@ -85,7 +85,6 @@ type StoreSuppliedNames =
   | "logging"
   | "metrics"
   | "eventing"
-  | "mail"
   | "rateLimiter"
   | "cache"
   | "idempotency";
@@ -335,10 +334,6 @@ export class ProcessSupply<
 
   withEventing<Value extends MemberValueFrom<RequiredMemberSet, "eventing">>(eventing: Value) {
     return this.#withMembers({ eventing });
-  }
-
-  withMail<Value extends MemberValueFrom<RequiredMemberSet, "mail">>(mail: Value) {
-    return this.#withMembers({ mail });
   }
 
   /**

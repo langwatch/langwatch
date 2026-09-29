@@ -68,8 +68,8 @@ export const emailAttachmentSchema = z
 
 /**
  * One transactional message, already rendered. Notification writes the envelope: `to` is the
- * visible recipient, `undisclosedRecipients` are delivered without appearing in any header,
- * and `unsubscribe` becomes the RFC 8058 one-click pair.
+ * visible recipient, `undisclosedRecipients` go out unseen, `unsubscribe` becomes the RFC 8058
+ * one-click pair, and `replyless` hides every recipient behind `no-reply+<tag>@<sender domain>`.
  */
 export const sendEmailCommandSchema = z
   .object({
@@ -79,6 +79,10 @@ export const sendEmailCommandSchema = z
     from: z.string().optional(),
     undisclosedRecipients: z.array(z.string().min(1)).optional(),
     unsubscribe: z.object({ url: z.string().url() }).strict().optional(),
+    replyless: z
+      .object({ tag: z.string().regex(/^[a-z0-9]+$/i) })
+      .strict()
+      .optional(),
     attachments: z.array(emailAttachmentSchema).optional(),
   })
   .strict();

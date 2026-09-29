@@ -8,7 +8,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
@@ -24,7 +24,6 @@ const bootIdentity = () =>
   createApp({ role: "api", secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(identityServer)])
     .withMembers({
-      mail: createApiFixture<EmailDelivery>(),
       adminEmails: [],
       publicBaseUrl: undefined,
       isSaas: false,
@@ -43,6 +42,7 @@ const bootIdentity = () =>
       "audit-log": createApiFixture<AuditLogApi>(),
       licensing: createApiFixture<LicensingApi>(),
       scim: createApiFixture<ScimApi>(),
+      notification: createApiFixture<NotificationService>(),
     })
     .boot();
 

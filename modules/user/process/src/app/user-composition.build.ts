@@ -9,7 +9,7 @@ import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contrac
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { sendBudgetIncreaseRequestEmail, type EmailDelivery } from "@langwatch/mail";
+import { sendBudgetIncreaseRequestEmail, type MailSender } from "@langwatch/mail";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
@@ -39,7 +39,7 @@ export function buildUserInfrastructure(input: {
   auth: Pick<AuthApi, "revokeCliTokens">;
   projects: Pick<ProjectApi, "findInternal">;
   governance: Pick<GovernanceRestApi, "personalUsage">;
-  mail: EmailDelivery;
+  mail: MailSender;
   publicBaseUrl: string | undefined;
   storedObjects: Pick<StoredObjectApi, "storeFromBytes" | "readById">;
 }): UserInfrastructure {
@@ -143,7 +143,7 @@ export function avatarObjectStore(
  * to link, so it refuses by name.
  */
 export function budgetRequestMailer(input: {
-  mail: EmailDelivery;
+  mail: MailSender;
   publicBaseUrl: string | undefined;
 }): UserBudgetRequestMailer {
   const { mail, publicBaseUrl } = input;

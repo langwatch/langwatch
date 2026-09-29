@@ -31,7 +31,7 @@ export class MailDeliveryService {
   }
 
   async sendEmail(command: SendEmailCommand): Promise<void> {
-    await this.delivery.send(envelopeOf(command));
+    await this.delivery.send(envelopeOf(command, this.delivery.defaultFrom()));
   }
 
   async getView(): Promise<MailDeliveryView> {
@@ -72,12 +72,17 @@ function readProviderChoice(settings: MailGatewaySettings): {
   }
 }
 
-/** The message as a gateway sends it; the one-click pair is RFC 8058's, as main wrote it. */
-function envelopeOf(command: SendEmailCommand): EmailContent {
-  const { undisclosedRecipients, unsubscribe, ...message } = command;
+/** The message as a gateway sends it; the no-reply To and the one-click pair are main's bytes. */
+function envelopeOf(command: SendEmailCommand, defaultFrom: string): EmailContent {
+  const { undisclosedRecipients, unsubscribe, replyless, ...message } = command;
+  const hidden = [
+    ...(replyless === undefined ? [] : [message.to].flat()),
+    ...(undisclosedRecipients ?? []),
+  ];
   return {
     ...message,
-    ...(undisclosedRecipients === undefined ? {} : { bcc: undisclosedRecipients }),
+    ...(replyless === undefined ? {} : { to: noReplyAddress(replyless.tag, defaultFrom) }),
+    ...(hidden.length === 0 ? {} : { bcc: hidden }),
     ...(unsubscribe === undefined
       ? {}
       : {
@@ -87,4 +92,10 @@ function envelopeOf(command: SendEmailCommand): EmailContent {
           },
         }),
   };
+}
+
+/** A bare sender address has no domain to read, so `langwatch.ai` stands in, as on main. */
+function noReplyAddress(tag: string, defaultFrom: string): string {
+  const domain = defaultFrom.match(/<[^@]+@([^>]+)>/)?.[1]?.trim() || "langwatch.ai";
+  return `LangWatch Triggers <no-reply+${tag}@${domain}>`;
 }

@@ -254,7 +254,8 @@ the S3 staging of large payloads and their config — and topic and workflow rea
 `EvaluationApi` (Alex, 2026-09-25).
 Notification owns mail outright: its config, its provider and its sending. There is no mail member;
 auth, identity, user, automation and billing send through `NotificationApi.sendEmail`, which takes
-intent (`undisclosedRecipients`, `unsubscribe: { url }`), never raw headers (Alex, 2026-09-29).
+intent (`undisclosedRecipients`, `unsubscribe: { url }`, `replyless: { tag }`, which notification
+writes as `no-reply+<tag>@<its sender domain>` with the recipients in bcc), never raw headers (Alex, 2026-09-29).
 Presence is a generic project-event fan-out: `PresenceApi.publishProjectEvent` and
 `subscribeProjectEvents` carry any channel, and each publisher owns its channel's name and schema; the
 contract carries no `EventEmitter`. Scenario and trace publish through it and keep no Redis broadcast of
@@ -885,7 +886,7 @@ both want is not evidence that the fact should be process-wide — it is usually
 evidence that one of them owns it and the other should be asking.
 
 Note the two member vocabularies, which are not interchangeable: `reads(...)`
-from `@langwatch/process-stores/members` is a **closed** list of the sixteen
+from `@langwatch/process-stores/members` is a **closed** list of the fifteen
 store members, so `reads("publicBaseUrl")` is a compile error on purpose. A
 module reading anything else declares the raw literal
 `static readonly reads = ["prisma", "publicBaseUrl"] as const` and restates
@@ -896,7 +897,7 @@ contracts, never on the stores package's types. `modules/platform-health` and
 **A credential's owner builds what others need from it** (ruled 2026-09-24,
 ADR-132 applied). The stores own `CLICKHOUSE_URL` and `DATABASE_URL`, and a
 second `Secret.load` of either is refused. So the stores answer two members
-more, sixteen in all, built inside the closure that resolves the URL:
+more, fifteen in all, built inside the closure that resolves the URL:
 `clickhouseAdmin` (the credential-free server origin and database, plus an
 untenanted statement client for DDL) and `databaseTarget` (the credential-free
 Postgres endpoint). Each answers `{ configured: false }` rather than refusing.

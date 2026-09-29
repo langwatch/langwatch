@@ -1,5 +1,5 @@
 import { ReactEmailMailRenderer } from "@langwatch/mail";
-import { recordingMail } from "@langwatch/test-harness";
+import type { SendEmailCommand } from "@langwatch/notification-contract";
 import { describe, expect, it } from "vitest";
 
 import type { WebhookDeliveryTransport } from "../../channels/http/http.webhook-delivery.channel.ts";
@@ -13,7 +13,8 @@ import { AutomationNotificationDeliveryService } from "../automation-notificatio
 const SIGNING_KEY = "0f".repeat(32);
 const BASE_HOST = "https://app.langwatch.test";
 
-const APPLICATION_NO_REPLY = "LangWatch Triggers <no-reply+81d9d46cce00@langwatch.ai>";
+/** Notification turns it into `LangWatch Triggers <no-reply+81d9d46cce00@langwatch.ai>`. */
+const APPLICATION_NO_REPLY_TAG = "81d9d46cce00";
 const APPLICATION_TRIGGER_TOKEN =
   "eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEiLCJ0cmlnZ2VySWQiOiJ0cmlnZ2VyLTEiLCJlbWFpbCI6ImFkYUBleGFtcGxlLmNvbSJ9.aba1dbbe8d7ba211a0d91c962a5993e4d61fcc0b56c55c06c37e24cbbd5af6b1";
 const APPLICATION_PROJECT_TOKEN =
@@ -39,7 +40,8 @@ class RecordingLogger {
 function composeDelivery(
   over: { logger?: RecordingLogger; webhookTransport?: WebhookDeliveryTransport } = {},
 ) {
-  const mailer = recordingMail();
+  const sent: SendEmailCommand[] = [];
+  const mailer = { sent, sendEmail: async (command: SendEmailCommand) => void sent.push(command) };
   const logger = over.logger ?? new RecordingLogger();
   const adapter = AutomationNotificationDeliveryService.create({
     mailer,
@@ -79,8 +81,10 @@ describe("AutomationNotificationDeliveryService", () => {
       await adapter.sendEmail(alert());
 
       expect(mailer.sent).toHaveLength(1);
-      expect(mailer.sent[0]?.to).toBe(APPLICATION_NO_REPLY);
-      expect(mailer.sent[0]?.bcc).toEqual(["ada@example.com"]);
+      expect(mailer.sent[0]).toMatchObject({
+        to: "ada@example.com",
+        replyless: { tag: APPLICATION_NO_REPLY_TAG },
+      });
     });
 
     /** @scenario "The footer and its one-click headers are the application's" */
@@ -90,9 +94,8 @@ describe("AutomationNotificationDeliveryService", () => {
       await adapter.sendEmail(alert());
 
       expect(mailer.sent[0]?.html).toBe(APPLICATION_HTML);
-      expect(mailer.sent[0]?.headers).toEqual({
-        "List-Unsubscribe": `<${BASE_HOST}/api/unsubscribe?token=${APPLICATION_TRIGGER_TOKEN}>`,
-        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      expect(mailer.sent[0]?.unsubscribe).toEqual({
+        url: `${BASE_HOST}/api/unsubscribe?token=${APPLICATION_TRIGGER_TOKEN}`,
       });
     });
 
@@ -112,7 +115,7 @@ describe("AutomationNotificationDeliveryService", () => {
 
       await adapter.sendEmail(alert({ recipients: ["not-an-email", "ada@example.com"] }));
 
-      expect(mailer.sent.map((message) => message.bcc)).toEqual([["ada@example.com"]]);
+      expect(mailer.sent.map((message) => message.to)).toEqual(["ada@example.com"]);
       expect(JSON.stringify(logger.warnings)).not.toContain("not-an-email");
     });
   });
@@ -134,7 +137,7 @@ describe("AutomationNotificationDeliveryService", () => {
         }),
       );
 
-      expect(mailer.sent.map((message) => message.bcc)).toEqual([["grace@example.com"]]);
+      expect(mailer.sent.map((message) => message.to)).toEqual(["grace@example.com"]);
       expect(claimed).toHaveLength(1);
       expect(claimed[0]).toMatch(/^[0-9a-f]{16}$/);
       expect(claimed[0]).not.toContain("grace");
@@ -193,8 +196,8 @@ describe("AutomationNotificationDeliveryService", () => {
       expect(mailer.sent).toHaveLength(1);
       const sent = mailer.sent[0]!;
       expect(sent.subject).toBe("Trigger - Error rate");
-      expect(sent.to).toBe(APPLICATION_NO_REPLY);
-      expect(sent.bcc).toEqual(["ada@example.com"]);
+      expect(sent.to).toBe("ada@example.com");
+      expect(sent.replyless).toEqual({ tag: APPLICATION_NO_REPLY_TAG });
       // The link a reader clicks, and the message its author wrote.
       expect(sent.html).toContain(`${BASE_HOST}/acme/traces/trace-1`);
       expect(sent.html).toContain("over budget");
@@ -202,7 +205,7 @@ describe("AutomationNotificationDeliveryService", () => {
       // author cannot strip it, and both unsubscribe scopes are offered.
       expect(sent.html).toContain("Stop receiving this notification</a>");
       expect(sent.html).toContain("Stop all notifications from this project</a>");
-      expect(sent.headers?.["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+      expect(sent.unsubscribe?.url).toContain(`${BASE_HOST}/api/unsubscribe?token=`);
     });
 
     /** @scenario "The default digest row carries when it happened and what matched" */

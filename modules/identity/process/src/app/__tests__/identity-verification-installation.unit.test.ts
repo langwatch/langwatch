@@ -7,7 +7,7 @@ import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
@@ -24,7 +24,6 @@ describe("identity verification installation", () => {
     })
       .withModules([withMemoryRepositories(identityServer)])
       .withMembers({
-        mail: createApiFixture<EmailDelivery>(),
         adminEmails: [],
         publicBaseUrl: undefined,
         isSaas: false,
@@ -43,6 +42,7 @@ describe("identity verification installation", () => {
         "audit-log": createApiFixture<AuditLogApi>(),
         licensing: createApiFixture<LicensingApi>(),
         scim: createApiFixture<ScimApi>(),
+        notification: createApiFixture<NotificationService>(),
       })
       .boot();
 

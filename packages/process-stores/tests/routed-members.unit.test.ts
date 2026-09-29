@@ -1,14 +1,10 @@
 /**
- * The two members that route themselves, and the gateway the process names. Every test here stops
- * before a socket: routing and refusal are decided from the directory read and the config alone,
- * which is the point of both.
+ * The two members that route themselves. Every test here stops before a socket: routing and
+ * refusal are decided from the directory read and the config alone, which is the point of both.
  */
-import { EmailDelivery, type EmailContent } from "@langwatch/mail/gateway";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { MailConfig } from "../src/config.ts";
-import { buildMail, mailOver } from "../src/mail-member.ts";
 import { UnknownStorageProjectError } from "../src/object-storage-backend.ts";
 import { buildObjectStorage } from "../src/object-storage-member.ts";
 import { cachedTenantDirectory } from "../src/tenant-directory.ts";
@@ -146,106 +142,6 @@ describe("given object storage with an organization on its own account", () => {
           directory: { organizationForTenant: () => Promise.resolve(null) },
         }),
       ).toThrow("without a bucket name");
-    });
-  });
-});
-
-describe("given the mail gateway this deployment named", () => {
-  describe("when a provider states its own leaves", () => {
-    it.each([
-      [
-        "smtp",
-        {
-          provider: "smtp",
-          defaultFrom: "a@b.test",
-          host: "mail.test",
-          port: 587,
-          user: "u",
-          password: "p",
-        },
-      ],
-      ["ses", { provider: "ses", defaultFrom: "a@b.test", region: "eu-west-1" }],
-      ["resend", { provider: "resend", defaultFrom: "a@b.test", apiKey: "key" }],
-    ] as const)("builds a %s gateway that sends from the declared address", (_name, config) => {
-      const mail = buildMail(config);
-
-      expect(mail.value).toHaveProperty("send", expect.any(Function));
-      expect(mail.close).toBeTypeOf("function");
-    });
-
-    /** @scenario "A configured gateway answers its sending address as the default from" */
-    it("answers the declared address as its default from", () => {
-      const mail = buildMail({
-        provider: "resend",
-        defaultFrom: "LangWatch <a@b.test>",
-        apiKey: "k",
-      });
-
-      expect(mail.value.defaultFrom()).toBe("LangWatch <a@b.test>");
-    });
-
-    it("refuses a gateway with no sending address", () => {
-      expect(() => buildMail({ provider: "resend", defaultFrom: "   ", apiKey: "key" })).toThrow(
-        "without a sending address",
-      );
-    });
-  });
-
-  describe("when a provider is missing one of its own leaves", () => {
-    /** @scenario "A mail provider missing one of its own leaves is refused at parse" */
-    it("does not compile, so no deployment reaches the first send to find out", () => {
-      // @ts-expect-error - ses states a region, and this one does not.
-      const missingRegion: MailConfig = { provider: "ses", defaultFrom: "a@b.test" };
-      const wrongLeaf: MailConfig = {
-        provider: "smtp",
-        defaultFrom: "a@b.test",
-        host: "mail.test",
-        port: 587,
-        user: "u",
-        password: "p",
-        // @ts-expect-error - resend's key is not readable on the smtp gateway.
-        apiKey: "key",
-      };
-
-      expect([missingRegion, wrongLeaf]).toHaveLength(2);
-    });
-  });
-});
-
-describe("given the mail member over one delivery", () => {
-  describe("when a module sends to hidden recipients with extra headers", () => {
-    /** @scenario "A send carries its BCC recipients and headers to the gateway" */
-    it("hands the gateway the BCC list and the headers as sent", async () => {
-      const handed: EmailContent[] = [];
-      const mail = mailOver(
-        new (class extends EmailDelivery {
-          defaultFrom() {
-            return "LangWatch <a@b.test>";
-          }
-          send(content: EmailContent) {
-            handed.push(content);
-            return Promise.resolve();
-          }
-        })(),
-      );
-
-      await mail.send({
-        to: "no-reply@b.test",
-        subject: "Alert",
-        html: "<p>alert</p>",
-        bcc: ["ada@example.com", "grace@example.com"],
-        headers: { "List-Unsubscribe": "<https://b.test/unsubscribe>" },
-      });
-
-      expect(handed).toEqual([
-        {
-          to: "no-reply@b.test",
-          subject: "Alert",
-          html: "<p>alert</p>",
-          bcc: ["ada@example.com", "grace@example.com"],
-          headers: { "List-Unsubscribe": "<https://b.test/unsubscribe>" },
-        },
-      ]);
     });
   });
 });

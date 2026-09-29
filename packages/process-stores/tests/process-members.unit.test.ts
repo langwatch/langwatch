@@ -1,6 +1,4 @@
-import { createLogger } from "@langwatch/observability";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createTestLogger } from "@langwatch/test-harness";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant, Temporal } from "@langwatch/time";
 /**
@@ -23,14 +21,13 @@ import {
 } from "../src/create-members.ts";
 import { MEMBER_NAMES, reads, type ProcessConfig } from "../src/index.ts";
 
-/** A process that named no datastore at all, and says so about its mail. */
+/** A process that named no datastore at all. */
 function config(overrides: Partial<ProcessConfig> = {}): ProcessConfig {
   return {
     processName: "test",
     encryptionKey: Buffer.alloc(32, 7).toString("hex"),
     secrets: {},
     rateLimit: { requests: 10, seconds: 60 },
-    mail: { provider: "off" },
     ...overrides,
   };
 }
@@ -95,40 +92,6 @@ describe("given a process that named no store", () => {
       const members = createProcessMembers({ config: config() });
 
       expect(() => members.read("objectStorage")).toThrow(MemberNotConfiguredError);
-    });
-  });
-});
-
-describe("given a process started with mail off", () => {
-  describe("when a module reads mail and sends", () => {
-    /** @scenario "Mail off boots and skips each send with one log line" */
-    it("builds the member and skips the send with one line naming it", async () => {
-      const { logger, lines } = createTestLogger();
-      const members = createProcessMembers({ config: config(), members: { logger } });
-
-      await members.read("mail").send({
-        to: "ada@example.com",
-        subject: "Trigger - Errors above threshold",
-        html: "<p>hi</p>",
-      });
-
-      const warnings = lines.filter((line) => line.level === 40);
-      expect(warnings).toHaveLength(1);
-      expect(
-        lines.findLine("warn", '"Trigger - Errors above threshold" was not sent'),
-      ).toMatchObject({
-        subject: "Trigger - Errors above threshold",
-      });
-    });
-
-    /** @scenario "Mail off still names the sender main answered" */
-    it("answers main's platform sender as its default from", () => {
-      const members = createProcessMembers({
-        config: config(),
-        members: { logger: createLogger("process-members-test") },
-      });
-
-      expect(members.read("mail").defaultFrom()).toBe("LangWatch <contact@langwatch.ai>");
     });
   });
 });
@@ -216,7 +179,7 @@ describe("given the closed member list", () => {
 
     it("names no audit member: the sink is the audit-log module's app", () => {
       expect([...MEMBER_NAMES]).not.toContain("audit");
-      expect(MEMBER_NAMES).toHaveLength(16);
+      expect(MEMBER_NAMES).toHaveLength(15);
     });
 
     it("reads a module's declaration back as the tuple it wrote", () => {

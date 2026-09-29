@@ -60,6 +60,7 @@ import {
   type Monitor,
   type MonitorApi as MonitorApiContract,
 } from "@langwatch/monitor-contract";
+import { NotificationService } from "@langwatch/notification-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
@@ -107,7 +108,6 @@ import {
   createAutomationSettlement,
   DatasetTraceMapper,
   LoggedSettlementBreach,
-  MailMemberDelivery,
   PeerPersistActionWriter,
   type AutomationComposedInfrastructure,
   type AutomationProcessMembers,
@@ -251,10 +251,17 @@ type AutomationDependencies = Readonly<{
   annotations: typeof AnnotationApi;
   /** Who a runaway automation's limit notice reaches: its organization's administrators. */
   authorization: typeof AuthzApi;
+  /** Where every mail automation sends goes out; notification writes the envelope. */
+  notifications: typeof NotificationService;
 }>;
 
-/** Peers only settlement reads, which `create` composes and `fromInfrastructure` never sees. */
-type AutomationSettlementPeer = "evaluations" | "datasets" | "annotations" | "authorization";
+/** Peers only `create` composes (settlement's and mail's); `fromInfrastructure` never sees them. */
+type AutomationSettlementPeer =
+  | "evaluations"
+  | "datasets"
+  | "annotations"
+  | "authorization"
+  | "notifications";
 
 /** {@link AutomationDependencies}, resolved to the peer Apps `fromInfrastructure` itself reads. */
 type AutomationRuntimeDependencies = Omit<
@@ -298,11 +305,13 @@ export class AutomationApp implements AutomationApi {
     datasets: DatasetApi,
     annotations: AnnotationApi,
     authorization: AuthzApi,
+    /** Where every mail automation sends goes out; notification owns the gateway. */
+    notifications: NotificationService,
   };
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
   static readonly secrets = { unsubscribe: sessionSecret } as const;
-  static readonly reads = ["logger", "encryption", "mail", "publicBaseUrl", "isSaas"] as const;
+  static readonly reads = ["logger", "encryption", "publicBaseUrl", "isSaas"] as const;
 
   /**
    * Builds this process's own {@link AutomationInfrastructure} from the
@@ -313,6 +322,7 @@ export class AutomationApp implements AutomationApi {
     return setup.secrets.into(AutomationApp.secrets.unsubscribe, (unsubscribeSigningSecret) => {
       const infrastructure = buildAutomationInfrastructure({
         members: setup.members,
+        notifications: setup.dependencies.notifications,
         auditLog: setup.dependencies.auditLog,
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
         unsubscribeSigningSecret,
@@ -395,7 +405,7 @@ export class AutomationApp implements AutomationApi {
             authorization: dependencies.authorization,
           },
           suppression,
-          mailer: new MailMemberDelivery(members.mail),
+          mailer: { send: (content) => dependencies.notifications.sendEmail(content) },
           traces: dependencies.traces,
           metrics: AutomationRunawayMetricsOtelService.create(),
           baseHost: members.publicBaseUrl ?? "",

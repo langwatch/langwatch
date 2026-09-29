@@ -8,7 +8,7 @@ import type {
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type {
   OrganizationApi,
   OrganizationSettings,
@@ -63,7 +63,6 @@ function process(
     .withMembers({
       passkeysEnabled: false,
       publicBaseUrl: undefined,
-      mail: createApiFixture<EmailDelivery>(),
     })
     .withRelational(fakeUserPrisma())
     .withKeyvalue(fakeUserRedis())
@@ -73,6 +72,7 @@ function process(
       "enterprise-gateway": peers.enterpriseGateway ?? createApiFixture<EnterpriseGatewayApi>(),
       gateway: peers.gateway ?? createApiFixture<GatewayApi>(),
       governance: createApiFixture<GovernanceRestApi>(),
+      notification: createApiFixture<NotificationService>(),
       organization: peers.organization ?? createUserTestOrganizations(),
       ops: createUserTestOps(),
       project: createApiFixture<ProjectApi>(),

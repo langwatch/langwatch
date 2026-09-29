@@ -9,14 +9,13 @@ import { describe, expect, it } from "vitest";
 import { createProcessMembers, MemberSuppliedUndefinedError } from "../src/create-members.ts";
 import type { ProcessConfig } from "../src/index.ts";
 
-/** A process that named no datastore at all, and says so about its mail. */
+/** A process that named no datastore at all. */
 function config(): ProcessConfig {
   return {
     processName: "test",
     encryptionKey: Buffer.alloc(32, 7).toString("hex"),
     secrets: {},
     rateLimit: { requests: 10, seconds: 60 },
-    mail: { provider: "off" },
   };
 }
 

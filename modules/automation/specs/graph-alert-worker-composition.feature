@@ -74,10 +74,10 @@ Feature: Composing the graph-alert vertical outside the application
     And the sweep reports failure so the queue redelivers it
 
   @unit
-  Scenario: With a public origin, a graph alert's email leaves through the process mail member
+  Scenario: With a public origin, a graph alert's email leaves through notification
     Given a process that names its public origin
     When a crossed graph alert is dispatched to one email recipient
-    Then one message leaves through the mail member, addressed to that recipient
+    Then one message leaves through notification, addressed to that recipient
 
   @unit
   Scenario: Without a public origin, graph alerts refuse by name

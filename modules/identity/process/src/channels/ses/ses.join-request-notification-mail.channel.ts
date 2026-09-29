@@ -5,7 +5,7 @@ import {
   sendJoinRequestExpiredEmail,
   sendJoinRequestReminderEmail,
   sendJoinRequestRejectedEmail,
-  type EmailDelivery,
+  type MailSender,
 } from "@langwatch/mail";
 
 import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
@@ -18,14 +18,14 @@ type Input<Name extends keyof JoinRequestNotificationMail> = Parameters<
 /** Main's join-request mails over the process's mail member; mail off skips each with one line. */
 export class SesJoinRequestNotificationMailChannel extends JoinRequestNotificationMailChannel {
   static create(input: {
-    mailer: EmailDelivery;
+    mailer: MailSender;
     baseUrl: string;
   }): SesJoinRequestNotificationMailChannel {
     return new SesJoinRequestNotificationMailChannel(input.mailer, input.baseUrl);
   }
 
   private constructor(
-    private readonly mailer: EmailDelivery,
+    private readonly mailer: MailSender,
     private readonly baseUrl: string,
   ) {
     super();

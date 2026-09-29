@@ -107,7 +107,6 @@ function processConfigOf(options: {
     encryptionKey: encryption ?? "",
     secrets: {},
     rateLimit: config.rateLimit,
-    mail: { provider: "off" },
     ...(urls.database ? { database: { url: urls.database } } : {}),
     ...clickhouse,
     ...(urls.redis ? { redis: { url: urls.redis } } : {}),

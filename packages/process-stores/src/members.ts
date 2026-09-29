@@ -1,5 +1,5 @@
 /**
- * The sixteen members a process hands its modules. Closed on purpose — an
+ * The fifteen members a process hands its modules. Closed on purpose — an
  * open list is the optional collaborator production forgets to supply.
  * `audit` is not on it, since that peer is resolved via `withAudit`.
  */
@@ -95,25 +95,6 @@ export interface ObjectStorage {
   probe(projectId: string): Promise<void>;
 }
 
-/** One message, already rendered, as the mail member sends it. */
-export interface MailMessage {
-  readonly to: string;
-  readonly subject: string;
-  readonly html: string;
-  readonly from?: string;
-  /** Delivered without appearing in the headers, so recipients cannot see each other. */
-  readonly bcc?: readonly string[];
-  /** Extra MIME headers, such as `List-Unsubscribe`. */
-  readonly headers?: Readonly<Record<string, string>>;
-}
-
-/** Transactional mail. Rendering belongs to @langwatch/mail, sending here. */
-export interface Mail {
-  send(message: MailMessage): Promise<void>;
-  /** The address a send without its own `from` goes out from. */
-  defaultFrom(): string;
-}
-
 /**
  * Response cache. The same shape the REST runtime in packages/api declares, so
  * it reads this member directly.
@@ -203,7 +184,6 @@ export interface ProcessMembers {
   readonly redis: RedisConnection;
   readonly eventing: EventSourcing;
   readonly objectStorage: ObjectStorage;
-  readonly mail: Mail;
   readonly clock: Clock;
   readonly encryption: Encryption;
   readonly secrets: SecretResolver;
@@ -238,7 +218,6 @@ export const MEMBER_NAMES = [
   "idempotency",
   "rateLimiter",
   "eventing",
-  "mail",
 ] as const satisfies readonly MemberName[];
 
 /**

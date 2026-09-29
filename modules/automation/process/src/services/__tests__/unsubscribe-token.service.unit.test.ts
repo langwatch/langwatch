@@ -101,30 +101,11 @@ describe("UnsubscribeTokenService", () => {
 describe("TriggerNoReplyService", () => {
   describe("given the signing key both processes share", () => {
     /** @scenario "The no-reply address is stable per automation" */
-    it("builds the address the application builds", () => {
+    it("tags the address with the hash the application tags it with", () => {
       const addresses = TriggerNoReplyService.create({ secret: SHARED_KEY });
-      const built = addresses.addressFor({
-        defaultFrom: "LangWatch <contact@langwatch.ai>",
-        triggerId: "trigger-1",
-      });
 
-      expect(built).toBe("LangWatch Triggers <no-reply+81d9d46cce00@langwatch.ai>");
-      expect(
-        addresses.addressFor({
-          defaultFrom: "LangWatch <contact@langwatch.ai>",
-          triggerId: "trigger-1",
-        }),
-      ).toBe(built);
-      expect(
-        addresses.addressFor({
-          defaultFrom: "Acme <alerts@mail.acme.test>",
-          triggerId: "trigger-1",
-        }),
-      ).toBe("LangWatch Triggers <no-reply+81d9d46cce00@mail.acme.test>");
-      // A deployment that wrote a bare address named no domain to read.
-      expect(
-        addresses.addressFor({ defaultFrom: "contact@acme.test", triggerId: "trigger-1" }),
-      ).toBe("LangWatch Triggers <no-reply+81d9d46cce00@langwatch.ai>");
+      expect(addresses.tagFor("trigger-1")).toBe("81d9d46cce00");
+      expect(addresses.tagFor("trigger-1")).toBe(addresses.tagFor("trigger-1"));
     });
   });
 
@@ -134,11 +115,8 @@ describe("TriggerNoReplyService", () => {
       const warnings = new RecordingWarnings();
 
       expect(
-        TriggerNoReplyService.create({ secret: undefined, warnings }).addressFor({
-          defaultFrom: "LangWatch <contact@langwatch.ai>",
-          triggerId: "trigger-1",
-        }),
-      ).toBe("LangWatch Triggers <no-reply+b3c9a7064c50@langwatch.ai>");
+        TriggerNoReplyService.create({ secret: undefined, warnings }).tagFor("trigger-1"),
+      ).toBe("b3c9a7064c50");
       expect(warnings.messages).toEqual([
         "NEXTAUTH_SECRET is not set; no-reply trigger tags are forgeable and not unguessable. Set NEXTAUTH_SECRET to secure trigger email addresses.",
       ]);

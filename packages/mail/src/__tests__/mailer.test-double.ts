@@ -1,10 +1,6 @@
-import { EmailDelivery, type EmailContent } from "../providers/types.ts";
+import type { EmailContent, MailSender } from "../email-sender.ts";
 
-export class TestMailer extends EmailDelivery {
-  defaultFrom(): string {
-    return "LangWatch <contact@langwatch.ai>";
-  }
-
+export class TestMailer implements MailSender {
   async send(_content: EmailContent): Promise<unknown> {
     return undefined;
   }

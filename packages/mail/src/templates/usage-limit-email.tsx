@@ -2,7 +2,7 @@ import { Section, Text } from "@react-email/components";
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { MailSender } from "../providers/types.ts";
+import type { MailSender } from "../email-sender.ts";
 import {
   ActionRow,
   EmailLayout,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TestMailer } from "../../__tests__/mailer.test-double.ts";
-import type { EmailContent } from "../../providers/types.ts";
+import type { EmailContent } from "../../email-sender.ts";
 import { sendOrganizationMfaRequirementEmail } from "../organization-mfa-requirement-email.tsx";
 
 class RecordingMailer extends TestMailer {

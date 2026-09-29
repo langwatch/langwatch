@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import { EMAIL_RX, type AlertType, type SlackPayload } from "@langwatch/automation-contract";
 import { toDispatchError } from "@langwatch/eventing";
 import type { MailRender, TriggerDigestEntry } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { Mail } from "@langwatch/process-stores/members";
 import { Temporal } from "@langwatch/time";
 import type { TraceRecord } from "@langwatch/trace-contract";
 
@@ -66,7 +66,8 @@ function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
  */
 export class AutomationNotificationDeliveryService extends AutomationNotificationDelivery {
   static create(options: {
-    mailer: Mail;
+    /** Notification writes the envelope: the no-reply To, the BCC and the one-click pair. */
+    mailer: Pick<NotificationService, "sendEmail">;
     /**
      * Renders the default digest. `@langwatch/mail` holds the words; this
      * adapter holds the envelope they leave in.
@@ -110,7 +111,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     });
   }
 
-  private readonly mailer: Mail;
+  private readonly mailer: Pick<NotificationService, "sendEmail">;
 
   private readonly renderer: MailRender;
 
@@ -139,7 +140,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     webhooks,
     logger,
   }: {
-    mailer: Mail;
+    mailer: Pick<NotificationService, "sendEmail">;
     renderer: MailRender;
     baseHost: string;
     unsubscribeTokens: UnsubscribeTokenService;
@@ -314,10 +315,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
     // free-form values in several places, and a newline in one becomes an
     // injected SMTP header no matter which builder produced it.
     const subject = input.subject.replace(/[\r\n\0]+/g, " ");
-    const to = this.noReply.addressFor({
-      defaultFrom: this.mailer.defaultFrom(),
-      triggerId: input.triggerId,
-    });
+    const replyless = { tag: this.noReply.tagFor(input.triggerId) };
     const isSentinel = input.triggerId === TEST_FIRE_TRIGGER_ID_SENTINEL;
 
     for (const recipient of input.recipients) {
@@ -342,7 +340,7 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
         // A test to the author's own inbox needs no suppression context, and
         // the token requires a real automation id. Sentinel sends also stay
         // out of the dedup ledger entirely.
-        await this.mailer.send({ to, bcc: [recipient], subject, html: input.html });
+        await this.mailer.sendEmail({ to: recipient, replyless, subject, html: input.html });
         continue;
       }
 
@@ -351,12 +349,12 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
         triggerId: input.triggerId,
         email: recipient,
       });
-      await this.mailer.send({
-        to,
-        bcc: [recipient],
+      await this.mailer.sendEmail({
+        to: recipient,
+        replyless,
         subject,
         html: injectFooterIntoBody(input.html, unsubscribe.footerHtml),
-        headers: unsubscribe.headers,
+        unsubscribe: { url: unsubscribe.oneClickUrl },
       });
 
       // Recorded only AFTER the provider accepted it, so a retryable failure
@@ -367,12 +365,12 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
 
   /**
    * The footer appended OUTSIDE the customer's template (ADR-031), plus the
-   * RFC 8058 headers beside it. Two scopes: this automation, or the whole
+   * RFC 8058 one-click address beside it. Two scopes: this automation, or the whole
    * project — both links are per-recipient, HMAC-bound to one address.
    */
   private unsubscribeFooter(payload: { projectId: string; triggerId: string; email: string }): {
     footerHtml: string;
-    headers: Record<string, string>;
+    oneClickUrl: string;
   } {
     const triggerToken = this.unsubscribeTokens.sign(payload);
     const projectToken = this.unsubscribeTokens.sign({ ...payload, triggerId: null });
@@ -386,12 +384,8 @@ export class AutomationNotificationDeliveryService extends AutomationNotificatio
       &nbsp;·&nbsp;
       <a href="${page(projectToken)}" style="color:#8B96A5;text-decoration:underline;">Stop all notifications from this project</a>
     </div>`,
-      headers: {
-        // RFC 8058: the one-click POST goes to the API route, never the page a
-        // person reads.
-        "List-Unsubscribe": `<${this.baseHost}/api/unsubscribe?token=${encodeURIComponent(triggerToken)}>`,
-        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-      },
+      // RFC 8058: the one-click POST goes to the API route, never the page a person reads.
+      oneClickUrl: `${this.baseHost}/api/unsubscribe?token=${encodeURIComponent(triggerToken)}`,
     };
   }
 }

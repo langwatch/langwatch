@@ -1,6 +1,6 @@
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
-import { type EmailDelivery, sendAutomationLimitEmail } from "@langwatch/mail";
+import { type MailSender, sendAutomationLimitEmail } from "@langwatch/mail";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -54,7 +54,7 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
     claims: AutomationContainmentClaimRepository;
     directories: AutomationRunawayDirectories;
     suppression: AutomationRunawaySuppression;
-    mailer: EmailDelivery;
+    mailer: MailSender;
     traces: Pick<TraceApi, "countTracesInLastDay">;
     metrics: AutomationRunawayMetricsSink;
     baseHost: string;
@@ -73,7 +73,7 @@ export class AutomationRunawayService extends AutomationRunawayRepository {
       claims: AutomationContainmentClaimRepository;
       directories: AutomationRunawayDirectories;
       suppression: AutomationRunawaySuppression;
-      mailer: EmailDelivery;
+      mailer: MailSender;
       traces: Pick<TraceApi, "countTracesInLastDay">;
       metrics: AutomationRunawayMetricsSink;
       baseHost: string;

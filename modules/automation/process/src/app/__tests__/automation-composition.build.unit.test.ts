@@ -1,6 +1,7 @@
 import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
-import { frozenAt, recordingMail } from "@langwatch/test-harness";
+import type { SendEmailCommand } from "@langwatch/notification-contract";
+import { frozenAt } from "@langwatch/test-harness";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -17,7 +18,8 @@ const BASE_HOST = "https://app.langwatch.test";
 const SAVED_AT = toDate(Temporal.Instant.from("2026-06-01T00:00:00.000Z"));
 
 function composeNotifier(publicBaseUrl: string | undefined) {
-  const mail = recordingMail();
+  const sent: SendEmailCommand[] = [];
+  const mail = { sent, sendEmail: async (command: SendEmailCommand) => void sent.push(command) };
   const notifier = buildGraphAlertNotifier({
     members: { publicBaseUrl },
     repositories: MemoryAutomationRepositories.create(),
@@ -73,8 +75,8 @@ function crossedAlert(): GraphAlertDispatchInput {
 
 describe("buildGraphAlertNotifier", () => {
   describe("given a process that names its public origin", () => {
-    /** @scenario "With a public origin, a graph alert's email leaves through the process mail member" */
-    it("sends the alert through the mail member", async () => {
+    /** @scenario "With a public origin, a graph alert's email leaves through notification" */
+    it("sends the alert through notification", async () => {
       const { mail, notifier } = composeNotifier(BASE_HOST);
 
       await expect(notifier.dispatch(crossedAlert())).resolves.toMatchObject({

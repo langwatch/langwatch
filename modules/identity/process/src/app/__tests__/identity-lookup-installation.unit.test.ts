@@ -8,7 +8,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing } from "@langwatch/eventing";
 import type { IdentityLookupApi } from "@langwatch/identity-contract";
 import { createApp, type FeatureTrpcHost, withMemoryRepositories } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
@@ -41,7 +41,6 @@ async function bootIdentity() {
   })
     .withModules([withMemoryRepositories(identityServer)])
     .withMembers({
-      mail: createApiFixture<EmailDelivery>(),
       adminEmails: ["olive@langwatch.ai"],
       publicBaseUrl: undefined,
       isSaas: false,
@@ -63,6 +62,7 @@ async function bootIdentity() {
       }),
       licensing: createApiFixture<LicensingApi>(),
       scim: createApiFixture<ScimApi>(),
+      notification: createApiFixture<NotificationService>(),
     })
     .boot();
 }

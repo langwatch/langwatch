@@ -157,49 +157,6 @@ export type ObjectStorageConfig = (
 ) &
   Readonly<{ privateAccounts?: readonly ObjectStoragePrivateAccount[] }>;
 
-/** `HTTPS_PROXY` and friends, already parsed, for a gateway reached through one. */
-export interface OutboundProxyConfig {
-  readonly httpsProxy?: string;
-  readonly httpProxy?: string;
-  readonly noProxy?: string;
-}
-
-/** `MAIL_PROVIDER`. `off` is a statement, not an absence: it says this deployment sends nothing. */
-export type MailProvider = "smtp" | "ses" | "resend" | "off";
-
-/**
- * Which gateway this process sends through, with only that gateway's own
- * fields present. A bad shape is refused at parse by the boot seam, not at
- * the first send weeks later, and `off` builds a member that skips every send.
- */
-export type MailConfig =
-  | Readonly<{ readonly provider: "off" }>
-  | Readonly<{
-      readonly provider: "smtp";
-      readonly defaultFrom: string;
-      readonly host: string;
-      readonly port: number;
-      readonly user: string;
-      readonly password: string;
-      /** TLS on connect, rather than STARTTLS. Absent leaves the transport's default. */
-      readonly secure?: boolean;
-      readonly outboundProxy?: OutboundProxyConfig;
-    }>
-  | Readonly<{
-      readonly provider: "ses";
-      readonly defaultFrom: string;
-      readonly region: string;
-      /** A non-AWS endpoint, for a local stand-in. Absent uses SES itself. */
-      readonly endpoint?: string;
-      readonly outboundProxy?: OutboundProxyConfig;
-    }>
-  | Readonly<{
-      readonly provider: "resend";
-      readonly defaultFrom: string;
-      readonly apiKey: string;
-      readonly outboundProxy?: OutboundProxyConfig;
-    }>;
-
 /** What the members are built from: parsed config, and nothing read from the shell. */
 export interface ProcessConfig {
   /** Names the process in every log line and every metric these members write. */
@@ -220,10 +177,4 @@ export interface ProcessConfig {
   readonly redis?: RedisConfig;
   readonly eventing?: EventingConfig;
   readonly objectStorage?: ObjectStorageConfig;
-  /**
-   * Which mail gateway this deployment sends through. Required, because
-   * `MAIL_PROVIDER=off` is how a deployment says it sends nothing: an absent
-   * slice would make a lost variable read as that same statement.
-   */
-  readonly mail: MailConfig;
 }

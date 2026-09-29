@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { MailSender } from "../providers/types.ts";
+import type { MailSender } from "../email-sender.ts";
 import { DetailTable, EmailLayout, Muted, Paragraph, PrimaryButton } from "./email-layout.tsx";
 import { readableDate } from "./readable-date.ts";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";

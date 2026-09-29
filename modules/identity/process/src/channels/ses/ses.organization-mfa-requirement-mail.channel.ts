@@ -1,4 +1,4 @@
-import { sendOrganizationMfaRequirementEmail, type EmailDelivery } from "@langwatch/mail";
+import { sendOrganizationMfaRequirementEmail, type MailSender } from "@langwatch/mail";
 
 import {
   type OrganizationMfaRequirementMail,
@@ -7,11 +7,11 @@ import {
 
 /** Main's requirement mail over the process's mail member; mail off skips it with one line. */
 export class SesOrganizationMfaRequirementMailChannel extends OrganizationMfaRequirementMailChannel {
-  static create(input: { mailer: EmailDelivery }): SesOrganizationMfaRequirementMailChannel {
+  static create(input: { mailer: MailSender }): SesOrganizationMfaRequirementMailChannel {
     return new SesOrganizationMfaRequirementMailChannel(input.mailer);
   }
 
-  private constructor(private readonly mailer: EmailDelivery) {
+  private constructor(private readonly mailer: MailSender) {
     super();
   }
 

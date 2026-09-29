@@ -75,6 +75,51 @@ describe("MailDeliveryService", () => {
     });
   });
 
+  describe("when a module sends replyless", () => {
+    it("addresses main's no-reply at the sender's domain and blind-copies the recipient", async () => {
+      const delivery = new RecordingDelivery();
+
+      await serviceOver(settingsWith(), delivery).sendEmail({
+        to: "ada@example.com",
+        replyless: { tag: "81d9d46cce00" },
+        subject: "Errors above threshold",
+        html: "<p>hi</p>",
+      });
+
+      expect(delivery.sent).toEqual([
+        {
+          to: "LangWatch Triggers <no-reply+81d9d46cce00@langwatch.test>",
+          bcc: ["ada@example.com"],
+          subject: "Errors above threshold",
+          html: "<p>hi</p>",
+        },
+      ]);
+    });
+  });
+
+  describe("when a module sends replyless from a sender with another domain, or none", () => {
+    it("reads the domain off the sender, falling back to langwatch.ai for a bare address", async () => {
+      const sentFrom = async (defaultFrom: string) => {
+        const delivery = new RecordingDelivery();
+        delivery.defaultFrom = () => defaultFrom;
+        await serviceOver(settingsWith(), delivery).sendEmail({
+          to: "ada@example.com",
+          replyless: { tag: "81d9d46cce00" },
+          subject: "s",
+          html: "h",
+        });
+        return delivery.sent[0]?.to;
+      };
+
+      await expect(sentFrom("Acme <alerts@mail.acme.test>")).resolves.toBe(
+        "LangWatch Triggers <no-reply+81d9d46cce00@mail.acme.test>",
+      );
+      await expect(sentFrom("contact@acme.test")).resolves.toBe(
+        "LangWatch Triggers <no-reply+81d9d46cce00@langwatch.ai>",
+      );
+    });
+  });
+
   describe("when the public config asks it, with EMAIL_PROVIDER unset and only a SendGrid credential", () => {
     it("projects email on from the member's own answer", async () => {
       const member = serviceOver(settingsWith({ sendgrid: { apiKey: "SG.test" } }));

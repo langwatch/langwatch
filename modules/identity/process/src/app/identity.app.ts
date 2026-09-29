@@ -37,7 +37,8 @@ import {
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
+import type { MailSender } from "@langwatch/mail";
+import { NotificationService } from "@langwatch/notification-contract";
 /**
  * The identity feature's application: guards, ledger writer, backfill,
  * newborn sweep, join-request/SSO-connection/directory-sync guards — every
@@ -174,8 +175,6 @@ type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption",
   Readonly<{
     /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
     isSaas: boolean;
-    /** The process mail member; with mail off each send is skipped with one line. */
-    mail: EmailDelivery;
     adminEmails: readonly string[];
     /** Where this deployment answers, which is what a SAML identity provider
      *  is told LangWatch is called. A process fact, not one of the fourteen. */
@@ -411,11 +410,12 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     licensing: LicensingApi,
     /** Where a finished SSO migration's directory sync is moved; called only from the worker. */
     scim: ScimApi,
+    /** Where every mail identity sends goes out; notification owns the gateway. */
+    notifications: NotificationService,
   };
   static readonly reads = [
     ...reads("prisma", "eventing", "encryption", "rateLimiter"),
     "isSaas",
-    "mail",
     "adminEmails",
     "publicBaseUrl",
   ] as const;
@@ -423,6 +423,9 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
   static async create(setup: IdentitySetup): Promise<IdentityApp> {
+    const mailer: MailSender = {
+      send: (content) => setup.dependencies.notifications.sendEmail(content),
+    };
     const signupAnnouncements = await setup.secrets.into(
       IdentityApp.secrets.internalSlackSignupsWebhook,
       (webhookUrl) =>
@@ -699,7 +702,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         identity,
         ceremony: verification,
         mail: addressConfirmationMailChannels.ses.create({
-          mailer: setup.members.mail,
+          mailer,
           baseUrl: setup.members.publicBaseUrl ?? "",
         }),
         rateLimiter: setup.members.rateLimiter,
@@ -762,7 +765,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         auth: setup.dependencies.auth,
         notifier: OrganizationMfaNotifierService.create({
           accounts: setup.repositories.twoStepVerification,
-          mail: organizationMfaRequirementMailChannels.ses.create({ mailer: setup.members.mail }),
+          mail: organizationMfaRequirementMailChannels.ses.create({ mailer }),
           emails,
         }),
         entitled: async ({ organizationId }) =>
@@ -782,7 +785,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
               audience: setup.repositories.joinRequestAudience,
               context: setup.repositories.joinRequestNotificationContext,
               mail: joinRequestNotificationMailChannels.ses.create({
-                mailer: setup.members.mail,
+                mailer,
                 baseUrl: setup.members.publicBaseUrl ?? "",
               }),
               baseHost: setup.members.publicBaseUrl ?? "",

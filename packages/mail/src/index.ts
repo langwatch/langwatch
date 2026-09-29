@@ -1,34 +1,13 @@
 /**
- * Mail gateways and transactional message templates moved from platform/app.
- * Two explicit rules: messages carry built links (not base URLs); configuration
- * comes from process (not environment), keeping credentials stable per process lifetime.
+ * Transactional message templates moved from platform/app; notification sends them.
+ * Messages carry built links, never base URLs.
  */
 export {
-  EmailDelivery,
-  EmailProviderConfigurationError,
-  EMAIL_PROVIDER_NAMES,
-  toArray,
+  sendEmail,
   type EmailAttachment,
   type EmailContent,
-  type EmailProviderName,
-  type EmailProvider,
-  type MailerConfiguration,
   type MailSender,
-} from "./providers/types.ts";
-export { hasEmailProvider, resolveEmailProviderName } from "./providers/index.ts";
-export {
-  buildSesClientConfig,
-  SesEmailProvider,
-  type SesAwsClientConfiguration,
-} from "./providers/ses.ts";
-export { SendgridEmailProvider } from "./providers/sendgrid.ts";
-export {
-  buildSmtpTransportOptions,
-  isSmtpConfigured,
-  SmtpEmailProvider,
-} from "./providers/smtp.ts";
-export { ResendEmailProvider } from "./providers/resend.ts";
-export { computeDefaultFrom, sendEmail } from "./email-sender.ts";
+} from "./email-sender.ts";
 export { MailRender } from "./mail-render.ts";
 export { mailTemplates } from "./templates/index.ts";
 export { propsFormSchema, renderMailTemplate } from "./templates/registry.ts";

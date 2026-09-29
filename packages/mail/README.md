@@ -1,7 +1,7 @@
 # @langwatch/mail
 
-The outbound mail gateways LangWatch sends through, and the fifteen transactional
-messages the identity, organization and billing surfaces send.
+The fifteen transactional messages the identity, organization and billing surfaces
+send. Rendering lives here; notification owns sending (`NotificationApi.sendEmail`).
 
 ## The preview studio
 
@@ -78,7 +78,7 @@ tsc is the whole build. `rewriteRelativeImportExtensions` rewrites the `.ts` and
 `.tsx` specifiers to `.js` on the way out, so no bundler has to be taught the
 package's shape, and `dist` mirrors `src` file for file.
 
-`dev/scripts/ensure-built.mjs` rebuilds it when `src` is newer than `dist`. The
+`pnpm ensure:built` (`cmd/devscripts`) rebuilds it when `src` is newer than `dist`. The
 `predev` hook of the api and the worker runs it, as do their `pretest` hooks, and
 the image builds it the way pnpm builds any workspace dependency. Running one of
 those is what keeps a rebuild out of your hands.
@@ -87,12 +87,10 @@ The studio and the tests read `src` directly, so neither needs a build.
 
 ## Sending in development
 
-Nothing here reads an environment variable. A gateway takes its
-`MailerConfiguration` from the process that composed it, so to send for real you
-run the API or worker with a provider configured (`ses`, `sendgrid`, `smtp` or
-`resend`) and trigger the flow. With no provider configured the send is a no-op and
-the surface that called it still completes — check `hasEmailProvider` if you need
-to know which.
+Nothing here sends. A template hands what it rendered to a `MailSender`, which the
+calling module answers with `NotificationApi.sendEmail`; notification picks the provider
+from its own config (`ses`, `sendgrid`, `smtp` or `resend`). With none configured each
+send is skipped with one log line and the surface that called it still completes.
 
 To see the words without sending anything, use the studio.
 

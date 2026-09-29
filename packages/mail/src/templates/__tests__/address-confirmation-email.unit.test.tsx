@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TestMailer } from "../../__tests__/mailer.test-double.ts";
-import type { EmailContent } from "../../providers/types.ts";
+import type { EmailContent } from "../../email-sender.ts";
 import { sendAddressConfirmationEmail } from "../address-confirmation-email.tsx";
 
 /** Keeps what it was handed, so the assertion reads the envelope the provider would send. */
