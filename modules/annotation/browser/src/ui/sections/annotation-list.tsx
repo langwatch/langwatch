@@ -16,6 +16,7 @@ import { ChevronDown, Database, Download, Inbox, SquarePen, Trash2 } from "lucid
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";
+import { useAnnotationColumnChoices } from "../../behavior/use-annotation-column-choices.ts";
 import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
 import { useAnnotationQueues } from "../../behavior/use-annotation-queues.ts";
 import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
@@ -50,6 +51,8 @@ import { annotationViewCopy, viewReadsMemberQueues } from "../../model/annotatio
 import type { AnnotationView } from "../../model/annotation-view.ts";
 import { AnnotationTable, AnnotationTableSkeleton } from "../blocks/annotation-table.tsx";
 import { PersonalFeatureGateDialog } from "../blocks/personal-feature-gate-dialog.tsx";
+import { AnnotationColumnsMenu } from "../elements/annotation-columns-menu.tsx";
+import { annotationColumnOptions } from "../elements/annotation-columns.ts";
 import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 import { PeriodPicker } from "../elements/period-picker.tsx";
 import { RedactedField } from "../elements/redacted-field.tsx";
@@ -118,6 +121,12 @@ function removedSentence(count: number): string {
   return `${count} ${count === 1 ? "item" : "items"} removed`;
 }
 
+const STATUS_LABELS: Record<AnnotationQueueItemStatus, string> = {
+  pending: "Pending",
+  completed: "Completed",
+  all: "All",
+};
+
 function StatusFilterMenu({
   value,
   onChange,
@@ -129,7 +138,7 @@ function StatusFilterMenu({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button variant="outline">
-          Status <ChevronDown size={16} />
+          Status: {STATUS_LABELS[value]} <ChevronDown size={16} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
@@ -260,6 +269,16 @@ export function AnnotationList({
         .map((scoreType) => ({ id: scoreType.id, name: scoreType.name })),
     [scoreTypes.data],
   );
+
+  const columnOptions = useMemo(
+    () =>
+      annotationColumnOptions({
+        dateColumnLabel: copy.dateColumnLabel,
+        scoreTypes: activeScoreTypes,
+      }),
+    [copy.dateColumnLabel, activeScoreTypes],
+  );
+  const columnChoices = useAnnotationColumnChoices({ projectId: project?.id });
 
   const redaction = useFieldRedaction({
     projectId: project?.id,
@@ -424,6 +443,13 @@ export function AnnotationList({
         {copy.showStatusFilter && (
           <StatusFilterMenu value={statusFilter} onChange={setStatusFilter} />
         )}
+        <AnnotationColumnsMenu
+          columns={columnOptions}
+          choices={columnChoices.choices}
+          onColumnVisibleChange={columnChoices.setColumnVisible}
+          onReset={columnChoices.resetColumns}
+          hasChoices={columnChoices.hasChoices}
+        />
         <ListPeriodControl
           reading={{ period, mode: periodMode }}
           query={query}
@@ -476,6 +502,7 @@ export function AnnotationList({
                 rows={pageRows}
                 activeScoreTypes={activeScoreTypes}
                 dateColumnLabel={copy.dateColumnLabel}
+                columnChoices={columnChoices.choices}
                 selectedRowIds={new Set(selectedRows.map((row) => row.id))}
                 allRowsSelected={pageRows.length > 0 && selectedRows.length === pageRows.length}
                 someRowsSelected={selectedRows.length > 0 && selectedRows.length < pageRows.length}

@@ -24,6 +24,8 @@ export type LLMModelCostRow = Partial<
     cacheReadCostPerToken?: number;
     cacheCreationCostPerToken?: number;
     cacheCreation1hCostPerToken?: number;
+    inputImageCostPerToken?: number;
+    outputImageCostPerToken?: number;
   };
 
 function absent(rate: number | null): number | undefined {
@@ -40,6 +42,8 @@ export function toLLMModelCostRow(cost: ListedCost): LLMModelCostRow {
       cacheReadCostPerToken: cost.cacheReadCostPerToken,
       cacheCreationCostPerToken: cost.cacheCreationCostPerToken,
       cacheCreation1hCostPerToken: cost.cacheCreation1hCostPerToken,
+      inputImageCostPerToken: cost.inputImageCostPerToken,
+      outputImageCostPerToken: cost.outputImageCostPerToken,
     };
   }
 

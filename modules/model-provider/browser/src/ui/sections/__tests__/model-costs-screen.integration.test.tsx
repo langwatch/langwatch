@@ -132,6 +132,21 @@ describe("given the LLM Model Costs screen", () => {
     });
   });
 
+  describe("when a catalogue rate prices image tokens", () => {
+    it("shows the image input and output rates in their own columns", () => {
+      mockState.costs = [
+        { ...CATALOGUE_ROW, inputImageCostPerToken: 0.000008, outputImageCostPerToken: 0.00003 },
+      ];
+
+      renderScreen();
+
+      expect(screen.getByText("Image input")).toBeTruthy();
+      expect(screen.getByText("Image output")).toBeTruthy();
+      expect(screen.getByText("0.000008")).toBeTruthy();
+      expect(screen.getByText("0.00003")).toBeTruthy();
+    });
+  });
+
   describe("when the reader may not manage the project", () => {
     it("blocks adding a cost rule", () => {
       renderScreen(new FakeModelProviderHost({ grants: new Set([]) }));

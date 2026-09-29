@@ -81,7 +81,7 @@ function renderTable(overrides: Partial<Parameters<typeof AnnotationTable>[0]> =
 
 describe("annotation table presentation", () => {
   it("renders review columns and controlled selection", async () => {
-    const { onToggleRow } = renderTable();
+    const { onToggleRow } = renderTable({ columnChoices: { "score-helpful": true } });
 
     expect(screen.getByRole("columnheader", { name: "Date queued" })).toBeInTheDocument();
     expect(screen.getByText("the question")).toBeInTheDocument();

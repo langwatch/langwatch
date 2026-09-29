@@ -224,6 +224,7 @@ const PICKED_RANGE: StubAnnotationHostOptions = {
 };
 
 beforeEach(() => {
+  window.localStorage.clear();
   mocks.deleteMutate.mockReset();
   mocks.downloadCsv.mockReset();
   mocks.utils.annotation.getOptimizedAnnotationQueues.invalidate.mockClear();
@@ -372,6 +373,12 @@ describe("given the annotations list shows rows", () => {
     expect(await screen.findByText("Pending")).toBeInTheDocument();
     expect(screen.getByText("Completed")).toBeInTheDocument();
     expect(screen.getByText("All")).toBeInTheDocument();
+  });
+
+  it("names the chosen status on the filter", () => {
+    renderQueuePage();
+
+    expect(screen.getByRole("button", { name: /Status: Pending/ })).toBeInTheDocument();
   });
 
   /** @scenario "Queue edits begin at the queue entry" */
@@ -554,7 +561,7 @@ describe("given a row carries comments", () => {
 
 describe("given the project collects scores", () => {
   /** @scenario "Score and content columns follow project and privacy state" */
-  it("adds one column per active score type and one cell per row", () => {
+  it("folds the scores into one column and keeps each type's own column off until picked", async () => {
     mocks.scoreTypes = [
       { id: "score-1", name: "Helpfulness", active: true },
       { id: "score-2", name: "Tone", active: true },
@@ -563,11 +570,26 @@ describe("given the project collects scores", () => {
 
     renderQueuePage();
 
+    expect(columnHeaders()).toContain("Scores");
+    expect(columnHeaders()).not.toContain("Helpfulness");
+
+    await user.click(screen.getByRole("button", { name: "Show or hide columns in the table" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Helpfulness" }));
+
     const headers = columnHeaders();
     expect(headers).toContain("Helpfulness");
-    expect(headers).toContain("Tone");
+    expect(headers).not.toContain("Tone");
     expect(headers).not.toContain("Retired");
     expect(screen.getAllByRole("row")[1]!.children).toHaveLength(headers.length);
+  });
+
+  it("hides a standard column the reviewer unticks", async () => {
+    renderQueuePage();
+
+    await user.click(screen.getByRole("button", { name: "Show or hide columns in the table" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Comments" }));
+
+    expect(columnHeaders()).not.toContain("Comments");
   });
 
   /** @scenario "Score and content columns follow project and privacy state" */

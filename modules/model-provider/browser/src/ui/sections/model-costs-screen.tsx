@@ -89,17 +89,19 @@ export default function ModelCostsScreen() {
         >
           <Table.Header width="full">
             <Table.Row width="full">
-              {/* The five rate columns share what these two leave. A rate runs to
+              {/* The seven rate columns share what these two leave. A rate runs to
                   nine decimal places and breaks mid-number when its column is
                   narrow, so the identifying columns give up some width to keep
                   the prices readable. */}
-              <Table.ColumnHeader width="18%">Model name</Table.ColumnHeader>
-              <Table.ColumnHeader width="18%">Regex match rule</Table.ColumnHeader>
+              <Table.ColumnHeader width="15%">Model name</Table.ColumnHeader>
+              <Table.ColumnHeader width="15%">Regex match rule</Table.ColumnHeader>
               <Table.ColumnHeader>Input cost</Table.ColumnHeader>
               <Table.ColumnHeader>Output cost</Table.ColumnHeader>
               <Table.ColumnHeader>Cache read</Table.ColumnHeader>
               <Table.ColumnHeader>Cache write (5 minutes)</Table.ColumnHeader>
               <Table.ColumnHeader>Cache write (1 hour)</Table.ColumnHeader>
+              <Table.ColumnHeader>Image input</Table.ColumnHeader>
+              <Table.ColumnHeader>Image output</Table.ColumnHeader>
               <Table.ColumnHeader width="64px" padding={1} />
             </Table.Row>
           </Table.Header>
@@ -107,7 +109,7 @@ export default function ModelCostsScreen() {
             {llmModelCosts.isLoading &&
               Array.from({ length: 3 }).map((_, rowIndex) => (
                 <Table.Row key={rowIndex}>
-                  {Array.from({ length: 7 }).map((__, cellIndex) => (
+                  {Array.from({ length: 9 }).map((__, cellIndex) => (
                     <Table.Cell key={cellIndex}>
                       <Skeleton height="20px" />
                     </Table.Cell>
@@ -145,6 +147,8 @@ export default function ModelCostsScreen() {
                 <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
                 <RateCell rate={row.cacheCreationCostPerToken} isCustom={!!row.id} />
                 <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
+                <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
+                <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
                 <Table.Cell padding={1}>
                   <ActionsMenu id={row.id} model={row.model} />
                 </Table.Cell>

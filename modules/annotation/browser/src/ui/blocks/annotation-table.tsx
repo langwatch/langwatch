@@ -10,6 +10,12 @@ import { z } from "zod";
 
 import type { AnnotationRow, AnnotationUser, DisplayMoment } from "../../model/annotation-row.ts";
 import { AnnotationAvatarGroup } from "../elements/annotation-avatar-group.tsx";
+import {
+  annotationColumnOptions,
+  scoreColumnId,
+  visibleColumnIds,
+  type AnnotationColumnChoices,
+} from "../elements/annotation-columns.ts";
 import { AnnotationCommentsChip } from "../elements/annotation-comments-chip.tsx";
 import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip.tsx";
 
@@ -24,6 +30,8 @@ export type AnnotationTableProps = {
   rows: AnnotationRow[];
   activeScoreTypes: readonly ActiveScoreType[];
   dateColumnLabel: string;
+  /** What the reviewer chose to show or hide; a column not chosen keeps its default. */
+  columnChoices?: AnnotationColumnChoices;
   selectedRowIds: ReadonlySet<string>;
   allRowsSelected: boolean;
   someRowsSelected: boolean;
@@ -65,6 +73,7 @@ export function AnnotationTable({
   rows,
   activeScoreTypes,
   dateColumnLabel,
+  columnChoices = {},
   selectedRowIds,
   allRowsSelected,
   someRowsSelected,
@@ -78,6 +87,13 @@ export function AnnotationTable({
   renderTraceField,
   renderRowContext,
 }: AnnotationTableProps) {
+  const shown = new Set(
+    visibleColumnIds({
+      columns: annotationColumnOptions({ dateColumnLabel, scoreTypes: [...activeScoreTypes] }),
+      choices: columnChoices,
+    }),
+  );
+
   return (
     <>
       <Table.Header>
@@ -91,15 +107,18 @@ export function AnnotationTable({
               />
             )}
           </Table.ColumnHeader>
-          <Table.ColumnHeader />
-          <Table.ColumnHeader>{dateColumnLabel}</Table.ColumnHeader>
-          <Table.ColumnHeader>Input</Table.ColumnHeader>
-          <Table.ColumnHeader>Output</Table.ColumnHeader>
-          <Table.ColumnHeader>Comments</Table.ColumnHeader>
-          <Table.ColumnHeader>Suggestions</Table.ColumnHeader>
-          {activeScoreTypes.map((scoreType) => (
-            <Table.ColumnHeader key={scoreType.id}>{scoreType.name}</Table.ColumnHeader>
-          ))}
+          {shown.has("queuedBy") && <Table.ColumnHeader />}
+          {shown.has("date") && <Table.ColumnHeader>{dateColumnLabel}</Table.ColumnHeader>}
+          {shown.has("input") && <Table.ColumnHeader>Input</Table.ColumnHeader>}
+          {shown.has("output") && <Table.ColumnHeader>Output</Table.ColumnHeader>}
+          {shown.has("scores") && <Table.ColumnHeader>Scores</Table.ColumnHeader>}
+          {shown.has("comments") && <Table.ColumnHeader>Comments</Table.ColumnHeader>}
+          {shown.has("suggestions") && <Table.ColumnHeader>Suggestions</Table.ColumnHeader>}
+          {activeScoreTypes
+            .filter((scoreType) => shown.has(scoreColumnId(scoreType.id)))
+            .map((scoreType) => (
+              <Table.ColumnHeader key={scoreType.id}>{scoreType.name}</Table.ColumnHeader>
+            ))}
           <Table.ColumnHeader width="48px" />
         </Table.Row>
       </Table.Header>
@@ -121,43 +140,65 @@ export function AnnotationTable({
                   onToggle={() => onToggleRow(row.id)}
                 />
               </Table.Cell>
-              <Table.Cell verticalAlign="top">
-                <Tooltip content={<PeopleTooltip row={row} />}>
-                  <HStack>
-                    <AnnotationAvatarGroup
-                      createdByUser={row.createdByUser}
-                      annotations={row.annotations}
-                      renderAvatar={renderAvatar}
-                    />
-                  </HStack>
-                </Tooltip>
-              </Table.Cell>
-              <Table.Cell verticalAlign="top">
-                <Text whiteSpace="nowrap">{formatRowDate(row.date)}</Text>
-              </Table.Cell>
-              <Table.Cell verticalAlign="top">
-                {renderTraceField({
-                  field: "input",
-                  value: row.trace?.input?.value ?? "<empty>",
-                })}
-              </Table.Cell>
-              <Table.Cell verticalAlign="top">
-                {renderTraceField({
-                  field: "output",
-                  value: row.trace?.output?.value ?? "<empty>",
-                })}
-              </Table.Cell>
-              <Table.Cell verticalAlign="top">
-                <AnnotationCommentsChip annotations={row.annotations} traceId={row.traceId} />
-              </Table.Cell>
-              <Table.Cell verticalAlign="top">
-                <AnnotationSuggestionsChip annotations={row.annotations} traceId={row.traceId} />
-              </Table.Cell>
-              {activeScoreTypes.map((scoreType) => (
-                <Table.Cell key={scoreType.id} verticalAlign="top">
-                  <ScoreCell annotations={row.annotations} scoreTypeId={scoreType.id} />
+              {shown.has("queuedBy") && (
+                <Table.Cell verticalAlign="top">
+                  <Tooltip content={<PeopleTooltip row={row} />}>
+                    <HStack>
+                      <AnnotationAvatarGroup
+                        createdByUser={row.createdByUser}
+                        annotations={row.annotations}
+                        renderAvatar={renderAvatar}
+                      />
+                    </HStack>
+                  </Tooltip>
                 </Table.Cell>
-              ))}
+              )}
+              {shown.has("date") && (
+                <Table.Cell verticalAlign="top">
+                  <Text whiteSpace="nowrap">{formatRowDate(row.date)}</Text>
+                </Table.Cell>
+              )}
+              {shown.has("input") && (
+                <Table.Cell verticalAlign="top">
+                  {renderTraceField({
+                    field: "input",
+                    value: row.trace?.input?.value ?? "<empty>",
+                  })}
+                </Table.Cell>
+              )}
+              {shown.has("output") && (
+                <Table.Cell verticalAlign="top">
+                  {renderTraceField({
+                    field: "output",
+                    value: row.trace?.output?.value ?? "<empty>",
+                  })}
+                </Table.Cell>
+              )}
+              {shown.has("scores") && (
+                <Table.Cell verticalAlign="top">
+                  <GivenScoresCell
+                    annotations={row.annotations}
+                    activeScoreTypes={activeScoreTypes}
+                  />
+                </Table.Cell>
+              )}
+              {shown.has("comments") && (
+                <Table.Cell verticalAlign="top">
+                  <AnnotationCommentsChip annotations={row.annotations} traceId={row.traceId} />
+                </Table.Cell>
+              )}
+              {shown.has("suggestions") && (
+                <Table.Cell verticalAlign="top">
+                  <AnnotationSuggestionsChip annotations={row.annotations} traceId={row.traceId} />
+                </Table.Cell>
+              )}
+              {activeScoreTypes
+                .filter((scoreType) => shown.has(scoreColumnId(scoreType.id)))
+                .map((scoreType) => (
+                  <Table.Cell key={scoreType.id} verticalAlign="top">
+                    <ScoreCell annotations={row.annotations} scoreTypeId={scoreType.id} />
+                  </Table.Cell>
+                ))}
               <Table.Cell verticalAlign="top">
                 <RowActions
                   row={row}
@@ -244,6 +285,32 @@ function ScoreCell({
         </HStack>
       ))}
     </VStack>
+  );
+}
+
+/** Every score given on the row, named by its type: the folded "Scores" column. */
+function GivenScoresCell({
+  annotations,
+  activeScoreTypes,
+}: {
+  annotations: AnnotationWithUser[];
+  activeScoreTypes: readonly ActiveScoreType[];
+}) {
+  return (
+    <HStack gap={1} wrap="wrap" minWidth="140px">
+      {activeScoreTypes.flatMap((scoreType) =>
+        scoreValuesFor(annotations, scoreType.id).map((score) => (
+          <Badge key={`${score.annotationId}-${scoreType.id}`} whiteSpace="normal">
+            {scoreType.name}: {score.value.join(", ")}
+            {score.reason && (
+              <Tooltip content={score.reason}>
+                <MessageCircle size={14} />
+              </Tooltip>
+            )}
+          </Badge>
+        )),
+      )}
+    </HStack>
   );
 }
 
