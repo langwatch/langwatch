@@ -47,19 +47,36 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 `autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
 </Warning>
 
+### Operator access and feature flags
+
+The Ops pages (`/ops`) are open only to the operators listed in `ADMIN_EMAILS`. No account has them on a new install. Add your email and upgrade:
+
+```yaml
+app:
+  extraEnvs:
+    - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
+workers:
+  extraEnvs:
+    - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
+```
+
+Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Custom LangWatchQL charts on dashboards need both `release_lwql_workbench` and `release_custom_chart_playground`. The Query API (`POST /api/v1/query`) works without either.
+
 ## Low-Resources Deployment
 
 The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
 
 ```bash
-curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
+helm pull langwatch/langwatch --untar
 
-helm install langwatch langwatch/langwatch \
+helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
-  -f size-dev.yaml \
+  -f langwatch/examples/overlays/size-dev.yaml \
   --wait --timeout 10m
 ```
+
+The overlay comes from the chart you pulled, so it always matches the chart version you install.
 
 This configures smaller resource limits, single replicas, and disables evaluator preloading to reduce memory usage. Suitable for development, demos, and small teams.
 
@@ -315,10 +332,10 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 | Overlay | Use Case | Approx Resources (requests) |
 |---------|----------|-----------------|
-| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi |
-| `size-dev.yaml` | Local dev, small teams | ~2 CPU, ~4 Gi |
-| `size-prod.yaml` | Production, single-node CH | ~12 CPU, ~28 Gi |
-| `size-ha.yaml` | HA production, replicated CH | ~25 CPU, ~70 Gi |
+| _(default, no overlay)_ | Quick start, small production | ~5 CPU, ~17 Gi |
+| `size-dev.yaml` | Local dev, small teams | ~2.6 CPU, ~6.7 Gi |
+| `size-prod.yaml` | Production, single-node CH | ~8.7 CPU, ~23 Gi |
+| `size-ha.yaml` | HA production, replicated CH | ~23 CPU, ~85 Gi |
 
 ### Access Overlays
 

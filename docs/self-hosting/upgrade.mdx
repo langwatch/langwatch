@@ -155,10 +155,12 @@ helm upgrade langwatch langwatch/langwatch \
 helm search repo langwatch/langwatch --versions
 
 # Install a specific chart version
+# x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
   --version 3.18.0 \
   -f values-production.yaml
+# x-release-please-end
 ```
 
 ## Database Migrations

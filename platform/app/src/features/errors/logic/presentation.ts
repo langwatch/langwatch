@@ -673,6 +673,11 @@ const presentations = {
     describe: () =>
       "Give the ClickHouse user permission to create functions, or set a user defined path.",
   },
+  checkup_model_provider_keys_unreadable: {
+    title: "A model provider's keys could not be decrypted",
+    describe: () =>
+      "Restore the CREDENTIALS_SECRET the keys were saved with, or enter the keys again on the Model Providers page.",
+  },
   checkup_model_provider_refused: {
     title: "A model provider refused the test call",
     describe: () =>

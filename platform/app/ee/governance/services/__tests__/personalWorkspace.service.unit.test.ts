@@ -194,6 +194,40 @@ describe("PersonalWorkspaceService.ensure", () => {
     });
   });
 
+  describe("when a brand-new workspace's owner grant fails", () => {
+    /** @scenario "A personal workspace whose owner grant fails still gets its key-map row" */
+    it("writes the key-map row before the grant failure propagates", async () => {
+      const lwqlKeyMap = {
+        syncLwqlKeyMapRow: vi.fn().mockResolvedValue(undefined),
+      };
+      service = new PersonalWorkspaceService(
+        prisma as unknown as PrismaClient,
+        {
+          writer,
+          lwqlKeyMap,
+        },
+      );
+      const { projects, ...team } = teamRow;
+      prisma.team.create.mockResolvedValueOnce(team);
+      prisma.project.create.mockResolvedValueOnce({
+        ...projects[0],
+        lwqlKey: "lwql_test",
+      });
+      (writer.attachBindings as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("boom"),
+      );
+
+      await expect(
+        service.ensure({ userId: USER_ID, organizationId: ORG_ID }),
+      ).rejects.toThrow("boom");
+
+      expect(lwqlKeyMap.syncLwqlKeyMapRow).toHaveBeenCalledWith({
+        id: "proj_pw",
+        lwqlKey: "lwql_test",
+      });
+    });
+  });
+
   describe("when a concurrent ensure() won the create race (P2002)", () => {
     beforeEach(() => {
       // In-transaction lookups see nothing (live: null, archived: null), the

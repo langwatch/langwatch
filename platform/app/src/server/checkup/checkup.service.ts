@@ -54,8 +54,17 @@ export type CanaryName =
   | "collector"
   | "processor"
   | "evaluations"
-  | "scenarios"
-  | "langy";
+  | "scenarios";
+
+/**
+ * What the Langy canary came back with. Langy acts as a person, so the turn is
+ * sent as the administrator who asked for the checkup, and only when Langy is
+ * open to them by the same decision the Langy panel makes.
+ */
+export type LangyCanaryProbe =
+  | { readonly kind: "no_actor" }
+  | { readonly kind: "no_access" }
+  | { readonly kind: "answered"; readonly answer: CanaryAnswer };
 
 /** Where the daily license sync stands, as the connect settings report it. */
 export interface ConnectView {
@@ -125,7 +134,12 @@ export interface CheckupDeps {
   };
   readonly gateway: {
     readonly baseUrl: string | null;
-    readonly expectedControlPlaneUrl: string | null;
+    /**
+     * Every address this app is reached at, its public address first. The
+     * gateway usually reaches the app over the cluster, so its control plane
+     * is this app when it names any one of them.
+     */
+    readonly controlPlaneUrls: string[];
     readonly health: () => Promise<void>;
     readonly probeControlPlane: () => Promise<ControlPlaneProbe>;
   };
@@ -146,7 +160,13 @@ export interface CheckupDeps {
     readonly verifySmtp: () => Promise<void>;
   };
   readonly modelProviders: () => Promise<
-    { id: string; provider: string; customKeys: Record<string, string> }[]
+    {
+      id: string;
+      provider: string;
+      customKeys: Record<string, string>;
+      /** The stored keys did not decrypt, e.g. after a CREDENTIALS_SECRET change. */
+      hasUnreadableKeys: boolean;
+    }[]
   >;
   /** Throws `ModelProviderTestRateLimitedError` past the budget. */
   readonly modelProviderBudget: () => Promise<void>;
@@ -158,6 +178,7 @@ export interface CheckupDeps {
     name: CanaryName,
     params: Record<string, string>,
   ) => Promise<CanaryAnswer>;
+  readonly langyCanary: () => Promise<LangyCanaryProbe>;
 }
 
 /** What an explicit run may be given. */
@@ -182,7 +203,7 @@ export const CHECKUP_DOCS = {
   environment: "/self-hosting/configuration/environment-variables",
   licensing: "/self-hosting/licensing",
   modelProviders: "/self-hosting/configuration/environment-variables",
-  gateway: "/ai-gateway/self-hosting/overview",
+  gateway: "/ai-gateway/self-hosting/helm",
   lwql: "/self-hosting/troubleshooting",
 } as const;
 
@@ -633,6 +654,8 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.modelProviders,
       };
     }
+    const unreadable = unreadableKeysVerdict(providers);
+    if (unreadable) return unreadable;
     const names = [...new Set(providers.map((row) => row.provider))].sort();
     return { outcome: "verified", detail: `Configured: ${names.join(", ")}.` };
   }
@@ -672,7 +695,7 @@ export class CheckupService {
               fix: "Name a run plan id or slug and run this check again.",
             };
       case "canary_langy":
-        return this.canary("langy", {});
+        return this.langyCanary();
       default:
         return notAskedFor();
     }
@@ -702,7 +725,8 @@ export class CheckupService {
   }
 
   private async gatewayControlPlane(): Promise<CheckVerdict> {
-    const expected = this.deps.gateway.expectedControlPlaneUrl;
+    const known = this.deps.gateway.controlPlaneUrls;
+    const expected = known[0];
     if (!this.deps.gateway.baseUrl || !expected) {
       return {
         outcome: "unchecked",
@@ -720,7 +744,8 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.gateway,
       };
     }
-    if (normalizeUrl(probe.controlPlaneBaseUrl) !== normalizeUrl(expected)) {
+    const reported = normalizeUrl(probe.controlPlaneBaseUrl);
+    if (!known.some((url) => normalizeUrl(url) === reported)) {
       return {
         outcome: "refused",
         code: "checkup_gateway_control_plane_mismatch",
@@ -797,6 +822,8 @@ export class CheckupService {
         docsPath: CHECKUP_DOCS.modelProviders,
       };
     }
+    const unreadable = unreadableKeysVerdict(providers);
+    if (unreadable) return unreadable;
     try {
       await this.deps.modelProviderBudget();
     } catch (error) {
@@ -840,7 +867,7 @@ export class CheckupService {
     if (verified.length === 0) {
       return {
         outcome: "unchecked",
-        detail: `None of the configured providers can be probed from here (${results.map((entry) => entry.provider).join(", ")}).`,
+        detail: `None of the configured providers could be tested: ${results.map((entry) => `${entry.provider} (${untestedReason(entry.result)})`).join(", ")}.`,
       };
     }
     return {
@@ -853,28 +880,79 @@ export class CheckupService {
     name: CanaryName,
     params: Record<string, string>,
   ): Promise<CheckVerdict> {
-    const answer = await this.deps.canary(name, params);
-    if (answer.status === 404 && name === "langy") {
-      return {
-        outcome: "unchecked",
-        detail:
-          "Langy is not enabled for this project, so there is no turn to send.",
-      };
+    return canaryVerdict(name, await this.deps.canary(name, params));
+  }
+
+  private async langyCanary(): Promise<CheckVerdict> {
+    const probe = await this.deps.langyCanary();
+    switch (probe.kind) {
+      case "no_actor":
+        return {
+          outcome: "unchecked",
+          detail:
+            "Langy answers as a person, and this check was not run by one. Run it from Settings, Checkup, or with an API key issued to a user.",
+        };
+      case "no_access":
+        return {
+          outcome: "unchecked",
+          detail:
+            "Langy is not open to you in this organization's first project, so there is no turn to send.",
+          fix: "Set langyagent.enableForAllUsers in the Helm chart, or turn on release_langy_enabled for this organization under Ops, Feature flags. Then run this check again.",
+        };
+      default:
+        return canaryVerdict("langy", probe.answer);
     }
-    if (answer.status >= 200 && answer.status < 300) {
-      return {
-        outcome: "verified",
-        detail: `The ${name} canary came back healthy.`,
-      };
-    }
+  }
+}
+
+/** A failing verdict naming every provider whose stored keys did not decrypt. */
+function unreadableKeysVerdict(
+  providers: { provider: string; hasUnreadableKeys: boolean }[],
+): CheckVerdict | null {
+  const names = [
+    ...new Set(
+      providers
+        .filter((row) => row.hasUnreadableKeys)
+        .map((row) => row.provider),
+    ),
+  ].sort();
+  if (names.length === 0) return null;
+  return {
+    outcome: "refused",
+    code: "checkup_model_provider_keys_unreadable",
+    detail: `The stored keys for ${names.join(", ")} could not be decrypted.`,
+    fix: "CREDENTIALS_SECRET differs from the value the keys were saved with. Restore that value, or enter the keys again under Settings, Model providers.",
+    docsPath: CHECKUP_DOCS.modelProviders,
+  };
+}
+
+function canaryVerdict(name: string, answer: CanaryAnswer): CheckVerdict {
+  if (answer.status >= 200 && answer.status < 300) {
     return {
-      outcome: "refused",
-      code: `checkup_canary_${name}_failed`,
-      detail: `The ${name} canary answered ${answer.status}: ${firstLine(bodyText(answer.body))}`,
-      fix: `Read the ${name} logs for the canary's trace, then see the troubleshooting page.`,
-      docsPath: CHECKUP_DOCS.troubleshooting,
+      outcome: "verified",
+      detail: `The ${name} canary came back healthy.`,
     };
   }
+  return {
+    outcome: "refused",
+    code: `checkup_canary_${name}_failed`,
+    detail: `The ${name} canary answered ${answer.status}: ${firstLine(bodyText(answer.body))}`,
+    fix: `Read the ${name} logs for the canary's trace, then see the troubleshooting page.`,
+    docsPath: CHECKUP_DOCS.troubleshooting,
+  };
+}
+
+const UNTESTED_REASONS: Record<string, string> = {
+  no_credential: "no key stored",
+  credential_masked: "no key stored",
+  no_endpoint: "no endpoint to ask",
+  provider_not_probeable: "its sign-in cannot be tested from here",
+  unknown_provider: "not a known provider",
+};
+
+function untestedReason(result: ProviderTestOutcome): string {
+  if (result.outcome !== "unchecked") return result.outcome;
+  return UNTESTED_REASONS[result.reason] ?? result.reason.replace(/_/g, " ");
 }
 
 function inDefinitionOrder(rows: CheckRow[]): CheckRow[] {
