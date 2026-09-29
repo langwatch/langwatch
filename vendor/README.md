@@ -6,7 +6,7 @@ known bits and can carry an unreleased build when one is needed.
 ## @langwatch/scenario
 
 **File:** `langwatch-scenario-1.7.0-dev.voice10.tgz`
-**sha256:** `5f2e53355baa90ed1fd38ec842a7bf2703276fd4604c2730e6b92d149e203ecf`
+**sha256:** `1e06a22a6929781b01cf153ac1ef7e4ffe4c6f6f4b85c41a8d9d9adf2e25ddaf`
 
 An unreleased build of [langwatch/scenario](https://github.com/langwatch/scenario)
 at `55de2020`, which is its main with scenario PR #1001 merged: the judge maps
@@ -32,6 +32,15 @@ events through the same `/api/scenario-events` path as any SDK, so bumping to a
 scenario release that carries per-criterion verdicts needs no platform change.
 Until then the run view derives each criterion from the met, unmet and
 inconclusive lists, without reasoning.
+
+The tarball carries one edit over that build, in `dist/index.js` and
+`dist/index.mjs`: the Claude Code watchdog kills the child's process group
+with `kill -TERM "-$child"` instead of `kill -TERM -- "-$child"`. It runs
+under `/bin/sh`, which is dash on Debian and Ubuntu, and dash refuses the
+`--` with "Illegal number", so a killed worker left its Claude Code child
+running. The same edit is needed in scenario's
+`javascript/src/agents/claude-code/process-lifecycle.ts` before the next
+build replaces this one.
 
 ## Updating
 

@@ -51,6 +51,19 @@ Feature: One OpenTelemetry setup every process uses
       Then the response is 401
 
     @unit
+    Scenario: In production an unset scrape token mounts no door
+      Given a production process whose metrics mode is "prometheus" and no scrape token is configured
+      When its metrics are composed
+      Then no route is contributed at "/metrics"
+      # Fail-closed: an unset token is a misconfiguration, not an invitation.
+
+    @unit
+    Scenario: An authenticated scrape in production reads the process's instruments
+      Given a production process whose metrics mode is "prometheus" and a scrape token is configured
+      When a caller scrapes "/metrics" with that token
+      Then the exposition names the instruments this process records
+
+    @unit
     Scenario: Metrics are switched off entirely
       Given a process whose metrics are disabled
       When its metrics are composed

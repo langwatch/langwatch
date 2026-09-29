@@ -16,6 +16,9 @@ const SERVER_RUNTIME =
 /** apps/tasks' pre-serve migration steps: its `*migrat*` files and the two LangWatchQL steps. */
 const MIGRATION_RUNNER =
   /^apps\/tasks\/src\/(?:[^/]*migrat[^/]*|lwql-provision|lwql-render-access-config)\.[cm]?tsx?$/;
+/** The scenario child program and the one scenario-process subpath it may take. */
+const SCENARIO_CHILD_PROGRAM = "apps/scenario-child/src/main.ts";
+const SCENARIO_CHILD_SUBPATH = "./scenario-child";
 const KIT_FETCH = /^@langwatch\/browser-trpc(?:\/|$)/;
 const SCHEMA_BINDING = new Set(["@hono/zod-validator", "hono-openapi/zod"]);
 const BROWSER_ROLES = new Set(["browser", "browser-kit"]);
@@ -178,6 +181,13 @@ function outsideModuleFinding(file, target, subpath) {
     if (isTestSeam(file, subpath, target)) return undefined;
     // Migrations run by hand, before any module boots (§7; Alex, 2026-09-27).
     if (MIGRATION_RUNNER.test(file.workspacePath)) return undefined;
+    // The voice transports stay in scenario-process until the live voice session spawns its
+    // own child (Alex, 2026-09-28).
+    const isScenarioChildVoice =
+      file.workspacePath === SCENARIO_CHILD_PROGRAM &&
+      target.module === "scenario" &&
+      subpath === SCENARIO_CHILD_SUBPATH;
+    if (isScenarioChildVoice) return undefined;
 
     return APPLICATION.test(file.workspacePath) ? "compositionRoot" : "processOutsideModule";
   }

@@ -1,4 +1,5 @@
 import type { ChatMessage, Span, Trace } from "@langwatch/trace-contract";
+import { renderToolLine } from "@langwatch/trace-contract/conversation";
 import { describe, expect, it } from "vitest";
 
 import { extractConversationSteps } from "../trace-conversation-steps.rules.ts";
@@ -142,10 +143,40 @@ const QUOTE = {
 };
 
 describe("renderThreadConversation", () => {
+  describe("given a thread whose first turn called a tool twice and another once", () => {
+    /** @scenario "The conversation view reads like the chat view with one line naming the tools" */
+    it("renders the conversation view with one line naming the tools and no step detail", () => {
+      const text = renderThreadConversation({
+        view: "conversation",
+        threadKey: "thread-1",
+        traces: thread({ turns: 2, toolAt: new Map([[0, QUOTE]]) }),
+      }).text;
+
+      expect(text).toContain("Question 0: tell me about activity 0 at the park.");
+      expect(text).toContain("Activity 1 runs every day.");
+      expect(text).toContain("_Used 1 tool: get_quote_");
+      expect(text.indexOf("get_quote")).toBeLessThan(text.indexOf("## Turn 2"));
+      expect(text).not.toContain("**Steps:**");
+      expect(text).not.toContain("1387.5");
+      expect(text).not.toContain("C-114");
+      expect(text).not.toContain("model gpt-5-mini");
+    });
+
+    it("counts a repeated tool rather than listing it twice", () => {
+      const step = (name: string) => ({ kind: "tool" as const, name, startedAt: T0, depth: 0 });
+      const line = renderToolLine({
+        steps: [step("search_units"), step("get_price"), step("search_units")],
+      });
+
+      expect(line).toBe("_Used 3 tools: search_units (2x), get_price_");
+    });
+  });
+
   describe("given a thread whose first turn called a tool that returned a price", () => {
     /** @scenario "A conversation turn lists its tool calls with their results" */
     it("lists the tool call with its arguments and result, and the model call that asked for it", () => {
       const text = renderThreadConversation({
+        view: "steps",
         threadKey: "thread-1",
         traces: thread({ turns: 3, toolAt: new Map([[0, QUOTE]]) }),
       }).text;
@@ -161,9 +192,13 @@ describe("renderThreadConversation", () => {
     /** @scenario "A thread transcript grows with the thread, not with its square" */
     it("prints the first user message once and grows linearly", () => {
       const tokensOf = (turns: number) =>
-        renderThreadConversation({ threadKey: "thread-1", traces: thread({ turns }) })
-          .estimatedTokens;
+        renderThreadConversation({
+          view: "steps",
+          threadKey: "thread-1",
+          traces: thread({ turns }),
+        }).estimatedTokens;
       const text = renderThreadConversation({
+        view: "steps",
         threadKey: "thread-1",
         traces: thread({ turns: 40 }),
       }).text;
@@ -177,6 +212,7 @@ describe("renderThreadConversation", () => {
     /** @scenario "A turn whose only step is the model call that wrote the reply does not repeat it" */
     it("lists the model call with its token counts, not its output", () => {
       const text = renderThreadConversation({
+        view: "steps",
         threadKey: "thread-1",
         traces: thread({ turns: 2 }),
       }).text;
@@ -192,7 +228,7 @@ describe("renderThreadConversation", () => {
         spans: trace.spans.map((each) => ({ ...each, metrics: null })),
       }));
 
-      const text = renderThreadConversation({ threadKey: "thread-1", traces }).text;
+      const text = renderThreadConversation({ view: "steps", threadKey: "thread-1", traces }).text;
 
       expect(text).not.toContain("**Steps:**");
     });
@@ -214,10 +250,15 @@ describe("renderThreadConversation", () => {
         ]),
         replyPadding: "The schedule and the age limits are described at the reception. ".repeat(12),
       });
-      const whole = renderThreadConversation({ threadKey: "thread-1", traces });
+      const whole = renderThreadConversation({ view: "steps", threadKey: "thread-1", traces });
       const budget = Math.floor(whole.estimatedTokens * 0.5);
 
-      const cut = renderThreadConversation({ threadKey: "thread-1", traces, maxTokens: budget });
+      const cut = renderThreadConversation({
+        view: "steps",
+        threadKey: "thread-1",
+        traces,
+        maxTokens: budget,
+      });
 
       expect(cut.isTruncated).toBe(true);
       expect(cut.omittedTurns).toBe(0);
@@ -262,7 +303,11 @@ describe("renderThreadConversation", () => {
         }),
       ];
 
-      const text = renderThreadConversation({ threadKey: "sess-1", traces: [coding] }).text;
+      const text = renderThreadConversation({
+        view: "steps",
+        threadKey: "sess-1",
+        traces: [coding],
+      }).text;
 
       expect(text).toMatch(/## Turn 1 · [^·]+ · claude-opus-5 ·/);
     });
@@ -304,9 +349,14 @@ describe("renderThreadConversation on one coding turn of hundreds of steps", () 
       ...agentTurn({ index: 0, user: "Read the files.", reply: "Done.", history: [] }),
       spans,
     };
-    const whole = renderThreadConversation({ threadKey: "sess-1", traces: [coding] });
+    const whole = renderThreadConversation({
+      view: "steps",
+      threadKey: "sess-1",
+      traces: [coding],
+    });
 
     const cut = renderThreadConversation({
+      view: "steps",
       threadKey: "sess-1",
       traces: [coding],
       maxTokens: Math.floor(whole.estimatedTokens * 0.45),
@@ -367,6 +417,44 @@ describe("extractConversationSteps", () => {
         ["tool", "Bash", 0],
         ["span", "db.query", 1],
       ]);
+    });
+  });
+
+  describe("given a Vercel AI SDK turn whose tool records its name and result as attributes", () => {
+    /** @scenario "A Vercel AI SDK tool call is listed by its tool name with the result it recorded" */
+    it("lists the tool by name with its result, and not the generateText wrapper", () => {
+      const steps = extractConversationSteps({
+        replyText: "The total is 928.80.",
+        spans: [
+          span({ span_id: "root", parent_id: null, type: "llm", name: "ai.generateText" }),
+          span({
+            span_id: "call",
+            parent_id: "root",
+            type: "llm",
+            name: "ai.generateText.doGenerate",
+            model: "gpt-5-mini",
+            metrics: { prompt_tokens: 580, completion_tokens: 24 },
+          }),
+          span({
+            span_id: "tool",
+            parent_id: "root",
+            type: "tool",
+            name: "ai.toolCall get_rates",
+            input: { type: "json", value: { unit: "DV-6" } },
+            params: {
+              "ai.toolCall.name": "get_rates",
+              "ai.toolCall.result.pricing.nightly": 139.5,
+              "ai.toolCall.result.unit.code": "DV-6",
+            },
+          }),
+        ],
+      });
+
+      expect(steps.map((step) => [step.kind, step.name])).toEqual([
+        ["model", "gpt-5-mini"],
+        ["tool", "get_rates"],
+      ]);
+      expect(steps[1]?.output).toBe('{"pricing.nightly":139.5,"unit.code":"DV-6"}');
     });
   });
 });

@@ -237,6 +237,8 @@ export class GatewayService {
     const parsed = createGatewayBudgetInputSchema.parse(input);
     assertOrganizationScopeIsOwn(parsed);
     await this.assertProjectScopesBelongToOrganization(parsed);
+    // Ownership before reach: a scope from another tenant is refused as that, never as unreachable.
+    await this.repository.assertScopeWithinOrganization(parsed);
     await this.assertScopeIsReachable(parsed);
 
     return this.repository.create(parsed);

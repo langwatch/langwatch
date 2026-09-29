@@ -18147,7 +18147,7 @@
           "name": "conversation",
           "kind": "extraction",
           "signature": "conversation(thread_key)",
-          "description": "The whole thread as one markdown transcript, the way the trace drawer renders it: the system prompt once, then one section per turn, with a marker where content was redacted.",
+          "description": "The whole thread as one markdown transcript that reads like the chat view: the system prompt once, then each turn's user message and reply, with one line naming the tools the turn used. For questions about what was said; `llm_readable_thread` holds what the agent did.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "thread",
@@ -18163,7 +18163,7 @@
           "name": "conversation_bounded",
           "kind": "extraction",
           "signature": "conversation_bounded(thread_key, max_tokens, until_trace_id)",
-          "description": "The same transcript under a token budget: the opening and closing turns are kept and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
+          "description": "The same transcript under a token budget: every turn is shortened before one is dropped, and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "thread",
@@ -18174,6 +18174,22 @@
           ],
           "available": true,
           "exampleSql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "llm_readable_thread",
+          "kind": "extraction",
+          "signature": "llm_readable_thread(thread_key, max_tokens)",
+          "description": "The thread as the thread evaluators read it: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), under a token budget. For questions about what the agent did; `conversation` holds what was said.",
+          "returns": "Nullable(String)",
+          "encoding": "text",
+          "keyKind": "thread",
+          "cap": 200,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT ConversationId, llm_readable_thread(ConversationId, 8000) AS text\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "thread_traces",

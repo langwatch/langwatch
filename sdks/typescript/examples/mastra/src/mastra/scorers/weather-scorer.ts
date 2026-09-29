@@ -16,6 +16,21 @@ export const toolCallAppropriatenessScorer = createToolCallAccuracyScorerCode({
 
 export const completenessScorer = createCompletenessScorer();
 
+const translationAnalysisSchema = z.object({
+  nonEnglish: z.boolean(),
+  translated: z.boolean(),
+  confidence: z.number().min(0).max(1).default(1),
+  explanation: z.string().default(""),
+});
+
+type TranslationAnalysis = Partial<z.infer<typeof translationAnalysisSchema>>;
+
+function analysisOf(results: unknown): TranslationAnalysis {
+  return (
+    (results as { analyzeStepResult?: TranslationAnalysis } | undefined)?.analyzeStepResult ?? {}
+  );
+}
+
 // Custom LLM-judged scorer: evaluates if non-English locations are translated appropriately
 export const translationScorer = createScorer({
   id: "translation-quality-scorer",
@@ -38,12 +53,7 @@ export const translationScorer = createScorer({
   })
   .analyze({
     description: "Extract location names and detect language/translation adequacy",
-    outputSchema: z.object({
-      nonEnglish: z.boolean(),
-      translated: z.boolean(),
-      confidence: z.number().min(0).max(1).default(1),
-      explanation: z.string().default(""),
-    }),
+    outputSchema: translationAnalysisSchema,
     createPrompt: ({ results }) => `
             You are evaluating if a weather assistant correctly handled translation of a non-English location.
             User text:
@@ -68,13 +78,13 @@ export const translationScorer = createScorer({
         `,
   })
   .generateScore(({ results }) => {
-    const r = (results as any)?.analyzeStepResult || {};
+    const r = analysisOf(results);
     if (!r.nonEnglish) return 1; // If not applicable, full credit
     if (r.translated) return Math.max(0, Math.min(1, 0.7 + 0.3 * (r.confidence ?? 1)));
     return 0; // Non-English but not translated
   })
   .generateReason(({ results, score }) => {
-    const r = (results as any)?.analyzeStepResult || {};
+    const r = analysisOf(results);
     return `Translation scoring: nonEnglish=${r.nonEnglish ?? false}, translated=${r.translated ?? false}, confidence=${r.confidence ?? 0}. Score=${score}. ${r.explanation ?? ""}`;
   });
 

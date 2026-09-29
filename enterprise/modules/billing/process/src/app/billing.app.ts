@@ -564,7 +564,10 @@ export class BillingApp
   /** The subscription door, or not found where main mounted no subscription router. */
   get #subscriptionDoor(): SubscriptionDoor {
     if (!this.#subscriptions) {
-      throw new NotFoundError("not_found", "Subscription service", "this deployment");
+      throw new NotFoundError("not_found", {
+        resource: "Subscription service",
+        id: "this deployment",
+      });
     }
     return this.#subscriptions;
   }
@@ -701,7 +704,10 @@ export class BillingApp
   /** Main mounted currency detection on LangWatch Cloud only; elsewhere the procedure is absent. */
   detectCurrency(request: CurrencyRequest): DetectedCurrency {
     if (!this.#isSaas) {
-      throw new NotFoundError("not_found", "Currency detection", "this deployment");
+      throw new NotFoundError("not_found", {
+        resource: "Currency detection",
+        id: "this deployment",
+      });
     }
     return CurrencyService.create().detect(request);
   }

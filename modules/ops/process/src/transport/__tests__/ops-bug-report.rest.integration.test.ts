@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { BugReportRateLimitedError, type BugReport } from "@langwatch/ops-contract";
@@ -119,7 +119,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     return runtime.mount(opsBugReportRest.router(), {
       app: () => app,
       credential: "public",
-      onError: (error, context) => context.json({ error: String(error) }, 500),
+      onError: (error, context) => canonicalErrorResponse(error, context),
       facts: [
         bindRestMiddleware(bugReportCredential, (request) => {
           const token = request.req.raw.headers.get("x-auth-token");

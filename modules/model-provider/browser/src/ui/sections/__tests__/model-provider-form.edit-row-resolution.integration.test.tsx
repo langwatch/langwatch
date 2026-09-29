@@ -1,31 +1,8 @@
 /**
  * @vitest-environment jsdom
  * @regression
- *
- * Regression tests for issue #5380: editing a model-provider row resolves
- * the wrong row when a second same-type row exists at a narrower scope,
- * producing a blank API-key field and, on save, a duplicate row.
- *
- * Covers @regression @integration scenarios from
- * specs/model-providers/scope-and-multi-instance.feature:
- *   - Editing a row shows its own saved credential, not another row's
- *   - Saving an edited row updates it in place, not as a duplicate
- *
- * Root cause: `EditModelProviderForm` resolves the row being edited by
- * searching the COLLAPSED `Record<providerKey, entry>` returned by
- * `useModelProvidersSettings` (one winner per provider type — the
- * narrowest scope wins). The settings table, however, passes the real
- * DB id from the UNCOLLAPSED flat list (`useAllModelProvidersList`). When
- * the id being edited is not the collapse winner, the lookup misses and
- * the form silently falls back to a blank draft with no id: the API key
- * field renders empty, and Save sends `id: undefined`, which the server
- * treats as a create — producing a duplicate row instead of an update.
- *
- * `useModelProviderForm` and `useAllModelProvidersList` are deliberately
- * NOT mocked below — the row-resolution memo and the real submit payload
- * must actually execute for this test to exercise the bug. Only
- * `useModelProvidersSettings` (the collapsed record) and the tRPC/peripheral
- * boundaries are stubbed.
+ * Issue #5380: editing a row resolves that row, not the collapsed per-type winner.
+ * useModelProviderForm and useAllModelProvidersList stay real so the bug can run.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

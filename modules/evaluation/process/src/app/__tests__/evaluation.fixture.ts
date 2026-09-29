@@ -30,9 +30,9 @@ import type {
 } from "../../app/evaluation.members.ts";
 import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
 import { evaluationServer } from "../../evaluation.server.ts";
+import { EvaluationProcessingStoresAdapter } from "../../eventing/evaluation-processing-stores.pipeline.ts";
 import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
-import { EvaluationEventingService } from "../../services/evaluation-eventing.service.ts";
 import { EvaluationRunProjectionService } from "../../services/evaluation-run-projection.service.ts";
 import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
 import { LangevalsPiiDetectionService } from "../../services/langevals-pii-detection.service.ts";
@@ -244,7 +244,7 @@ export function createEvaluationTestApp(
     executionIntent: {
       execute: () => Promise.reject(new Error("this test composed no evaluation execution intent")),
     },
-    eventing: EvaluationEventingService.create({
+    eventing: EvaluationProcessingStoresAdapter.create({
       runs: EvaluationRunProjectionService.create({
         repository: repositories.runs,
         retention: new PlatformDefaultRetention(),

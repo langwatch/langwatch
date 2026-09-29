@@ -19,7 +19,7 @@ describe("the deployment's password reset", () => {
       const onPasswordReset = auth.options.emailAndPassword?.onPasswordReset;
       expect(typeof onPasswordReset).toBe("function");
 
-      await onPasswordReset!({ user: { id: "user_1", email: "a@acme.test" } } as never);
+      await onPasswordReset!({ user: { id: "user_1", email: "a@acme.test" } } as never, undefined);
 
       expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user_1" });
     });

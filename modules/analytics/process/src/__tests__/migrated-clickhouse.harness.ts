@@ -3,7 +3,7 @@
  * the schema production actually deploys. One endpoint name is shared across every suite here --
  * migrations are slow and tenant ids keep rows apart -- and the run is memoised per URL/process.
  */
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { type ClickHouseClient, ClickHouseError, createClient } from "@clickhouse/client";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
@@ -261,15 +261,25 @@ async function insertInBatches({
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
     });
+    // Each part write frees ~200 MB the allocator keeps resident, and the cap counts it.
+    await client.command({ query: "SYSTEM JEMALLOC PURGE" }).catch(ignoreUnsupported);
   }
 }
 
 /**
- * Releases the caches the shared endpoint has accumulated. Every suite in the lane shares one 1
- * GiB server, so a wide seed can be refused for memory an earlier file left behind.
+ * Releases the caches the shared endpoint has accumulated, then the memory the allocator retains.
+ * Every suite in the lane shares one 1 GiB server, and its limit counts resident memory, so a
+ * wide seed can be refused for memory an earlier file freed but the allocator kept.
  */
 export async function releaseMigratedCaches(client: ClickHouseClient): Promise<void> {
   for (const cache of ["MARK CACHE", "UNCOMPRESSED CACHE", "COMPILED EXPRESSION CACHE"]) {
-    await client.command({ query: `SYSTEM DROP ${cache}` });
+    await client.command({ query: `SYSTEM DROP ${cache}` }).catch(ignoreUnsupported);
   }
+  await client.command({ query: "SYSTEM JEMALLOC PURGE" }).catch(ignoreUnsupported);
+}
+
+/** A server built without JIT or jemalloc has no such cache to release, which is not a failure. */
+function ignoreUnsupported(error: unknown): void {
+  if (error instanceof ClickHouseError && error.type === "SUPPORT_IS_DISABLED") return;
+  throw error;
 }

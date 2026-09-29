@@ -6,14 +6,14 @@ import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 
 import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
-import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-fold.projection.ts";
-import type { EvaluationAnalyticsRollupRow } from "../eventing/evaluation-analytics-rollup.projection.ts";
-import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
+import type { EvaluationAnalyticsData } from "./evaluation-analytics-fold.projection.ts";
+import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup.projection.ts";
+import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
 import {
-  EvaluationProcessingService,
+  EvaluationProcessingPipelineAdapter,
   type EvaluationAutomationReactions,
   type EvaluationProcessingPipeline,
-} from "./evaluation-processing.service.ts";
+} from "./evaluation-processing-definition.pipeline.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {
@@ -74,9 +74,9 @@ function producerOnlyAutomations(processName: string): EvaluationAutomationReact
  * `processName` names the refusal, so a stand-in reached by accident says which process
  * reached it rather than reporting an anonymous failure.
  */
-export class EvaluationProcessingProducerService {
-  static create(input: { processName: string }): EvaluationProcessingProducerService {
-    return new EvaluationProcessingProducerService(input.processName);
+export class EvaluationProcessingProducerAdapter {
+  static create(input: { processName: string }): EvaluationProcessingProducerAdapter {
+    return new EvaluationProcessingProducerAdapter(input.processName);
   }
 
   private constructor(private readonly processName: string) {}
@@ -84,7 +84,7 @@ export class EvaluationProcessingProducerService {
   build(): EvaluationProcessingPipeline {
     const { processName } = this;
 
-    return EvaluationProcessingService.createPipeline({
+    return EvaluationProcessingPipelineAdapter.createPipeline({
       evalRunStore: new ProducerOnlyFoldStore<EvaluationRunData>(processName, "evaluation run"),
       evaluationAnalyticsStore: new ProducerOnlyFoldStore<EvaluationAnalyticsData>(
         processName,

@@ -301,7 +301,7 @@ describe("the scenarios tRPC transport", () => {
     it("answers not found rather than an empty run", async () => {
       const { caller } = harness({
         getRunState: async ({ scenarioRunId }) => {
-          throw new NotFoundError("not_found", "Scenario run", scenarioRunId);
+          throw new NotFoundError("not_found", { resource: "Scenario run", id: scenarioRunId });
         },
       });
 

@@ -234,11 +234,14 @@ export const datasetWithRecordsInputSchema = datasetLookupInputSchema.safeExtend
 });
 export type DatasetWithRecordsInput = z.input<typeof datasetWithRecordsInputSchema>;
 
+/** The largest page the public dataset REST family accepts; the service must accept it too. */
+export const DATASET_PAGE_LIMIT_MAX = 1000;
+
 export const listDatasetsInputSchema = z
   .object({
     projectId: z.string().min(1),
     page: z.number().int().positive().default(1),
-    limit: z.number().int().positive().max(200).default(50),
+    limit: z.number().int().positive().max(DATASET_PAGE_LIMIT_MAX).default(50),
   })
   .strict();
 export type ListDatasetsInput = z.input<typeof listDatasetsInputSchema>;
@@ -252,7 +255,7 @@ export const datasetRecordLookupInputSchema = z
 
 export const datasetPageInputSchema = datasetRecordLookupInputSchema.safeExtend({
   page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().max(200).default(50),
+  limit: z.number().int().positive().max(DATASET_PAGE_LIMIT_MAX).default(50),
   search: z.string().optional(),
 });
 export type DatasetPageInput = z.input<typeof datasetPageInputSchema>;

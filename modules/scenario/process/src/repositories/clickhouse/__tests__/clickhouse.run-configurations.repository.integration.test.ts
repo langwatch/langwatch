@@ -98,6 +98,18 @@ function scenariosWith(plans: ScenarioPlanRecord[]): ScenarioRepository {
   });
 }
 
+let scenarioRunSequence = 0;
+
+/**
+ * Run ids that sort in the order they were queued, as the platform's do. The
+ * read takes a batch's "first" scenario as its lowest run id, so random ids
+ * would make that pick a coin toss.
+ */
+function nextScenarioRunId(): string {
+  scenarioRunSequence += 1;
+  return `scenariorun-${String(scenarioRunSequence).padStart(6, "0")}-${nanoid()}`;
+}
+
 /**
  * Starts one batch and records every run of it at a chosen moment.
  */
@@ -126,7 +138,7 @@ async function runBatch(params: {
         };
         return {
           tenantId,
-          scenarioRunId: `scenariorun-${nanoid()}`,
+          scenarioRunId: nextScenarioRunId(),
           scenarioId,
           batchRunId,
           scenarioSetId: getSuiteSetId(params.suiteId),

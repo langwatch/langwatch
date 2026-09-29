@@ -11,7 +11,7 @@ import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-pris
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import * as budgetDtos from "../rules/gateway-budget-dto.rules.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
+import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the
@@ -78,7 +78,7 @@ describe.skipIf(!databaseUrl)(
     beforeAll(async () => {
       service = PrismaGatewayAdapter.create({
         database: prisma,
-        projects: new TestProjectApi(),
+        projects: new TraceDestinationProjectService(prisma),
         evaluators: {} as never,
         monitors: {} as never,
         changes: {} as never,

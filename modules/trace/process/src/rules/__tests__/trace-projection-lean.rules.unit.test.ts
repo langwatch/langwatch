@@ -748,10 +748,8 @@ function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
 // ---------------------------------------------------------------------------
 
 /**
- * REGRESSION — >256KB value ONLY in span.events[].attributes, nothing oversized at
- *   span top-level, no large IO attr. Before the fix the Step-2 gate only scanned
- *   span.attributes, so this span returned the original event un-cloned and the cap
- *   never fired, letting the oversized blob flow into the projection queue.
+ * Regression: a >256KB value only in span.events[].attributes is still capped; the gate
+ * once scanned span.attributes alone and let the blob into the projection queue.
  */
 describe("given a SpanReceived event with a >256KB value only in span.events[0].attributes (not at span top-level, not IO)", () => {
   describe("when leanForProjection is applied", () => {
@@ -858,12 +856,8 @@ describe("given a SpanReceived event with a >256KB value only in resource.attrib
 });
 
 /**
- * small structured non-IO attr — must not trigger clone (hot-path guard)
- *
- * Before the fix, ANY non-IO arrayValue/kvlistValue with length > 0 forced a
- * structuredClone regardless of the actual content size. After the fix,
- * hasOversizedAttribute / valueExceeds recurses into the nested values — a
- * small structured attr is a no-op.
+ * Hot-path guard: a small structured non-IO attribute does not force a structuredClone;
+ * the size check recurses into nested values.
  */
 describe("given a span with a small structured non-IO attribute", () => {
   describe("when leanForProjection is applied to an event with a small kvlistValue non-IO attr", () => {

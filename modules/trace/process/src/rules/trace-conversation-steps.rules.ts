@@ -14,6 +14,8 @@ type SpanRole = ConversationStepKind | "not-a-step";
 interface StepContext {
   byId: Map<string, Span>;
   parentIds: Set<string>;
+  /** Spans a model call sits under: an LLM span among them is a wrapper, not a call. */
+  modelParentIds: Set<string>;
   printedProse: Set<string>;
 }
 
@@ -33,6 +35,9 @@ export function extractConversationSteps({
   const context: StepContext = {
     byId: new Map(spans.map((span) => [span.span_id, span])),
     parentIds: new Set(spans.flatMap((span) => (span.parent_id ? [span.parent_id] : []))),
+    modelParentIds: new Set(
+      spans.flatMap((span) => (span.parent_id && span.type === "llm" ? [span.parent_id] : [])),
+    ),
     printedProse: new Set<string>([normalise(replyText)]),
   };
   const steps = spans
@@ -51,6 +56,7 @@ function findStepsOfSpan({
 }): ConversationStep[] {
   const role = spanRole({ span, isLeaf: !context.parentIds.has(span.span_id) });
   if (role === "not-a-step") return [];
+  if (role === "model" && context.modelParentIds.has(span.span_id)) return [];
   const parent = span.parent_id ? context.byId.get(span.parent_id) : undefined;
   if (parent && repeatsParent({ span, parent })) return [];
   const depth = isInsideTool({ span, byId: context.byId }) ? 1 : 0;
@@ -88,10 +94,38 @@ function spanRole({ span, isLeaf }: { span: Span; isLeaf: boolean }): SpanRole {
 /** The tool's own name, from the attributes tool instrumentations record it under. */
 function findToolNames(span: Span): string[] {
   const params = span.params ?? {};
-  const nested = (params.gen_ai as { tool?: { name?: unknown } } | undefined)?.tool?.name;
-  return [params["gen_ai.tool.name"], params.tool_name, nested].filter(
-    (name): name is string => typeof name === "string" && name !== "",
-  );
+  return ["gen_ai.tool.name", "tool_name", "ai.toolCall.name"]
+    .map((path) => valueAt({ params, path }))
+    .filter((name): name is string => typeof name === "string" && name !== "");
+}
+
+/** The result the Vercel AI SDK records on the tool span's attributes rather than as its output. */
+function toolResultOf(span: Span): string {
+  const result = valueAt({ params: span.params ?? {}, path: "ai.toolCall.result" });
+  if (result === undefined || result === null || result === "") return "";
+  return typeof result === "string" ? result : JSON.stringify(result);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * The value at a dotted path, read flat, then nested, then gathered from flat
+ * keys under it, as span params hold any of the three.
+ */
+function valueAt({ params, path }: { params: Record<string, unknown>; path: string }): unknown {
+  if (params[path] !== undefined) return params[path];
+  let node: unknown = params;
+  for (const key of path.split(".")) {
+    node = isRecord(node) ? node[key] : undefined;
+  }
+  if (node !== undefined) return node;
+  const prefix = `${path}.`;
+  const entries = Object.entries(params).filter(([key]) => key.startsWith(prefix));
+  return entries.length > 0
+    ? Object.fromEntries(entries.map(([key, value]) => [key.slice(prefix.length), value]))
+    : undefined;
 }
 
 /** A child that only restates its parent's input and output, as a tool's execution phase does. */
@@ -150,7 +184,8 @@ function ioStep({
 }): ConversationStep {
   const input = ioText(span.input);
   const contexts = "contexts" in span && span.contexts ? JSON.stringify(span.contexts) : "";
-  const output = kind === "retrieval" && contexts ? contexts : ioText(span.output);
+  const output =
+    kind === "retrieval" && contexts ? contexts : ioText(span.output) || toolResultOf(span);
   return {
     kind,
     startedAt: span.timestamps.started_at,
@@ -232,14 +267,8 @@ function findNumbersAt({
   params: Record<string, unknown>;
   path: string;
 }): number[] {
-  const flat = params[path];
-  if (typeof flat === "number") return [flat];
-  let node: unknown = params;
-  for (const key of path.split(".")) {
-    if (typeof node !== "object" || node === null) return [];
-    node = (node as Record<string, unknown>)[key];
-  }
-  return typeof node === "number" ? [node] : [];
+  const value = valueAt({ params, path });
+  return typeof value === "number" ? [value] : [];
 }
 
 function ioText(io: LegacySpanInputOutput | null | undefined): string {

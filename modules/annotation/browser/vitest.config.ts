@@ -2,6 +2,8 @@ import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
+  // Its suites replace modules with vi.mock, so each file needs its own registry.
+  isolate: true,
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],

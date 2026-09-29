@@ -34,7 +34,7 @@ export {
   EVAL_INPUTS_PREVIEW_BYTES,
 } from "./services/evaluation-inputs-offload.service.ts";
 export { EvaluationExecutionIntentService } from "./services/evaluation-execution-intent.service.ts";
-export { createEvaluationProcessingPipeline } from "./services/evaluation-processing.service.ts";
+export { createEvaluationProcessingPipeline } from "./eventing/evaluation-processing-definition.pipeline.ts";
 export { EvaluationCostService } from "./services/evaluation-cost.service.ts";
 export {
   EvaluationExecutionService,

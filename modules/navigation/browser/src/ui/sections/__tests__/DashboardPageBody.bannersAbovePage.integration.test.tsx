@@ -14,67 +14,6 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ pathname: "/[project]", query: { project: "acme" } }),
 }));
 
-vi.mock("../../hooks/useRequiredSession", () => ({
-  useRequiredSession: () => ({
-    data: { user: { id: "user_1" } },
-    status: "authenticated",
-  }),
-}));
-
-vi.mock("../../hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    organization: { id: "org_1" },
-    team: { id: "team_1", name: "Team", isPersonal: false },
-    project: { id: "proj_1" },
-    organizationRole: "MEMBER",
-    hasPermission: () => true,
-  }),
-  userBelongsToTeam: () => true,
-}));
-
-vi.mock("../../hooks/usePublicEnv", () => ({
-  usePublicEnv: () => ({
-    data: {
-      NODE_ENV: "test",
-      HAS_LANGWATCH_NLP_SERVICE: true,
-      HAS_LANGEVALS_ENDPOINT: true,
-    },
-  }),
-}));
-
-vi.mock("../../hooks/usePlanManagementUrl", () => ({
-  usePlanManagementUrl: () => ({ url: "/settings/subscription" }),
-}));
-
-vi.mock("../../hooks/useSavedViews", () => ({
-  SavedViewsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-
-vi.mock("../../utils/api", () => ({
-  api: {
-    limits: {
-      getUsage: {
-        useQuery: () => ({
-          data: {
-            currentMonthCost: 0,
-            maxMonthlyUsageLimit: 100,
-            messageLimitInfo: {
-              status: "exceeded",
-              message: "You reached the limit of 1,000 messages this month.",
-            },
-          },
-        }),
-      },
-    },
-    user: { getSsoStatus: { useQuery: () => ({ data: undefined }) } },
-    governance: {
-      recordWorkspaceView: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-      },
-    },
-  },
-}));
-
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     limits: {
@@ -98,15 +37,6 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
       },
     },
   },
-}));
-
-vi.mock("../../utils/tracking", () => ({ trackEvent: vi.fn() }));
-vi.mock("../AnnouncementBanner", () => ({ AnnouncementBanner: () => null }));
-vi.mock("../CurrentDrawer", () => ({ CurrentDrawer: () => null }));
-vi.mock("../UpgradeModal", () => ({ GlobalUpgradeModal: () => null }));
-vi.mock("../SavedViewsBar", () => ({ SavedViewsBar: () => null }));
-vi.mock("../../features/traces-v2/components/GlobalTraceV2DrawerMount", () => ({
-  GlobalTraceV2DrawerMount: () => null,
 }));
 
 afterEach(() => cleanup());

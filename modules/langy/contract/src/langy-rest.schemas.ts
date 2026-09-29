@@ -77,8 +77,11 @@ export const langyLocalConversationBodySchema = z.object({
   toolCallId: z.string().min(1).optional(),
 });
 
-/** The call or wait a poll and a cancel name in the path. */
-export const langyLocalCallIdParamsSchema = z.object({ id: z.string().min(1) });
+/** The call a poll and a cancel name in the path. */
+export const langyLocalCallIdParamsSchema = z.object({ callId: z.string().min(1) });
+
+/** The wait a poll names in the path. */
+export const langyLocalWaitIdParamsSchema = z.object({ waitId: z.string().min(1) });
 
 /** The conversation a code-access status read optionally narrows to. */
 export const langyLocalWorkspaceQuerySchema = z.object({

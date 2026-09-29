@@ -10,17 +10,17 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { RedisTraceAnalyticsFoldCacheRepository } from "../../repositories/redis/redis.trace-analytics-fold-cache.repository.ts";
 import { RedisTraceSummaryFoldCacheRepository } from "../../repositories/redis/redis.trace-summary-fold-cache.repository.ts";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   type TraceProcessingPipelineInput,
-  TraceProcessingPipelineService,
-} from "../trace-processing-pipeline.service.ts";
+  TraceProcessingRuntimeAdapter,
+} from "../trace-processing-runtime.pipeline.ts";
 
 function compose() {
   const set = vi.fn(async (): Promise<"OK"> => "OK");
   const get = vi.fn(async () => null);
   const redis = createApiFixture<ProcessMembers["redis"]>({ get, set }, "redis");
-  const pipeline = TraceProcessingPipelineService.create({
+  const pipeline = TraceProcessingRuntimeAdapter.create({
     processName: "langwatch-test",
     tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
     peers: createApiFixture<TraceProcessingPipelineInput["peers"]>({
@@ -44,7 +44,7 @@ function compose() {
 
 const context = { aggregateId: "trace-1", tenantId: createTenantId("project-1") };
 
-describe("TraceProcessingPipelineService", () => {
+describe("TraceProcessingRuntimeAdapter", () => {
   describe("given the worker's trace pipeline built over the process's Redis", () => {
     /** @scenario "The worker's trace folds read through the Redis fold cache under main's keyspaces" */
     it.each([

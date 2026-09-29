@@ -6,16 +6,16 @@ import type {
   RetentionPolicyResolver,
 } from "@langwatch/eventing";
 
-import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-fold.projection.ts";
-import type { EvaluationAnalyticsRollupRow } from "../eventing/evaluation-analytics-rollup.projection.ts";
+import type { EvaluationAnalyticsFoldCacheRepository } from "../repositories/evaluation-analytics-fold-cache.repository.ts";
+import type { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
+import type { EvaluationAnalyticsData } from "./evaluation-analytics-fold.projection.ts";
+import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup.projection.ts";
 import {
   EvaluationAnalyticsStore,
   type EvaluationAnalyticsFoldWrites,
-} from "../eventing/evaluation-attributes.store.ts";
-import { EvaluationAnalyticsRollupStore } from "../eventing/evaluation-rollup.store.ts";
-import { EvaluationRunStore } from "../eventing/evaluation-run.store.ts";
-import type { EvaluationAnalyticsFoldCacheRepository } from "../repositories/evaluation-analytics-fold-cache.repository.ts";
-import type { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
+} from "./evaluation-attributes.store.ts";
+import { EvaluationAnalyticsRollupStore } from "./evaluation-rollup.store.ts";
+import { EvaluationRunStore } from "./evaluation-run.store.ts";
 
 export interface EvaluationEventingStores {
   readonly evalRunStore: FoldProjectionStore<EvaluationRunData>;
@@ -33,7 +33,7 @@ export type EvaluationAnalyticsWrites = EvaluationAnalyticsFoldWrites &
  * The stores evaluation_processing projects into: the run fold over the run
  * repository, the analytics fold behind its cache, and the rollup append.
  */
-export class EvaluationEventingService {
+export class EvaluationProcessingStoresAdapter {
   private constructor(
     private readonly input: {
       runs: EvaluationRunProjectionRepository;
@@ -51,8 +51,8 @@ export class EvaluationEventingService {
     analyticsFoldCache: EvaluationAnalyticsFoldCacheRepository;
     defaultRetentionDays: () => number;
     tenantRetention: RetentionPolicyResolver;
-  }): EvaluationEventingService {
-    return new EvaluationEventingService(input);
+  }): EvaluationProcessingStoresAdapter {
+    return new EvaluationProcessingStoresAdapter(input);
   }
 
   buildStores(): EvaluationEventingStores {

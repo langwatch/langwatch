@@ -28,7 +28,7 @@ LangWatch is configured through environment variables. How you set them depends 
 
 <Note>
   There is no in-process worker mode. The app and the background workers are always separate
-  processes/pods — see [Architecture](/self-hosting/infrastructure/architecture) and the `workers.*`
+  processes/pods. See [Architecture](/self-hosting/infrastructure/architecture) and the `workers.*`
   Helm values below.
 </Note>
 
@@ -343,7 +343,8 @@ The `smtp` gateway ignores these variables on purpose, because an SMTP relay is 
 | Variable              | Description                       | Default |
 | --------------------- | --------------------------------- | ------- |
 | `DISABLE_USAGE_STATS` | Stop the daily usage report. See [Data and telemetry](/self-hosting/data-and-telemetry) for what it carries and the two smaller switches | `false` |
-| `METRICS_API_KEY`     | API key for metrics collection    | -       |
+| `LANGWATCH_METRICS_MODE` | `otlp` pushes metrics to `OTEL_EXPORTER_OTLP_ENDPOINT`; `prometheus` serves a `/metrics` scrape endpoint instead. The Helm chart sets `prometheus` when `app.telemetry.metrics.enabled` is true | `otlp` |
+| `LANGWATCH_METRICS_TOKEN` | Bearer token a Prometheus scrape must send. In production, `/metrics` is not served without it | -       |
 
 ## Langy (optional)
 
@@ -400,7 +401,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.governance.erasurePseudonymSecret.value` | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET`. Derives the stand-in that replaces an erased identifier. Optional until somebody is erased; required in the app and the workers alike afterwards, with the same value in both |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
-| `workers.enabled` | Not an environment variable — toggles whether the separate workers Deployment is created at all. There is no in-process worker mode to fall back to. |
+| `workers.enabled` | Not an environment variable. It toggles whether the separate workers Deployment is created at all. There is no in-process worker mode to fall back to. |
 
 <Tip>
 For production, use `secretKeyRef` instead of inline values. This references a Kubernetes Secret:

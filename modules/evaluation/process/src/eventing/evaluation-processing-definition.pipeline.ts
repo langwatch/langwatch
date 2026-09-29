@@ -23,17 +23,17 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
+import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
 import {
   type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
-} from "../eventing/evaluation-analytics-fold.projection.ts";
+} from "./evaluation-analytics-fold.projection.ts";
 import {
   EvaluationAnalyticsRollupMapProjection,
   type EvaluationAnalyticsRollupRow,
-} from "../eventing/evaluation-analytics-rollup.projection.ts";
-import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
-import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
-import { EvaluationCommandService } from "./evaluation-command.service.ts";
+} from "./evaluation-analytics-rollup.projection.ts";
+import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
+import { EvaluationRunFoldProjection } from "./evaluation-run.projection.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 
@@ -64,15 +64,15 @@ export type EvaluationAutomationReactions = Pick<
 >;
 
 /** Tracks evaluation lifecycle (scheduled → completed) via evaluation-level aggregates. */
-export class EvaluationProcessingService {
-  static create(deps: EvaluationProcessingPipelineDeps): EvaluationProcessingService {
-    return new EvaluationProcessingService(deps);
+export class EvaluationProcessingPipelineAdapter {
+  static create(deps: EvaluationProcessingPipelineDeps): EvaluationProcessingPipelineAdapter {
+    return new EvaluationProcessingPipelineAdapter(deps);
   }
 
   static createPipeline(
     deps: EvaluationProcessingPipelineDeps,
-  ): ReturnType<EvaluationProcessingService["build"]> {
-    return EvaluationProcessingService.create(deps).build();
+  ): ReturnType<EvaluationProcessingPipelineAdapter["build"]> {
+    return EvaluationProcessingPipelineAdapter.create(deps).build();
   }
 
   private constructor(private readonly deps: EvaluationProcessingPipelineDeps) {}
@@ -119,8 +119,8 @@ export class EvaluationProcessingService {
         events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
         delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
         dedup: {
-          makeId: EvaluationProcessingService.graphTriggerActivityGroupKey.bind(
-            EvaluationProcessingService,
+          makeId: EvaluationProcessingPipelineAdapter.graphTriggerActivityGroupKey.bind(
+            EvaluationProcessingPipelineAdapter,
           ),
           ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
           extend: false,
@@ -130,8 +130,8 @@ export class EvaluationProcessingService {
         // carries no pipeline segment, so both pipelines' sweeps serialize in
         // ONE lane per tenant — a sweep evaluates all of the tenant's graph
         // triggers regardless of which event kind woke it.
-        groupKeyFn: EvaluationProcessingService.graphTriggerActivityGroupKey.bind(
-          EvaluationProcessingService,
+        groupKeyFn: EvaluationProcessingPipelineAdapter.graphTriggerActivityGroupKey.bind(
+          EvaluationProcessingPipelineAdapter,
         ),
         handler: (event, context) =>
           this.deps.automations.handleEvaluationGraphTriggerActivity({ event, context }),
@@ -167,6 +167,5 @@ export class EvaluationProcessingService {
   }
 }
 
-export const createEvaluationProcessingPipeline = EvaluationProcessingService.createPipeline.bind(
-  EvaluationProcessingService,
-);
+export const createEvaluationProcessingPipeline =
+  EvaluationProcessingPipelineAdapter.createPipeline.bind(EvaluationProcessingPipelineAdapter);

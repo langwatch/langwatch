@@ -18,7 +18,7 @@ export class ApiHelpers {
     const results = await Promise.allSettled(targets.map((h) => this.langwatch.prompts.delete(h)));
     const failures = results
       .map((r, i) => ({ r, handle: targets[i] }))
-      .filter(({ r }) => r.status === "rejected");
+      .filter(({ r }) => r.status === "rejected" && !isAlreadyGone(r.reason));
     if (failures.length > 0) {
       const detail = failures
         .map(({ r, handle }) => `${handle}: ${(r as PromiseRejectedResult).reason}`)
@@ -28,4 +28,9 @@ export class ApiHelpers {
       );
     }
   };
+}
+
+/** A test that deleted its own prompt leaves nothing for the sweep: a 404 is the goal met. */
+function isAlreadyGone(reason: unknown): boolean {
+  return (reason as { httpStatus?: number } | null)?.httpStatus === 404;
 }

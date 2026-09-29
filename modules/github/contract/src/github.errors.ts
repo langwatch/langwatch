@@ -4,7 +4,7 @@ export class GithubNotConnectedError extends NotFoundError {
   declare readonly code: "github_not_connected";
 
   constructor(organizationId: string) {
-    super("github_not_connected", "GitHub connection", organizationId);
+    super("github_not_connected", { resource: "GitHub connection", id: organizationId });
   }
 }
 
@@ -12,7 +12,10 @@ export class GithubPullRequestNotMappedError extends NotFoundError {
   declare readonly code: "github_pr_not_mapped";
 
   constructor(input: { repositoryFullName: string; prNumber: number }) {
-    super("github_pr_not_mapped", "pull request", `${input.repositoryFullName}#${input.prNumber}`);
+    super("github_pr_not_mapped", {
+      resource: "pull request",
+      id: `${input.repositoryFullName}#${input.prNumber}`,
+    });
   }
 }
 

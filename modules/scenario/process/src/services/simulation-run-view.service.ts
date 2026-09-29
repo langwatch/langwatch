@@ -39,7 +39,8 @@ export class SimulationRunViewService {
   /** A point lookup by unique run id, with no window, so old runs stay reachable. */
   async getRunState(input: SimulationScenarioRunInput): Promise<SimulationRunData> {
     const data = await this.#simulations.findScenarioRunData(input);
-    if (!data) throw new NotFoundError("not_found", "Scenario run", input.scenarioRunId);
+    if (!data)
+      throw new NotFoundError("not_found", { resource: "Scenario run", id: input.scenarioRunId });
     return data;
   }
 

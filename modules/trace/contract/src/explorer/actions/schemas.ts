@@ -184,7 +184,7 @@ export const runInstantEvalPayloadSchema = z
       .enum(["traces", "threads", "llm_spans"])
       .optional()
       .describe(
-        "What one judged row is. Omit to judge what the lens shows: conversations on the Conversations lens, traces elsewhere.",
+        "What one judged row is. Omit to judge what the lens shows: conversations on the Conversations lens, traces elsewhere. A conversation is judged with every turn's tool calls and results, so a question about what the agent did works on either.",
       ),
   })
   .describe(

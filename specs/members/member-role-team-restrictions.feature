@@ -293,6 +293,15 @@ Feature: Member Role Team Restrictions
     Then at most one of them commits
     And the team keeps at least one admin
 
+  @integration
+  Scenario: A team admin removal that starts while another is being written is refused
+    Given a team whose only two admins are admin A and admin B
+    And the removal of admin A has been checked but its revocation has not landed yet
+    When the removal of admin B starts
+    Then it waits for the removal of admin A to finish
+    And it is refused because admin B is now the team's last admin
+    And the team keeps exactly one admin
+
   # "Has an admin" counts people. A group given the Admin role on a team
   # administers it through every one of its members, so a change the group can
   # absorb is not taking the team's last admin away, and a team administered

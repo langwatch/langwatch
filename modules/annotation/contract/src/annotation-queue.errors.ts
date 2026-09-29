@@ -32,9 +32,13 @@ export class AnnotationQueueItemNotFoundError extends NotFoundError {
   declare readonly code: "annotation_queue_item_not_found";
 
   constructor(queueItemId: string) {
-    super("annotation_queue_item_not_found", "Queue item", queueItemId, {
-      meta: { queueItemId },
-    });
+    super(
+      "annotation_queue_item_not_found",
+      { resource: "Queue item", id: queueItemId },
+      {
+        meta: { queueItemId },
+      },
+    );
 
     this.name = "AnnotationQueueItemNotFoundError";
   }
@@ -44,7 +48,11 @@ export class AnnotationQueueNotFoundError extends NotFoundError {
   declare readonly code: "annotation_queue_not_found";
 
   constructor(queueId: string) {
-    super("annotation_queue_not_found", "Annotation queue", queueId, { meta: { queueId } });
+    super(
+      "annotation_queue_not_found",
+      { resource: "Annotation queue", id: queueId },
+      { meta: { queueId } },
+    );
     this.name = "AnnotationQueueNotFoundError";
   }
 }

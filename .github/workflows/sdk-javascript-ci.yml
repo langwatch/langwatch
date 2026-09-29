@@ -308,6 +308,12 @@ jobs:
           # The e2e global setup probes the seed's DEFAULT_INGESTION_KEY, so
           # the seed writes that key.
           HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-local-development-key
+          # The seed stores these as the organisation's OpenAI provider, which the
+          # simulator and judge of a scenario run call through nlpgo. They land in
+          # the database only, so the app and worker never inherit the gateway URL.
+          # Without the secret (forks, Dependabot) the seed skips the provider.
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
         run: pnpm prisma:seed
 
       - name: Install goose
@@ -326,6 +332,19 @@ jobs:
         working-directory: .
         run: pnpm run build:types && NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
 
+      # Scenario runs need the NLP engine: a worker without LANGWATCH_NLP_SERVICE
+      # composes no scenario executor and every queued run waits forever.
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Build the Go service binary and the scenario child bundle
+        working-directory: .
+        run: |
+          go build -o /tmp/langwatch-service ./cmd/service
+          pnpm --filter @langwatch/scenario-child run build
+
       - name: Start LangWatch server and worker
         working-directory: .
         env:
@@ -333,11 +352,13 @@ jobs:
           # Pointing a LangWatch process at its own ingest is a feedback loop,
           # so blank it here.
           LANGWATCH_API_KEY: ""
+          LANGWATCH_NLP_SERVICE: http://localhost:5561
         run: |
-          # Capture both processes' output: background-process stdout is lost
+          # Capture every process's output: background-process stdout is lost
           # once this step ends, which has already hidden one real regression
           # (a server-side 500 on the visibility poll shows up only as SDK
           # test timeouts). The failure step below tails these files.
+          SERVER_ADDR=:5561 /tmp/langwatch-service nlpgo > /tmp/langwatch-nlpgo.log 2>&1 &
           # The api listens on API_PORT (6560 by default); the SDK and the probe call 5560.
           API_PORT=5560 NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
           # Start the worker process so the event-sourcing pipeline
@@ -345,7 +366,8 @@ jobs:
           pnpm --filter @langwatch/worker start > /tmp/langwatch-workers.log 2>&1 &
           # Wait for server to be ready
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
-          echo "✅ LangWatch server is ready"
+          timeout 30 bash -c 'until curl -sf http://localhost:5561/healthz >/dev/null; do sleep 1; done'
+          echo "✅ LangWatch server and nlpgo are ready"
 
       # Already installed above alongside the app; nothing further to fetch.
 
@@ -376,10 +398,21 @@ jobs:
       - name: Dump server and worker logs on failure
         if: failure()
         run: |
+          # The tails alone are mostly ClickHouse backup_log polling, so first
+          # pull out the warnings, errors and the scenario/suite/agent path.
+          for name in server workers nlpgo; do
+            log="/tmp/langwatch-$name.log"
+            echo "===== langwatch $name: errors, warnings, scenario/simulation/suite/agent lines ====="
+            grep -v -i "backup_log" "$log" \
+              | grep -i -E '"level":"(warn|error|fatal)"|\[error\]|scenario|simulation|suite|agent' \
+              | tail -400 || true
+          done
           echo "===== langwatch server (last 300 lines) ====="
           tail -300 /tmp/langwatch-server.log || true
           echo "===== langwatch workers (last 300 lines) ====="
           tail -300 /tmp/langwatch-workers.log || true
+          echo "===== nlpgo (last 100 lines) ====="
+          tail -100 /tmp/langwatch-nlpgo.log || true
 
   sdk-javascript-complete:
     needs: [changes, ci, e2e]

@@ -172,13 +172,12 @@ jobs:
           --health-timeout 30s
           --health-retries 3
 
-      # NOTE: langwatch_nlp is intentionally NOT a service container here.
-      # The langwatch app auto-starts its own nlpgo binary on :5563
-      # (visible as "✓ nlpgo: auto-start on :5563" in startup logs).
-      # Adding a Docker service container on port 5563 causes an
-      # "address already in use" conflict that crash-loops the app.
-      # LANGWATCH_NLP_SERVICE=http://localhost:5563 is set in the env
-      # section above and the app's own nlpgo binary satisfies it.
+      # No nlpgo runs in this job: only `pnpm dev` starts one, and the api and
+      # worker below are started directly. LANGWATCH_NLP_SERVICE therefore names
+      # a port nothing listens on, so a scenario run is only queued, never
+      # executed; the scenario specs assert the queued run or the missing-provider
+      # notice. A suite that needs a run to finish starts nlpgo the way
+      # sdk-javascript-ci.yml does (go build ./cmd/service, then `nlpgo`).
 
       langevals:
         image: langwatch/langevals:latest
@@ -225,23 +224,6 @@ jobs:
           node-version: 24
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
-
-      # start.sh auto-starts the aigateway + nlpgo Go services via
-      # `go run ./cmd/service`. Without a Go toolchain + warm caches, both
-      # lanes cold-download the toolchain and the full module graph while
-      # tsx is booting the API server — starving it past global-setup's
-      # 60s readiness window on the 2-core runner (intermittent
-      # "API not ready ... backend never answered its tRPC door" failures).
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-
-      # Compile the service dispatcher (imports both aigateway and nlpgo)
-      # up front so the auto-start lanes' `go run` during `pnpm start` is a
-      # warm-cache no-op and the API lane keeps the CPU while it boots.
-      - name: Pre-build Go services
-        run: go build -o /dev/null ./cmd/service
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`, which pnpm

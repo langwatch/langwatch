@@ -350,11 +350,10 @@ const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
 
 /** A browser target is `browser-package-closure`'s edge, so it is reported there once. */
 const crossFeatureCheck: DependencyCheck = (pkg, target, dependency) => {
+  if (!pkg.feature || !target.feature) return undefined;
   const isForeignFeature = pkg.feature !== target.feature;
   const isImplementationTarget = target.kind !== "contract" && target.kind !== "browser";
-  if (!pkg.feature || !target.feature || !isForeignFeature || !isImplementationTarget) {
-    return undefined;
-  }
+  if (!isForeignFeature || !isImplementationTarget) return undefined;
 
   return {
     policy: "cross-feature",

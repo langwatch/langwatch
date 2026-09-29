@@ -10,12 +10,12 @@ import { dirname, join } from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 
 /**
- * The shipped migration files, resolved through the package that owns them
- * rather than by walking the workspace: the entry point is `src/index.ts`, and
- * `migrations/` sits beside `src/`.
+ * The shipped migration files, resolved through `@langwatch/clickhouse-migrations`,
+ * the package that owns them, rather than by walking the workspace: the entry
+ * point is `src/index.ts`, and `migrations/` sits beside `src/`.
  */
 const migrationsDirectory = join(
-  dirname(createRequire(import.meta.url).resolve("@langwatch/clickhouse-client")),
+  dirname(createRequire(import.meta.url).resolve("@langwatch/clickhouse-migrations")),
   "..",
   "migrations",
 );

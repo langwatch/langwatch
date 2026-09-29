@@ -130,35 +130,41 @@ export const scenarioIdInputSchema = z
   .strict();
 export type ScenarioIdInput = z.infer<typeof scenarioIdInputSchema>;
 
-const scenarioFieldsSchema = z
+// No defaults here: under `.partial()` Zod still applies a default, so an
+// update that never named criteria or labels would write them as empty.
+const scenarioFieldsShape = {
+  name: z.string().min(1),
+  situation: z.string(),
+  criteria: z.array(z.string()),
+  labels: z.array(z.string()),
+  parameters: scenarioParameterDefinitionsSchema.nullable().optional(),
+  simulatorModel: z.string().nullable().optional(),
+  judgeModel: z.string().nullable().optional(),
+  maxTurns: z.number().int().min(1).max(100).nullable().optional(),
+  minTurns: z.number().int().min(0).max(100).nullable().optional(),
+  lastUpdatedById: z.string().nullable().optional(),
+  testSuiteId: z.string().min(1).nullable().optional(),
+  fields: scenarioFieldValuesSchema.optional(),
+  // The simulated caller's voice for a voice target. Absent leaves it
+  // unset (create) or keeps the current voice (update); send the default
+  // config to clear. Never null: a plain null is not a valid Prisma JSON
+  // write, matching the pre-module router's contract.
+  callerVoice: callerVoiceConfigSchema.optional(),
+};
+
+export const scenarioCreateInputSchema = z
   .object({
-    name: z.string().min(1),
-    situation: z.string(),
+    ...scenarioFieldsShape,
     criteria: z.array(z.string()).default([]),
     labels: z.array(z.string()).default([]),
-    parameters: scenarioParameterDefinitionsSchema.nullable().optional(),
-    simulatorModel: z.string().nullable().optional(),
-    judgeModel: z.string().nullable().optional(),
-    maxTurns: z.number().int().min(1).max(100).nullable().optional(),
-    minTurns: z.number().int().min(0).max(100).nullable().optional(),
-    lastUpdatedById: z.string().nullable().optional(),
-    testSuiteId: z.string().min(1).nullable().optional(),
-    fields: scenarioFieldValuesSchema.optional(),
-    // The simulated caller's voice for a voice target. Absent leaves it
-    // unset (create) or keeps the current voice (update); send the default
-    // config to clear. Never null: a plain null is not a valid Prisma JSON
-    // write, matching the pre-module router's contract.
-    callerVoice: callerVoiceConfigSchema.optional(),
+    projectId: z.string().min(1),
+    actor: scenarioActorSchema.optional(),
   })
   .strict();
-
-export const scenarioCreateInputSchema = scenarioFieldsSchema.safeExtend({
-  projectId: z.string().min(1),
-  actor: scenarioActorSchema.optional(),
-});
 export type ScenarioCreateInput = z.infer<typeof scenarioCreateInputSchema>;
 
-export const scenarioUpdateInputSchema = scenarioFieldsSchema
+export const scenarioUpdateInputSchema = z
+  .object(scenarioFieldsShape)
   .partial()
   .safeExtend({
     ...scenarioIdInputSchema.shape,

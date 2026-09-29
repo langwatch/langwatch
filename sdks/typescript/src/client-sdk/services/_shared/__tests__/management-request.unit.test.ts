@@ -102,10 +102,9 @@ describe("OrganizationsAdminApiService", () => {
 });
 
 describe("managementPath", () => {
-  it("addresses the latest namespace explicitly, with the collection root at its trailing slash", () => {
-    // The bare alias is gone (packages/api/adrs/002): a bare call 404s, and a
-    // family root mounts at `/{version}/` because its route path is `/`.
-    expect(managementPath("/api/v1/roles")).toBe("/api/v1/roles/latest/");
+  it("addresses the latest namespace explicitly, with the collection root at no trailing slash", () => {
+    // A family root answers at `/{version}`; `/{version}/` is a 404.
+    expect(managementPath("/api/v1/roles")).toBe("/api/v1/roles/latest");
     expect(managementPath("/api/v1/roles/permissions")).toBe("/api/v1/roles/latest/permissions");
     expect(managementPath("/api/v1/organization/invites/invite_1")).toBe(
       "/api/v1/organization/latest/invites/invite_1",

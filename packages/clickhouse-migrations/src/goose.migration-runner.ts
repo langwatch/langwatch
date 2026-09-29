@@ -194,21 +194,27 @@ export function parseConnectionUrl({
   };
 }
 
-function checkGooseBinary(): void {
+/**
+ * The absolute goose path, found on this process's PATH. Spawned by path
+ * because goose's own environment may carry no PATH, and Linux resolves a
+ * bare command against the child's environment, not the parent's.
+ */
+function locateGoose(): string {
   const result = spawnSync("which", ["goose"], { encoding: "utf-8" });
-  if (result.status !== 0) {
+  const located = result.status === 0 ? result.stdout.trim() : "";
+  if (located === "") {
     throw new MigrationError(
       "Goose binary not found. Install from https://github.com/pressly/goose",
       "preflight",
     );
   }
+  return located;
 }
 
 async function preflight(config: ClickHouseConfig): Promise<void> {
   logger.debug("Running pre-flight checks...");
 
-  // Check goose binary exists
-  checkGooseBinary();
+  locateGoose();
 
   try {
     await withClient(config.serverUrl, async (client) => {
@@ -492,7 +498,7 @@ function executeGoose({
   }
 
   // Always pipe output so we can check for specific messages
-  const result = spawnSync("goose", args, {
+  const result = spawnSync(locateGoose(), args, {
     encoding: "utf-8",
     stdio: "pipe",
     env: envVars,

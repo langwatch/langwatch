@@ -53,7 +53,7 @@ describe("given a target and some questions", () => {
   });
 
   describe("when the target is threads", () => {
-    /** @scenario "The threads target judges one bounded transcript per conversation" */
+    /** @scenario "The threads target judges the steps view of each conversation" */
     it("groups the metrics view by conversation and judges its transcript", () => {
       const { sql } = expand({ target: "threads" });
 
@@ -67,7 +67,7 @@ describe("given a target and some questions", () => {
         questions: [{ id: "q1", kind: "boolean", instructions: "The customer sounds annoyed" }],
       });
       expect(sql).toContain(
-        `conversation_bounded(m.ConversationId, ${instantEvalTranscriptRenderTokens({ textBudgetTokens: available })}, '')`,
+        `llm_readable_thread(m.ConversationId, ${instantEvalTranscriptRenderTokens({ textBudgetTokens: available })})`,
       );
     });
   });

@@ -21,6 +21,8 @@ export {
   type ConversationStep,
   type ConversationStepKind,
   type ConversationStepUsage,
+  type ConversationView,
   FULL_CONVERSATION_DETAIL,
   renderConversationSteps,
+  renderToolLine,
 } from "./conversation-steps.ts";

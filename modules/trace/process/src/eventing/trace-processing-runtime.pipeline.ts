@@ -20,38 +20,38 @@ import type {
 } from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
-import { createCodingAgentSpanFactsDispatchSubscriber } from "../eventing/coding-agent-span-facts-dispatch.subscriber.ts";
-import { createCustomEvaluationSyncHandler } from "../eventing/custom-evaluation-sync.subscriber.ts";
-import { createDeferredOriginHandler } from "../eventing/deferred-origin.process.ts";
-import { createEvaluationTriggerSubscriber } from "../eventing/evaluation-trigger.subscriber.ts";
-import { createExperimentMetricsSyncHandler } from "../eventing/experiment-metrics-sync.subscriber.ts";
-import { passesTraceOriginGuards } from "../eventing/origin-guarded.subscriber.ts";
-import { createProjectMetadataHandler } from "../eventing/project-metadata.subscriber.ts";
-import { EventingRecordSpanAdapter } from "../eventing/record-span.commands.ts";
-import { createSimulationMetricsSyncHandler } from "../eventing/simulation-metrics-sync.subscriber.ts";
-import { createSpanStorageBroadcastHandler } from "../eventing/span-storage-broadcast.subscriber.ts";
-import { SpanStorageStore } from "../eventing/span-storage.store.ts";
-import { TraceAnalyticsStore } from "../eventing/trace-derived.store.ts";
-import { createTraceProcessingProducerPipeline } from "../eventing/trace-processing-producer.pipeline.ts";
-import { EventingTracePipelineAdapter } from "../eventing/trace-processing-projections.pipeline.ts";
-import { buildTraceProcessingConsumer } from "../eventing/trace-processing.pipeline.ts";
-import { TraceAnalyticsRollupStore } from "../eventing/trace-rollup.store.ts";
-import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
-import { createTraceUpdateBroadcastHandler } from "../eventing/trace-update-broadcast.subscriber.ts";
+import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
+import { OtlpSpanCostEnrichmentService } from "../services/span-cost-enrichment.service.ts";
+import { OtlpSpanTokenEstimationService } from "../services/span-token-estimation.service.ts";
+import { TraceEvaluationLoopMetricsService } from "../services/trace-evaluation-loop-metrics.service.ts";
+import { TraceIoExtractionAdapterService } from "../services/trace-io-extraction-adapter.service.ts";
+import { TraceMediaReferenceService } from "../services/trace-media-reference.service.ts";
+import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
+import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
+import { TraceSpanNormalizationAdapterService } from "../services/trace-span-normalization-adapter.service.ts";
+import { createCodingAgentSpanFactsDispatchSubscriber } from "./coding-agent-span-facts-dispatch.subscriber.ts";
+import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subscriber.ts";
+import { createDeferredOriginHandler } from "./deferred-origin.process.ts";
+import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
+import { createExperimentMetricsSyncHandler } from "./experiment-metrics-sync.subscriber.ts";
+import { passesTraceOriginGuards } from "./origin-guarded.subscriber.ts";
+import { createProjectMetadataHandler } from "./project-metadata.subscriber.ts";
+import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
+import { createSimulationMetricsSyncHandler } from "./simulation-metrics-sync.subscriber.ts";
+import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
+import { SpanStorageStore } from "./span-storage.store.ts";
+import { TraceAnalyticsStore } from "./trace-derived.store.ts";
+import { createTraceProcessingProducerPipeline } from "./trace-processing-producer.pipeline.ts";
+import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
+import { buildTraceProcessingConsumer } from "./trace-processing.pipeline.ts";
+import { TraceAnalyticsRollupStore } from "./trace-rollup.store.ts";
+import { TraceSummaryStore } from "./trace-summary.store.ts";
+import { createTraceUpdateBroadcastHandler } from "./trace-update-broadcast.subscriber.ts";
 import {
   type TrackedEventSyncSubscriberDeps,
   createTrackedEventSyncHandler,
-} from "../eventing/tracked-event-sync.subscriber.ts";
-import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
-import { OtlpSpanCostEnrichmentService } from "./span-cost-enrichment.service.ts";
-import { OtlpSpanTokenEstimationService } from "./span-token-estimation.service.ts";
-import { TraceEvaluationLoopMetricsService } from "./trace-evaluation-loop-metrics.service.ts";
-import { TraceIoExtractionAdapterService } from "./trace-io-extraction-adapter.service.ts";
-import { TraceMediaReferenceService } from "./trace-media-reference.service.ts";
-import { TraceModelCostService } from "./trace-model-cost.service.ts";
-import type { TraceProcessingCommandsService } from "./trace-processing-commands.service.ts";
-import { TraceSpanNormalizationAdapterService } from "./trace-span-normalization-adapter.service.ts";
+} from "./tracked-event-sync.subscriber.ts";
 
 export interface TraceProcessingPeers {
   codingAgents: Pick<CodingAgentApi, "contributeReceivedSpan">;
@@ -99,9 +99,9 @@ export interface TraceProcessingPipelineInput {
 }
 
 /** trace_processing per role: producers send; consumers fold and react as main's worker did. */
-export class TraceProcessingPipelineService {
-  static create(input: TraceProcessingPipelineInput): TraceProcessingPipelineService {
-    return new TraceProcessingPipelineService(input);
+export class TraceProcessingRuntimeAdapter {
+  static create(input: TraceProcessingPipelineInput): TraceProcessingRuntimeAdapter {
+    return new TraceProcessingRuntimeAdapter(input);
   }
 
   private constructor(private readonly input: TraceProcessingPipelineInput) {}

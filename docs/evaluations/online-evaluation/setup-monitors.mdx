@@ -61,6 +61,8 @@ A trace is one request and response. A thread is the whole conversation, grouped
 
 Pick **Thread Level** in the drawer. The evaluator's variables now map to the **Current Thread** source, whose `traces` field holds every trace in the thread with its input and output.
 
+The **Full Thread (AI-Readable)** field (`formatted_traces`) holds the thread as one text: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), cut to 64,000 tokens. It is the same rendering as the [`llm_readable_thread`](/api-reference/query/extraction-functions#which-thread-function-to-use) query function.
+
 <Frame>
   <img
     src="/images/evaluations/online-evaluation-thread-level.png"

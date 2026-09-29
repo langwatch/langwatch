@@ -7,13 +7,13 @@ import type { EvaluationRunData, UpsertEvaluationRunCommand } from "@langwatch/e
 import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { EvaluationAnalyticsFoldProjection } from "../../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationRunProjectionRepository } from "../../repositories/evaluation-run-projection.repository.ts";
 import { MemoryEvaluationAnalyticsFoldCacheRepository } from "../../repositories/memory/memory.evaluation-analytics-fold-cache.repository.ts";
+import { EvaluationAnalyticsFoldProjection } from "../evaluation-analytics-fold.projection.ts";
 import {
-  EvaluationEventingService,
+  EvaluationProcessingStoresAdapter,
   type EvaluationAnalyticsWrites,
-} from "../evaluation-eventing.service.ts";
+} from "../evaluation-processing-stores.pipeline.ts";
 
 const TENANT = "project-1";
 const context: ProjectionStoreContext = {
@@ -50,7 +50,7 @@ function storesReading(defaultRetentionDays: () => number) {
   const runs: UpsertEvaluationRunCommand[] = [];
   const analytics: AnalyticsEvaluationUpsertInput[] = [];
   const rollups: AnalyticsEvaluationRollupAppendInput[] = [];
-  const stores = EvaluationEventingService.create({
+  const stores = EvaluationProcessingStoresAdapter.create({
     runs: createApiFixture<EvaluationRunProjectionRepository>({
       upsertRun: async (input) => {
         runs.push(input);

@@ -242,7 +242,7 @@ export class UserLinkedAccountNotFoundError extends NotFoundError {
   declare readonly code: "linked_account_not_found";
 
   constructor(accountId: string) {
-    super("linked_account_not_found", "Sign-in method", accountId);
+    super("linked_account_not_found", { resource: "Sign-in method", id: accountId });
     this.name = "UserLinkedAccountNotFoundError";
   }
 }
@@ -255,7 +255,10 @@ export class UserFederatedPasswordAccountMissingError extends NotFoundError {
   declare readonly code: "federated_password_account_missing";
 
   constructor(userId: string) {
-    super("federated_password_account_missing", "Password sign-in method", userId);
+    super("federated_password_account_missing", {
+      resource: "Password sign-in method",
+      id: userId,
+    });
     this.name = "UserFederatedPasswordAccountMissingError";
   }
 }
@@ -336,7 +339,7 @@ export class UserNotFoundError extends NotFoundError {
   declare readonly code: "user_not_found";
 
   constructor(userId: string) {
-    super("user_not_found", "User", userId, { meta: { userId } });
+    super("user_not_found", { resource: "User", id: userId }, { meta: { userId } });
     this.name = "UserNotFoundError";
   }
 }
@@ -349,7 +352,7 @@ export class UserAvatarNotFoundError extends NotFoundError {
   declare readonly code: "avatar_not_found";
 
   constructor(id: string) {
-    super("avatar_not_found", "Avatar", id);
+    super("avatar_not_found", { resource: "Avatar", id: id });
     this.name = "UserAvatarNotFoundError";
   }
 }

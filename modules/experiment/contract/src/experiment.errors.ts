@@ -4,10 +4,14 @@ export class ExperimentNotFoundError extends NotFoundError {
   declare readonly code: "experiment_not_found";
 
   constructor(id: string, options: { reasons?: readonly Error[] } = {}) {
-    super("experiment_not_found", "Experiment", id, {
-      meta: { experimentId: id },
-      ...options,
-    });
+    super(
+      "experiment_not_found",
+      { resource: "Experiment", id: id },
+      {
+        meta: { experimentId: id },
+        ...options,
+      },
+    );
     this.name = "ExperimentNotFoundError";
   }
 }
@@ -16,10 +20,14 @@ export class ExperimentDspyStepNotFoundError extends NotFoundError {
   declare readonly code: "dspy_step_not_found";
 
   constructor(stepId: string, options: { reasons?: readonly Error[] } = {}) {
-    super("dspy_step_not_found", "DSPy step", stepId, {
-      meta: { stepId },
-      ...options,
-    });
+    super(
+      "dspy_step_not_found",
+      { resource: "DSPy step", id: stepId },
+      {
+        meta: { stepId },
+        ...options,
+      },
+    );
     this.name = "ExperimentDspyStepNotFoundError";
   }
 }
@@ -28,10 +36,14 @@ export class ExperimentRunNotFoundError extends NotFoundError {
   declare readonly code: "run_not_found";
 
   constructor(runId: string, options: { reasons?: readonly Error[] } = {}) {
-    super("run_not_found", "Run", runId, {
-      meta: { runId },
-      ...options,
-    });
+    super(
+      "run_not_found",
+      { resource: "Run", id: runId },
+      {
+        meta: { runId },
+        ...options,
+      },
+    );
     this.name = "ExperimentRunNotFoundError";
   }
 }
@@ -154,9 +166,13 @@ export class ExperimentVersionNotFoundError extends NotFoundError {
   declare readonly code: "experiment_version_not_found";
 
   constructor({ experimentId, version }: { experimentId: string; version: number }) {
-    super("experiment_version_not_found", "Experiment version", String(version), {
-      meta: { experimentId, version },
-    });
+    super(
+      "experiment_version_not_found",
+      { resource: "Experiment version", id: String(version) },
+      {
+        meta: { experimentId, version },
+      },
+    );
     this.name = "ExperimentVersionNotFoundError";
   }
 }
@@ -166,9 +182,13 @@ export class ExperimentWorkflowNotFoundError extends NotFoundError {
   declare readonly code: "experiment_workflow_not_found";
 
   constructor(experimentId: string) {
-    super("experiment_workflow_not_found", "Experiment workflow", experimentId, {
-      meta: { experimentId },
-    });
+    super(
+      "experiment_workflow_not_found",
+      { resource: "Experiment workflow", id: experimentId },
+      {
+        meta: { experimentId },
+      },
+    );
     this.name = "ExperimentWorkflowNotFoundError";
   }
 }

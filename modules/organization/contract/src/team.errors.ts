@@ -4,7 +4,11 @@ export class TeamNotFoundError extends NotFoundError {
   declare readonly code: "team_not_found";
 
   constructor(teamId?: string) {
-    super("team_not_found", "Team", teamId ?? "", teamId ? { meta: { teamId } } : {});
+    super(
+      "team_not_found",
+      { resource: "Team", id: teamId ?? "" },
+      teamId ? { meta: { teamId } } : {},
+    );
     this.name = "TeamNotFoundError";
   }
 }
@@ -39,9 +43,13 @@ export class TeamMembershipNotFoundError extends NotFoundError {
   declare readonly code: "team_membership_not_found";
 
   constructor(userId: string) {
-    super("team_membership_not_found", "Team membership", userId, {
-      meta: { userId },
-    });
+    super(
+      "team_membership_not_found",
+      { resource: "Team membership", id: userId },
+      {
+        meta: { userId },
+      },
+    );
     this.name = "TeamMembershipNotFoundError";
   }
 }

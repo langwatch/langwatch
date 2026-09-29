@@ -88,10 +88,10 @@ afterEach(() => {
 describe("the organization members page", () => {
   describe("given an admin is looking at it", () => {
     /** @scenario The members page opens the invite drawer */
-    it("opens the invite drawer from Add members", async () => {
+    it("opens the invite drawer from Invite people", async () => {
       const { host } = renderMembers();
 
-      await userEvent.click(screen.getByRole("button", { name: /add members/i }));
+      await userEvent.click(screen.getByRole("button", { name: /invite people/i }));
 
       expect(host.overlays).toEqual([{ name: "inviteMember", props: undefined }]);
     });

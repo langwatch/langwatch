@@ -916,7 +916,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
   async resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller> {
     const project = await this.#dependencies.projects.findById(input.projectId);
     if (!project) {
-      throw new NotFoundError("project_not_found", "Project", input.projectId);
+      throw new NotFoundError("project_not_found", { resource: "Project", id: input.projectId });
     }
 
     return { id: project.id, lwqlKey: project.lwqlKey };

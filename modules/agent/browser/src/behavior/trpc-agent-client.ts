@@ -19,6 +19,7 @@ import {
   type UpdateAgentCommand,
 } from "@langwatch/agent-contract";
 import type { UiRpc } from "@langwatch/browser-host/capabilities";
+import { Temporal, toDate } from "@langwatch/time";
 
 import type {
   AgentClient,
@@ -30,6 +31,19 @@ import type {
 } from "../model/agent-client.ts";
 
 const agentCopiesSchema = agentCopySchema.array();
+
+const WIRE_DATE_KEYS = ["archivedAt", "createdAt", "updatedAt", "lastSeenAt"] as const;
+
+/** This transport carries plain JSON, so a row's dates arrive as ISO strings. */
+function withDates(output: unknown): unknown {
+  if (typeof output !== "object" || output === null || Array.isArray(output)) return output;
+  const row: Record<string, unknown> = { ...output };
+  for (const key of WIRE_DATE_KEYS) {
+    const value = row[key];
+    if (typeof value === "string") row[key] = toDate(Temporal.Instant.from(value));
+  }
+  return row;
+}
 const agentHistoryEntriesSchema = agentHistoryEntrySchema.array();
 
 export class TrpcAgentClient implements AgentClient {
@@ -41,17 +55,17 @@ export class TrpcAgentClient implements AgentClient {
 
   async getById(input: AgentApiAgentInput) {
     const output = await this.rpc.query("agents.getById", input);
-    return agentWithFieldsSchema.parse(output);
+    return agentWithFieldsSchema.parse(withDates(output));
   }
 
   async create(input: CreateAgentCommand) {
     const output = await this.rpc.mutate("agents.create", input);
-    return agentWithFieldsSchema.parse(output);
+    return agentWithFieldsSchema.parse(withDates(output));
   }
 
   async update(input: UpdateAgentCommand) {
     const output = await this.rpc.mutate("agents.update", input);
-    return agentWithFieldsSchema.parse(output);
+    return agentWithFieldsSchema.parse(withDates(output));
   }
 
   async relatedEntities(input: AgentApiAgentInput) {
@@ -66,7 +80,7 @@ export class TrpcAgentClient implements AgentClient {
 
   async archive(input: AgentApiAgentInput) {
     const output = await this.rpc.mutate("agents.delete", input);
-    return agentSchema.parse(output);
+    return agentSchema.parse(withDates(output));
   }
 
   async getCopies(input: AgentCopiesInput) {
@@ -91,6 +105,6 @@ export class TrpcAgentClient implements AgentClient {
 
   async getHistory(input: AgentHistoryInput) {
     const output = await this.rpc.query("agents.getHistory", input);
-    return agentHistoryEntriesSchema.parse(output);
+    return agentHistoryEntriesSchema.parse(Array.isArray(output) ? output.map(withDates) : output);
   }
 }

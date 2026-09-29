@@ -7,7 +7,7 @@
 import { clearFlowCallbacks, getFlowCallbacks } from "@langwatch/browser-host/drawer";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Scenario } from "../../../../../behavior/scenario-api.ts";
@@ -63,6 +63,16 @@ function saveAndRun() {
   return callbacks?.onSaved;
 }
 
+/** Stands in for the editor drawer closing, which drops its key from the address. */
+function CloseEditorDrawer() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => void navigate("/test-project/agent-testing")}>
+      close editor
+    </button>
+  );
+}
+
 describe("Save & Run on the scenarios page", () => {
   beforeEach(() => {
     clearFlowCallbacks();
@@ -91,6 +101,25 @@ describe("Save & Run on the scenarios page", () => {
       act(() => clearFlowCallbacks());
 
       expect(saveAndRun()).toBeDefined();
+      expect(screen.getByTestId("run-dialog-open")).toHaveTextContent("Double charge");
+    });
+  });
+
+  describe("given Save & Run while the editor drawer is still open", () => {
+    it("opens the run dialog only once the editor drawer has closed", () => {
+      render(
+        <MemoryRouter
+          initialEntries={[`/test-project/agent-testing?drawer.open=${CASE_EDITOR_DRAWER}`]}
+        >
+          <AgentTestingCaseEditor />
+          <CloseEditorDrawer />
+        </MemoryRouter>,
+      );
+
+      saveAndRun();
+      expect(screen.queryByTestId("run-dialog-open")).toBeNull();
+
+      act(() => screen.getByText("close editor").click());
       expect(screen.getByTestId("run-dialog-open")).toHaveTextContent("Double charge");
     });
   });

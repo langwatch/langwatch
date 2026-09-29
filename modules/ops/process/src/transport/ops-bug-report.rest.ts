@@ -14,7 +14,6 @@ import {
   OpsApi,
   submitBugReportSchema,
 } from "@langwatch/ops-contract";
-import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 /**
@@ -32,10 +31,6 @@ export const bugReportCredential = defineRestMiddleware(
   "bugReportCredential",
   z.object({ token: z.string(), projectId: z.string().nullable() }).nullable(),
 );
-
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 /** Every body this route writes, in the sentences released builds already read. */
 const INTAKE_ANSWERS =
@@ -73,7 +68,7 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
   )
   .withMiddleware(bugReportCredential)
   .withHeaders(bugReportIntakeHeadersSchema)
-  .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: MAX_BODY_BYTES })
   .withResponse("protocol", { produces: "application/json", because: INTAKE_ANSWERS })
   .handle(async ({ app, raw, response }, credential, headers) => {
     const answer = await app.receiveBugReport({

@@ -114,7 +114,10 @@ describe("given a deployment that serves no currency detection", () => {
     currencyTrpcTransport,
     () => ({
       detectCurrency: () => {
-        throw new NotFoundError("not_found", "Currency detection", "this deployment");
+        throw new NotFoundError("not_found", {
+          resource: "Currency detection",
+          id: "this deployment",
+        });
       },
     }),
     { facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.headers ?? null)] },

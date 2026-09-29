@@ -163,7 +163,10 @@ describe("agent turn liveness subscriber", () => {
   it("retries the delivery while the conversation is not folded yet", async () => {
     const deps = makeDeps();
     deps.conversations.getById.mockRejectedValue(
-      new NotFoundError("langy_conversation_not_found", "Langy conversation", "conv_1"),
+      new NotFoundError("langy_conversation_not_found", {
+        resource: "Langy conversation",
+        id: "conv_1",
+      }),
     );
     const subscriber = createAgentTurnLivenessSubscriber(deps);
 
