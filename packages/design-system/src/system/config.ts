@@ -71,6 +71,16 @@ export const designSystemConfig = defineConfig({
         from: { transform: "scaleX(1)" },
         to: { transform: "scaleX(0)" },
       },
+      // A toast card rising into the stack and sinking out of it. It runs on
+      // `transform`, so it composes with the stack's own translate and scale.
+      "toast-rise": {
+        from: { transform: "translateY(24px) scale(0.94)", opacity: 0, filter: "blur(4px)" },
+        to: { transform: "none", opacity: 1, filter: "none" },
+      },
+      "toast-sink": {
+        from: { transform: "none", opacity: 1, filter: "none" },
+        to: { transform: "translateY(16px) scale(0.96)", opacity: 0, filter: "blur(2px)" },
+      },
     },
     tokens: {
       fonts: {
@@ -1191,7 +1201,17 @@ export const designSystemConfig = defineConfig({
             "&[data-overlap]": {
               opacity: "clamp(0, calc(var(--opacity) * (3 - var(--index))), 1)",
             },
-            _motionReduce: { transition: "none" },
+            // Cards glide when the stack fans out, collapses or moves up.
+            transitionProperty: "translate, scale, opacity, height, box-shadow",
+            transitionDuration: "450ms",
+            transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+            "&[data-state=open]": {
+              animation: "toast-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
+            },
+            "&[data-state=closed]": {
+              animation: "toast-sink 220ms cubic-bezier(0.4, 0, 1, 1) both",
+            },
+            _motionReduce: { transition: "none", animation: "none" },
             // A hairline around a solid fill reads as an outline; the fill is
             // already the edge.
             "&:is([data-type=error], [data-type=warning], [data-type=success])": {
