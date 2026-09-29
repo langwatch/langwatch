@@ -311,7 +311,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             content="Export the current view to CSV or JSON"
             positioning={{ placement: "bottom" }}
           >
-            <IconButton size="xs" variant="ghost" onClick={onExportAll} aria-label="Export traces">
+            <IconButton
+              size="xs"
+              variant="ghost"
+              onClick={onExportAll}
+              aria-label="Export traces"
+              data-testid="trace-toolbar-export"
+            >
               <Icon boxSize={3.5}>
                 <Download />
               </Icon>

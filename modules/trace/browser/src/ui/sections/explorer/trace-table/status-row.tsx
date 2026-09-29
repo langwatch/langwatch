@@ -121,6 +121,7 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
     data-index={dataIndex}
     onClick={onClick}
     {...langyTargetProps}
+    data-testid="trace-row"
     data-trace-id={traceId}
     data-new={isNew ? "true" : undefined}
     data-pulsing={isPulsing ? "true" : undefined}

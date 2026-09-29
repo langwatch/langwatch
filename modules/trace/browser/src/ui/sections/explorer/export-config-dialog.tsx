@@ -104,10 +104,10 @@ export function ExportConfigDialog({
         </Dialog.Body>
         <Dialog.Footer>
           <HStack gap={3}>
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={onClose} data-testid="trace-export-cancel">
               Cancel
             </Button>
-            <Button colorPalette="blue" onClick={handleExport}>
+            <Button colorPalette="blue" onClick={handleExport} data-testid="trace-export-submit">
               <Download size={16} />
               Export
             </Button>

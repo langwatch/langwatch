@@ -385,6 +385,7 @@ function AnalyticsCustomGraphContent({
                     paddingX={2}
                     fontWeight="bold"
                     fontSize="16px"
+                    data-testid="analytics-graph-title"
                   />
                   <HStack gap={2}>
                     {/*
@@ -910,6 +911,7 @@ function CustomGraphForm({
         <Button
           variant="outline"
           onClick={() => host.navigate(reportsPath({ projectSlug: project?.slug, dashboardId }))}
+          data-testid="analytics-graph-cancel"
         >
           Cancel
         </Button>
@@ -920,6 +922,7 @@ function CustomGraphForm({
             loading={updateGraphById.isPending}
             marginX={2}
             minWidth="fit-content"
+            data-testid="analytics-graph-update"
           >
             Update
           </Button>
@@ -932,6 +935,7 @@ function CustomGraphForm({
             }}
             marginX={2}
             minWidth="fit-content"
+            data-testid="analytics-graph-save"
           >
             Save
           </Button>

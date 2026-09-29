@@ -786,6 +786,7 @@ function StructuredSearchBar({
           minWidth={0}
           position="relative"
           css={editorStyles}
+          data-testid="trace-search-input"
           data-instant-eval-busy={instantEvalBusy ? "" : undefined}
         >
           {editorMounted ? (

@@ -143,7 +143,12 @@ export function TraceOverflowMenu({
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
       <Menu.Trigger asChild>
-        <Button size="xs" variant="ghost" aria-label="More actions">
+        <Button
+          size="xs"
+          variant="ghost"
+          aria-label="More actions"
+          data-testid="trace-overflow-menu"
+        >
           <Icon as={MoreVertical} boxSize={3.5} />
         </Button>
       </Menu.Trigger>
@@ -185,7 +190,11 @@ export function TraceOverflowMenu({
         )}
 
         {canQueueForAnnotation && (
-          <Menu.Item value="add-to-annotation-queue" onClick={onAddToAnnotationQueue}>
+          <Menu.Item
+            value="add-to-annotation-queue"
+            onClick={onAddToAnnotationQueue}
+            data-testid="trace-overflow-add-to-annotation-queue"
+          >
             <HStack gap={2}>
               <Icon as={LuListPlus} boxSize={3.5} />
               <Text>Add to annotation queue</Text>

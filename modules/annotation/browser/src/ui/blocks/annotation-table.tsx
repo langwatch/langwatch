@@ -112,6 +112,7 @@ export function AnnotationTable({
               _hover={{ bg: "bg.emphasized" }}
               backgroundColor={row.doneAt ? "bg.subtle" : "bg.panel"}
               onClick={() => onRowClick(row)}
+              data-testid="annotation-row"
             >
               <Table.Cell paddingX={0} verticalAlign="top">
                 <SelectCheckbox

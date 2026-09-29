@@ -134,6 +134,7 @@ export function CreateShareLinkForm({
           colorPalette="orange"
           loading={isCreating}
           disabled={!canCreate}
+          data-testid="share-link-create"
           onClick={() => onCreate({ visibility, expiry, isSingleView })}
         >
           Create link

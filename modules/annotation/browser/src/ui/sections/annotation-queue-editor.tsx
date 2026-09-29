@@ -230,7 +230,11 @@ export function AnnotationQueueEditor({
                   positioning={{ placement: "bottom-start" }}
                 >
                   <Popover.Trigger asChild>
-                    <PickedTrigger picked={participants} placeholder="Add Participants" />
+                    <PickedTrigger
+                      picked={participants}
+                      placeholder="Add Participants"
+                      data-testid="annotation-queue-editor-participants"
+                    />
                   </Popover.Trigger>
                   <Popover.Content width="300px">
                     <Popover.Body>
@@ -243,6 +247,7 @@ export function AnnotationQueueEditor({
                           return (
                             <Button
                               key={member.user.id}
+                              data-testid="annotation-queue-editor-participant-option"
                               variant="ghost"
                               width="full"
                               justifyContent="flex-start"
@@ -276,7 +281,12 @@ export function AnnotationQueueEditor({
 
               <Field.Root invalid={!!problems.name} width="full">
                 <Field.Label>Name Annotation Queue</Field.Label>
-                <Input value={name} required onChange={(event) => setName(event.target.value)} />
+                <Input
+                  value={name}
+                  required
+                  onChange={(event) => setName(event.target.value)}
+                  data-testid="annotation-queue-editor-name"
+                />
                 <Field.ErrorText>{problems.name}</Field.ErrorText>
                 <Field.HelperText>
                   Give it a name to identify this annotation queue
@@ -288,6 +298,7 @@ export function AnnotationQueueEditor({
                 <Textarea
                   value={description}
                   required
+                  data-testid="annotation-queue-editor-description"
                   onChange={(event) => setDescription(event.target.value)}
                 />
                 <Field.ErrorText>{problems.description}</Field.ErrorText>
@@ -302,7 +313,11 @@ export function AnnotationQueueEditor({
                   positioning={{ placement: "bottom-start" }}
                 >
                   <Popover.Trigger asChild>
-                    <PickedTrigger picked={scoreTypes} placeholder="Add Score Type" />
+                    <PickedTrigger
+                      picked={scoreTypes}
+                      placeholder="Add Score Type"
+                      data-testid="annotation-queue-editor-score-types"
+                    />
                   </Popover.Trigger>
                   <Popover.Content width="300px">
                     <Popover.Body>
@@ -315,6 +330,7 @@ export function AnnotationQueueEditor({
                           return (
                             <Button
                               key={score.id}
+                              data-testid="annotation-queue-editor-score-option"
                               variant="ghost"
                               width="full"
                               justifyContent="flex-start"
@@ -352,6 +368,7 @@ export function AnnotationQueueEditor({
                   type="submit"
                   minWidth="fit-content"
                   loading={save.isPending}
+                  data-testid="annotation-queue-editor-save"
                 >
                   Save
                 </Button>

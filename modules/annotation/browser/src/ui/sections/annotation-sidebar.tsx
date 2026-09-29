@@ -46,7 +46,13 @@ function QueueSidebarEntry({
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <Box width="full" borderRadius="lg" position="relative" className="group">
+    <Box
+      width="full"
+      borderRadius="lg"
+      position="relative"
+      className="group"
+      data-testid="annotation-queue-entry"
+    >
       <SidebarMenuLink
         href={href}
         isSelected={isSelected}
@@ -197,6 +203,7 @@ export function AnnotationSidebar({
                 minWidth={0}
                 paddingX={1}
                 aria-label="Create annotation queue"
+                data-testid="annotation-queue-create"
                 onClick={onCreateQueue}
               >
                 <Plus width={14} height={14} />

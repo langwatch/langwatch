@@ -45,9 +45,17 @@ export function ShareLinkRow({
       _hover={{ bg: "bg.muted/50" }}
       // A spent link stays visible so it can be revoked, but reads as inert.
       opacity={isShareLinkSpent({ link }) ? 0.55 : 1}
+      data-testid="share-link-row"
     >
       <VStack align="start" gap={0.5} flex="1" minWidth={0}>
-        <Text fontFamily="mono" fontSize="xs" color="fg" truncate width="full">
+        <Text
+          fontFamily="mono"
+          fontSize="xs"
+          color="fg"
+          truncate
+          width="full"
+          data-testid="share-link-url"
+        >
           {url}
         </Text>
         <HStack gap={1.5} color="fg.muted" fontSize="xs">
@@ -59,7 +67,13 @@ export function ShareLinkRow({
       </VStack>
 
       <Tooltip content="Copy link">
-        <IconButton aria-label="Copy link" variant="ghost" size="sm" onClick={() => onCopy(url)}>
+        <IconButton
+          aria-label="Copy link"
+          variant="ghost"
+          size="sm"
+          onClick={() => onCopy(url)}
+          data-testid="share-link-copy"
+        >
           <Icon as={LuCopy} boxSize={4} />
         </IconButton>
       </Tooltip>
@@ -71,6 +85,7 @@ export function ShareLinkRow({
           colorPalette="red"
           loading={isRevoking}
           onClick={onRevoke}
+          data-testid="share-link-revoke"
         >
           <Icon as={LuTrash2} boxSize={4} />
         </IconButton>

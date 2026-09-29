@@ -1089,7 +1089,13 @@ function HeaderActions({
     <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
       {canShare && (
         <Tooltip content="Share" positioning={{ placement: "bottom" }}>
-          <Button size="xs" variant="ghost" onClick={onShare} aria-label="Share trace">
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={onShare}
+            aria-label="Share trace"
+            data-testid="trace-drawer-share"
+          >
             <Icon as={LuShare2} boxSize={3.5} />
           </Button>
         </Tooltip>

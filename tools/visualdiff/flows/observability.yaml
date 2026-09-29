@@ -1,0 +1,443 @@
+# Observability: the trace explorer, trace sharing, annotations and the analytics query surface.
+#
+# Every name carries {uid}, so any number of flows share one stack. The seed is
+# expected to provide {errorTrace} (a trace whose root span failed) and
+# {conversationTrace} (a trace in a thread with two or more turns) beside the
+# plain {trace}, to enable trace sharing for the project, and to leave at
+# least one active annotation score and one organisation member so a queue can
+# be created. The queue flows pick the first option of each picker.
+# Not scripted: a download assertion for export (the runner has no expect for a
+# download, so the export flow proves the dialog closes) and the user-events
+# and sample-agents journeys (no UI).
+flows:
+  - id: trace-share-link
+    title: Share a trace, open the link with no session, revoke it and see it denied
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          testId: trace-drawer-share
+      - action: click
+        with:
+          testId: share-link-create
+      - action: expect
+        with:
+          testId: share-link-row
+      - action: capture
+        with:
+          testId: share-link-url
+          as: shareToken
+          match: /share/([A-Za-z0-9_-]+)
+      - action: go
+        with:
+          path: /share/{shareToken}
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: share-page-trace
+          anonymous: "true"
+      - action: expect
+        with:
+          text: handle_request
+          anonymous: "true"
+      - action: click
+        with:
+          selector: '[data-testid="share-link-row"]:has-text("{shareToken}") [data-testid="share-link-revoke"]'
+      - action: go
+        with:
+          path: /share/{shareToken}
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: share-page-unavailable
+          anonymous: "true"
+
+  - id: trace-open-spans
+    title: Open a trace, pick a span in the waterfall and read the trace over the API
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          testId: trace-mode-tab-trace
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: handle_request
+      - action: click
+        with:
+          testId: waterfall-row
+          hasText: chat_completion
+      - action: expect
+        with:
+          text: gpt-5-mini
+      - action: click
+        with:
+          testId: trace-mode-tab-summary
+      - action: expect
+        with:
+          api: /api/traces/{trace}
+          contains: handle_request
+
+  - id: trace-annotate-comment
+    title: Comment on a message in the trace drawer and read the annotation back
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          label: Comment on this message
+      - action: fill
+        with:
+          testId: annotation-comment-input
+          value: vd-note-{uid}
+      - action: click
+        with:
+          testId: annotation-form-save
+      - action: expect
+        with:
+          api: /api/annotations/trace/{trace}
+          field: data
+          contains: vd-note-{uid}
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          testId: annotation-row
+          hasText: vd-note-{uid}
+
+  - id: annotation-queue-add-trace
+    title: Create an annotation queue, add a trace to it from the drawer and open the queue
+    steps:
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          testId: annotation-queue-create
+      - action: fill
+        with:
+          testId: annotation-queue-editor-name
+          value: vd-queue-{uid}
+      - action: fill
+        with:
+          testId: annotation-queue-editor-description
+          value: Created by the visual diff flow {uid}
+      - action: click
+        with:
+          testId: annotation-queue-editor-participants
+      - action: click
+        with:
+          testId: annotation-queue-editor-participant-option
+      - action: click
+        with:
+          testId: annotation-queue-editor-description
+      - action: click
+        with:
+          testId: annotation-queue-editor-score-types
+      - action: click
+        with:
+          testId: annotation-queue-editor-score-option
+      - action: click
+        with:
+          testId: annotation-queue-editor-description
+      - action: click
+        with:
+          testId: annotation-queue-editor-save
+      - action: expect
+        with:
+          testId: annotation-queue-entry
+          hasText: vd-queue-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          testId: trace-overflow-menu
+      - action: click
+        with:
+          testId: trace-overflow-add-to-annotation-queue
+      - action: click
+        with:
+          testId: annotation-queue-participants-trigger
+      - action: click
+        with:
+          testId: annotation-queue-participant-option
+          hasText: vd-queue-{uid}
+      - action: click
+        with:
+          testId: annotation-queue-participants-send
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          testId: annotation-queue-entry
+          hasText: vd-queue-{uid}
+      - action: expect
+        with:
+          testId: annotation-queue-position
+          hasText: /^1 of 1$/
+
+  - id: annotation-queue-walk
+    title: Queue two traces and step through them with Next until Done
+    steps:
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          testId: annotation-queue-create
+      - action: fill
+        with:
+          testId: annotation-queue-editor-name
+          value: vd-walk-{uid}
+      - action: fill
+        with:
+          testId: annotation-queue-editor-description
+          value: Walked by the visual diff flow {uid}
+      - action: click
+        with:
+          testId: annotation-queue-editor-participants
+      - action: click
+        with:
+          testId: annotation-queue-editor-participant-option
+      - action: click
+        with:
+          testId: annotation-queue-editor-description
+      - action: click
+        with:
+          testId: annotation-queue-editor-score-types
+      - action: click
+        with:
+          testId: annotation-queue-editor-score-option
+      - action: click
+        with:
+          testId: annotation-queue-editor-description
+      - action: click
+        with:
+          testId: annotation-queue-editor-save
+      - action: expect
+        with:
+          testId: annotation-queue-entry
+          hasText: vd-walk-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          testId: trace-overflow-menu
+      - action: click
+        with:
+          testId: trace-overflow-add-to-annotation-queue
+      - action: click
+        with:
+          testId: annotation-queue-participants-trigger
+      - action: click
+        with:
+          testId: annotation-queue-participant-option
+          hasText: vd-walk-{uid}
+      - action: click
+        with:
+          testId: annotation-queue-participants-send
+      - action: go
+        with:
+          path: /{slug}/traces/trace_visualdiff_1
+      - action: click
+        with:
+          testId: trace-overflow-menu
+      - action: click
+        with:
+          testId: trace-overflow-add-to-annotation-queue
+      - action: click
+        with:
+          testId: annotation-queue-participants-trigger
+      - action: click
+        with:
+          testId: annotation-queue-participant-option
+          hasText: vd-walk-{uid}
+      - action: click
+        with:
+          testId: annotation-queue-participants-send
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          testId: annotation-queue-entry
+          hasText: vd-walk-{uid}
+      - action: expect
+        with:
+          testId: annotation-queue-position
+          hasText: /^1 of 2$/
+      - action: click
+        with:
+          testId: annotation-queue-next
+      - action: expect
+        with:
+          testId: annotation-queue-position
+          hasText: /^2 of 2$/
+      - action: expect
+        with:
+          testId: annotation-queue-next
+          hasText: Done
+      - action: click
+        with:
+          testId: annotation-queue-previous
+      - action: expect
+        with:
+          testId: annotation-queue-position
+          hasText: /^1 of 2$/
+
+  - id: trace-errors-lens
+    title: The Errors lens lists the failed trace and only failed traces
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          testId: trace-lens-tab-errors
+      - action: expect
+        with:
+          count: tbody[data-testid="trace-row"][data-trace-id="{errorTrace}"]
+      - action: expect
+        with:
+          count: tbody[data-testid="trace-row"]:not([data-row-variant="error"])
+          equals: "0"
+      - action: expect
+        with:
+          count: tbody[data-testid="trace-row"][data-trace-id="{errorTrace}"]
+      - action: click
+        with:
+          testId: trace-lens-tab-all-traces
+      - action: expect
+        with:
+          count: tbody[data-testid="trace-row"][data-trace-id="{trace}"]
+
+  - id: trace-search-query
+    title: Type a search query into the explorer and see the list narrow to matching traces
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          count: tbody[data-testid="trace-row"][data-trace-id="{trace}"]
+      - action: type
+        with:
+          testId: trace-search-input
+          text: "status:error"
+          submit: "true"
+      - action: expect
+        with:
+          count: tbody[data-testid="trace-row"][data-trace-id="{errorTrace}"]
+      - action: expect
+        with:
+          count: tbody[data-testid="trace-row"]:not([data-row-variant="error"])
+          equals: "0"
+
+  - id: trace-save-lens
+    title: Save the current view as a lens and find its tab after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          testId: trace-lens-create
+      - action: fill
+        with:
+          testId: trace-lens-name-input
+          value: vd-lens-{uid}
+      - action: click
+        with:
+          testId: trace-lens-name-submit
+      - action: expect
+        with:
+          testIdPrefix: trace-lens-tab-
+          hasText: vd-lens-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          testIdPrefix: trace-lens-tab-
+          hasText: vd-lens-{uid}
+
+  - id: trace-export
+    title: Open the export dialog from the toolbar and start an export
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          count: tbody[data-testid="trace-row"][data-trace-id="{trace}"]
+      - action: click
+        with:
+          testId: trace-toolbar-export
+      - action: expect
+        with:
+          text: Export Traces
+      - action: click
+        with:
+          testId: trace-export-submit
+      - action: expect
+        with:
+          testId: trace-export-submit
+          equals: "0"
+
+  - id: trace-conversation-thread
+    title: Open a conversation trace in Conversation mode and see its turns
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/{conversationTrace}
+      - action: click
+        with:
+          testId: trace-mode-tab-conversation
+      - action: expect
+        with:
+          testId: trace-conversation-turn
+          min: "2"
+
+  - id: analytics-custom-chart
+    title: Build a custom chart, save it and read it back from the graphs API
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom
+      - action: fill
+        with:
+          testId: analytics-graph-title
+          value: vd-chart-{uid}
+      - action: click
+        with:
+          testId: analytics-graph-save
+      - action: expect
+        with:
+          api: /api/graphs
+          contains: vd-chart-{uid}
+
+  - id: analytics-query-run
+    title: Write a query in the analytics workbench, run it and read the result table
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/query
+      - action: type
+        with:
+          testId: lwql-editor
+          text: "SELECT trace_id, latency_ms FROM analytics.traces_daily LIMIT 100"
+      - action: click
+        with:
+          testId: lwql-run
+      - action: expect
+        with:
+          label: Query result rows

@@ -106,7 +106,7 @@ export const AddParticipants = ({
             );
           }}
         >
-          <Select.Trigger width="full">
+          <Select.Trigger width="full" data-testid="annotation-queue-participants-trigger">
             <Select.ValueText placeholder="Add Participants">
               {(items) => {
                 return (
@@ -155,7 +155,11 @@ export const AddParticipants = ({
               }}
             >
               {participantsLeft.map((item) => (
-                <Select.Item key={item.value} item={item}>
+                <Select.Item
+                  key={item.value}
+                  item={item}
+                  data-testid="annotation-queue-participant-option"
+                >
                   <VStack align="start">
                     <HStack>
                       {item.value.startsWith("user-") ? (
@@ -205,6 +209,7 @@ export const AddParticipants = ({
             size="sm"
             onClick={sendToQueue}
             loading={isLoading}
+            data-testid="annotation-queue-participants-send"
           >
             Send
           </Button>

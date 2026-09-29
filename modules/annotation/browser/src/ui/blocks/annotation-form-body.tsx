@@ -102,6 +102,7 @@ export function SuggestBody({
             ? "What should the input have been?"
             : "What should the output have been?"
         }
+        data-testid="annotation-suggest-input"
         // Fixed height, locked to a stable size so the popover never
         // grows or jumps based on the user's edit. Internal scroll instead.
         height="180px"
@@ -174,6 +175,7 @@ function CommentField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Optional"
+        data-testid="annotation-comment-input"
         // Fixed height so adding multi-line comments doesn't push the diff
         // off-screen and start a layout cascade inside the popover.
         height="64px"
@@ -202,7 +204,12 @@ export function FormFooter({ state, padding }: { state: AnnotationFormState; pad
       paddingTop={0}
     >
       <Spacer />
-      <Button size="xs" variant="ghost" onClick={state.onCancel}>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={state.onCancel}
+        data-testid="annotation-form-cancel"
+      >
         Cancel
       </Button>
       <Button
@@ -210,6 +217,7 @@ export function FormFooter({ state, padding }: { state: AnnotationFormState; pad
         colorPalette="blue"
         onClick={state.handleSave}
         loading={state.isSaving}
+        data-testid="annotation-form-save"
         // An edit cannot be written back before the annotation it edits has
         // been read, and the reviewer should see that rather than click into
         // a save that quietly does nothing.

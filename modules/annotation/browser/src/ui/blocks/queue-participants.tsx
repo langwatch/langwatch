@@ -73,7 +73,7 @@ export function QueueParticipants({
           setAnnotators(picked.map((option) => ({ id: option.value, name: option.label })));
         }}
       >
-        <Select.Trigger width="full">
+        <Select.Trigger width="full" data-testid="annotation-queue-participants-trigger">
           <Select.ValueText placeholder="Add Participants">
             {(items) => (
               <HStack flexWrap="wrap" gap={1} paddingY={2}>
@@ -122,7 +122,11 @@ export function QueueParticipants({
             }}
           >
             {left.map((item) => (
-              <Select.Item key={item.value} item={item}>
+              <Select.Item
+                key={item.value}
+                item={item}
+                data-testid="annotation-queue-participant-option"
+              >
                 <VStack align="start">
                   <HStack>
                     {item.value.startsWith("user-") ? (
@@ -172,6 +176,7 @@ export function QueueParticipants({
           size="sm"
           onClick={onSend}
           loading={isSending}
+          data-testid="annotation-queue-participants-send"
         >
           Send
         </Button>

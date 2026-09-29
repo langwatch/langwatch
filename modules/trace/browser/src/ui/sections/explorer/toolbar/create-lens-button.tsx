@@ -40,6 +40,7 @@ export const CreateLensButton: React.FC = () => {
             minWidth="auto"
             paddingX={1}
             aria-label="Create new lens"
+            data-testid="trace-lens-create"
             // Sitting inside Tabs.Root, the button was picking up a
             // faint border + focus ring from the tabs styling layer.
             // Explicit reset keeps it consistent with the other

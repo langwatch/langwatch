@@ -269,7 +269,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
   const assistantBody = spokenBody ?? errorBody ?? silentBody;
 
   return (
-    <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>
+    <VStack align="stretch" gap={layout === "thread" ? 1 : 2} data-testid="trace-conversation-turn">
       {shouldShowGap && (
         <Flex align="center" gap={2}>
           <Box height="1px" flex={1} bg="border.muted" />

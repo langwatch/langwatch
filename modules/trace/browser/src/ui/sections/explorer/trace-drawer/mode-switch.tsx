@@ -88,6 +88,7 @@ function ModeTab({
   const tab = (
     <Flex
       as={disabled ? "div" : "button"}
+      data-testid={`trace-mode-tab-${label.toLowerCase()}`}
       align="center"
       gap={1}
       paddingX={0.5}

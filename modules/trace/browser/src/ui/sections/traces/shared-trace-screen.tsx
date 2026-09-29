@@ -52,6 +52,7 @@ function SharedTraceView() {
       // Never scrolls - every pane inside owns its own scroll viewport.
       overflow="hidden"
       position="relative"
+      data-testid="share-page-trace"
     >
       {shared?.isSpanDetailTruncated && (
         <Box paddingX={4} paddingTop={3}>
@@ -85,7 +86,7 @@ function SharedTraceView() {
  */
 function SharePageSignUpInvitation() {
   return (
-    <VStack gap={3} width="full" paddingTop={2}>
+    <VStack gap={3} width="full" paddingTop={2} data-testid="share-page-unavailable">
       <Separator />
       <Text fontSize="14px" color="fg.muted" maxWidth="420px">
         LangWatch shows you what your AI agents actually did - every call, its cost, and where it

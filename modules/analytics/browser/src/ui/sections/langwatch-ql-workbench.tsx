@@ -491,6 +491,7 @@ export function LangWatchQLWorkbench({
                   !timeWindow.sendable
                 }
                 onClick={granularity.run}
+                data-testid="lwql-run"
               >
                 {query.actionLabel}
               </Button>

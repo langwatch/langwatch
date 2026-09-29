@@ -68,6 +68,7 @@ export const LensTab: React.FC<LensTabProps> = ({ lens, isDraft, errorCount, hid
       minWidth="auto"
       gap={1}
       aria-label={ariaLabel}
+      data-testid={`trace-lens-tab-${lens.id}`}
       display={hidden ? "none" : undefined}
       onDoubleClick={handleDoubleClick}
     >

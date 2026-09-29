@@ -72,6 +72,7 @@ export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
               <Input
                 size="sm"
                 placeholder="Lens name"
+                data-testid="trace-lens-name-input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => {
@@ -79,7 +80,13 @@ export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
                   else if (e.key === "Escape") reset();
                 }}
               />
-              <Button size="sm" colorPalette="blue" onClick={submit} disabled={!name.trim()}>
+              <Button
+                size="sm"
+                colorPalette="blue"
+                onClick={submit}
+                disabled={!name.trim()}
+                data-testid="trace-lens-name-submit"
+              >
                 Create
               </Button>
             </HStack>

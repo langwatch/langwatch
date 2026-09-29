@@ -117,6 +117,7 @@ export function AnnotationQueueBar({
       <HStack gap={4} width="full">
         <Button
           variant="outline"
+          data-testid="annotation-queue-previous"
           disabled={!previousItemId || isNavigating || stepIsStale}
           onClick={() => {
             if (previousItemId) navigateToQueue(previousItemId);
@@ -124,7 +125,7 @@ export function AnnotationQueueBar({
         >
           <ChevronLeft /> Previous
         </Button>
-        <Text whiteSpace="nowrap">
+        <Text whiteSpace="nowrap" data-testid="annotation-queue-position">
           {position} of {total}
         </Text>
         <Spacer />
@@ -146,6 +147,7 @@ export function AnnotationQueueBar({
             )}
             <Button
               colorPalette="blue"
+              data-testid="annotation-queue-next"
               disabled={
                 currentQueueItem.doneAt !== null || isFinishing || isNavigating || stepIsStale
               }
@@ -165,6 +167,7 @@ export function AnnotationQueueBar({
         ) : (
           <Button
             variant="outline"
+            data-testid="annotation-queue-next"
             disabled={!nextItemId || isNavigating || stepIsStale}
             onClick={() => {
               if (stepIsStale || !nextItemId) return;
