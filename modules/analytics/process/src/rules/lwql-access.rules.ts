@@ -16,6 +16,13 @@ export const LWQL_FLAG = "release_lwql_workbench";
 export const INSTANT_EVALS_FLAG = "release_instant_evals";
 
 /**
+ * The rollout gate over the Dashboards area (Flight Deck). Analytics owns the
+ * area's flags, so it answers this one too: the browser flag only hides chrome,
+ * and every server entry point that gates the area asks through here.
+ */
+export const DASHBOARDS_FLAG = "release_dashboards";
+
+/**
  * Whether the LangWatchQL surface is open to this project. Both boundaries
  * ask through here: org-scoped rules fail closed with no organization, and
  * the distinct identity is always the *project* — never the member.
@@ -55,6 +62,29 @@ export async function instantEvalsEnabled({
   const organizationId = await projects.getOrganizationId(projectId);
 
   return featureFlags.isEnabled(INSTANT_EVALS_FLAG, {
+    kind: "project",
+    projectId,
+    organizationId,
+  });
+}
+
+/**
+ * Whether the Dashboards area is open to this project. Asked of the project,
+ * like the gates above, and fails closed when the project names no
+ * organization.
+ */
+export async function dashboardsEnabled({
+  featureFlags,
+  projectId,
+  projects,
+}: {
+  featureFlags: FeatureFlagApi;
+  projectId: string;
+  projects: ProjectApi;
+}): Promise<boolean> {
+  const organizationId = await projects.getOrganizationId(projectId);
+
+  return featureFlags.isEnabled(DASHBOARDS_FLAG, {
     kind: "project",
     projectId,
     organizationId,

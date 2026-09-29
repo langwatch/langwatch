@@ -30,19 +30,35 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.listPaths?.(input) ?? this.unimplemented("listPaths");
   }
 
-  findOrganizationId(projectId: Parameters<ProjectApi["findOrganizationId"]>[0]): ReturnType<ProjectApi["findOrganizationId"]> {
-    return this.overrides.findOrganizationId?.(projectId) ?? this.unimplemented("findOrganizationId");
+  findOrganizationId(
+    projectId: Parameters<ProjectApi["findOrganizationId"]>[0],
+  ): ReturnType<ProjectApi["findOrganizationId"]> {
+    return (
+      this.overrides.findOrganizationId?.(projectId) ?? this.unimplemented("findOrganizationId")
+    );
   }
 
-  isPresenceEnabled(input: Parameters<ProjectApi["isPresenceEnabled"]>[0]): ReturnType<ProjectApi["isPresenceEnabled"]> {
+  isPresenceEnabled(
+    input: Parameters<ProjectApi["isPresenceEnabled"]>[0],
+  ): ReturnType<ProjectApi["isPresenceEnabled"]> {
     return this.overrides.isPresenceEnabled?.(input) ?? this.unimplemented("isPresenceEnabled");
   }
 
-  findSummaryById(projectId: Parameters<ProjectApi["findSummaryById"]>[0]): ReturnType<ProjectApi["findSummaryById"]> {
+  isTeamMember(
+    input: Parameters<ProjectApi["isTeamMember"]>[0],
+  ): ReturnType<ProjectApi["isTeamMember"]> {
+    return this.overrides.isTeamMember?.(input) ?? this.unimplemented("isTeamMember");
+  }
+
+  findSummaryById(
+    projectId: Parameters<ProjectApi["findSummaryById"]>[0],
+  ): ReturnType<ProjectApi["findSummaryById"]> {
     return this.overrides.findSummaryById?.(projectId) ?? this.unimplemented("findSummaryById");
   }
 
-  searchByQuery(input: Parameters<ProjectApi["searchByQuery"]>[0]): ReturnType<ProjectApi["searchByQuery"]> {
+  searchByQuery(
+    input: Parameters<ProjectApi["searchByQuery"]>[0],
+  ): ReturnType<ProjectApi["searchByQuery"]> {
     return this.overrides.searchByQuery?.(input) ?? this.unimplemented("searchByQuery");
   }
 
@@ -50,7 +66,9 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.findById?.(id) ?? this.unimplemented("findById");
   }
 
-  getOrganizationId(projectId: Parameters<ProjectApi["getOrganizationId"]>[0]): ReturnType<ProjectApi["getOrganizationId"]> {
+  getOrganizationId(
+    projectId: Parameters<ProjectApi["getOrganizationId"]>[0],
+  ): ReturnType<ProjectApi["getOrganizationId"]> {
     return this.overrides.getOrganizationId?.(projectId) ?? this.unimplemented("getOrganizationId");
   }
 
@@ -58,11 +76,15 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.getWithTeam?.(id) ?? this.unimplemented("getWithTeam");
   }
 
-  findWithTeam(id: Parameters<ProjectApi["findWithTeam"]>[0]): ReturnType<ProjectApi["findWithTeam"]> {
+  findWithTeam(
+    id: Parameters<ProjectApi["findWithTeam"]>[0],
+  ): ReturnType<ProjectApi["findWithTeam"]> {
     return this.overrides.findWithTeam?.(id) ?? this.unimplemented("findWithTeam");
   }
 
-  listByOrganization(input: Parameters<ProjectApi["listByOrganization"]>[0]): ReturnType<ProjectApi["listByOrganization"]> {
+  listByOrganization(
+    input: Parameters<ProjectApi["listByOrganization"]>[0],
+  ): ReturnType<ProjectApi["listByOrganization"]> {
     return this.overrides.listByOrganization?.(input) ?? this.unimplemented("listByOrganization");
   }
 
@@ -70,18 +92,27 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.listByTeam?.(input) ?? this.unimplemented("listByTeam");
   }
 
-  listNamesByIds(input: Parameters<ProjectApi["listNamesByIds"]>[0]): ReturnType<ProjectApi["listNamesByIds"]> {
+  listNamesByIds(
+    input: Parameters<ProjectApi["listNamesByIds"]>[0],
+  ): ReturnType<ProjectApi["listNamesByIds"]> {
     return this.overrides.listNamesByIds?.(input) ?? this.unimplemented("listNamesByIds");
   }
 
-  listIdsByOrganization(input: Parameters<ProjectApi["listIdsByOrganization"]>[0]): ReturnType<ProjectApi["listIdsByOrganization"]> {
-    return this.overrides.listIdsByOrganization?.(input) ?? this.unimplemented("listIdsByOrganization");
+  listIdsByOrganization(
+    input: Parameters<ProjectApi["listIdsByOrganization"]>[0],
+  ): ReturnType<ProjectApi["listIdsByOrganization"]> {
+    return (
+      this.overrides.listIdsByOrganization?.(input) ?? this.unimplemented("listIdsByOrganization")
+    );
   }
 
   findLiveNonGovernanceIdsByOrganization(
     input: Parameters<ProjectApi["findLiveNonGovernanceIdsByOrganization"]>[0],
   ): ReturnType<ProjectApi["findLiveNonGovernanceIdsByOrganization"]> {
-    return this.overrides.findLiveNonGovernanceIdsByOrganization?.(input) ?? this.unimplemented("findLiveNonGovernanceIdsByOrganization");
+    return (
+      this.overrides.findLiveNonGovernanceIdsByOrganization?.(input) ??
+      this.unimplemented("findLiveNonGovernanceIdsByOrganization")
+    );
   }
 
   findLiveBySlug(
@@ -96,11 +127,16 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.findLiveByRef?.(input) ?? this.unimplemented("findLiveByRef");
   }
 
-  create(input: Parameters<ProjectApi["create"]>[0], by: Parameters<ProjectApi["create"]>[1]): ReturnType<ProjectApi["create"]> {
+  create(
+    input: Parameters<ProjectApi["create"]>[0],
+    by: Parameters<ProjectApi["create"]>[1],
+  ): ReturnType<ProjectApi["create"]> {
     return this.overrides.create?.(input, by) ?? this.unimplemented("create");
   }
 
-  updateSettings(input: Parameters<ProjectApi["updateSettings"]>[0]): ReturnType<ProjectApi["updateSettings"]> {
+  updateSettings(
+    input: Parameters<ProjectApi["updateSettings"]>[0],
+  ): ReturnType<ProjectApi["updateSettings"]> {
     return this.overrides.updateSettings?.(input) ?? this.unimplemented("updateSettings");
   }
 
@@ -108,39 +144,77 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.archive?.(input) ?? this.unimplemented("archive");
   }
 
-  regenerateLegacyProjectKey(input: Parameters<ProjectApi["regenerateLegacyProjectKey"]>[0]): ReturnType<ProjectApi["regenerateLegacyProjectKey"]> {
-    return this.overrides.regenerateLegacyProjectKey?.(input) ?? this.unimplemented("regenerateLegacyProjectKey");
+  regenerateLegacyProjectKey(
+    input: Parameters<ProjectApi["regenerateLegacyProjectKey"]>[0],
+  ): ReturnType<ProjectApi["regenerateLegacyProjectKey"]> {
+    return (
+      this.overrides.regenerateLegacyProjectKey?.(input) ??
+      this.unimplemented("regenerateLegacyProjectKey")
+    );
   }
 
-  findIdByLegacyApiKey(input: Parameters<ProjectApi["findIdByLegacyApiKey"]>[0]): ReturnType<ProjectApi["findIdByLegacyApiKey"]> {
-    return this.overrides.findIdByLegacyApiKey?.(input) ?? this.unimplemented("findIdByLegacyApiKey");
+  findIdByLegacyApiKey(
+    input: Parameters<ProjectApi["findIdByLegacyApiKey"]>[0],
+  ): ReturnType<ProjectApi["findIdByLegacyApiKey"]> {
+    return (
+      this.overrides.findIdByLegacyApiKey?.(input) ?? this.unimplemented("findIdByLegacyApiKey")
+    );
   }
 
-  rotateLegacyApiKey(input: Parameters<ProjectApi["rotateLegacyApiKey"]>[0]): ReturnType<ProjectApi["rotateLegacyApiKey"]> {
+  rotateLegacyApiKey(
+    input: Parameters<ProjectApi["rotateLegacyApiKey"]>[0],
+  ): ReturnType<ProjectApi["rotateLegacyApiKey"]> {
     return this.overrides.rotateLegacyApiKey?.(input) ?? this.unimplemented("rotateLegacyApiKey");
   }
 
-  findTraceSharingConfig(input: Parameters<ProjectApi["findTraceSharingConfig"]>[0]): ReturnType<ProjectApi["findTraceSharingConfig"]> {
-    return this.overrides.findTraceSharingConfig?.(input) ?? this.unimplemented("findTraceSharingConfig");
+  findTraceSharingConfig(
+    input: Parameters<ProjectApi["findTraceSharingConfig"]>[0],
+  ): ReturnType<ProjectApi["findTraceSharingConfig"]> {
+    return (
+      this.overrides.findTraceSharingConfig?.(input) ?? this.unimplemented("findTraceSharingConfig")
+    );
   }
 
-  findPersonalWorkspaceOwner(input: Parameters<ProjectApi["findPersonalWorkspaceOwner"]>[0]): ReturnType<ProjectApi["findPersonalWorkspaceOwner"]> {
-    return this.overrides.findPersonalWorkspaceOwner?.(input) ?? this.unimplemented("findPersonalWorkspaceOwner");
+  findPersonalWorkspaceOwner(
+    input: Parameters<ProjectApi["findPersonalWorkspaceOwner"]>[0],
+  ): ReturnType<ProjectApi["findPersonalWorkspaceOwner"]> {
+    return (
+      this.overrides.findPersonalWorkspaceOwner?.(input) ??
+      this.unimplemented("findPersonalWorkspaceOwner")
+    );
   }
 
-  requestTopicClustering(input: Parameters<ProjectApi["requestTopicClustering"]>[0], by: Parameters<ProjectApi["requestTopicClustering"]>[1]): ReturnType<ProjectApi["requestTopicClustering"]> {
-    return this.overrides.requestTopicClustering?.(input, by) ?? this.unimplemented("requestTopicClustering");
+  requestTopicClustering(
+    input: Parameters<ProjectApi["requestTopicClustering"]>[0],
+    by: Parameters<ProjectApi["requestTopicClustering"]>[1],
+  ): ReturnType<ProjectApi["requestTopicClustering"]> {
+    return (
+      this.overrides.requestTopicClustering?.(input, by) ??
+      this.unimplemented("requestTopicClustering")
+    );
   }
 
-  touchCodingAgentPullRequestSeen(input: Parameters<ProjectApi["touchCodingAgentPullRequestSeen"]>[0]): ReturnType<ProjectApi["touchCodingAgentPullRequestSeen"]> {
-    return this.overrides.touchCodingAgentPullRequestSeen?.(input) ?? this.unimplemented("touchCodingAgentPullRequestSeen");
+  touchCodingAgentPullRequestSeen(
+    input: Parameters<ProjectApi["touchCodingAgentPullRequestSeen"]>[0],
+  ): ReturnType<ProjectApi["touchCodingAgentPullRequestSeen"]> {
+    return (
+      this.overrides.touchCodingAgentPullRequestSeen?.(input) ??
+      this.unimplemented("touchCodingAgentPullRequestSeen")
+    );
   }
 
-  touchCodingAgentSessionSeen(input: Parameters<ProjectApi["touchCodingAgentSessionSeen"]>[0]): ReturnType<ProjectApi["touchCodingAgentSessionSeen"]> {
-    return this.overrides.touchCodingAgentSessionSeen?.(input) ?? this.unimplemented("touchCodingAgentSessionSeen");
+  touchCodingAgentSessionSeen(
+    input: Parameters<ProjectApi["touchCodingAgentSessionSeen"]>[0],
+  ): ReturnType<ProjectApi["touchCodingAgentSessionSeen"]> {
+    return (
+      this.overrides.touchCodingAgentSessionSeen?.(input) ??
+      this.unimplemented("touchCodingAgentSessionSeen")
+    );
   }
 
-  findInternal(input: Parameters<ProjectApi["findInternal"]>[0]): ReturnType<ProjectApi["findInternal"]> {
+  findInternal(
+    input: Parameters<ProjectApi["findInternal"]>[0],
+  ): ReturnType<ProjectApi["findInternal"]> {
     return this.overrides.findInternal?.(input) ?? this.unimplemented("findInternal");
   }
 
@@ -150,36 +224,60 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.findInternalIds?.(input) ?? this.unimplemented("findInternalIds");
   }
 
-  ensureInternal(input: Parameters<ProjectApi["ensureInternal"]>[0]): ReturnType<ProjectApi["ensureInternal"]> {
+  ensureInternal(
+    input: Parameters<ProjectApi["ensureInternal"]>[0],
+  ): ReturnType<ProjectApi["ensureInternal"]> {
     return this.overrides.ensureInternal?.(input) ?? this.unimplemented("ensureInternal");
   }
 
-  findIdentity(id: Parameters<ProjectApi["findIdentity"]>[0]): ReturnType<ProjectApi["findIdentity"]> {
+  findIdentity(
+    id: Parameters<ProjectApi["findIdentity"]>[0],
+  ): ReturnType<ProjectApi["findIdentity"]> {
     return this.overrides.findIdentity?.(id) ?? this.unimplemented("findIdentity");
   }
 
-  listActiveByScopes(input: Parameters<ProjectApi["listActiveByScopes"]>[0]): ReturnType<ProjectApi["listActiveByScopes"]> {
+  listActiveByScopes(
+    input: Parameters<ProjectApi["listActiveByScopes"]>[0],
+  ): ReturnType<ProjectApi["listActiveByScopes"]> {
     return this.overrides.listActiveByScopes?.(input) ?? this.unimplemented("listActiveByScopes");
   }
 
-  updateMetadata(input: Parameters<ProjectApi["updateMetadata"]>[0]): ReturnType<ProjectApi["updateMetadata"]> {
+  updateMetadata(
+    input: Parameters<ProjectApi["updateMetadata"]>[0],
+  ): ReturnType<ProjectApi["updateMetadata"]> {
     return this.overrides.updateMetadata?.(input) ?? this.unimplemented("updateMetadata");
   }
 
-  resolveOrgAdmin(projectId: Parameters<ProjectApi["resolveOrgAdmin"]>[0]): ReturnType<ProjectApi["resolveOrgAdmin"]> {
+  resolveOrgAdmin(
+    projectId: Parameters<ProjectApi["resolveOrgAdmin"]>[0],
+  ): ReturnType<ProjectApi["resolveOrgAdmin"]> {
     return this.overrides.resolveOrgAdmin?.(projectId) ?? this.unimplemented("resolveOrgAdmin");
   }
 
-  resolveTraceDestination(input: Parameters<ProjectApi["resolveTraceDestination"]>[0]): ReturnType<ProjectApi["resolveTraceDestination"]> {
-    return this.overrides.resolveTraceDestination?.(input) ?? this.unimplemented("resolveTraceDestination");
+  resolveTraceDestination(
+    input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
+  ): ReturnType<ProjectApi["resolveTraceDestination"]> {
+    return (
+      this.overrides.resolveTraceDestination?.(input) ??
+      this.unimplemented("resolveTraceDestination")
+    );
   }
 
-  findTraceDestination(projectId: Parameters<ProjectApi["findTraceDestination"]>[0]): ReturnType<ProjectApi["findTraceDestination"]> {
-    return this.overrides.findTraceDestination?.(projectId) ?? this.unimplemented("findTraceDestination");
+  findTraceDestination(
+    projectId: Parameters<ProjectApi["findTraceDestination"]>[0],
+  ): ReturnType<ProjectApi["findTraceDestination"]> {
+    return (
+      this.overrides.findTraceDestination?.(projectId) ?? this.unimplemented("findTraceDestination")
+    );
   }
 
-  listTraceDestinations(projectIds: Parameters<ProjectApi["listTraceDestinations"]>[0]): ReturnType<ProjectApi["listTraceDestinations"]> {
-    return this.overrides.listTraceDestinations?.(projectIds) ?? this.unimplemented("listTraceDestinations");
+  listTraceDestinations(
+    projectIds: Parameters<ProjectApi["listTraceDestinations"]>[0],
+  ): ReturnType<ProjectApi["listTraceDestinations"]> {
+    return (
+      this.overrides.listTraceDestinations?.(projectIds) ??
+      this.unimplemented("listTraceDestinations")
+    );
   }
 
   protected unimplemented(operation: string): Promise<never> {

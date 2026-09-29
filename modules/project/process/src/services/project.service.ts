@@ -253,6 +253,22 @@ export class ProjectService {
     return this.repository.findOrganizationId(projectId);
   }
 
+  /**
+   * Whether the user belongs to the team that owns this project. The team roster
+   * is the organisation's, read here because the project's team is this module's
+   * own fact; an absent project is nobody's team.
+   */
+  async isTeamMember(input: { projectId: string; userId: string }): Promise<boolean> {
+    const project = await this.findWithTeam(input.projectId);
+    if (!project) return false;
+
+    const teamIds = await this.organizations.findMemberTeamIds({
+      organizationId: project.team.organizationId,
+      userId: input.userId,
+    });
+    return teamIds.includes(project.teamId);
+  }
+
   findIdentity(id: string): Promise<ProjectIdentity | null> {
     return this.repository.findIdentity(id);
   }
