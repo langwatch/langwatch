@@ -3,7 +3,7 @@
  * with URL state managed via ?rule=new or ?rule=<tier>:<id>:<personal>.
  */
 
-import { Button, Heading, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   ScopeChipPicker,
   ScopeFilter,
@@ -17,6 +17,7 @@ import type {
   DataPrivacyRule,
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { useMemo } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
@@ -94,11 +95,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
     host.setQuery({ ...query, [PRIVACY_RULE_QUERY_KEY]: next });
 
   if (snapshotQuery.isLoading) {
-    return (
-      <VStack width="full" padding={8}>
-        <Spinner />
-      </VStack>
-    );
+    return <Skeleton width="full" height="200px" />;
   }
 
   const snapshot = snapshotQuery.data;
@@ -126,11 +123,9 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
   };
 
   return (
-    <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
-      <HStack width="full" marginTop={2}>
-        <Heading as="h2" fontSize="xl">
-          Data Privacy
-        </Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Data Privacy</PageLayout.Heading>
         <Spacer />
         {snapshot && snapshot.rules.length > 0 && (
           <ScopeFilter
@@ -142,49 +137,48 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
           />
         )}
         {canWrite && (
-          <Button colorPalette="blue" onClick={openAdd}>
-            Add privacy rule
-          </Button>
+          <PageLayout.HeaderButton onClick={openAdd}>Add privacy rule</PageLayout.HeaderButton>
         )}
-      </HStack>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text fontSize="sm" color="fg.muted">
+          Control what trace content LangWatch stores, who can see it, and how secrets and PII are
+          scrubbed, at any scope, inherited down to projects.
+        </Text>
 
-      <Text fontSize="sm" color="fg.muted">
-        Control what trace content LangWatch stores, who can see it, and how secrets and PII are
-        scrubbed, at any scope, inherited down to projects.
-      </Text>
+        {snapshot && snapshot.rules.length === 0 && (
+          <NoPrivacyRules canWrite={canWrite} onAdd={openAdd} />
+        )}
+        {snapshot && snapshot.rules.length > 0 && (
+          <PrivacyRulesTable
+            rules={filteredRules}
+            canWrite={canWrite}
+            onEdit={openEdit}
+            onRemove={(rule) => void removeRule(rule)}
+          />
+        )}
 
-      {snapshot && snapshot.rules.length === 0 && (
-        <NoPrivacyRules canWrite={canWrite} onAdd={openAdd} />
-      )}
-      {snapshot && snapshot.rules.length > 0 && (
-        <PrivacyRulesTable
-          rules={filteredRules}
-          canWrite={canWrite}
-          onEdit={openEdit}
-          onRemove={(rule) => void removeRule(rule)}
-        />
-      )}
+        {snapshot && (
+          <EffectiveSummary
+            snapshot={snapshot}
+            scopeFilter={scopeFilter}
+            currentTeamId={teamId ?? null}
+          />
+        )}
 
-      {snapshot && (
-        <EffectiveSummary
-          snapshot={snapshot}
-          scopeFilter={scopeFilter}
-          currentTeamId={teamId ?? null}
-        />
-      )}
-
-      {snapshot && available && (
-        <PrivacyRuleDrawerMount
-          host={host}
-          projectId={projectId}
-          snapshot={snapshot}
-          open={ruleAddress !== void 0}
-          editingRule={privacyRuleForAddress(ruleAddress, snapshot.rules)}
-          onClose={closeRuleDrawer}
-          onSaved={() => void invalidate()}
-        />
-      )}
-    </VStack>
+        {snapshot && available && (
+          <PrivacyRuleDrawerMount
+            host={host}
+            projectId={projectId}
+            snapshot={snapshot}
+            open={ruleAddress !== void 0}
+            editingRule={privacyRuleForAddress(ruleAddress, snapshot.rules)}
+            onClose={closeRuleDrawer}
+            onSaved={() => void invalidate()}
+          />
+        )}
+      </VStack>
+    </>
   );
 }
 

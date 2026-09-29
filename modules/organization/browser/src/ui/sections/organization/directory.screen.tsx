@@ -3,7 +3,8 @@
  * Members, Teams and Groups are its tabs; their old addresses forward onto them.
  * Spec: specs/identity/directory-administration.feature
  */
-import { Heading, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Tabs, Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Suspense } from "react";
 
 import { useDirectoryTabCounts } from "../../../behavior/use-directory-tab-counts.ts";
@@ -50,23 +51,25 @@ function Directory({
   const Summary = host.directorySummary();
 
   return (
-    <VStack gap={6} width="full" align="start">
-      <VStack align="start" gap={1}>
-        <Heading as="h2">Directory</Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Directory</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">
           Who is in this organization, how they got here, and which system says so.
         </Text>
+
+        {/* The status band reads what the directory has been doing: sso:view. */}
+        {Summary && host.hasOrganizationPermission("sso:view") && (
+          <Suspense fallback={null}>
+            <Summary organizationId={organizationId} canReadMembership={true} />
+          </Suspense>
+        )}
+
+        <DirectoryTabs organizationId={organizationId} tab={tab} onSelectTab={selectTab} />
       </VStack>
-
-      {/* The status band reads what the directory has been doing: sso:view. */}
-      {Summary && host.hasOrganizationPermission("sso:view") && (
-        <Suspense fallback={null}>
-          <Summary organizationId={organizationId} canReadMembership={true} />
-        </Suspense>
-      )}
-
-      <DirectoryTabs organizationId={organizationId} tab={tab} onSelectTab={selectTab} />
-    </VStack>
+    </>
   );
 }
 

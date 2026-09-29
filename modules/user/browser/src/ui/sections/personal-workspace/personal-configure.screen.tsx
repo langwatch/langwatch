@@ -1,16 +1,6 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Input,
-  Spacer,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Input, Spacer, Tabs, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { toEpochMs } from "@langwatch/time";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
@@ -47,69 +37,72 @@ export function PersonalConfigureScreen() {
   const personalProjectId = personalContextQuery.data?.workspace.project.id ?? null;
 
   return (
-    <PersonalWorkspaceLayout>
-      <VStack align="stretch" gap={6} width="full">
-        <HStack alignItems="end">
-          <VStack align="start" gap={0}>
-            <Heading as="h2" size="lg">
-              Settings
-            </Heading>
-            <Text color="fg.muted" fontSize="sm">
-              Manage your personal API keys and view your admin-managed budget
-            </Text>
-          </VStack>
-          <Spacer />
-        </HStack>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Settings</PageLayout.Heading>
+      </PageLayout.Header>
+      <PersonalWorkspaceLayout>
+        <VStack align="stretch" gap={6} width="full">
+          <Text color="fg.muted" fontSize="sm">
+            Manage your personal API keys and view your admin-managed budget
+          </Text>
 
-        <SectionCard title="Profile">
-          <VStack align="stretch" gap={4}>
-            {ctx.organizationId && <AvatarUploadControl organizationId={ctx.organizationId} />}
-            <Field label="Name" value={ctx.fullName} />
-            <Field label="Email" value={ctx.email} hint={`Managed by ${ctx.organizationName} IT`} />
-            <Field label="Joined" value={ctx.joinedOn} />
-            {ctx.routingPolicyName && (
+          <SectionCard title="Profile">
+            <VStack align="stretch" gap={4}>
+              {ctx.organizationId && <AvatarUploadControl organizationId={ctx.organizationId} />}
+              <Field label="Name" value={ctx.fullName} />
               <Field
-                label="Routing"
-                value={
-                  <HStack gap={2}>
-                    <Text>{ctx.routingPolicyName}</Text>
-                    <Badge variant="surface" colorPalette="gray" size="sm">
-                      managed by your org
-                    </Badge>
-                  </HStack>
-                }
+                label="Email"
+                value={ctx.email}
+                hint={`Managed by ${ctx.organizationName} IT`}
               />
-            )}
-          </VStack>
-        </SectionCard>
-
-        <PersonalCredentialsSection organizationId={ctx.organizationId} apiKeys={ctx.apiKeys} />
-
-        {ctx.organizationId ? (
-          <SectionCard
-            title="Default landing page"
-            description="Where to land when you open LangWatch. Auto uses your detected persona."
-          >
-            <HomePagePicker organizationId={ctx.organizationId} />
+              <Field label="Joined" value={ctx.joinedOn} />
+              {ctx.routingPolicyName && (
+                <Field
+                  label="Routing"
+                  value={
+                    <HStack gap={2}>
+                      <Text>{ctx.routingPolicyName}</Text>
+                      <Badge variant="surface" colorPalette="gray" size="sm">
+                        managed by your org
+                      </Badge>
+                    </HStack>
+                  }
+                />
+              )}
+            </VStack>
           </SectionCard>
-        ) : null}
 
-        {personalContextQuery.data?.workspace.project.apiKey ? (
-          <SectionCard
-            title="Personal OTLP Endpoint"
-            description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
-          >
-            <PersonalOtlpEndpointPanel
-              apiKey={personalContextQuery.data.workspace.project.apiKey}
-            />
-          </SectionCard>
-        ) : null}
+          <PersonalCredentialsSection organizationId={ctx.organizationId} apiKeys={ctx.apiKeys} />
 
-        {personalProjectId ? <WorkspaceFeaturesSection projectId={personalProjectId} /> : null}
+          {ctx.organizationId ? (
+            <SectionCard
+              title="Default landing page"
+              description="Where to land when you open LangWatch. Auto uses your detected persona."
+            >
+              <HomePagePicker organizationId={ctx.organizationId} />
+            </SectionCard>
+          ) : null}
 
-        {ctx.budgetOverview.gatewayAccess && <BudgetsSection budgetOverview={ctx.budgetOverview} />}
-      </VStack>
-    </PersonalWorkspaceLayout>
+          {personalContextQuery.data?.workspace.project.apiKey ? (
+            <SectionCard
+              title="Personal OTLP Endpoint"
+              description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
+            >
+              <PersonalOtlpEndpointPanel
+                apiKey={personalContextQuery.data.workspace.project.apiKey}
+              />
+            </SectionCard>
+          ) : null}
+
+          {personalProjectId ? <WorkspaceFeaturesSection projectId={personalProjectId} /> : null}
+
+          {ctx.budgetOverview.gatewayAccess && (
+            <BudgetsSection budgetOverview={ctx.budgetOverview} />
+          )}
+        </VStack>
+      </PersonalWorkspaceLayout>
+    </>
   );
 }
 

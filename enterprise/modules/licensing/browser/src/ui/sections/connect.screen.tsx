@@ -3,8 +3,9 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
-import { Heading, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
 import { connectApi } from "../../behavior/connect-api.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
@@ -17,10 +18,14 @@ import { ConnectSyncSection } from "./connect-sync-section.tsx";
 export default function ConnectScreen() {
   const organizationId = useLicensingHost().organizationId();
   return (
-    <VStack gap={2} width="full" align="start">
-      <Heading>Connect</Heading>
-      {organizationId ? <ConnectStatusPanel organizationId={organizationId} /> : null}
-    </VStack>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Connect</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={2} width="full" align="start" paddingTop={4}>
+        {organizationId ? <ConnectStatusPanel organizationId={organizationId} /> : null}
+      </VStack>
+    </>
   );
 }
 

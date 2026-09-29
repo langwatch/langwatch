@@ -8,7 +8,6 @@ import {
   Box,
   Button,
   Card,
-  Heading,
   HStack,
   Spacer,
   Table,
@@ -595,146 +594,152 @@ export default function ApiKeysScreen() {
   };
 
   return (
-    <VStack gap={4} width="full" maxWidth="1200px" align="stretch">
-      <VStack gap={1} align="start">
-        <Heading size="lg">API Keys</Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>API Keys</PageLayout.Heading>
+        <Spacer />
+        <ScopeFilter
+          value={scopeFilter}
+          onChange={handleScopeFilterChange}
+          available={filterAvailable}
+          currentTeamId={scope.teamId}
+          currentProjectId={scope.projectId}
+        />
+        <PageLayout.HeaderButton onClick={onCreateOpen} data-testid="api-key-create">
+          <Plus size={16} />
+          Create new secret key
+        </PageLayout.HeaderButton>
+      </PageLayout.Header>
+      <VStack gap={4} width="full" align="stretch" paddingTop={4}>
         <Text fontSize="sm" color="fg.muted">
           Manage credentials used to authenticate with the LangWatch API.
         </Text>
-      </VStack>
 
-      <VStack gap={8} width="full" align="stretch">
-        {/* Personal + service keys (ingestSourceType == null). The page
+        <VStack gap={8} width="full" align="stretch">
+          {/* Personal + service keys (ingestSourceType == null). The page
             heading titles this table, so the section carries no heading of
-            its own. The "Create API key" flow and scope filter belong here. */}
-        <VStack gap={4} width="full" align="start">
-          <HStack width="full" flexWrap="wrap" gap={2}>
-            <Text fontSize="sm" color="fg.muted">
-              Do not share your API keys or expose them in the browser or other client-side code.
-            </Text>
-            <Spacer />
-            <ScopeFilter
-              value={scopeFilter}
-              onChange={handleScopeFilterChange}
-              available={filterAvailable}
-              currentTeamId={scope.teamId}
-              currentProjectId={scope.projectId}
-            />
-            <PageLayout.HeaderButton onClick={onCreateOpen} data-testid="api-key-create">
-              <Plus size={16} />
-              Create new secret key
-            </PageLayout.HeaderButton>
-          </HStack>
+            its own. The "Create API key" flow and scope filter sit in the header. */}
+          <VStack gap={4} width="full" align="start">
+            <HStack width="full" flexWrap="wrap" gap={2}>
+              <Text fontSize="sm" color="fg.muted">
+                Do not share your API keys or expose them in the browser or other client-side code.
+              </Text>
+            </HStack>
 
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-              <Table.Root variant="line" size="md" width="full">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Name</Table.ColumnHeader>
-                    <Table.ColumnHeader>Status</Table.ColumnHeader>
-                    <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
-                    <Table.ColumnHeader>Created</Table.ColumnHeader>
-                    <Table.ColumnHeader>Last Used</Table.ColumnHeader>
-                    <Table.ColumnHeader>Type</Table.ColumnHeader>
-                    <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                    <Table.ColumnHeader>Permissions</Table.ColumnHeader>
-                    <Table.ColumnHeader width="100px"></Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {/* Project service key row - shown only if it survives the scope filter */}
-                  {showProjectKey && projectApiKey && (
-                    <ProjectKeyRow
-                      apiKey={projectApiKey}
-                      projectId={scope.projectId ?? ""}
-                      projectName={scope.projectName}
-                      canManage={canManageProject}
-                      host={host}
-                      onRotate={() => setIsRotateConfirmOpen(true)}
-                    />
-                  )}
+            <Card.Root width="full" overflow="hidden">
+              <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+                <Table.Root variant="line" size="md" width="full">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader>Name</Table.ColumnHeader>
+                      <Table.ColumnHeader>Status</Table.ColumnHeader>
+                      <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
+                      <Table.ColumnHeader>Created</Table.ColumnHeader>
+                      <Table.ColumnHeader>Last Used</Table.ColumnHeader>
+                      <Table.ColumnHeader>Type</Table.ColumnHeader>
+                      <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                      <Table.ColumnHeader>Permissions</Table.ColumnHeader>
+                      <Table.ColumnHeader width="100px"></Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {/* Project service key row - shown only if it survives the scope filter */}
+                    {showProjectKey && projectApiKey && (
+                      <ProjectKeyRow
+                        apiKey={projectApiKey}
+                        projectId={scope.projectId ?? ""}
+                        projectName={scope.projectName}
+                        canManage={canManageProject}
+                        host={host}
+                        onRotate={() => setIsRotateConfirmOpen(true)}
+                      />
+                    )}
 
-                  {/* User-scoped API key rows */}
-                  {filteredKeys.map((apiKey) => (
-                    <ApiKeyTableRow
-                      key={apiKey.id}
-                      apiKey={apiKey}
-                      scopeBadge={getScopeBadge(apiKey)}
-                      canModify={isAdmin || apiKey.userId === currentUserId}
-                      onEdit={setApiKeyToEdit}
-                      onRevoke={setApiKeyToRevoke}
-                    />
-                  ))}
+                    {/* User-scoped API key rows */}
+                    {filteredKeys.map((apiKey) => (
+                      <ApiKeyTableRow
+                        key={apiKey.id}
+                        apiKey={apiKey}
+                        scopeBadge={getScopeBadge(apiKey)}
+                        canModify={isAdmin || apiKey.userId === currentUserId}
+                        onEdit={setApiKeyToEdit}
+                        onRevoke={setApiKeyToRevoke}
+                      />
+                    ))}
 
-                  {filteredKeys.length === 0 && !showProjectKey && (
-                    <NoKeysRow filtered={scopeFilter.kind !== "all"} />
-                  )}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
+                    {filteredKeys.length === 0 && !showProjectKey && (
+                      <NoKeysRow filtered={scopeFilter.kind !== "all"} />
+                    )}
+                  </Table.Body>
+                </Table.Root>
+              </Card.Body>
+            </Card.Root>
+          </VStack>
+
+          {/* Ingestion keys render below the API keys table. */}
+          <IngestionKeysSection
+            keys={ingestionKeys}
+            isAdmin={isAdmin}
+            onRevoke={setApiKeyToRevoke}
+          />
         </VStack>
 
-        {/* Ingestion keys render below the API keys table. */}
-        <IngestionKeysSection keys={ingestionKeys} isAdmin={isAdmin} onRevoke={setApiKeyToRevoke} />
+        <CreateApiKeyDrawer
+          isOpen={isCreateOpen && !newToken}
+          isCreating={createMutation.isPending}
+          myBindings={myBindings}
+          orgProjects={orgProjects.data ?? []}
+          orgTeams={orgTeams.data ?? []}
+          organizationId={organizationId}
+          organizationName={scope.organizationName}
+          currentTeamId={scope.teamId}
+          currentProjectId={scope.projectId}
+          onClose={onCreateClose}
+          onCreate={handleCreate}
+        />
+
+        <EditApiKeyDrawer
+          apiKey={apiKeyToEdit}
+          isUpdating={updateMutation.isPending}
+          myBindings={myBindings}
+          orgProjects={orgProjects.data ?? []}
+          orgTeams={orgTeams.data ?? []}
+          organizationId={organizationId}
+          organizationName={scope.organizationName}
+          currentTeamId={scope.teamId}
+          currentProjectId={scope.projectId}
+          onClose={() => setApiKeyToEdit(null)}
+          onSave={handleUpdate}
+        />
+
+        <TokenCreatedDialog
+          newToken={newToken}
+          projectId={scope.projectId}
+          endpoint={endpoint}
+          orgProjects={(orgProjects.data ?? []).filter((project) =>
+            isProjectReachable({ project, keyInput: newKeyInput }),
+          )}
+          onClose={() => {
+            setNewToken(null);
+            setNewKeyInput(null);
+            onCreateClose();
+          }}
+        />
+
+        <RevokeConfirmDialog
+          apiKeyId={apiKeyToRevoke}
+          isRevoking={revokeMutation.isPending}
+          onCancel={() => setApiKeyToRevoke(null)}
+          onConfirm={handleRevoke}
+        />
+
+        <RegenerateApiKeyDialog
+          open={isRotateConfirmOpen}
+          isLoading={regenerateMutation.isPending}
+          onClose={() => setIsRotateConfirmOpen(false)}
+          onConfirm={handleRotateProjectKey}
+        />
       </VStack>
-
-      <CreateApiKeyDrawer
-        isOpen={isCreateOpen && !newToken}
-        isCreating={createMutation.isPending}
-        myBindings={myBindings}
-        orgProjects={orgProjects.data ?? []}
-        orgTeams={orgTeams.data ?? []}
-        organizationId={organizationId}
-        organizationName={scope.organizationName}
-        currentTeamId={scope.teamId}
-        currentProjectId={scope.projectId}
-        onClose={onCreateClose}
-        onCreate={handleCreate}
-      />
-
-      <EditApiKeyDrawer
-        apiKey={apiKeyToEdit}
-        isUpdating={updateMutation.isPending}
-        myBindings={myBindings}
-        orgProjects={orgProjects.data ?? []}
-        orgTeams={orgTeams.data ?? []}
-        organizationId={organizationId}
-        organizationName={scope.organizationName}
-        currentTeamId={scope.teamId}
-        currentProjectId={scope.projectId}
-        onClose={() => setApiKeyToEdit(null)}
-        onSave={handleUpdate}
-      />
-
-      <TokenCreatedDialog
-        newToken={newToken}
-        projectId={scope.projectId}
-        endpoint={endpoint}
-        orgProjects={(orgProjects.data ?? []).filter((project) =>
-          isProjectReachable({ project, keyInput: newKeyInput }),
-        )}
-        onClose={() => {
-          setNewToken(null);
-          setNewKeyInput(null);
-          onCreateClose();
-        }}
-      />
-
-      <RevokeConfirmDialog
-        apiKeyId={apiKeyToRevoke}
-        isRevoking={revokeMutation.isPending}
-        onCancel={() => setApiKeyToRevoke(null)}
-        onConfirm={handleRevoke}
-      />
-
-      <RegenerateApiKeyDialog
-        open={isRotateConfirmOpen}
-        isLoading={regenerateMutation.isPending}
-        onClose={() => setIsRotateConfirmOpen(false)}
-        onConfirm={handleRotateProjectKey}
-      />
-    </VStack>
+    </>
   );
 }

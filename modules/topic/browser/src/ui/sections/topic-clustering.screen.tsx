@@ -17,6 +17,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { nowInstant } from "@langwatch/time";
 import type {
   ClusteringErrorCode,
@@ -70,16 +71,19 @@ export default function TopicClusteringScreen() {
   if (!project) return null;
 
   return (
-    <VStack gap={6} width="full" align="start">
-      {/* Names the feature, matching the settings nav entry. */}
-      <Heading as="h2">Topic Clustering</Heading>
-      <Text fontSize="sm" color="fg.muted">
-        Choose the model and embeddings used for topic clustering in{" "}
-        <strong>Settings → Model Providers → Default Models</strong>.
-      </Text>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Topic Clustering</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text fontSize="sm" color="fg.muted">
+          Choose the model and embeddings used for topic clustering in{" "}
+          <strong>Settings → Model Providers → Default Models</strong>.
+        </Text>
 
-      <TopicClusteringCard project={project} />
-    </VStack>
+        <TopicClusteringCard project={project} />
+      </VStack>
+    </>
   );
 }
 

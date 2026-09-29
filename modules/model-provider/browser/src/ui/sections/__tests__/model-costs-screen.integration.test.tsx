@@ -34,6 +34,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 
 vi.mock("@langwatch/design-system/page-layout", () => ({
   PageLayout: {
+    Heading: ({ children }: { children?: ReactNode }) => <h1>{children}</h1>,
     Header: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     HeaderButton: ({ children, ...props }: { children?: ReactNode; disabled?: boolean }) => (
       <button data-testid="add-model-cost" {...props}>

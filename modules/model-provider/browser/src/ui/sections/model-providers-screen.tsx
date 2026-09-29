@@ -4,19 +4,7 @@
  * rows arrive pre-masked and only the editor drawer accepts a key.
  */
 
-import {
-  Box,
-  Button,
-  Card,
-  EmptyState,
-  Heading,
-  HStack,
-  Skeleton,
-  Spacer,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Card, HStack, Skeleton, Spacer, Table, Text, VStack } from "@chakra-ui/react";
 import {
   ProviderScopeChips,
   ScopeFilter,
@@ -27,6 +15,7 @@ import {
 } from "@langwatch/authz-browser-kit";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
@@ -230,40 +219,33 @@ function ProvidersPanel({
   if (isLoading) return <ProvidersTableSkeleton />;
   if (enabledProviders.length === 0) {
     return (
-      <EmptyState.Root width="full">
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <BrainCircuit size={24} />
-          </EmptyState.Indicator>
-          <VStack textAlign="center" gap={3}>
-            <VStack textAlign="center" gap={1}>
-              <EmptyState.Title>No model providers</EmptyState.Title>
-              <EmptyState.Description>Add a model provider to get started</EmptyState.Description>
-            </VStack>
-            {/* The empty-state call to action mirrors the page header - same
-                menu, same grant, same handler. Without one right where the
-                reader is looking, the only way forward is the top-right button,
-                which is easy to miss on a fresh empty screen. */}
-            <AddModelProviderMenu
-              addableProviders={addable}
-              disabledReason={addProviderDisabledReason}
-              onPick={(providerKey) => onEdit({ providerKey, modelProviderId: "new" })}
-            >
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!!addProviderDisabledReason}
-                data-testid="empty-state-add-model-provider"
-              >
-                <HStack gap={1}>
-                  <Plus size={14} />
-                  <Text>Add Model Provider</Text>
-                </HStack>
-              </Button>
-            </AddModelProviderMenu>
-          </VStack>
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <NoDataInfoBlock
+        title="No model providers"
+        description="Add a model provider to get started"
+        icon={<BrainCircuit size={24} />}
+      >
+        {/* The empty-state call to action mirrors the page header - same
+            menu, same grant, same handler. Without one right where the
+            reader is looking, the only way forward is the top-right button,
+            which is easy to miss on a fresh empty screen. */}
+        <AddModelProviderMenu
+          addableProviders={addable}
+          disabledReason={addProviderDisabledReason}
+          onPick={(providerKey) => onEdit({ providerKey, modelProviderId: "new" })}
+        >
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!!addProviderDisabledReason}
+            data-testid="empty-state-add-model-provider"
+          >
+            <HStack gap={1}>
+              <Plus size={14} />
+              <Text>Add Model Provider</Text>
+            </HStack>
+          </Button>
+        </AddModelProviderMenu>
+      </NoDataInfoBlock>
     );
   }
 
@@ -437,14 +419,14 @@ export default function ModelProvidersScreen() {
     });
 
   return (
-    <VStack gap={6} width="full" align="start">
+    <>
       {/* The Codex post-connect question, mounted at page level because the
           drawer that queues it closes the moment the connect completes - see
           `CodexCodingDefaultsAskHost`. Nothing renders until a sign-in queues
           one. */}
       <CodexCodingDefaultsAskHost />
-      <HStack width="full" marginTop={2}>
-        <Heading as="h2">Model Providers</Heading>
+      <PageLayout.Header>
+        <PageLayout.Heading>Model Providers</PageLayout.Heading>
         <Spacer />
         {/* Single scope filter for the whole page - narrows the Model Providers
             table and the Default Models table below. See
@@ -473,96 +455,98 @@ export default function ModelProvidersScreen() {
             <Plus /> Add Model Provider
           </PageLayout.HeaderButton>
         </AddModelProviderMenu>
-      </HStack>
+      </PageLayout.Header>
 
-      <ProvidersPanel
-        addProviderDisabledReason={addProviderDisabledReason}
-        addable={addable}
-        connectionTests={connectionTests}
-        enabledProviders={enabledProviders}
-        isLoading={isLoading}
-        onDelete={setProviderToDelete}
-        onEdit={openProviderEditor}
-        rowActionsDisabledReason={rowActionsDisabledReason}
-        scopeNameById={scopeNameById}
-      />
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <ProvidersPanel
+          addProviderDisabledReason={addProviderDisabledReason}
+          addable={addable}
+          connectionTests={connectionTests}
+          enabledProviders={enabledProviders}
+          isLoading={isLoading}
+          onDelete={setProviderToDelete}
+          onEdit={openProviderEditor}
+          rowActionsDisabledReason={rowActionsDisabledReason}
+          scopeNameById={scopeNameById}
+        />
 
-      {/* Renders whenever the project has providers OR orphan default-model
+        {/* Renders whenever the project has providers OR orphan default-model
           configs; hides only when both are empty. An account that nuked its
           providers still sees the table to fix orphan defaults. Mounted
           unconditionally so its query fires in parallel, not waterfalled. */}
-      {projectId && (
-        <DefaultModelsSection
-          filter={scopeFilter}
-          enabledProviderKeys={enabledProviderKeys}
-          noProvidersConfigured={!isLoading && enabledProviders.length === 0}
-          hierarchy={hierarchy}
-          displayNames={defaultModelsDisplayNames}
-        />
-      )}
+        {projectId && (
+          <DefaultModelsSection
+            filter={scopeFilter}
+            enabledProviderKeys={enabledProviderKeys}
+            noProvidersConfigured={!isLoading && enabledProviders.length === 0}
+            hierarchy={hierarchy}
+            displayNames={defaultModelsDisplayNames}
+          />
+        )}
 
-      <Dialog.Root
-        open={!!providerToDelete}
-        onOpenChange={(details) => {
-          if (!details.open) setProviderToDelete(null);
-        }}
-      >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>Delete {providerToDelete?.name}?</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack gap={3} align="start">
-              <Text>
-                This permanently deletes the provider and its stored API keys. This cannot be
-                undone.
-              </Text>
-              <Text fontSize="sm" color="fg.muted">
-                Default model configs that reference this provider will surface as &ldquo;Update
-                needed&rdquo; in the table below.
-              </Text>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Dialog.ActionTrigger asChild>
-              <Button variant="outline">Cancel</Button>
-            </Dialog.ActionTrigger>
-            <Button
-              colorPalette="red"
-              data-testid="model-provider-delete-confirm"
-              loading={deleteMutation.isPending}
-              onClick={async () => {
-                if (!providerToDelete) return;
-                try {
-                  await deleteMutation.mutateAsync({
-                    id: providerToDelete.id,
-                    projectId,
-                    organizationId,
-                    provider: providerToDelete.provider,
-                  });
-                } catch (error) {
-                  // The application used to leave this to a global interceptor
-                  // that showed a modal; nothing above a package-served screen
-                  // holds one, so the refusal is reported here. The raw error
-                  // travels - the host resolves the words from its code.
-                  host.failed({ error, fallbackTitle: "Couldn't delete this provider" });
-                  return;
-                }
-                setProviderToDelete(null);
-                await refetch();
-                // Invalidate every cross-page query that gates UI on "are there
-                // enabled providers?" so the prompts page and the evaluation
-                // wizard pick the deletion up without a window-focus refetch.
-                await utils.modelProvider.invalidate();
-              }}
-            >
-              Delete
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
-    </VStack>
+        <Dialog.Root
+          open={!!providerToDelete}
+          onOpenChange={(details) => {
+            if (!details.open) setProviderToDelete(null);
+          }}
+        >
+          <Dialog.Content bg="bg">
+            <Dialog.Header>
+              <Dialog.Title>Delete {providerToDelete?.name}?</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <VStack gap={3} align="start">
+                <Text>
+                  This permanently deletes the provider and its stored API keys. This cannot be
+                  undone.
+                </Text>
+                <Text fontSize="sm" color="fg.muted">
+                  Default model configs that reference this provider will surface as &ldquo;Update
+                  needed&rdquo; in the table below.
+                </Text>
+              </VStack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Dialog.ActionTrigger asChild>
+                <Button variant="outline">Cancel</Button>
+              </Dialog.ActionTrigger>
+              <Button
+                colorPalette="red"
+                data-testid="model-provider-delete-confirm"
+                loading={deleteMutation.isPending}
+                onClick={async () => {
+                  if (!providerToDelete) return;
+                  try {
+                    await deleteMutation.mutateAsync({
+                      id: providerToDelete.id,
+                      projectId,
+                      organizationId,
+                      provider: providerToDelete.provider,
+                    });
+                  } catch (error) {
+                    // The application used to leave this to a global interceptor
+                    // that showed a modal; nothing above a package-served screen
+                    // holds one, so the refusal is reported here. The raw error
+                    // travels - the host resolves the words from its code.
+                    host.failed({ error, fallbackTitle: "Couldn't delete this provider" });
+                    return;
+                  }
+                  setProviderToDelete(null);
+                  await refetch();
+                  // Invalidate every cross-page query that gates UI on "are there
+                  // enabled providers?" so the prompts page and the evaluation
+                  // wizard pick the deletion up without a window-focus refetch.
+                  await utils.modelProvider.invalidate();
+                }}
+              >
+                Delete
+              </Button>
+            </Dialog.Footer>
+            <Dialog.CloseTrigger />
+          </Dialog.Content>
+        </Dialog.Root>
+      </VStack>
+    </>
   );
 }
 

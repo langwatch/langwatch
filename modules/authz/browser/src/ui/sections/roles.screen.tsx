@@ -9,7 +9,7 @@ import {
   HStack,
   Separator,
   Spacer,
-  Spinner,
+  Skeleton,
   Text,
   useDisclosure,
   VStack,
@@ -60,27 +60,28 @@ export default function RolesScreen() {
   const { isEnterprise, isLoading: isPlanLoading } = host.plan();
 
   if (!organizationId || isPlanLoading) {
-    return (
-      <VStack align="center" justify="center" width="full" height="200px">
-        <Spinner />
-      </VStack>
-    );
+    return <Skeleton width="full" height="200px" />;
   }
 
   if (!isEnterprise) {
     return (
-      <VStack gap={6} width="full" align="start">
-        <Alert.Root status="info">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Enterprise Feature</Alert.Title>
-            <Alert.Description>
-              Custom roles are available on Enterprise plans. Contact sales to upgrade.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
-        <EnterpriseUpsell />
-      </VStack>
+      <>
+        <PageLayout.Header>
+          <PageLayout.Heading>Roles</PageLayout.Heading>
+        </PageLayout.Header>
+        <VStack gap={6} width="full" align="start" paddingTop={4}>
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Enterprise Feature</Alert.Title>
+              <Alert.Description>
+                Custom roles are available on Enterprise plans. Contact sales to upgrade.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <EnterpriseUpsell />
+        </VStack>
+      </>
     );
   }
 
@@ -262,11 +263,7 @@ function RolesManagement({ organizationId, host }: { organizationId: string; hos
           </Tooltip>
         </HStack>
 
-        {roles.isLoading && (
-          <VStack align="center" width="full" padding={8}>
-            <Spinner />
-          </VStack>
-        )}
+        {roles.isLoading && <Skeleton width="full" height="120px" />}
 
         {roles.data && roles.data.length === 0 && (
           <Card.Root width="full">

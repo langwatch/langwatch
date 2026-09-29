@@ -17,37 +17,41 @@ export function PersonalSessionsScreen() {
   const isWorkspaceResolved = ready && isPersonalProjectResolved;
 
   return (
-    <PersonalWorkspaceLayout>
-      <VStack align="stretch" gap={6} width="full">
-        <VStack align="start" gap={0}>
-          <PageLayout.Heading>Sessions</PageLayout.Heading>
-          <Text color="fg.muted" fontSize="sm">
-            Every coding-agent session you ran over the last ninety days, with the context it
-            carried, how often it compacted, how long it worked against how long it waited on you,
-            and the pull requests it drove. Choosing a session replays it in the terminal.
-          </Text>
-        </VStack>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Sessions</PageLayout.Heading>
+      </PageLayout.Header>
+      <PersonalWorkspaceLayout>
+        <VStack align="stretch" gap={6} width="full">
+          <VStack align="start" gap={0}>
+            <Text color="fg.muted" fontSize="sm">
+              Every coding-agent session you ran over the last ninety days, with the context it
+              carried, how often it compacted, how long it worked against how long it waited on you,
+              and the pull requests it drove. Choosing a session replays it in the terminal.
+            </Text>
+          </VStack>
 
-        {/* The workspace is resolved before anything is claimed about it, and
+          {/* The workspace is resolved before anything is claimed about it, and
             that takes both flags: `ready` covers the session and the
             organization, and the project is read only once those land, so
             `ready` alone still leaves a window with no project id yet. Saying
             "no sessions" in that window states a fact that is not known to be
             true. */}
-        {!isWorkspaceResolved && <Skeleton height="180px" borderRadius="md" />}
-        {isWorkspaceResolved && personalProjectId ? (
-          <CodingAgentSessionsTable
-            projectId={personalProjectId}
-            projectSlug={personalProjectSlug}
-          />
-        ) : null}
-        {isWorkspaceResolved && !personalProjectId && (
-          <Text fontSize="sm" color="fg.muted">
-            No sessions yet
-          </Text>
-        )}
-      </VStack>
-    </PersonalWorkspaceLayout>
+          {!isWorkspaceResolved && <Skeleton height="180px" borderRadius="md" />}
+          {isWorkspaceResolved && personalProjectId ? (
+            <CodingAgentSessionsTable
+              projectId={personalProjectId}
+              projectSlug={personalProjectSlug}
+            />
+          ) : null}
+          {isWorkspaceResolved && !personalProjectId && (
+            <Text fontSize="sm" color="fg.muted">
+              No sessions yet
+            </Text>
+          )}
+        </VStack>
+      </PersonalWorkspaceLayout>
+    </>
   );
 }
 

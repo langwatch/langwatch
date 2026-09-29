@@ -6,7 +6,8 @@
  * token, and a reader without it is offered no control at all.
  */
 
-import { Alert, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Alert, Heading, Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Lock } from "lucide-react";
 
 import { scimApi } from "../../behavior/scim-api.ts";
@@ -23,16 +24,21 @@ export default function ScimScreen() {
 
   if (!organizationId) return null;
 
-  return <ScimSettingsContent organizationId={organizationId} title="SCIM Provisioning" />;
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>SCIM Provisioning</PageLayout.Heading>
+      </PageLayout.Header>
+      <ScimSettingsContent organizationId={organizationId} />
+    </>
+  );
 }
 
 export function ScimSettingsContent({
   organizationId,
-  title,
   lede,
 }: {
   organizationId: string;
-  title: string;
   /** One line under the title saying what the page is for. */
   lede?: string;
 }) {
@@ -43,14 +49,8 @@ export function ScimSettingsContent({
   const mayReadMembership = host.hasPermission("organization:manage");
 
   return (
-    <VStack gap={6} width="full" align="stretch">
-      <VStack align="start" gap={1} width="full">
-        <HStack width="full">
-          <Heading>{title}</Heading>
-          <Spacer />
-        </HStack>
-        {lede && <Text color="fg.muted">{lede}</Text>}
-      </VStack>
+    <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      {lede && <Text color="fg.muted">{lede}</Text>}
 
       {maySeeSync ? (
         <>

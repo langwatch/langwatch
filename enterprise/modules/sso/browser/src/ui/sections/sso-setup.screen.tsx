@@ -6,6 +6,7 @@
  */
 import { Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -66,22 +67,24 @@ export default function SsoSetupScreen() {
   if (!organizationId) return null;
 
   return (
-    <SectionNavigationFrame
-      label="Authentication"
-      links={AUTHENTICATION_LINKS}
-      activeHref="/settings/authentication/provider"
-      onNavigate={(href) => navigation?.navigate(href)}
-    >
-      <VStack align="stretch" gap={6} width="full">
-        <VStack align="start" gap={1}>
-          <Heading as="h2">Identity provider</Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Identity provider</PageLayout.Heading>
+      </PageLayout.Header>
+      <SectionNavigationFrame
+        label="Authentication"
+        links={AUTHENTICATION_LINKS}
+        activeHref="/settings/authentication/provider"
+        onNavigate={(href) => navigation?.navigate(href)}
+      >
+        <VStack align="stretch" gap={6} width="full" paddingTop={4}>
           <Text color="fg.muted">
             Where your people sign in, and everything it takes to put it in front of them.
           </Text>
+          <SsoSetupPage organizationId={organizationId} />
         </VStack>
-        <SsoSetupPage organizationId={organizationId} />
-      </VStack>
-    </SectionNavigationFrame>
+      </SectionNavigationFrame>
+    </>
   );
 }
 

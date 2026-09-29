@@ -1,15 +1,5 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Link,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, Link, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { AlertTriangle, CheckCircle2, Mail, TrendingUp } from "lucide-react";
 import { useState } from "react";
@@ -103,145 +93,142 @@ export function PersonalBudgetRequestScreen() {
   };
 
   return (
-    <PersonalWorkspaceLayout>
-      <VStack align="stretch" gap={6} width="full" maxWidth="640px">
-        <HStack alignItems="end">
-          <VStack align="start" gap={0}>
-            <Heading as="h2" size="lg">
-              Request budget increase
-            </Heading>
-            <Text color="fg.muted" fontSize="sm">
-              Send the request to your organization admin with the current spend and limit context.
-            </Text>
-          </VStack>
-          <Spacer />
-        </HStack>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Request budget increase</PageLayout.Heading>
+      </PageLayout.Header>
+      <PersonalWorkspaceLayout>
+        <VStack align="stretch" gap={6} width="full" maxWidth="640px">
+          <Text color="fg.muted" fontSize="sm">
+            Send the request to your organization admin with the current spend and limit context.
+          </Text>
 
-        {noOrg && (
-          <Alert.Root status="info">
-            <Alert.Indicator />
-            <Box>
-              <Alert.Title>Personal account - no admin to email</Alert.Title>
-              <Alert.Description>
-                Budget-increase requests only apply to organization-managed accounts. Personal
-                accounts manage their own limits in Settings.
-              </Alert.Description>
-            </Box>
-          </Alert.Root>
-        )}
-
-        {!noOrg && submitState === "sent" && (
-          <Alert.Root status="success">
-            <Alert.Indicator>
-              <CheckCircle2 size={18} />
-            </Alert.Indicator>
-            <Box>
-              <Alert.Title>Request sent</Alert.Title>
-              <Alert.Description>
-                We emailed {adminEmail ?? "your organization admin"} with the spend context. They'll
-                review and update the budget in Settings → AI Governance → Budgets.
-              </Alert.Description>
-            </Box>
-          </Alert.Root>
-        )}
-
-        {!noOrg && submitState !== "sent" && sendFailed && (
-          <Alert.Root status="error">
-            <Alert.Indicator>
-              <AlertTriangle size={18} />
-            </Alert.Indicator>
-            <Box>
-              <Alert.Title>We couldn't send your request</Alert.Title>
-              <Alert.Description>
-                Try again, or{" "}
-                {adminEmail ? (
-                  <>
-                    email <Link href={`mailto:${adminEmail}`}>{adminEmail}</Link> directly.
-                  </>
-                ) : (
-                  "contact your organization admin directly."
-                )}
-              </Alert.Description>
-            </Box>
-          </Alert.Root>
-        )}
-
-        {!noOrg && submitState !== "sent" && (
-          <>
-            {hasContext ? (
-              <Box
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="md"
-                padding={4}
-                backgroundColor="bg.subtle"
-              >
-                <Text
-                  fontSize="xs"
-                  color="fg.muted"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                  marginBottom={3}
-                >
-                  Context (carried from the gateway block)
-                </Text>
-                <VStack align="stretch" gap={2}>
-                  <ContextRow label="Scope" value={scope} />
-                  <ContextRow label="Period" value={period} />
-                  <ContextRow label="Spent so far" value={fmtUsd(spentUsd ?? 0)} tone="red" />
-                  <ContextRow label="Current limit" value={fmtUsd(limitUsd ?? 0)} />
-                </VStack>
+          {noOrg && (
+            <Alert.Root status="info">
+              <Alert.Indicator />
+              <Box>
+                <Alert.Title>Personal account - no admin to email</Alert.Title>
+                <Alert.Description>
+                  Budget-increase requests only apply to organization-managed accounts. Personal
+                  accounts manage their own limits in Settings.
+                </Alert.Description>
               </Box>
-            ) : (
-              <Alert.Root status="warning">
-                <Alert.Indicator>
-                  <AlertTriangle size={18} />
-                </Alert.Indicator>
-                <Box>
-                  <Alert.Title>No context attached</Alert.Title>
-                  <Alert.Description>
-                    The page was opened without a budget block context. You can still send a
-                    free-form message - the admin will review and decide.
-                  </Alert.Description>
+            </Alert.Root>
+          )}
+
+          {!noOrg && submitState === "sent" && (
+            <Alert.Root status="success">
+              <Alert.Indicator>
+                <CheckCircle2 size={18} />
+              </Alert.Indicator>
+              <Box>
+                <Alert.Title>Request sent</Alert.Title>
+                <Alert.Description>
+                  We emailed {adminEmail ?? "your organization admin"} with the spend context.
+                  They'll review and update the budget in Settings → AI Governance → Budgets.
+                </Alert.Description>
+              </Box>
+            </Alert.Root>
+          )}
+
+          {!noOrg && submitState !== "sent" && sendFailed && (
+            <Alert.Root status="error">
+              <Alert.Indicator>
+                <AlertTriangle size={18} />
+              </Alert.Indicator>
+              <Box>
+                <Alert.Title>We couldn't send your request</Alert.Title>
+                <Alert.Description>
+                  Try again, or{" "}
+                  {adminEmail ? (
+                    <>
+                      email <Link href={`mailto:${adminEmail}`}>{adminEmail}</Link> directly.
+                    </>
+                  ) : (
+                    "contact your organization admin directly."
+                  )}
+                </Alert.Description>
+              </Box>
+            </Alert.Root>
+          )}
+
+          {!noOrg && submitState !== "sent" && (
+            <>
+              {hasContext ? (
+                <Box
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="md"
+                  padding={4}
+                  backgroundColor="bg.subtle"
+                >
+                  <Text
+                    fontSize="xs"
+                    color="fg.muted"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    marginBottom={3}
+                  >
+                    Context (carried from the gateway block)
+                  </Text>
+                  <VStack align="stretch" gap={2}>
+                    <ContextRow label="Scope" value={scope} />
+                    <ContextRow label="Period" value={period} />
+                    <ContextRow label="Spent so far" value={fmtUsd(spentUsd ?? 0)} tone="red" />
+                    <ContextRow label="Current limit" value={fmtUsd(limitUsd ?? 0)} />
+                  </VStack>
                 </Box>
-              </Alert.Root>
-            )}
+              ) : (
+                <Alert.Root status="warning">
+                  <Alert.Indicator>
+                    <AlertTriangle size={18} />
+                  </Alert.Indicator>
+                  <Box>
+                    <Alert.Title>No context attached</Alert.Title>
+                    <Alert.Description>
+                      The page was opened without a budget block context. You can still send a
+                      free-form message - the admin will review and decide.
+                    </Alert.Description>
+                  </Box>
+                </Alert.Root>
+              )}
 
-            <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
-              <HStack marginBottom={2} fontSize="sm" color="fg.muted">
-                <Mail size={14} />
-                <Text>
-                  To: <strong>{adminEmail ?? "your organization admin"}</strong>
+              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+                <HStack marginBottom={2} fontSize="sm" color="fg.muted">
+                  <Mail size={14} />
+                  <Text>
+                    To: <strong>{adminEmail ?? "your organization admin"}</strong>
+                  </Text>
+                </HStack>
+                <Text fontSize="xs" color="fg.muted" marginBottom={3}>
+                  Optional message - explain why you need the increase
                 </Text>
-              </HStack>
-              <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Optional message - explain why you need the increase
-              </Text>
-              <Textarea
-                placeholder="e.g. Need it for the demo on Friday - usually under limit"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                minHeight="100px"
-                resize="vertical"
-              />
-            </Box>
+                <Textarea
+                  placeholder="e.g. Need it for the demo on Friday - usually under limit"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  minHeight="100px"
+                  resize="vertical"
+                />
+              </Box>
 
-            <HStack>
-              <Spacer />
-              <Button
-                colorPalette="orange"
-                onClick={submit}
-                disabled={submitState === "submitting" || !organization || adminQuery.isLoading}
-                loading={submitState === "submitting"}
-              >
-                <TrendingUp size={16} />
-                Send request
-              </Button>
-            </HStack>
-          </>
-        )}
-      </VStack>
-    </PersonalWorkspaceLayout>
+              <HStack>
+                <Spacer />
+                <Button
+                  colorPalette="orange"
+                  onClick={submit}
+                  disabled={submitState === "submitting" || !organization || adminQuery.isLoading}
+                  loading={submitState === "submitting"}
+                >
+                  <TrendingUp size={16} />
+                  Send request
+                </Button>
+              </HStack>
+            </>
+          )}
+        </VStack>
+      </PersonalWorkspaceLayout>
+    </>
   );
 }
 

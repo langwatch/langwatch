@@ -1,4 +1,4 @@
-import { Button, Heading, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type {
   DataPrivacyAudienceOptions,
   DataPrivacyConfig,
@@ -111,7 +111,7 @@ export function PrivacyRuleDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">{editingRule ? "Edit privacy rule" : "Add privacy rule"}</Heading>
+          <Drawer.Title>{editingRule ? "Edit privacy rule" : "Add privacy rule"}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

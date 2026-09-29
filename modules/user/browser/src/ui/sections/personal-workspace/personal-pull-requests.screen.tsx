@@ -14,26 +14,30 @@ export function PersonalPullRequestsScreen() {
   const { personalProjectId } = usePersonalContext();
 
   return (
-    <PersonalWorkspaceLayout>
-      <VStack align="stretch" gap={6} width="full">
-        <VStack align="start" gap={0}>
-          <PageLayout.Heading>Pull requests</PageLayout.Heading>
-          <Text color="fg.muted" fontSize="sm">
-            What each pull request cost in assistant usage. These are the pull requests your own
-            work touched, priced across everyone who worked on them, over the pull request's whole
-            life from its first session to its last rather than a selected period.
-          </Text>
-        </VStack>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Pull requests</PageLayout.Heading>
+      </PageLayout.Header>
+      <PersonalWorkspaceLayout>
+        <VStack align="stretch" gap={6} width="full">
+          <VStack align="start" gap={0}>
+            <Text color="fg.muted" fontSize="sm">
+              What each pull request cost in assistant usage. These are the pull requests your own
+              work touched, priced across everyone who worked on them, over the pull request's whole
+              life from its first session to its last rather than a selected period.
+            </Text>
+          </VStack>
 
-        {personalProjectId ? (
-          <CodingAgentPullRequestsTable projectId={personalProjectId} />
-        ) : (
-          <Text fontSize="sm" color="fg.muted">
-            No pull requests yet
-          </Text>
-        )}
-      </VStack>
-    </PersonalWorkspaceLayout>
+          {personalProjectId ? (
+            <CodingAgentPullRequestsTable projectId={personalProjectId} />
+          ) : (
+            <Text fontSize="sm" color="fg.muted">
+              No pull requests yet
+            </Text>
+          )}
+        </VStack>
+      </PersonalWorkspaceLayout>
+    </>
   );
 }
 

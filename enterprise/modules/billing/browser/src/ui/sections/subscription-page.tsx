@@ -2,7 +2,8 @@
  * Cloud-only Subscription Page; lets org admins manage plans and users.
  * @see specs/licensing/subscription-page.feature
  */
-import { Badge, Flex, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Badge, Flex, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { CONTACT_SALES_URL, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";
 import { useEffect, useState } from "react";
@@ -224,11 +225,7 @@ export function SubscriptionPage() {
   });
 
   if (!organization || activePlan.isLoading || isCurrencyLoading) {
-    return (
-      <Flex justifyContent="center" padding={8}>
-        <Spinner />
-      </Flex>
-    );
+    return <Skeleton width="full" height="200px" />;
   }
 
   if (activePlan.isError || !plan) {
@@ -271,16 +268,27 @@ export function SubscriptionPage() {
 
   return (
     <>
-      <VStack gap={6} width="full" align="stretch" maxWidth="900px" marginX="auto">
-        <SubscriptionPageHeader
-          showPlanPickers={
-            (isDeveloperPlan || isTieredLegacyPaidPlan || isLicenseOverride) && !isEnterprisePlan
-          }
-          billingPeriod={billingPeriod}
-          onBillingPeriodChange={setBillingPeriod}
-          currency={currency}
-          onCurrencyChange={setSelectedCurrency}
-        />
+      <SubscriptionPageHeader
+        showPlanPickers={
+          (isDeveloperPlan || isTieredLegacyPaidPlan || isLicenseOverride) && !isEnterprisePlan
+        }
+        billingPeriod={billingPeriod}
+        onBillingPeriodChange={setBillingPeriod}
+        currency={currency}
+        onCurrencyChange={setSelectedCurrency}
+      />
+      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+        <Text color="fg.muted">
+          For questions about billing,{" "}
+          <Link
+            href="mailto:sales@langwatch.ai"
+            fontWeight="semibold"
+            color="fg"
+            _hover={{ color: "fg" }}
+          >
+            contact us
+          </Link>
+        </Text>
 
         {showSuccess && <SubscriptionSuccessNotice showUpgradeCredit={showUpgradeCredit} />}
 

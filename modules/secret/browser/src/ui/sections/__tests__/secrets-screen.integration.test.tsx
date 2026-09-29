@@ -7,7 +7,6 @@
 
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeSecretHost, renderWithSecretHost } from "../../../testing.tsx";
@@ -63,14 +62,6 @@ vi.mock("../../../behavior/secret-api.ts", () => ({
         }),
       },
     },
-  },
-}));
-
-vi.mock("@langwatch/design-system/page-layout", () => ({
-  PageLayout: {
-    HeaderButton: ({ children, onClick }: { children?: ReactNode; onClick?: () => void }) => (
-      <button onClick={onClick}>{children}</button>
-    ),
   },
 }));
 

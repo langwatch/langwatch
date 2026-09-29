@@ -85,6 +85,7 @@ export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.Rea
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
+          <Drawer.Title>Create New Team</Drawer.Title>
           <Drawer.CloseTrigger onClick={closeDrawer} />
         </Drawer.Header>
         <Drawer.Body>

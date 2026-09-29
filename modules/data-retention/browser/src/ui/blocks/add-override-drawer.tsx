@@ -3,7 +3,6 @@ import {
   Button,
   createListCollection,
   Field,
-  Heading,
   HStack,
   Input,
   Text,
@@ -211,9 +210,9 @@ export function AddOverrideDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">
+          <Drawer.Title>
             {isEditing ? "Edit retention policy" : "Add retention policy"}
-          </Heading>
+          </Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

@@ -9,7 +9,6 @@ import {
   Input,
   type ListCollection,
   Spacer,
-  Spinner,
   Table,
   Text,
   VStack,
@@ -254,11 +253,6 @@ export const TeamForm = ({
   return (
     <form style={{ width: "100%" }} onSubmit={handleSubmit(onSubmit)}>
       <VStack gap={4} width="full" align="start">
-        <HStack width="full">
-          <Heading>{team ? "Team Settings" : "Create New Team"}</Heading>
-          <Spacer />
-          {isLoading && team && <Spinner />}
-        </HStack>
         <VStack width="full" gap={0}>
           <HorizontalFormControl
             label="Name"

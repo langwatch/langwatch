@@ -8,11 +8,9 @@ import {
   Badge,
   Button,
   Card,
-  EmptyState,
-  Heading,
   HStack,
   Spacer,
-  Spinner,
+  Skeleton,
   Table,
   Text,
   VStack,
@@ -32,6 +30,8 @@ import {
   type ScopeAssignment,
 } from "@langwatch/data-retention-contract";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -233,11 +233,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   });
 
   if (rulesQuery.isLoading) {
-    return (
-      <VStack width="full" padding={8}>
-        <Spinner />
-      </VStack>
-    );
+    return <Skeleton width="full" height="200px" />;
   }
 
   const snapshot = rulesQuery.data;
@@ -293,11 +289,9 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   );
 
   return (
-    <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
-      <HStack width="full" marginTop={2}>
-        <Heading as="h2" fontSize="xl">
-          Retention Policies
-        </Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Retention Policies</PageLayout.Heading>
         <Spacer />
         <ScopeFilter
           value={scopeFilter}
@@ -307,113 +301,114 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           currentProjectId={projectId}
         />
         {canWrite && (
-          <Button colorPalette="blue" onClick={() => setDrawerOpen(true)}>
+          <PageLayout.HeaderButton onClick={() => setDrawerOpen(true)}>
             Add retention policy
-          </Button>
+          </PageLayout.HeaderButton>
         )}
-      </HStack>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        {!canConfigureRetention && snapshot && (
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Configurable retention is a paid-plan feature</Alert.Title>
+              <Alert.Description>
+                Your plan applies the platform default to every project. Upgrade to configure
+                per-organization, per-team, or per-project retention overrides.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
 
-      {!canConfigureRetention && snapshot && (
-        <Alert.Root status="info">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Configurable retention is a paid-plan feature</Alert.Title>
-            <Alert.Description>
-              Your plan applies the platform default to every project. Upgrade to configure
-              per-organization, per-team, or per-project retention overrides.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
-      )}
+        {snapshot && (
+          <RetentionAndUsageCard
+            effective={snapshot.effective}
+            isLoading={storageQuery.isLoading}
+            data={storageQuery.data}
+            storageDescription={storageDescription}
+          />
+        )}
 
-      {snapshot && (
-        <RetentionAndUsageCard
-          effective={snapshot.effective}
-          isLoading={storageQuery.isLoading}
-          data={storageQuery.data}
-          storageDescription={storageDescription}
+        {snapshot && (
+          <RetentionPolicyList
+            ruleCount={snapshot.rules.length}
+            scopeGroups={scopeGroups}
+            canWrite={canWrite}
+            onAdd={() => setDrawerOpen(true)}
+            onEdit={openEditForGroup}
+            onRemove={setRemoveTarget}
+          />
+        )}
+
+        <RetroactiveProgressCard
+          mutations={activeMutations}
+          onCancel={(mutationId) => killMutation.mutate({ projectId, mutationId })}
+          isCancelling={killMutation.isPending}
         />
-      )}
 
-      {snapshot && (
-        <RetentionPolicyList
-          ruleCount={snapshot.rules.length}
-          scopeGroups={scopeGroups}
-          canWrite={canWrite}
-          onAdd={() => setDrawerOpen(true)}
-          onEdit={openEditForGroup}
-          onRemove={setRemoveTarget}
+        {available && (
+          <AddOverrideDrawer
+            open={drawerOpen}
+            onClose={closeDrawer}
+            editTarget={editTarget}
+            available={available}
+            currentProjectId={projectId}
+            isPlatformAdmin={isPlatformAdmin}
+            isEnterprise={isEnterprise}
+            isSaving={setForScope.isPending || triggerUpdate.isPending}
+            scopePicker={({ value, onChange }) => (
+              <ScopeChipPicker
+                value={value}
+                onChange={onChange}
+                organizationId={available.organization?.id}
+                organizationName={available.organization?.name}
+                availableTeams={available.teams}
+                availableProjects={available.projects}
+                label=""
+                currentOrganizationId={available.organization ? organizationId : undefined}
+                currentTeamId={teamId}
+                currentProjectId={projectId}
+              />
+            )}
+            onSave={savePolicy}
+          />
+        )}
+
+        <RemoveScopeConfirmDialog
+          group={removeTarget}
+          isRemoving={removeForScope.isPending}
+          preview={{
+            data: removePreviewQuery.data,
+            isLoading: removePreviewQuery.isLoading,
+            isError: removePreviewQuery.isError,
+          }}
+          onCancel={() => setRemoveTarget(null)}
+          onConfirm={async () => {
+            if (!removeTarget) return;
+            await removeRetentionScope({
+              group: removeTarget,
+              remove: ({ scope, category }) =>
+                removeForScope.mutateAsync({ projectId, scope, category }),
+              afterWrite: () => void invalidate(),
+              notices: host,
+            });
+            setRemoveTarget(null);
+          }}
         />
-      )}
 
-      <RetroactiveProgressCard
-        mutations={activeMutations}
-        onCancel={(mutationId) => killMutation.mutate({ projectId, mutationId })}
-        isCancelling={killMutation.isPending}
-      />
-
-      {available && (
-        <AddOverrideDrawer
-          open={drawerOpen}
-          onClose={closeDrawer}
-          editTarget={editTarget}
-          available={available}
-          currentProjectId={projectId}
-          isPlatformAdmin={isPlatformAdmin}
-          isEnterprise={isEnterprise}
-          isSaving={setForScope.isPending || triggerUpdate.isPending}
-          scopePicker={({ value, onChange }) => (
-            <ScopeChipPicker
-              value={value}
-              onChange={onChange}
-              organizationId={available.organization?.id}
-              organizationName={available.organization?.name}
-              availableTeams={available.teams}
-              availableProjects={available.projects}
-              label=""
-              currentOrganizationId={available.organization ? organizationId : undefined}
-              currentTeamId={teamId}
-              currentProjectId={projectId}
-            />
-          )}
-          onSave={savePolicy}
+        <ApplyToExistingConfirmDialog
+          pending={pendingConfirm}
+          isApplying={triggerUpdate.isPending || setForScope.isPending}
+          onCancel={() => setPendingConfirm(null)}
+          onConfirm={async () => {
+            if (!pendingConfirm) return;
+            const confirm = pendingConfirm.onConfirm;
+            setPendingConfirm(null);
+            await confirm();
+          }}
         />
-      )}
-
-      <RemoveScopeConfirmDialog
-        group={removeTarget}
-        isRemoving={removeForScope.isPending}
-        preview={{
-          data: removePreviewQuery.data,
-          isLoading: removePreviewQuery.isLoading,
-          isError: removePreviewQuery.isError,
-        }}
-        onCancel={() => setRemoveTarget(null)}
-        onConfirm={async () => {
-          if (!removeTarget) return;
-          await removeRetentionScope({
-            group: removeTarget,
-            remove: ({ scope, category }) =>
-              removeForScope.mutateAsync({ projectId, scope, category }),
-            afterWrite: () => void invalidate(),
-            notices: host,
-          });
-          setRemoveTarget(null);
-        }}
-      />
-
-      <ApplyToExistingConfirmDialog
-        pending={pendingConfirm}
-        isApplying={triggerUpdate.isPending || setForScope.isPending}
-        onCancel={() => setPendingConfirm(null)}
-        onConfirm={async () => {
-          if (!pendingConfirm) return;
-          const confirm = pendingConfirm.onConfirm;
-          setPendingConfirm(null);
-          await confirm();
-        }}
-      />
-    </VStack>
+      </VStack>
+    </>
   );
 }
 
@@ -437,31 +432,17 @@ function RetentionPolicyList({
 }: RetentionPolicyListProps) {
   if (ruleCount === 0) {
     return (
-      <Card.Root width="full">
-        <Card.Body>
-          <EmptyState.Root width="full">
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <DatabaseBackup size={24} />
-              </EmptyState.Indicator>
-              <VStack textAlign="center" gap={3}>
-                <VStack textAlign="center" gap={1}>
-                  <EmptyState.Title>No retention policies</EmptyState.Title>
-                  <EmptyState.Description>
-                    Add a retention policy to override the platform default of{" "}
-                    {PLATFORM_DEFAULT_RETENTION_DAYS} days.
-                  </EmptyState.Description>
-                </VStack>
-                {canWrite && (
-                  <Button colorPalette="blue" variant="outline" onClick={onAdd}>
-                    <Plus /> Add retention policy
-                  </Button>
-                )}
-              </VStack>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </Card.Body>
-      </Card.Root>
+      <NoDataInfoBlock
+        title="No retention policies"
+        description={`Add a retention policy to override the platform default of ${PLATFORM_DEFAULT_RETENTION_DAYS} days.`}
+        icon={<DatabaseBackup size={24} />}
+      >
+        {canWrite && (
+          <PageLayout.HeaderButton onClick={onAdd}>
+            <Plus /> Add retention policy
+          </PageLayout.HeaderButton>
+        )}
+      </NoDataInfoBlock>
     );
   }
   if (scopeGroups.length === 0) {

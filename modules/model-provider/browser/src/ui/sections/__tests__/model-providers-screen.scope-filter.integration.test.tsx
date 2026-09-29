@@ -82,6 +82,8 @@ vi.mock("@langwatch/authz-browser-kit", async () => {
 
 vi.mock("@langwatch/design-system/page-layout", () => ({
   PageLayout: {
+    Header: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Heading: ({ children }: { children?: ReactNode }) => <h1>{children}</h1>,
     HeaderButton: ({ children }: { children?: ReactNode }) => <button>{children}</button>,
   },
 }));

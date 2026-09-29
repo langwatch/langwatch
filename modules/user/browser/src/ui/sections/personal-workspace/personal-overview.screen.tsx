@@ -1,4 +1,5 @@
 import { Box, Heading, HStack, SimpleGrid, Spacer, Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import numeral from "numeral";
@@ -75,194 +76,196 @@ export function PersonalOverviewScreen() {
   );
 
   return (
-    <PersonalWorkspaceLayout>
-      <VStack align="stretch" gap={6} width="full">
-        <PersonalWorkspaceViewOnlyNotice />
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Your AI tools</PageLayout.Heading>
+      </PageLayout.Header>
+      <PersonalWorkspaceLayout>
+        <VStack align="stretch" gap={6} width="full">
+          <PersonalWorkspaceViewOnlyNotice />
 
-        <VStack id={PERSONAL_AI_TOOLS_ANCHOR} align="stretch" gap={3} scrollMarginTop={4}>
-          <Heading as="h2" size="lg">
-            Your AI tools
-          </Heading>
-          <Text color="fg.muted" fontSize="sm">
-            Pick a tool to get started, or issue a virtual key for your own integrations.
-          </Text>
-          <AiToolsPortal />
-        </VStack>
-
-        <Box id={PERSONAL_TRACE_INGEST_ANCHOR} scrollMarginTop={4}>
-          <TraceIngestSection />
-        </Box>
-
-        <HStack alignItems="end" paddingTop={4}>
-          <VStack align="start" gap={0}>
-            <Heading as="h3" size="md">
-              My Usage
-            </Heading>
+          <VStack id={PERSONAL_AI_TOOLS_ANCHOR} align="stretch" gap={3} scrollMarginTop={4}>
             <Text color="fg.muted" fontSize="sm">
-              Your AI usage in {organizationName} this month
+              Pick a tool to get started, or issue a virtual key for your own integrations.
             </Text>
+            <AiToolsPortal />
           </VStack>
-          <Spacer />
-          {/* Renders only once the personal project has traces: exploration
-              of usage that exists, not another setup entry point. */}
-          <ConnectYourAgentButton projectId={personalProjectId} />
-        </HStack>
 
-        <BudgetStateBanners budgetOverview={budgetOverview} budget={budget} />
+          <Box id={PERSONAL_TRACE_INGEST_ANCHOR} scrollMarginTop={4}>
+            <TraceIngestSection />
+          </Box>
 
-        {budgetOverview.gatewayAccess && budgetOverview.budgets.length > 0 && (
-          <SectionCard title="Budgets that apply to you">
-            <BudgetOverviewList items={budgetOverview.budgets} />
-          </SectionCard>
-        )}
-
-        <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-          <SummaryCard
-            title="Spent this month"
-            value={fmtUsd(summary.billedThisMonthUsd)}
-            subline={spentCardSubline}
-          />
-          <SummaryCard
-            title="Requests this month"
-            value={numeral(summary.requestsThisMonth).format("0,0")}
-            subline={fmtPctDelta(summary.requestsDeltaPctVsLastMonth) ?? "—"}
-          />
-          <SummaryCard
-            title="Most-used model"
-            value={summary.mostUsedModel?.name ?? "—"}
-            subline={
-              summary.mostUsedModel
-                ? `${summary.mostUsedModel.usagePct}% of usage`
-                : "Run a request to see this"
-            }
-          />
-        </SimpleGrid>
-
-        <SectionCard title="Spending over time">
-          {spendByDay.length === 0 ? (
-            <EmptyState message="No usage yet" hint="Run `langwatch claude` to get started" />
-          ) : (
-            <VStack align="stretch" gap={2}>
-              <CostSeriesLegend
-                showTheoretical={showTheoretical}
-                showBilled={showBilled}
-                onToggleTheoretical={() => setShowTheoretical((v) => !v)}
-                onToggleBilled={() => setShowBilled((v) => !v)}
-              />
-              <HStack gap={1} alignItems="end" height="120px" paddingTop={2}>
-                {spendByDay.map((d) => {
-                  const theoreticalPct = (d.usd / maxDay) * 100;
-                  const billedPct = (d.billedUsd / maxDay) * 100;
-                  return (
-                    <Tooltip
-                      key={d.day}
-                      openDelay={100}
-                      positioning={{ placement: "top" }}
-                      content={
-                        <VStack gap={0.5} align="start">
-                          <Text fontWeight="semibold">{d.day}</Text>
-                          <Text>Theoretical: {fmtUsd(d.usd)}</Text>
-                          <Text>Billed: {fmtUsd(d.billedUsd)}</Text>
-                        </VStack>
-                      }
-                    >
-                      <Box flex={1} position="relative" height="full" cursor="default">
-                        {/* Always-present baseline so empty days still read as a
-                            point on the timeline instead of a blank gap. */}
-                        <Box
-                          position="absolute"
-                          bottom={0}
-                          width="full"
-                          height="2px"
-                          borderRadius="full"
-                          backgroundColor="blue.200"
-                        />
-                        {showTheoretical && d.usd > 0 && (
-                          <Box
-                            position="absolute"
-                            bottom={0}
-                            width="full"
-                            backgroundColor="blue.200"
-                            borderRadius="sm"
-                            height={`${Math.max(2, theoreticalPct)}%`}
-                          />
-                        )}
-                        {showBilled && d.billedUsd > 0 && (
-                          <Box
-                            position="absolute"
-                            bottom={0}
-                            width="full"
-                            backgroundColor="blue.400"
-                            borderRadius="sm"
-                            height={`${Math.max(2, billedPct)}%`}
-                          />
-                        )}
-                      </Box>
-                    </Tooltip>
-                  );
-                })}
-              </HStack>
-              <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
-                <Text>{spendByDay[0]?.day}</Text>
-                <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
-              </HStack>
+          <HStack alignItems="end" paddingTop={4}>
+            <VStack align="start" gap={0}>
+              <Heading as="h3" size="md">
+                My Usage
+              </Heading>
+              <Text color="fg.muted" fontSize="sm">
+                Your AI usage in {organizationName} this month
+              </Text>
             </VStack>
-          )}
-        </SectionCard>
+            <Spacer />
+            {/* Renders only once the personal project has traces: exploration
+              of usage that exists, not another setup entry point. */}
+            <ConnectYourAgentButton projectId={personalProjectId} />
+          </HStack>
 
-        <SectionCard title="By tool">
-          {spendByTool.length === 0 ? (
-            <EmptyState message="No tool data yet" />
-          ) : (
-            <VStack align="stretch" gap={3}>
-              <CostSeriesLegend
-                showTheoretical={showTheoretical}
-                showBilled={showBilled}
-                onToggleTheoretical={() => setShowTheoretical((v) => !v)}
-                onToggleBilled={() => setShowBilled((v) => !v)}
-              />
-              {spendByTool.map((tool) => (
-                <ToolSpendRow
-                  key={tool.tool}
-                  tool={tool}
-                  maxTool={maxTool}
+          <BudgetStateBanners budgetOverview={budgetOverview} budget={budget} />
+
+          {budgetOverview.gatewayAccess && budgetOverview.budgets.length > 0 && (
+            <SectionCard title="Budgets that apply to you">
+              <BudgetOverviewList items={budgetOverview.budgets} />
+            </SectionCard>
+          )}
+
+          <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+            <SummaryCard
+              title="Spent this month"
+              value={fmtUsd(summary.billedThisMonthUsd)}
+              subline={spentCardSubline}
+            />
+            <SummaryCard
+              title="Requests this month"
+              value={numeral(summary.requestsThisMonth).format("0,0")}
+              subline={fmtPctDelta(summary.requestsDeltaPctVsLastMonth) ?? "—"}
+            />
+            <SummaryCard
+              title="Most-used model"
+              value={summary.mostUsedModel?.name ?? "—"}
+              subline={
+                summary.mostUsedModel
+                  ? `${summary.mostUsedModel.usagePct}% of usage`
+                  : "Run a request to see this"
+              }
+            />
+          </SimpleGrid>
+
+          <SectionCard title="Spending over time">
+            {spendByDay.length === 0 ? (
+              <EmptyState message="No usage yet" hint="Run `langwatch claude` to get started" />
+            ) : (
+              <VStack align="stretch" gap={2}>
+                <CostSeriesLegend
                   showTheoretical={showTheoretical}
                   showBilled={showBilled}
+                  onToggleTheoretical={() => setShowTheoretical((v) => !v)}
+                  onToggleBilled={() => setShowBilled((v) => !v)}
                 />
-              ))}
-            </VStack>
-          )}
-        </SectionCard>
+                <HStack gap={1} alignItems="end" height="120px" paddingTop={2}>
+                  {spendByDay.map((d) => {
+                    const theoreticalPct = (d.usd / maxDay) * 100;
+                    const billedPct = (d.billedUsd / maxDay) * 100;
+                    return (
+                      <Tooltip
+                        key={d.day}
+                        openDelay={100}
+                        positioning={{ placement: "top" }}
+                        content={
+                          <VStack gap={0.5} align="start">
+                            <Text fontWeight="semibold">{d.day}</Text>
+                            <Text>Theoretical: {fmtUsd(d.usd)}</Text>
+                            <Text>Billed: {fmtUsd(d.billedUsd)}</Text>
+                          </VStack>
+                        }
+                      >
+                        <Box flex={1} position="relative" height="full" cursor="default">
+                          {/* Always-present baseline so empty days still read as a
+                            point on the timeline instead of a blank gap. */}
+                          <Box
+                            position="absolute"
+                            bottom={0}
+                            width="full"
+                            height="2px"
+                            borderRadius="full"
+                            backgroundColor="blue.200"
+                          />
+                          {showTheoretical && d.usd > 0 && (
+                            <Box
+                              position="absolute"
+                              bottom={0}
+                              width="full"
+                              backgroundColor="blue.200"
+                              borderRadius="sm"
+                              height={`${Math.max(2, theoreticalPct)}%`}
+                            />
+                          )}
+                          {showBilled && d.billedUsd > 0 && (
+                            <Box
+                              position="absolute"
+                              bottom={0}
+                              width="full"
+                              backgroundColor="blue.400"
+                              borderRadius="sm"
+                              height={`${Math.max(2, billedPct)}%`}
+                            />
+                          )}
+                        </Box>
+                      </Tooltip>
+                    );
+                  })}
+                </HStack>
+                <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
+                  <Text>{spendByDay[0]?.day}</Text>
+                  <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
+                </HStack>
+              </VStack>
+            )}
+          </SectionCard>
 
-        <SectionCard
-          title="Coding-agent usage (last 30 days)"
-          action={
-            <HStack gap={4}>
-              <Link href="/me/sessions" fontSize="sm" color="blue.fg">
-                View sessions
-              </Link>
-              <Link href="/me/pull-requests" fontSize="sm" color="blue.fg">
-                View pull requests
-              </Link>
-            </HStack>
-          }
-        >
-          {personalProjectId ? (
-            <CodingAgentUsageContent projectId={personalProjectId} />
-          ) : (
-            <EmptyState message="No coding-agent usage yet" />
-          )}
-        </SectionCard>
+          <SectionCard title="By tool">
+            {spendByTool.length === 0 ? (
+              <EmptyState message="No tool data yet" />
+            ) : (
+              <VStack align="stretch" gap={3}>
+                <CostSeriesLegend
+                  showTheoretical={showTheoretical}
+                  showBilled={showBilled}
+                  onToggleTheoretical={() => setShowTheoretical((v) => !v)}
+                  onToggleBilled={() => setShowBilled((v) => !v)}
+                />
+                {spendByTool.map((tool) => (
+                  <ToolSpendRow
+                    key={tool.tool}
+                    tool={tool}
+                    maxTool={maxTool}
+                    showTheoretical={showTheoretical}
+                    showBilled={showBilled}
+                  />
+                ))}
+              </VStack>
+            )}
+          </SectionCard>
 
-        <SectionCard title="Recent activity" flushContent>
-          {personalProjectId && personalProjectSlug ? (
-            <PersonalRecentTracesTable projectSlug={personalProjectSlug} />
-          ) : (
-            <EmptyState message="No requests yet" />
-          )}
-        </SectionCard>
-      </VStack>
-    </PersonalWorkspaceLayout>
+          <SectionCard
+            title="Coding-agent usage (last 30 days)"
+            action={
+              <HStack gap={4}>
+                <Link href="/me/sessions" fontSize="sm" color="blue.fg">
+                  View sessions
+                </Link>
+                <Link href="/me/pull-requests" fontSize="sm" color="blue.fg">
+                  View pull requests
+                </Link>
+              </HStack>
+            }
+          >
+            {personalProjectId ? (
+              <CodingAgentUsageContent projectId={personalProjectId} />
+            ) : (
+              <EmptyState message="No coding-agent usage yet" />
+            )}
+          </SectionCard>
+
+          <SectionCard title="Recent activity" flushContent>
+            {personalProjectId && personalProjectSlug ? (
+              <PersonalRecentTracesTable projectSlug={personalProjectSlug} />
+            ) : (
+              <EmptyState message="No requests yet" />
+            )}
+          </SectionCard>
+        </VStack>
+      </PersonalWorkspaceLayout>
+    </>
   );
 }
 

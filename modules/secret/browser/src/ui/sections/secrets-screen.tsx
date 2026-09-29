@@ -3,23 +3,11 @@
  * Spec: specs/secrets/secrets-manager.feature
  */
 
-import {
-  Box,
-  Button,
-  Card,
-  EmptyState,
-  Heading,
-  HStack,
-  Input,
-  Spacer,
-  Spinner,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Card, Input, Spacer, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Secret } from "@langwatch/secret-contract";
@@ -214,9 +202,9 @@ export default function SecretsScreen() {
   const showSecrets = !secretsQuery.isLoading && secrets.length > 0;
 
   return (
-    <VStack gap={6} width="full" align="start">
-      <HStack width="full" marginTop={2}>
-        <Heading as="h2">Secrets</Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Secrets</PageLayout.Heading>
         <Spacer />
         {host.projectSwitcher()}
         {canManageSecrets && (
@@ -229,185 +217,180 @@ export default function SecretsScreen() {
             </PageLayout.HeaderButton>
           </Tooltip>
         )}
-      </HStack>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        {secretsQuery.isLoading && <Skeleton width="full" height="120px" />}
+        {showEmpty && (
+          <NoDataInfoBlock
+            title="No secrets configured"
+            description="Add secrets to use in code blocks"
+            icon={<Key size={24} />}
+          />
+        )}
+        {showSecrets && (
+          <Card.Root width="full" overflow="hidden">
+            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+              <Table.Root width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Created By</Table.ColumnHeader>
+                    <Table.ColumnHeader>Last Updated</Table.ColumnHeader>
+                    <Table.ColumnHeader />
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {secrets.map((secret) => (
+                    <SecretRow
+                      key={secret.id}
+                      secret={secret}
+                      canManage={canManageSecrets}
+                      onUpdate={(picked) => {
+                        setSecretToUpdate(picked);
+                        setUpdateValue("");
+                      }}
+                      onDelete={setSecretToDelete}
+                    />
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            </Card.Body>
+          </Card.Root>
+        )}
 
-      {secretsQuery.isLoading && <Spinner />}
-      {showEmpty && (
-        <EmptyState.Root width="full">
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <Key size={24} />
-            </EmptyState.Indicator>
-            <VStack textAlign="center">
-              <EmptyState.Title>No secrets configured</EmptyState.Title>
-              <EmptyState.Description>Add secrets to use in code blocks</EmptyState.Description>
-            </VStack>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      )}
-      {showSecrets && (
-        <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-            <Table.Root width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Created By</Table.ColumnHeader>
-                  <Table.ColumnHeader>Last Updated</Table.ColumnHeader>
-                  <Table.ColumnHeader />
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {secrets.map((secret) => (
-                  <SecretRow
-                    key={secret.id}
-                    secret={secret}
-                    canManage={canManageSecrets}
-                    onUpdate={(picked) => {
-                      setSecretToUpdate(picked);
-                      setUpdateValue("");
-                    }}
-                    onDelete={setSecretToDelete}
+        {/* Add Secret Dialog */}
+        <Dialog.Root
+          open={isAddDialogOpen}
+          onOpenChange={(details) => {
+            if (!details.open) {
+              setIsAddDialogOpen(false);
+              setNewSecretName("");
+              setNewSecretValue("");
+            }
+          }}
+        >
+          <Dialog.Content bg="bg">
+            <Dialog.Header>
+              <Dialog.Title>Add Secret</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <VStack gap={4} align="start">
+                <VStack gap={1} align="start" width="full">
+                  <Text fontWeight="medium">Name</Text>
+                  <Input
+                    placeholder="e.g., OPENAI_API_KEY"
+                    data-testid="secret-name"
+                    value={newSecretName}
+                    onChange={(e) => setNewSecretName(normaliseSecretName(e.target.value))}
                   />
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
-      )}
-
-      {/* Add Secret Dialog */}
-      <Dialog.Root
-        open={isAddDialogOpen}
-        onOpenChange={(details) => {
-          if (!details.open) {
-            setIsAddDialogOpen(false);
-            setNewSecretName("");
-            setNewSecretValue("");
-          }
-        }}
-      >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>Add Secret</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack gap={4} align="start">
-              <VStack gap={1} align="start" width="full">
-                <Text fontWeight="medium">Name</Text>
-                <Input
-                  placeholder="e.g., OPENAI_API_KEY"
-                  data-testid="secret-name"
-                  value={newSecretName}
-                  onChange={(e) => setNewSecretName(normaliseSecretName(e.target.value))}
-                />
-              </VStack>
-              <VStack gap={1} align="start" width="full">
-                <Text fontWeight="medium">Value</Text>
-                {/* `type="password"` on purpose: the value is a live credential
+                </VStack>
+                <VStack gap={1} align="start" width="full">
+                  <Text fontWeight="medium">Value</Text>
+                  {/* `type="password"` on purpose: the value is a live credential
                     and there is no reveal anywhere on this page. */}
+                  <Input
+                    type="password"
+                    placeholder="Enter secret value"
+                    data-testid="secret-value"
+                    value={newSecretValue}
+                    onChange={(e) => setNewSecretValue(e.target.value)}
+                  />
+                </VStack>
+              </VStack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Dialog.ActionTrigger asChild>
+                <Button variant="outline">Cancel</Button>
+              </Dialog.ActionTrigger>
+              <Button
+                colorPalette="blue"
+                loading={createMutation.isPending}
+                disabled={!newSecretName || !newSecretValue}
+                data-testid="secret-save"
+                onClick={() => void handleCreate()}
+              >
+                Save
+              </Button>
+            </Dialog.Footer>
+            <Dialog.CloseTrigger />
+          </Dialog.Content>
+        </Dialog.Root>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog.Root
+          open={!!secretToDelete}
+          onOpenChange={(details) => {
+            if (!details.open) setSecretToDelete(null);
+          }}
+        >
+          <Dialog.Content bg="bg">
+            <Dialog.Header>
+              <Dialog.Title>Delete {secretToDelete?.name ?? ""}?</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Text>Code blocks referencing this secret will no longer have access.</Text>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Dialog.ActionTrigger asChild>
+                <Button variant="outline">Cancel</Button>
+              </Dialog.ActionTrigger>
+              <Button
+                colorPalette="red"
+                loading={deleteMutation.isPending}
+                data-testid="secret-delete-confirm"
+                onClick={() => void handleDelete()}
+              >
+                Delete
+              </Button>
+            </Dialog.Footer>
+            <Dialog.CloseTrigger />
+          </Dialog.Content>
+        </Dialog.Root>
+
+        {/* Update Value Dialog */}
+        <Dialog.Root
+          open={!!secretToUpdate}
+          onOpenChange={(details) => {
+            if (!details.open) {
+              setSecretToUpdate(null);
+              setUpdateValue("");
+            }
+          }}
+        >
+          <Dialog.Content bg="bg">
+            <Dialog.Header>
+              <Dialog.Title>Update Value for {secretToUpdate?.name ?? ""}</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <VStack gap={1} align="start" width="full">
+                <Text fontWeight="medium">New Value</Text>
                 <Input
                   type="password"
-                  placeholder="Enter secret value"
-                  data-testid="secret-value"
-                  value={newSecretValue}
-                  onChange={(e) => setNewSecretValue(e.target.value)}
+                  placeholder="Enter new secret value"
+                  data-testid="secret-update-value"
+                  value={updateValue}
+                  onChange={(e) => setUpdateValue(e.target.value)}
                 />
               </VStack>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Dialog.ActionTrigger asChild>
-              <Button variant="outline">Cancel</Button>
-            </Dialog.ActionTrigger>
-            <Button
-              colorPalette="blue"
-              loading={createMutation.isPending}
-              disabled={!newSecretName || !newSecretValue}
-              data-testid="secret-save"
-              onClick={() => void handleCreate()}
-            >
-              Save
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog.Root
-        open={!!secretToDelete}
-        onOpenChange={(details) => {
-          if (!details.open) setSecretToDelete(null);
-        }}
-      >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>Delete {secretToDelete?.name ?? ""}?</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text>Code blocks referencing this secret will no longer have access.</Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Dialog.ActionTrigger asChild>
-              <Button variant="outline">Cancel</Button>
-            </Dialog.ActionTrigger>
-            <Button
-              colorPalette="red"
-              loading={deleteMutation.isPending}
-              data-testid="secret-delete-confirm"
-              onClick={() => void handleDelete()}
-            >
-              Delete
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
-
-      {/* Update Value Dialog */}
-      <Dialog.Root
-        open={!!secretToUpdate}
-        onOpenChange={(details) => {
-          if (!details.open) {
-            setSecretToUpdate(null);
-            setUpdateValue("");
-          }
-        }}
-      >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>Update Value for {secretToUpdate?.name ?? ""}</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack gap={1} align="start" width="full">
-              <Text fontWeight="medium">New Value</Text>
-              <Input
-                type="password"
-                placeholder="Enter new secret value"
-                data-testid="secret-update-value"
-                value={updateValue}
-                onChange={(e) => setUpdateValue(e.target.value)}
-              />
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Dialog.ActionTrigger asChild>
-              <Button variant="outline">Cancel</Button>
-            </Dialog.ActionTrigger>
-            <Button
-              colorPalette="blue"
-              loading={updateMutation.isPending}
-              disabled={!updateValue}
-              data-testid="secret-update-save"
-              onClick={() => void handleUpdate()}
-            >
-              Save
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
-    </VStack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Dialog.ActionTrigger asChild>
+                <Button variant="outline">Cancel</Button>
+              </Dialog.ActionTrigger>
+              <Button
+                colorPalette="blue"
+                loading={updateMutation.isPending}
+                disabled={!updateValue}
+                data-testid="secret-update-save"
+                onClick={() => void handleUpdate()}
+              >
+                Save
+              </Button>
+            </Dialog.Footer>
+            <Dialog.CloseTrigger />
+          </Dialog.Content>
+        </Dialog.Root>
+      </VStack>
+    </>
   );
 }

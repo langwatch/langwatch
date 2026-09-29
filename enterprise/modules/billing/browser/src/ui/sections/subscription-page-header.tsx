@@ -1,13 +1,6 @@
-import {
-  Button,
-  createListCollection,
-  Flex,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, createListCollection, HStack, Spacer } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Select } from "@langwatch/design-system/select";
 import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
 import { ArrowRight } from "lucide-react";
@@ -21,7 +14,7 @@ const currencyOptions: { label: string; value: Currency }[] = [
 ];
 const currencyCollection = createListCollection({ items: currencyOptions });
 
-/** The billing heading, and the period and currency pickers while a plan is still being chosen. */
+/** The billing header, and the period and currency pickers while a plan is still being chosen. */
 export function SubscriptionPageHeader({
   showPlanPickers,
   billingPeriod,
@@ -36,21 +29,9 @@ export function SubscriptionPageHeader({
   onCurrencyChange: (currency: Currency) => void;
 }) {
   return (
-    <Flex justifyContent="space-between" alignItems="flex-start">
-      <VStack align="start" gap={1}>
-        <Heading size="xl">Billing</Heading>
-        <Text color="fg.muted">
-          For questions about billing,{" "}
-          <Link
-            href="mailto:sales@langwatch.ai"
-            fontWeight="semibold"
-            color="fg"
-            _hover={{ color: "fg" }}
-          >
-            contact us
-          </Link>
-        </Text>
-      </VStack>
+    <PageLayout.Header>
+      <PageLayout.Heading>Billing</PageLayout.Heading>
+      <Spacer />
       <HStack gap={4} alignItems="center">
         {showPlanPickers && (
           <>
@@ -93,6 +74,6 @@ export function SubscriptionPageHeader({
           </Button>
         </Link>
       </HStack>
-    </Flex>
+    </PageLayout.Header>
   );
 }

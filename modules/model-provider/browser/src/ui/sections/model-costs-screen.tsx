@@ -4,17 +4,7 @@
  * Contract: specs/model-providers/model-cost-scoping.feature.
  */
 
-import {
-  Button,
-  Code,
-  Heading,
-  HStack,
-  Skeleton,
-  Spacer,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Code, HStack, Skeleton, Spacer, Table, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { MoreVertical, Plus } from "lucide-react";
@@ -57,10 +47,10 @@ export default function ModelCostsScreen() {
   );
 
   return (
-    <VStack gap={0} paddingTop={2} width="full" align="start">
-      <PageLayout.Header withBorder={false}>
+    <VStack gap={0} width="full" align="start">
+      <PageLayout.Header>
         <HStack>
-          <Heading>LLM Model Costs</Heading>
+          <PageLayout.Heading>LLM Model Costs</PageLayout.Heading>
           {llmModelCosts.data && (
             <>
               <Text fontSize="md">·</Text>
@@ -79,7 +69,7 @@ export default function ModelCostsScreen() {
           <Text>Add New Model</Text>
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <VStack width="full" gap={0} align="start" paddingY={4} paddingX={4} paddingBottom={12}>
+      <VStack width="full" gap={0} align="start" paddingTop={4}>
         <Table.Root
           variant="line"
           width="full"

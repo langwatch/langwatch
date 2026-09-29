@@ -13,30 +13,34 @@ export function ProjectSessionsScreen() {
   const { project, isResolved } = useOrganizationTeamProject();
 
   return (
-    <VStack align="stretch" gap={6} width="full" padding={6}>
-      <VStack align="start" gap={0}>
+    <>
+      <PageLayout.Header>
         <PageLayout.Heading>Sessions</PageLayout.Heading>
-        <Text color="fg.muted" fontSize="sm">
-          Every coding-agent session this project recorded over the last ninety days, with the
-          context it carried, how often it compacted, how long it worked against how long it waited
-          on a person, and the pull requests it drove. Choosing a session replays it in the
-          terminal.
-        </Text>
-      </VStack>
+      </PageLayout.Header>
+      <VStack align="stretch" gap={6} width="full" padding={6}>
+        <VStack align="start" gap={0}>
+          <Text color="fg.muted" fontSize="sm">
+            Every coding-agent session this project recorded over the last ninety days, with the
+            context it carried, how often it compacted, how long it worked against how long it
+            waited on a person, and the pull requests it drove. Choosing a session replays it in the
+            terminal.
+          </Text>
+        </VStack>
 
-      {/* The project is resolved before anything is claimed about it.
+        {/* The project is resolved before anything is claimed about it.
             Saying "no sessions" while the project is still loading states a
             fact that is not known to be true. */}
-      {!isResolved && <Skeleton height="180px" borderRadius="md" />}
-      {isResolved && project ? (
-        <CodingAgentSessionsTable projectId={project.id} projectSlug={project.slug} />
-      ) : null}
-      {isResolved && !project && (
-        <Text fontSize="sm" color="fg.muted">
-          No sessions yet
-        </Text>
-      )}
-    </VStack>
+        {!isResolved && <Skeleton height="180px" borderRadius="md" />}
+        {isResolved && project ? (
+          <CodingAgentSessionsTable projectId={project.id} projectSlug={project.slug} />
+        ) : null}
+        {isResolved && !project && (
+          <Text fontSize="sm" color="fg.muted">
+            No sessions yet
+          </Text>
+        )}
+      </VStack>
+    </>
   );
 }
 

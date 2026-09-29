@@ -14,6 +14,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -274,12 +275,12 @@ function SettingsForm({
 
   return (
     <>
-      <VStack gap={6} width="full" align="start">
-        <HStack width="full">
-          <Heading as="h2">Organization Settings</Heading>
-          <Spacer />
-          {updateOrganization.isPending && <Spinner />}
-        </HStack>
+      <PageLayout.Header>
+        <PageLayout.Heading>Organization Settings</PageLayout.Heading>
+        <Spacer />
+        {updateOrganization.isPending && <Spinner />}
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
         <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
           <VStack gap={0}>
             <VStack gap={0} width="full">

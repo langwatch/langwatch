@@ -5,6 +5,7 @@
  * it is a list of its own beside the identity provider's page.
  */
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -32,17 +33,21 @@ export default function ConnectorsScreen() {
   if (!organizationId) return null;
 
   return (
-    <SectionNavigationFrame
-      label="Authentication"
-      links={AUTHENTICATION_LINKS}
-      activeHref="/settings/authentication/connectors"
-      onNavigate={(href) => navigation?.navigate(href)}
-    >
-      <ScimSettingsContent
-        organizationId={organizationId}
-        title="Connectors"
-        lede="Your identity provider creates, updates and removes people here on its own, over SCIM."
-      />
-    </SectionNavigationFrame>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Connectors</PageLayout.Heading>
+      </PageLayout.Header>
+      <SectionNavigationFrame
+        label="Authentication"
+        links={AUTHENTICATION_LINKS}
+        activeHref="/settings/authentication/connectors"
+        onNavigate={(href) => navigation?.navigate(href)}
+      >
+        <ScimSettingsContent
+          organizationId={organizationId}
+          lede="Your identity provider creates, updates and removes people here on its own, over SCIM."
+        />
+      </SectionNavigationFrame>
+    </>
   );
 }

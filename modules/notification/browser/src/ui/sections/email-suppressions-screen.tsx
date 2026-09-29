@@ -4,18 +4,9 @@
  * `triggers:view`. The settings frame is applied by whoever serves the address.
  */
 
-import {
-  Badge,
-  Button,
-  Card,
-  EmptyState,
-  Heading,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Button, Card, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { MailX, Trash2 } from "lucide-react";
 
 import { notificationApi } from "../../behavior/notification-api.ts";
@@ -60,11 +51,7 @@ function EmailSuppressionsPage({
   /** One region, four outcomes: still loading, failed, empty, or the list. */
   function suppressionsBody() {
     if (suppressions.isLoading) {
-      return (
-        <HStack justify="center" padding={8}>
-          <Spinner />
-        </HStack>
-      );
+      return <Skeleton width="full" height="120px" />;
     }
 
     if (suppressions.isError) {
@@ -85,17 +72,11 @@ function EmailSuppressionsPage({
 
     if (!suppressions.data || suppressions.data.length === 0) {
       return (
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <MailX />
-            </EmptyState.Indicator>
-            <EmptyState.Title>No suppressions yet</EmptyState.Title>
-            <EmptyState.Description>
-              When a recipient unsubscribes from a notification, they appear here.
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
+        <NoDataInfoBlock
+          title="No suppressions yet"
+          description="When a recipient unsubscribes from a notification, they appear here."
+          icon={<MailX />}
+        />
       );
     }
 
@@ -142,20 +123,20 @@ function EmailSuppressionsPage({
   }
 
   return (
-    <VStack gap={6} width="full" align="start" paddingX={6} paddingY={4}>
-      <VStack align="start" gap={1} width="full" marginTop={2}>
-        <Heading as="h2" fontSize="xl">
-          Email Suppressions
-        </Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Email Suppressions</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">
           Recipients who unsubscribed from this project&apos;s trigger notifications. Removing an
           entry resumes delivery to that address.
         </Text>
-      </VStack>
 
-      <Card.Root width="full">
-        <Card.Body>{suppressionsBody()}</Card.Body>
-      </Card.Root>
-    </VStack>
+        <Card.Root width="full">
+          <Card.Body>{suppressionsBody()}</Card.Body>
+        </Card.Root>
+      </VStack>
+    </>
   );
 }

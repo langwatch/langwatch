@@ -6,12 +6,11 @@ import {
   Alert,
   Badge,
   Box,
-  Heading,
   HStack,
   Input,
   NativeSelect,
   Spacer,
-  Spinner,
+  Skeleton,
   Table,
   Text,
   VStack,
@@ -127,11 +126,7 @@ export default function AuditLogScreen() {
   const utils = organizationApi.useUtils();
 
   if (!organizationId || usage.isLoading) {
-    return (
-      <VStack align="center" justify="center" width="full" height="200px">
-        <Spinner />
-      </VStack>
-    );
+    return <Skeleton width="full" height="200px" />;
   }
 
   if (!isEnterprise) {
@@ -228,9 +223,19 @@ export default function AuditLogScreen() {
   };
 
   return (
-    <VStack gap={6} width="full" align="start">
-      <HStack width="full" marginTop={2}>
-        <VStack align="start" gap={1}>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Audit Log</PageLayout.Heading>
+        <Spacer />
+        {host.projectSwitcher()}
+        <PageLayout.HeaderButton onClick={() => void downloadCsv()} disabled={isExporting}>
+          <Download />
+          Export CSV
+        </PageLayout.HeaderButton>
+      </PageLayout.Header>
+
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <VStack align="start" gap={1} width="full">
           {backLink && (
             <Link href={backLink.href} color="fg.muted" fontSize="sm">
               <HStack gap={1}>
@@ -238,7 +243,6 @@ export default function AuditLogScreen() {
               </HStack>
             </Link>
           )}
-          <Heading as="h2">Audit Log</Heading>
           <Text color="fg.muted">
             View all audit logs for your organization. Filter by project, user, action type, or date
             range.
@@ -256,126 +260,114 @@ export default function AuditLogScreen() {
             </Badge>
           )}
         </VStack>
-        <Spacer />
-        {host.projectSwitcher()}
-      </HStack>
 
-      <HStack gap={4} width="full" flexWrap="wrap" align="end">
-        <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
-          <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-            Search by User
-          </Text>
-          <InputGroup startElement={<Search size={16} />} width="full">
+        <HStack gap={4} width="full" flexWrap="wrap" align="end">
+          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              Search by User
+            </Text>
+            <InputGroup startElement={<Search size={16} />} width="full">
+              <Input
+                placeholder="Search by name or email..."
+                aria-label="Search by User"
+                value={userSearch}
+                onChange={(event) => handleUserSearchChange(event.target.value)}
+                width="full"
+              />
+            </InputGroup>
+          </VStack>
+
+          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              Filter by Action
+            </Text>
             <Input
-              placeholder="Search by name or email..."
-              aria-label="Search by User"
-              value={userSearch}
-              onChange={(event) => handleUserSearchChange(event.target.value)}
+              placeholder="Filter by action type..."
+              aria-label="Filter by Action"
+              value={actionFilter}
+              onChange={(event) => handleActionFilterChange(event.target.value)}
               width="full"
             />
-          </InputGroup>
-        </VStack>
+          </VStack>
 
-        <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
-          <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-            Filter by Action
-          </Text>
-          <Input
-            placeholder="Filter by action type..."
-            aria-label="Filter by Action"
-            value={actionFilter}
-            onChange={(event) => handleActionFilterChange(event.target.value)}
-            width="full"
-          />
-        </VStack>
-
-        <VStack align="start" gap={1} flex="1" minWidth="150px" maxWidth="200px">
-          <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-            Project
-          </Text>
-          <NativeSelect.Root size="sm" width="full">
-            <NativeSelect.Field
-              aria-label="Project"
-              value={selectedProjectId ?? "all"}
-              onChange={(event) =>
-                handleProjectChange(event.target.value === "all" ? null : event.target.value)
-              }
-            >
-              <option value="all">All Projects</option>
-              {disambiguateLabels(projects, (project) => project.teamName).map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.displayLabel}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </VStack>
-
-        <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
-          <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-            Select Date
-          </Text>
-          <AuditPeriodPicker
-            label={auditPeriodLabel(period, mode, now)}
-            onPick={(presetKey) => host.setQuery(auditPeriodQuery(query, presetKey))}
-          />
-        </VStack>
-
-        <PageLayout.HeaderButton onClick={() => void downloadCsv()} disabled={isExporting}>
-          <Download />
-          Export CSV
-        </PageLayout.HeaderButton>
-      </HStack>
-
-      {logsView === "loading" && (
-        <VStack padding={8}>
-          <Spinner />
-          <Text>Loading audit logs...</Text>
-        </VStack>
-      )}
-      {logsView === "empty" && (
-        <VStack padding={8}>
-          <Text color="fg.muted">No audit logs found</Text>
-        </VStack>
-      )}
-      {logsView === "table" && (
-        <>
-          <Box width="full" overflowX="auto">
-            <Table.Root variant="line" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
-                  <Table.ColumnHeader>Source</Table.ColumnHeader>
-                  <Table.ColumnHeader>User</Table.ColumnHeader>
-                  <Table.ColumnHeader>Action</Table.ColumnHeader>
-                  <Table.ColumnHeader>Target</Table.ColumnHeader>
-                  <Table.ColumnHeader>Project</Table.ColumnHeader>
-                  <Table.ColumnHeader>IP Address</Table.ColumnHeader>
-                  <Table.ColumnHeader>Error</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {rows.map((log) => (
-                  <AuditLogRow key={log.id} log={log} projects={projects} />
+          <VStack align="start" gap={1} flex="1" minWidth="150px" maxWidth="200px">
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              Project
+            </Text>
+            <NativeSelect.Root size="sm" width="full">
+              <NativeSelect.Field
+                aria-label="Project"
+                value={selectedProjectId ?? "all"}
+                onChange={(event) =>
+                  handleProjectChange(event.target.value === "all" ? null : event.target.value)
+                }
+              >
+                <option value="all">All Projects</option>
+                {disambiguateLabels(projects, (project) => project.teamName).map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.displayLabel}
+                  </option>
                 ))}
-              </Table.Body>
-            </Table.Root>
-          </Box>
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </VStack>
 
-          {totalHits > 0 && (
-            <AuditPaginationFooter
-              totalHits={totalHits}
-              pageOffset={pageOffset}
-              pageSize={pageSize}
-              nextPage={() => host.setQuery(withAuditPageOffset(query, pageOffset + pageSize))}
-              prevPage={() => host.setQuery(withAuditPageOffset(query, pageOffset - pageSize))}
-              changePageSize={(size) => host.setQuery(withAuditPageSize(query, size))}
+          <VStack align="start" gap={1} flex="1" minWidth="200px" maxWidth="300px">
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              Select Date
+            </Text>
+            <AuditPeriodPicker
+              label={auditPeriodLabel(period, mode, now)}
+              onPick={(presetKey) => host.setQuery(auditPeriodQuery(query, presetKey))}
             />
-          )}
-        </>
-      )}
-    </VStack>
+          </VStack>
+        </HStack>
+
+        {logsView === "loading" && <Skeleton width="full" height="200px" />}
+        {logsView === "empty" && (
+          <VStack padding={8}>
+            <Text color="fg.muted">No audit logs found</Text>
+          </VStack>
+        )}
+        {logsView === "table" && (
+          <>
+            <Box width="full" overflowX="auto">
+              <Table.Root variant="line" width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
+                    <Table.ColumnHeader>Source</Table.ColumnHeader>
+                    <Table.ColumnHeader>User</Table.ColumnHeader>
+                    <Table.ColumnHeader>Action</Table.ColumnHeader>
+                    <Table.ColumnHeader>Target</Table.ColumnHeader>
+                    <Table.ColumnHeader>Project</Table.ColumnHeader>
+                    <Table.ColumnHeader>IP Address</Table.ColumnHeader>
+                    <Table.ColumnHeader>Error</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {rows.map((log) => (
+                    <AuditLogRow key={log.id} log={log} projects={projects} />
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            </Box>
+
+            {totalHits > 0 && (
+              <AuditPaginationFooter
+                totalHits={totalHits}
+                pageOffset={pageOffset}
+                pageSize={pageSize}
+                nextPage={() => host.setQuery(withAuditPageOffset(query, pageOffset + pageSize))}
+                prevPage={() => host.setQuery(withAuditPageOffset(query, pageOffset - pageSize))}
+                changePageSize={(size) => host.setQuery(withAuditPageSize(query, size))}
+              />
+            )}
+          </>
+        )}
+      </VStack>
+    </>
   );
 }
 

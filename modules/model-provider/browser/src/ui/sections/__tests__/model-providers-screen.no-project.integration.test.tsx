@@ -85,8 +85,10 @@ vi.mock("@langwatch/authz-browser-kit", async () => {
 
 vi.mock("@langwatch/design-system/page-layout", () => ({
   PageLayout: {
+    Header: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Heading: ({ children }: { children?: ReactNode }) => <h1>{children}</h1>,
     HeaderButton: ({ children, ...props }: { children?: ReactNode; disabled?: boolean }) => (
-      <button data-testid="header-add-model-provider" {...props}>
+      <button data-testid="model-provider-add" {...props}>
         {children}
       </button>
     ),
@@ -226,7 +228,7 @@ describe("given the Model Providers screen", () => {
     it("offers adding a model provider, with no blocked reason on it", () => {
       renderPage(hostWithoutProject());
 
-      const addButton = screen.getByTestId("header-add-model-provider");
+      const addButton = screen.getByTestId("model-provider-add");
 
       expect(addButton.hasAttribute("disabled")).toBe(false);
       expect(tooltipWith("Create a project first to add a model provider.")).toBeNull();
@@ -440,7 +442,7 @@ describe("given the Model Providers screen", () => {
     it("blocks adding a model provider and says why", () => {
       renderPage(hostWithoutProject(["organization:view"]));
 
-      expect(screen.getByTestId("header-add-model-provider").hasAttribute("disabled")).toBe(true);
+      expect(screen.getByTestId("model-provider-add").hasAttribute("disabled")).toBe(true);
       expect(
         tooltipWith("You need model provider manage permissions to add new providers."),
       ).toBeTruthy();
@@ -450,7 +452,7 @@ describe("given the Model Providers screen", () => {
     it("opens no provider list to pick from", () => {
       const { host } = renderPage(hostWithoutProject(["organization:view"]));
 
-      fireEvent.click(screen.getByTestId("header-add-model-provider"));
+      fireEvent.click(screen.getByTestId("model-provider-add"));
 
       expect(document.querySelector("[data-menu-item]")).toBeNull();
       expect(host.drawerOpens).toEqual([]);
@@ -472,7 +474,7 @@ describe("given the Model Providers screen", () => {
     it("offers adding a model provider", () => {
       renderPage(hostWithProject());
 
-      expect(screen.getByTestId("header-add-model-provider").hasAttribute("disabled")).toBe(false);
+      expect(screen.getByTestId("model-provider-add").hasAttribute("disabled")).toBe(false);
       expect(screen.queryByText("Create a project first")).toBeNull();
     });
 

@@ -4,7 +4,7 @@
  * chrome — the settings frame is applied by whichever app serves the address.
  */
 
-import { Spinner } from "@chakra-ui/react";
+import { Skeleton } from "@chakra-ui/react";
 
 import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
@@ -26,7 +26,7 @@ export default function PlansScreen() {
   );
 
   if (activePlan.isLoading && !activePlan.data) {
-    return <Spinner />;
+    return <Skeleton width="full" height="200px" />;
   }
 
   return (

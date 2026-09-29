@@ -3,7 +3,7 @@
  * from platform/app; chrome, permissions, navigation delegated to host.
  */
 
-import { Badge, Button, Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Badge, Button, Card, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
@@ -21,14 +21,16 @@ export default function IntegrationsScreen() {
   const organizationId = host.scope().organizationId;
 
   return (
-    <VStack align="stretch" gap={6} padding={6} maxWidth="720px">
-      <Heading size="md">Integrations</Heading>
-      {organizationId ? (
-        <GithubConnectionCard organizationId={organizationId} />
-      ) : (
-        <Spinner data-testid="integrations-loading" />
-      )}
-    </VStack>
+    <>
+      <Heading>Integrations</Heading>
+      <VStack align="stretch" gap={6} paddingTop={4}>
+        {organizationId ? (
+          <GithubConnectionCard organizationId={organizationId} />
+        ) : (
+          <Skeleton data-testid="integrations-loading" height="120px" />
+        )}
+      </VStack>
+    </>
   );
 }
 

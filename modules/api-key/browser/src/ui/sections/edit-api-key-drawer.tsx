@@ -1,13 +1,4 @@
-import {
-  Button,
-  Heading,
-  HStack,
-  Input,
-  SegmentGroup,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, HStack, Input, SegmentGroup, Text, Textarea, VStack } from "@chakra-ui/react";
 /**
  * "Edit API key": the same ceiling as create, on a key that already
  * exists. Selections are clamped TWICE — a stored or pre-existing level
@@ -268,7 +259,7 @@ export function EditApiKeyDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">Edit API key</Heading>
+          <Drawer.Title>Edit API key</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

@@ -7,7 +7,7 @@ import type { PropsWithChildren } from "react";
 
 export function PersonalWorkspaceLayout({ children }: PropsWithChildren) {
   return (
-    <Container maxW="container.xl" paddingX={4} paddingY={4}>
+    <Container maxW="container.xl" paddingX={6} paddingY={4}>
       <Box width="full">{children}</Box>
     </Container>
   );

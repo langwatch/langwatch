@@ -4,7 +4,8 @@
  * Spec: specs/settings/profile.feature
  */
 
-import { Heading, Text, VStack } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
 import { BrowserSessionsSection } from "../browser-sessions-section.tsx";
 import { PersonalApiKeysSummary } from "../personal-api-keys-summary.tsx";
@@ -13,16 +14,18 @@ import { SignInMethodsSummary } from "../sign-in-methods-summary.tsx";
 
 export default function ProfileScreen() {
   return (
-    <VStack gap={6} width="full" align="start">
-      <VStack align="start" gap={1}>
-        <Heading as="h2">Profile</Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Profile</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">Who you are here, how you get in, and where you are signed in.</Text>
-      </VStack>
 
-      <ProfileDetailsSection />
-      <SignInMethodsSummary />
-      <BrowserSessionsSection />
-      <PersonalApiKeysSummary />
-    </VStack>
+        <ProfileDetailsSection />
+        <SignInMethodsSummary />
+        <BrowserSessionsSection />
+        <PersonalApiKeysSummary />
+      </VStack>
+    </>
   );
 }

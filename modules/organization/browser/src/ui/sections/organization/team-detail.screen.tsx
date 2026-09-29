@@ -4,8 +4,20 @@
  * a membership change cannot half-apply; archiving leaves for the list.
  */
 
-import { Button, Card, Heading, HStack, Separator, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Separator,
+  Skeleton,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import isEqual from "lodash-es/isEqual";
 import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
@@ -99,7 +111,7 @@ export default function TeamDetailScreen() {
     const error = team.error;
     if (trpcErrorCode(error) === "UNAUTHORIZED") {
       return (
-        <VStack paddingX={4} paddingY={6} gap={4} align="start">
+        <VStack gap={4} align="start">
           <PermissionAlert
             permission="team:view"
             message="You don't have permission to view this team. Please contact your team administrator for access."
@@ -112,7 +124,7 @@ export default function TeamDetailScreen() {
   // Handle loading state
   if (team.isLoading || !team.data) {
     return (
-      <VStack paddingX={4} paddingY={6} gap={6} width="full" maxWidth="920px" align="start">
+      <VStack gap={6} width="full" align="start">
         <HStack gap="8px">
           <Skeleton height="20px" width="60px" />
           <Skeleton height="20px" width="12px" />
@@ -282,7 +294,12 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
 
   return (
     <>
-      <VStack gap={8} align="start" width="full">
+      <PageLayout.Header>
+        <PageLayout.Heading>Team Settings</PageLayout.Heading>
+        <Spacer />
+        {updateTeam.isPending && <Spinner />}
+      </PageLayout.Header>
+      <VStack gap={8} align="start" width="full" paddingTop={4}>
         <TeamForm
           organizationId={team.organizationId}
           team={team}
