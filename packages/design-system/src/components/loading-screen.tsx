@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useReducedMotion } from "../use-reduced-motion.ts";
+import { AmbientGround } from "./ambient-ground.tsx";
 import { FullLogo } from "./full-logo.tsx";
 
 let logoVisibleOnce = false;
@@ -104,21 +105,7 @@ export const LoadingScreen = () => {
         alignItems="center"
         justifyContent="center"
       >
-        {/* Orange mesh gradient background */}
-        <Box
-          position="absolute"
-          inset={0}
-          pointerEvents="none"
-          overflow="hidden"
-          zIndex={0}
-          style={{
-            contain: "layout paint",
-            background: [
-              "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(237,137,38,0.06) 0%, transparent 70%)",
-              "radial-gradient(ellipse 60% 40% at 70% 100%, rgba(237,137,38,0.02) 0%, transparent 60%)",
-            ].join(", "),
-          }}
-        />
+        <AmbientGround />
 
         <Box position="relative" zIndex={1}>
           {!logoVisibleOnce ? (

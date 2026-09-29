@@ -102,6 +102,10 @@
       "types": "./dist/langwatch-endpoint-env.d.ts",
       "default": "./src/langwatch-endpoint-env.ts"
     },
+    "./ambient-ground": {
+      "types": "./dist/components/ambient-ground.d.ts",
+      "default": "./src/components/ambient-ground.tsx"
+    },
     "./loading-screen": {
       "types": "./dist/components/loading-screen.d.ts",
       "default": "./src/components/loading-screen.tsx"

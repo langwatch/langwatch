@@ -53,3 +53,10 @@ Feature: The browser waits for an API that is still starting
   Scenario: The waiting screen carries the LangWatch logo
     Given the reader is on the waiting screen
     Then the waiting screen shows the LangWatch logo above what it is waiting for
+
+  @integration
+  Scenario: The waiting screen stands still for a reader who asked for less motion
+    Given the reader has asked their system for less motion
+    When the waiting screen renders
+    Then only the still background is shown
+    And the moving background is never started
