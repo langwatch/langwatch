@@ -5,6 +5,7 @@
 
 import { Badge, Button, Card, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { UiSlot } from "@langwatch/browser-host/slots";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { useEffect, useState } from "react";
 import { GitHub } from "react-feather";
 
@@ -22,7 +23,9 @@ export default function IntegrationsScreen() {
 
   return (
     <>
-      <Heading>Integrations</Heading>
+      <PageLayout.Header>
+        <PageLayout.Heading>Integrations</PageLayout.Heading>
+      </PageLayout.Header>
       <VStack align="stretch" gap={6} paddingTop={4}>
         {organizationId ? (
           <GithubConnectionCard organizationId={organizationId} />

@@ -8590,6 +8590,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
       '@langwatch/github-contract':
         specifier: workspace:*
         version: link:../contract
