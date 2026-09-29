@@ -19,6 +19,20 @@ export class OpsCapabilityUnavailableError extends HandledError {
   }
 }
 
+/** Cloud admin asked for at boot without the licence key that proves the release's owner. */
+export class CloudOpsKeyMismatchError extends HandledError {
+  declare readonly code: "cloud_ops_key_mismatch";
+
+  constructor() {
+    super(
+      "cloud_ops_key_mismatch",
+      "LANGWATCH_CLOUD_OPS is set but LANGWATCH_LICENSE_PRIVATE_KEY is missing or does not match this release's licence public key",
+      { httpStatus: 500, fault: "platform" },
+    );
+    this.name = "CloudOpsKeyMismatchError";
+  }
+}
+
 /** The checkup over REST is for self-hosted installs; LangWatch Cloud answers that it has none. */
 export class CheckupNotSelfHostedError extends HandledError {
   declare readonly code: "checkup_not_self_hosted";

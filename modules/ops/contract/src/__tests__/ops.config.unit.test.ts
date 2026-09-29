@@ -1,7 +1,7 @@
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { opsConfig } from "../ops.config.ts";
+import { opsBrowserConfig, opsConfig } from "../ops.config.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "ops", config: opsConfig }], environment }).ops;
@@ -33,6 +33,37 @@ describe("ops server configuration", () => {
     it("reads the opt-out at the deployment's own spelling", () => {
       expect(read({ DISABLE_USAGE_STATS: "1" }).usageStats.disabled).toBe(true);
       expect(read({}).usageStats.disabled).toBe(false);
+    });
+  });
+
+  describe("given a deployment does not ask for Cloud admin", () => {
+    /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
+    it("keeps LANGWATCH_CLOUD_OPS off by default", () => {
+      expect(read({}).cloudOps).toBe(false);
+      expect(read({ LANGWATCH_CLOUD_OPS: "false" }).cloudOps).toBe(false);
+    });
+  });
+
+  describe("given a deployment asks for Cloud admin", () => {
+    /** @scenario "Cloud admin is on only when asked for and the licence key matches the release" */
+    it("reads the switch as a boolean and refuses anything else", () => {
+      expect(read({ LANGWATCH_CLOUD_OPS: "true" }).cloudOps).toBe(true);
+      expect(read({ LANGWATCH_CLOUD_OPS: "1" }).cloudOps).toBe(true);
+      expect(() => read({ LANGWATCH_CLOUD_OPS: "maybe" })).toThrow(/LANGWATCH_CLOUD_OPS/);
+    });
+  });
+
+  describe("given the browser is told what ops answers", () => {
+    /** @scenario "The browser learns Cloud admin from what the ops process answered" */
+    it("projects the running answer and never the switch or a key", async () => {
+      const config = read({ LANGWATCH_CLOUD_OPS: "true" });
+
+      await expect(
+        opsBrowserConfig.project(config, { offersCloudOps: () => false }),
+      ).resolves.toEqual({ cloudOps: false });
+      await expect(
+        opsBrowserConfig.project(config, { offersCloudOps: () => true }),
+      ).resolves.toEqual({ cloudOps: true });
     });
   });
 });

@@ -8,6 +8,8 @@ import {
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { z } from "zod";
 
+import type { OpsApi } from "./ops.api.ts";
+
 /** Operator surfaces and config; bearers are optional and blank means the
  * door is not registered. Backup metrics on by default. */
 /** Values of `CLICKHOUSE_BACKUP_METRICS_ENABLED` that turn backup collection off. */
@@ -34,6 +36,8 @@ export const opsConfig = Config.define((c) => ({
       .transform((value) => !BACKUP_METRICS_OFF_VALUES.has((value ?? "").trim().toLowerCase())),
   ),
   productAnalytics: { key: posthogKey, host: posthogHost },
+  /** Asks for Cloud admin; boot refuses unless the licence private key matches (§3.5). */
+  cloudOps: c.env("LANGWATCH_CLOUD_OPS", z.stringbool().default(false)),
 }));
 
 export type OpsServerConfig = ConfigOf<typeof opsConfig>;
@@ -41,8 +45,9 @@ export type OpsServerConfig = ConfigOf<typeof opsConfig>;
 /** Where server-side product analytics goes: the public PostHog project key, and its host. */
 export type ProductAnalyticsTarget = Readonly<{ key: string; host?: string }>;
 
-/** What a browser is told about product analytics and browser tracing. */
+/** What a browser is told about product analytics and whether Cloud admin is on. */
 export const opsWebConfigSchema = z.strictObject({
+  cloudOps: z.boolean(),
   posthog: z
     .strictObject({ key: z.string().min(1), host: z.string().min(1).optional() })
     .optional(),
@@ -52,6 +57,11 @@ export type OpsWebConfig = z.infer<typeof opsWebConfigSchema>;
 
 export const opsBrowserConfig = defineBrowserConfig({
   schema: opsWebConfigSchema,
-  project: ({ productAnalytics: { key, host } }: OpsServerConfig) =>
-    key ? { posthog: { key, ...(host ? { host } : {}) } } : {},
+  project: (
+    { productAnalytics: { key, host } }: OpsServerConfig,
+    ops: Pick<OpsApi, "offersCloudOps">,
+  ) => ({
+    cloudOps: ops.offersCloudOps(),
+    ...(key ? { posthog: { key, ...(host ? { host } : {}) } } : {}),
+  }),
 });

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** The backoffice's registry of self-hosted installs: every read lands on the audit log, as main's did. */
+/** Cloud admin's registry of self-hosted installs: every read lands on the audit log, as main's did. */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type {
   LicensingApi,

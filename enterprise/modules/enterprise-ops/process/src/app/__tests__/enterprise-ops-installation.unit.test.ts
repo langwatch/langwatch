@@ -17,17 +17,23 @@ import { enterpriseOpsServer } from "../../enterprise-ops.server.ts";
 const staff: OpsOperator = { id: "user_olive", email: "olive@langwatch.test" };
 const customerAdmin: OpsOperator = { id: "user_mallory", email: "admin@customer.test" };
 
-function boot({ audited, isSaas = true }: { audited: RecordAuditLogCommand[]; isSaas?: boolean }) {
+function boot({
+  audited,
+  cloudOps = true,
+}: {
+  audited: RecordAuditLogCommand[];
+  cloudOps?: boolean;
+}) {
   const { logger } = createTestLogger();
   return createApp({ role: "api" })
     .withModules([enterpriseOpsServer])
     .withStores(memoryStores())
-    .withMember("isSaas", isSaas)
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
       ops: createApiFixture<OpsApi>({
-        admitBackOfficeStaff: (operator) => {
-          if (!operator || operator.email !== staff.email) throw new AdminSurfaceHiddenError();
+        admitCloudAdmin: (operator) => {
+          if (!cloudOps || !operator || operator.email !== staff.email)
+            throw new AdminSurfaceHiddenError();
           return operator;
         },
       }),
@@ -53,7 +59,7 @@ describe("enterprise ops installation", () => {
     ]);
   });
 
-  describe("given back-office staff", () => {
+  describe("given Cloud admin staff", () => {
     /** @scenario "Staff read the self-hosted instance registry from licensing, audited" */
     it("boots over memory stores and answers from licensing, audited", async () => {
       const audited: RecordAuditLogCommand[] = [];
@@ -72,11 +78,11 @@ describe("enterprise ops installation", () => {
     });
   });
 
-  describe("given back-office staff on an install that is not LangWatch's SaaS", () => {
-    /** @scenario "Cloud admin answers only on LangWatch's own SaaS" */
-    it("refuses with the back office's not-found and records nothing", async () => {
+  describe("given Cloud admin staff where ops's cloud-ops capability is off", () => {
+    /** @scenario "Cloud admin refuses as not found where ops's cloud-ops capability is off" */
+    it("refuses with not-found and records nothing", async () => {
       const audited: RecordAuditLogCommand[] = [];
-      const runtime = await boot({ audited, isSaas: false });
+      const runtime = await boot({ audited, cloudOps: false });
 
       try {
         const app = runtime.service(EnterpriseOpsApi);
@@ -91,8 +97,8 @@ describe("enterprise ops installation", () => {
   });
 
   describe("given someone who is not staff", () => {
-    /** @scenario "Someone who is not staff is answered with the back office's not-found" */
-    it("refuses with the back office's not-found and records nothing", async () => {
+    /** @scenario "Someone who is not staff is answered with not-found" */
+    it("refuses with not-found and records nothing", async () => {
       const audited: RecordAuditLogCommand[] = [];
       const runtime = await boot({ audited });
 

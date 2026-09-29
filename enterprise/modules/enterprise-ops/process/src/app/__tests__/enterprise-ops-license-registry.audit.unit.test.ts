@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The backoffice license registry: a non-operator is answered with a
+ * The Cloud admin license registry: a non-operator is answered with a
  * not-found and commands nothing; an operator's reads and commands are
  * audited, refusals included, and no entry ever holds a license key.
  * @see specs/self-hosting/connected-services/license-registry.feature
@@ -25,9 +25,9 @@ type Registry = LicensingApi;
 
 const OPS_STAFF_ADDRESS = "olive@langwatch.test";
 
-/** OpsApi's back-office gate over a one-address staff list. */
+/** OpsApi's Cloud admin gate over a one-address staff list. */
 const ops = createApiFixture<OpsApi>({
-  admitBackOfficeStaff: (operator) => {
+  admitCloudAdmin: (operator) => {
     if (!operator || operator.email !== OPS_STAFF_ADDRESS) throw new AdminSurfaceHiddenError();
     return operator;
   },
@@ -105,7 +105,6 @@ async function build(registry: Partial<Registry> = {}) {
   const runtime = await createApp({ role: "api" })
     .withModules([enterpriseOpsServer])
     .withStores(memoryStores())
-    .withMember("isSaas", true)
     .provide({ ops, licensing, "audit-log": auditLog })
     .boot();
   const app = runtime.service(EnterpriseOpsApi);
@@ -120,7 +119,7 @@ const issueInput = {
   expiresAt: "2027-09-01T00:00:00.000Z",
 };
 
-describe("the backoffice license registry", () => {
+describe("the Cloud admin license registry", () => {
   describe("given an organization admin who is not a LangWatch operator", () => {
     /** @scenario "Only a LangWatch operator can issue or manage licenses" */
     it("answers every call with a not-found and commands nothing", async () => {

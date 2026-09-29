@@ -3,6 +3,8 @@
  * The feature installs: a process booting it over memory gets a working
  * `OpsApi`, the instance the runtime hands back, in either role.
  */
+import { generateKeyPairSync } from "node:crypto";
+
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
@@ -36,6 +38,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -67,10 +70,17 @@ function process(
   redisCommands: unknown[][] = [],
   identity: IdentityApi = createApiFixture<IdentityApi>(),
   authz: AuthzApi = createApiFixture<AuthzApi>(),
+  cloud: { asked?: boolean; privateKey?: string } = {},
 ) {
   const { logger } = createTestLogger();
 
-  return createApp({ role })
+  return createApp({
+    role,
+    secrets: () =>
+      new ScopedSecrets(async (handle, build) =>
+        build(handle.id === "LANGWATCH_LICENSE_PRIVATE_KEY" ? cloud.privateKey : void 0),
+      ),
+  })
     .withModules([withMemoryRepositories(opsServer)])
     .withConfig({
       ops: {
@@ -84,8 +94,10 @@ function process(
         },
         collectClickHouseBackupMetrics: true,
         productAnalytics: { key: undefined, host: undefined },
+        cloudOps: cloud.asked ?? false,
       },
     })
+
     .withMember("nodeEnvironment", undefined)
     .withMember("adminEmails", [OPS_STAFF_ADDRESS])
     .withMember("isSaas", false)
@@ -162,13 +174,32 @@ describe("ops app installation", () => {
         });
 
         expect(filed.id).toEqual(expect.any(String));
-        // Intake answers everywhere; the inbox is Cloud admin, and this install is not SaaS.
+        // Intake answers everywhere; the inbox is Cloud admin, and this install has cloud-ops off.
         await expect(
           app.getBugReport({ id: filed.id, actorUserId: "user_alex" }),
         ).rejects.toMatchObject({ code: "not_found" });
       } finally {
         await runtime.stop();
       }
+    });
+  });
+
+  describe("given the deployment asks for Cloud admin (LANGWATCH_CLOUD_OPS)", () => {
+    /** @scenario "Asking for Cloud admin without a matching licence key refuses boot" */
+    it("refuses boot naming both variables when no licence private key is held", async () => {
+      await expect(process("api", [], void 0, void 0, { asked: true }).boot()).rejects.toThrow(
+        /LANGWATCH_CLOUD_OPS.*LANGWATCH_LICENSE_PRIVATE_KEY/,
+      );
+    });
+
+    /** @scenario "Asking for Cloud admin without a matching licence key refuses boot" */
+    it("refuses boot when the key is not the pair of the release's public key", async () => {
+      const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+      const other = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+
+      await expect(
+        process("api", [], void 0, void 0, { asked: true, privateKey: other }).boot(),
+      ).rejects.toThrow(/LANGWATCH_CLOUD_OPS.*LANGWATCH_LICENSE_PRIVATE_KEY/);
     });
   });
 

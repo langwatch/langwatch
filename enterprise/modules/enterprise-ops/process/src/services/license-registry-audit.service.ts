@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The backoffice license registry: every read and command lands on the audit
+ * The Cloud admin license registry: every read and command lands on the audit
  * log, a refusal included, and no entry ever carries a license key.
  */
 import type { AuditLogApi, AuditLogJsonValue } from "@langwatch/audit-log-contract";

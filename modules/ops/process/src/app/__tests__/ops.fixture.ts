@@ -89,7 +89,7 @@ export function createOpsTestInfrastructure(
     findOpsApiKey: () => null,
     findProductAnalyticsTargets: () => [],
     isProduction: false,
-    isSaas: true,
+    cloudOps: true,
     ...overrides,
   };
 }

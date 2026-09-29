@@ -478,10 +478,12 @@ export interface OpsApi {
   /** Refuses anyone who is not on the deployment's staff allow-list. */
   admitStaff(operator: OpsOperator | null): OpsOperator;
   /**
-   * The same list, refused the back office's way: not-found rather than
-   * forbidden, so a probe learns nothing about whether the surface exists.
+   * The staff list, refused as not-found so a probe learns nothing about the
+   * surface, and only where ops's cloud-ops capability is on (§3.5).
    */
-  admitBackOfficeStaff(operator: OpsOperator | null): OpsOperator;
+  admitCloudAdmin(operator: OpsOperator | null): OpsOperator;
+  /** Whether Cloud admin is on here: the one answer the browser's public config projects. */
+  offersCloudOps(): boolean;
   /**
    * Refuses a caller who did not present this deployment's operator secret.
    * Compared in constant time, and refused outright where no secret is set.

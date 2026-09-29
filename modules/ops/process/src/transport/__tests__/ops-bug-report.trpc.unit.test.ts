@@ -25,11 +25,11 @@ const IMPERSONATING: OpsOperator = {
   impersonator: { id: "operator", email: OPS_STAFF_ADDRESS },
 };
 
-function harness({ isSaas = true }: { isSaas?: boolean } = {}) {
+function harness({ cloudOps = true }: { cloudOps?: boolean } = {}) {
   const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
   const { app, repositories } = createOpsTestApp({
     auditLog: createApiFixture<AuditLogApi>({ record }),
-    members: { isSaas },
+    members: { cloudOps },
   });
 
   const trpc = initTRPC.context<BugReportTestContext>().create();
@@ -187,9 +187,9 @@ describe("the bugReports tRPC namespace", () => {
     });
   });
 
-  describe("given a staff caller on an install that is not LangWatch's SaaS", () => {
+  describe("given a staff caller where the cloud-ops capability is off", () => {
     it("answers NOT_FOUND for both reads and writes no audit row", async () => {
-      const { staffCaller, record } = harness({ isSaas: false });
+      const { staffCaller, record } = harness({ cloudOps: false });
 
       await expect(staffCaller.getAll({})).rejects.toMatchObject({ code: "NOT_FOUND" });
       await expect(staffCaller.getById({ id: "bugreport_1" })).rejects.toMatchObject({

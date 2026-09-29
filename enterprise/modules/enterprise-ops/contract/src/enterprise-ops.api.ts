@@ -17,7 +17,7 @@ import type { OpsOperator } from "@langwatch/ops-contract";
 
 /**
  * The operator views over enterprise subjects (ARCHITECTURE.md section 3): each op admits
- * back-office staff through OpsApi, then forwards to the owner's Api.
+ * Cloud admin staff through OpsApi, then forwards to the owner's Api.
  */
 export interface EnterpriseOpsApi {
   // -- the license registry (ADR-156) ------------------------------------------

@@ -18,7 +18,11 @@ import {
   type DataRetentionApi as DataRetentionApiContract,
 } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
-import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import {
+  DEFAULT_LICENSE_PUBLIC_KEY,
+  LicensingApi,
+  licensingSecrets,
+} from "@langwatch/enterprise-licensing-contract";
 import type {
   Event,
   RegisteredFoldProjection,
@@ -262,6 +266,7 @@ import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.a
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { RedisRedisHealthRepository } from "../repositories/redis/redis.datastore-health.repository.ts";
 import { RedisStorageStatsReadingsRepository } from "../repositories/redis/redis.storage-stats-readings.repository.ts";
+import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
@@ -611,8 +616,8 @@ export interface OpsAppInfrastructure {
    * package reads none.
    */
   isProduction: boolean;
-  /** Whether this is LangWatch's own SaaS; Cloud admin answers nowhere else (§3.5). */
-  isSaas: boolean;
+  /** Whether ops's cloud-ops capability is on: Cloud admin answers nowhere else (§3.5). */
+  cloudOps: boolean;
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
@@ -640,7 +645,7 @@ type OpsRuntimeDependencies = Readonly<{
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   isProduction: boolean;
-  isSaas: boolean;
+  cloudOps: boolean;
 }>;
 
 /** {@link OpsAppDependencies} plus the contract peers only `create()` itself reads. */
@@ -699,6 +704,9 @@ export class OpsApp implements OpsApi {
     analytics: AnalyticsApi,
   };
   static readonly config = opsConfig;
+  static readonly secrets = {
+    licensePrivateKey: licensingSecrets.licensePrivateKey,
+  } as const;
   static readonly publicConfig = opsBrowserConfig.project;
   static readonly reads = [
     "prisma",
@@ -719,7 +727,14 @@ export class OpsApp implements OpsApi {
    * reads, then composes over it exactly as {@link OpsApp.fromInfrastructure}
    * does — what a hand composition (or a test) still supplies directly.
    */
-  static create(setup: OpsSetup): OpsApp {
+  static async create(setup: OpsSetup): Promise<OpsApp> {
+    const cloudOps = await setup.secrets.into(OpsApp.secrets.licensePrivateKey, (privateKey) =>
+      decideCloudOps({
+        asked: setup.config.cloudOps,
+        privateKey,
+        builtInPublicKey: DEFAULT_LICENSE_PUBLIC_KEY,
+      }),
+    );
     // One tracker: the queue-metrics writer records into it, the detector reads it.
     const rateTracker = RedisAnomalyRateTrackerRepository.create({
       redis: setup.members.redis,
@@ -731,6 +746,7 @@ export class OpsApp implements OpsApi {
       resources: setup.resources,
       processStore: setup.repositories.processStore,
       rateTracker,
+      cloudOps,
     });
 
     const { dependencies } = setup;
@@ -850,7 +866,7 @@ export class OpsApp implements OpsApi {
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
       isProduction: members.isProduction,
-      isSaas: members.isSaas,
+      cloudOps: members.cloudOps,
     });
   }
 
@@ -1115,7 +1131,7 @@ export class OpsApp implements OpsApi {
   async startAdminImpersonation(
     input: StartAdminImpersonationInput,
   ): Promise<AdminImpersonationStarted> {
-    const staff = this.admitBackOfficeStaff(input.actor);
+    const staff = this.#admitHiddenStaff(input.actor);
     const session = this.#adminSession(input.session);
 
     await this.#dependencies.ops.startImpersonation({
@@ -1132,7 +1148,7 @@ export class OpsApp implements OpsApi {
   async stopAdminImpersonation(
     input: StopAdminImpersonationInput,
   ): Promise<AdminImpersonationStopped> {
-    this.admitBackOfficeStaff(input.actor);
+    this.#admitHiddenStaff(input.actor);
     const session = this.#adminSession(input.session);
 
     await this.#dependencies.ops.stopImpersonation({ sessionId: session.id });
@@ -1141,7 +1157,7 @@ export class OpsApp implements OpsApi {
   }
 
   runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult> {
-    const staff = this.admitBackOfficeStaff(input.actor);
+    const staff = this.#admitHiddenStaff(input.actor);
     const resource = adminResourceNameSchema.safeParse(
       ADMIN_RESOURCE_NAMES[input.resource] ?? input.resource,
     );
@@ -1151,7 +1167,7 @@ export class OpsApp implements OpsApi {
         meta: { fieldErrors: { resource: ["This isn't a resource the admin API serves."] } },
       });
     }
-    if (resource.data === "subscription") this.#refuseOffSaas();
+    if (resource.data === "subscription") this.#refuseWithoutCloudOps();
 
     return this.#dependencies.ops.adminOperation({
       resource: resource.data,
@@ -1349,10 +1365,21 @@ export class OpsApp implements OpsApi {
   }
 
   /**
-   * The same list, refused the back office's way: not-found rather than
-   * forbidden, so a probe learns nothing about whether the surface exists.
+   * The staff list refused as not-found, so a probe learns nothing about the
+   * surface, and only where the cloud-ops capability is on.
    */
-  admitBackOfficeStaff(operator: OpsOperator | null): OpsOperator {
+  admitCloudAdmin(operator: OpsOperator | null): OpsOperator {
+    const staff = this.#admitHiddenStaff(operator);
+    this.#refuseWithoutCloudOps();
+
+    return staff;
+  }
+
+  offersCloudOps(): boolean {
+    return this.#dependencies.cloudOps;
+  }
+
+  #admitHiddenStaff(operator: OpsOperator | null): OpsOperator {
     if (!this.#operatorOf(operator)) throw new AdminSurfaceHiddenError();
 
     return actingIdentityOf(operator);
@@ -1623,7 +1650,7 @@ export class OpsApp implements OpsApi {
   async listBugReports(
     input: ListBugReportsInput & { actorUserId: string },
   ): Promise<BugReportListing> {
-    this.#refuseOffSaas();
+    this.#refuseWithoutCloudOps();
     await this.#recordBugReportRead({
       actorUserId: input.actorUserId,
       action: "bugReports.getAll",
@@ -1644,7 +1671,7 @@ export class OpsApp implements OpsApi {
   }
 
   async getBugReport(input: { id: string; actorUserId: string }): Promise<BugReport> {
-    this.#refuseOffSaas();
+    this.#refuseWithoutCloudOps();
     await this.#recordBugReportRead({
       actorUserId: input.actorUserId,
       action: "bugReports.getById",
@@ -1860,9 +1887,9 @@ export class OpsApp implements OpsApi {
     return signUpHealth;
   }
 
-  /** Cloud admin is LangWatch's own tooling: elsewhere it answers as not found (§3.5). */
-  #refuseOffSaas(): void {
-    if (!this.#dependencies.isSaas) throw new AdminSurfaceHiddenError();
+  /** Cloud admin is ops's own cloud-ops capability: without it, it answers as not found (§3.5). */
+  #refuseWithoutCloudOps(): void {
+    if (!this.#dependencies.cloudOps) throw new AdminSurfaceHiddenError();
   }
 
   get #checkup(): OpsCheckupService {

@@ -232,6 +232,7 @@ export function buildOpsInfrastructure(input: {
   resources: ResourceOwnership;
   processStore: ProcessStore;
   rateTracker: AnomalyRateTrackerRepository;
+  cloudOps: boolean;
 }): OpsAppInfrastructure {
   const { members, config, resources } = input;
   const introspection = EventingIntrospectionService.create(() => members.eventing.definitions);
@@ -350,7 +351,7 @@ export function buildOpsInfrastructure(input: {
       return key ? [{ key, ...(host ? { host } : {}) }] : [];
     },
     isProduction: members.nodeEnvironment === "production",
-    isSaas: members.isSaas,
+    cloudOps: input.cloudOps,
   };
 }
 
