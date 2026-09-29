@@ -2457,10 +2457,6 @@ const presentations = {
     title: "That simulation run isn't available",
     describe: () => "It may have been archived or removed. Reload and try again.",
   },
-  bad_request: {
-    title: "That request can't be completed",
-    describe: () => "Check what was sent and try again.",
-  },
   batch_run_not_found: {
     title: "That batch isn't available",
     describe: () => "It may have been archived or removed. Reload to see the current runs.",
