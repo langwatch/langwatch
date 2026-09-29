@@ -30,13 +30,6 @@ export {
   type GraphPartition,
 } from "./integration-module-graph.ts";
 export {
-  mightContainMockCall,
-  resolveMockSpecifier,
-  scanSourceForMockSpecifiers,
-  type MockSpecifierResolution,
-  type MockSpecifierSite,
-} from "./mock-specifier-scan.ts";
-export {
   default as ShardFailureReporter,
   recordShardSelection,
   resetShardState,
@@ -49,7 +42,6 @@ export {
   armUnitShardHardFloor,
 } from "./unit-shard-hard-floor.ts";
 export { createWeigher, loadDurationManifest, type DurationManifest } from "./shard-weights.ts";
-export { scanTestSourceForUnsafeDeleteMany, type TeardownViolation } from "./teardown-scan.ts";
 export {
   frozenAt,
   memoryCache,
@@ -72,9 +64,3 @@ export {
 export { createTestAuditSink, type TestAuditRow, type TestAuditSink } from "./test-audit-sink.ts";
 export { createTestLogger, type TestLogLine, type TestLogLines } from "./test-logger.ts";
 export { allowConsole } from "@langwatch/vitest-config/console-guard";
-export { closeTsAstSession, parseSourceText, parseSourceTexts } from "./ts-ast.ts";
-export {
-  aliasesForFile,
-  parseVitestConfigAliases,
-  type ModuleAlias,
-} from "./vitest-alias-table.ts";

@@ -1,6 +1,6 @@
 #!/bin/bash
 # The goal counters, measured at HEAD. Printed every tick beside the previous tick's values.
-export PATH=/usr/bin:/bin:/usr/sbin:/sbin:$PATH; cd /Users/afr/Source/github.com/langwatch/langwatch
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin:$PATH; cd "$(dirname "$0")/../.." || exit 1
 L='createTrpcService|createTrpcApiService|createServiceApp|createProjectVersionedApp|createServiceVersionedApp|createVersionedApp\b|createProjectApp|createTrpcHandlerBinding|createAppRestSecurity|mountProjectTransport|registerJsonProtocol|createTrpcProcedure\b|createTrpcRouter\b|createRestRouter\b|mountProjectRestRouter'
 legacy=$(git grep -lE "$L" HEAD -- 'apps/api/src/*.ts' 'modules/*.ts' 'enterprise/*.ts' | grep -v __tests__ | wc -l | tr -d ' ')
 # The shape register is empty, so it can no longer answer this: count the
