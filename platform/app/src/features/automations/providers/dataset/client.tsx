@@ -11,13 +11,11 @@ import {
   type DatasetColumns,
   datasetColumnsSchema,
 } from "~/server/datasets/types";
-import {
-  type MappingState,
-  mappingStateSchema,
-} from "~/server/tracer/tracesMapping";
+import { mappingStateSchema } from "~/server/tracer/tracesMapping";
 import { api } from "~/utils/api";
 import { keepDraftOnSubFlowReturn } from "../../state/subFlow";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";
+import { useMappingEditsOnly } from "./useMappingEditsOnly";
 
 /** A single dataset column's trace source. Mirrors the `traceMappingEntrySchema`
  *  shape the dispatcher casts to `TraceMapping` — `source` names a
@@ -263,10 +261,11 @@ function DatasetMappingEditor({
 }) {
   const parsed = mappingStateSchema.safeParse(mapping);
   const fallbacks = metadataFallbackColumns(mapping);
-  const save = (next: MappingState) => {
-    if (JSON.stringify(next) === JSON.stringify(mapping)) return;
-    onMappingChange(next);
-  };
+  const save = useMappingEditsOnly({
+    columns,
+    savedMapping: mapping,
+    onEdit: onMappingChange,
+  });
 
   return (
     <VStack align="stretch" gap={2} data-testid="dataset-mapping-editor">

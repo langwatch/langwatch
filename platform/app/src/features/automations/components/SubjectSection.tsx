@@ -638,7 +638,7 @@ function TraceQuerySubject({
   const trimmed = debounced.trim();
   // A query the parser rejects is reported inline; the preview would only
   // repeat the same failure as a server error.
-  const debouncedParses = useMemo(
+  const doesDebouncedParse = useMemo(
     () => checkQuery(debounced).error === null,
     [debounced],
   );
@@ -658,7 +658,7 @@ function TraceQuerySubject({
       query: trimmed,
     },
     {
-      enabled: !!projectId && trimmed.length > 0 && debouncedParses,
+      enabled: !!projectId && trimmed.length > 0 && doesDebouncedParse,
       ...PREVIEW_LIST_OPTIONS,
     },
   );
@@ -743,7 +743,7 @@ function TraceQuerySubject({
         </VStack>
       )}
       <QueryCheckNotice query={debounced} />
-      {debouncedParses ? (
+      {doesDebouncedParse ? (
         <TracePreview
           trimmed={trimmed}
           fetching={preview.isFetching}
@@ -890,10 +890,10 @@ function TracePreview({
   capAdvice: DailyCapAdvice | null;
 }) {
   if (trimmed.length === 0) {
-    const flagged = requireQuery && setupComplete;
+    const isFlagged = requireQuery && setupComplete;
     return (
-      <Text textStyle="xs" color={flagged ? "orange.fg" : "fg.muted"}>
-        {flagged
+      <Text textStyle="xs" color={isFlagged ? "orange.fg" : "fg.muted"}>
+        {isFlagged
           ? "Add at least one condition."
           : requireQuery
             ? "Add a condition to see which traces would match."

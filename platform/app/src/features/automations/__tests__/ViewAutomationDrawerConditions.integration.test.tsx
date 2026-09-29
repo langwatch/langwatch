@@ -166,6 +166,29 @@ describe("ViewAutomationDrawer conditions section", () => {
     });
   });
 
+  describe("given an automation narrowed only by a monitor check", () => {
+    beforeEach(() => {
+      mockTriggerRow = {
+        ...baseTrigger,
+        filterQuery: null,
+        // Monitor checks are stored as keys inside `filters`, which is where
+        // the automations table's check count comes from as well.
+        filters: JSON.stringify({
+          "evaluations.passed": { check_abc: ["false"] },
+        }),
+      };
+    });
+
+    describe("when the drawer renders", () => {
+      it("does not claim it matches every trace", () => {
+        renderDrawer();
+
+        expect(screen.queryByTestId("matches-every-trace")).toBeNull();
+        expect(screen.getByTestId("filter-display")).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given an automation with no query and empty filters", () => {
     beforeEach(() => {
       mockTriggerRow = {

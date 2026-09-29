@@ -78,7 +78,7 @@ export function ViewAutomationDrawer({
   // trace search query (ADR-043). A graph alert watches a metric, and a
   // legacy `filters` row has no query to run — both simply get no control.
   const traceQuery = !isGraphAlert ? (trigger?.filterQuery ?? null) : null;
-  const unconditioned =
+  const isUnconditioned =
     !!trigger &&
     !isGraphAlert &&
     !isSchedule &&
@@ -223,7 +223,7 @@ export function ViewAutomationDrawer({
         );
       }
     }
-    if (unconditioned) return <MatchesEveryTraceNotice />;
+    if (isUnconditioned) return <MatchesEveryTraceNotice />;
     return (
       <Text textStyle="sm" color="fg.muted">
         No conditions
@@ -336,7 +336,7 @@ export function ViewAutomationDrawer({
                 projectId={project?.id ?? ""}
                 isGraphAlert={isGraphAlert}
                 canRunConditions={!!traceQuery}
-                matchesEveryTrace={unconditioned}
+                isUnconditioned={isUnconditioned}
               />
             ) : null}
 

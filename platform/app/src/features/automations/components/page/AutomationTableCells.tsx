@@ -427,7 +427,7 @@ export function TraceFilterCell({
   filters: unknown;
   applyChecks: (checks: Monitor[]) => React.ReactNode;
 }) {
-  const unconditioned = matchesEveryTrace({
+  const isUnconditioned = matchesEveryTrace({
     filterQuery,
     filters,
     checkCount: checks.length,
@@ -437,7 +437,7 @@ export function TraceFilterCell({
       <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
         Trace filter
       </Text>
-      {unconditioned ? <MatchesEveryTraceNotice /> : null}
+      {isUnconditioned ? <MatchesEveryTraceNotice /> : null}
       {applyChecks(checks)}
       {filterQuery ? (
         // ADR-043: a trace-subject automation shows its search query.
@@ -463,6 +463,23 @@ export function TraceFilterCell({
   );
 }
 
+interface AutomationRowProps {
+  trigger: EnhancedTrigger;
+  graphJsonById: Map<string, unknown>;
+  statsByTriggerId: Map<string, TriggerStats>;
+  applyChecks: (checks: Monitor[]) => React.ReactNode;
+  actionItems: (
+    action: TriggerAction,
+    actionParams: TriggerActionParams,
+  ) => React.ReactNode;
+  triggerActionName: (action: TriggerAction) => string;
+  sharedRowProps: (
+    trigger: EnhancedTrigger,
+  ) => React.ComponentProps<typeof Table.Row>;
+  activeCell: (trigger: EnhancedTrigger) => React.ReactNode;
+  rowActionsMenu: (trigger: EnhancedTrigger) => React.ReactNode;
+}
+
 /** One row of the automations table: a trace-filter or graph-watching
  *  automation, plus its delivery, metrics and actions. Extracted out of the
  *  table body's `.map` (rather than left inline) purely to keep that
@@ -479,22 +496,7 @@ export function AutomationRow({
   sharedRowProps,
   activeCell,
   rowActionsMenu,
-}: {
-  trigger: EnhancedTrigger;
-  graphJsonById: Map<string, unknown>;
-  statsByTriggerId: Map<string, TriggerStats>;
-  applyChecks: (checks: Monitor[]) => React.ReactNode;
-  actionItems: (
-    action: TriggerAction,
-    actionParams: TriggerActionParams,
-  ) => React.ReactNode;
-  triggerActionName: (action: TriggerAction) => string;
-  sharedRowProps: (
-    trigger: EnhancedTrigger,
-  ) => React.ComponentProps<typeof Table.Row>;
-  activeCell: (trigger: EnhancedTrigger) => React.ReactNode;
-  rowActionsMenu: (trigger: EnhancedTrigger) => React.ReactNode;
-}) {
+}: AutomationRowProps) {
   const actionParams = trigger.actionParams as TriggerActionParams;
   const stats = statsByTriggerId.get(trigger.id);
   const isWatchingGraph = !!trigger.customGraphId;
@@ -512,50 +514,18 @@ export function AutomationRow({
     >
       <Table.Row {...sharedRowProps(trigger)}>
         <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
-        <Table.Cell>
-          {isWatchingGraph ? (
-            <VStack gap={0} align="start" minWidth={0}>
-              <GraphWatchCell
-                graphName={trigger.customGraph?.name ?? null}
-                graph={graphJsonById.get(trigger.customGraphId ?? "")}
-                seriesName={actionParams.seriesName}
-              />
-              <AlertRuleCell actionParams={actionParams} />
-            </VStack>
-          ) : (
-            <TraceFilterCell
-              checks={
-                trigger.checks?.filter((check): check is Monitor => !!check) ??
-                []
-              }
-              filterQuery={trigger.filterQuery}
-              filters={trigger.filters}
-              applyChecks={applyChecks}
-            />
-          )}
-        </Table.Cell>
-        <Table.Cell>
-          <VStack align="start" gap={0} minWidth={0}>
-            <Text textStyle="sm" fontWeight="medium">
-              {triggerActionName(trigger.action)}
-            </Text>
-            {/* Clamped, so it needs a reveal: the
-                destination (a long email, a webhook
-                URL) is the whole point of the cell.
-                Not expandable — the dialog wants a
-                string and these are nodes. */}
-            <HoverableBigText
-              textStyle="xs"
-              color="fg.muted"
-              width="full"
-              lineClamp={2}
-              overflowWrap="anywhere"
-              expandable={false}
-            >
-              {actionItems(trigger.action, actionParams)}
-            </HoverableBigText>
-          </VStack>
-        </Table.Cell>
+        <AutomationWatchCell
+          trigger={trigger}
+          actionParams={actionParams}
+          graphJsonById={graphJsonById}
+          applyChecks={applyChecks}
+        />
+        <AutomationDeliveryCell
+          trigger={trigger}
+          actionParams={actionParams}
+          actionItems={actionItems}
+          triggerActionName={triggerActionName}
+        />
         <Table.Cell>
           <LastFiredCell trigger={trigger} stats={stats} />
         </Table.Cell>
@@ -564,23 +534,112 @@ export function AutomationRow({
             {stats?.recentFireCount ?? 0}
           </Text>
         </Table.Cell>
-        <Table.Cell whiteSpace="nowrap">
-          {/* Only a threshold rule has something to
-              be firing or recovered from; a trace
-              filter acts per match and has no such
-              state to report. */}
-          {isWatchingGraph ? (
-            <FiringStatus firing={!!stats?.currentlyFiring} />
-          ) : (
-            <Text textStyle="sm" color="fg.muted">
-              —
-            </Text>
-          )}
-        </Table.Cell>
+        <AutomationFiringCell
+          isWatchingGraph={isWatchingGraph}
+          isFiring={!!stats?.currentlyFiring}
+        />
         {activeCell(trigger)}
         <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
       </Table.Row>
     </LangyContextTarget>
+  );
+}
+
+/** What a row watches: a graph series and its rule, or a trace filter. */
+function AutomationWatchCell({
+  trigger,
+  actionParams,
+  graphJsonById,
+  applyChecks,
+}: {
+  trigger: EnhancedTrigger;
+  actionParams: TriggerActionParams;
+  graphJsonById: Map<string, unknown>;
+  applyChecks: (checks: Monitor[]) => React.ReactNode;
+}) {
+  return (
+    <Table.Cell>
+      {trigger.customGraphId ? (
+        <VStack gap={0} align="start" minWidth={0}>
+          <GraphWatchCell
+            graphName={trigger.customGraph?.name ?? null}
+            graph={graphJsonById.get(trigger.customGraphId)}
+            seriesName={actionParams.seriesName}
+          />
+          <AlertRuleCell actionParams={actionParams} />
+        </VStack>
+      ) : (
+        <TraceFilterCell
+          checks={
+            trigger.checks?.filter((check): check is Monitor => !!check) ?? []
+          }
+          filterQuery={trigger.filterQuery}
+          filters={trigger.filters}
+          applyChecks={applyChecks}
+        />
+      )}
+    </Table.Cell>
+  );
+}
+
+/** Where a row delivers: the channel name over its clamped destination. */
+function AutomationDeliveryCell({
+  trigger,
+  actionParams,
+  actionItems,
+  triggerActionName,
+}: {
+  trigger: EnhancedTrigger;
+  actionParams: TriggerActionParams;
+  actionItems: (
+    action: TriggerAction,
+    actionParams: TriggerActionParams,
+  ) => React.ReactNode;
+  triggerActionName: (action: TriggerAction) => string;
+}) {
+  return (
+    <Table.Cell>
+      <VStack align="start" gap={0} minWidth={0}>
+        <Text textStyle="sm" fontWeight="medium">
+          {triggerActionName(trigger.action)}
+        </Text>
+        {/* Clamped, so it needs a reveal: the destination (a long email, a
+            webhook URL) is the whole point of the cell. Not expandable: the
+            dialog wants a string and these are nodes. */}
+        <HoverableBigText
+          textStyle="xs"
+          color="fg.muted"
+          width="full"
+          lineClamp={2}
+          overflowWrap="anywhere"
+          expandable={false}
+        >
+          {actionItems(trigger.action, actionParams)}
+        </HoverableBigText>
+      </VStack>
+    </Table.Cell>
+  );
+}
+
+/** Only a threshold rule has something to be firing or recovered from; a
+ *  trace filter acts per match and has no such state to report. */
+function AutomationFiringCell({
+  isWatchingGraph,
+  isFiring,
+}: {
+  isWatchingGraph: boolean;
+  isFiring: boolean;
+}) {
+  return (
+    <Table.Cell whiteSpace="nowrap">
+      {isWatchingGraph ? (
+        <FiringStatus firing={isFiring} />
+      ) : (
+        <Text textStyle="sm" color="fg.muted">
+          —
+        </Text>
+      )}
+    </Table.Cell>
   );
 }
 

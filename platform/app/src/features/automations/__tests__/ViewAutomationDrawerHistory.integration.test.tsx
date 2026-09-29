@@ -22,6 +22,15 @@ let mockTriggerRow: Record<string, unknown> | null = null;
 let mockFires: Array<Record<string, unknown>> = [];
 let mockLatestEvaluation: Record<string, unknown> | null = null;
 let mockNextFiring: Record<string, unknown> | null = null;
+let mockFireHistoryFails = false;
+let mockEvaluationFails = false;
+
+const FAILED_QUERY = {
+  data: undefined,
+  isLoading: false,
+  isError: true,
+  error: new Error("boom"),
+};
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
@@ -65,14 +74,17 @@ vi.mock("~/utils/api", () => ({
             { pages: [{ fires: mockFires, nextCursor: null }] },
             options,
           ),
+          ...(mockFireHistoryFails ? FAILED_QUERY : {}),
           hasNextPage: false,
           isFetchingNextPage: false,
           fetchNextPage: vi.fn(),
         }),
       },
       getLatestEvaluation: {
-        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
-          fakeQuery(mockLatestEvaluation, options),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => ({
+          ...fakeQuery(mockLatestEvaluation, options),
+          ...(mockEvaluationFails ? FAILED_QUERY : {}),
+        }),
       },
       getNextFiring: {
         useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
@@ -127,6 +139,40 @@ describe("ViewAutomationDrawer history", () => {
     mockFires = [];
     mockLatestEvaluation = null;
     mockNextFiring = { kind: "alert", sweepIntervalMs: 30_000 };
+    mockFireHistoryFails = false;
+    mockEvaluationFails = false;
+  });
+
+  describe("given a trace automation whose fire history fails to load", () => {
+    describe("when the drawer renders", () => {
+      it("says the history couldn't load instead of claiming it never fired", () => {
+        mockTriggerRow = TRACE_AUTOMATION_ROW;
+        mockFireHistoryFails = true;
+
+        renderDrawer();
+
+        expect(
+          screen.getByText("Couldn't load this automation's history."),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/has not fired yet/)).toBeNull();
+      });
+    });
+  });
+
+  describe("given an alert whose last evaluation fails to load", () => {
+    describe("when the drawer renders", () => {
+      it("says the history couldn't load instead of claiming it was never checked", () => {
+        mockTriggerRow = GRAPH_ALERT_ROW;
+        mockEvaluationFails = true;
+
+        renderDrawer();
+
+        expect(
+          screen.getByText("Couldn't load this automation's history."),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/has not been checked yet/)).toBeNull();
+      });
+    });
   });
 
   afterEach(() => {

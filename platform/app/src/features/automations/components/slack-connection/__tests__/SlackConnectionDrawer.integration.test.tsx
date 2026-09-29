@@ -195,6 +195,23 @@ describe("SlackConnectionDrawer", () => {
     });
   });
 
+  describe("when Add connection is clicked with the name and secret empty", () => {
+    it("keeps the button enabled, marks both fields and sends nothing", async () => {
+      const user = userEvent.setup();
+      renderDrawer({});
+
+      const add = screen.getByRole("button", { name: "Add connection" });
+      expect(add).toBeEnabled();
+      await user.click(add);
+
+      expect(
+        screen.getByText("Give the connection a name."),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Paste the bot token.")).toBeInTheDocument();
+      expect(state.createCalls).toEqual([]);
+    });
+  });
+
   describe("when a webhook connection is added for one project", () => {
     /** @scenario "Adding a webhook connection for one project" */
     it("creates an incoming webhook scoped to the project", async () => {
@@ -252,8 +269,8 @@ describe("SlackConnectionDrawer", () => {
     });
   });
 
-  describe("when the secret is already stored in the organization", () => {
-    /** @scenario "The same secret cannot be stored twice in an organization" */
+  describe("when the secret is already stored in that scope", () => {
+    /** @scenario "The same secret cannot be stored twice in one scope" */
     it("names the existing connection next to the form", () => {
       state.createError = handledError("slack_connection_exists", {
         connectionName: "Alerts bot",

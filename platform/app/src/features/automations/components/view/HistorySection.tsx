@@ -18,6 +18,17 @@ const TONE_DOT: Record<string, string> = {
   attention: "orange.solid",
 };
 
+interface HistorySectionProps {
+  automationId: string;
+  projectId: string;
+  isGraphAlert: boolean;
+  /** Whether the drawer is also offering to run the conditions now — the
+   *  empty state points at that control only when it exists. */
+  canRunConditions: boolean;
+  /** No condition at all: the empty state must not promise it filters. */
+  isUnconditioned?: boolean;
+}
+
 /**
  * Everything this automation has done, newest first: the last check of an
  * alert, and every time it fired.
@@ -34,17 +45,8 @@ export function HistorySection({
   projectId,
   isGraphAlert,
   canRunConditions,
-  matchesEveryTrace = false,
-}: {
-  automationId: string;
-  projectId: string;
-  isGraphAlert: boolean;
-  /** Whether the drawer is also offering to run the conditions now — the
-   *  empty state points at that control only when it exists. */
-  canRunConditions: boolean;
-  /** No condition at all: the empty state must not promise it filters. */
-  matchesEveryTrace?: boolean;
-}) {
+  isUnconditioned = false,
+}: HistorySectionProps) {
   const historyQuery = api.automation.getFireHistory.useInfiniteQuery(
     { projectId, triggerId: automationId, limit: FIRE_PAGE_SIZE },
     {
@@ -67,27 +69,23 @@ export function HistorySection({
   // schedule sat under a permanent skeleton and never showed its history.
   const isLoading =
     historyQuery.isLoading || (wantsEvaluation && evaluationQuery.isLoading);
+  const isError =
+    historyQuery.isError || (wantsEvaluation && evaluationQuery.isError);
 
   return (
     <VStack align="start" gap={2} width="full">
       <Text textStyle="xs" color="fg.muted" fontWeight="medium">
         History
       </Text>
-      {isLoading ? (
-        <Skeleton height="60px" width="full" />
-      ) : fires.length === 0 && !evaluation ? (
-        <EmptyHistory
-          isGraphAlert={isGraphAlert}
-          canRunConditions={canRunConditions}
-          matchesEveryTrace={matchesEveryTrace}
-        />
-      ) : (
-        <Timeline
-          fires={fires}
-          evaluation={evaluation}
-          isGraphAlert={isGraphAlert}
-        />
-      )}
+      <HistoryBody
+        isLoading={isLoading}
+        isError={isError}
+        fires={fires}
+        evaluation={evaluation}
+        isGraphAlert={isGraphAlert}
+        canRunConditions={canRunConditions}
+        isUnconditioned={isUnconditioned}
+      />
       {historyQuery.hasNextPage ? (
         <Button
           size="xs"
@@ -226,14 +224,58 @@ function TimelineRow({
   );
 }
 
+/** Loading, a failed read, nothing yet, or the timeline: in that order. */
+function HistoryBody({
+  isLoading,
+  isError,
+  fires,
+  evaluation,
+  isGraphAlert,
+  canRunConditions,
+  isUnconditioned,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  fires: TriggerFire[];
+  evaluation: RecordedEvaluation | null;
+  isGraphAlert: boolean;
+  canRunConditions: boolean;
+  isUnconditioned: boolean;
+}) {
+  if (isLoading) return <Skeleton height="60px" width="full" />;
+  if (isError) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        {"Couldn't load this automation's history."}
+      </Text>
+    );
+  }
+  if (fires.length === 0 && !evaluation) {
+    return (
+      <EmptyHistory
+        isGraphAlert={isGraphAlert}
+        canRunConditions={canRunConditions}
+        isUnconditioned={isUnconditioned}
+      />
+    );
+  }
+  return (
+    <Timeline
+      fires={fires}
+      evaluation={evaluation}
+      isGraphAlert={isGraphAlert}
+    />
+  );
+}
+
 function EmptyHistory({
   isGraphAlert,
   canRunConditions,
-  matchesEveryTrace,
+  isUnconditioned,
 }: {
   isGraphAlert: boolean;
   canRunConditions: boolean;
-  matchesEveryTrace: boolean;
+  isUnconditioned: boolean;
 }) {
   if (isGraphAlert) {
     return (
@@ -243,7 +285,7 @@ function EmptyHistory({
       </Text>
     );
   }
-  if (matchesEveryTrace) {
+  if (isUnconditioned) {
     return (
       <Text textStyle="sm" color="fg.muted">
         This automation has not fired yet. It has no condition, so it will act

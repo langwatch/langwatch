@@ -332,7 +332,7 @@ describe("AutomationDrawer", () => {
     });
 
     describe("when the draft reaches the review step with nothing configured", () => {
-      it("disables the create button", async () => {
+      it("keeps the create button enabled and says why on click, sending nothing", async () => {
         const user = userEvent.setup();
         renderDrawer();
         await continueToReview(user);
@@ -340,7 +340,16 @@ describe("AutomationDrawer", () => {
         const createButton = await screen.findByRole("button", {
           name: "Create automation",
         });
-        expect(createButton).toBeDisabled();
+        expect(createButton).toBeEnabled();
+        await user.click(createButton);
+
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
+        expect(toaster.create).toHaveBeenCalledWith({
+          title: expect.stringMatching(
+            /^To save, .*pick a delivery channel\.$/,
+          ),
+          type: "warning",
+        });
       });
 
       it("explains why saving is blocked on hover", async () => {
@@ -829,7 +838,7 @@ describe("AutomationDrawer", () => {
     });
 
     describe("when the saved row is still loading", () => {
-      it("shows a skeleton instead of the blank form and disables Save", async () => {
+      it("shows a skeleton instead of the blank form and refuses to save", async () => {
         mockGetTriggerByIdQuery.mockImplementation(() => ({
           data: null,
           isLoading: true,
@@ -844,9 +853,14 @@ describe("AutomationDrawer", () => {
         // The blank form must not render — a keystroke into it would block
         // hydration and let Save overwrite the row with a near-blank draft.
         expect(screen.queryByPlaceholderText(/name/i)).not.toBeInTheDocument();
-        expect(
+        await userEvent.click(
           screen.getByRole("button", { name: "Save changes" }),
-        ).toBeDisabled();
+        );
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
+        expect(toaster.create).toHaveBeenCalledWith({
+          title: "This automation can't be saved until it has loaded.",
+          type: "warning",
+        });
       });
 
       it("swaps the skeleton for the hydrated form once the row lands", async () => {
@@ -882,7 +896,7 @@ describe("AutomationDrawer", () => {
     });
 
     describe("when the saved row fails to load", () => {
-      it("shows an error state instead of the form and keeps Save disabled", async () => {
+      it("shows an error state instead of the form and refuses to save", async () => {
         mockGetTriggerByIdQuery.mockImplementation(() => ({
           data: null,
           isLoading: false,
@@ -894,9 +908,10 @@ describe("AutomationDrawer", () => {
         expect(
           await screen.findByText(/couldn't load this/i),
         ).toBeInTheDocument();
-        expect(
+        await userEvent.click(
           screen.getByRole("button", { name: "Save changes" }),
-        ).toBeDisabled();
+        );
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
       });
     });
 
@@ -1227,9 +1242,10 @@ describe("AutomationDrawer", () => {
             "* * * * *",
           );
         });
-        expect(
+        await userEvent.click(
           await screen.findByRole("button", { name: "Save report" }),
-        ).toBeDisabled();
+        );
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
         // And says why, in the cadence field itself.
         expect(
           screen.getByText(/can send at most every 15 minutes/i),

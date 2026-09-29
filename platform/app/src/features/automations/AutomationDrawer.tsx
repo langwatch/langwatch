@@ -163,13 +163,18 @@ function saveDisabledReason({
   configComplete,
   actionPicked,
   hasInvalidConditionRows,
+  isRowUnavailable,
 }: {
   draft: AutomationDraft;
   nameSet: boolean;
   configComplete: boolean;
   actionPicked: boolean;
   hasInvalidConditionRows: boolean;
+  isRowUnavailable: boolean;
 }): string {
+  if (isRowUnavailable) {
+    return "This automation can't be saved until it has loaded.";
+  }
   const missing: string[] = [];
   if (!nameSet) missing.push("give it a name");
   if (hasInvalidConditionRows)
@@ -918,6 +923,14 @@ export function AutomationDrawer({
     configComplete &&
     !editLoading &&
     !editError;
+  const saveBlockedReason = saveDisabledReason({
+    draft,
+    nameSet,
+    configComplete,
+    actionPicked: !!draft.action,
+    hasInvalidConditionRows,
+    isRowUnavailable: editLoading || editError,
+  });
 
   const onTestFire = useCallback(() => {
     if (!channel || !projectId || !draft.action) return;
@@ -1006,7 +1019,10 @@ export function AutomationDrawer({
   ]);
 
   const onSave = useCallback(() => {
-    if (!canSave || !draft.action) return;
+    if (!canSave || !draft.action) {
+      toaster.create({ title: saveBlockedReason, type: "warning" });
+      return;
+    }
     upsert.mutate(
       {
         projectId,
@@ -1093,6 +1109,7 @@ export function AutomationDrawer({
     openDrawer,
     projectId,
     queryClient,
+    saveBlockedReason,
     upsert,
   ]);
 
@@ -1313,21 +1330,12 @@ export function AutomationDrawer({
                 </Tooltip>
               ) : null}
               {showStepNavigation ? null : (
-                <Tooltip
-                  content={saveDisabledReason({
-                    draft,
-                    nameSet,
-                    configComplete,
-                    actionPicked: !!draft.action,
-                    hasInvalidConditionRows,
-                  })}
-                  disabled={canSave}
-                >
+                <Tooltip content={saveBlockedReason} disabled={canSave}>
                   <Button
                     colorPalette="orange"
                     onClick={onSave}
                     loading={upsert.isPending}
-                    disabled={!canSave}
+                    disabled={upsert.isPending}
                   >
                     {labels.saveButton}
                   </Button>

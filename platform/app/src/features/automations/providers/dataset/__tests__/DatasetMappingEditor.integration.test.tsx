@@ -4,10 +4,11 @@
  * The "Add to dataset" delivery step edits which trace field fills each
  * column, with the traces view's own mapping editor, and saves it with the
  * automation. The editor itself is stood in: what is under test is that it
- * starts from the slice's mapping and writes its answer back to the slice.
+ * starts from the slice's mapping and writes only the user's edits back.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { ConfigFormCtx } from "../../types";
@@ -23,6 +24,16 @@ const editor = vi.hoisted(() => ({
 vi.mock("~/components/traces/TracesMapping", () => ({
   TracesMapping: (props: NonNullable<typeof editor.props>) => {
     editor.props = props;
+    // Like the real editor, report the mapping it derives on opening; key
+    // order differs from the saved one, so a naive comparison sees a change.
+    useEffect(() => {
+      props.setTraceMapping?.({
+        mapping: Object.fromEntries(
+          Object.entries(props.traceMapping?.mapping ?? {}).reverse(),
+        ),
+        expansions: [],
+      });
+    }, []);
     return (
       <button
         type="button"
@@ -145,6 +156,12 @@ describe("the Add to dataset delivery step", () => {
           expansions: [],
         },
       });
+    });
+
+    it("does not save anything merely by opening the editor", () => {
+      const onChange = renderForm();
+
+      expect(onChange).not.toHaveBeenCalled();
     });
 
     it("no longer claims the dataset view can refine the mapping", () => {

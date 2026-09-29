@@ -479,13 +479,13 @@ function templatesFromSlice(slice: SlackSlice) {
 function previewOptions({ slice }: { slice: SlackSlice }): {
   allowGatedBlocks: boolean;
 } {
-  const legacyBotToken = usesLegacySecret(slice)
+  const hasLegacyBotToken = usesLegacySecret(slice)
     ? slice.legacyParams?.slackBotTokenSet === true
     : false;
   return {
     allowGatedBlocks:
       slice.deliveryMethod === "bot" &&
-      (!!slice.slackIntegrationId || legacyBotToken),
+      (!!slice.slackIntegrationId || hasLegacyBotToken),
   };
 }
 

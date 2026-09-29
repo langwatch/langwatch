@@ -7,7 +7,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState } from "react";
 import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
@@ -25,10 +24,19 @@ import type {
   SlackConnection,
   SlackConnectionSaved,
 } from "./slackConnectionTypes";
+import {
+  type ConnectionScope,
+  type SlackConnectionDraft,
+  useSlackConnectionFormState,
+} from "./useSlackConnectionFormState";
 
-interface ConnectionScope {
-  scopeType: SlackIntegrationScopeType;
-  scopeId: string;
+interface SlackConnectionFormProps {
+  projectId: string;
+  connection: SlackConnection | undefined;
+  canManageProject: boolean;
+  canManageOrganization: boolean;
+  onSaved: (saved: SlackConnectionSaved) => void;
+  onDeleted: () => void;
 }
 
 /** The kind, name, scope and secret of one connection. The kind is chosen once
@@ -40,93 +48,117 @@ export function SlackConnectionForm({
   canManageOrganization,
   onSaved,
   onDeleted,
-}: {
-  projectId: string;
-  connection: SlackConnection | undefined;
-  canManageProject: boolean;
-  canManageOrganization: boolean;
-  onSaved: (saved: SlackConnectionSaved) => void;
-  onDeleted: () => void;
-}) {
-  const { organization, project } = useOrganizationTeamProject();
-  const [kind, setKind] = useState<SlackIntegrationKind>(
-    connection?.kind ?? "BOT",
-  );
-  const [name, setName] = useState(connection?.name ?? "");
-  const [scopes, setScopes] = useState<ConnectionScope[]>(() =>
-    initialScopes({
-      connection,
-      projectId: canManageProject ? project?.id : undefined,
-      organizationId: canManageOrganization ? organization?.id : undefined,
-    }),
-  );
-  const [secret, setSecret] = useState("");
-  const [isReplacingSecret, setIsReplacingSecret] = useState(!connection);
+}: SlackConnectionFormProps) {
+  const form = useSlackConnectionFormState({
+    connection,
+    canManageProject,
+    canManageOrganization,
+  });
   const save = useSaveSlackConnection({ projectId, connection, onSaved });
-  const scope = scopes[0];
-  const canSave =
-    name.trim().length > 0 &&
-    !!scope &&
-    (!isReplacingSecret || secret.trim().length > 0);
 
   return (
     <VStack align="stretch" gap={5}>
-      <KindField kind={kind} onChange={setKind} isLocked={!!connection} />
-      <Field.Root required>
-        <Field.Label>Name</Field.Label>
-        <Input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder={kind === "BOT" ? "Alerts bot" : "Alerts channel webhook"}
-        />
-      </Field.Root>
+      <KindField
+        kind={form.kind}
+        onChange={form.setKind}
+        isLocked={!!connection}
+      />
+      <ConnectionNameField
+        name={form.name}
+        kind={form.kind}
+        onChange={form.setName}
+        isInvalid={form.errors.name}
+      />
       <ConnectionScopeField
-        scopes={scopes}
-        onChange={setScopes}
+        scopes={form.scopes}
+        onChange={form.setScopes}
         canManageProject={canManageProject}
         canManageOrganization={canManageOrganization}
+        isInvalid={form.errors.scope}
       />
       <SecretField
-        kind={kind}
+        kind={form.kind}
         secretHint={connection?.secretHint}
-        secret={secret}
-        onSecretChange={setSecret}
-        isReplacing={isReplacingSecret}
-        onReplacingChange={(replacing) => {
-          setIsReplacingSecret(replacing);
-          setSecret("");
-        }}
+        secret={form.secret}
+        onSecretChange={form.setSecret}
+        isReplacing={form.isReplacingSecret}
+        onReplacingChange={form.changeReplacing}
+        isInvalid={form.errors.secret}
       />
       <HandledErrorAlert
         error={save.error}
         fallbackTitle="Couldn't save the Slack connection"
       />
-      <HStack justify="space-between">
-        <Button
-          colorPalette="blue"
-          disabled={!canSave}
-          loading={save.isPending}
-          onClick={() =>
-            scope &&
-            save.run({
-              kind,
-              name: name.trim(),
-              scope,
-              secret: isReplacingSecret ? secret.trim() : undefined,
-            })
-          }
-        >
-          {connection ? "Save" : "Add connection"}
-        </Button>
-        {connection ? (
-          <DeleteSlackConnectionButton
-            projectId={projectId}
-            connection={connection}
-            onDeleted={onDeleted}
-          />
-        ) : null}
-      </HStack>
+      <SlackConnectionFormFooter
+        projectId={projectId}
+        connection={connection}
+        isSaving={save.isPending}
+        onSave={() => {
+          const draft = form.submit();
+          if (draft) save.run(draft);
+        }}
+        onDeleted={onDeleted}
+      />
     </VStack>
+  );
+}
+
+function ConnectionNameField({
+  name,
+  kind,
+  onChange,
+  isInvalid,
+}: {
+  name: string;
+  kind: SlackIntegrationKind;
+  onChange: (name: string) => void;
+  isInvalid: boolean;
+}) {
+  return (
+    <Field.Root required invalid={isInvalid}>
+      <Field.Label>Name</Field.Label>
+      <Input
+        value={name}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={kind === "BOT" ? "Alerts bot" : "Alerts channel webhook"}
+      />
+      <Field.ErrorText>Give the connection a name.</Field.ErrorText>
+    </Field.Root>
+  );
+}
+
+/** Save stays enabled except while a save is in flight; the handler validates. */
+function SlackConnectionFormFooter({
+  projectId,
+  connection,
+  isSaving,
+  onSave,
+  onDeleted,
+}: {
+  projectId: string;
+  connection: SlackConnection | undefined;
+  isSaving: boolean;
+  onSave: () => void;
+  onDeleted: () => void;
+}) {
+  return (
+    <HStack justify="space-between">
+      <Button
+        colorPalette="blue"
+        disabled={isSaving}
+        loading={isSaving}
+        onClick={onSave}
+      >
+        {connection ? "Save" : "Add connection"}
+      </Button>
+      {connection ? (
+        <DeleteSlackConnectionButton
+          projectId={projectId}
+          connection={connection}
+          onDeleted={onDeleted}
+        />
+      ) : null}
+    </HStack>
   );
 }
 
@@ -136,48 +168,34 @@ function ConnectionScopeField({
   onChange,
   canManageProject,
   canManageOrganization,
+  isInvalid,
 }: {
   scopes: ConnectionScope[];
   onChange: (scopes: ConnectionScope[]) => void;
   canManageProject: boolean;
   canManageOrganization: boolean;
+  isInvalid: boolean;
 }) {
   const { organization, project } = useOrganizationTeamProject();
   return (
-    <ScopeChipPicker<SlackIntegrationScopeType>
-      value={scopes}
-      onChange={onChange}
-      organizationId={organization?.id}
-      organizationName={organization?.name}
-      projectId={project?.id}
-      projectName={project?.name}
-      allowedScopeTypes={["ORGANIZATION", "PROJECT"]}
-      singleSelect
-      label="Who can use it"
-      subjectNoun="connection"
-      currentOrganizationId={canManageOrganization ? organization?.id : null}
-      currentProjectId={canManageProject ? project?.id : null}
-    />
+    <Field.Root invalid={isInvalid}>
+      <ScopeChipPicker<SlackIntegrationScopeType>
+        value={scopes}
+        onChange={onChange}
+        organizationId={organization?.id}
+        organizationName={organization?.name}
+        projectId={project?.id}
+        projectName={project?.name}
+        allowedScopeTypes={["ORGANIZATION", "PROJECT"]}
+        singleSelect
+        label="Who can use it"
+        subjectNoun="connection"
+        currentOrganizationId={canManageOrganization ? organization?.id : null}
+        currentProjectId={canManageProject ? project?.id : null}
+      />
+      <Field.ErrorText>Choose who can use the connection.</Field.ErrorText>
+    </Field.Root>
   );
-}
-
-function initialScopes({
-  connection,
-  projectId,
-  organizationId,
-}: {
-  connection: SlackConnection | undefined;
-  projectId: string | undefined;
-  organizationId: string | undefined;
-}): ConnectionScope[] {
-  if (connection) {
-    return [{ scopeType: connection.scopeType, scopeId: connection.scopeId }];
-  }
-  if (projectId) return [{ scopeType: "PROJECT", scopeId: projectId }];
-  if (organizationId) {
-    return [{ scopeType: "ORGANIZATION", scopeId: organizationId }];
-  }
-  return [];
 }
 
 /** Create and update as one save, reporting through the form's inline alert:
@@ -201,17 +219,7 @@ function useSaveSlackConnection({
     onSaved(saved);
   };
 
-  const run = ({
-    kind,
-    name,
-    scope,
-    secret,
-  }: {
-    kind: SlackIntegrationKind;
-    name: string;
-    scope: ConnectionScope;
-    secret: string | undefined;
-  }) => {
+  const run = ({ kind, name, scope, secret }: SlackConnectionDraft) => {
     if (connection) {
       update.mutate(
         { projectId, id: connection.id, name, ...scope, secret },
@@ -292,6 +300,16 @@ function KindField({
   );
 }
 
+interface SecretFieldProps {
+  kind: SlackIntegrationKind;
+  secretHint: string | undefined;
+  secret: string;
+  onSecretChange: (secret: string) => void;
+  isReplacing: boolean;
+  onReplacingChange: (replacing: boolean) => void;
+  isInvalid: boolean;
+}
+
 /** A saved secret shows only its last four characters; typing a new one is
  *  an explicit Replace, so leaving the field alone keeps the stored secret. */
 function SecretField({
@@ -301,39 +319,23 @@ function SecretField({
   onSecretChange,
   isReplacing,
   onReplacingChange,
-}: {
-  kind: SlackIntegrationKind;
-  secretHint: string | undefined;
-  secret: string;
-  onSecretChange: (secret: string) => void;
-  isReplacing: boolean;
-  onReplacingChange: (replacing: boolean) => void;
-}) {
+  isInvalid,
+}: SecretFieldProps) {
   const isBot = kind === "BOT";
   const label = isBot ? "Bot User OAuth token" : "Webhook URL";
   if (!isReplacing && secretHint !== undefined) {
     return (
-      <Field.Root>
-        <Field.Label>{label}</Field.Label>
-        <HStack gap={3}>
-          <Text fontSize="sm" fontFamily="mono">
-            {maskedSecret(secretHint)}
-          </Text>
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => onReplacingChange(true)}
-          >
-            Replace
-          </Button>
-        </HStack>
-      </Field.Root>
+      <SavedSecretField
+        label={label}
+        secretHint={secretHint}
+        onReplace={() => onReplacingChange(true)}
+      />
     );
   }
   return (
     <VStack align="stretch" gap={2}>
       {isBot ? <SlackAppSetupCallout /> : <WebhookHelp />}
-      <Field.Root required>
+      <Field.Root required invalid={isInvalid}>
         <Field.Label>{label}</Field.Label>
         <Input
           type="password"
@@ -342,6 +344,9 @@ function SecretField({
           onChange={(event) => onSecretChange(event.target.value)}
           placeholder={isBot ? "xoxb-…" : "https://hooks.slack.com/services/…"}
         />
+        <Field.ErrorText>
+          {isBot ? "Paste the bot token." : "Paste the webhook URL."}
+        </Field.ErrorText>
         {secretHint !== undefined ? (
           <Field.HelperText>
             Every automation using this connection switches to the new secret
@@ -359,6 +364,31 @@ function SecretField({
         ) : null}
       </Field.Root>
     </VStack>
+  );
+}
+
+/** A stored secret, shown as its last four characters with a Replace button. */
+function SavedSecretField({
+  label,
+  secretHint,
+  onReplace,
+}: {
+  label: string;
+  secretHint: string;
+  onReplace: () => void;
+}) {
+  return (
+    <Field.Root>
+      <Field.Label>{label}</Field.Label>
+      <HStack gap={3}>
+        <Text fontSize="sm" fontFamily="mono">
+          {maskedSecret(secretHint)}
+        </Text>
+        <Button size="xs" variant="outline" onClick={onReplace}>
+          Replace
+        </Button>
+      </HStack>
+    </Field.Root>
   );
 }
 
