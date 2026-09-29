@@ -6,38 +6,47 @@ import {
   type EnterpriseOpsApi as EnterpriseOpsApiContract,
 } from "@langwatch/enterprise-ops-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import { AdminSurfaceHiddenError, OpsApi, type OpsOperator } from "@langwatch/ops-contract";
 
 import { LicenseRegistryAuditService } from "../services/license-registry-audit.service.ts";
 import { SelfHostedInstanceAuditService } from "../services/self-hosted-instance-audit.service.ts";
 
-type EnterpriseOpsSetup = FeatureSetup<typeof EnterpriseOpsApp.dependencies, never, undefined>;
+type EnterpriseOpsSetup = FeatureSetup<
+  typeof EnterpriseOpsApp.dependencies,
+  Readonly<{ isSaas: boolean }>,
+  undefined
+>;
 
 /** Admits back-office staff through ops, then forwards to licensing with the staff member recorded. */
 export class EnterpriseOpsApp implements EnterpriseOpsApiContract {
   static readonly contract = EnterpriseOpsApi;
   static readonly dependencies = { ops: OpsApi, licensing: LicensingApi, auditLog: AuditLogApi };
+  static readonly reads = ["isSaas"] as const;
 
   readonly #ops: Pick<OpsApi, "admitBackOfficeStaff">;
   readonly #licenses: LicenseRegistryAuditService;
   readonly #instances: SelfHostedInstanceAuditService;
+  readonly #isSaas: boolean;
 
   private constructor(deps: {
     ops: Pick<OpsApi, "admitBackOfficeStaff">;
     licenses: LicenseRegistryAuditService;
     instances: SelfHostedInstanceAuditService;
+    isSaas: boolean;
   }) {
     this.#ops = deps.ops;
     this.#licenses = deps.licenses;
     this.#instances = deps.instances;
+    this.#isSaas = deps.isSaas;
   }
 
-  static create({ dependencies }: EnterpriseOpsSetup): EnterpriseOpsApp {
+  static create({ dependencies, members }: EnterpriseOpsSetup): EnterpriseOpsApp {
     const { ops, licensing, auditLog } = dependencies;
     return new EnterpriseOpsApp({
       ops,
       licenses: LicenseRegistryAuditService.create({ registry: licensing, auditLog }),
       instances: SelfHostedInstanceAuditService.create({ instances: licensing, auditLog }),
+      isSaas: members.isSaas,
     });
   }
 
@@ -94,8 +103,9 @@ export class EnterpriseOpsApp implements EnterpriseOpsApiContract {
   getSelfHostedInstance: EnterpriseOpsApiContract["getSelfHostedInstance"] = ({ operator, id }) =>
     this.#instances.getById({ id, operatorId: this.#staff(operator) });
 
-  /** The staff member's id, or the back office's not-found. Throws synchronously, before any read. */
+  /** The staff member's id, or not-found; Cloud admin answers only on SaaS (§3.5). Throws before any read. */
   #staff(operator: OpsOperator | null): string {
+    if (!this.#isSaas) throw new AdminSurfaceHiddenError();
     return this.#ops.admitBackOfficeStaff(operator).id;
   }
 }

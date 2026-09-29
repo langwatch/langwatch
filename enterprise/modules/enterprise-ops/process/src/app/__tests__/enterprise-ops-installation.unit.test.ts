@@ -17,11 +17,12 @@ import { enterpriseOpsServer } from "../../enterprise-ops.server.ts";
 const staff: OpsOperator = { id: "user_olive", email: "olive@langwatch.test" };
 const customerAdmin: OpsOperator = { id: "user_mallory", email: "admin@customer.test" };
 
-function boot({ audited }: { audited: RecordAuditLogCommand[] }) {
+function boot({ audited, isSaas = true }: { audited: RecordAuditLogCommand[]; isSaas?: boolean }) {
   const { logger } = createTestLogger();
   return createApp({ role: "api" })
     .withModules([enterpriseOpsServer])
     .withStores(memoryStores())
+    .withMember("isSaas", isSaas)
     .withObservability((observability) => observability.withLogging(logger))
     .provide({
       ops: createApiFixture<OpsApi>({
@@ -65,6 +66,24 @@ describe("enterprise ops installation", () => {
           app.listSelfHostedInstances({ page: 0, pageSize: 25, operator: staff }),
         ).resolves.toEqual({ instances: [], total: 3 });
         expect(audited).toMatchObject([{ userId: staff.id, action: "selfHostedInstances.getAll" }]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("given back-office staff on an install that is not LangWatch's SaaS", () => {
+    /** @scenario "Cloud admin answers only on LangWatch's own SaaS" */
+    it("refuses with the back office's not-found and records nothing", async () => {
+      const audited: RecordAuditLogCommand[] = [];
+      const runtime = await boot({ audited, isSaas: false });
+
+      try {
+        const app = runtime.service(EnterpriseOpsApi);
+        expect(() =>
+          app.listSelfHostedInstances({ page: 0, pageSize: 25, operator: staff }),
+        ).toThrow(AdminSurfaceHiddenError);
+        expect(audited).toEqual([]);
       } finally {
         await runtime.stop();
       }

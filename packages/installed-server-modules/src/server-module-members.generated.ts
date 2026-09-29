@@ -61,7 +61,7 @@ export const serverModuleMembers = {
   billing: ["isSaas", "mail", "nodeEnvironment", "publicBaseUrl"],
   "demo-data": [],
   "enterprise-gateway": ["isSaas"],
-  "enterprise-ops": [],
+  "enterprise-ops": ["isSaas"],
   governance: ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"],
   licensing: ["encryption", "logger", "prisma", "rateLimiter"],
   "managed-provider": [],

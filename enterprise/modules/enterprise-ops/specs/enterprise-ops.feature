@@ -20,6 +20,12 @@ Feature: Enterprise operator views
     Then the call is refused with not_found and nothing is audited
 
   @unit
+  Scenario: Cloud admin answers only on LangWatch's own SaaS
+    Given back-office staff on an install that is not LangWatch's SaaS
+    When they read a self-hosted instance
+    Then the call is refused with not_found and nothing is audited
+
+  @unit
   Scenario: Core ops serves no operator view over an enterprise subject
     Given the core ops module is installed
     Then it declares neither the licenseRegistry nor the selfHostedInstances namespace

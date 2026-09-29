@@ -105,6 +105,7 @@ async function build(registry: Partial<Registry> = {}) {
   const runtime = await createApp({ role: "api" })
     .withModules([enterpriseOpsServer])
     .withStores(memoryStores())
+    .withMember("isSaas", true)
     .provide({ ops, licensing, "audit-log": auditLog })
     .boot();
   const app = runtime.service(EnterpriseOpsApi);
