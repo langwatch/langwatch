@@ -2,6 +2,16 @@ module github.com/langwatch/langwatch
 
 go 1.27.1
 
+// The root module spans the JS workspace; keep ./... and gopls out of it.
+ignore (
+	node_modules
+	dist
+	./apps
+	./enterprise
+	./modules
+	./packages
+)
+
 require (
 	github.com/0xdeafcafe/moron v1.0.1-0.20260714030656-2b32ef25bff8
 	github.com/andybalholm/brotli v1.2.1
