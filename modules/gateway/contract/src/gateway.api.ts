@@ -23,7 +23,9 @@ import type {
 } from "./gateway-guardrail.ts";
 import type { GatewayInternalSpendCommandRecord } from "./gateway-internal.schemas.ts";
 import type {
+  GatewayAuthorizedKeyCaller,
   GatewayKeyCaller,
+  GatewayKeyCallerReach,
   gatewayRequestCredentialSchema,
 } from "./gateway-platform.schemas.ts";
 import type {
@@ -80,20 +82,6 @@ import type {
 
 /** The REST credential a project door presented, as this module is told about it. */
 export type GatewayRequestCredential = z.infer<typeof gatewayRequestCredentialSchema>;
-
-/**
- * Where a key caller's permission is asked. `caller` is the key's own reach:
- * its project when it resolved one, else its organization. `organization` is
- * the whole organization, for a write to an organization-owned row.
- */
-export type GatewayKeyCallerReach = "caller" | "organization";
-
-/** A key caller the application authorized: its organization and who a write is recorded as. */
-export type GatewayAuthorizedKeyCaller = Readonly<{
-  organizationId: string;
-  actor: GatewayCaller;
-  actorUserId: string;
-}>;
 
 /** A minted or read virtual key, published in the public REST surface's snake_case shape. */
 export type GatewayVirtualKeySnakeDto = {

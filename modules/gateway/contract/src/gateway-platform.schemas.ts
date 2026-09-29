@@ -373,3 +373,23 @@ export const gatewayKeyCallerSchema = z.discriminatedUnion("kind", [
 ]);
 
 export type GatewayKeyCaller = z.infer<typeof gatewayKeyCallerSchema>;
+
+/**
+ * Where a key caller's permission is asked. `caller` is the key's own reach:
+ * its project when it resolved one, else its organization. `organization` is
+ * the whole organization, for a write to an organization-owned row.
+ */
+export const gatewayKeyCallerReachSchema = z.enum(["caller", "organization"]);
+
+export type GatewayKeyCallerReach = z.infer<typeof gatewayKeyCallerReachSchema>;
+
+/** A key caller the application authorized: its organization and who a write is recorded as. */
+export const gatewayAuthorizedKeyCallerSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    actor: z.unknown(),
+    actorUserId: z.string().min(1),
+  })
+  .readonly();
+
+export type GatewayAuthorizedKeyCaller = z.infer<typeof gatewayAuthorizedKeyCallerSchema>;
