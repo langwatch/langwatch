@@ -8,10 +8,17 @@ Feature: Managed model providers
 
   @unit
   Scenario: Build credentials through both roles
-    Given a project resolves to a configured organization
+    Given the caller names a configured organization
     When LiteLLM parameters are prepared
     Then the proxy role and customer role are assumed in order
     And API key input is replaced by temporary Bedrock credentials
+
+  # The caller names the organization, so this module needs no project peer (Alex, 2026-09-29).
+  @unit
+  Scenario: The caller's organization decides the managed deployment
+    Given a Bedrock call for an organization with no managed deployment
+    When LiteLLM parameters are prepared
+    Then the original parameters are returned unchanged and no role is assumed
 
   @unit
   Scenario: Ignore unrelated providers

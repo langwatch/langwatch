@@ -52,7 +52,7 @@ function fakeContext() {
 describe("formatError", () => {
   describe("when given a HandledError", () => {
     it("returns the clean format", () => {
-      const err = new NotFoundError("not_found", "Resource", "abc");
+      const err = new NotFoundError("not_found", { resource: "Resource", id: "abc" });
 
       const { status, body } = formatError({ err });
 
@@ -141,7 +141,7 @@ describe("formatError", () => {
      */
     /** @scenario "A REST refusal carries its fields at the root of the body" */
     it("never carries the legacy error field", () => {
-      const err = new NotFoundError("not_found", "Resource", "abc");
+      const err = new NotFoundError("not_found", { resource: "Resource", id: "abc" });
 
       const { body } = formatError({ err });
 
@@ -157,7 +157,7 @@ describe("formatError", () => {
     describe("given the back-compat `kind` alias", () => {
       /** @scenario "An external contract wins over cross-transport symmetry" */
       it("emits `kind` equal to `code`", () => {
-        const err = new NotFoundError("not_found", "Resource", "abc");
+        const err = new NotFoundError("not_found", { resource: "Resource", id: "abc" });
         const { body } = formatError({ err });
         expect(body.kind).toBe("not_found");
         expect(body.kind).toBe(body.code);
@@ -448,7 +448,7 @@ describe("createErrorHandler", () => {
   describe("when the error is handled", () => {
     it("publishes the error and the status it sent", () => {
       const handler = createErrorHandler();
-      const err = new NotFoundError("not_found", "Resource", "abc");
+      const err = new NotFoundError("not_found", { resource: "Resource", id: "abc" });
       const c = fakeContext();
 
       void handler(err as Error, c as never);

@@ -1,3 +1,4 @@
+import { anyAuthenticated } from "@langwatch/api/access";
 import {
   apiErrorSchema,
   canonicalBaseResponses,
@@ -36,6 +37,7 @@ import {
   gatewayEnableVirtualKeyBodySchema,
   gatewayRevokeVirtualKeyBodySchema,
   gatewayRetiredProviderBindingBodySchema,
+  gatewayKeyCallerSchema,
   gatewayRequestCredentialSchema,
   GatewayProviderBindingsGoneError,
   type GatewayCacheRuleResource,
@@ -73,6 +75,13 @@ export const gatewayRestCredential = defineRestMiddleware(
   "gatewayRestCredential",
   gatewayRequestCredentialSchema,
 );
+
+/** The key an organization-owned route was called with, as the key door resolved it. */
+export const gatewayKeyCaller = defineRestMiddleware("gatewayKeyCaller", gatewayKeyCallerSchema);
+
+/** The key door reads any API key; the application asks the permission at the reach needed. */
+const ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION =
+  "budgets and cache rules belong to the organization, so any API key is read here and the application asks the route's permission at the key's own reach for a read and at the organization for a write";
 
 /** With `reveal_once` the response withholds the secret and names the reveal instead. */
 function createdVirtualKeyWire(
@@ -135,6 +144,35 @@ const toBudgetDto = (
   ...args: Parameters<typeof budgetDtos.toBudgetDto>
 ): z.infer<typeof gatewayPlatformBudgetDtoSchema> =>
   budgetDtos.toBudgetDto(...args) as z.infer<typeof gatewayPlatformBudgetDtoSchema>;
+
+/**
+ * One budget with the spend the ledger holds for it now, the same figure the
+ * listing reports. A write answers with this rather than the row it wrote,
+ * whose stored spend column is not the live figure.
+ */
+async function liveBudgetAnswer({
+  app,
+  id,
+  organizationId,
+  includeReach = true,
+}: {
+  app: GatewayApi;
+  id: string;
+  organizationId: string;
+  /** Reset answers with the row it just moved, not a fresh reach read (main's shape). */
+  includeReach?: boolean;
+}): Promise<{ budget: z.infer<typeof gatewayPlatformBudgetDtoSchema>; spend_available: boolean }> {
+  const found = await app.getBudgetWithHealth({ id, organizationId });
+  const memberCounts = await app.groupMemberCounts([found.budget]);
+  return {
+    spend_available: found.spendAvailable,
+    budget: toBudgetDto({
+      budget: found.budget,
+      memberCount: memberCounts.get(found.budget.scopeId),
+      ...(includeReach ? { reachable: !found.unreachableByAnyKey } : {}),
+    }),
+  };
+}
 
 function scopeFromWire(
   scope: z.infer<typeof gatewayCreateBudgetSchema>["scope"],
@@ -494,8 +532,9 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   // ── Budgets ──────────────────────────────────────────────────────────────
 
   .get("/budgets", "getApiGatewayV1Budgets")
+  .withCredential("apiKey")
   .withQuery(gatewayBudgetListQuerySchema)
-  .withPermission("gatewayBudgets:view")
+  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(
     z.object({
       data: z.array(gatewayPlatformBudgetDtoSchema),
@@ -506,12 +545,17 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "List budgets",
     description:
-      "Returns the non-archived budgets in the caller's organization across all seven scope types, with live spent_usd from the spend ledger.",
+      "Returns the non-archived budgets in the caller's organization across all seven scope types, with live spent_usd from the spend ledger. Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at the organization for a key that names no project.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope }) => {
-    const organizationId = await app.organizationIdForProject(scope.id);
-    const { budgets, spendAvailable } = await app.listBudgetPageWithHealth({
+  .withMiddleware(gatewayKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { organizationId } = await app.authorizeKeyCaller({
+      caller,
+      permission: "gatewayBudgets:view",
+      reach: "caller",
+    });
+    const { budgets, spendAvailable, scopeReach } = await app.listBudgetPageWithHealth({
       organizationId,
       limit: input.limit,
       cursor: input.cursor === undefined ? null : decodeCreatedAtIdCursor(input.cursor),
@@ -522,7 +566,11 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return {
       spend_available: spendAvailable,
       data: budgets.map((b) =>
-        toBudgetDto({ budget: b, memberCount: memberCounts.get(b.scopeId) }),
+        toBudgetDto({
+          budget: b,
+          memberCount: memberCounts.get(b.scopeId),
+          reachable: scopeReach.get(b.id)?.reachable,
+        }),
       ),
       next_cursor: buildNextPageCursor(budgets, input.limit, (b) => [
         b.createdAt.epochMilliseconds,
@@ -532,43 +580,45 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .get("/budgets/:id", "getApiGatewayV1BudgetsById")
+  .withCredential("apiKey")
   .withParams(gatewayIdParamsSchema)
-  .withPermission("gatewayBudgets:view")
+  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema, spend_available: z.boolean() }))
-  .withDocs({ summary: "Get budget", responses: canonicalBaseResponses })
-  .handle(async ({ app, input, scope }) => {
-    const organizationId = await app.organizationIdForProject(scope.id);
-    const found = await app.getBudgetWithHealth({ id: input.id, organizationId });
-    const memberCounts = await app.groupMemberCounts([found.budget]);
-    return {
-      spend_available: found.spendAvailable,
-      budget: toBudgetDto({
-        budget: found.budget,
-        memberCount: memberCounts.get(found.budget.scopeId),
-        reachable: !found.unreachableByAnyKey,
-      }),
-    };
+  .withDocs({
+    summary: "Get budget",
+    description:
+      "Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at the organization for a key that names no project.",
+    responses: canonicalBaseResponses,
+  })
+  .withMiddleware(gatewayKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { organizationId } = await app.authorizeKeyCaller({
+      caller,
+      permission: "gatewayBudgets:view",
+      reach: "caller",
+    });
+    return liveBudgetAnswer({ app, id: input.id, organizationId });
   })
 
   .post("/budgets", "postApiGatewayV1Budgets")
+  .withCredential("apiKey")
   .withInput(gatewayCreateBudgetSchema)
-  .withPermission("gatewayBudgets:create")
+  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withStatus(201)
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withIdempotency({ operation: "gateway.v1.budgets.create" })
   .withDocs({
     summary: "Create budget",
-    description: "Creates an organization-owned budget across all seven scope types.",
+    description:
+      "Creates an organization-owned budget across all seven scope types. Spend is counted from the moment the budget is created, so spend earlier in the current window is not included. Requires gatewayBudgets:create at the organization; a project key or an organization key may call it.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
-    await app.authorizeOrganizationWideOperation({
-      actor,
-      organizationId,
+  .withMiddleware(gatewayKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { organizationId, actorUserId } = await app.authorizeKeyCaller({
+      caller,
       permission: "gatewayBudgets:create",
+      reach: "organization",
     });
     const row = await app.createBudget({
       organizationId,
@@ -600,23 +650,23 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .patch("/budgets/:id", "patchApiGatewayV1BudgetsById")
+  .withCredential("apiKey")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayUpdateBudgetSchema)
-  .withPermission("gatewayBudgets:update")
+  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withDocs({
     summary: "Update budget",
-    description: "Partial update. Scope, window and cycle_anchor_at are immutable after create.",
+    description:
+      "Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the organization.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
-    await app.authorizeOrganizationWideOperation({
-      actor,
-      organizationId,
+  .withMiddleware(gatewayKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { organizationId, actorUserId } = await app.authorizeKeyCaller({
+      caller,
       permission: "gatewayBudgets:update",
+      reach: "organization",
     });
     const row = await app.updateBudget({
       id: input.id,
@@ -630,52 +680,51 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       metadata: input.metadata,
       actorUserId,
     });
-    const memberCounts = await app.groupMemberCounts([row]);
-    return { budget: toBudgetDto({ budget: row, memberCount: memberCounts.get(row.scopeId) }) };
+    const { budget } = await liveBudgetAnswer({ app, id: row.id, organizationId });
+    return { budget };
   })
 
   .delete("/budgets/:id", "deleteApiGatewayV1BudgetsById")
+  .withCredential("apiKey")
   .withParams(gatewayIdParamsSchema)
-  .withPermission("gatewayBudgets:delete")
+  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withDocs({
     summary: "Archive budget",
     description:
-      "Soft-delete: the row is marked archived and no longer counted by the budget engine.",
+      "Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires gatewayBudgets:delete at the organization.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
-    await app.authorizeOrganizationWideOperation({
-      actor,
-      organizationId,
+  .withMiddleware(gatewayKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { organizationId, actorUserId } = await app.authorizeKeyCaller({
+      caller,
       permission: "gatewayBudgets:delete",
+      reach: "organization",
     });
     const row = await app.archiveBudget({ id: input.id, organizationId, actorUserId });
     return { budget: toBudgetDto({ budget: row }) };
   })
 
   .post("/budgets/:id/reset", "postApiGatewayV1BudgetsByIdReset")
+  .withCredential("apiKey")
   .withParams(gatewayIdParamsSchema)
   .withQuery(gatewayResetBudgetQuerySchema)
   .withInput(gatewayResetBudgetSchema)
-  .withPermission("gatewayBudgets:update")
+  .withAccess(anyAuthenticated({ reason: ORGANIZATION_ROWS_ARE_AUTHORIZED_BY_THE_APPLICATION }))
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withDocs({
     summary: "Reset budget period",
-    description: "Moves the budget's period boundary to now; recorded spend is never mutated.",
+    description:
+      "Moves the budget's period boundary to now; recorded spend is never mutated. Requires gatewayBudgets:update at the organization.",
     responses: canonicalBaseResponses,
   })
-  .withMiddleware(gatewayRestCredential)
-  .handle(async ({ app, input, scope }, credential) => {
-    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
-    const organizationId = await app.organizationIdForProject(scope.id);
-    await app.authorizeOrganizationWideOperation({
-      actor,
-      organizationId,
+  .withMiddleware(gatewayKeyCaller)
+  .handle(async ({ app, input }, caller) => {
+    const { organizationId, actorUserId } = await app.authorizeKeyCaller({
+      caller,
       permission: "gatewayBudgets:update",
+      reach: "organization",
     });
     const row = await app.resetBudget({
       id: input.id,
@@ -684,8 +733,13 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       endUserId: input.end_user_id ?? null,
       reason: input.reason ?? null,
     });
-    const memberCounts = await app.groupMemberCounts([row]);
-    return { budget: toBudgetDto({ budget: row, memberCount: memberCounts.get(row.scopeId) }) };
+    const { budget } = await liveBudgetAnswer({
+      app,
+      id: row.id,
+      organizationId,
+      includeReach: false,
+    });
+    return { budget };
   })
 
   // ── Cache rules ──────────────────────────────────────────────────────────

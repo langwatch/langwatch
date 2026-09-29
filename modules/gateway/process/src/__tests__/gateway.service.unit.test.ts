@@ -63,6 +63,9 @@ class FakeBudgetRepository extends GatewayBudgetRepository {
   findScopeReachCandidates(): never {
     throw new Error("not used");
   }
+  assertScopeWithinOrganization(): never {
+    throw new Error("not used");
+  }
   create(): never {
     throw new Error("not used");
   }

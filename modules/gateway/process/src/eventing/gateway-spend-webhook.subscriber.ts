@@ -30,7 +30,7 @@ function webhookSpendEvent(event: GatewaySpendProcessingEvent): WebhookSpendEven
  * idempotency key, so a redelivery here is dropped by webhook's pipeline.
  */
 export function gatewaySpendWebhookSubscriber(
-  webhooks: Pick<WebhookApi, "requestSpendDelivery">,
+  webhooks: Pick<WebhookApi, "requestGatewayEventDelivery">,
 ): SubscriberSpec<GatewaySpendProcessingEvent> & { fold?: never; map?: never } {
   return {
     events: [
@@ -40,7 +40,7 @@ export function gatewaySpendWebhookSubscriber(
       GATEWAY_SPEND_SETTLED_EVENT_TYPE,
     ],
     handler: (event) =>
-      webhooks.requestSpendDelivery({
+      webhooks.requestGatewayEventDelivery({
         sourceEventId: event.idempotencyKey ?? event.id,
         spend: webhookSpendEvent(event),
       }),

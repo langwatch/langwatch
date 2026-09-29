@@ -16,7 +16,11 @@ import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis"
 import { describe, expect, it, vi } from "vitest";
 
 import { GatewayApp } from "../../app/gateway.app.ts";
-import { gatewayPlatformRest, gatewayRestCredential } from "../gateway-platform.rest.ts";
+import {
+  gatewayKeyCaller,
+  gatewayPlatformRest,
+  gatewayRestCredential,
+} from "../gateway-platform.rest.ts";
 
 const ORG_A = "organization_a";
 const ORG_B = "organization_b";
@@ -205,13 +209,17 @@ async function mountAsLegacyProjectKey() {
   const createBudget = vi.spyOn(app, "createBudget");
   const createCacheRule = vi.spyOn(app, "createCacheRule");
 
+  const door = () => ({
+    actor: { type: "api_key" as const, id: "legacy-project-key" },
+    scope: { tier: "project" as const, id: PROJECT_A },
+  });
+  const keyDoor = () => ({
+    actor: { type: "api_key" as const, id: "legacy-project-key" },
+    scope: { tier: "organization" as const, id: ORG_A },
+  });
   const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => ({
-        actor: { type: "api_key", id: "legacy-project-key" },
-        scope: { tier: "project", id: PROJECT_A },
-      }),
-    },
+    identity: { authenticate: door, identify: door },
+    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: async ({ handler }) => {
       const response = await handler();
       return { isReplayed: false, status: response.status, response };
@@ -220,7 +228,13 @@ async function mountAsLegacyProjectKey() {
   const hono = runtime.mount(gatewayPlatformRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(gatewayRestCredential, () => legacyProjectKey)],
+    facts: [
+      bindRestMiddleware(gatewayRestCredential, () => legacyProjectKey),
+      bindRestMiddleware(gatewayKeyCaller, () => ({
+        kind: "project" as const,
+        projectId: PROJECT_A,
+      })),
+    ],
   });
 
   const send = async (method: string, path: string, body?: object) => {

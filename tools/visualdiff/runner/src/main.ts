@@ -59,7 +59,14 @@ const captureSide = async ({
   const [first] = pages;
   if (first === undefined) return;
   const flows = orderFlows(plan.flows);
-  await captureRoutes({ plan, pages, collect, alongside: flows.readers });
+  const side = first.name;
+  const timings = await captureRoutes({ plan, pages, collect, alongside: flows.readers });
+  emit({ message: { type: "phase", side, name: "capture", millis: timings.captureMillis }, out });
+  emit({
+    message: { type: "phase", side, name: "recapture", millis: timings.recaptureMillis },
+    out,
+  });
+  const flowsStartedAt = Date.now();
   await runPool({
     items: flows.writers,
     width: pages.length,
@@ -69,6 +76,10 @@ const captureSide = async ({
   for (const flow of flows.last) {
     await captureFlow({ plan, flow, side: first, collect });
   }
+  emit({
+    message: { type: "phase", side, name: "flows", millis: Date.now() - flowsStartedAt },
+    out,
+  });
 };
 
 const main = async (): Promise<void> => {

@@ -36,6 +36,9 @@ import type {
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
   TraceDateField,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
 } from "@langwatch/trace-contract";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
@@ -487,6 +490,112 @@ function buildPageSharedParams({
     // Only present when the SQL references it.
     ...(scrollStart !== undefined ? { scrollStart } : {}),
   };
+}
+
+/** What a failed list read logs: the project, and the error's message and stack. */
+function listFailureLogFields({ projectId, error }: { projectId: string; error: unknown }) {
+  return {
+    projectId,
+    error: error instanceof Error ? error.message : error,
+    stack: error instanceof Error ? error.stack : undefined,
+  };
+}
+
+/** The list page's last trace as the cursor seeks it: its time on the paged axis, and its id. */
+function traceSortKey({ trace, dateField }: { trace: Trace; dateField: TraceDateField }): {
+  timestamp: number;
+  traceId: string;
+} {
+  const timestamp =
+    dateField === "updated" ? trace.timestamps.updated_at : trace.timestamps.started_at;
+  return { timestamp, traceId: trace.trace_id };
+}
+
+/** The page's id and count statements over `trace_summaries`, shared by both list reads. */
+function buildPageStatements({
+  projectId,
+  startDate,
+  endDate,
+  filterParams,
+  traceIds,
+  effectiveQuery,
+  scrollStart,
+  cursor,
+  sortDirection,
+  dateField,
+  extraFilters,
+  searchFilter,
+  traceIdFilter,
+}: {
+  projectId: string;
+  startDate: number | undefined;
+  endDate: number | undefined;
+  filterParams: Record<string, unknown> | undefined;
+  traceIds: string[] | undefined;
+  effectiveQuery: string | undefined;
+  scrollStart: number | undefined;
+  cursor: ClickHouseScrollCursor | null;
+  sortDirection: "asc" | "desc";
+  dateField: TraceDateField;
+  extraFilters: string;
+  searchFilter: string;
+  traceIdFilter: string;
+}) {
+  // occurred (default): windows + seeks on the immutable OccurredAt (prunes partitions).
+  // updated (CDC): restricts ts to each trace's latest version (global max UpdatedAt) first,
+  // then applies window/filters/cursor to that row, so a stale version can never satisfy a
+  // filter the latest version doesn't, and adjacent CDC windows stay mutually exclusive.
+  const isUpdatedAxis = dateField === "updated";
+  const dateColumn: "UpdatedAt" | "OccurredAt" = isUpdatedAxis ? "UpdatedAt" : "OccurredAt";
+  const cmp = sortDirection === "desc" ? "<" : ">";
+  const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
+
+  const occurredWindow =
+    " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
+  const updatedWindow =
+    " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
+  // Collapses ts to each trace's latest version so the updated-axis window/filters/cursor
+  // evaluate on the latest row, bounded by scrollStart when a scroll is in play — otherwise
+  // a trace bumped past the cursor mid-scroll would silently drop out of every remaining
+  // page. Capped inside the dedup, not on the outer rows, since version resolution itself
+  // must stay stable for the scroll's duration.
+  const latestVersionOnly = buildLatestVersionOnly(scrollStart);
+
+  const { occurredCursor, updatedCursor } = buildCursorSeeks({ cursor, cmp });
+
+  const sharedParams = buildPageSharedParams({
+    projectId,
+    startDate,
+    endDate,
+    filterParams,
+    traceIds,
+    effectiveQuery,
+    scrollStart,
+  });
+
+  const cursorParams = {
+    lastTimestamp: cursor?.lastTimestamp ?? 0,
+    lastTraceId: cursor?.lastTraceId ?? "",
+  };
+
+  // Step 1: Find page trace IDs + count in parallel.
+  // The ID query is lightweight (no heavy columns). occurred counts with
+  // HyperLogLog (~2% error, fine for display); updated counts traces whose
+  // global max(UpdatedAt) falls in the window (exact, via the aggregate).
+  const { countQuery, idQuery } = buildPageQueries({
+    isUpdatedAxis,
+    extraFilters,
+    latestVersionOnly,
+    occurredCursor,
+    occurredWindow,
+    orderDirection,
+    searchFilter,
+    traceIdFilter,
+    updatedCursor,
+    updatedWindow,
+  });
+
+  return { countQuery, idQuery, sharedParams, cursorParams, dateColumn, orderDirection };
 }
 
 function buildPageQueries({
@@ -1152,26 +1261,25 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   private buildNextScrollId({
-    lastTrace,
+    last,
     traceCount,
     pageSize,
     sortDirection,
     dateField,
     scrollStart,
   }: {
-    lastTrace: Trace | null;
+    /** The page's last row: its sort timestamp on the paged axis and its trace id. */
+    last: { timestamp: number; traceId: string } | null;
     traceCount: number;
     pageSize: number;
     sortDirection: "asc" | "desc";
     dateField: TraceDateField;
     scrollStart: number | undefined;
   }): string | undefined {
-    if (!lastTrace || traceCount !== pageSize) return undefined;
-    const lastSortTimestamp =
-      dateField === "updated" ? lastTrace.timestamps.updated_at : lastTrace.timestamps.started_at;
+    if (!last || traceCount !== pageSize) return undefined;
     const newCursor: ClickHouseScrollCursor = {
-      lastTimestamp: lastSortTimestamp,
-      lastTraceId: lastTrace.trace_id,
+      lastTimestamp: last.timestamp,
+      lastTraceId: last.traceId,
       pageSize,
       sortDirection,
       dateField,
@@ -1183,8 +1291,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
     this.logger.debug(
       {
-        lastTraceTimestamp: lastTrace.timestamps.started_at,
-        lastTraceId: lastTrace.trace_id,
+        lastTraceTimestamp: last.timestamp,
+        lastTraceId: last.traceId,
         tracesCount: traceCount,
         pageSize,
         newScrollId,
@@ -1378,7 +1486,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // the latest-version UpdatedAt — and records the axis so the next
           // page rejects a cursor from a different axis.
           const newScrollId = this.buildNextScrollId({
-            lastTrace,
+            last: lastTrace === null ? null : traceSortKey({ trace: lastTrace, dateField }),
             traceCount: traces.length,
             pageSize,
             sortDirection,
@@ -1437,15 +1545,114 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           };
         } catch (error) {
           this.logger.warn(
-            {
-              projectId: input.projectId,
-              error: error instanceof Error ? error.message : error,
-              stack: error instanceof Error ? error.stack : undefined,
-            },
+            listFailureLogFields({ projectId: input.projectId, error }),
             "Failed to fetch all traces from ClickHouse",
           );
           throw error;
         }
+      },
+    );
+  }
+
+  /**
+   * The list read's keyset page as bare summaries, for a system reader: the id statement and
+   * the summary rows with content pruned, oldest first; no count, evaluations or protections.
+   */
+  async findTraceSummaries(
+    input: TraceSummaryListQuery,
+    options: TraceSummaryListOptions = {},
+  ): Promise<TraceSummaryPage> {
+    return this.tracer.withActiveSpan(
+      "TraceLegacyReadClickHouseRepository.findTraceSummaries",
+      { attributes: { "tenant.id": input.projectId } },
+      async () => {
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        const pageSize = input.pageSize ?? 25;
+        const sortDirection = "asc";
+        const dateField: TraceDateField = options.dateField ?? "occurred";
+        const cursor = this.decodeScrollCursor({
+          scrollId: options.scrollId,
+          sortDirection,
+          pageSize,
+          dateField,
+        });
+        const { filterConditions, filterParams } = mergeFilterWhere({
+          conditions: [],
+          params: {},
+          filterWhere: options.filterWhere,
+        });
+        const { scrollStart, effectiveEndDate } = resolveScrollWindow({
+          dateField,
+          cursor,
+          endDate: input.endDate,
+        });
+        const { extraFilters, traceIdFilter } = buildPageFilterClauses({
+          filterConditions,
+          traceIds: undefined,
+        });
+        const { idQuery, sharedParams, cursorParams, dateColumn, orderDirection } =
+          buildPageStatements({
+            projectId: input.projectId,
+            startDate: input.startDate,
+            endDate: effectiveEndDate,
+            filterParams,
+            traceIds: undefined,
+            effectiveQuery: undefined,
+            scrollStart,
+            cursor,
+            sortDirection,
+            dateField,
+            extraFilters,
+            searchFilter: "",
+            traceIdFilter,
+          });
+        const idRows = traceIdRowsSchema.parse(
+          await (
+            await clickHouseClient.query({
+              query: idQuery,
+              query_params: { ...sharedParams, ...cursorParams, pageSize },
+              format: "JSONEachRow",
+            })
+          ).json(),
+        );
+        const traceIds = idRows.map((row) => row.TraceId);
+        const rows =
+          traceIds.length === 0
+            ? []
+            : await this.fetchTraceSummaryRows({
+                clickHouseClient,
+                projectId: input.projectId,
+                startDate: input.startDate,
+                endDate: effectiveEndDate ?? nowInstant().epochMilliseconds,
+                traceIds,
+                orderDirection,
+                fetchInput: false,
+                fetchOutput: false,
+                dateColumn,
+                scrollStart,
+              });
+        const summaries = rows.map((row) => this.rowToTraceSummaryData(row));
+        const last = summaries.at(-1);
+        const scrollId = this.buildNextScrollId({
+          last: last
+            ? {
+                timestamp: dateField === "updated" ? last.updatedAt : last.occurredAt,
+                traceId: last.traceId,
+              }
+            : null,
+          traceCount: summaries.length,
+          pageSize,
+          sortDirection,
+          dateField,
+          scrollStart,
+        });
+        return {
+          summaries,
+          ...(scrollId ? { scrollId } : {}),
+          ...(effectiveEndDate !== undefined && scrollStart !== undefined
+            ? { updatedThrough: effectiveEndDate }
+            : {}),
+        };
       },
     );
   }
@@ -1987,61 +2194,22 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         }
 
         const searchFilter = buildSearchFilter({ effectiveQuery, protections });
-
-        // occurred (default): windows + seeks on the immutable OccurredAt (prunes partitions).
-        // updated (CDC): restricts ts to each trace's latest version (global max UpdatedAt) first,
-        // then applies window/filters/cursor to that row, so a stale version can never satisfy a
-        // filter the latest version doesn't, and adjacent CDC windows stay mutually exclusive.
-        const isUpdatedAxis = dateField === "updated";
-        const dateColumn = isUpdatedAxis ? "UpdatedAt" : "OccurredAt";
-        const cmp = sortDirection === "desc" ? "<" : ">";
-        const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
-
-        const occurredWindow =
-          " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
-        const updatedWindow =
-          " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
-        // Collapses ts to each trace's latest version so the updated-axis window/filters/cursor
-        // evaluate on the latest row, bounded by scrollStart when a scroll is in play — otherwise
-        // a trace bumped past the cursor mid-scroll would silently drop out of every remaining
-        // page. Capped inside the dedup, not on the outer rows, since version resolution itself
-        // must stay stable for the scroll's duration.
-        const latestVersionOnly = buildLatestVersionOnly(scrollStart);
-
-        const { occurredCursor, updatedCursor } = buildCursorSeeks({ cursor, cmp });
-
-        const sharedParams = buildPageSharedParams({
-          projectId,
-          startDate,
-          endDate,
-          filterParams,
-          traceIds,
-          effectiveQuery,
-          scrollStart,
-        });
-
-        const cursorParams = {
-          lastTimestamp: cursor?.lastTimestamp ?? 0,
-          lastTraceId: cursor?.lastTraceId ?? "",
-        };
-
-        // Step 1: Find page trace IDs + count in parallel.
-        // The ID query is lightweight (no heavy columns). occurred counts with
-        // HyperLogLog (~2% error, fine for display); updated counts traces whose
-        // global max(UpdatedAt) falls in the window (exact, via the aggregate).
-        const { countQuery, idQuery } = buildPageQueries({
-          isUpdatedAxis,
-          extraFilters,
-          latestVersionOnly,
-          occurredCursor,
-          occurredWindow,
-          orderDirection,
-          searchFilter,
-          traceIdFilter,
-          updatedCursor,
-          updatedWindow,
-        });
-
+        const { countQuery, idQuery, sharedParams, cursorParams, dateColumn, orderDirection } =
+          buildPageStatements({
+            projectId,
+            startDate,
+            endDate,
+            filterParams,
+            traceIds,
+            effectiveQuery,
+            scrollStart,
+            cursor,
+            sortDirection,
+            dateField,
+            extraFilters,
+            searchFilter,
+            traceIdFilter,
+          });
         const [countResult, idsResult] = await Promise.all([
           clickHouseClient.query({
             query: countQuery,

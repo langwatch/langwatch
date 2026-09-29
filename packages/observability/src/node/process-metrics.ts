@@ -31,8 +31,9 @@ export function processMetrics(serviceName: string) {
     const settings = config.observability;
 
     if (settings.metrics.mode === "prometheus") {
+      const production = config.process?.nodeEnvironment === "production";
       return secrets.into(metricsScrapeTokenSecret, (token) =>
-        scrapeDoor({ serviceName, settings, token }),
+        scrapeDoor({ serviceName, settings, token, production }),
       );
     }
 
@@ -69,12 +70,16 @@ function scrapeDoor({
   serviceName,
   settings,
   token,
+  production,
 }: {
   serviceName: string;
   settings: TelemetrySettings;
   token: string | undefined;
+  production: boolean;
 }): readonly MetricsContribution[] {
   if (!settings.metrics.enabled) return [inert()];
+  // An unset token in production is a misconfiguration, not an invitation.
+  if (token === undefined && production) return [inert()];
 
   const reader = new PrometheusPullReader();
   const meterProvider = meterProviderOver({ reader, serviceName, settings });

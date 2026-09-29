@@ -1,4 +1,4 @@
-import type { WebhookApi, WebhookSpendDeliveryRequest } from "@langwatch/webhook-contract";
+import type { WebhookApi, WebhookGatewayEventDeliveryRequest } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import { GATEWAY_SPEND_EVENT_VERSION_LATEST } from "../gateway-spend-commands.process.ts";
@@ -28,9 +28,9 @@ const settled = gatewaySpendSettledEventSchema.parse({
 describe("gateway spend's webhook subscriber redelivery", () => {
   it("names one delivery when the same spend event is handled twice", async () => {
     // webhook_delivery collapses on sourceEventId, its command's idempotency key.
-    const pending = new Map<string, WebhookSpendDeliveryRequest>();
-    const webhooks: Pick<WebhookApi, "requestSpendDelivery"> = {
-      requestSpendDelivery: async (input) => {
+    const pending = new Map<string, WebhookGatewayEventDeliveryRequest>();
+    const webhooks: Pick<WebhookApi, "requestGatewayEventDelivery"> = {
+      requestGatewayEventDelivery: async (input) => {
         pending.set(input.sourceEventId, input);
       },
     };

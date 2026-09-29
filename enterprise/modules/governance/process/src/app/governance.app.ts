@@ -172,6 +172,7 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
+import { HttpAnomalyAlertChannel } from "../channels/http/http.anomaly-alert.channel.ts";
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
 import { HttpCopilotStudioDataverseChannel } from "../channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.channel.ts";
@@ -202,6 +203,7 @@ import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catal
 import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-catalog.service.ts";
 import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.service.ts";
 import { GovernanceAiToolSlugService } from "../services/ai-tool-slug.service.ts";
+import { AnomalyAlertDispatcherService } from "../services/anomaly-alert-dispatcher.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { AnthropicAdminPullerService } from "../services/anthropic-admin-puller.service.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
@@ -237,6 +239,7 @@ import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.serv
 import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
 import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
+import { GovernanceTraceFactsService } from "../services/governance-trace-facts.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
@@ -273,6 +276,10 @@ import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.serv
 import { ProjectQuarantineTenantResolverService } from "../services/quarantine-tenant.service.ts";
 import { S3PollingPullerService } from "../services/s3-puller.service.ts";
 import { SourceCredentialAccessService } from "../services/source-credential-access.service.ts";
+import {
+  SpendSpikeAnomalyEvaluatorService,
+  type SpendSpikeEvaluationSummary,
+} from "../services/spend-spike-anomaly-evaluator.service.ts";
 import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
 import type {
   GovernanceEncryptor,
@@ -324,6 +331,8 @@ export interface GovernanceAppDependencies {
     | "findModelSpend"
     | "hasTraceWithAttribute"
     | "findTraceCountsByAttribute"
+    | "compileLangWatchQLTraceFilter"
+    | "listTraceSummaries"
   >;
   apiKeys: Pick<
     ApiKeyApi,
@@ -675,6 +684,25 @@ export class GovernanceApp implements GovernanceRestApi {
       tenant: ProjectQuarantineTenantResolverService.create(dependencies.projects),
       traces: dependencies.traces,
     });
+    const anomalyDiagnostics = {
+      warn: (message: string, context: Record<string, unknown>) => logger.warn(context, message),
+    };
+    this.traceFacts = GovernanceTraceFactsService.create({
+      kpis: repositories.anomalySpend,
+      ocsf: repositories.ocsfEvents,
+      traces: dependencies.traces,
+      projects: dependencies.projects,
+      diagnostics: anomalyDiagnostics,
+    });
+    this.spendSpikes = SpendSpikeAnomalyEvaluatorService.create({
+      repository: repositories.spendSpikeAnomalies,
+      spend: repositories.anomalySpend,
+      dispatcher: AnomalyAlertDispatcherService.create({
+        http: HttpAnomalyAlertChannel.create(),
+        diagnostics: anomalyDiagnostics,
+      }),
+      diagnostics: anomalyDiagnostics,
+    });
     this.pullLifecycle = IngestionPullLifecycleService.create({
       repository: repositories.ingestionPullLifecycle,
       projects: dependencies.projects,
@@ -851,6 +879,8 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly ottl: GovernanceOttlGateway;
   private readonly ocsfExport: DefaultGovernanceOcsfExportService;
   private readonly quarantineFill: QuarantineFillEvaluatorService;
+  private readonly spendSpikes: SpendSpikeAnomalyEvaluatorService;
+  private readonly traceFacts: GovernanceTraceFactsService;
   private readonly erasureSuppression: ErasureSuppressionService;
   private readonly suppressionSnapshot: SuppressionSnapshotService;
   private readonly identityMatches: IdentityMatchService;
@@ -911,6 +941,16 @@ export class GovernanceApp implements GovernanceRestApi {
 
   connectIngestionPull(commands: EventingSenders): void {
     this.ingestionPullCommands = commands;
+  }
+
+  /** Main's `governanceKpisSync` + `governanceOcsfEventsSync`, pulled: the window's governance traces. */
+  pullGovernanceTraceFacts(window: { fromMs: number; toMs: number }): Promise<{ written: number }> {
+    return this.traceFacts.pull(window);
+  }
+
+  /** Main's `spendSpikeAnomalyWorker` tick: every active spend_spike rule against `governance_kpis`. */
+  evaluateSpendSpikes(): Promise<SpendSpikeEvaluationSummary> {
+    return this.spendSpikes.evaluateAll();
   }
 
   /** Main's boot reconciliation (`pipelineSet.ts:132-150`): every source's schedule sent to its pull process. */

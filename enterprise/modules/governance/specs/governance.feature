@@ -33,13 +33,6 @@ Feature: Enterprise governance package boundary
     Then the projected cursor remains at the newer completion
 
   @unit
-  Scenario: Governance signals remain idempotent at the event store
-    Given a virtual-key lifecycle event or a budget crossing is recorded
-    When the same governed fact is submitted again
-    Then the lifecycle identity is scoped to its subject and occurrence
-    And the budget identity is scoped to its bucket, kind, and period
-
-  @unit
   Scenario: Pulled usage keeps money lossless
     Given a provider-reported decimal USD value
     When governance prices the observation
@@ -185,3 +178,59 @@ Feature: Enterprise governance package boundary
     When it mints a personal ingestion key for copilot_app
     Then the key is minted with the device label "unknown-device", as its login key carries
     And its name reads "Ingestion key (copilot_app, unknown-device)"
+
+  Rule: Governance-origin trace activity feeds the KPI rows and the OCSF export, as on main
+
+    @unit
+    Scenario: A governance trace's spend lands in governance_kpis
+      Given a trace in the hidden governance project carrying `langwatch.origin.kind = "ingestion_source"`
+      When governance reads the trace's summary
+      Then one governance_kpis row keyed by tenant, source, hour and trace carries its running spend and tokens
+      And a trace that is not governance-origin, names no source or has no moment writes nothing
+
+    @unit
+    Scenario: A governance trace derives one OCSF row
+      Given a governance-origin trace
+      When governance reads the trace's summary
+      Then one governance_ocsf_events row keyed by the trace id is written
+      And its severity is medium when the trace carries an anomaly alert id, informational otherwise
+
+    @unit
+    Scenario: A governance trace whose row write fails is written again without duplicate rows
+      Given a governance-origin trace whose KPI row write fails
+      When governance records the trace's facts
+      Then the recording fails rather than dropping the trace, as main's swallowed write did
+      And recording the trace again leaves one KPI row and one OCSF row
+
+    @unit
+    Scenario: A governance trace summary read that fails is re-driven without duplicate rows
+      Given governance pulls governance-origin trace summaries on a schedule
+      When the trace read fails
+      Then the pass fails and the same traces are read again by a later pass
+      And each trace still leaves one KPI row and one OCSF row
+
+    @unit
+    Scenario: Governance pulls each minute's updated traces with an overlap behind the last pass
+      Given the worker hosts the governance activity monitor
+      When its one-minute schedule wakes
+      Then one pass reads governance-origin trace summaries updated since five minutes before the last wake
+      And the window ends at the wake's own schedule time, never at a read's result
+
+    @unit
+    Scenario: A spend spike fires once the spend has landed
+      Given an active spend_spike rule over an organization's governance tenant
+      When governance-origin spend above the rule's ratio lands in governance_kpis
+      Then the next evaluation fires one anomaly alert
+
+    @unit
+    Scenario: Spend spike rules are evaluated every five minutes
+      Given the worker hosts the governance activity monitor
+      When its five-minute schedule wakes
+      Then one pass evaluates every active spend_spike rule
+
+    @unit
+    Scenario: A failed spend spike pass is evaluated again at the next wake
+      Given a spend spike pass whose evaluation fails
+      When the pass runs
+      Then the pass fails rather than reporting success
+      And the next wake evaluates every rule again

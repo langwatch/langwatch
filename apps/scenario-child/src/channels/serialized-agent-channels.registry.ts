@@ -40,6 +40,12 @@ export type AgentAdapterBuildInput = {
  */
 export type VoiceAgentBuilder = (data: VoiceAgentData) => AgentAdapter;
 
+/** Ends a voice target's live call through its transport, so the drained transcript is judged. */
+export type VoiceCallEnder = (input: {
+  data: VoiceAgentData;
+  adapter: AgentAdapter;
+}) => Promise<void>;
+
 /**
  * Creates an adapter from serialized data using the registry. @throws Error if adapter type is not
  * registered, or if the resolved factory is missing the credential it needs (modelParams for

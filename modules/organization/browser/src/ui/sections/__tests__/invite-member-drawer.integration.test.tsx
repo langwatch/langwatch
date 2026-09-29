@@ -5,6 +5,7 @@
  * @see specs/settings/add-member-drawer.feature
  */
 import "@testing-library/jest-dom/vitest";
+import { organizationApiCreateInvitesInputSchema } from "@langwatch/organization-contract";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -79,6 +80,10 @@ describe("the invite drawer", () => {
         organizationId: "org-1",
         invites: [expect.objectContaining({ email: "new@acme.com" })],
       });
+      // What the drawer sends is what the procedure accepts, a team with no custom role included.
+      expect(() =>
+        organizationApiCreateInvitesInputSchema.parse(calls.createInvites.mock.calls[0]?.[0]),
+      ).not.toThrow();
       await waitFor(() => expect(host.overlays).toContainEqual({ name: null }));
     });
   });

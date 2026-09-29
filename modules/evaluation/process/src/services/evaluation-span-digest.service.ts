@@ -3,6 +3,13 @@ import type { Span, Trace, TraceApi } from "@langwatch/trace-contract";
 import type { EvaluationSpanDigest } from "../app/evaluation.members.ts";
 
 /**
+ * A thread monitor judges what the agent did, so `formatted_traces` is the
+ * steps view: each turn with its tool calls and results.
+ * @see specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature
+ */
+const EVALUATION_THREAD_VIEW = "steps";
+
+/**
  * The budget a thread is rendered under for `formatted_traces`: well inside
  * the judge's default 128k-token limit even for JSON-dense tool results, so a
  * long thread is shortened turn by turn rather than skipped or cut blind.
@@ -33,6 +40,7 @@ export class EvaluationSpanDigestService implements EvaluationSpanDigest {
     return this.traces.renderThreadTranscript({
       threadKey,
       traces: traces.toSorted((a, b) => a.timestamps.started_at - b.timestamps.started_at),
+      view: EVALUATION_THREAD_VIEW,
       maxTokens: EVALUATION_THREAD_DIGEST_MAX_TOKENS,
     });
   }

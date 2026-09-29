@@ -6,7 +6,7 @@ import { RESERVED_ROUTING_HANDLES } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 function gatewayProviderFamilies(): string[] {
-  const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
+  const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
   const source = readFileSync(
     resolve(repositoryRoot, "services/aigateway/domain/provider.go"),
     "utf8",

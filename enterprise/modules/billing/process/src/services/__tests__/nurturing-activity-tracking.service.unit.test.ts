@@ -8,6 +8,7 @@ import { fire, resetCache } from "../../rules/nurturing-activity-tracking-servic
 import {
   registerNoNurturingSink,
   registerNurturingSink,
+  wiring,
   settle,
 } from "./support/nurturing-harness.ts";
 
@@ -31,7 +32,7 @@ describe("fire", () => {
       it("identifies them with the moment they were last active", async () => {
         const sink = registerNurturingSink();
 
-        fire({ userId: "user-1" });
+        fire({ ...wiring(), userId: "user-1" });
         await settle();
 
         const [call] = sink.sentTo("/identify") as [
@@ -49,9 +50,9 @@ describe("fire", () => {
       it("identifies them once, not once per refresh", async () => {
         const sink = registerNurturingSink();
 
-        fire({ userId: "user-1" });
-        fire({ userId: "user-1" });
-        fire({ userId: "user-1" });
+        fire({ ...wiring(), userId: "user-1" });
+        fire({ ...wiring(), userId: "user-1" });
+        fire({ ...wiring(), userId: "user-1" });
         await settle();
 
         expect(sink.sentTo("/identify")).toHaveLength(1);
@@ -65,7 +66,7 @@ describe("fire", () => {
       it("returns normally and reports the failure for observability", async () => {
         const sink = registerNurturingSink({ failing: true });
 
-        expect(() => fire({ userId: "user-1" })).not.toThrow();
+        expect(() => fire({ ...wiring(), userId: "user-1" })).not.toThrow();
         await settle();
 
         expect(sink.errorReporter.capture).toHaveBeenCalled();

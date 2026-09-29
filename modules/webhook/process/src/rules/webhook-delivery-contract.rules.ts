@@ -134,6 +134,8 @@ export interface WebhookDeliveryEndpointService {
 }
 
 export const WEBHOOK_DELIVERY_PROCESS_NAME = "webhookDelivery" as const;
+/** Main's governance delivery process: its instance, inbox and outbox rows keep this name. */
+export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
 
 /**
  * The Stripe-shaped retry ladder. `attempt` is the 1-based attempt that

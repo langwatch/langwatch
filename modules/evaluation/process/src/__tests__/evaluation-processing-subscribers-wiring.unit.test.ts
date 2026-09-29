@@ -11,7 +11,7 @@ import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.inten
 import {
   createEvaluationProcessingPipeline,
   type EvaluationAutomationReactions,
-} from "../services/evaluation-processing.service.ts";
+} from "../eventing/evaluation-processing-definition.pipeline.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 import type {

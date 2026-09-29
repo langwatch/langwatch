@@ -39,7 +39,8 @@ describe("given an agent defined in the application's own code", () => {
         let calls = 0;
 
         agents.push(
-          connectAgent({ name, environment: "development" }, async () => {
+          // The SDK stays offline when CI is set, so a CI run opts in explicitly.
+          connectAgent({ name, environment: "development", enabled: true }, async () => {
             calls += 1;
             return "LangWatch watches what your language models do.";
           }),

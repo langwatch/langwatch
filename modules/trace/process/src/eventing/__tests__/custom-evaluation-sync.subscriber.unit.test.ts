@@ -163,6 +163,32 @@ describe("extractEvaluationsFromSpan", () => {
     });
   });
 
+  describe("when the SDK writes null for every field the caller left out", () => {
+    it("keeps the evaluation", () => {
+      const span = makeOtlpSpan([
+        {
+          evaluation_id: "eval_1",
+          span_id: "bbbb000000000001",
+          name: "correctness",
+          type: "custom",
+          is_guardrail: null,
+          status: "processed",
+          passed: true,
+          score: 1,
+          label: "correct",
+          details: null,
+          error: null,
+          timestamps: null,
+        },
+      ]);
+
+      const result = extractEvaluationsFromSpan(span);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ name: "correctness", passed: true, score: 1 });
+    });
+  });
+
   describe("when span has no evaluation events", () => {
     it("returns empty array", () => {
       const span = makeOtlpSpan([]);

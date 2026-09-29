@@ -186,6 +186,49 @@ Feature: visualdiff catches regressions and reports its own coverage
       When the report is written
       Then findings.md names the finding and not the noise row
 
+  Rule: A flow proves its feature works, and a run says so in one file
+
+    @unit
+    Scenario: A flow's expect proves the feature did its job on both sides
+      Given a flow whose steps end in an expect (text, count, url, or an api field read with the signed-in session)
+      When the expect holds on the base and on the candidate
+      Then the flow's verdict is "works" and the expect is recorded as its proof
+
+    @unit
+    Scenario: An expect failing on the candidate alone is broken
+      Given a flow whose expect holds on the base and fails on the candidate
+      When the row is classified
+      Then it is a "broken" finding naming what the expect missed
+      And an expect failing on the base alone is "intended-restore"
+
+    @unit
+    Scenario: An expect that times out fails its step with what it missed
+      Given an expect that never holds
+      When it has polled for its timeout, with no fixed sleep
+      Then its step fails with "expect <description>: <why> after <timeout>ms"
+
+    @unit
+    Scenario: verdict.md names each finding's class, first failure, console errors and PNGs
+      Given a finished run
+      When it writes verdict.md
+      Then each flow has one line: works, broken, broken-both, layout-only or unproven
+      And a failing flow names its first failure: step, expect, side, and the console signature
+      And routes with a finding are listed, and the rest counted as rendered alike, never as working
+      And every finding carries its failed step or request, up to three console errors and its base, candidate and diff PNG paths
+
+    @unit
+    Scenario: signatures.md splits log signatures new on the candidate from those also on the base
+      Given the stacks' logs hold warn, error and fatal lines, JSON or plain
+      When a run finishes
+      Then signatures.md groups them by shape, ids and numbers masked, with counts and where each was first seen
+      And lists those new on the candidate before those also on the base
+
+    @unit
+    Scenario: -routes and -flows re-check only what they name
+      Given a run naming some routes or flows
+      When the configuration is narrowed
+      Then only the named routes and flows are captured, an unknown name is refused, and coverage still reads every route
+
   Rule: gc removes what dead runs left behind
 
     @unit
@@ -195,10 +238,18 @@ Feature: visualdiff catches regressions and reports its own coverage
       Then none of them is selected, and their stacks are not orphans
 
     @unit
-    Scenario: The newest dead run keeps its report
-      Given two dead runs
-      When gc selects what to remove
-      Then both lose their worktrees and stacks, and only the older loses its directory
+    Scenario: A run keeps its own directory and the previous run's, and deletes the rest
+      Given dead runs from three earlier starts, a kept run and a directory not named as a run time
+      When the gc pass a new run makes selects what to remove
+      Then every dead run loses its worktrees and stacks
+      And only the newest earlier run keeps its directory; older ones are deleted
+      And the kept run and the directory not named as a run time are left alone
+
+    @unit
+    Scenario: visualdiff gc removes only reports older than -older-than
+      Given dead runs started a month ago and yesterday, and a directory not named as a run time
+      When `visualdiff gc -older-than 168h` selects what to remove
+      Then only the month-old run loses its directory
 
     @unit
     Scenario: gc destroys orphan visualdiff stacks no run owns
@@ -237,7 +288,7 @@ Feature: visualdiff catches regressions and reports its own coverage
 
     @unit
     Scenario: A side captures its routes on several pages at once
-      Given visualdiff.yaml sets concurrency routes to 4
+      Given four pages per side: -pages, half the CPUs by default, or visualdiff.yaml's concurrency when the machine cannot be read
       When a side captures its routes
       Then four pages of one signed-in session each take the next route as they free up
       And a candidate whose shell does not render stops every page taking another route
@@ -287,7 +338,8 @@ Feature: visualdiff catches regressions and reports its own coverage
       Given a run on haven whose sides checked out into .visualdiff/worktrees/base and .visualdiff/worktrees/candidate
       When the next run starts
       Then it moves each worktree to its commit in place instead of adding a new one
-      And it skips the install and generated files when the commit's tree matches the last finished prepare
+      And it skips the install when the lockfile inputs match the last finished install, and the generated files and UI build when the code inputs match
+      And ensure-built runs every time, after removing a build lock a killed prepare left behind
       And a worktree another live or kept run holds is not shared; that run gets one of its own
       And teardown destroys both stacks in the background and removes no persistent worktree
       And gc never collects the persistent worktrees
@@ -298,7 +350,7 @@ Feature: visualdiff catches regressions and reports its own coverage
       When a route is added, the scheduling changes or a day passes
       Then the key is the same
       And a settle, fixture, viewport, capture source or UI serving change moves it
-      And a plan with a route or flow step the baseline never recorded renders the base live
+      And a plan with a route or flow step the baseline never recorded renders only those on the base
 
     @unit
     Scenario: The candidate captures while the base is still booting
@@ -307,6 +359,63 @@ Feature: visualdiff catches regressions and reports its own coverage
       Then the runner starts it at once and opens the base when its pending file arrives
       And the run adopts the base's address and fixtures once capture ends
       And a base that never comes up stops the runner with its reason
+
+  Rule: Main stays put, and a run starts only on a machine that can carry it
+
+    @unit
+    Scenario: The base is main pinned at a commit, and the pin moves only when main moved far or is asked to
+      Given no -base and a pin recorded in .visualdiff/baselines/main-pin.json
+      When a run starts
+      Then the base renders the pinned commit, and the run prints the pin and why it did or did not move
+      And the pin moves only when `git diff --shortstat pin..origin/main` counts 2000 changed lines or more
+      And it moves on -rebase-main, when there is no pin yet, and when the pinned commit is gone
+
+    @unit
+    Scenario: Main boots only for what its cached baseline lacks, and the baseline grows by it
+      Given a cached baseline at the pinned commit
+      When a run adds a route and changes a flow's steps
+      Then it prints "main: <edition> cached (N) / live (M, why)"
+      And main boots and renders only the new route and the changed flow, alone, before the diff
+      And they are added to the baseline, and the diff replays main from it
+      And a run with nothing new boots only the candidate
+
+    @unit
+    Scenario: A run refuses to start on battery, under load or beside another visualdiff stack
+      Given the machine is on battery, its 1-minute load average is above -max-load (20 by default), or another live or kept run's stack is up
+      When a run starts
+      Then it stops before creating its directory, naming every reason and -force
+      And with -force it runs, on no more pages per side than the CPUs the load leaves free
+
+    @unit
+    Scenario: Each phase's wall time is on the run log and in summary.txt
+      Given a run
+      When each phase ends: install, prepare, ui build, boot, seed, capture, recapture, flows, the main top-up and teardown
+      Then run.log carries "phase: <name> <duration>"
+      And summary.txt ends with every phase's wall time
+
+    @unit
+    Scenario: A flow or route whose last verdict was works is skipped while nothing it touches changed
+      Given a route with no finding or a flow judged works, recorded in .visualdiff/works.json at its candidate commit
+      And the module that touches it is read from the candidate's defineWebModule screen declarations
+      When a later run finds git diff since that commit empty over that module's browser, process and contract paths, the shell packages, apps/ui and the runner, and a flow's steps and expects unchanged
+      Then it is skipped as the done ledger skips a section, the dry run lists it, and verdict.md says "skipped (works at <sha>, unchanged)"
+      And a route no module declares, or a flow with no go step, is walked with the reason printed
+      And -include-done, -routes and -flows walk it anyway
+
+    @unit
+    Scenario: visualdiff flow re-runs one flow against a kept candidate stack in seconds
+      Given main's cached baseline and a candidate stack `visualdiff flow` booted and kept under .visualdiff/loop
+      When a fixer runs `visualdiff flow <id>` or `visualdiff route <path>` again after committing an edit
+      Then the kept stack is reused, its worktree follows the candidate's commit and re-prepares only what changed
+      And only that flow or route is captured and diffed against the baseline, topped up when the baseline lacks it
+      And its verdict line prints, and `visualdiff down` stops the stack and removes the loop's directory
+
+    @unimplemented
+    Scenario: Screens are diffed and classified in the Go tool on a bounded worker pool
+      Given captures arriving from the runner
+      When both sides of a screen exist
+      Then the pixel diff runs in a Go goroutine pool, not in the runner
+      And the runner only drives Playwright
 
   Rule: A finished run shows its screens on the branch's pull request
 
@@ -333,6 +442,15 @@ Feature: visualdiff catches regressions and reports its own coverage
       And each screen shows the candidate beside a readable base, or the candidate alone when the passkey offer covers the base
 
     @unit
+    Scenario: A run rewrites only its own flows' rows of the parity status in the PR body
+      Given a pull request body with a "### visualdiff flows" table between the parity-status markers
+      When a run publishes
+      Then each row whose flow the run covered gets its "last result" and "state" cells from the flow's verdict
+      And a covered flow with no row gets one appended, and the heading's count follows
+      And every other row, and everything outside the markers, is left byte for byte
+      And gh's own output never reaches the body
+
+    @unit
     Scenario: Each run edits the PR's one marked comment in place
       Given the branch's open pull request
       When a run publishes
@@ -356,3 +474,20 @@ Feature: visualdiff catches regressions and reports its own coverage
       When the row is classified
       Then it is "capture-failed", a finding naming the side and the first failed module
       And a live base holding one is not cached as a baseline
+
+  Rule: A signed-off section keeps its proof and is not captured again
+
+    @unit
+    Scenario: A section marked done keeps its proof and is skipped by later runs
+      Given a finished run whose route or flow is only noise, copy or intended-restore
+      When `visualdiff done -run RUNID -route PATH -note WHY` marks it
+      Then its screenshots, aria snapshots, console and request log and a meta.json with both commits land under .visualdiff/done/<edition>/<key>
+      And every later run skips it, says how many sections it skipped and which, and never counts it as a finding or uncovered
+      And -include-done captures it again, and `done -undo KEY` removes it
+
+    @unit
+    Scenario: A section with a failing class is refused unless forced
+      Given a finished run whose section has a failing class
+      When `visualdiff done` marks it without -force
+      Then it is refused naming the class, and no entry is written
+      And with -force and a note it is marked done and recorded as forced

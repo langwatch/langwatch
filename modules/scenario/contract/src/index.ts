@@ -78,6 +78,7 @@ export * from "./voice/voice-transport.ts";
 // Pure, dependency-free math and constants the browser panel also needs:
 // remaining-time countdown and the operator's default call-length limit.
 export * from "./voice/voice-countdown.ts";
+export * from "./voice/call-limit-timer.ts";
 export {
   VOICE_CALL_MAX_SECONDS_DEFAULT,
   VOICE_HTTP_TIMEOUT_MS,

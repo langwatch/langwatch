@@ -105,7 +105,7 @@ const detailLines = (domain: LangWatchHandledErrorShape): string[] => {
  */
 const withCliAdvice = (domain: LangWatchHandledErrorShape): LangWatchHandledErrorShape => {
   const enriched = withFallbackSuggestions(domain);
-  const hint = loginPermissionsHint(enriched.code);
+  const hint = loginPermissionsHint(enriched.code, enriched.meta);
   if (!hint) return enriched;
   return { ...enriched, suggestions: [...(enriched.suggestions ?? []), hint] };
 };

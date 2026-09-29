@@ -4,7 +4,7 @@ import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
-import { APIError } from "better-auth/api";
+import { APIError, getSessionFromCtx } from "better-auth/api";
 import { z } from "zod";
 
 import type { BetterAuthAnnouncements } from "../better-auth.channel.ts";
@@ -33,6 +33,18 @@ export const PASSKEY_SIGNUP_EMAIL_INVALID = "INVALID_EMAIL";
 
 /** The code for a ceremony whose address proof is missing, spent, expired or another address's. */
 export const PASSKEY_SIGNUP_VERIFICATION_REQUIRED = "VERIFICATION_REQUIRED";
+
+/** A signed-in browser ran the sign-up ceremony for some other address. */
+export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
+
+/** Who the ceremony's request is signed in as, if anyone. */
+export type PasskeyCeremonyCaller =
+  | { signedIn: true; user: { id: string; email: string } }
+  | { signedIn: false };
+
+export type PasskeyCeremonySession = (
+  ctx: GenericEndpointContext,
+) => Promise<PasskeyCeremonyCaller>;
 
 /** What the sign-up screen bakes into the registration challenge. */
 const signUpContextSchema = z.object({
@@ -158,20 +170,31 @@ function createAfterVerification({
   announcements,
   users,
   verification,
+  sessionOf,
 }: {
   announcements: BetterAuthAnnouncements;
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
+  sessionOf: PasskeyCeremonySession;
 }): (params: {
   ctx: GenericEndpointContext;
   context?: string | null | undefined;
 }) => Promise<{ userId: string; name: string }> {
   return async function afterVerification({
+    ctx,
     context,
   }: {
     ctx: GenericEndpointContext;
     context?: string | null | undefined;
   }): Promise<{ userId: string; name: string }> {
+    // The plugin runs this for a signed-in caller too: adding a passkey from settings, the
+    // nudge or the post-reset offer attaches it to the account already signed in, while a
+    // sign-up ceremony from a signed-in browser is refused. specs/identity/passkeys.feature
+    const caller = await sessionOf(ctx);
+    if (caller.signedIn) {
+      if (carriesSignUpContext(context)) throw alreadySignedIn();
+      return { userId: caller.user.id, name: caller.user.email };
+    }
     const { email: resolvedEmail, addressProof } = resolveSignUpContext(context);
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. The unique index on the
@@ -205,6 +228,7 @@ export function passkeySignUpRegistration(options: {
   handleSecret: string;
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
+  sessionOf?: PasskeyCeremonySession;
 }): {
   requireSession: boolean;
   resolveUser: (params: {
@@ -226,6 +250,27 @@ export function passkeySignUpRegistration(options: {
         verification: options.verification,
         handleSecret: options.handleSecret,
       }),
-    afterVerification: createAfterVerification(options),
+    afterVerification: createAfterVerification({
+      ...options,
+      sessionOf: options.sessionOf ?? identifyCeremonyCaller,
+    }),
   };
+}
+
+async function identifyCeremonyCaller(ctx: GenericEndpointContext): Promise<PasskeyCeremonyCaller> {
+  const session = await getSessionFromCtx(ctx);
+  return session?.user.id
+    ? { signedIn: true, user: { id: session.user.id, email: session.user.email } }
+    : { signedIn: false };
+}
+
+function carriesSignUpContext(context: string | null | undefined): boolean {
+  return signUpContextSchema.validate(parseContext(context));
+}
+
+function alreadySignedIn(): APIError {
+  return new APIError("FORBIDDEN", {
+    code: PASSKEY_SIGNUP_ALREADY_SIGNED_IN,
+    message: "Sign out before creating a new account with a passkey.",
+  });
 }

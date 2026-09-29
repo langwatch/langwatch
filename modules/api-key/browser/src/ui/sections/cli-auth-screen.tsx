@@ -2,6 +2,11 @@
 // unchanged; three fetch calls delegated to host. CreateProjectDrawer is recorded gap.
 
 import { Box, Button, HStack, Icon, Spinner, Stack, Text, VStack } from "@chakra-ui/react";
+import {
+  CLI_KEY_MANAGEMENT_PERMISSIONS,
+  cliKeyManagementPermissions,
+  type CliKeyManagementPermission,
+} from "@langwatch/api-key-contract";
 import { nowInstant } from "@langwatch/time";
 import { CheckCircle2, CircleAlert, Clock3, Info, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -162,6 +167,7 @@ function isApprovalIncomplete({
   isLoadingBindings,
   scopeCount,
   permissionCount,
+  isManagementBlocked,
 }: {
   selectedOrgId: string | null;
   requiresProject: boolean;
@@ -169,10 +175,46 @@ function isApprovalIncomplete({
   isLoadingBindings: boolean;
   scopeCount: number;
   permissionCount: number;
+  isManagementBlocked: boolean;
 }): boolean {
   if (!selectedOrgId) return true;
   if (requiresProject) return !selectedProjectId;
-  return isLoadingBindings || scopeCount === 0 || permissionCount === 0;
+  return isLoadingBindings || scopeCount === 0 || permissionCount === 0 || isManagementBlocked;
+}
+
+type ManagementRequest = {
+  /** The management permissions the reader holds, which the key also gets. */
+  held: CliKeyManagementPermission[];
+  cannotGrant: boolean;
+  needsOrganization: boolean;
+};
+
+/**
+ * Management access rides on the whole organization, and the key gets only the
+ * management permissions the reader holds there; holding none refuses the approval.
+ */
+function managementRequestFor({
+  requestsManagement,
+  isLoadingBindings,
+  selectedScopes,
+  userPermissions,
+}: {
+  requestsManagement: boolean;
+  isLoadingBindings: boolean;
+  selectedScopes: ScopeTriadEntry[];
+  userPermissions: string[];
+}): ManagementRequest {
+  const held = requestsManagement
+    ? cliKeyManagementPermissions().filter((permission) => userPermissions.includes(permission))
+    : [];
+  const hasScopes = selectedScopes.length > 0;
+  const cannotGrant = requestsManagement && !isLoadingBindings && hasScopes && held.length === 0;
+  const needsOrganization =
+    requestsManagement &&
+    !cannotGrant &&
+    hasScopes &&
+    !selectedScopes.some((scopeEntry) => scopeEntry.scopeType === "ORGANIZATION");
+  return { held, cannotGrant, needsOrganization };
 }
 
 /**
@@ -237,6 +279,8 @@ export default function CliAuthScreen() {
   const credentialType: CliCredentialType =
     lookup.kind === "ready" ? lookup.credentialType : "device_session";
   const requiresProject = credentialType === "project_api_key";
+  // `langwatch login --management` asked for management access on the key.
+  const requestsManagement = lookup.kind === "ready" && !requiresProject && lookup.management;
 
   // The user's own role bindings in the picked org: the ceiling the CLI key
   // can never exceed. Drives the scope defaults and which permission rows
@@ -258,6 +302,13 @@ export default function CliAuthScreen() {
     selectedScopes: keyScopes.selectedScopes,
     bindings: myBindings.data,
     offeredProjects,
+    management: requestsManagement,
+  });
+  const management = managementRequestFor({
+    requestsManagement,
+    isLoadingBindings: myBindings.isLoading,
+    selectedScopes: keyScopes.selectedScopes,
+    userPermissions: keyPermissions.userPermissions,
   });
 
   const isSelectionIncomplete = isApprovalIncomplete({
@@ -267,6 +318,7 @@ export default function CliAuthScreen() {
     isLoadingBindings: myBindings.isLoading,
     scopeCount: keyScopes.selectedScopes.length,
     permissionCount: keyPermissions.permissions.length,
+    isManagementBlocked: management.cannotGrant || management.needsOrganization,
   });
   const { isLookupCurrent, isApprovalReady, isCodeConfirmed } = approvalGates({
     lookup,
@@ -381,7 +433,9 @@ export default function CliAuthScreen() {
                   selections={keyPermissions.effectiveSelections}
                   userPermissions={keyPermissions.userPermissions}
                   onChange={keyPermissions.setSelections}
+                  grantsManagement={management.held.length > 0}
                 />
+                <CliManagementRequest management={management} />
               </>
             )}
 
@@ -687,6 +741,7 @@ function CliKeyPermissionsField({
   selections,
   userPermissions,
   onChange,
+  grantsManagement,
 }: {
   isCustomized: boolean;
   onToggleCustomized: () => void;
@@ -694,6 +749,7 @@ function CliKeyPermissionsField({
   selections: Record<string, PermissionSelection>;
   userPermissions: string[];
   onChange: (selections: Record<string, PermissionSelection>) => void;
+  grantsManagement: boolean;
 }) {
   return (
     <Box>
@@ -720,12 +776,82 @@ function CliKeyPermissionsField({
           )}
         </VStack>
       ) : (
-        <Text textStyle="xs" color="fg.muted" lineHeight="tall">
-          The key gets your access for everyday work: traces, datasets, prompts, evaluations, the AI
-          Gateway, and project settings. It cannot manage members and roles, or manage the
-          organization.
-        </Text>
+        <DefaultAccessNote grantsManagement={grantsManagement} />
       )}
+    </Box>
+  );
+}
+
+/** What the default permissions reach, and whether management access rides on top. */
+function DefaultAccessNote({ grantsManagement }: { grantsManagement: boolean }) {
+  return (
+    <Text textStyle="xs" color="fg.muted" lineHeight="tall">
+      The key gets your access for everyday work: traces, datasets, prompts, evaluations, the AI
+      Gateway, and project settings
+      {grantsManagement
+        ? ", plus the management access below."
+        : ". It cannot manage members and roles, or manage the organization."}
+    </Text>
+  );
+}
+
+/** What `langwatch login --management` adds to the key, or why it cannot be approved here. */
+function CliManagementRequest({ management }: { management: ManagementRequest }) {
+  if (management.cannotGrant) {
+    return (
+      <StatusCard palette="red" icon={TriangleAlert} title="You have no management access here">
+        The CLI asked for management access, and your account holds no management permission in this
+        organization. Deny this request and run <code>langwatch login --device</code> without{" "}
+        <code>--management</code>, or ask an organization admin.
+      </StatusCard>
+    );
+  }
+
+  return (
+    <>
+      {management.held.length > 0 && <ManagementGrantList held={management.held} />}
+      {management.needsOrganization && (
+        <StatusCard
+          palette="orange"
+          icon={CircleAlert}
+          title="Management access needs the organization"
+        >
+          The CLI asked for management access, which applies to the whole organization. Add the
+          organization to what the CLI can access to approve.
+        </StatusCard>
+      )}
+    </>
+  );
+}
+
+/** The management permissions the key gets on top of everyday access. */
+function ManagementGrantList({ held }: { held: CliKeyManagementPermission[] }) {
+  return (
+    <Box
+      data-testid="cli-auth-management-request"
+      borderWidth="1px"
+      borderColor="blue.muted"
+      borderRadius="lg"
+      bg="blue.subtle"
+      paddingX={5}
+      paddingY={4}
+    >
+      <HStack align="flex-start" gap={3}>
+        <Icon as={Info} boxSize={5} color="blue.fg" flexShrink={0} marginTop={0.5} />
+        <VStack align="stretch" gap={1} flex={1}>
+          <Text textStyle="sm" fontWeight="semibold" color="fg" lineHeight="snug">
+            Management access requested
+          </Text>
+          <Text textStyle="xs" color="fg.muted" lineHeight="tall">
+            The CLI asked for management access. The key also gets:
+          </Text>
+          <Box as="ul" paddingStart={4} textStyle="xs" color="fg.muted">
+            {held.map((permission) => (
+              <li key={permission}>{CLI_KEY_MANAGEMENT_PERMISSIONS[permission]}</li>
+            ))}
+          </Box>
+        </VStack>
+      </HStack>
     </Box>
   );
 }

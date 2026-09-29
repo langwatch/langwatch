@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
+  wiring,
   settle,
 } from "../../services/__tests__/support/nurturing-harness.ts";
 import {
@@ -27,6 +28,7 @@ describe("fireFirstTraceIntegrated()", () => {
     const sink = registerNurturingSink();
 
     fireFirstTraceIntegrated({
+      ...wiring(),
       userId: "user-1",
       projectId: "project-1",
       sdkLanguage: "python",
@@ -51,6 +53,7 @@ describe("fireFirstTraceIntegrated()", () => {
     const sink = registerNurturingSink();
 
     fireFirstTraceIntegrated({
+      ...wiring(),
       userId: "user-1",
       projectId: "project-1",
       sdkLanguage: "typescript",
@@ -75,6 +78,7 @@ describe("fireFirstTraceIntegrated()", () => {
 
     expect(() =>
       fireFirstTraceIntegrated({
+        ...wiring(),
         userId: "user-1",
         projectId: "project-1",
         sdkLanguage: "python",
@@ -92,7 +96,11 @@ describe("identifySubsequentTrace()", () => {
   it("identifies the user with last_trace_at only", async () => {
     const sink = registerNurturingSink();
 
-    identifySubsequentTrace({ userId: "user-1", traceOccurredAt: "2026-09-06T10:00:00.000Z" });
+    identifySubsequentTrace({
+      ...wiring(),
+      userId: "user-1",
+      traceOccurredAt: "2026-09-06T10:00:00.000Z",
+    });
     await settle();
 
     expect(sink.sentTo("/identify")[0]).toMatchObject({

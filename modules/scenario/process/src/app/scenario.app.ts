@@ -156,6 +156,10 @@ import {
   buildScenarioLifecyclePipeline,
   type ScenarioLifecyclePipeline,
 } from "../eventing/scenario-lifecycle.pipeline.ts";
+import {
+  SimulationProcessingRuntimeAdapter,
+  type SimulationPipelineSetup,
+} from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
 import { AgentTestTurnChildService } from "../services/agent-test-turn-child.service.ts";
@@ -180,10 +184,6 @@ import { ScenarioRunLaunchService } from "../services/scenario-run-launch.servic
 import { ScenarioTabRegistryService } from "../services/scenario-tab-registry.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 import { SimulationCommandDispatcherService } from "../services/simulation-command-dispatcher.service.ts";
-import {
-  SimulationProcessingService,
-  type SimulationPipelineSetup,
-} from "../services/simulation-processing.service.ts";
 import { SimulationRunViewService } from "../services/simulation-run-view.service.ts";
 import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
 import { VoiceMediaDoorService } from "../services/voice-media-door.service.ts";
@@ -522,7 +522,7 @@ export class ScenarioApp implements ScenarioApi {
         claim: (key, ttlSeconds) => setup.members.idempotency.claim(key, ttlSeconds),
       }),
       simulationCommands,
-      simulationProcessing: SimulationProcessingService.create({
+      simulationProcessing: SimulationProcessingRuntimeAdapter.create({
         runs: setup.repositories.simulationRunProcessing,
         cancellations,
         traces: setup.dependencies.traces,
@@ -574,14 +574,14 @@ export class ScenarioApp implements ScenarioApi {
   readonly #lifecycle: ScenarioLifecyclePipeline;
   #lifecycleCommands: EventingCommands<ScenarioLifecyclePipeline> | undefined;
   readonly #simulationCommands: SimulationCommandDispatcherService;
-  readonly #simulationProcessing: SimulationProcessingService;
+  readonly #simulationProcessing: SimulationProcessingRuntimeAdapter;
   readonly #runLaunch: ScenarioRunLaunchService;
 
   private constructor(
     dependencies: ScenarioAppDependencies & {
       lifecycle: ScenarioLifecyclePipeline;
       simulationCommands: SimulationCommandDispatcherService;
-      simulationProcessing: SimulationProcessingService;
+      simulationProcessing: SimulationProcessingRuntimeAdapter;
     },
   ) {
     const { lifecycle, simulationCommands, simulationProcessing, ...rest } = dependencies;

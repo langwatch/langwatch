@@ -2,6 +2,10 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "module": "CommonJS",
+    // The one CommonJS project in the workspace: verbatimModuleSyntax forbids
+    // ECMAScript import/export syntax under a CommonJS module target, which
+    // every file here uses. Genuine exception, not a restatement.
+    "verbatimModuleSyntax": false,
     "lib": ["ES2023", "DOM"],
     "types": ["node"],
     "esModuleInterop": true,

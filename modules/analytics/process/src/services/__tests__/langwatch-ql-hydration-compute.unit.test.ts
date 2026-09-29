@@ -96,6 +96,37 @@ describe("LangWatchQLHydrationComputeService", () => {
     expect(asked?.traces.map((entry) => entry.trace_id)).toEqual(["trace-a"]);
   });
 
+  /** @scenario "conversation reads like the chat view and llm_readable_thread holds the agent's steps" */
+  it("renders conversation in the conversation view and llm_readable_thread in the steps view", async () => {
+    const asked: Parameters<LangWatchQLTraceRenderer["renderThreadTranscript"]>[0][] = [];
+    const service = LangWatchQLHydrationComputeService.create({
+      renderer: renderer({
+        renderThreadTranscript: async (input) => {
+          asked.push(input);
+          return `### ${input.view}`;
+        },
+      }),
+    });
+    const traces = [trace({ id: "trace-a" }), trace({ id: "trace-b" })];
+
+    await service.computeValues({
+      resolved: collectLangWatchQLKeys({
+        calls: [
+          { column: "transcript", function: "conversation", options: [] },
+          { column: "text", function: "llm_readable_thread", options: [8_000] },
+        ],
+        rows: [{ transcript: "thread-a", text: "thread-a" }],
+      }),
+      traces: fetched({ byThread: [["thread-a", traces]] }),
+      maxHydratedValueBytes: MAX_VALUE_BYTES,
+    });
+
+    const byView = new Map(asked.map((input) => [input.view, input]));
+    expect(byView.get("conversation")?.maxTokens).toBeUndefined();
+    expect(byView.get("steps")?.maxTokens).toBe(8_000);
+    expect(byView.get("steps")?.traces).toHaveLength(2);
+  });
+
   it("answers thread_traces from the traces themselves, reading nothing", async () => {
     const service = LangWatchQLHydrationComputeService.create({ renderer: renderer() });
 

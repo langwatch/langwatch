@@ -55,6 +55,35 @@ describe("startDeviceCode", () => {
     const dc = await startDeviceCode({ baseUrl: "http://x", fetchImpl });
     expect(dc.interval).toBe(5);
   });
+
+  describe("when the login asks for management access", () => {
+    const deviceCodeBody = async (init: { management?: boolean }) => {
+      const fetchImpl = vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          device_code: "DC",
+          user_code: "X-Y",
+          verification_uri: "http://x/cli/auth",
+          expires_in: 600,
+          interval: 5,
+        }),
+      );
+      await startDeviceCode({ baseUrl: "http://x", fetchImpl }, init);
+      const [, request] = fetchImpl.mock.calls[0] as [string, RequestInit];
+      return JSON.parse(request.body as string) as Record<string, unknown>;
+    };
+
+    /** @scenario A CLI login with --management asks for management access */
+    it("sends management in the device code request", async () => {
+      await expect(deviceCodeBody({ management: true })).resolves.toMatchObject({
+        management: true,
+      });
+    });
+
+    /** @scenario A plain CLI login does not ask for management access */
+    it("leaves management off the request otherwise", async () => {
+      await expect(deviceCodeBody({})).resolves.not.toHaveProperty("management");
+    });
+  });
 });
 
 describe("exchange", () => {

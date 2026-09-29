@@ -3403,9 +3403,6 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/project/contract
     devDependencies:
       '@langwatch/secrets':
         specifier: workspace:*
@@ -9943,6 +9940,9 @@ importers:
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress
+      '@langwatch/enterprise-managed-provider-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/managed-provider/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -16719,6 +16719,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../modules/organization/contract
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../prisma-client
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../process-stores
@@ -16729,9 +16732,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/prisma-client':
-        specifier: workspace:*
-        version: link:../prisma-client
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
@@ -19258,7 +19258,7 @@ packages:
       '@langchain/core': '>=0.3.80'
 
   '@langwatch/scenario@file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz':
-    resolution: {integrity: sha512-1Xm1jbEOEFs7OQ2g0luC4hw5vlK3ioQwhuuzKcEPX3KqiB4kst2qsvZ9NTPp97D2EcyJsymTHWl9zSM2Q7hpKQ==, tarball: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz}
+    resolution: {integrity: sha512-v9wP+E0AOwEtwrxsGNw6IvtQ6xAttIB5uANHYdP6ND44L6zd1MfNFJyvF+R1P9p0bFiqyNqexhOgwAXkTioP/g==, tarball: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz}
     version: 1.7.0-dev.voice10
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:

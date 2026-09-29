@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { captureMessage, type Side } from "./capture";
 import { DeadlineAlarm } from "./deadline-alarm";
 import { fillPath, sideFixtures } from "./flows/context";
+import { describeExpect } from "./flows/expect";
 import { declinePasskeyOffer } from "./flows/primitives";
 import { resolveAction } from "./flows/registry";
 import { needsRecapture } from "./module-load";
@@ -124,6 +125,12 @@ const probeShell = async ({
 /** RouteJob is one item of a side's route pool: a route, or a read-only flow once routes drain. */
 type RouteJob = { route: string } | { flow: PlanFlow };
 
+/** RouteTimings split a side's route pass into its pooled capture and its retakes alone. */
+export interface RouteTimings {
+  captureMillis: number;
+  recaptureMillis: number;
+}
+
 /**
  * captureRoutes takes the first SHELL_PROBE routes one at a time (the fail-fast probe), then
  * spreads the rest over the side's pages, each taking an `alongside` flow once no route is
@@ -139,9 +146,11 @@ export const captureRoutes = async ({
   pages: Side[];
   collect: Collect;
   alongside?: PlanFlow[];
-}): Promise<void> => {
+}): Promise<RouteTimings> => {
+  const startedAt = Date.now();
+  let recaptureMillis = 0;
   const [first] = pages;
-  if (first === undefined) return;
+  if (first === undefined) return { captureMillis: 0, recaptureMillis };
   const alarm = new DeadlineAlarm(first.name);
   const capture = (route: string, side: Side): Promise<CaptureMessage> =>
     captureRoute({ plan, route, side, alarm });
@@ -168,6 +177,9 @@ export const captureRoutes = async ({
     keep: (message) => {
       if (message !== undefined) collect(message);
     },
+    onRecaptured: (millis) => {
+      recaptureMillis = millis;
+    },
   });
   if (heldBack.length > 0) {
     const routes = heldBack.map((job) => ("route" in job ? job.route : job.flow.id));
@@ -176,6 +188,7 @@ export const captureRoutes = async ({
       err: process.stderr,
     });
   }
+  return { captureMillis: Date.now() - startedAt - recaptureMillis, recaptureMillis };
 };
 
 /** captureFlow runs one flow's steps on one page; each step's first action opens its own screen. */
@@ -191,6 +204,7 @@ export const captureFlow = async ({
   collect: Collect;
 }): Promise<void> => {
   side.drain();
+  let failed = 0;
   for (const [stepIndex, step] of flow.steps.entries()) {
     let snapshots = 0;
     const startedAt = Date.now();
@@ -219,6 +233,7 @@ export const captureFlow = async ({
           notFound: false,
           blank: await side.blank(),
           ariaSnapshot: await side.ariaSnapshot(),
+          expect: step.action === "expect" ? describeExpect(step.with ?? {}) : undefined,
         }),
       );
     };
@@ -235,10 +250,18 @@ export const captureFlow = async ({
     } catch (thrown) {
       error = step.optional === true ? "" : stepError(thrown);
     }
-    note({
-      text: `${side.name} ${flow.id} ${stepIndex} ${step.action} ${error === "" ? "ok" : error}`,
-      err: process.stderr,
-    });
+    if (error !== "") {
+      failed += 1;
+      note({
+        text: `${side.name} ${flow.id} ${stepIndex} ${step.action} ${error}`,
+        err: process.stderr,
+      });
+    }
     await shoot({ label: "after", error });
   }
+  const outcome = failed === 0 ? "ok" : `${failed} failed`;
+  note({
+    text: `${side.name} ${flow.id}: ${flow.steps.length} steps, ${outcome}`,
+    err: process.stderr,
+  });
 };

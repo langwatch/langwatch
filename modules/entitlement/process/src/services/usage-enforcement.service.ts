@@ -212,6 +212,25 @@ export class UsageService {
     return total;
   }
 
+  /**
+   * The month's count per project, counted once for a usage warning; "unlimited" where the
+   * plan caps nothing, so no count is made.
+   */
+  async getCurrentMonthCountByProjects({
+    organizationId,
+    projectIds,
+  }: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<ProjectUsageCounts | "unlimited"> {
+    const plan = await this.planResolver(organizationId);
+    if (plan.maxMessagesPerMonth >= UNLIMITED_MESSAGES) {
+      return "unlimited";
+    }
+
+    return this.getCountByProjects({ organizationId, projectIds });
+  }
+
   async getCountByProjects({
     organizationId,
     projectIds,

@@ -549,7 +549,7 @@ describe("given an approved control request", () => {
       // and the branch. Saying any of it again filled the panel with the same
       // sentence twice.
       expect(startedTurns[0]?.text).toBe("Local folder connected");
-      expect(startedTurns[0]?.idempotencyKey).toMatch(/^local-connect:lcr_/);
+      expect(startedTurns[0]?.idempotencyKey).toMatch(/^local-connect:langyctlreq_/);
 
       cli.close();
       await cli.closed();
@@ -1217,9 +1217,8 @@ describe("given a command line that reconnects while a command still runs", () =
       });
       await new Promise((resolve) => setTimeout(resolve, 300));
       expect(await podA.runtime.dispatcher.read(call.callId)).toMatchObject({
-        state: "done",
-        ok: true,
-        text: "4 migrations applied",
+        kind: "hit",
+        call: { state: "done", ok: true, text: "4 migrations applied" },
       });
 
       second.cli.close();

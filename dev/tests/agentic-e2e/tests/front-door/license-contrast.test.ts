@@ -45,7 +45,12 @@ function relativeLuminance([r, g, b]: [number, number, number]): number {
 function parseRgb(css: string): [number, number, number] {
   const match = /rgba?\(([^)]+)\)/.exec(css);
   if (!match) throw new Error(`Not an rgb()/rgba() colour: ${css}`);
-  const [r, g, b] = match[1].split(",").map((n) => parseFloat(n.trim()));
+  const group = match[1];
+  if (group === undefined) throw new Error(`Not an rgb()/rgba() colour: ${css}`);
+  const [r, g, b] = group.split(",").map((n) => parseFloat(n.trim()));
+  if (r === undefined || g === undefined || b === undefined) {
+    throw new Error(`Not an rgb()/rgba() colour: ${css}`);
+  }
   return [r, g, b];
 }
 

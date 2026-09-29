@@ -142,5 +142,5 @@ export type ManagementRequest = ReturnType<typeof createManagementRequest>;
 export const managementPath = (path: string): string =>
   path.replace(
     /^(\/api\/v1\/[^/]+)(\/.*)?$/,
-    (_match, base: string, rest?: string) => `${base}/latest${rest ?? "/"}`,
+    (_match, base: string, rest?: string) => `${base}/latest${rest ?? ""}`,
   );

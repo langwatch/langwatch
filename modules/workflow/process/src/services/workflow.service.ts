@@ -218,7 +218,10 @@ export class WorkflowService {
       projectId: input.projectId,
     });
     if (!version) {
-      throw new NotFoundError("workflow_version_not_found", "Workflow version", input.versionId);
+      throw new NotFoundError("workflow_version_not_found", {
+        resource: "Workflow version",
+        id: input.versionId,
+      });
     }
 
     const workflow = await this.options.repository.findById({

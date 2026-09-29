@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"path/filepath"
+	"time"
 )
 
 // coverageCommand prints the coverage verdict between two refs and exits 1
@@ -54,6 +55,7 @@ func gcCommand(ctx context.Context, args []string, streams Streams) int {
 	root := flags.String("root", ".", "repository root")
 	kept := flags.Bool("kept", false, "also remove -keep runs and their running stacks")
 	noHaven := flags.Bool("no-haven", false, "leave haven stacks alone")
+	olderThan := flags.Duration("older-than", 7*24*time.Hour, "remove a dead run's directory, report included, once it is this old")
 	if err := flags.Parse(args); err != nil {
 		return ExitOperational
 	}
@@ -63,7 +65,7 @@ func gcCommand(ctx context.Context, args []string, streams Streams) int {
 		return ExitOperational
 	}
 	err = CollectGarbage(ctx, GCRequest{
-		Root: absoluteRoot, IncludeKept: *kept, UseHaven: havenSelected(havenOnPath(), *noHaven), Out: streams.Out,
+		Root: absoluteRoot, IncludeKept: *kept, RemoveOlderThan: *olderThan, UseHaven: havenSelected(havenOnPath(), *noHaven), Out: streams.Out,
 	})
 	if err != nil {
 		fmt.Fprintln(streams.Err, "visualdiff:", err)

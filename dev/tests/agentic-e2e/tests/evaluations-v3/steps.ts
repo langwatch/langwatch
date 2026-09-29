@@ -256,11 +256,11 @@ export async function thenTargetCellsShowOutput(
   targetColumnId: string,
   expectedOutputs: string[],
 ) {
-  for (let i = 0; i < expectedOutputs.length; i++) {
+  for (const [i, expectedOutput] of expectedOutputs.entries()) {
     const cell = page
       .locator(`[data-testid="spreadsheet-cell"][data-row="${i}"][data-column="${targetColumnId}"]`)
       .last();
-    await expect(cell).toContainText(expectedOutputs[i], { timeout: 15000 });
+    await expect(cell).toContainText(expectedOutput, { timeout: 15000 });
   }
 }
 
@@ -313,14 +313,17 @@ export async function thenOtherRowsRemainUnchanged(
   columnId: string,
   expectedOutputs: string[],
 ) {
-  for (let i = 0; i < unchangedRows.length; i++) {
-    const rowIndex = unchangedRows[i];
+  for (const [i, rowIndex] of unchangedRows.entries()) {
+    const expectedOutput = expectedOutputs[i];
+    if (expectedOutput === undefined) {
+      throw new Error(`Missing expected output for row index ${i}`);
+    }
     const cell = page
       .locator(
         `[data-testid="spreadsheet-cell"][data-row="${rowIndex}"][data-column="${columnId}"]`,
       )
       .last();
-    await expect(cell).toContainText(expectedOutputs[i], { timeout: 5000 });
+    await expect(cell).toContainText(expectedOutput, { timeout: 5000 });
   }
 }
 

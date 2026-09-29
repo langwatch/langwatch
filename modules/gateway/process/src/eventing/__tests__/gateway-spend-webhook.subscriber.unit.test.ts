@@ -1,4 +1,4 @@
-import type { WebhookApi, WebhookSpendDeliveryRequest } from "@langwatch/webhook-contract";
+import type { WebhookApi, WebhookGatewayEventDeliveryRequest } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import { GATEWAY_SPEND_EVENT_VERSION_LATEST } from "../gateway-spend-commands.process.ts";
@@ -31,9 +31,9 @@ describe("gateway spend's webhook subscriber", () => {
   describe("when a confirmed spend event reaches it", () => {
     /** @scenario "Each committed spend step is handed to webhook delivery under its own event id" */
     it("asks webhook delivery once, named by the event's idempotency key", async () => {
-      const requests: WebhookSpendDeliveryRequest[] = [];
-      const webhooks: Pick<WebhookApi, "requestSpendDelivery"> = {
-        requestSpendDelivery: async (input) => {
+      const requests: WebhookGatewayEventDeliveryRequest[] = [];
+      const webhooks: Pick<WebhookApi, "requestGatewayEventDelivery"> = {
+        requestGatewayEventDelivery: async (input) => {
           requests.push(input);
         },
       };

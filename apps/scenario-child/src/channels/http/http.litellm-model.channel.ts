@@ -136,7 +136,10 @@ export class HttpLitellmModelChannel implements LitellmModelChannel {
     const { litellmParams, nlpServiceUrl } = input;
     const providerKey = litellmParams.model.split("/")[0] || undefined;
     const headers = Object.fromEntries(
-      Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
+      Object.entries(litellmParams).map(([key, value]): [string, string] => [
+        `x-litellm-${key}`,
+        value,
+      ]),
     );
 
     const vercelProvider = createOpenAICompatible({

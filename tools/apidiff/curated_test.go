@@ -139,8 +139,10 @@ func TestCuratedCreateSendsEachSideItsOwnPrerequisites(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0:\n%s", code, stdout)
 	}
-	if len(bodiesA) != 1 || len(bodiesB) != 1 {
-		t.Fatalf("each side must be sent exactly one valid suite: A=%v B=%v", bodiesA, bodiesB)
+	// The main pass's suite, then the round trip's own (roundtrip.go), which
+	// reuses the same per-side prerequisites.
+	if len(bodiesA) != 2 || len(bodiesB) != 2 || !strings.Contains(bodiesA[1], `"scenario-a"`) || !strings.Contains(bodiesB[1], `"scenario-b"`) {
+		t.Fatalf("each side must be sent its main-pass and round-trip suite, with its own ids: A=%v B=%v", bodiesA, bodiesB)
 	}
 	if !strings.Contains(bodiesA[0], `"agent-a"`) || !strings.Contains(bodiesA[0], `"scenario-a"`) {
 		t.Fatalf("candidate suite body = %s", bodiesA[0])

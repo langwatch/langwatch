@@ -1380,6 +1380,12 @@ Rule: Enter routes a sentence
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @unit
+  Scenario: A sentence about what the agent did is offered to the classifier as a judgement
+    When the classifier's routing question is built
+    Then the instant_eval option names judging what the agent did, such as a tool called with a wrong value or tests not re-run
+    And the free_text option says a description of something that happened is not a literal string
+
   @integration
   Scenario: Enter on a sentence asks the router
     Given the search bar contains the applied query "model:gpt-4o"

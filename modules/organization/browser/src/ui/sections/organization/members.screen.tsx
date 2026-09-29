@@ -316,7 +316,7 @@ function MembersList({
               />
               <PageLayout.HeaderButton onClick={() => openDrawer("inviteMember")}>
                 <Plus size={20} />
-                Add members
+                Invite people
               </PageLayout.HeaderButton>
             </HStack>
           )}
@@ -330,74 +330,78 @@ function MembersList({
           counts={counts}
           provenanceFailed={provenance.isError}
         />
-        {peopleCutShows({ cut, list: "members" }) && (
-          <Card.Root width="full" overflow="hidden">
-            {/*
+        <VStack gap={6} width="full" align="start" data-testid="people-list">
+          {peopleCutShows({ cut, list: "members" }) && (
+            <Card.Root width="full" overflow="hidden">
+              {/*
             overflowX="auto" so the row never clips the rightmost ⋮ menu. The
             department picker keeps its full width (do NOT shrink it); the email
             column truncates via OverflownTextWithTooltip so long addresses don't push the row.
           */}
-            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-              <Table.Root variant="line" size="md" width="full">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader width="56px" />
-                    <Table.ColumnHeader>Name</Table.ColumnHeader>
-                    <Table.ColumnHeader maxWidth="280px">Email</Table.ColumnHeader>
-                    {hasOrganizationManagePermission && (
-                      <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
-                    )}
-                    {showDepartment && <Table.ColumnHeader>Department</Table.ColumnHeader>}
-                    {twoStep.show && <Table.ColumnHeader>Two-step verification</Table.ColumnHeader>}
-                    <Table.ColumnHeader width="60px"></Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {sortedMembers.map((member) => (
-                    <MemberRow
-                      key={member.userId}
-                      member={member}
-                      organizationId={organization.id}
-                      provenance={provenance.data?.[member.userId]}
-                      showAccess={hasOrganizationManagePermission}
-                      bindings={bindingsByUser.get(member.userId) ?? []}
-                      bindingsLoading={isBindingsLoading || isBindingsError}
-                      showDepartment={showDepartment}
-                      department={department}
-                      twoStep={twoStep}
-                      canDisable={canDisableMember(member.userId)}
-                      canDelete={canDeleteMember(member.userId)}
-                      onSelect={setSelectedMember}
-                      onSetDisabled={setMemberDisabled}
-                      onDelete={deleteMember}
-                    />
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
-        )}
+              <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+                <Table.Root variant="line" size="md" width="full">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeader width="56px" />
+                      <Table.ColumnHeader>Name</Table.ColumnHeader>
+                      <Table.ColumnHeader maxWidth="280px">Email</Table.ColumnHeader>
+                      {hasOrganizationManagePermission && (
+                        <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+                      )}
+                      {showDepartment && <Table.ColumnHeader>Department</Table.ColumnHeader>}
+                      {twoStep.show && (
+                        <Table.ColumnHeader>Two-step verification</Table.ColumnHeader>
+                      )}
+                      <Table.ColumnHeader width="60px"></Table.ColumnHeader>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {sortedMembers.map((member) => (
+                      <MemberRow
+                        key={member.userId}
+                        member={member}
+                        organizationId={organization.id}
+                        provenance={provenance.data?.[member.userId]}
+                        showAccess={hasOrganizationManagePermission}
+                        bindings={bindingsByUser.get(member.userId) ?? []}
+                        bindingsLoading={isBindingsLoading || isBindingsError}
+                        showDepartment={showDepartment}
+                        department={department}
+                        twoStep={twoStep}
+                        canDisable={canDisableMember(member.userId)}
+                        canDelete={canDeleteMember(member.userId)}
+                        onSelect={setSelectedMember}
+                        onSetDisabled={setMemberDisabled}
+                        onDelete={deleteMember}
+                      />
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </Card.Body>
+            </Card.Root>
+          )}
 
-        {peopleCutShows({ cut, list: "waiting" }) && (
-          <JoinRequestsTable
-            requests={joinRequests.requests}
-            isAdmin={hasOrganizationManagePermission}
-            answeringId={joinRequests.answeringId}
-            onApprove={joinRequests.approve}
-            onReject={joinRequests.reject}
-          />
-        )}
+          {peopleCutShows({ cut, list: "waiting" }) && (
+            <JoinRequestsTable
+              requests={joinRequests.requests}
+              isAdmin={hasOrganizationManagePermission}
+              answeringId={joinRequests.answeringId}
+              onApprove={joinRequests.approve}
+              onReject={joinRequests.reject}
+            />
+          )}
 
-        {peopleCutShows({ cut, list: "invited" }) && (
-          <InvitesTable
-            invites={cut === "invited" ? invites : openInvites}
-            isAdmin={hasOrganizationManagePermission}
-            teams={teams}
-            onViewInviteLink={viewInviteLink}
-            onResendInvite={resendInvite}
-            onRevokeInvite={revokeInvite}
-          />
-        )}
+          {peopleCutShows({ cut, list: "invited" }) && (
+            <InvitesTable
+              invites={cut === "invited" ? invites : openInvites}
+              isAdmin={hasOrganizationManagePermission}
+              teams={teams}
+              onViewInviteLink={viewInviteLink}
+              onResendInvite={resendInvite}
+              onRevokeInvite={revokeInvite}
+            />
+          )}
+        </VStack>
       </VStack>
 
       {selectedMember && (

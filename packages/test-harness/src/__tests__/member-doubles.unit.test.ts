@@ -30,9 +30,9 @@ describe("given the memory cache", () => {
   describe("when a tag is invalidated", () => {
     it("drops every entry written under it and leaves the rest", async () => {
       const cache = memoryCache();
-      await cache.set("a", "annotations", new Uint8Array([1]), 60);
-      await cache.set("b", "annotations", new Uint8Array([2]), 60);
-      await cache.set("c", "traces", new Uint8Array([3]), 60);
+      await cache.set({ key: "a", tag: "annotations", body: new Uint8Array([1]), ttlSeconds: 60 });
+      await cache.set({ key: "b", tag: "annotations", body: new Uint8Array([2]), ttlSeconds: 60 });
+      await cache.set({ key: "c", tag: "traces", body: new Uint8Array([3]), ttlSeconds: 60 });
 
       await cache.invalidateTag("annotations");
 

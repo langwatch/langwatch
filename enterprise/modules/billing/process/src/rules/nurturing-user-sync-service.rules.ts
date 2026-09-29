@@ -2,11 +2,13 @@ import type { CioOrgTraits, CioPersonTraits } from "@langwatch/enterprise-billin
 import { parseGuidedOnboardingState, parseOnboardingVariant } from "@langwatch/onboarding-contract";
 import { nowInstant } from "@langwatch/time";
 
+import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
 import {
   guidedOnboardingOrgTraits,
   guidedOnboardingPersonTraits,
 } from "./nurturing-guided-onboarding-service.rules.ts";
-import { findProfiles, findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
+import { reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 /**
  * Users backfilled with a full profile this process lifetime. Process-local:
@@ -37,13 +39,15 @@ function readGuidedOnboardingTraits(signupData: unknown): {
  * Reads the user's full profile through the registered reader and sends it
  * to Customer.io. Only called on first login per process lifetime.
  */
-async function performFullSync({ userId }: { userId: string }): Promise<void> {
-  const nurturing = findSink();
-  if (!nurturing) return;
-
-  const profiles = findProfiles();
-  if (!profiles) return;
-
+async function performFullSync({
+  nurturing,
+  profiles,
+  userId,
+}: {
+  nurturing: NurturingService;
+  profiles: NurturingProfileRepository;
+  userId: string;
+}): Promise<void> {
   const profile = await profiles.findProfile(userId);
   if (!profile) return;
 
@@ -76,15 +80,18 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
  * process lifetime; every later call this lifetime is a no-op. Fire-and-forget.
  */
 export function ensureUserSynced({
+  nurturing,
+  profiles,
   userId,
   hasOrganization,
 }: {
+  nurturing: NurturingService | undefined;
+  profiles: NurturingProfileRepository | undefined;
   userId: string;
   /** False when onboarding incomplete; skips identify to avoid ghosts. */
   hasOrganization: boolean;
 }): void {
-  const nurturing = findSink();
-  if (!nurturing) return;
+  if (!nurturing || !profiles) return;
   if (!hasOrganization) return;
   if (syncedUserIds.has(userId)) return;
 
@@ -93,7 +100,7 @@ export function ensureUserSynced({
   // next login can retry.
   syncedUserIds.add(userId);
 
-  void performFullSync({ userId }).catch((error) => {
+  void performFullSync({ nurturing, profiles, userId }).catch((error) => {
     syncedUserIds.delete(userId);
     reportFailure(error);
   });

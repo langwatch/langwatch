@@ -2,6 +2,7 @@ import type { Span, Trace } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
   type ConversationTurnSource,
+  type ConversationView,
   type RenderedConversationMarkdown,
   renderConversationMarkdown,
 } from "@langwatch/trace-contract/conversation";
@@ -19,14 +20,17 @@ export function renderThreadConversation({
   threadKey,
   traces,
   maxTokens,
+  view,
 }: {
   threadKey: string;
   traces: readonly Trace[];
   maxTokens?: number;
+  view: ConversationView;
 }): RenderedConversationMarkdown {
   return renderConversationMarkdown({
     conversationId: threadKey,
     turns: buildParsedTurns({ turns: traces.map((trace) => traceToConversationTurn({ trace })) }),
+    view,
     ...(maxTokens === undefined ? {} : { maxTokens }),
   });
 }

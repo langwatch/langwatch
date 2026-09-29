@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const MIGRATIONS_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../../../../../../packages/prisma-client/prisma/migrations",
+  "../../../../../../../packages/prisma-client/prisma/migrations",
 );
 
 /**

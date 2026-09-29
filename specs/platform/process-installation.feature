@@ -58,6 +58,13 @@ Feature: Every installed module boots in the process that installs it
     Then the gateway spend pipeline hosts gatewayDebits, the name its stored rows are keyed by
 
   @integration
+  Scenario: The worker hands gateway's governance facts to webhook delivery
+    Given the worker's installed modules over memory stores
+    When the worker process boots
+    Then governance_events_processing hosts gateway's webhook governance subscriber
+    And webhook_delivery hosts governanceEventsDelivery, the name its stored rows are keyed by
+
+  @integration
   Scenario: A SaaS worker registers the billable-events meter
     Given the worker's installed modules over memory stores on a SaaS deployment
     When the worker process boots

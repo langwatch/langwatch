@@ -21,8 +21,9 @@ import { serveBuiltUi } from "./static-ui";
 const FREEZE_CSS =
   "*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}";
 
+// The splash screen and its fade-out ghost (design-system loading-screen.tsx) count as loading.
 const LOADING_SELECTOR =
-  '.chakra-skeleton,[data-skeleton],[aria-busy="true"],[data-loading="true"],.chakra-spinner';
+  '.chakra-skeleton,[data-skeleton],[aria-busy="true"],[data-loading="true"],.chakra-spinner,[data-testid="loading-screen"],[data-loading-screen-ghost]';
 
 const MAX_SCREENSHOT_HEIGHT = 6000;
 
@@ -411,6 +412,7 @@ export const captureMessage = ({
   notFound,
   blank,
   ariaSnapshot,
+  expect,
 }: {
   kind: "route" | "flow";
   key: string;
@@ -423,6 +425,7 @@ export const captureMessage = ({
   notFound: boolean;
   blank: boolean;
   ariaSnapshot: string;
+  expect?: string;
 }): CaptureMessage => {
   const drained = side.drain();
   return {
@@ -442,5 +445,6 @@ export const captureMessage = ({
     ariaSnapshot,
     error,
     durationMs,
+    ...(expect === undefined ? {} : { expect }),
   };
 };

@@ -92,8 +92,7 @@ func trpcData(body map[string]any, field string) (string, bool) {
 	return "", false
 }
 
-// budgetsPath is the gateway's budget create, which the run never probes
-// (the gateway family is excluded) but whose budget the CLI overview lists.
+// budgetsPath is the gateway's budget create, whose budget the CLI overview lists.
 const budgetsPath = "/api/gateway/v1/budgets"
 
 // budgetsProcedure is the dashboard's budget create, the fallback where a

@@ -171,6 +171,11 @@ export abstract class ScimRepository extends ScimGrantRepository {
     role: string;
   }) => Promise<void>;
   abstract removeMembership: (input: { organizationId: string; userId: string }) => Promise<void>;
+  /** The organization-scoped roles this person's SCIM-pushed groups here are mapped to. */
+  abstract findDirectoryAssertedRoles(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]>;
   abstract findGroup(input: {
     organizationId: string;
     id: string;

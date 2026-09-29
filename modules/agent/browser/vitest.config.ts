@@ -13,14 +13,12 @@ export default defineConfig({
         find: /^@langwatch\/agent-contract$/,
         replacement: fileURLToPath(new URL("../contract/src/index.ts", import.meta.url)),
       },
-      {
-        find: /^@langwatch\/agent-contract\/(.+)$/,
-        replacement: `${fileURLToPath(new URL("../contract/src/", import.meta.url))}$1.ts`,
-      },
     ],
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
+    // Ten suites replace modules with vi.mock, so each file needs its own registry.
+    isolate: true,
     test: {
       setupFiles: ["./vitest.setup.ts"],
       // The screen's suite drives real user events through Chakra overlays; under

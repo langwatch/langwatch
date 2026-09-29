@@ -16,7 +16,10 @@ import { describe, expect, it } from "vitest";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
 import { ModelProviderApp } from "../model-provider.app.ts";
-import { createModelProviderTestDataPrivacy } from "./model-provider.fixture.ts";
+import {
+  createModelProviderTestDataPrivacy,
+  createModelProviderTestManagedProviders,
+} from "./model-provider.fixture.ts";
 
 function testProject(id: string) {
   return projectWithTeamSchema.parse({
@@ -111,6 +114,7 @@ function createRealModelProviderApp(
       organizations: createFullModelProviderTestOrganizations(),
       permissions: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       dataPrivacy: createModelProviderTestDataPrivacy(),
+      managed: createModelProviderTestManagedProviders(),
     },
     members: {
       redis: fakeRedis(),

@@ -1,7 +1,7 @@
 ---
 title: Instant Evals targets and statements
 sidebarTitle: Targets and statements
-keywords: langwatch, instant evals, target, threads, traces, llm spans, trace filter, langwatchql statement, eval functions, conversation, llm_readable_trace
+keywords: langwatch, instant evals, target, threads, traces, llm spans, trace filter, langwatchql statement, eval functions, conversation, llm_readable_thread, llm_readable_trace
 description: What one judged row is, how the time window and the trace filter narrow the rows, the LangWatchQL statement each target writes for you, and how to write your own.
 ---
 
@@ -9,11 +9,11 @@ description: What one judged row is, how the time window and the trace filter na
 
 A target is one of `traces`, `threads` or `llm-spans`. It sets what one judged row is and which text the judge reads for it. Pass it as `--target` on the CLI or `target` on the API; the default is `traces`.
 
-| Target      | One row is       | What the judge reads                                                                                     | Pick it for                                                                                                       |
-| ----------- | ---------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `traces`    | One trace        | A digest of the trace's spans, 8,000 tokens at most: the failed spans, the model calls, then the slowest | Questions about what the agent did on one turn: tools called, errors, tests run                                   |
-| `threads`   | One conversation | The whole transcript, the way the trace drawer renders it                                                | Questions about how a conversation went: tone, resolution, what the customer asked for                            |
-| `llm-spans` | One LLM call     | The input and output messages of that call                                                               | Questions about one prompt: whether the model was asked two things at once, whether it followed the system prompt |
+| Target      | One row is       | What the judge reads                                                                                                | Pick it for                                                                                                       |
+| ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `traces`    | One trace        | A digest of the trace's spans, 8,000 tokens at most: the failed spans, the model calls, then the slowest            | Questions about what the agent did on one turn: tools called, errors, tests run                                   |
+| `threads`   | One conversation | The whole thread with the agent's work on each turn: model calls, tool calls with arguments and results, retrievals | Questions about how a conversation went or what the agent did across it: tone, resolution, tools called           |
+| `llm-spans` | One LLM call     | The input and output messages of that call                                                                          | Questions about one prompt: whether the model was asked two things at once, whether it followed the system prompt |
 
 A conversation is one row when its traces share a `gen_ai.conversation.id`. A project that does not set one has no rows under `threads`, so ask for `traces` instead.
 
@@ -80,7 +80,7 @@ SELECT
   argMax(m.TraceId, m.OccurredAt) AS TraceId,
   m.ConversationId AS ThreadId,
   max(m.OccurredAt) AS OccurredAt,
-  eval(conversation(m.ConversationId), 'the customer sounds annoyed') AS q1
+  eval(llm_readable_thread(m.ConversationId, 18729), 'the customer sounds annoyed') AS q1
 FROM analytics.trace_metrics AS m
 WHERE m.OccurredAt >= {start_at:DateTime}
   AND m.OccurredAt < {end_at:DateTime}
@@ -108,13 +108,19 @@ A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it
 
 ## What is the token budget per row
 
-Under `traces` the digest is cut to 8,000 tokens. Under `threads` and `llm-spans` the text goes to the judge whole, up to the judge's own ceiling of about 31,000 tokens once your questions are counted in. A long conversation therefore costs more than a short one, and the estimate measures your rows as they are.
+Under `traces` the digest is cut to 8,000 tokens. Under `threads` the budget handed to `llm_readable_thread` is the judge's whole text budget, about 31,000 judge tokens once your questions are counted in, so an ordinary conversation arrives whole. The number in the statement, `18729` for one short question, is that budget in the renderer's own count of four bytes per token. Under `llm-spans` the text goes to the judge whole, up to the same ceiling.
 
-When a conversation is over the ceiling, you still get a verdict: LangWatch keeps the opening and closing turns and puts a marker in the middle with the number of turns left out, so a question about how the conversation ended still reads the ending. To choose the budget yourself, write the statement with `conversation_bounded`, which cuts the same way at the size you name:
+A long conversation costs more than a short one, and the estimate measures your rows as they are.
+
+When a conversation is over the budget, you still get a verdict: every turn is shortened before any is dropped, and when turns do have to go, the opening and closing turns stay and a marker in the middle names the turns left out. A question about how the conversation ended still reads the ending.
+
+`threads` reads the agent's work because a question about tools needs it and a question about the conversation scores within 2.5 points of the plain transcript. To judge only what was said, at fewer tokens, write the statement with `conversation_bounded`, which shows each turn's messages and the names of the tools it used:
 
 ```sql
 eval(conversation_bounded(m.ConversationId, 8000, ''), 'the customer left angry') AS q1
 ```
+
+[Which thread function to use](/api-reference/query/extraction-functions#which-thread-function-to-use) has the measurements behind the choice.
 
 ## Writing your own statement
 
@@ -149,16 +155,17 @@ Send either `--sql` or `--target`, not both. Use `--param` only with your own st
 
 The text to judge is one of these functions over the row's key:
 
-| Function                                                           | Text                                                                                                                                                                                                             |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `conversation(ConversationId)`                                     | The whole thread as one transcript: the system prompt once, then one section per turn                                                                                                                            |
-| `conversation_bounded(ConversationId, max_tokens, until_trace_id)` | The same transcript under a token budget, opening and closing turns kept. Pass `''` as `until_trace_id` to read the whole thread, or a trace id to stop there, so a judgement reads only what the agent had seen |
-| `llm_readable_trace(TraceId, max_tokens)`                          | The trace as a span digest, cut to the budget by keeping the structure and expanding the failed spans, then the model calls, then the slowest                                                                    |
-| `llm_messages(TraceId)`                                            | The chat messages of the trace's main LLM call, as JSON `{input, output}`                                                                                                                                        |
-| `llm_input_messages(TraceId)`                                      | The request side only: the history the model was given on this turn                                                                                                                                              |
-| `llm_output_messages(TraceId)`                                     | The response side only: everything the agent did from the last request on, tool calls included                                                                                                                   |
-| `llm_messages_span(TraceId, SpanId)`                               | The chat messages of one named span                                                                                                                                                                              |
-| `trace_json(TraceId)`                                              | The whole trace as one JSON object, spans included                                                                                                                                                               |
+| Function                                                           | Text                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `conversation(ConversationId)`                                     | The thread as the chat view shows it: the system prompt once, then each turn's user message and reply, with one line naming the tools the turn used. Best for questions about what was said                                                                  |
+| `conversation_bounded(ConversationId, max_tokens, until_trace_id)` | The same transcript under a token budget: every turn shortened before any is dropped, opening and closing turns kept. Pass `''` as `until_trace_id` to read the whole thread, or a trace id to stop there, so a judgement reads only what the agent had seen |
+| `llm_readable_thread(ConversationId, max_tokens)`                  | The thread with the agent's work between each user message and reply: model calls with token counts, tool calls with arguments and results, retrievals. Best for questions about what the agent did, and the safe default                                    |
+| `llm_readable_trace(TraceId, max_tokens)`                          | The trace as a span digest, cut to the budget by keeping the structure and expanding the failed spans, then the model calls, then the slowest                                                                                                                |
+| `llm_messages(TraceId)`                                            | The chat messages of the trace's main LLM call, as JSON `{input, output}`                                                                                                                                                                                    |
+| `llm_input_messages(TraceId)`                                      | The request side only: the history the model was given on this turn                                                                                                                                                                                          |
+| `llm_output_messages(TraceId)`                                     | The response side only: everything the agent did from the last request on, tool calls included                                                                                                                                                               |
+| `llm_messages_span(TraceId, SpanId)`                               | The chat messages of one named span                                                                                                                                                                                                                          |
+| `trace_json(TraceId)`                                              | The whole trace as one JSON object, spans included                                                                                                                                                                                                           |
 
 ### Eval functions
 

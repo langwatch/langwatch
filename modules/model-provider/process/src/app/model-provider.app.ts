@@ -1,5 +1,6 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 /**
  * The model-provider feature's application: what `modelProvider.*`, `llmModelCost.*` and
@@ -209,6 +210,7 @@ export class ModelProviderApp implements ModelProviderApi {
     organizations: OrganizationApi,
     permissions: AuthzApi,
     dataPrivacy: DataPrivacyApi,
+    managed: ManagedProviderApi,
   };
   static readonly config = modelProviderConfig;
   /**

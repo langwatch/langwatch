@@ -100,4 +100,6 @@ export abstract class ScenarioExecutionService {
     scenarioRunId: string;
     agentInstance: ScenarioAgentInstance;
   }): Promise<void>;
+  /** Marks a voice run LangWatch ended at the maximum call duration (AC28). */
+  abstract recordCutAtLimit(input: { projectId: string; scenarioRunId: string }): Promise<void>;
 }

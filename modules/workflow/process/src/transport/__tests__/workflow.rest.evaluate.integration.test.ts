@@ -195,7 +195,10 @@ describe("POST /api/workflows/:id/evaluate", () => {
       const response = await post(
         buildApi({
           triggerEvaluation: vi.fn<() => never>(() => {
-            throw new NotFoundError("workflow_not_found", "Workflow", "workflow_elsewhere");
+            throw new NotFoundError("workflow_not_found", {
+              resource: "Workflow",
+              id: "workflow_elsewhere",
+            });
           }),
         }),
         "workflow_elsewhere",

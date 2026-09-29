@@ -10,7 +10,7 @@ mode is not a red test: it is a screen that still renders, still looks right,
 and quietly lost the endpoint behind it.
 
 ```text
-visualdiff run [-base REF] [-candidate REF] [-routes-only] [-flows a,b]
+visualdiff run [-base REF] [-candidate REF] [-routes-only] [-routes /a,/b] [-flows a,b]
                [-viewport 1440x900] [-config PATH] [-root DIR]
                [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                [-dry-run] [-keep] [-agent] [-no-haven]
@@ -18,7 +18,7 @@ visualdiff run [-base REF] [-candidate REF] [-routes-only] [-flows a,b]
                [-no-fail-fast] [-resume RUNID]
 visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E]
 visualdiff coverage [-base REF] [-candidate REF] [-config PATH]
-visualdiff gc [-kept] [-no-haven]
+visualdiff gc [-kept] [-no-haven] [-older-than 168h]
 visualdiff publish -run-dir DIR [-pr N] [-link URL] [-base REF] [-candidate REF]
 ```
 
@@ -96,16 +96,26 @@ base will be replayed from a baseline or rendered live. It starts nothing.
 
 ## Baselines, editions and failing fast
 
+**Main is pinned.** Without `-base`, the base is `origin/main` at a commit
+recorded in `.visualdiff/baselines/main-pin.json`. Each run prints the pin
+and why it did or did not move; it moves when there is no pin yet, when the
+pinned commit is gone, on `-rebase-main`, and once `git diff --shortstat
+pin origin/main` counts 2000 changed lines or more. Naming `-base` renders
+that ref as it is, unpinned.
+
 **Baselines.** Booting the base is most of a run's cost, and the base does
 not move while you fix your branch. Each live base pass is cached under
 `.visualdiff/baselines/<commit>-<edition>-<hash>/` (captures plus
 screenshots). The hash covers what changes a capture: the viewport, the
 settle and fixtures configuration and the runner sources that capture,
 settle and diff (`captureSources` in baseline.go). Its `meta.json` lists the
-routes and flow steps it recorded; a plan it does not cover renders the base
-live and replaces it. A run whose
-every edition has a baseline never checks out or boots the base at all: only
-the candidate stack comes up. `-refresh-baseline` re-renders and replaces
+routes and flow steps it recorded. A run prints, per edition, `main: <edition>
+cached (N) / live (M, why)`. A run whose every edition's baseline holds every
+route and flow step it asks for never checks out or boots the base: only the
+candidate stack comes up. When a baseline lacks some (a new route, a new flow,
+a flow whose steps or expects changed), the base boots, renders only those
+alone before the diff, and adds them to the baseline (baseline_fill.go); the
+diff then replays the base from it. `-refresh-baseline` re-renders and replaces
 it; `-no-baseline` neither reads nor writes one.
 
 **Editions.** Both refs seed the same signed local-dev enterprise licence onto
@@ -197,6 +207,17 @@ stack:
    `origin/main`) already builds the SDK and the MCP server inline, and
    `ensure-built.mjs` does not exist there at all.
 
+On a persistent worktree a step whose inputs are unchanged since it last
+finished there is skipped (reuse.go): the install when the lockfile, the
+workspace file, `.npmrc`, `.pnpmfile.cjs` and `patches` are unchanged and
+`node_modules` is there; the generated files, and the UI build, when the code
+inputs are unchanged (every top-level entry but Go, docs, specs, tools and
+infrastructure, plus `services/langevals/ts-integration` and
+`services/langyworker`). Inputs are git object ids, never mtimes.
+`ensure-built.mjs` checks itself and runs every time, after the run removes
+any `.ensure-built.lock` a killed prepare left: that script waits 180s on a
+stale lock, which cost runs 20260929-161501 and -164614 over three minutes each.
+
 Every step's name and exit status go to the run log as it runs; nothing here
 ever logs a byte of `.env`'s contents. See
 `specs/tooling/visualdiff-on-haven.feature`'s "A fresh worktree is prepared
@@ -212,6 +233,28 @@ lanes it supervises either - it resolves secrets itself and injects them into
 the processes it starts) but is worth knowing if you are chasing a monolith
 ref's crash-loop on the port-based path.
 
+## Proving a flow works
+
+A flow ends in `expect` steps; each takes exactly one form and polls up to
+`timeout` millis (10000 by default), then fails its step:
+
+```yaml
+- action: expect
+  with: { text: VD Alert }                          # visible text; role/name scope it
+- action: expect
+  with: { count: "role=row", min: "3" }             # or equals
+- action: expect
+  with: { url: /simulations/scenarios }
+- action: expect
+  with: { api: /api/triggers, contains: VD Alert }  # field, min, equals too
+```
+
+An expect failing on the candidate alone is `broken`. Each run writes
+`verdict.md` (one line per flow: works, broken, broken-both, layout-only,
+unproven, with the first failure) and `signatures.md` (log lines by shape,
+new on the candidate first). Read `verdict.md` first; open PNGs only for
+broken rows. `visualdiff done` keeps a flow's held expects as its proof.
+
 ## Classification
 
 One classifier (`classify.go`) decides every screen, for the report,
@@ -219,20 +262,21 @@ One classifier (`classify.go`) decides every screen, for the report,
 that applies wins, and every row keeps both screenshots so a person can
 overrule it. The finding classes fail the run (exit 1):
 
-| Class               | Rule                                                                            |
-| ------------------- | ------------------------------------------------------------------------------- |
-| `missing-candidate` | the base captured the screen and the candidate never did                        |
-| `missing-base`      | the candidate captured the screen and the base never did - nothing compared     |
-| `capture-failed`    | a side's own modules did not load, even taken again alone - the tool's failure  |
-| `broken-both`       | the route or flow step fails on both refs                                       |
-| `regression`        | the candidate fails, or logs a console error, where the base does not           |
-| `not-found`         | the candidate shows its not-found page where the base renders the screen        |
-| `blank`             | the candidate page has no text at all, on any route or step                     |
-| `redirect`          | the candidate ends on a different path (ids masked) than the base               |
-| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make             |
+| Class               | Rule                                                                                         |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `missing-candidate` | the base captured the screen and the candidate never did                                     |
+| `missing-base`      | the candidate captured the screen and the base never did - nothing compared                  |
+| `capture-failed`    | a side's own modules did not load, even taken again alone - the tool's failure               |
+| `broken-both`       | the route or flow step fails on both refs                                                    |
+| `broken`            | a flow's `expect` fails on the candidate and holds on the base: the feature does not work    |
+| `regression`        | the candidate fails, or logs a console error, where the base does not                        |
+| `not-found`         | the candidate shows its not-found page where the base renders the screen                     |
+| `blank`             | the candidate page has no text at all, on any route or step                                  |
+| `redirect`          | the candidate ends on a different path (ids masked) than the base                            |
+| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make                          |
 | `layout`            | the page changed size, 5% or more of its covered area moved, or pixels differ by 10% or more |
-| `controls`          | a button, link, heading, tab or form field one side has and the other lacks     |
-| `uncovered`         | a route either ref declares that `visualdiff.yaml` neither renders nor excludes |
+| `controls`          | a button, link, heading, tab or form field one side has and the other lacks                  |
+| `uncovered`         | a route either ref declares that `visualdiff.yaml` neither renders nor excludes              |
 
 The informational classes are reported and never fail it:
 
@@ -292,6 +336,19 @@ its `report/*/findings.json`: `-pr` names the pull request and `-link` adds
 the full report's address. It exits 0 when it published, 1 when it skipped
 and said why, 2 when it failed.
 
+### The parity status
+
+The same publish also keeps the pull request body's parity status current.
+Between `<!-- parity-status:start -->` and `<!-- parity-status:end -->`, under
+`### visualdiff flows`, each row whose flow this run covered gets its
+`last result` (every edition's verdict and first failure) and `state` (the
+worst edition's: ❌ broken, ❔ broken-both, 🟡 layout-only, ⬜ unproven,
+✅ works) from the run's verdicts. A covered flow with no row gets one, and the
+heading's count follows. Every other row and everything outside the markers
+stays as it was; a body without the markers is left alone. The body is read
+with `gh api repos/{owner}/{repo}/pulls/N` and written back with
+`-X PATCH -F body=@<run>/pr-body.md`.
+
 ## Running in CI
 
 `.github/workflows/visualdiff.yml` runs on every non-draft pull request that
@@ -321,6 +378,24 @@ push cancels the one still going. It follows `apidiff.yml` and `e2e-ci.yml`:
 
 Findings are for review and never fail the job; exit 2 does, and prints the
 end of every stack log into the step's output.
+
+## Refusing a slow machine, and where the time goes
+
+A run refuses to start, before it creates its directory, on battery, above
+`-max-load` (a 1-minute load average of 20 by default), or while another live
+or kept run's `visualdiff-*` stack is up; `-force` runs anyway. Each side
+captures on `-pages` pages: half the CPUs by default, and never more than the
+CPUs the load leaves free.
+
+Every phase's wall time goes to run.log as `phase: <name> <duration>` and to
+the end of summary.txt: each side's install, prepare, ui build and boot, the
+seed, each edition's runner and, from the runner, each side's capture,
+recapture and flows, the main top-up, and teardown.
+
+Run 17 recaptured 138 screens alone, every one held back as blank (none for a
+module failure) while its API answered in up to eleven seconds (2062 late
+requests, against 17 in run 16). That was load, not an eager settle: the
+refusal above covers it.
 
 ## Capturing under concurrency
 
@@ -352,9 +427,11 @@ never cached. `-dev-ui` keeps both sides on their dev servers. Dev-only chrome
 
 Every run first collects what dead runs left behind (`visualdiff gc` does
 the same on its own): a run directory whose `pid` names no live process
-loses its haven stacks (and with them their databases), its own worktrees
-(never the persistent `.visualdiff/worktrees`) and,
-except for the newest one whose report may still be open, its directory.
+loses its haven stacks (and with them their databases) and its own worktrees
+(never the persistent `.visualdiff/worktrees`). A run keeps its own directory
+and the previous run's, and deletes every older run directory; a kept or live
+run, and a directory not named as a run time, are left alone. `visualdiff gc`
+by hand removes run directories older than `-older-than` (a week by default).
 Registered `visualdiff-*` stacks no run owns are destroyed, then `git
 worktree prune` runs. A `-keep` run is left alone unless `gc -kept`.
 
@@ -424,6 +501,61 @@ never tears anything down - both are the `run` step's job, not
 `recapture`'s. See `specs/tooling/visualdiff-on-haven.feature`'s "A findings
 stream reports each comparison as it completes" rule for the bound scenarios.
 
+## Marking a section done
+
+A section is one route or one flow in one edition. Once it is signed off, keep
+its proof and stop capturing it:
+
+```bash
+go run ./cmd/visualdiff done -run 20260929-161501 -route /{slug}/settings -note "copy only, wording agreed"
+go run ./cmd/visualdiff done -list                                # key, candidate commit, date, note
+go run ./cmd/visualdiff done -undo enterprise/route-%2F%7Bslug%7D%2Fsettings
+```
+
+`done` copies the section's screenshots and diffs, its rows (aria snapshots,
+console errors, failed requests) and a `meta.json` (run id, both commits, date,
+note, classes) from `report/<edition>/findings.json` into
+`.visualdiff/done/<edition>/<key>/`, which is local and gitignored. It refuses a
+section with any class but `noise`, `copy` or `intended-restore` unless `-force`
+is given. Every later `run` skips done sections and prints how many and which;
+a skip is neither a finding nor `uncovered`. `-include-done` captures them
+anyway, for a periodic full pass.
+
+## Skipping what works
+
+Every finished run records, in `.visualdiff/works.json`, each route with no
+finding and each flow judged `works`, at the candidate commit; a section that
+fails again is forgotten. A later run skips a recorded section while
+`git diff --name-only <commit> <candidate> --` is empty over what it touches:
+the module whose `defineWebModule` screens declare its path (its `browser`,
+`browser-kit`, `process` and `contract`), `packages/browser-host`,
+`packages/design-system`, `apps/ui` and the runner's source. A flow touches the
+modules of its `go` steps' paths, and its steps and expects must hash as
+recorded. The map is read from the candidate's screen declarations at run
+time. A route no module declares, or a flow with no `go` step, is walked and
+the reason printed. The dry run lists the skips, and verdict.md ends with
+`skipped (works at <sha>, unchanged)` per section. `-include-done`, `-routes`
+and `-flows` walk everything they name.
+
+## The fix loop
+
+```bash
+go run ./cmd/visualdiff flow automation-alert     # boots or reuses the loop's candidate stack
+go run ./cmd/visualdiff route /{slug}/prompts -edition free
+go run ./cmd/visualdiff down                      # stops the loop's stacks
+```
+
+`flow` and `route` run one section against main's pinned, cached baseline
+(topped up when it lacks the section) on a candidate stack kept under
+`.visualdiff/loop`, and print its verdict line and verdict.md's path. The first
+call boots the stack; later calls reuse it. A later call moves the candidate
+worktree to the candidate ref's commit when it changed and re-prepares it with
+the reuse keys, so only a changed lockfile reinstalls and only changed code
+rebuilds the UI; the backend lanes' watchers restart on the new files. The loop
+renders commits, not uncommitted edits. While the loop is up, a full `run`
+refuses to start beside it; `down` destroys its stacks and removes the
+directory.
+
 ## Adding a route
 
 Add the path to `routes:` in `tools/visualdiff/visualdiff.yaml`. `{slug}` is substituted with
@@ -488,6 +620,7 @@ tools/visualdiff/haven.go            the haven boot path: slugs, up, readiness, 
 tools/visualdiff/findings_stream.go  findings.jsonl: the live tracker, the file writer, run+recapture's shared capture path
 tools/visualdiff/catalogue.go        the module guess, from modules/catalogue.json
 tools/visualdiff/recapture.go        `visualdiff recapture`: replays named routes against a -keep run's own stacks
+tools/visualdiff/done.go             `visualdiff done`: the ledger of signed-off sections a run skips
 tools/havenrun/                      what visualdiff and apidiff share to boot through haven
 cmd/visualdiff/main.go               the entry point
 tools/visualdiff/runner/             @langwatch/visual-diff-runner: Playwright capture + pixel diff

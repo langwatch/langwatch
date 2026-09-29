@@ -4,7 +4,7 @@
 // rest export `src`); `@langwatch/mail` joined because Node can't load
 // its `.tsx` templates directly, so it compiles first.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, rmSync, statSync, utimesSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, utimesSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -73,12 +73,18 @@ for (const target of selected) {
 
   // The three dev lanes each run this hook, concurrently under haven and under
   // `pnpm dev`. Two tsup builds writing one `dist` would race, so the loser of
-  // this mkdir waits for the winner instead of building too.
+  // this mkdir waits for the winner instead of building too. It waits for the
+  // lock to go, not for the entry: tsup writes the JS entry seconds before the
+  // declarations, and a dependant compiled in that gap sees an untyped module.
   const lock = join(dir, "node_modules", ".ensure-built.lock");
+  // A lock older than ten minutes outlived a killed build; nothing still holds it.
+  if (existsSync(lock) && Date.now() - statSync(lock).mtimeMs > 600_000) {
+    rmSync(lock, { recursive: true, force: true });
+  }
   try {
     mkdirSync(lock, { recursive: false });
   } catch {
-    for (let i = 0; i < 900 && !isFresh(); i++) sleep(200);
+    for (let i = 0; i < 900 && existsSync(lock); i++) sleep(200);
     continue;
   }
   try {

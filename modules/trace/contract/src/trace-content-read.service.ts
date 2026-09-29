@@ -1,7 +1,13 @@
 import type { Span, Trace } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { CompiledProjection } from "./trace-projection.types.ts";
-import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
+import type {
+  TraceLegacyListInput,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
+  TracesForProjectResult,
+} from "./trace-read.contract.ts";
 
 export type TraceListTracesInput = {
   query: TraceLegacyListInput;
@@ -70,6 +76,10 @@ export type TraceReadSampleTracesInput = {
 
 export abstract class TraceContentReadService {
   abstract listTraces(input: TraceListTracesInput): Promise<TracesForProjectResult>;
+  abstract listTraceSummaries(input: {
+    query: TraceSummaryListQuery;
+    options?: TraceSummaryListOptions;
+  }): Promise<TraceSummaryPage>;
   abstract findTrace(input: TraceFindTraceInput): Promise<Trace | undefined>;
   abstract readTracesWithSpans(input: TraceReadTracesWithSpansInput): Promise<Trace[]>;
   abstract readTracesWithSpansPreview(

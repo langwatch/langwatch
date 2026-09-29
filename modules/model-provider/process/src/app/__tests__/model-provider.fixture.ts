@@ -6,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 
@@ -133,6 +134,7 @@ export function createModelProviderTestApp(
       organizations: OrganizationApi;
       permissions: AuthzApi;
       dataPrivacy: DataPrivacyApi;
+      managed: ManagedProviderApi;
     }>;
   }> = {},
 ): ModelProviderApp {
@@ -146,7 +148,19 @@ export function createModelProviderTestApp(
         input.dependencies?.permissions ??
         createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       dataPrivacy: input.dependencies?.dataPrivacy ?? createModelProviderTestDataPrivacy(),
+      managed: input.dependencies?.managed ?? createModelProviderTestManagedProviders(),
     },
+  });
+}
+
+/** A deployment with no managed provider: every provider is the customer's own. */
+export function createModelProviderTestManagedProviders(
+  managedOrganizationIds: readonly string[] = [],
+): ManagedProviderApi {
+  return createApiFixture<ManagedProviderApi>({
+    isManagedProvider: ({ organizationId, provider }) =>
+      provider === "bedrock" && managedOrganizationIds.includes(organizationId),
+    buildLitellmParameters: async ({ params }) => params,
   });
 }
 

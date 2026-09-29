@@ -1,18 +1,22 @@
-import { findProfiles, findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
+import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
+import { reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 async function syncSubscriptionTrait({
+  nurturing,
+  profiles,
   organizationId,
   hasSubscription,
 }: {
+  nurturing: NurturingService | undefined;
+  profiles: NurturingProfileRepository | undefined;
   organizationId: string;
   hasSubscription: boolean;
 }): Promise<void> {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }
 
-  const profiles = findProfiles();
   if (!profiles) {
     return;
   }
@@ -33,16 +37,21 @@ async function syncSubscriptionTrait({
  * Syncs has_subscription trait to Customer.io for all members of an organization.
  */
 export function fireSubscriptionSync({
+  nurturing,
+  profiles,
   organizationId,
   hasSubscription,
 }: {
+  nurturing: NurturingService | undefined;
+  profiles: NurturingProfileRepository | undefined;
   organizationId: string;
   hasSubscription: boolean;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }
 
-  void syncSubscriptionTrait({ organizationId, hasSubscription }).catch(reportFailure);
+  void syncSubscriptionTrait({ nurturing, profiles, organizationId, hasSubscription }).catch(
+    reportFailure,
+  );
 }

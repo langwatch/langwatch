@@ -178,6 +178,7 @@ describe("the worker process installation", () => {
       ).toBe(true);
       expect(pipelines).toContain("ingestion_pull_processing");
       expect(pipelines).toContain("ingestion_pull_reconcile");
+      expect(pipelines).toContain("governance_activity_monitor");
       expect(pipelines).toContain("blob_maintenance");
       expect(pipelines).toContain("process_manager_maintenance");
       // Every process that is not producing resolves trace commands from this registration.
@@ -188,6 +189,8 @@ describe("the worker process installation", () => {
         ),
       );
       expect(schedules).not.toEqual([]);
+      expect(schedules).toContain("spendSpikeEvaluation");
+      expect(schedules).toContain("governanceTraceFacts");
     } finally {
       await runtime.stop();
     }
@@ -283,6 +286,26 @@ describe("the worker process installation", () => {
         (definition) => definition.metadata.name === "gateway_spend_processing",
       );
       expect(spend?.processManagers.get("gatewayDebits")?.config.transient).toBe(true);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker hands gateway's governance facts to webhook delivery" */
+  it("hosts gateway's governance subscriber and webhook's governance delivery under main's names", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const pipeline = (name: string) =>
+        eventing.definitions.find((definition) => definition.metadata.name === name);
+      expect(
+        pipeline("governance_events_processing")?.open((definition) =>
+          definition.eventSubscribers.has("webhookGovernanceDelivery"),
+        ),
+      ).toBe(true);
+      expect(pipeline("webhook_delivery")?.processManagers.has("governanceEventsDelivery")).toBe(
+        true,
+      );
     } finally {
       await runtime.stop();
     }

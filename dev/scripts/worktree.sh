@@ -202,6 +202,14 @@ main() {
   echo "Installing dependencies..."
   (cd "$dir" && pnpm install)
 
+  # Build the packages nothing else stands up: `langwatch`, `@langwatch/mcp-server`,
+  # `@langwatch/ksuid` and `@langwatch/mail` are dist-first by design (published to
+  # npm), so an internal import of any of them by name resolves through a `dist`
+  # a fresh worktree has never built, and `pnpm typecheck` alone never triggers it.
+  echo ""
+  echo "Building dist-first published packages..."
+  (cd "$dir" && pnpm run ensure:built)
+
   # Print summary
   echo ""
   echo "Worktree created:"

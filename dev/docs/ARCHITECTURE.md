@@ -236,6 +236,9 @@ The legacy `filters` grammar (a filter field to a parameterised ClickHouse condi
 
 Enterprise-licensed code stays in enterprise modules: auth (open) obtains the SSO provider configs better-auth needs from
 `SsoApi`, building better-auth lazily so no peer is called during construction (Alex, 2026-09-25).
+Model provider asks the enterprise `ManagedProviderApi` whether LangWatch supplies a provider's credentials and
+for a managed call's parameters, naming the project's organization itself so managed-provider holds no project
+peer and closes no cycle (Alex, 2026-09-29).
 
 ### 3.4 The browser half and the kit
 
@@ -1371,6 +1374,14 @@ logged and dropped (Alex, 2026-09-29). A command job
 keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
 append (Alex, 2026-09-29).
 
+A fact is recorded by its owner; delivery modules are handed it; there is no relay module (Alex,
+2026-09-29). Gateway's budget crossings and virtual key lifecycle changes are the case: gateway
+detects a crossing after its own debit lands and records it with `recordBudgetCrossing`, keyed by
+(budget, bucket, kind, period), on its `governance_events_processing` pipeline (main's stored
+names). A subscriber there hands each fact to `WebhookApi.requestGatewayEventDelivery`, and webhook
+builds and delivers the envelope. A failed detection throws and the debit is re-driven. That is
+safe because the ledger insert skips any budget the request has already debited.
+
 ### 9.1 Purge, erase and retention across modules
 
 **Cross-module purge, erase and retention are commanded by the owners** (Alex, 2026-09-29). Work
@@ -1383,6 +1394,10 @@ and never loops over a list of other modules' tables. Progress is tracked per ow
 sees when every owner has finished and which has not. Today's breaks (organization's provisioned
 organization delete, user's data erase, data-retention's retroactive rewrite over other modules'
 tables) move to this shape in their own changes.
+
+A pinned trace is a bookmark, as on main: retention ignores pins (Alex, 2026-09-29). Until the
+branch matches main, ownership moves that change no behaviour wait; they are listed with their
+rollout checks in `dev/docs/plans/ownership-after-parity.md` (Alex, 2026-09-29).
 
 ---
 
@@ -1800,6 +1815,12 @@ owns the membership rows a seat counts and already reads the plan through
 peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing is told through its Api, by §9's
 subscriber on the owner's pipeline (Alex, 2026-09-28).
+
+**Usage warnings: entitlement decides, billing only sends** (Alex, 2026-09-29). Entitlement counts
+the month once per project in the organization's meter and decides the crossed threshold;
+`BillingApi.sendUsageWarning` receives that decision with the per-project counts, and billing
+resolves the admins and project names, sends once per threshold a month and records it. Billing
+counts no usage and holds no `TraceApi` peer for it.
 
 **Enterprise scim owns the directory-sync state** (`ScimSyncState`, its `scim-sync` pipeline,
 guards and ledger); identity keeps none of it, and `ScimApp` builds the sync lifecycle over its

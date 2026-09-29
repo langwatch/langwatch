@@ -10,7 +10,7 @@ import { fromDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
+import { TraceDestinationProjectService } from "../../__tests__/support/trace-destination-project-service.ts";
 import { PostgresVirtualKeyAdapter } from "../../__tests__/testing.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayJwtService } from "../../services/gateway-jwt.service.ts";
@@ -28,6 +28,8 @@ const prisma = connection?.client as PrismaClient;
 const suffix = nanoid(8);
 const ORG_ID = `org-lwl-${suffix}`;
 const USER_ID = `usr-lwl-${suffix}`;
+const TEAM_ID = `team-lwl-${suffix}`;
+const GOVERNANCE_PROJECT_ID = `proj-lwl-gov-${suffix}`;
 const CUSTOMER_NAME = `ACME Rockets ${suffix}`;
 const INSTANCE_ID = `instance-${suffix}`;
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -69,6 +71,7 @@ async function licensedKey({
     organizationId: ORG_ID,
     name: `Connect lic-${nanoid(6)}`,
     scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+    traceProjectId: GOVERNANCE_PROJECT_ID,
     actorUserId: USER_ID,
     purpose: "CONNECT",
   });
@@ -89,7 +92,7 @@ async function licensedKey({
 
 describe.skipIf(!databaseUrl)("a license token on resolve-key (real PG + internal route)", () => {
   beforeAll(async () => {
-    const projects = new TestProjectApi();
+    const projects = new TraceDestinationProjectService(prisma);
     service = PostgresVirtualKeyAdapter.createVirtualKeyServiceForTest(prisma, projects);
     app = mountGatewayInternalRest({
       virtualKeys: service,
@@ -103,6 +106,27 @@ describe.skipIf(!databaseUrl)("a license token on resolve-key (real PG + interna
     await prisma.user.create({
       data: { id: USER_ID, email: `${suffix}@lwl.local`, name: "Operator" },
     });
+    // Licensing names the organization's governance project as the key's trace home.
+    await prisma.team.create({
+      data: {
+        id: TEAM_ID,
+        name: `LWL Team ${suffix}`,
+        slug: `lwl-team-${suffix}`,
+        organizationId: ORG_ID,
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: GOVERNANCE_PROJECT_ID,
+        name: `LWL Governance ${suffix}`,
+        slug: `lwl-gov-${suffix}`,
+        teamId: TEAM_ID,
+        language: "en",
+        framework: "openai",
+        apiKey: `lwl-gov-key-${suffix}`,
+        kind: "internal_governance",
+      },
+    });
   }, 120_000);
 
   afterAll(async () => {
@@ -111,6 +135,8 @@ describe.skipIf(!databaseUrl)("a license token on resolve-key (real PG + interna
     await prisma.virtualKeyScope.deleteMany({ where: { virtualKey: { organizationId: ORG_ID } } });
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.user.deleteMany({ where: { id: USER_ID } });
+    await prisma.project.deleteMany({ where: { id: GOVERNANCE_PROJECT_ID } });
+    await prisma.team.deleteMany({ where: { id: TEAM_ID } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
   }, 60_000);
 

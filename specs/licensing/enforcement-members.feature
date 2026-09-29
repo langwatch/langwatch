@@ -246,20 +246,20 @@ Feature: Member Limit Enforcement with License
   # ============================================================================
 
   @unit @unimplemented
-  Scenario: Add members button is always clickable when admin
+  Scenario: Invite people button is always clickable when admin
     Given the organization has a license with maxMembers 3
     And the organization has 3 members (at limit)
     And I am authenticated as an admin of the organization
     When I view the members page
-    Then the "Add members" button is enabled
-    And the "Add members" button is not visually disabled
+    Then the "Invite people" button is enabled
+    And the "Invite people" button is not visually disabled
 
   @unit @unimplemented
   Scenario: Clicking Add members at limit shows upgrade modal
     Given the organization has a license with maxMembers 3
     And the organization has 3 members (at limit)
     And I am authenticated as an admin of the organization
-    When I click the "Add members" button
+    When I click the "Invite people" button
     Then an upgrade modal is displayed
     And the modal shows "team members: 3 / 3"
     And the modal includes an upgrade call-to-action
@@ -268,7 +268,7 @@ Feature: Member Limit Enforcement with License
   Scenario: The upgrade modal opening is counted with what stopped the action
     Given the organization has a license with maxMembers 5
     And the organization has 5 members (at limit)
-    When I click the "Add members" button
+    When I click the "Invite people" button
     Then an upgrade modal is displayed
     And one event is emitted naming the limit that stopped the action
 
@@ -277,7 +277,7 @@ Feature: Member Limit Enforcement with License
     Given the organization has a license with maxMembers 5
     And the organization has 3 members (under limit)
     And I am authenticated as an admin of the organization
-    When I click the "Add members" button
+    When I click the "Invite people" button
     Then the add members dialog is displayed
     And no upgrade modal is shown
 
@@ -286,7 +286,7 @@ Feature: Member Limit Enforcement with License
     Given the organization has a license with maxMembers 5
     And I am authenticated as a non-admin member of the organization
     When I view the members page
-    Then the "Add members" button is disabled
+    Then the "Invite people" button is disabled
     And the button has tooltip "You need admin privileges to add members"
 
   # ============================================================================

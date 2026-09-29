@@ -424,7 +424,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.reconcileTotalPending", () => {
         // marker (the first pass holds it for the rest of the window), so it
         // measures nothing of its own.
         const otherInstance = QueueRedisRepository.create({ redis });
-        expect(await otherInstance.reconcileTotalPending(queueName)).toBeNull();
+        expect(await otherInstance.reconcileTotalPending(queueName)).toEqual({ kind: "skipped" });
 
         expect(await otherInstance.readPublishedPendingDrift([queueName])).toBe(95);
       });

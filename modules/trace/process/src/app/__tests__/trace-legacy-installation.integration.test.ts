@@ -70,6 +70,7 @@ function bootTraceApp(options: {
   const read: TraceLegacyRead = {
     findById,
     getAllTracesForProject: unread,
+    listTraceSummaries: unread,
     getTracesWithSpans: unread,
     getTracesByThreadId: unread,
     getTracesWithSpansByThreadIds: unread,

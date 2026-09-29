@@ -5,16 +5,28 @@ import type {
 } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
 
-import { USAGE_UNKNOWN, type UsageCount } from "../app/entitlement.members.ts";
+import {
+  USAGE_UNKNOWN,
+  type ProjectUsageCount,
+  type ProjectUsageCounts,
+} from "../app/entitlement.members.ts";
+
+/** A warning to decide, with the per-project counts its total was summed from. */
+export type CountedUsageReading = SendUsageLimitWarningInput & {
+  projectCounts: ProjectUsageCount[];
+};
 
 type UsageWarningSweepDeps = Readonly<{
   isSaas: boolean;
   logger: Pick<Logger, "debug" | "info" | "warn" | "error">;
   organizationIds: () => Promise<string[]>;
   projectIds: (organizationId: string) => Promise<string[]>;
-  currentMonthCount: (organizationId: string) => Promise<UsageCount | "unlimited">;
+  countByProjects: (input: {
+    organizationId: string;
+    projectIds: string[];
+  }) => Promise<ProjectUsageCounts | "unlimited">;
   activePlan: (organizationId: string) => Promise<Pick<PlanInfo, "maxMessagesPerMonth">>;
-  send: (input: SendUsageLimitWarningInput) => Promise<UsageLimitWarning>;
+  send: (input: CountedUsageReading) => Promise<UsageLimitWarning>;
 }>;
 
 /** Main's `/cron/trace_analytics` (routes/cron.ts:79-192): every organization's usage warning. */
@@ -49,18 +61,19 @@ export class UsageWarningSweepService {
       logger.debug({ organizationId }, "organization has no projects, skipping");
       return;
     }
-    const currentMonthCount = await this.deps.currentMonthCount(organizationId);
-    if (currentMonthCount === "unlimited") {
+    const projectCounts = await this.deps.countByProjects({ organizationId, projectIds });
+    if (projectCounts === "unlimited") {
       logger.debug({ organizationId }, "organization has unlimited plan, skipping usage check");
       return;
     }
-    if (currentMonthCount === USAGE_UNKNOWN) {
+    if (projectCounts === USAGE_UNKNOWN) {
       logger.warn(
         { organizationId },
         "usage is unknown, skipping usage check for this organization",
       );
       return;
     }
+    const currentMonthCount = projectCounts.reduce((total, { count }) => total + count, 0);
     const { maxMessagesPerMonth } = await this.deps.activePlan(organizationId);
     if (typeof maxMessagesPerMonth !== "number" || maxMessagesPerMonth <= 0) {
       logger.debug(
@@ -85,6 +98,7 @@ export class UsageWarningSweepService {
       organizationId,
       currentMonthMessagesCount: currentMonthCount,
       maxMonthlyUsageLimit: maxMessagesPerMonth,
+      projectCounts,
     });
   }
 }

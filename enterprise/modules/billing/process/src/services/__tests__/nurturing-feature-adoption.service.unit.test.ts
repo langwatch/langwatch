@@ -13,6 +13,7 @@ import {
 import {
   registerNoNurturingSink,
   registerNurturingSink,
+  wiring,
   settle,
 } from "./support/nurturing-harness.ts";
 
@@ -31,6 +32,7 @@ describe("feature adoption signals", () => {
         const sink = registerNurturingSink();
 
         fireTeamMemberInvited({
+          ...wiring(),
           userId: "user-1",
           teamMemberCount: 4,
           role: "member",
@@ -57,6 +59,7 @@ describe("feature adoption signals", () => {
         const sink = registerNurturingSink();
 
         fireWorkflowCreated({
+          ...wiring(),
           userId: "user-1",
           workflowCount: 2,
           workflowId: "workflow-1",
@@ -80,6 +83,7 @@ describe("feature adoption signals", () => {
         const sink = registerNurturingSink();
 
         fireScenarioCreated({
+          ...wiring(),
           userId: "user-1",
           scenarioCount: 3,
           scenarioId: "scenario-1",
@@ -103,6 +107,7 @@ describe("feature adoption signals", () => {
         const sink = registerNurturingSink();
 
         fireExperimentRan({
+          ...wiring(),
           userId: "user-1",
           experimentId: "experiment-1",
           projectId: "project-1",
@@ -125,6 +130,7 @@ describe("feature adoption signals", () => {
 
         expect(() =>
           fireWorkflowCreated({
+            ...wiring(),
             userId: "user-1",
             workflowCount: 1,
             workflowId: "workflow-1",

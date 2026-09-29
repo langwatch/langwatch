@@ -67,9 +67,9 @@ pg_query() {
 # pass a status-only assertion while collecting nothing.
 #
 # `node -e` rather than curl/wget — the app image is a Node image and is not
-# guaranteed to ship either. `process_cpu_user_seconds_total` is the sentinel
-# because prom-client's default-metrics collector always registers it, so its
-# presence means the registry was really serialized to the caller.
+# guaranteed to ship either. `process_cpu_time_total` is the sentinel because
+# the OpenTelemetry host-metrics collector every process starts in prometheus
+# mode always records it, so its presence means real samples reached the caller.
 #
 #   http_probe <target> <port> <path> [bearer-token]
 http_probe() {
@@ -84,7 +84,7 @@ require("http")
     r.setEncoding("utf8");
     r.on("data", (chunk) => { body += chunk; });
     r.on("end", () => {
-      const hasSamples = /(^|\n)process_cpu_user_seconds_total/.test(body);
+      const hasSamples = /(^|\n)process_cpu_time_total/.test(body);
       console.log(r.statusCode + " " + (hasSamples ? "samples" : "no-samples"));
     });
   })
@@ -989,7 +989,7 @@ test_workers() {
   # ── the liveness probe contract ─────────────────────────────────────────
   # Regression guard for the CrashLoopBackOff class: probing /metrics instead
   # of /healthz crash-loops BOTH a stock install (production + no
-  # METRICS_API_KEY ⇒ the endpoint fails closed with 500) and a secretKeyRef
+  # LANGWATCH_METRICS_TOKEN ⇒ no scrape door, 404) and a secretKeyRef
   # install (an httpGet probe cannot read a Secret ⇒ 401). Assert the live
   # Deployment probes the unauthenticated liveness path and carries no
   # credentials, then prove the endpoint really answers that way in-cluster.
@@ -1015,11 +1015,11 @@ test_workers() {
     "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
 
   # …and confirm WHY the probe cannot use /metrics in this configuration: the
-  # e2e release sets no metrics API key, so the bearer gate fails closed. If
-  # this ever stops being 500, the constraint that forced /healthz has changed
-  # and the probe design should be revisited.
+  # e2e release sets no metrics API key, so the process mounts no scrape door.
+  # If this ever stops being 404, the constraint that forced /healthz has
+  # changed and the probe design should be revisited.
   assert_eq "Worker /metrics fails closed without a key" \
-    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "500 no-samples"
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "404 no-samples"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

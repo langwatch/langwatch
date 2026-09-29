@@ -40,6 +40,7 @@ import {
   SEED_RECENT_WEEK,
   SEEDED_CONTENT,
   SEEDED_DIMENSION_ATTRIBUTE,
+  seedEveryCatalogSource,
   selectRows,
   selectScalar,
   startLangWatchQLClickHouse,
@@ -117,6 +118,7 @@ beforeAll(async () => {
   });
   database = harness.names.database;
   facts = harness.factDatabase;
+  await seedEveryCatalogSource({ admin: harness.admin, database: facts, views: LWQL_VIEW_CATALOG });
   await mapPostgresIntoClickHouse({ harness, postgres });
   await applyShippedViews();
   tenantA = await harness.restrictedClient({
@@ -232,16 +234,19 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
         `${view.sourceTable} is not on the server — the migrations did not run`,
       ).toBeDefined();
 
+      // The catalog names its keys as callers see them; the engine sorts by the source columns.
       const sortingKey = source!.sorting_key.split(", ");
       expect(
-        [...view.dedup.keyColumns],
+        view.dedup.keyColumns.map((key) => catalogShapes.physicalColumn(view, key)),
         `${view.name} declares a key its source does not sort by`,
       ).toEqual(sortingKey);
 
       // The grain can be narrower than the sort key — that is what a
       // time-leading analytics table is — but never something the engine does
       // not sort by, which would be a row identity no dedup shape can honour.
-      for (const column of catalogShapes.grainColumns(view)) {
+      for (const column of catalogShapes
+        .grainColumns(view)
+        .map((key) => catalogShapes.physicalColumn(view, key))) {
         expect(
           sortingKey,
           `${view.name} calls ${column} part of its grain, but ${view.sourceTable} does not sort by it`,
@@ -315,7 +320,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
         // A PostgreSQL-engine table sits in the LangWatchQL database, which is
         // `recordSeedControl`'s default; only the fact tables live elsewhere.
         ...(catalogShapes.isPostgresResident(view) ? {} : { database: facts }),
-        tenantColumn: "TenantId",
+        tenantColumn: view.tenantColumn ?? "TenantId",
       });
       const rows = await selectRows<{ TenantId: string }>(
         tenantA,
@@ -963,7 +968,8 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables w
     )) {
       const tenants = await selectRows<{ TenantId: string }>(
         harness.admin,
-        `SELECT DISTINCT TenantId FROM ${facts}.${view.sourceTable} ORDER BY TenantId`,
+        `SELECT DISTINCT ${view.tenantColumn ?? "TenantId"} AS TenantId ` +
+          `FROM ${facts}.${view.sourceTable} ORDER BY TenantId`,
       );
       expect(
         tenants.map((row) => row.TenantId),

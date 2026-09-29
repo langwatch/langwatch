@@ -86,6 +86,9 @@ import {
   type TraceAnnotationMarker,
   type TraceSuggestionTarget,
   type TraceSummaryData,
+  type TraceSummaryListOptions,
+  type TraceSummaryListQuery,
+  type TraceSummaryPage,
   type TraceByIdInput,
   type TraceRecord,
   type TraceFullReadInput,
@@ -165,9 +168,11 @@ import {
   type TraceMetadataUpdate,
   type TracePreconditionSampleInput,
 } from "@langwatch/trace-contract";
+import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
 
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
+import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { RedisTraceExportSlotRepository } from "../repositories/redis/redis.trace-export-slot.repository.ts";
@@ -233,7 +238,6 @@ import { TraceLogRecordIOService } from "../services/trace-log-record-io.service
 import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
-import { TraceProcessingPipelineService } from "../services/trace-processing-pipeline.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
 import type { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
@@ -758,7 +762,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
     const tokenizer = tokenCounterChannels.live.create(input.config.tokenizer);
     input.resources.own("Trace tokenizer", () => tokenizer.close());
-    app.#processing = TraceProcessingPipelineService.create({
+    app.#processing = TraceProcessingRuntimeAdapter.create({
       processName: input.members.processName,
       tokenizer,
       peers: input.dependencies,
@@ -773,7 +777,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     return app;
   }
 
-  #processing: TraceProcessingPipelineService | null = null;
+  #processing: TraceProcessingRuntimeAdapter | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
@@ -961,6 +965,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   async renderThreadTranscript(input: {
     threadKey: string;
     traces: readonly Trace[];
+    view: ConversationView;
     maxTokens?: number;
   }): Promise<string> {
     // The text alone: the renderer writes its own omitted-turn marker into the
@@ -1055,6 +1060,19 @@ export class TraceApp implements TraceApi, CollectorApp {
         ...input.query,
         ...(pageSize === undefined ? {} : { pageSize }),
       },
+    });
+  }
+  async listTraceSummaries(input: {
+    query: TraceSummaryListQuery;
+    options?: TraceSummaryListOptions;
+  }): Promise<TraceSummaryPage> {
+    const pageSize =
+      input.query.pageSize === undefined
+        ? undefined
+        : await this.#readBounds.clampPageSize(input.query.projectId, input.query.pageSize);
+    return this.#contentReader.listTraceSummaries({
+      ...input,
+      query: { ...input.query, ...(pageSize === undefined ? {} : { pageSize }) },
     });
   }
   findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
@@ -2572,7 +2590,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   }): Promise<CodingAgentTranscript> {
     const { protections } = input;
     return this.#transcriptRead.readCodingAgentTranscript({
-      app: this,
+      reads: this,
       ports: {
         getVisibilityWindow: async () => ({
           visibilityCutoffMs: protections.visibilityCutoffMs ?? null,

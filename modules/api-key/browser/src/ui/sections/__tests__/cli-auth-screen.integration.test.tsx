@@ -223,6 +223,67 @@ describe("given an organization admin", () => {
   });
 });
 
+describe("given the CLI asked for management access", () => {
+  const managementLookup = {
+    outcome: "pending" as const,
+    userCode: "WDJB-MJHT",
+    status: "pending",
+    expiresAt: Date.now() + 600_000,
+    credentialType: "device_session" as const,
+    management: true,
+  };
+
+  describe("when an organization admin approves", () => {
+    /** @scenario The approval screen shows management access when the CLI asked for it */
+    it("lists what management adds and sends it with the organization binding", async () => {
+      const user = userEvent.setup();
+      state.bindings = [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }];
+      const host = hostFor({ lookup: managementLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+      const request = await screen.findByTestId("cli-auth-management-request");
+      expect(request).toHaveTextContent("Management access requested");
+      expect(request).toHaveTextContent("Create teams and manage their members");
+      expect(request).toHaveTextContent("Manage the organization's settings, members and roles");
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Approve" })).not.toBeDisabled(),
+      );
+      await user.click(screen.getByRole("button", { name: "Approve" }));
+      await waitFor(() => expect(host.approvals).toHaveLength(1));
+
+      expect(host.approvals[0]!.keySelection?.bindings).toEqual([
+        { scopeType: "ORGANIZATION", scopeId: "org-1" },
+      ]);
+      expect(host.approvals[0]!.keySelection?.permissions).toEqual(
+        expect.arrayContaining(["team:manage", "organization:manage"]),
+      );
+      expect(host.approvals[0]!.keySelection?.permissions).not.toContain("organization:delete");
+      expect(request).not.toHaveTextContent("Delete the organization");
+    });
+  });
+
+  describe("when a member who holds no management permission opens it", () => {
+    /** @scenario Management access is refused to a user who holds no management permission */
+    it("says so and keeps approve unavailable", async () => {
+      const user = userEvent.setup();
+      state.bindings = [
+        { scopeType: "TEAM", scopeId: "team-1", role: "MEMBER" },
+        { scopeType: "TEAM", scopeId: "team-personal", role: "ADMIN" },
+      ];
+      const host = hostFor({ lookup: managementLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+
+      expect(await screen.findByText("You have no management access here")).toBeInTheDocument();
+      expect(screen.queryByTestId("cli-auth-management-request")).toBeNull();
+      expect(screen.queryByText(/plus the management access below/)).toBeNull();
+      expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+      expect(host.approvals).toEqual([]);
+    });
+  });
+});
+
 describe("given a member of two shared teams", () => {
   /** @scenario regular member defaults to their own teams plus personal workspace */
   it("preselects the teams they hold and their own workspace, never the organization", async () => {
@@ -313,6 +374,7 @@ describe("given the CLI asked for a project API key", () => {
     status: "pending",
     expiresAt: Date.now() + 600_000,
     credentialType: "project_api_key" as const,
+    management: false,
   };
 
   describe("when the organization has shared projects", () => {
@@ -369,6 +431,7 @@ describe("given a second login is opened in the same tab", () => {
         status: "pending",
         expiresAt: Date.now() + 600_000,
         credentialType: "device_session",
+        management: false,
       },
     });
     rerender(

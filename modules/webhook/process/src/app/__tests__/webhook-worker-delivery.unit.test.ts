@@ -89,8 +89,8 @@ describe("given a memory-tier worker with one active HTTP endpoint", () => {
           admittedAt: Date.now(),
         });
 
-        await webhooks.requestSpendDelivery(admitted);
-        await webhooks.requestSpendDelivery(confirmed);
+        await webhooks.requestGatewayEventDelivery(admitted);
+        await webhooks.requestGatewayEventDelivery(confirmed);
 
         // The egress fence refuses the private address: the attempt still reached the last hop.
         await vi.waitFor(
@@ -176,8 +176,8 @@ describe("given a memory-tier worker with an endpoint that holds envelopes for a
           admittedAt: Date.now(),
         });
 
-        await webhooks.requestSpendDelivery(admitted);
-        await webhooks.requestSpendDelivery(confirmed);
+        await webhooks.requestGatewayEventDelivery(admitted);
+        await webhooks.requestGatewayEventDelivery(confirmed);
 
         await vi.waitFor(
           async () => {

@@ -79,9 +79,7 @@ describe("given a trace the SDK posted", () => {
 
   describe("when the trace's transcript is asked for", () => {
     // @scenario "A trace's transcript is read from the terminal"
-    // Marked failing: GET /api/v1/traces/{traceId}/transcript is not mounted on
-    // this branch, so the command cannot succeed until that route is served.
-    it.fails(
+    it(
       "prints the transcript",
       () => {
         const result = workspace.cli.run(`trace transcript ${traceId} -o json`);

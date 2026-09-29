@@ -32,9 +32,13 @@ const secretsAnswering = (values: Record<string, string>): TelemetrySecrets => (
   into: async (handle, build) => build(values[handle.id]),
 });
 
-const composeMetrics = (over: Partial<TelemetrySettings>, values: Record<string, string> = {}) =>
+const composeMetrics = (
+  over: Partial<TelemetrySettings>,
+  values: Record<string, string> = {},
+  nodeEnvironment?: string,
+) =>
   processMetrics("langwatch-test")({
-    config: { observability: settings(over) },
+    config: { observability: settings(over), process: { nodeEnvironment } },
     secrets: secretsAnswering(values),
   });
 
@@ -107,6 +111,36 @@ describe("the process metrics transport", () => {
       );
 
       expect((await scrape(contributions)).status).toBe(401);
+      await stopAll(contributions);
+    });
+  });
+
+  describe("given the Prometheus mode in production", () => {
+    /** @scenario "In production an unset scrape token mounts no door" */
+    it("mounts no door when no token is configured", async () => {
+      const contributions = await composeMetrics(
+        { metrics: { mode: "prometheus", enabled: true } },
+        {},
+        "production",
+      );
+
+      expect(routeIn(contributions)).toBeUndefined();
+      await stopAll(contributions);
+    });
+
+    /** @scenario "An authenticated scrape in production reads the process's instruments" */
+    it("serves a scrape that carries the configured token", async () => {
+      const contributions = await composeMetrics(
+        { metrics: { mode: "prometheus", enabled: true } },
+        { LANGWATCH_METRICS_TOKEN: "scrape-me" },
+        "production",
+      );
+      counter({ name: "langwatch_test_jobs", description: "jobs" }).inc(void 0, 1);
+
+      const response = await scrape(contributions, "Bearer scrape-me");
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain("langwatch_test_jobs_total 1");
       await stopAll(contributions);
     });
   });

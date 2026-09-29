@@ -54,7 +54,6 @@
     "billing -> ops": 1,
     "billing -> organization": 1,
     "billing -> project": 1,
-    "billing -> trace": 1,
     "coding-agent -> audit-log": 1,
     "coding-agent -> data-retention": 1,
     "coding-agent -> github": 1,

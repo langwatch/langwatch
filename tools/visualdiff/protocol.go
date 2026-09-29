@@ -17,12 +17,22 @@ type runnerMessage struct {
 	Ratio   float64 `json:"ratio"`
 	File    string  `json:"file"`
 	Message string  `json:"message"`
+	Name    string  `json:"name"`
+	Millis  int64   `json:"millis"`
 }
 
 // RunnerStream is everything one runner invocation reported.
 type RunnerStream struct {
 	Captures []Capture
 	Diffs    []Diff
+	Phases   []RunnerPhase
+}
+
+// RunnerPhase is how long one side spent in one phase of its capture.
+type RunnerPhase struct {
+	Side   string
+	Name   string
+	Millis int64
 }
 
 // ParseRunnerStream reads the runner's JSON lines. A malformed line is an
@@ -106,6 +116,8 @@ func (line runnerLine) applyTo(stream *RunnerStream, hooks runnerStreamHooks) er
 		}
 	case "error":
 		return errors.New("runner: " + message.Message)
+	case "phase":
+		stream.Phases = append(stream.Phases, RunnerPhase{Side: message.Side, Name: message.Name, Millis: message.Millis})
 	case "done", "ready", "log":
 	default:
 		return fmt.Errorf("runner output line %d: unknown message type %q", line.line, message.Type)

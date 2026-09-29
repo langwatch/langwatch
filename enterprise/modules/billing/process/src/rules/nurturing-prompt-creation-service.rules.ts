@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { NurturingPromptCountRepository } from "../repositories/nurturing-prompt-count.repository.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
 import {
-  findOrganizationAdminResolver,
-  findSink,
+  type OrganizationAdminResolver,
   reportFailure,
 } from "./nurturing-sink-registry-service.rules.ts";
 
@@ -15,15 +15,16 @@ const logger = createLogger("ee:nurturing:prompt-creation");
  * @param orgPromptCount - The org-wide prompt count AFTER the prompt was created
  */
 export function firePromptCreated({
+  nurturing,
   userId,
   projectId,
   orgPromptCount,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   projectId: string;
   orgPromptCount: number;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }
@@ -52,10 +53,14 @@ export function firePromptCreated({
  * @param userId - User who created the prompt; optional
  */
 export function afterPromptCreated({
+  nurturing,
+  resolveOrgAdmin,
   repository,
   projectId,
   userId,
 }: {
+  nurturing: NurturingService | undefined;
+  resolveOrgAdmin: OrganizationAdminResolver | undefined;
   repository: NurturingPromptCountRepository;
   projectId: string;
   userId?: string | null;
@@ -67,7 +72,6 @@ export function afterPromptCreated({
       let organizationId: string | undefined;
 
       if (!resolvedUserId) {
-        const resolveOrgAdmin = findOrganizationAdminResolver();
         const resolution = await resolveOrgAdmin?.(projectId);
         resolvedUserId = resolution?.userId;
         organizationId = resolution?.organizationId ?? undefined;
@@ -94,6 +98,7 @@ export function afterPromptCreated({
       const orgPromptCount = await repository.countOrganizationPrompts(organizationId);
 
       firePromptCreated({
+        nurturing,
         userId: resolvedUserId,
         projectId,
         orgPromptCount,

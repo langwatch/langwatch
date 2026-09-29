@@ -39,10 +39,12 @@ describe("Evaluations E2E", () => {
       const probe = await langwatch.evaluations.evaluate("presidio/pii_detection", {
         data: { input: "hello" },
       });
-      if (probe.status === "error") {
+      // A deployment without a langevals endpoint answers `skipped`; one whose
+      // endpoint is down answers `error`. Neither can run an evaluator.
+      if (probe.status === "error" || probe.status === "skipped") {
         nlpAvailable = false;
         console.log(
-          "NLP service unavailable (evaluation returned error) — skipping NLP-dependent tests",
+          `NLP service unavailable (evaluation returned ${probe.status}), skipping NLP-dependent tests`,
         );
       }
     } catch {

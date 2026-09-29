@@ -4,10 +4,8 @@
 
 import {
   NOTIFICATION_TYPES,
-  USAGE_UNKNOWN,
-  type BillingUsageCounter,
   type BillingUsageLimitOrganization,
-  type UsageLimitData,
+  type UsageWarningDecision,
 } from "@langwatch/enterprise-billing-contract";
 import type { Notification } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
@@ -17,9 +15,8 @@ import type { UsageLimitEmailData } from "./billing-usage-notice.service.ts";
 const logger = createLogger("langwatch:notifications:usageWarning");
 
 /**
- * Most calls find usage under threshold, or the warning already sent this
- * month — "no email went out" is the ordinary outcome, not an anomaly, so
- * it is a named result rather than `null`.
+ * Most calls find the warning already sent this month, or nobody to send it
+ * to: "no email went out" is an ordinary outcome, so it is a named result.
  */
 export type CheckAndSendWarningResult =
   | { outcome: "sent"; notification: Notification }
@@ -28,8 +25,6 @@ export type CheckAndSendWarningResult =
 import { toDate } from "@langwatch/time";
 
 import {
-  USAGE_WARNING_THRESHOLDS,
-  findCrossedUsageThreshold,
   getCurrentMonthStart,
   type UsageWarningServiceOptions,
 } from "../rules/usage-warning-thresholds.rules.ts";
@@ -38,7 +33,6 @@ import { UsageWarningDispatchService } from "./usage-warning-dispatch.service.ts
 export class UsageWarningService {
   private readonly records: UsageWarningServiceOptions["records"];
   private readonly organizations: BillingUsageLimitOrganization;
-  private readonly usageCounts: BillingUsageCounter;
   private readonly emails: UsageWarningServiceOptions["emails"];
   private readonly baseHost: string;
 
@@ -49,7 +43,6 @@ export class UsageWarningService {
   private constructor(options: UsageWarningServiceOptions) {
     this.records = options.records;
     this.organizations = options.organizations;
-    this.usageCounts = options.usageCounts;
     this.emails = options.emails;
     this.baseHost = options.baseHost;
     this.dispatch = UsageWarningDispatchService.create({
@@ -62,23 +55,14 @@ export class UsageWarningService {
   private readonly dispatch: UsageWarningDispatchService;
 
   /**
-   * Sends a usage-limit warning email if one is due, and records that it went.
+   * Sends the warning entitlement decided, unless this threshold went out this month, and
+   * records that it went.
    */
-  async checkAndSendWarning(data: UsageLimitData): Promise<CheckAndSendWarningResult> {
-    const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } = data;
-
+  async send(decision: UsageWarningDecision): Promise<CheckAndSendWarningResult> {
+    const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit, crossedThreshold } =
+      decision;
     const usagePercentage =
       maxMonthlyUsageLimit > 0 ? (currentMonthMessagesCount / maxMonthlyUsageLimit) * 100 : 0;
-    const crossedThreshold = findCrossedUsageThreshold(usagePercentage);
-
-    if (!crossedThreshold) {
-      logger.debug(
-        { organizationId, usagePercentage, lowestThreshold: USAGE_WARNING_THRESHOLDS[0] },
-        "Usage below all warning thresholds, skipping notification",
-      );
-
-      return { outcome: "skipped" };
-    }
 
     const organization = await this.organizations.findWithAdmins(organizationId);
 
@@ -98,10 +82,7 @@ export class UsageWarningService {
       return { outcome: "skipped" };
     }
 
-    const projectUsageData = await this.projectUsage({ organizationId, crossedThreshold });
-    if (projectUsageData === null) {
-      return { outcome: "skipped" };
-    }
+    const projectUsageData = await this.projectUsage(decision);
 
     const deliverableAdmins = organization.members.filter((member) => member.user.email);
 
@@ -187,32 +168,13 @@ export class UsageWarningService {
     return true;
   }
 
-  /**
-   * Per-project message counts, or null when they cannot be read.
-   */
+  /** The named projects, each with the count entitlement decided on; 0 where it counted none. */
   private async projectUsage({
     organizationId,
-    crossedThreshold,
-  }: {
-    organizationId: string;
-    crossedThreshold: number;
-  }): Promise<{ id: string; name: string; messageCount: number }[] | null> {
+    projectCounts,
+  }: UsageWarningDecision): Promise<{ id: string; name: string; messageCount: number }[]> {
     const projects = await this.organizations.findProjectsWithName(organizationId);
-    const counts = await this.usageCounts.getCountByProjects({
-      organizationId,
-      projectIds: projects.map((project) => project.id),
-    });
-
-    if (counts === USAGE_UNKNOWN) {
-      logger.warn(
-        { organizationId, crossedThreshold },
-        "usage is unknown, skipping usage-limit email rather than reporting zeros",
-      );
-
-      return null;
-    }
-
-    const countsMap = new Map(counts.map((count) => [count.projectId, count.count]));
+    const countsMap = new Map(projectCounts.map((count) => [count.projectId, count.count]));
 
     return projects.map((project) => ({
       id: project.id,

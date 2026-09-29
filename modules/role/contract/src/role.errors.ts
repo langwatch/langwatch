@@ -34,7 +34,7 @@ export class RoleInUseError extends HandledError {
 export class RoleNotFoundError extends NotFoundError {
   declare readonly code: "custom_role_not_found";
   constructor(roleId: string) {
-    super("custom_role_not_found", "Custom role", roleId, { meta: { roleId } });
+    super("custom_role_not_found", { resource: "Custom role", id: roleId }, { meta: { roleId } });
     this.name = "RoleNotFoundError";
   }
 }
@@ -64,7 +64,7 @@ export class RoleNotAssignableError extends HandledError {
 export class RoleTeamNotFoundError extends NotFoundError {
   declare readonly code: "team_not_found";
   constructor(teamId: string) {
-    super("team_not_found", "Team", teamId, { meta: { teamId } });
+    super("team_not_found", { resource: "Team", id: teamId }, { meta: { teamId } });
     this.name = "RoleTeamNotFoundError";
   }
 }

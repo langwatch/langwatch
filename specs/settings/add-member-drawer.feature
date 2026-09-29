@@ -13,7 +13,7 @@ Feature: Inviting a teammate through a drawer
   @integration
   Scenario: The members page opens the invite drawer
     Given an admin is on the organization members page
-    When they choose "Add members"
+    When they choose "Invite people"
     Then the invite-member drawer opens
 
   @integration

@@ -7,6 +7,12 @@ import {
   DEMO_PROMPT_CONFIG_DATA,
 } from "./demo-platform-ids.ts";
 
+const DATASET_COLUMNS = [
+  { name: "input", type: "string" },
+  { name: "expected_output", type: "string" },
+  { name: "category", type: "string" },
+];
+
 const DATASET_ROWS = [
   {
     input: "I was charged twice for my Pro subscription. Please fix it.",
@@ -255,17 +261,14 @@ export async function seedDemoPlatform({
       projectId,
       name: "Support Regression Cases",
       slug: "demo-support-regression",
-      columnTypes: {
-        input: "string",
-        expected_output: "string",
-        category: "string",
-      },
+      columnTypes: DATASET_COLUMNS,
       rowCount: DATASET_ROWS.length,
       contentLayout: "postgres",
       status: "ready",
     },
     update: {
       archivedAt: null,
+      columnTypes: DATASET_COLUMNS,
       rowCount: DATASET_ROWS.length,
       status: "ready",
     },

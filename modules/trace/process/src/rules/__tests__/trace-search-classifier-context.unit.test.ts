@@ -38,5 +38,21 @@ describe("given the classifier's input", () => {
         "langy",
       ]);
     });
+
+    /** @scenario "A sentence about what the agent did is offered to the classifier as a judgement" */
+    it("offers what the agent did as a judgement, not as a phrase", () => {
+      const options = new Map(
+        buildRouteQuestion({ isLangyAvailable: true }).options.map((option) => [
+          option.name,
+          option.description,
+        ]),
+      );
+
+      expect(options.get("instant_eval")).toContain("what the agent did");
+      expect(options.get("instant_eval")).toContain("a tool called with a wrong value");
+      expect(options.get("free_text")).toContain(
+        "A description of something that happened is not a literal string.",
+      );
+    });
   });
 });

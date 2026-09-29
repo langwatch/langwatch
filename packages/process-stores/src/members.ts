@@ -120,7 +120,7 @@ export interface Mail {
  */
 export interface Cache {
   find(key: string): Promise<Uint8Array | undefined>;
-  set(key: string, tag: string, body: Uint8Array, ttlSeconds: number): Promise<void>;
+  set(entry: { key: string; tag: string; body: Uint8Array; ttlSeconds: number }): Promise<void>;
   invalidateTag(tag: string): Promise<void>;
 }
 

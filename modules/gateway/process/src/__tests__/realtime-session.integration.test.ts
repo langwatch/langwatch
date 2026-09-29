@@ -449,7 +449,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
       where: { id: stale },
       data: {
         mintedAt: toDate(
-          nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS - 60_000 }),
+          nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS + 60_000 }),
         ),
       },
     });
@@ -568,7 +568,7 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
       where: { id: old },
       data: {
         mintedAt: toDate(
-          nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS - 1000 }),
+          nowInstant().subtract({ milliseconds: REALTIME_OPEN_SESSION_WINDOW_MS + 1000 }),
         ),
       },
     });

@@ -5,14 +5,13 @@
  */
 
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectApi } from "./support/test-project-api.ts";
+import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the
@@ -23,22 +22,6 @@ import { TestProjectApi } from "./support/test-project-api.ts";
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
-
-/**
- * The one Project read the budget guards make: a PROJECT-scoped budget is
- * refused unless its project's team belongs to the budget's org.
- */
-class SuiteProjectService extends TestProjectApi {
-  override async findWithTeam(id: string): ReturnType<ProjectApi["findWithTeam"]> {
-    // The generated row types every JSON column as `JsonValue`, which is wider
-    // than the contract's `JSONType` by the array case. The rows this suite
-    // writes carry no JSON at all.
-    return (await prisma.project.findUnique({
-      where: { id },
-      include: { team: true },
-    })) as Awaited<ReturnType<ProjectApi["findWithTeam"]>>;
-  }
-}
 
 const ns = nanoid(8);
 const ORG_ID = `org-pcasc-${ns}`;
@@ -122,7 +105,7 @@ describe.skipIf(!databaseUrl)("GatewayService — PRINCIPAL cascade", () => {
     // create or check, which is the whole of this suite.
     service = PrismaGatewayAdapter.create({
       database: prisma,
-      projects: new SuiteProjectService(),
+      projects: new TraceDestinationProjectService(prisma),
       evaluators: {} as never,
       monitors: {} as never,
       changes: {} as never,

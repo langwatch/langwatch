@@ -2,6 +2,7 @@
 
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
+import { ClickHouseAnomalySpendRepository } from "../clickhouse/clickhouse.anomaly-spend.repository.ts";
 import {
   memberClickHouseResolver,
   memberGovernanceClickHouseResolver,
@@ -17,7 +18,7 @@ import {
   PrismaSuppressionSnapshotRepository,
 } from "../prisma/prisma.suppression-snapshot.repository.ts";
 
-/** Governance's live stores: its rows in Prisma; in ClickHouse, pulled OCSF events and the rollups an erasure rewrites. */
+/** Governance's live stores: its rows in Prisma; in ClickHouse, OCSF events, KPI rows and the rollups an erasure rewrites. */
 export class LiveGovernanceRepositories {
   static readonly requires = ["prisma", "clickhouse", "operatorReads"] as const;
 
@@ -38,6 +39,7 @@ export class LiveGovernanceRepositories {
         memberClickHouseResolver(clickhouse),
       ),
       ocsfEvents: ClickHouseOcsfEventsRepository.create(memberClickHouseResolver(clickhouse)),
+      anomalySpend: ClickHouseAnomalySpendRepository.create(memberClickHouseResolver(clickhouse)),
       rollupErasure: ClickHouseRollupErasureRepository.create(clickhouse),
     };
   }
