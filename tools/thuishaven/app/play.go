@@ -947,7 +947,7 @@ func (o *Orchestrator) PlayLaunch(ctx context.Context, pl PlaySandbox) error {
 	if pl.dockerHost, err = o.ensurePlayRuntime(ctx); err != nil {
 		return err
 	}
-	free, err := o.sys.FreePorts(len(domain.PerWorktreeServices) + 5)
+	free, err := o.sys.FreePorts(len(domain.PerWorktreeServices) + 6)
 	if err != nil {
 		return err
 	}
@@ -1012,6 +1012,7 @@ type playPorts struct {
 	services      []int // one per domain.PerWorktreeServices, in order
 	api           int
 	workerMetrics int
+	voiceSocket   int
 	postgres      int
 	clickHouse    int
 	redis         int
@@ -1021,7 +1022,7 @@ func newPlayPorts(free []int) playPorts {
 	n := len(domain.PerWorktreeServices)
 	return playPorts{
 		services: free[:n], api: free[n], workerMetrics: free[n+1],
-		postgres: free[n+2], clickHouse: free[n+3], redis: free[n+4],
+		postgres: free[n+2], clickHouse: free[n+3], redis: free[n+4], voiceSocket: free[n+5],
 	}
 }
 
@@ -1079,6 +1080,7 @@ func (o *Orchestrator) registerPlayStack(pl PlaySandbox, ports playPorts) (domai
 		RedisDB:            0,
 		APIPort:            ports.api,
 		WorkerMetricsPort:  ports.workerMetrics,
+		VoiceSocketPort:    ports.voiceSocket,
 		LocalAPIKey:        o.cfg.LocalAPIKey,
 		ClickHouseHTTPPort: ports.clickHouse, ClickHouseDatabase: pl.database,
 		PostgresPort: ports.postgres, PostgresDatabase: pl.database,

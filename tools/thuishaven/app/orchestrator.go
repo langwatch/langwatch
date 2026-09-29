@@ -171,7 +171,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, err
 	}
 	nSvc := len(domain.PerWorktreeServices)
-	ports, err := o.sys.FreePorts(nSvc + 4)
+	ports, err := o.sys.FreePorts(nSvc + 5)
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
@@ -184,7 +184,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	// ports[nSvc+1] the worker metrics endpoint, ports[nSvc+2] the IdP
 	// simulator's verification nameserver, and ports[nSvc+3] the mail sink's SMTP
 	// listener — both reached by address rather than by hostname, so neither can
-	// go through the proxy.
+	// go through the proxy. ports[nSvc+4] is the worker's voice socket.
 	redisDB, exclusive := o.allocateRedisDB(slug)
 	if !exclusive {
 		fmt.Printf(
@@ -201,7 +201,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// one-shot jobs, the lanes status reports and the names restart accepts.
 		Layout:      detectLayout(p.WorktreeDir),
 		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
-		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], VoiceSocketPort: ports[nSvc+4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 		PublicURL:        o.cfg.PublicURL,
 		LangyTier:        opts.LangyTier,
 		LangyImage:       opts.langyImageTag,

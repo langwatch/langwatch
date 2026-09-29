@@ -57,7 +57,10 @@ type Stack struct {
 	// (/metrics and /healthz). It belongs to that process alone: the worker is
 	// its own application, so `haven restart workers` bounces the group holding
 	// this port and can never reach the API's.
-	WorkerMetricsPort  int    `json:"workerMetricsPort"`
+	WorkerMetricsPort int `json:"workerMetricsPort"`
+	// VoiceSocketPort is the worker's raw voice socket (VOICE_WS_PORT); each
+	// stack needs its own or two stacks collide on the default 3300.
+	VoiceSocketPort    int    `json:"voiceSocketPort"`
 	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
 	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
 	PostgresPort       int    `json:"postgresPort"`       // shared managed Postgres's port (0 = unmanaged)

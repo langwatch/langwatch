@@ -168,7 +168,7 @@ func TestGovernorNamesTheWorstOffenderWithoutStoppingIt(t *testing.T) {
 	t.Run("given pressure is red", func(t *testing.T) {
 		store, sys := twoStacks()
 		sys.memStat = domain.MemStat{
-			TotalBytes: 18 * testGiB, SwapUsedBytes: 3900 * (1 << 20), SwapTotalBytes: 4 * testGiB,
+			TotalBytes: 18 * testGiB, CompressedBytes: 4 * testGiB, SwapUsedBytes: 3900 * (1 << 20), SwapTotalBytes: 4 * testGiB,
 		}
 
 		t.Run("when the daemon completes a tick", func(t *testing.T) {
