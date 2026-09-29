@@ -64,7 +64,7 @@ afterEach(cleanup);
 describe("given a connection the directory is pushing to", () => {
   /** @scenario "A connection's sync state is on the SCIM settings page" */
   it("names the state in words rather than in a code", () => {
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     expect(screen.getByText("Syncing")).toBeTruthy();
     expect(screen.getByText(/pushing changes/i)).toBeTruthy();
@@ -73,7 +73,7 @@ describe("given a connection the directory is pushing to", () => {
 
   /** @scenario "The last push and the people managed are counted per connection" */
   it("shows when the directory last pushed and how many people it manages", () => {
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     expect(screen.getByText("Last push from the directory")).toBeTruthy();
     expect(screen.getByText("People this directory manages")).toBeTruthy();
@@ -101,7 +101,7 @@ describe("given a connection no directory has pushed to", () => {
       recentChanges: [],
     };
 
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     expect(screen.getByText("Not set up yet")).toBeTruthy();
     expect(screen.getByText("No push yet")).toBeTruthy();
@@ -136,7 +136,7 @@ describe("given a failed apply that is standing", () => {
 
   /** @scenario "A failed apply reaches the administrator as words to act on" */
   it("lists the failure in words, with no code or record identifier", () => {
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     const failures = screen.getByTestId("directory-failures");
     expect(failures.textContent).toContain("Offboard incomplete");
@@ -146,7 +146,7 @@ describe("given a failed apply that is standing", () => {
 
   /** @scenario "The organization view offers no retry" */
   it("offers no re-run, and says the next push is what re-asserts it", () => {
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     expect(screen.queryByRole("button", { name: /retry|re-?run|re-?drive/i })).toBeNull();
     expect(screen.getByTestId("directory-failures").textContent).toMatch(/next push re-asserts/i);
@@ -169,7 +169,7 @@ describe("given the directory removed somebody", () => {
       ],
     };
 
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     const changes = screen.getByTestId("directory-recent-changes");
     expect(changes.textContent).toContain("Sam Patel lost access");
@@ -193,7 +193,7 @@ describe("given a connection that has been removed", () => {
       recentChanges: [],
     };
 
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     expect(screen.queryByText("Entra")).toBeNull();
     fireEvent.click(screen.getByTestId("retired-connections-toggle"));
@@ -205,7 +205,7 @@ describe("given no connection at all", () => {
   it("says the step that would fill it, and draws no empty table", () => {
     state.panel = { connections: [], recentChanges: [] };
 
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     expect(screen.getByTestId("directory-no-connection").textContent).toContain(
       "No identity provider is connected yet",
@@ -218,7 +218,7 @@ describe("while the panel is still reading", () => {
   it("says it is loading rather than that nothing is connected", () => {
     state.isLoading = true;
 
-    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" />);
+    renderWithScimHost(<DirectoryReconciliation organizationId="org-1" maySetUpSingleSignOn />);
 
     expect(screen.getByTestId("scim-reconciliation-loading")).toBeTruthy();
     expect(screen.queryByTestId("directory-no-connection")).toBeNull();

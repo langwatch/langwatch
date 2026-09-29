@@ -24,6 +24,8 @@ export class FakeScimHost extends ScimHostApi {
       organizationId?: string | null;
       scimBaseUrl?: string;
       query?: Readonly<Record<string, string | undefined>>;
+      /** Permissions the reader lacks; everything else is held. */
+      withheld?: readonly string[];
     } = {},
   ) {
     super();
@@ -36,6 +38,10 @@ export class FakeScimHost extends ScimHostApi {
 
   scimBaseUrl(): string {
     return this.options.scimBaseUrl ?? "https://app.langwatch.test/api/scim/v2";
+  }
+
+  hasPermission(permission: string): boolean {
+    return !this.options.withheld?.includes(permission);
   }
 
   succeeded(notice: ScimSuccessNotice): void {

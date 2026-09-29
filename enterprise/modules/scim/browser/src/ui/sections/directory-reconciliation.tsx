@@ -23,6 +23,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
+import { Plug } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import {
@@ -48,7 +50,14 @@ const TONE_PALETTE: Record<string, string> = {
 
 const RECENT_CHANGES_SHOWN = 8;
 
-export function DirectoryReconciliation({ organizationId }: { organizationId: string }) {
+export function DirectoryReconciliation({
+  organizationId,
+  maySetUpSingleSignOn,
+}: {
+  organizationId: string;
+  /** `sso:manage`: whether the empty state carries the first step. */
+  maySetUpSingleSignOn: boolean;
+}) {
   const reconciliation = scimApi.scimReconciliation.getAll.useQuery({ organizationId });
 
   if (reconciliation.isLoading) {
@@ -70,8 +79,8 @@ export function DirectoryReconciliation({ organizationId }: { organizationId: st
   return (
     <VStack gap={6} width="full" align="stretch" data-testid="scim-reconciliation">
       <VStack gap={3} width="full" align="stretch">
-        <Heading size="md">Connections</Heading>
-        {connections.length === 0 && <NoConnectionYet />}
+        <Heading size="sm">Connections</Heading>
+        {connections.length === 0 && <NoConnectionYet maySetUp={maySetUpSingleSignOn} />}
         {connections
           .filter((connection) =>
             isRunningConnection({ connectionState: connection.connectionState }),
@@ -96,19 +105,41 @@ export function DirectoryReconciliation({ organizationId }: { organizationId: st
 }
 
 /**
- * A directory with nothing in it, said as the step that would fill it.
- *
- * The step is under Authentication, where a connection is registered. It is
- * named rather than offered as a control: this screen has no way to take a
- * reader there until its host publishes one (handoff §10.1).
+ * A directory with nothing in it, said as the step that would fill it, and the
+ * door to it for the reader who could walk through: a connection is registered
+ * under Authentication.
  */
-function NoConnectionYet() {
+function NoConnectionYet({ maySetUp }: { maySetUp: boolean }) {
   return (
-    <Text fontSize="sm" color="fg.muted" maxWidth="72ch" data-testid="directory-no-connection">
-      No identity provider is connected yet. Provisioning runs against a single sign-on connection,
-      so connecting one under Authentication is the first step. After that your identity provider
-      creates, updates and removes people here on its own.
-    </Text>
+    <VStack
+      gap={2}
+      paddingY={8}
+      paddingX={4}
+      borderWidth="1px"
+      borderStyle="dashed"
+      borderColor="border.emphasized"
+      borderRadius="lg"
+      textAlign="center"
+      data-testid="directory-no-connection"
+    >
+      <Plug size={20} />
+      <Text fontWeight="500">No identity provider is connected yet</Text>
+      <Text fontSize="sm" color="fg.muted" maxWidth="60ch">
+        Provisioning runs against a single sign-on connection, so connecting one is the first step.
+        After that your identity provider creates, updates and removes people here on its own.
+      </Text>
+      {maySetUp ? (
+        <Button asChild size="sm" colorPalette="orange" color="white" _hover={{ color: "white" }}>
+          <Link unstyled href="/settings/authentication">
+            Set up single sign-on
+          </Link>
+        </Button>
+      ) : (
+        <Text fontSize="xs" color="fg.muted">
+          An administrator who manages single sign-on sets this up.
+        </Text>
+      )}
+    </VStack>
   );
 }
 

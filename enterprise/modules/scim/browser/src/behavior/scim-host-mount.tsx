@@ -9,6 +9,7 @@ import {
   useUiScope,
   type UiFeedback,
   type UiRoute,
+  type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import { useMemo, type ReactNode } from "react";
 
@@ -25,23 +26,27 @@ class CapabilityScimHost extends ScimHostApi {
   private readonly appBaseUrl: string;
   private readonly feedback: UiFeedback;
   private readonly uiRoute: UiRoute;
+  private readonly session: UiSession;
 
   constructor({
     orgId,
     appBaseUrl,
     feedback,
     uiRoute,
+    session,
   }: {
     orgId: string | undefined;
     appBaseUrl: string;
     feedback: UiFeedback;
     uiRoute: UiRoute;
+    session: UiSession;
   }) {
     super();
     this.orgId = orgId;
     this.appBaseUrl = appBaseUrl;
     this.feedback = feedback;
     this.uiRoute = uiRoute;
+    this.session = session;
   }
 
   organizationId(): string | undefined {
@@ -51,6 +56,10 @@ class CapabilityScimHost extends ScimHostApi {
   /** The address an identity provider posts SCIM requests to. */
   scimBaseUrl(): string {
     return `${this.appBaseUrl}/api/scim/v2`;
+  }
+
+  hasPermission(permission: string): boolean {
+    return this.session.hasPermission(permission);
   }
 
   succeeded(notice: ScimSuccessNotice): void {
@@ -76,7 +85,7 @@ class CapabilityScimHost extends ScimHostApi {
  * is what `mounts.load` resolves.
  */
 export default function ScimHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route } = useUiCapabilities();
+  const { feedback, route, session } = useUiCapabilities();
   const { organizationId } = useUiScope().activeScope();
   const { appBaseUrl } = useUiDeployment();
 
@@ -87,8 +96,9 @@ export default function ScimHostMount({ children }: { children?: ReactNode }) {
         appBaseUrl,
         feedback,
         uiRoute: route,
+        session,
       }),
-    [organizationId, appBaseUrl, feedback, route],
+    [organizationId, appBaseUrl, feedback, route, session],
   );
 
   return <ScimHostProvider value={host}>{children}</ScimHostProvider>;

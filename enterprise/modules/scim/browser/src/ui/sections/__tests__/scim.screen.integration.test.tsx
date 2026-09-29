@@ -5,7 +5,7 @@
  * Critical: token shown exactly once; generate shows plaintext, list never shows secrets.
  */
 
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { state, calls } = vi.hoisted(() => ({
@@ -18,6 +18,8 @@ const { state, calls } = vi.hoisted(() => ({
       state: string;
     }[],
     minted: { token: "scim_live_secret_value" },
+    members: [] as Record<string, unknown>[],
+    provenance: {} as Record<string, { source: string }>,
     /** Recorded requests, keyed by the tenant AND connection they were asked
      *  for: a feed answered for any other key is a feed nobody may read. */
     requests: {} as Record<string, Record<string, unknown>[]>,
@@ -26,8 +28,21 @@ const { state, calls } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../behavior/scim-api.ts", () => ({
+  directoryMembershipApi: {
+    organization: {
+      getAllOrganizationMembers: {
+        useQuery: () => ({ data: state.members, isLoading: false, error: null }),
+      },
+      getMemberProvenance: {
+        useQuery: () => ({ data: state.provenance, isLoading: false, error: null }),
+      },
+    },
+  },
   scimApi: {
-    useUtils: () => ({ scimToken: { list: { invalidate: calls.invalidate } } }),
+    useUtils: () => ({
+      scimToken: { list: { invalidate: calls.invalidate } },
+      scimReconciliation: { invalidate: calls.invalidate },
+    }),
     scimToken: {
       list: { useQuery: () => ({ data: state.rows, isLoading: false }) },
       connections: { useQuery: () => ({ data: state.connections, isLoading: false }) },
@@ -106,13 +121,9 @@ const connection = (
 
 /** Opens the dialog and answers with its own submit, which mounts a tick later. */
 async function openGenerateDialog() {
-  fireEvent.click(screen.getByRole("button", { name: /generate token/i }));
+  fireEvent.click(screen.getByTestId("scim-generate-open"));
 
-  return waitFor(() => {
-    const buttons = screen.getAllByRole("button", { name: /generate token/i });
-    if (buttons.length < 2) throw new Error("the dialog has not mounted yet");
-    return buttons[buttons.length - 1]!;
-  });
+  return screen.findByTestId("scim-generate-submit");
 }
 
 beforeEach(() => {
@@ -121,6 +132,8 @@ beforeEach(() => {
   state.connections = [connection()];
   state.minted = { token: "scim_live_secret_value" };
   state.requests = {};
+  state.members = [];
+  state.provenance = {};
 });
 
 afterEach(cleanup);
@@ -169,7 +182,7 @@ describe("given no token has been generated yet", () => {
   it("says so instead of leaving an empty table", () => {
     renderWithScimHost(<ScimScreen />);
 
-    expect(screen.getByText(/no scim tokens yet/i)).toBeTruthy();
+    expect(screen.getByText(/no provisioning token has been issued yet/i)).toBeTruthy();
   });
 });
 
@@ -367,5 +380,73 @@ describe("given a token nothing has ever presented", () => {
 
     expect(screen.getByText(/Nothing has presented this token yet/)).toBeTruthy();
     expect(screen.getByText(/check the token it is using/)).toBeTruthy();
+  });
+});
+
+describe("given no identity provider is connected", () => {
+  it("offers the first step to a reader who manages single sign-on", () => {
+    renderWithScimHost(<ScimScreen />);
+
+    expect(screen.getByText("No identity provider is connected yet")).toBeTruthy();
+    const door = screen.getByRole("link", { name: "Set up single sign-on" });
+    expect(door.getAttribute("href")).toBe("/settings/authentication");
+  });
+
+  it("offers no control to a reader who cannot manage it", () => {
+    renderWithScimHost(<ScimScreen />, new FakeScimHost({ withheld: ["sso:manage"] }));
+
+    expect(screen.queryByRole("link", { name: "Set up single sign-on" })).toBeNull();
+    expect(screen.queryByTestId("scim-generate-open")).toBeNull();
+    expect(screen.getByText(/an administrator who manages single sign-on/i)).toBeTruthy();
+  });
+});
+
+describe("given a reader without sso:view", () => {
+  it("says which permission the page needs and shows none of it", () => {
+    renderWithScimHost(<ScimScreen />, new FakeScimHost({ withheld: ["sso:view"] }));
+
+    expect(screen.getByText(/required permission: sso:view/i)).toBeTruthy();
+    expect(screen.queryByText("Provisioning tokens")).toBeNull();
+  });
+});
+
+describe("given the directory has provisioned people", () => {
+  const member = (id: string, name: string) => ({
+    id,
+    name,
+    email: `${id}@example.com`,
+    deactivatedAt: null,
+  });
+
+  it("names only the ones it manages", () => {
+    state.members = [member("u1", "Sam Directory"), member("u2", "Ana Invited")];
+    state.provenance = { u1: { source: "directory" }, u2: { source: "invited" } };
+
+    renderWithScimHost(<ScimScreen />);
+
+    const list = screen.getByTestId("directory-managed-members");
+    expect(within(list).getByText("Sam Directory")).toBeTruthy();
+    expect(within(list).queryByText("Ana Invited")).toBeNull();
+  });
+
+  it("is absent for a reader who may not read the roster", () => {
+    renderWithScimHost(<ScimScreen />, new FakeScimHost({ withheld: ["organization:manage"] }));
+
+    expect(screen.queryByText("People your directory manages")).toBeNull();
+  });
+});
+
+describe("when the administrator brings a token of their own", () => {
+  it("sends it as the secret and never displays it back", async () => {
+    renderWithScimHost(<ScimScreen />);
+
+    const submit = await openGenerateDialog();
+    fireEvent.change(screen.getByLabelText("Token"), { target: { value: " from-the-idp " } });
+    fireEvent.click(screen.getAllByRole("button", { name: /save token/i }).at(-1) ?? submit);
+
+    expect(calls.generate).toHaveBeenCalledWith(
+      expect.objectContaining({ connectionId: "ssoconn_1", secret: "from-the-idp" }),
+    );
+    expect(screen.queryByDisplayValue("scim_live_secret_value")).toBeNull();
   });
 });

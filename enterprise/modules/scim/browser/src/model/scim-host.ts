@@ -29,6 +29,9 @@ export abstract class ScimHostApi {
   /** The address an identity provider posts SCIM requests to. */
   abstract scimBaseUrl(): string;
 
+  /** Whether the reader holds a permission in the organization in scope. */
+  abstract hasPermission(permission: string): boolean;
+
   abstract succeeded(notice: ScimSuccessNotice): void;
 
   abstract failed(failure: ScimFailureNotice): void;

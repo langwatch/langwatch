@@ -64,7 +64,7 @@ function connection(overrides: Record<string, unknown> = {}) {
 }
 
 function draw() {
-  renderWithScimHost(<DirectoryReconciliation organizationId="org_acme" />);
+  renderWithScimHost(<DirectoryReconciliation organizationId="org_acme" maySetUpSingleSignOn />);
 }
 
 function openActivity() {
