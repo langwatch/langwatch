@@ -17,7 +17,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { roleBindingScopeTypeSchema } from "@langwatch/authz-contract";
-import { Users } from "lucide-react";
+import { KeyRound, Users } from "lucide-react";
 import { useState } from "react";
 
 import { authzApi } from "../../behavior/authz-api.ts";
@@ -28,6 +28,7 @@ import {
   groupBindingsByPrincipal,
   type RoleBinding,
   roleBadgePalette,
+  scopeCounts,
   scopeLabel,
   scopePalette,
   scopePillText,
@@ -51,6 +52,7 @@ export function RoleAssignmentsPanel({ organizationId }: { organizationId: strin
     { enabled: !!organizationId },
   );
 
+  const counts = scopeCounts(bindings ?? []);
   const principals = groupBindingsByPrincipal(bindingsInFilter(bindings ?? [], scopeFilter));
 
   return (
@@ -63,9 +65,13 @@ export function RoleAssignmentsPanel({ organizationId }: { organizationId: strin
               size="sm"
               variant={scopeFilter === filter.value ? "subtle" : "ghost"}
               colorPalette={scopeFilter === filter.value ? "blue" : "gray"}
+              aria-label={`${filter.label}, ${counts[filter.value]} role ${counts[filter.value] === 1 ? "assignment" : "assignments"}`}
               onClick={() => setScopeFilter(filter.value)}
             >
               {filter.label}
+              <Text as="span" color="fg.muted" fontVariantNumeric="tabular-nums">
+                {counts[filter.value]}
+              </Text>
             </Button>
           ))}
         </HStack>
@@ -134,7 +140,7 @@ function AssignmentsTable({
   );
 }
 
-/** Who the row is about: a member with a face, or a group with an icon. */
+/** Who the row is about: a member with a face, a group or an API key with an icon. */
 function PrincipalCell({ principal }: { principal: BindingPrincipal }) {
   if (principal.userId) {
     return (
@@ -159,6 +165,13 @@ function PrincipalCell({ principal }: { principal: BindingPrincipal }) {
     );
   }
 
+  const isGroup = principal.groupId !== null;
+  const Icon = isGroup ? Users : KeyRound;
+  const name = isGroup
+    ? (principal.groupName ?? "Unknown group")
+    : (principal.apiKeyName ??
+      (principal.apiKeyId ? "An API key with no name yet" : "An assignment with no holder"));
+
   return (
     <HStack gap={2}>
       <Box
@@ -171,12 +184,17 @@ function PrincipalCell({ principal }: { principal: BindingPrincipal }) {
         justifyContent="center"
         flexShrink={0}
       >
-        <Users size={12} />
+        <Icon size={12} />
       </Box>
       <VStack gap={0} align="start">
         <Text fontWeight="medium" fontSize="sm">
-          {principal.groupName ?? "Unknown group"}
+          {name}
         </Text>
+        {!isGroup && (
+          <Badge size="xs" colorPalette="gray">
+            API key
+          </Badge>
+        )}
         {principal.groupScimSource && (
           <Badge size="xs" colorPalette="blue">
             {principal.groupScimSource.toUpperCase()}

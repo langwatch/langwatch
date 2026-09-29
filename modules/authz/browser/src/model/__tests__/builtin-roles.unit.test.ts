@@ -6,8 +6,13 @@
 import { builtinRoleGrants, roleKeyForTeamRole } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import { BUILTIN_ROLE_CARDS, builtinRoleGrantedPermissions } from "../builtin-roles.ts";
+import {
+  BUILTIN_ROLE_CARDS,
+  builtinRoleGrantedPermissions,
+  peopleHoldingBuiltinRole,
+} from "../builtin-roles.ts";
 import { ORDERED_RESOURCES, permissionsForResource } from "../permission-catalogue.ts";
+import type { RoleBinding } from "../role-binding-principals.ts";
 
 const OFFERED = ORDERED_RESOURCES.flatMap((resource) => permissionsForResource(resource));
 
@@ -57,5 +62,51 @@ describe("the built-in roles", () => {
 
     expect(new Set(names).size).toBe(names.length);
     expect(new Set(descriptions).size).toBe(descriptions.length);
+  });
+
+  describe.each(BUILTIN_ROLE_CARDS)("given the $name card", (card) => {
+    it("headlines only permissions the role really grants", () => {
+      const granted = new Set<string>(builtinRoleGrantedPermissions(card.teamRole));
+
+      expect(card.headline.filter((permission) => !granted.has(permission))).toEqual([]);
+    });
+  });
+
+  describe("when people are counted for a built-in role", () => {
+    const held = (overrides: Partial<RoleBinding>): RoleBinding => ({
+      id: "b",
+      userId: null,
+      userName: null,
+      userEmail: null,
+      userImage: null,
+      groupId: null,
+      groupName: null,
+      groupScimSource: null,
+      apiKeyId: null,
+      apiKeyName: null,
+      role: "ADMIN",
+      customRoleId: null,
+      customRoleName: null,
+      scopeType: "ORGANIZATION",
+      scopeId: "org-1",
+      scopeName: null,
+      memberUserIds: [],
+      createdAt: "2026-01-01T00:00:00.000Z",
+      ...overrides,
+    });
+
+    it("counts a person once, direct or through a group, and skips custom roles", () => {
+      const bindings = [
+        held({ userId: "u1" }),
+        held({ userId: "u1", scopeType: "TEAM" }),
+        held({ groupId: "g1", memberUserIds: ["u1", "u2"] }),
+        held({ userId: "u3", customRoleId: "role-1" }),
+        held({ userId: "u4", role: "VIEWER" }),
+      ];
+
+      expect(peopleHoldingBuiltinRole({ bindings, teamRole: "ADMIN" })).toBe(2);
+      expect(peopleHoldingBuiltinRole({ bindings, teamRole: "VIEWER" })).toBe(1);
+      expect(peopleHoldingBuiltinRole({ bindings, teamRole: "MEMBER" })).toBe(0);
+    });
   });
 });

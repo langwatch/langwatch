@@ -50,13 +50,13 @@ beforeEach(() => {
 
 describe("the Roles page", () => {
   describe("given an address with no tab", () => {
-    it("opens on the roles and reads no assignment", () => {
+    it("opens on the roles, reading the assignments only to count who holds each", () => {
       renderWithAuthzHost(<RolesScreen />);
 
       expect(screen.getByRole("heading", { name: "Roles" })).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: "Roles" })).toHaveAttribute("aria-selected", "true");
-      expect(screen.getByText("Default Roles")).toBeInTheDocument();
-      expect(state.bindingReads).toBe(0);
+      expect(screen.getByText("Predefined roles")).toBeInTheDocument();
+      expect(state.bindingReads).toBeGreaterThan(0);
     });
 
     it("writes the assignments tab into the address when it is picked", async () => {

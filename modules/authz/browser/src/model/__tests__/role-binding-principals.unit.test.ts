@@ -11,6 +11,7 @@ import {
   groupBindingsByPrincipal,
   type RoleBinding,
   roleBadgePalette,
+  scopeCounts,
   scopeLabel,
   scopePillText,
 } from "../role-binding-principals.ts";
@@ -64,13 +65,22 @@ describe("the role bindings audit", () => {
     });
 
     /** @scenario A binding with no principal still appears on the audit */
-    it("keeps a binding that names neither a user nor a group", () => {
+    it("gives each API key its own row, named for the key", () => {
       const principals = groupBindingsByPrincipal([
         binding({ id: "b1", apiKeyId: "k1", apiKeyName: "CI" }),
+        binding({ id: "b2", apiKeyId: "k1", apiKeyName: "CI", scopeType: "TEAM" }),
+        binding({ id: "b3", apiKeyId: "k2", apiKeyName: "Deploy" }),
       ]);
 
-      expect(principals).toHaveLength(1);
-      expect(principals[0]?.key).toBe("unknown");
+      expect(principals.map((principal) => principal.key)).toEqual(["k1", "k2"]);
+      expect(principals.map((principal) => principal.apiKeyName)).toEqual(["CI", "Deploy"]);
+      expect(principals[0]?.bindings.map((row) => row.id)).toEqual(["b1", "b2"]);
+    });
+
+    it("keeps a binding that names no holder on a row of its own", () => {
+      const principals = groupBindingsByPrincipal([binding({ id: "b1" }), binding({ id: "b2" })]);
+
+      expect(principals).toHaveLength(2);
     });
   });
 
@@ -88,6 +98,15 @@ describe("the role bindings audit", () => {
 
     it("keeps every binding when nothing is narrowed", () => {
       expect(bindingsInFilter(rows, "ALL")).toHaveLength(3);
+    });
+
+    it("counts each tier across every binding for the filter chips", () => {
+      expect(scopeCounts([...rows, binding({ id: "b4", scopeType: "TEAM" })])).toEqual({
+        ALL: 4,
+        ORGANIZATION: 1,
+        TEAM: 2,
+        PROJECT: 1,
+      });
     });
   });
 

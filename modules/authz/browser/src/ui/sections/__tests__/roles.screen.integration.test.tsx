@@ -16,6 +16,7 @@ type MutationOptions = {
 const { api, state } = vi.hoisted(() => {
   const state = {
     roles: [] as Record<string, unknown>[],
+    bindings: undefined as Record<string, unknown>[] | undefined,
     rolesLoading: false,
     detail: null as Record<string, unknown> | null,
     detailError: null as unknown,
@@ -38,6 +39,9 @@ const { api, state } = vi.hoisted(() => {
         },
       },
     }),
+    roleBinding: {
+      listForOrg: { useQuery: () => ({ data: state.bindings }) },
+    },
     role: {
       getAll: {
         useQuery: () => ({ data: state.roles, isLoading: state.rolesLoading }),
@@ -81,6 +85,7 @@ const ANALYST_ROLE = {
 
 beforeEach(() => {
   state.roles = [];
+  state.bindings = [];
   state.rolesLoading = false;
   state.detail = null;
   state.detailError = null;
@@ -100,7 +105,7 @@ describe("the Roles screen", () => {
       );
 
       expect(screen.queryByText("Enterprise Feature")).not.toBeInTheDocument();
-      expect(screen.queryByText("Default Roles")).not.toBeInTheDocument();
+      expect(screen.queryByText("Predefined roles")).not.toBeInTheDocument();
     });
   });
 
@@ -114,7 +119,7 @@ describe("the Roles screen", () => {
 
       expect(screen.getByText("Enterprise Feature")).toBeInTheDocument();
       expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
-      expect(screen.queryByText("Custom Roles")).not.toBeInTheDocument();
+      expect(screen.queryByText("Custom roles")).not.toBeInTheDocument();
     });
   });
 
@@ -126,7 +131,49 @@ describe("the Roles screen", () => {
       expect(screen.getByText("Admin")).toBeInTheDocument();
       expect(screen.getByText("Member")).toBeInTheDocument();
       expect(screen.getByText("Viewer")).toBeInTheDocument();
-      expect(screen.getAllByText("Built-in Role")).toHaveLength(3);
+      expect(screen.getByText("Predefined roles")).toBeInTheDocument();
+      expect(screen.getAllByRole("button", { name: "See what it can do" })).toHaveLength(3);
+    });
+
+    /** @scenario The three built-in roles are listed beside the custom ones */
+    it("counts the people holding each built-in role, through a group too", () => {
+      state.bindings = [
+        { id: "b1", role: "ADMIN", customRoleId: null, userId: "u1", memberUserIds: [] },
+        { id: "b2", role: "ADMIN", customRoleId: null, userId: null, memberUserIds: ["u1", "u2"] },
+        { id: "b3", role: "VIEWER", customRoleId: "role-1", userId: "u3", memberUserIds: [] },
+      ];
+      renderWithAuthzHost(<RolesScreen />);
+
+      expect(within(screen.getByTestId("builtin-role-admin")).getByText("2 people")).toBeVisible();
+      expect(within(screen.getByTestId("builtin-role-viewer")).getByText("0 people")).toBeVisible();
+    });
+
+    it("shows a headline permission chip on each built-in card", () => {
+      renderWithAuthzHost(<RolesScreen />);
+
+      const chips = within(screen.getByTestId("builtin-role-viewer")).getAllByTestId(
+        "permission-token",
+      );
+      expect(chips.map((chip) => chip.textContent)).toEqual([
+        "traces:view",
+        "analytics:view",
+        "datasets:view",
+      ]);
+    });
+
+    it("links to the audit log only for a reader who may read it", () => {
+      const { unmount } = renderWithAuthzHost(<RolesScreen />);
+      expect(screen.queryByRole("link", { name: "audit log" })).not.toBeInTheDocument();
+      unmount();
+
+      renderWithAuthzHost(
+        <RolesScreen />,
+        new FakeAuthzHost({ grants: new Set(["organization:manage", "auditLog:view"]) }),
+      );
+      expect(screen.getByRole("link", { name: "audit log" })).toHaveAttribute(
+        "href",
+        "/settings/audit-log",
+      );
     });
 
     it("says so when no custom role has been defined", () => {
@@ -149,9 +196,11 @@ describe("the Roles screen", () => {
     it("shows what a built-in role can do", async () => {
       renderWithAuthzHost(<RolesScreen />);
 
-      // A built-in card carries no action buttons — it cannot be edited or
-      // deleted — so the card itself is what opens its permissions.
-      fireEvent.click(screen.getByText("Read-only access to analytics, messages, and guardrails"));
+      fireEvent.click(
+        within(screen.getByTestId("builtin-role-viewer")).getByRole("button", {
+          name: "See what it can do",
+        }),
+      );
 
       expect(await screen.findByText(/^View Permissions - Viewer$/)).toBeInTheDocument();
       // The viewer reads, so its rows are views and never a manage.
@@ -166,14 +215,14 @@ describe("the Roles screen", () => {
         new FakeAuthzHost({ grants: new Set(["organization:view"]) }),
       );
 
-      expect(screen.getByRole("button", { name: /Create Role/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /New role/ })).toBeDisabled();
     });
 
     /** @scenario An administrator defines a custom role */
     it("files the new role against the organization in scope", async () => {
       renderWithAuthzHost(<RolesScreen />);
 
-      fireEvent.click(screen.getByRole("button", { name: /Create Role/ }));
+      fireEvent.click(screen.getByRole("button", { name: /New role/ }));
 
       const nameField = await screen.findByPlaceholderText("e.g., Data Analyst");
       fireEvent.change(nameField, { target: { value: "Auditor" } });
@@ -181,12 +230,7 @@ describe("the Roles screen", () => {
       const matrix = screen.getByText("auditLog", { selector: "p" }).closest("fieldset");
       fireEvent.click(within(matrix as HTMLElement).getByRole("checkbox"));
 
-      // Two buttons read "Create Role" once the dialog is open — the header's
-      // and the form's — and it is the form's that submits.
-      const submit = screen
-        .getAllByRole("button", { name: "Create Role" })
-        .find((button) => button.getAttribute("form") === "role-form");
-      fireEvent.click(submit!);
+      fireEvent.click(screen.getByRole("button", { name: "Create Role" }));
 
       await waitFor(() => expect(state.create).toHaveBeenCalledTimes(1));
       expect(state.create.mock.calls[0]?.[0]).toEqual({

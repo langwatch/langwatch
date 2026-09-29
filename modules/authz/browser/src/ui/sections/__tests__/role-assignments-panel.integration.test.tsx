@@ -125,15 +125,47 @@ describe("the role assignments tab", () => {
 
       expect(screen.getByText("2 members and groups")).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("button", { name: "Team" }));
+      fireEvent.click(screen.getByRole("button", { name: "Team, 1 role assignment" }));
 
       expect(screen.getByText("1 member or group")).toBeInTheDocument();
       expect(screen.getByText("Grace")).toBeInTheDocument();
       expect(screen.queryByText("Ada")).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole("button", { name: "All" }));
+      fireEvent.click(screen.getByRole("button", { name: "All, 2 role assignments" }));
 
       expect(screen.getByText("2 members and groups")).toBeInTheDocument();
+    });
+
+    /** @scenario A binding with no principal still appears on the audit */
+    it("names each API key on its own row with an API key badge", () => {
+      state.bindings = [
+        binding({ id: "b1", apiKeyId: "k1", apiKeyName: "CI pipeline" }),
+        binding({ id: "b2", apiKeyId: "k2", apiKeyName: "Deploy bot" }),
+      ];
+      renderWithAuthzHost(panel);
+
+      expect(screen.getByText("2 members and groups")).toBeInTheDocument();
+      expect(screen.getByText("CI pipeline")).toBeInTheDocument();
+      expect(screen.getByText("Deploy bot")).toBeInTheDocument();
+      expect(screen.getAllByText("API key")).toHaveLength(2);
+      expect(screen.queryByText("Unknown group")).not.toBeInTheDocument();
+    });
+
+    it("counts every tier on its filter chip, whichever tier is open", () => {
+      state.bindings = [
+        binding({ id: "b1", userId: "u1", scopeType: "ORGANIZATION" }),
+        binding({ id: "b2", userId: "u2", scopeType: "TEAM" }),
+        binding({ id: "b3", userId: "u3", scopeType: "TEAM" }),
+      ];
+      renderWithAuthzHost(panel);
+
+      fireEvent.click(screen.getByRole("button", { name: "Org, 1 role assignment" }));
+
+      expect(screen.getByRole("button", { name: "All, 3 role assignments" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Team, 2 role assignments" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Project, 0 role assignments" }),
+      ).toBeInTheDocument();
     });
 
     it("shows a spinner rather than an empty audit while the read is in flight", () => {

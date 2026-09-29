@@ -8,19 +8,20 @@ import {
   Heading,
   HStack,
   Separator,
+  Spacer,
   Spinner,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ShieldUser } from "lucide-react";
 import { useState } from "react";
-import { Eye, Plus, Shield, Users } from "react-feather";
+import { Plus, Shield } from "react-feather";
 
 import { authzApi } from "../../behavior/authz-api.ts";
 import {
@@ -28,7 +29,12 @@ import {
   type AuthzHostApi,
   useAuthzHost,
 } from "../../model/authz-host.ts";
-import { BUILTIN_ROLE_CARDS, builtinRoleGrantedPermissions } from "../../model/builtin-roles.ts";
+import {
+  BUILTIN_ROLE_CARDS,
+  builtinRoleGrantedPermissions,
+  peopleHoldingBuiltinRole,
+} from "../../model/builtin-roles.ts";
+import { BuiltinRoleCardView } from "../blocks/builtin-role-card.tsx";
 import { PermissionViewer } from "../blocks/permission-viewer.tsx";
 import { RoleCard } from "../blocks/role-card.tsx";
 import { EnterpriseUpsell } from "../elements/enterprise-upsell.tsx";
@@ -109,6 +115,11 @@ function RolesManagement({ organizationId, host }: { organizationId: string; hos
   const canManage = host.hasPermission(AUTHZ_MANAGE_PERMISSION);
   const utils = authzApi.useUtils();
   const roles = authzApi.role.getAll.useQuery({ organizationId });
+  const bindings = authzApi.roleBinding.listForOrg.useQuery(
+    { organizationId },
+    { enabled: !!organizationId },
+  );
+  const canReadAuditLog = host.hasPermission("auditLog:view");
 
   const createRole = authzApi.role.create.useMutation({
     onSuccess: () => {
@@ -196,47 +207,31 @@ function RolesManagement({ organizationId, host }: { organizationId: string; hos
 
   return (
     <VStack align="start" width="full" gap={6}>
-      <HStack justify="end" width="full">
-        <Tooltip
-          content="You need organization:manage permissions to create roles."
-          disabled={canManage}
-        >
-          <PageLayout.HeaderButton
-            onClick={onOpen}
-            disabled={!canManage}
-            data-testid="authz-role-create"
-          >
-            <Plus size={16} /> Create Role
-          </PageLayout.HeaderButton>
-        </Tooltip>
-      </HStack>
-
-      <Separator />
-
       <VStack align="start" width="full" gap={4}>
         <Box>
-          <Heading as="h3">Default Roles</Heading>
+          <Heading as="h3">Predefined roles</Heading>
           <Text color="fg.muted" fontSize="sm">
-            These are the built-in roles that cannot be modified or deleted.
+            Three roles cover most teams. They cannot be changed or deleted.
           </Text>
         </Box>
 
         <Box
           width="full"
           display="grid"
-          gridTemplateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+          gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))"
           gap={4}
         >
           {BUILTIN_ROLE_CARDS.map((card) => (
-            <RoleCard
+            <BuiltinRoleCardView
               key={card.teamRole}
-              hasPermission={(permission) => host.hasPermission(permission)}
-              name={card.name}
-              description={card.description}
-              isDefault
-              permissionCount={card.permissionCount}
-              icon={BUILTIN_ROLE_ICONS[card.teamRole]}
-              onViewPermissions={() => handleViewBuiltinRole(card)}
+              card={card}
+              people={
+                bindings.data
+                  ? peopleHoldingBuiltinRole({ bindings: bindings.data, teamRole: card.teamRole })
+                  : null
+              }
+              totalPermissions={builtinRoleGrantedPermissions(card.teamRole).length}
+              onOpenDetail={() => handleViewBuiltinRole(card)}
             />
           ))}
         </Box>
@@ -245,12 +240,27 @@ function RolesManagement({ organizationId, host }: { organizationId: string; hos
       <Separator />
 
       <VStack align="start" width="full" gap={4}>
-        <Box>
-          <Heading as="h3">Custom Roles</Heading>
-          <Text color="fg.muted" fontSize="sm">
-            Custom roles created for your organization with specific permission sets.
-          </Text>
-        </Box>
+        <HStack width="full" align="start">
+          <Box>
+            <Heading as="h3">Custom roles</Heading>
+            <Text color="fg.muted" fontSize="sm">
+              Scoped grants for people who need one thing and nothing else.
+            </Text>
+          </Box>
+          <Spacer />
+          <Tooltip
+            content="You need permission to manage this organization to write a role."
+            disabled={canManage}
+          >
+            <PageLayout.HeaderButton
+              onClick={onOpen}
+              disabled={!canManage}
+              data-testid="authz-role-create"
+            >
+              <Plus size={16} /> New role
+            </PageLayout.HeaderButton>
+          </Tooltip>
+        </HStack>
 
         {roles.isLoading && (
           <VStack align="center" width="full" padding={8}>
@@ -294,6 +304,16 @@ function RolesManagement({ organizationId, host }: { organizationId: string; hos
             />
           ))}
         </Box>
+
+        {canReadAuditLog && (
+          <Text fontSize="xs" color="fg.muted">
+            Every role you write, change or hand to somebody is recorded in the{" "}
+            <Link href="/settings/audit-log" fontSize="xs">
+              audit log
+            </Link>
+            .
+          </Text>
+        )}
       </VStack>
 
       <RoleFormDialog
@@ -364,12 +384,6 @@ function RolesManagement({ organizationId, host }: { organizationId: string; hos
     </VStack>
   );
 }
-
-const BUILTIN_ROLE_ICONS = {
-  ADMIN: ShieldUser,
-  MEMBER: Users,
-  VIEWER: Eye,
-} as const;
 
 // Read-only permissions dialog; one component for both; fallback only difference.
 function PermissionsDialog({

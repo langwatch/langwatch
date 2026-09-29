@@ -26,6 +26,8 @@ export type BindingPrincipal = {
   groupId: string | null;
   groupName: string | null;
   groupScimSource: string | null;
+  apiKeyId: string | null;
+  apiKeyName: string | null;
   bindings: RoleBinding[];
 };
 
@@ -43,16 +45,28 @@ export function bindingsInFilter(
     : bindings.filter((binding) => binding.scopeType === filter);
 }
 
+/** How many bindings sit at each tier, counted across all of them for the filter chips. */
+export function scopeCounts(bindings: readonly RoleBinding[]): Record<BindingScopeFilter, number> {
+  const count = (filter: BindingScopeFilter) => bindingsInFilter(bindings, filter).length;
+  return {
+    ALL: count("ALL"),
+    ORGANIZATION: count("ORGANIZATION"),
+    TEAM: count("TEAM"),
+    PROJECT: count("PROJECT"),
+  };
+}
+
 /**
- * One row per principal, ordered by the name a reader sees. A binding with
- * neither a user nor a group is an API key's; those collapse onto one
- * `"unknown"` row rather than being dropped, so every binding still appears.
+ * One row per principal, ordered by the name a reader sees. An API key is a
+ * principal of its own; a binding naming no holder at all keeps a row of its
+ * own rather than piling onto its siblings, so every binding stays countable.
  */
 export function groupBindingsByPrincipal(bindings: readonly RoleBinding[]): BindingPrincipal[] {
   const byKey = new Map<string, BindingPrincipal>();
 
   for (const binding of bindings) {
-    const key = binding.userId ?? binding.groupId ?? "unknown";
+    const key =
+      binding.userId ?? binding.groupId ?? binding.apiKeyId ?? `unattributed:${binding.id}`;
     let principal = byKey.get(key);
     if (!principal) {
       principal = {
@@ -64,6 +78,8 @@ export function groupBindingsByPrincipal(bindings: readonly RoleBinding[]): Bind
         groupId: binding.groupId,
         groupName: binding.groupName,
         groupScimSource: binding.groupScimSource,
+        apiKeyId: binding.apiKeyId,
+        apiKeyName: binding.apiKeyName,
         bindings: [],
       };
       byKey.set(key, principal);
@@ -77,7 +93,9 @@ export function groupBindingsByPrincipal(bindings: readonly RoleBinding[]): Bind
 }
 
 function principalDisplayName(principal: BindingPrincipal): string {
-  return principal.userName ?? principal.groupName ?? principal.userEmail ?? "";
+  return (
+    principal.userName ?? principal.groupName ?? principal.apiKeyName ?? principal.userEmail ?? ""
+  );
 }
 
 /** The palette a role badge takes. Anything that is not built in is a custom role. */
