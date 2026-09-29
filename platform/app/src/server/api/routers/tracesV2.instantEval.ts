@@ -159,14 +159,16 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
     }),
 
   /**
-   * The organization's switch, thrown by a member who may spend on Instant
-   * Evals. Refused for an organization the popover offers "Contact us" to, so
-   * an enterprise organization is never switched on by a request the popover
-   * did not make.
+   * The organization's switch. It consents to every project's trace text
+   * leaving for the judge, so it takes the organization tier, derived from
+   * the project the popover was opened in, not the project-level spend
+   * permission the estimate takes. Refused for an organization the popover
+   * offers "Contact us" to, so an enterprise organization is never switched
+   * on by a request the popover did not make.
    */
   enable: protectedProcedure
     .input(projectScopeSchema)
-    .permission("analytics:manage")
+    .permission("organization:manage", { via: "projectId" })
     .mutation(async ({ input, ctx }) => {
       const organizationId = await organizationOfProject({
         prisma: ctx.prisma,
