@@ -18,10 +18,15 @@ import type {
   StaticPipelineDefinition,
 } from "./pipeline/staticBuilder.types.ts";
 import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./pipeline/types.ts";
+import type {
+  DispatchableMessage,
+  IntentHandler,
+} from "./process-manager/outbox/outboxDispatcherService.ts";
 import { ProcessRuntime } from "./process-manager/processRuntime.ts";
 import type { ProcessStore } from "./process-manager/stores/processStore.types.ts";
 import { ProjectionRegistry } from "./projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "./projections/replayMarkerCheck.ts";
+import { DispatchError } from "./queues/dispatchError.ts";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
@@ -36,6 +41,11 @@ import {
   QueueTenantMismatchError,
   ValidationError,
 } from "./services/errorHandling.ts";
+import {
+  HANDOFF_PROCESS_NAME,
+  handoffLaneKindSchema,
+  handoffPayloadSchema,
+} from "./services/handoff/failedHandoff.ts";
 import { JOB_ROUTING_FIELD, type JobTenants, readJobRouting } from "./services/queues/jobLane.ts";
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
@@ -137,6 +147,11 @@ export class EventSourcing {
   private readonly _participation?: EventingParticipation;
   private readonly _maintenance?: () => readonly StaticPipelineDefinition<never>[];
   private _processRuntimeInstance?: ProcessRuntime;
+  /** Each registered pipeline's re-drive of its recorded hand-offs, by pipeline name. */
+  private readonly handoffRedrives = new Map<
+    string,
+    (message: DispatchableMessage) => Promise<void>
+  >();
   /** The process managers this producer registered and will not run. */
   private readonly _unrunProcessManagers = new Set<string>();
 
@@ -452,12 +467,18 @@ export class EventSourcing {
       parseEvent: definition.parseEvent,
       metadata: definition.metadata,
       globalRegistry: this.projectionRegistry,
+      handoffStore: this._processStore,
       executionTarget: this._executionTarget,
       replayMarkerChecker: this._replayMarkerChecker,
       retentionPolicyResolver: definition.retentionPolicyResolver ?? this._retentionPolicyResolver,
       killSwitch: this._killSwitch,
       warnWhenProjectionsRunInline: this._warnWhenProjectionsRunInline,
       prepareEventForProjection: definition.prepareEventForProjection,
+    });
+
+    this.hostHandoffRedrive({
+      pipelineName: definition.metadata.name,
+      redeliver: (message) => pipeline.service.redeliverHandoff({ message }),
     });
 
     // Get command dispatchers
@@ -470,6 +491,37 @@ export class EventSourcing {
 
     this.pipelines.set(definition.metadata.name, result);
     return result as ReturnType;
+  }
+
+  /**
+   * Routes each recorded hand-off row to its pipeline's re-drive. One outbox
+   * worker serves every pipeline, hosted when the first one registers.
+   */
+  private hostHandoffRedrive({
+    pipelineName,
+    redeliver,
+  }: {
+    pipelineName: string;
+    redeliver: (message: DispatchableMessage) => Promise<void>;
+  }): void {
+    if (!this._processStore || this._processManagerMode !== "run") return;
+    this.handoffRedrives.set(pipelineName, redeliver);
+    if (this.handoffRedrives.size > 1) return;
+    const route: IntentHandler = async ({ message }) => {
+      const { pipeline } = handoffPayloadSchema.parse(message.payload);
+      const redrive = this.handoffRedrives.get(pipeline);
+      if (!redrive) {
+        throw new DispatchError({
+          message: `Pipeline "${pipeline}" is not registered in this process`,
+          retryable: true,
+        });
+      }
+      await redrive(message);
+    };
+    this.processRuntime.hostOutbox({
+      processName: HANDOFF_PROCESS_NAME,
+      handlers: Object.fromEntries(handoffLaneKindSchema.options.map((kind) => [kind, route])),
+    });
   }
 
   /**

@@ -2,6 +2,8 @@ import { performance } from "node:perf_hooks";
 
 import { Counter, Histogram, register } from "prom-client";
 
+import type { HandoffLaneKind } from "./services/handoff/failedHandoff.ts";
+
 type CounterMetric = Counter<string>;
 type HistogramMetric = Histogram<string>;
 
@@ -76,19 +78,19 @@ const mapEnqueueTotal = counter(
   ["pipeline_name", "projection_name", "outcome"],
 );
 const projectionSubscriberTotal = counter(
-  "es_reactor_total",
+  "es_projection_subscriber_total",
   "Eventing projection subscriber executions",
-  ["pipeline_name", "reactor_name", "status"],
+  ["pipeline_name", "subscriber_name", "status"],
 );
 const projectionSubscriberDuration = histogram({
-  name: "es_reactor_duration_milliseconds",
+  name: "es_projection_subscriber_duration_milliseconds",
   help: "Eventing projection subscriber duration",
-  labelNames: ["pipeline_name", "reactor_name"],
+  labelNames: ["pipeline_name", "subscriber_name"],
 });
 const projectionSubscriberCollapsed = counter(
-  "es_reactor_collapsed_total",
+  "es_projection_subscriber_collapsed_total",
   "Projection subscriber jobs collapsed before enqueue",
-  ["pipeline_name", "reactor_name"],
+  ["pipeline_name", "subscriber_name"],
 );
 const subscriberTotal = counter("es_subscriber_total", "Eventing subscriber executions", [
   "pipeline_name",
@@ -100,6 +102,11 @@ const subscriberDuration = histogram({
   help: "Eventing subscriber duration",
   labelNames: ["pipeline_name", "subscriber_name"],
 });
+const handoffTotal = counter(
+  "es_handoff_total",
+  "First-hop hand-offs that failed to stage, by what became of them",
+  ["pipeline_name", "lane_kind", "outcome"],
+);
 const subscriberEnqueueTotal = counter(
   "es_subscriber_enqueue_total",
   "Eventing subscriber routing outcomes",
@@ -330,17 +337,17 @@ export const incrementEsMapProjectionEnqueueTotal = ({
 }) => {
   if (count > 0) mapEnqueueTotal.labels(pipelineName, projectionName, outcome).inc(count);
 };
-export const incrementEsReactorTotal = (
+export const incrementEsProjectionSubscriberTotal = (
   pipelineName: string,
   subscriberName: string,
   status: "completed" | "failed" | "skipped",
 ) => projectionSubscriberTotal.labels(pipelineName, subscriberName, status).inc();
-export const observeEsReactorDuration = (
+export const observeEsProjectionSubscriberDuration = (
   pipelineName: string,
   subscriberName: string,
   durationMs: number,
 ) => projectionSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
-export const incrementEsReactorCollapsedTotal = (
+export const incrementEsProjectionSubscriberCollapsedTotal = (
   pipelineName: string,
   subscriberName: string,
   skipped: number,
@@ -363,6 +370,19 @@ export const observeEsSubscriberDuration = ({
   subscriberName: string;
   durationMs: number;
 }) => subscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
+/**
+ * `unrecorded` is the residual loss: the outbox write itself failed, so
+ * nothing will re-drive the lane. `redriven` counts a re-staged row.
+ */
+export const incrementEsHandoffTotal = ({
+  pipelineName,
+  laneKind,
+  outcome,
+}: {
+  pipelineName: string;
+  laneKind: HandoffLaneKind;
+  outcome: "recorded" | "unrecorded" | "redriven";
+}) => handoffTotal.labels(pipelineName, laneKind, outcome).inc();
 export const incrementEsSubscriberEnqueueTotal = ({
   pipelineName,
   subscriberName,
@@ -427,7 +447,7 @@ export const incrementEsFoldPostStoreFailure = ({
   stage,
 }: {
   projectionName: string;
-  stage: "reactor_dispatch";
+  stage: "subscriber_dispatch";
 }) => foldPostStoreFailureTotal.labels(projectionName, stage).inc();
 
 export const incrementEsProcessManagerTotal = ({

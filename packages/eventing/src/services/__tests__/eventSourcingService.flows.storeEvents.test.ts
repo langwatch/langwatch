@@ -50,7 +50,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
     });
 
-    it("logs projection dispatch errors but does not fail storage operation", async () => {
+    it("logs a lane it could not stage or record, and does not fail storage", async () => {
       const eventStore = createMockEventStore<Event>();
       const logger = {
         debug: vi.fn(),
@@ -89,10 +89,10 @@ describe("EventSourcingService - Store Events Flow", () => {
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
-          aggregateType,
-          eventCount: 1,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          lanes: [expect.objectContaining({ kind: "map", lane: "failing-handler" })],
         }),
-        "Failed to dispatch events to projections",
+        "Lanes failed to stage and the hand-off outbox could not record them; these reactions are lost",
       );
     });
   });

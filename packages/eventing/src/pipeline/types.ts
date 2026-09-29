@@ -2,6 +2,7 @@ import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type { KillSwitch } from "../kill-switch/index.ts";
+import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck.ts";
 import type {
@@ -73,6 +74,7 @@ export interface EventSourcingPipelineDefinition<
   parseEvent: (value: unknown) => EventType;
   commandRegistrations?: readonly SealedCommand<EventType>[];
   globalRegistry?: ProjectionRegistry<Event>;
+  handoffStore?: ProcessStore;
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;

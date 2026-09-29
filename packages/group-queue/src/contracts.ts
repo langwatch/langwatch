@@ -45,6 +45,10 @@ export interface QueueSendOptions<Payload> {
 export interface JobDelivery {
   attempt: number;
   isContinuation?: boolean;
+  /** The staged job's id, stable across retries and crash redelivery (ADR-080). */
+  jobId?: string;
+  /** A coalesced batch's staged job ids, one per payload in order. */
+  jobIds?: readonly string[];
 }
 
 export interface GroupQueueHandlerContext extends JobDelivery {

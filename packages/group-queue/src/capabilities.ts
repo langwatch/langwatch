@@ -176,6 +176,8 @@ export class GroupQueueConsumer<Payload extends Record<string, unknown>> {
     const context = (delivery?: JobDelivery): GroupQueueHandlerContext => ({
       attempt: delivery?.attempt ?? 1,
       isContinuation: delivery?.isContinuation,
+      jobId: delivery?.jobId,
+      jobIds: delivery?.jobIds,
       signal: abort.signal,
     });
     const processor = new GroupQueueProcessor(

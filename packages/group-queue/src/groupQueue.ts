@@ -1345,7 +1345,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                 span,
               });
             } else {
-              await this.process(payload, { attempt });
+              await this.process(payload, { attempt, jobId: stagedJobId });
             }
           });
 
@@ -1963,7 +1963,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     try {
       await this.processBatch(
         entries.map((entry) => entry.payload),
-        { attempt, ...(dispatch.hasCommitted ? { isContinuation: true } : {}) },
+        {
+          attempt,
+          jobIds: entries.map((entry) => entry.stagedJobId),
+          ...(dispatch.hasCommitted ? { isContinuation: true } : {}),
+        },
       );
     } catch (err) {
       failure = { err };

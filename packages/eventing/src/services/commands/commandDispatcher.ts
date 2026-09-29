@@ -5,6 +5,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import { createCommand } from "../../commands/command.ts";
 import type { CommandSchema } from "../../commands/commandSchema.ts";
+import { eventIdempotencyKey } from "../../commands/idempotency-key.ts";
 import type { TenantScopedPayload } from "../../commands/sealedCommand.ts";
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { CommandType } from "../../domain/commandType.ts";
@@ -47,6 +48,27 @@ export interface ProcessCommandParams<
   killSwitch?: KillSwitch;
   killSwitchOptions?: KillSwitchOptions;
   logger?: ReturnType<typeof createLogger>;
+  /** The queue job's stable id; a crash replay of the job carries the same one. */
+  jobId?: string;
+}
+
+/**
+ * Keys each event the handler left unkeyed on the command job's stable id, so
+ * a crash replay's second append collapses onto the first in the event log.
+ */
+function keyEventsByJob<EventType extends Event>({
+  events,
+  jobId,
+}: {
+  events: readonly EventType[];
+  jobId: string | undefined;
+}): EventType[] {
+  if (!jobId) return [...events];
+  return events.map((event, index) =>
+    event.idempotencyKey
+      ? event
+      : { ...event, idempotencyKey: eventIdempotencyKey({ commandId: jobId, index }) },
+  );
 }
 
 /**
@@ -145,6 +167,7 @@ export async function processCommand<EventType extends Event, Payload extends Te
     killSwitch,
     killSwitchOptions,
     logger: log,
+    jobId,
   } = params;
 
   const validated = payload;
@@ -169,9 +192,10 @@ export async function processCommand<EventType extends Event, Payload extends Te
 
   const commandStartTime = performance.now();
   try {
-    const events = await handler.handle(command);
+    const handled = await handler.handle(command);
 
-    validateHandlerEvents(events, commandType);
+    validateHandlerEvents(handled, commandType);
+    const events = keyEventsByJob({ events: handled, jobId });
 
     if (events.length > 0) {
       await storeEventsFn(events, { tenantId });
@@ -214,9 +238,11 @@ export async function processCommand<EventType extends Event, Payload extends Te
 export interface ProcessCommandBatchParams<
   EventType extends Event,
   Payload extends TenantScopedPayload,
-> extends Omit<ProcessCommandParams<EventType, Payload>, "payload"> {
+> extends Omit<ProcessCommandParams<EventType, Payload>, "payload" | "jobId"> {
   /** Same-command payloads to coalesce, in dispatch (occurredAt) order. */
   payloads: Payload[];
+  /** Each payload's stable queue job id, by position. */
+  jobIds?: readonly string[];
 }
 
 /**
@@ -269,7 +295,7 @@ async function handleBatchCommands<
 
   const handledCommands: Command<Payload>[] = [];
   const allEvents: EventType[] = [];
-  for (const validated of validatedPayloads) {
+  for (const [position, validated] of validatedPayloads.entries()) {
     const payloadTenantId = createTenantId(String(validated.tenantId));
     const aggregateId = getAggregateId(validated);
 
@@ -296,8 +322,9 @@ async function handleBatchCommands<
       type: commandType,
       data: validated,
     });
-    const events = await handler.handle(command);
-    validateHandlerEvents(events, commandType);
+    const handled = await handler.handle(command);
+    validateHandlerEvents(handled, commandType);
+    const events = keyEventsByJob({ events: handled, jobId: params.jobIds?.[position] });
     // Only a command that contributed events is "handled" for cleanup,
     // mirroring the single path's `if (events.length > 0)` gate — running
     // cleanup off some OTHER payload's successful append would release a

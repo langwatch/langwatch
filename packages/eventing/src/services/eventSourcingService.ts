@@ -1,14 +1,22 @@
 import { performance } from "node:perf_hooks";
 
 import { createLogger } from "@langwatch/observability";
-import { type Span, SpanKind } from "@opentelemetry/api";
+import { nowInstant } from "@langwatch/time";
+import { context as otelContext, propagation, type Span, SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { createTenantId } from "../domain/tenantId.ts";
 import type { Event, Projection } from "../domain/types.ts";
+import { incrementEsHandoffTotal } from "../metrics.ts";
+import type { DispatchableMessage } from "../process-manager/outbox/outboxDispatcherService.ts";
+import type {
+  NewOutboxMessage,
+  ProcessStore,
+} from "../process-manager/stores/processStore.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import { ProjectionRouter } from "../projections/projectionRouter.ts";
+import { DispatchError } from "../queues/dispatchError.ts";
 import type { DeduplicationConfig, EventSourcedQueueProcessor } from "../queues/index.ts";
 import type { EventStore, EventStoreReadContext } from "../stores/eventStore.types.ts";
 import { EventUtils } from "../utils/event.utils.ts";
@@ -16,17 +24,19 @@ import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
 } from "./eventSourcingService.types.ts";
+import {
+  type FailedHandoff,
+  HANDOFF_PROCESS_NAME,
+  handoffLaneKindSchema,
+  handoffMessageKey,
+  type HandoffPayload,
+  handoffPayloadSchema,
+  type HandoffScope,
+} from "./handoff/failedHandoff.ts";
 import { QueueManager } from "./queues/queueManager.ts";
 
-/** Flattens an AggregateError's members into loggable `{message, stack}` shapes. */
-function extractSubErrors(error: unknown): ({ message: string; stack?: string } | string)[] {
-  if (!(error instanceof AggregateError)) return [];
-  return error.errors.map((e: unknown) =>
-    e instanceof Error
-      ? { message: e.message, stack: e.stack?.split("\n").slice(0, 3).join("\n") }
-      : String(e),
-  );
-}
+/** A failed lane, tagged with the dispatcher that answered it. */
+type ScopedFailure<E extends Event> = FailedHandoff<E> & { scope: HandoffScope };
 
 /**
  * Main service that orchestrates event sourcing: coordinates event stores,
@@ -48,6 +58,7 @@ export class EventSourcingService<
   private readonly queueManager: QueueManager<EventType>;
   private readonly router: ProjectionRouter<EventType, ProjectionTypes>;
   private readonly globalRegistry?: ProjectionRegistry<Event>;
+  private readonly handoffStore?: ProcessStore;
   private readonly prepareEventForProjection: (event: EventType) => EventType;
   private readonly metrics?: EventSourcingServiceOptions<EventType, ProjectionTypes>["metrics"];
 
@@ -70,6 +81,7 @@ export class EventSourcingService<
     metrics,
     commandRegistrations,
     globalRegistry,
+    handoffStore,
     executionTarget,
     replayMarkerChecker,
     retentionPolicyResolver,
@@ -84,6 +96,7 @@ export class EventSourcingService<
     this.options = serviceOptions ?? {};
     this.logger = logger ?? createLogger("langwatch.trace-processing.event-sourcing-service");
     this.globalRegistry = globalRegistry;
+    this.handoffStore = handoffStore;
     this.prepareEventForProjection = prepareEventForProjection ?? ((event) => event);
     this.metrics = metrics;
 
@@ -385,8 +398,8 @@ export class EventSourcingService<
 
   /**
    * Stores events using the pipeline's aggregate type. Events are stored in
-   * the event store first (must succeed), then dispatched to projections —
-   * projection errors are logged but don't fail the store.
+   * the event store first (must succeed), then staged onto their lanes; a lane
+   * that fails is recorded in the hand-off outbox and never fails the store.
    */
   async storeEvents(
     events: readonly EventType[],
@@ -434,8 +447,11 @@ export class EventSourcingService<
     // Map to new array — do NOT mutate enrichedEvents in place.
     const leanedEvents = enrichedEvents.map((event) => this.prepareEventForProjection(event));
 
-    await this.dispatchToRouter({ leanedEvents, enrichedEvents, context, span });
-    await this.dispatchToGlobalRegistry({ leanedEvents, context, span });
+    const failures = [
+      ...(await this.dispatchToRouter({ leanedEvents, context, span })),
+      ...(await this.dispatchToGlobalRegistry({ leanedEvents, context, span })),
+    ];
+    await this.recordFailedHandoffs({ failures, context });
 
     // Record throughput and duration metrics
     this.metrics?.eventsStored(this.pipelineName, enrichedEvents.length);
@@ -481,49 +497,30 @@ export class EventSourcingService<
     };
   }
 
-  /** Dispatches leaned events to the fold/map/subscriber router, tolerating and logging failure. */
+  /** Stages leaned events onto the pipeline's own lanes, answering those that failed. */
   private async dispatchToRouter({
     leanedEvents,
-    enrichedEvents,
     context,
     span,
   }: {
     leanedEvents: EventType[];
-    enrichedEvents: EventType[];
     context: EventStoreReadContext<EventType>;
     span: Span;
-  }): Promise<void> {
+  }): Promise<ScopedFailure<EventType>[]> {
     const hasProjectionWork =
       this.router.hasFoldProjections ||
       this.router.hasStateProjections ||
       this.router.hasMapProjections ||
       this.router.hasEventSubscribers;
-    if (leanedEvents.length === 0 || !hasProjectionWork) return;
+    if (leanedEvents.length === 0 || !hasProjectionWork) return [];
 
     span.addEvent("projection.dispatch.start");
-    try {
-      await this.router.dispatch(leanedEvents, context);
-      span.addEvent("projection.dispatch.complete");
-    } catch (error) {
-      span.addEvent("projection.dispatch.error", {
-        "error.message": error instanceof Error ? error.message : String(error),
-      });
-      if (this.logger) {
-        const subErrors = extractSubErrors(error);
-        this.logger.error(
-          {
-            aggregateType: this.aggregateType,
-            eventCount: enrichedEvents.length,
-            error: error instanceof Error ? error.message : String(error),
-            subErrors,
-          },
-          "Failed to dispatch events to projections",
-        );
-      }
-    }
+    const failures = await this.router.dispatch(leanedEvents, context);
+    span.addEvent("projection.dispatch.complete", { "handoff.failed": failures.length });
+    return failures.map((failure) => ({ ...failure, scope: "pipeline" }));
   }
 
-  /** Dispatches leaned events to the cross-pipeline global registry, logging any failure. */
+  /** Stages leaned events onto the cross-pipeline global registry, answering failed lanes. */
   private async dispatchToGlobalRegistry({
     leanedEvents,
     context,
@@ -532,26 +529,156 @@ export class EventSourcingService<
     leanedEvents: EventType[];
     context: EventStoreReadContext<EventType>;
     span: Span;
-  }): Promise<void> {
-    if (!this.globalRegistry || leanedEvents.length === 0) return;
+  }): Promise<ScopedFailure<EventType>[]> {
+    if (!this.globalRegistry || leanedEvents.length === 0) return [];
 
     span.addEvent("global_projection.dispatch.start");
+    const failures = await this.globalRegistry.dispatch(leanedEvents, context);
+    span.addEvent("global_projection.dispatch.complete", { "handoff.failed": failures.length });
+    const leanedById = new Map(leanedEvents.map((event) => [event.id, event]));
+    return failures.map((failure) => ({
+      kind: failure.kind,
+      lane: failure.lane,
+      events: failure.events.flatMap((event) => leanedById.get(event.id) ?? []),
+      error: failure.error,
+      scope: "global",
+    }));
+  }
+
+  /**
+   * Records one outbox row per failed (lane, event), so the hand-off outbox
+   * re-drives it. Only a failed outbox write, or no outbox, still loses it.
+   */
+  private async recordFailedHandoffs({
+    failures,
+    context,
+  }: {
+    failures: ScopedFailure<EventType>[];
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
+    if (failures.length === 0) return;
+    const traceCarrier: Record<string, string> = {};
+    propagation.inject(otelContext.active(), traceCarrier);
+
+    const byAggregate = new Map<
+      string,
+      { failure: ScopedFailure<EventType>; message: NewOutboxMessage }[]
+    >();
+    for (const failure of failures) {
+      for (const event of failure.events) {
+        const payload: HandoffPayload = {
+          pipeline: this.pipelineName,
+          scope: failure.scope,
+          lane: failure.lane,
+          eventId: event.id,
+          aggregateId: String(event.aggregateId),
+        };
+        const rows = byAggregate.get(payload.aggregateId) ?? [];
+        rows.push({
+          failure,
+          message: {
+            messageKey: handoffMessageKey({ kind: failure.kind, payload }),
+            intentType: failure.kind,
+            payload,
+            traceCarrier,
+          },
+        });
+        byAggregate.set(payload.aggregateId, rows);
+      }
+    }
+
+    for (const [aggregateId, rows] of byAggregate) {
+      const outcome = await this.appendHandoffRows({ aggregateId, rows, context });
+      for (const { failure } of rows) {
+        incrementEsHandoffTotal({
+          pipelineName: this.pipelineName,
+          laneKind: failure.kind,
+          outcome,
+        });
+      }
+    }
+  }
+
+  /** One aggregate's rows in one idempotent append; answers whether they landed. */
+  private async appendHandoffRows({
+    aggregateId,
+    rows,
+    context,
+  }: {
+    aggregateId: string;
+    rows: { failure: ScopedFailure<EventType>; message: NewOutboxMessage }[];
+    context: EventStoreReadContext<EventType>;
+  }): Promise<"recorded" | "unrecorded"> {
+    const lanes = rows.map(({ failure, message }) => ({
+      scope: failure.scope,
+      kind: failure.kind,
+      lane: failure.lane,
+      messageKey: message.messageKey,
+      error: failure.error.message,
+    }));
     try {
-      await this.globalRegistry.dispatch(leanedEvents, context);
-      span.addEvent("global_projection.dispatch.complete");
-    } catch (error) {
-      span.addEvent("global_projection.dispatch.error", {
-        "error.message": error instanceof Error ? error.message : String(error),
+      if (!this.handoffStore) throw new Error("No process store is wired to record hand-offs");
+      await this.handoffStore.appendIntents({
+        ref: {
+          processName: HANDOFF_PROCESS_NAME,
+          projectId: context.tenantId,
+          processKey: `${this.pipelineName}:${aggregateId}`,
+        },
+        tenantId: context.tenantId,
+        sourceEventId: null,
+        messages: rows.map(({ message }) => message),
+        now: nowInstant().epochMilliseconds,
       });
+      this.logger.warn(
+        { pipelineName: this.pipelineName, aggregateId, lanes },
+        "Lanes failed to stage; recorded in the hand-off outbox for re-drive",
+      );
+      return "recorded";
+    } catch (error) {
       this.logger.error(
         {
-          aggregateType: this.aggregateType,
-          eventCount: leanedEvents.length,
+          pipelineName: this.pipelineName,
+          aggregateId,
+          lanes,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Failed to dispatch events to global projection registry",
+        "Lanes failed to stage and the hand-off outbox could not record them; these reactions are lost",
       );
+      return "unrecorded";
     }
+  }
+
+  /**
+   * Re-stages one recorded hand-off: reads the event back from the event log
+   * and stages it onto the one lane that missed it. A throw leaves the row
+   * to the outbox's backoff and dead letters.
+   */
+  async redeliverHandoff({ message }: { message: DispatchableMessage }): Promise<void> {
+    const kind = handoffLaneKindSchema.parse(message.intentType);
+    const { scope, lane, eventId, aggregateId } = handoffPayloadSchema.parse(message.payload);
+    const event = this.prepareEventForProjection(
+      await this.eventStore.getEvent({
+        eventId,
+        tenantId: createTenantId(message.tenantId),
+        aggregateType: this.aggregateType,
+        aggregateId,
+      }),
+    );
+    if (scope === "pipeline") {
+      await this.router.redeliver({ kind, lane, event });
+    } else if (this.globalRegistry) {
+      await this.globalRegistry.redeliver({ kind, lane, event });
+    } else {
+      throw new DispatchError({
+        message: `Pipeline "${this.pipelineName}" has no global registry to re-drive lane "${lane}"`,
+        retryable: false,
+      });
+    }
+    incrementEsHandoffTotal({
+      pipelineName: this.pipelineName,
+      laneKind: kind,
+      outcome: "redriven",
+    });
   }
 
   /**

@@ -49,6 +49,10 @@ export interface JobDelivery {
   attempt: number;
   /** True when this is a continuation of a batched dispatch. */
   isContinuation?: boolean;
+  /** The staged job's id, stable across retries and crash redelivery (ADR-080). */
+  jobId?: string;
+  /** A coalesced batch's staged job ids, one per payload in order. */
+  jobIds?: readonly string[];
 }
 
 /**

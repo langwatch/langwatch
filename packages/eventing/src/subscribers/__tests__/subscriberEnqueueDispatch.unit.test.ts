@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
 import { KillSwitch, type KillSwitchQuery } from "../../kill-switch/index.ts";
+import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore.ts";
 import { ProjectionRouter } from "../../projections/projectionRouter.ts";
 import {
   createMockEventStore,
@@ -19,6 +20,7 @@ import {
   parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
 import { EventSourcingService } from "../../services/eventSourcingService.ts";
+import { type FailedHandoff, HANDOFF_PROCESS_NAME } from "../../services/handoff/failedHandoff.ts";
 import { QueueManager } from "../../services/queues/queueManager.ts";
 import type { EventSubscriberDefinition } from "../eventSubscriber.types.ts";
 
@@ -78,20 +80,14 @@ const raises = () => {
 };
 
 /**
- * `dispatch` reports failures as an AggregateError, so the specific cause sits
- * in `.errors`. Asserting there proves *which* failure surfaced — a bare
- * `rejects.toThrow()` would pass on any dispatch fault at all.
+ * `dispatch` answers each lane it could not stage, so the specific cause sits
+ * on each answer. Asserting there proves *which* failure surfaced.
  */
 async function expectDispatchFailure(
-  dispatching: Promise<void>,
+  dispatching: Promise<FailedHandoff[]>,
   expected: RegExp,
 ): Promise<Error[]> {
-  const caught: unknown = await dispatching.then(
-    () => null,
-    (error: unknown) => error,
-  );
-  expect(caught).toBeInstanceOf(AggregateError);
-  const causes = (caught as AggregateError).errors as Error[];
+  const causes = (await dispatching).map((failure) => failure.error);
   // Without this the loop below vacuously passes on an empty errors array.
   expect(causes.length).toBeGreaterThan(0);
   for (const cause of causes) {
@@ -292,13 +288,12 @@ describe("subscriber enqueue-time contract", () => {
         expect(healthy).toEqual(["evt-a", "evt-b"]);
       });
 
-      // The honest semantics the contract states: the routing path has no
-      // retry, so the reported failure is where it ends. Pinned at the
-      // production caller, not just at the router boundary — a router-level
-      // `rejects.toThrow()` passes even when storeEvents swallows it.
+      // Pinned at the production caller, not just at the router boundary: the
+      // write stands and the failed lane is recorded for re-drive.
       /** @scenario a subscriber that cannot decide relevance never fails the write behind it */
-      it("is swallowed by storeEvents, so the committed write succeeds and nothing re-dispatches", async () => {
+      it("records the lane in the hand-off outbox, so the committed write succeeds", async () => {
         const eventStore = createMockEventStore<Event>();
+        const handoffStore = InMemoryProcessStore.createForTesting();
         const logger = {
           debug: vi.fn(),
           info: vi.fn(),
@@ -325,21 +320,29 @@ describe("subscriber enqueue-time contract", () => {
               options: { enqueue: { filter: raises } },
             },
           ],
+          handoffStore,
           logger: logger as never,
         });
 
-        await expect(
-          service.storeEvents([makeEvent("evt-committed")], readContext),
-        ).resolves.not.toThrow();
+        const event = makeEvent("evt-committed");
+        await expect(service.storeEvents([event], readContext)).resolves.not.toThrow();
 
-        // The write stands, the failure is visible to operators, and the job
-        // is simply gone — there is no re-dispatch anywhere behind this.
         expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
-        expect(logger.error).toHaveBeenCalledWith(
-          expect.objectContaining({ aggregateType }),
-          "Failed to dispatch events to projections",
-        );
         expect(handle).not.toHaveBeenCalled();
+        const rows = await handoffStore.findMessagesByRef({
+          ref: {
+            processName: HANDOFF_PROCESS_NAME,
+            projectId: readContext.tenantId,
+            processKey: `${TEST_CONSTANTS.PIPELINE_NAME}:${String(event.aggregateId)}`,
+          },
+        });
+        expect(rows).toEqual([
+          expect.objectContaining({
+            intentType: "subscriber",
+            status: "pending",
+            payload: expect.objectContaining({ lane: "seamSubscriber", eventId: event.id }),
+          }),
+        ]);
       });
     });
   });

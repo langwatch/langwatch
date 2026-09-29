@@ -1360,6 +1360,11 @@ Worker semantics: delivery is at-least-once, so subscribers are idempotent;
 ordering is per aggregate via the group queue, so one poisoned aggregate
 retries with backoff without blocking neighbours; projections fold from the
 same ordered stream; every consumer registers drain-first on the server.
+The hand-off from an append to its projections, subscribers and process managers is durable: a
+lane that cannot be staged is recorded in the process store's outbox and re-driven, a fold or state
+projection by rebuilding the aggregate, never logged and dropped (Alex, 2026-09-29). A command job
+keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
+append (Alex, 2026-09-29).
 
 ### 9.1 Purge, erase and retention across modules
 
