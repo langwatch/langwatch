@@ -231,7 +231,7 @@ describe.skipIf(databaseUrl === null)("the previous configurations of a scope", 
       expect(
         entries
           .map((entry) => entry.runParameters.region)
-          .toSorted((a, b) => (a < b ? -1 : Number(a > b))),
+          .toSorted((a = "", b = "") => (a < b ? -1 : Number(a > b))),
       ).toEqual(["eu-central", "us-east"]);
     });
   });

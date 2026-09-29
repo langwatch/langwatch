@@ -142,18 +142,23 @@ export class Ksuid {
       throw new Error("Timestamp greater than 8921556-12-07T10:44:16Z");
     }
 
+    // fullDecoded is a fixed-length (DECODED_LEN) Uint8Array filled in full
+    // above, so every index read here is in-bounds by construction.
     const timestamp =
-      (fullDecoded[2] << 40) |
-      (fullDecoded[3] << 32) |
-      (fullDecoded[4] << 24) |
-      (fullDecoded[5] << 16) |
-      (fullDecoded[6] << 8) |
-      fullDecoded[7];
+      (fullDecoded[2]! << 40) |
+      (fullDecoded[3]! << 32) |
+      (fullDecoded[4]! << 24) |
+      (fullDecoded[5]! << 16) |
+      (fullDecoded[6]! << 8) |
+      fullDecoded[7]!;
 
     const instance = Instance.fromBuffer(fullDecoded.slice(8, 17));
 
     const sequenceId =
-      (fullDecoded[17] << 24) | (fullDecoded[18] << 16) | (fullDecoded[19] << 8) | fullDecoded[20];
+      (fullDecoded[17]! << 24) |
+      (fullDecoded[18]! << 16) |
+      (fullDecoded[19]! << 8) |
+      fullDecoded[20]!;
 
     return new Ksuid({ environment, resource, timestamp, instance, sequenceId });
   }
@@ -203,6 +208,13 @@ function splitPrefixId(input: string): ParsedKsuid {
   }
 
   const [, environment, resource, encoded] = parsed;
+
+  // `resource` and `encoded` are non-optional capture groups in KSUID_REGEX
+  // (only `environment` is wrapped in `(?:...)?`), so a successful match
+  // always fills them; this narrows the type rather than handling a real case.
+  if (resource === undefined || encoded === undefined) {
+    throw new Error("ID is invalid");
+  }
 
   if (environment === "prod") {
     throw new Error("Production environment is implied");
