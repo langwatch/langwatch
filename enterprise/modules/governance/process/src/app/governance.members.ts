@@ -6,19 +6,15 @@ import type {
   ActivityMonitorWindowQuery,
   ConfigureIngestionPullCommand,
   DisableIngestionPullCommand,
-  GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
-  GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE,
   GovernanceBudgetOverviewForUser,
   GovernanceIngestionSource,
   GovernanceOcsfExportRow,
   IngestionSourceHealthRow,
   PulledUsageObservedEventData,
   RecentAnomalyRow,
-  RecordBudgetCrossingCommandData,
   RecordIngestionPullRunCompletedCommand,
   RecordIngestionPullRunFailedCommand,
   RecordPulledUsageCommand,
-  RecordVkLifecycleCommandData,
   SourceHealthMetrics,
   SpendByDepartmentRow,
   SpendByTeamRow,
@@ -26,12 +22,7 @@ import type {
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  type Event,
-  type IntentContext,
-  type ProcessStore,
-  type TriggerContext,
-} from "@langwatch/eventing";
+import { type TriggerContext } from "@langwatch/eventing";
 import type {
   InternalProject,
   InternalProjectQuery,
@@ -83,24 +74,6 @@ export interface PersonalBudgetOverviewReader {
 export interface CliAdminContactReader {
   findAdminEmail(organizationId: string): Promise<string | null>;
 }
-
-export type GatewayBudgetScope =
-  | "ORGANIZATION"
-  | "TEAM"
-  | "PROJECT"
-  | "VIRTUAL_KEY"
-  | "PRINCIPAL"
-  | "GROUP"
-  | "ATTRIBUTED_USER";
-
-export type GatewayBudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
-
-export type GatewayBudgetCrossingCandidate = {
-  tenantId: string;
-  budgetId: string;
-  bucketScopeId: string;
-  endUserId: string | null;
-};
 
 /**
  * Three small read-side signal ports (OCSF export, workspace-view audit,
@@ -424,31 +397,6 @@ export interface GovernanceProjectDirectory {
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
 }
 
-export type GovernanceResolvedBudgetCrossing = {
-  candidate: GatewayBudgetCrossingCandidate;
-  budget: {
-    id: string;
-    organizationId: string;
-    scopeType: GatewayBudgetScope;
-    scopeId: string;
-    window: GatewayBudgetWindow;
-    limitUsd: string;
-    onBreach: "BLOCK" | "WARN";
-  };
-  spentUsd: string;
-  periodStartedAtMs: number;
-};
-
-export interface GovernanceSignalChannel {
-  available(): boolean;
-  now(): Instant;
-  resolveBudgetCrossings(
-    candidates: GatewayBudgetCrossingCandidate[],
-    now: Instant,
-  ): Promise<GovernanceResolvedBudgetCrossing[]>;
-  appendBudgetCrossing(data: GovernanceBudgetCrossingData): Promise<void>;
-}
-
 export type GovernanceTraceSummary = {
   traceId: string;
   occurredAt: number;
@@ -511,44 +459,6 @@ export interface GovernanceOcsfEventWriter {
 export interface GovernanceSubscriberDiagnosticsSink {
   warn(input: { code: string; tenantId: string; traceId: string }): void;
   capture(error: unknown): void;
-}
-
-export type GovernanceVkLifecycleData = RecordVkLifecycleCommandData;
-
-export type GovernanceBudgetCrossingData = RecordBudgetCrossingCommandData;
-
-export type GovernanceEventsProcessingEvent =
-  | (Event<GovernanceVkLifecycleData> & {
-      type: typeof GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE;
-    })
-  | (Event<GovernanceBudgetCrossingData> & {
-      type: typeof GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE;
-    });
-
-export type GovernanceWebhookEnvelope = {
-  id: string;
-  type: string;
-  created: string;
-  schema_version: "1";
-  data: Record<string, string | null>;
-};
-
-export type GovernanceWebhookSendBatch = {
-  organizationId: string;
-  endpointId: string;
-  batchId: string;
-  envelopes: GovernanceWebhookEnvelope[];
-};
-
-export interface GovernanceWebhookChannel {
-  readonly processStore: ProcessStore;
-  readonly maxAttempts: number;
-
-  webhooksEnabled(organizationId: string): Promise<boolean>;
-  activeEndpointIds(input: { organizationId: string; eventType: string }): Promise<string[]>;
-  sendBatch(payload: GovernanceWebhookSendBatch, context: IntentContext): Promise<void>;
-  retryDelayMs(input: { attempt: number }): number;
-  now(): number;
 }
 
 export interface ActivityMonitorRepository {

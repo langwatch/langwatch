@@ -35,6 +35,7 @@ import {
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
+import { WebhookGovernanceDeliveryService } from "../services/webhook-governance-delivery.service.ts";
 import { WebhookHealthService } from "../services/webhook-health.service.ts";
 import { WebhookTestBoundsService } from "../services/webhook-test-bounds.service.ts";
 import { buildWebhookComposition } from "./webhook-composition.build.ts";
@@ -189,6 +190,7 @@ export class WebhookApp implements WebhookApiContract {
 
   #delivery: WebhookDeliveryParts | undefined;
   #requestSpendDelivery: EventingCommandSender<unknown> | undefined;
+  #requestGovernanceDelivery: EventingCommandSender<unknown> | undefined;
 
   /** webhook_delivery for this role: the worker also hosts the delivery process manager. */
   deliveryPipeline({
@@ -207,26 +209,33 @@ export class WebhookApp implements WebhookApiContract {
       };
     }
     if (participation === "produce" || !parts) return buildWebhookDeliveryPipeline({});
+    const deps = {
+      processStore,
+      endpoints: parts.endpoints,
+      pruneExpiredIdempotencyReceipts: (now: Instant) =>
+        parts.retention.pruneExpiredIdempotencyReceipts({ now }),
+      dispatch: parts.dispatch(),
+      getPlan: parts.getPlan,
+    };
     return buildWebhookDeliveryPipeline({
-      deliveryProcess: WebhookDeliveryService.create({
-        processStore,
-        endpoints: parts.endpoints,
-        pruneExpiredIdempotencyReceipts: (now) =>
-          parts.retention.pruneExpiredIdempotencyReceipts({ now }),
-        dispatch: parts.dispatch(),
-        getPlan: parts.getPlan,
-      }).processManager(),
+      deliveryProcess: WebhookDeliveryService.create(deps).processManager(),
+      governanceProcess: WebhookGovernanceDeliveryService.create(deps).processManager(),
     });
   }
 
   connectDelivery(commands: Readonly<Record<string, EventingCommandSender<unknown>>>): void {
     this.#requestSpendDelivery = commands.requestSpendDelivery;
+    this.#requestGovernanceDelivery = commands.requestGovernanceDelivery;
   }
 
-  requestSpendDelivery: WebhookApiContract["requestSpendDelivery"] = async (input) => {
-    const sender = this.#requestSpendDelivery;
+  /** Spend keeps its own command, wire and idempotency; a governance fact takes the other. */
+  requestGatewayEventDelivery: WebhookApiContract["requestGatewayEventDelivery"] = async (
+    input,
+  ) => {
+    const sender = "spend" in input ? this.#requestSpendDelivery : this.#requestGovernanceDelivery;
     if (!sender) throw new Error("webhook_delivery is not registered in this process");
-    await sender.send({ ...input, tenantId: input.spend.data.tenantId });
+    const tenantId = "spend" in input ? input.spend.data.tenantId : input.governance.data.tenantId;
+    await sender.send({ ...input, tenantId });
   };
 
   /** Compatibility construction used by process roots and tests not yet on

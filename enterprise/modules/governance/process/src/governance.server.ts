@@ -24,7 +24,6 @@ import {
 import { GovernanceApp } from "./app/governance.app.ts";
 import type {
   GovernanceDiagnosticsSink,
-  GovernanceSignalChannel,
   IngestionPullLifecycleChannel,
   IngestionPullMetricsSink,
   IngestionPullOutcomeChannel,
@@ -35,11 +34,6 @@ import type {
   AnomalySpendReader,
 } from "./app/governance.members.ts";
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
-import {
-  GovernanceEventsAdapter,
-  type GovernanceEventsPipelineDeps,
-  governanceEventsEventing,
-} from "./eventing/governance-events.pipeline.ts";
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
 import {
   IngestionPullEventingAdapter,
@@ -77,7 +71,6 @@ import {
   type DepartmentProjects,
   DepartmentService,
 } from "./services/department.service.ts";
-import { GovernanceSignalService } from "./services/governance-signal.service.ts";
 import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
@@ -141,7 +134,6 @@ export const governanceServer = defineServerModule("governance")
       bindRestCredential("cliToken", () => app.cliTokenDoor),
     ];
   })
-  .withEventing(governanceEventsEventing)
   .withEventing(pulledUsageEventing)
   .withEventing(ingestionPullEventing)
   .withEventing(ingestionPullReconcileEventing);
@@ -221,14 +213,6 @@ export function findAgentsListings(options: {
   });
 }
 
-/** Where a governance signal is stated, and where a failure to state it is reported. */
-export function createGovernanceSignals(
-  channel: GovernanceSignalChannel,
-  diagnostics?: GovernanceDiagnosticsSink,
-): GovernanceSignalService {
-  return GovernanceSignalService.create(channel, diagnostics);
-}
-
 /** The department directory, over the process's own connection. */
 export function createDepartmentDirectory(
   database: DepartmentDatabase,
@@ -266,13 +250,6 @@ export function createGovernanceServices(
   options: PostgresGovernanceAdapterOptions,
 ): PostgresGovernanceServices {
   return PostgresGovernanceAdapter.create(options).build();
-}
-
-/** The Governance events pipeline a process registers on its event sourcing. */
-export function createGovernanceEventsPipeline(
-  deps: GovernanceEventsPipelineDeps,
-): ReturnType<typeof GovernanceEventsAdapter.prototype.pipeline> {
-  return GovernanceEventsAdapter.create(deps).pipeline();
 }
 
 /** The sources one ingestion-pull installation reads, over its own connection. */

@@ -7,6 +7,7 @@ import type {
   GatewayBudgetDebitRow,
   GatewayBudgetScopeType,
   GatewayBudgetWindow,
+  VkLifecycleAction,
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -309,7 +310,7 @@ export type GatewayVirtualKeyLifecycleSignal = {
     displayPrefix: string;
     traceProjectId: string | null;
   };
-  action: "created" | "updated" | "rotated" | "revoked" | "disabled" | "enabled";
+  action: VkLifecycleAction;
   reason?: string | null;
 };
 

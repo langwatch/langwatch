@@ -1371,6 +1371,14 @@ logged and dropped (Alex, 2026-09-29). A command job
 keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
 append (Alex, 2026-09-29).
 
+A fact is recorded by its owner; delivery modules are handed it; there is no relay module (Alex,
+2026-09-29). Gateway's budget crossings and virtual key lifecycle changes are the case: gateway
+detects a crossing after its own debit lands and records it with `recordBudgetCrossing`, keyed by
+(budget, bucket, kind, period), on its `governance_events_processing` pipeline (main's stored
+names). A subscriber there hands each fact to `WebhookApi.requestGatewayEventDelivery`, and webhook
+builds and delivers the envelope. A failed detection throws and the debit is re-driven. That is
+safe because the ledger insert skips any budget the request has already debited.
+
 ### 9.1 Purge, erase and retention across modules
 
 **Cross-module purge, erase and retention are commanded by the owners** (Alex, 2026-09-29). Work

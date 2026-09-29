@@ -71,7 +71,7 @@ export interface EventingGatewaySpendAdapterOptions {
     inner: FoldProjectionStore<GatewaySpendState>,
   ) => FoldProjectionStore<GatewaySpendState>;
   /** Webhook's own delivery op; each committed spend step is handed to it (WP-6c). */
-  webhookSpendDelivery?: Pick<WebhookApi, "requestSpendDelivery">;
+  webhookSpendDelivery?: Pick<WebhookApi, "requestGatewayEventDelivery">;
   /** The gateway's budget debits (`gatewayDebits`); absent without the
    *  ClickHouse spend path (the ledger is the only spend store). */
   gatewayDebits?: GatewaySpendProcessManagerMount;

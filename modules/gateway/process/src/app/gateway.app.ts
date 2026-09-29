@@ -150,6 +150,10 @@ import {
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
 } from "../eventing/gateway-debit.process.ts";
+import {
+  buildGatewayGovernanceEventsPipeline,
+  type GatewayGovernanceEventsDefinition,
+} from "../eventing/gateway-governance-events.pipeline.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
 import {
@@ -180,6 +184,7 @@ import {
   type GatewayAgentCacheEncryption,
 } from "../services/gateway-agent-cache.service.ts";
 import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
+import { GatewayBudgetCrossingService } from "../services/gateway-budget-crossing.service.ts";
 import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
@@ -192,6 +197,7 @@ import { GatewayElevenLabsWebhookService } from "../services/gateway-elevenlabs-
  * serves both a browser session and an API key.
  */
 import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
+import { GatewayGovernanceEventsService } from "../services/gateway-governance-events.service.ts";
 import {
   GatewayGuardrailEvaluationService,
   type EvaluatorRunner,
@@ -674,7 +680,7 @@ function spendCommandRecord(command: string, payload: unknown): Record<string, u
 type GatewaySpendPipelineParts = Readonly<{
   ledger: GatewaySpendEventsRepository;
   commands: Record<string, GatewaySpendCommandSender | undefined>;
-  webhooks: Pick<WebhookApi, "requestSpendDelivery">;
+  webhooks: Pick<WebhookApi, "requestGatewayEventDelivery">;
   openAdmissions: GatewayOpenAdmissionsRepository;
   settlementGraceMs: number;
   foldCache: GatewaySpendFoldCacheRepository;
@@ -816,6 +822,9 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       virtualKeyPepper: string | undefined;
     }>,
   ): GatewayApp {
+    const governanceEvents = GatewayGovernanceEventsService.create({
+      projects: setup.dependencies.projects,
+    });
     const controlPlane = buildGatewayControlPlane({
       prisma: setup.members.prisma,
       clickhouse: setup.members.clickhouse,
@@ -828,6 +837,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
         traces: setup.dependencies.traces,
       },
       virtualKeyPepper: secrets.virtualKeyPepper,
+      governanceSignals: governanceEvents,
     });
     const internalCollaborators = setup.members.gatewayInternalProtocol;
     // `settlementGraceMs` owns the parse, the bound and the warning on the raw
@@ -932,6 +942,11 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
                 RedisGatewayBudgetChangeDedupeRepository.create(setup.members.redis),
               ),
               changes: controlPlane.changeEvents,
+              crossings: GatewayBudgetCrossingService.create({
+                budgets: controlPlane.budgetDecisions,
+                spend: controlPlane.budgetSpend,
+                facts: governanceEvents,
+              }),
             })
           : void 0,
       },
@@ -952,6 +967,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       },
       connectUpstream,
       oneTimeReveals: setup.dependencies.oneTimeReveals,
+      governanceEvents,
     });
   }
 
@@ -974,6 +990,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
   #connectUpstream: GatewayConnectUpstreamService | undefined;
   #addresses: GatewayDeploymentAddresses;
   #oneTimeReveals: SecretApi | undefined;
+  #governanceEvents: GatewayGovernanceEventsService | undefined;
 
   private constructor({
     members,
@@ -990,6 +1007,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     },
     connectUpstream,
     oneTimeReveals,
+    governanceEvents,
   }: {
     members: GatewayInfrastructure;
     voice: GatewayVoiceServices;
@@ -1001,9 +1019,11 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     addresses?: GatewayDeploymentAddresses;
     connectUpstream?: GatewayConnectUpstreamService;
     oneTimeReveals?: SecretApi;
+    governanceEvents?: GatewayGovernanceEventsService;
   }) {
     this.#addresses = addresses;
     this.#oneTimeReveals = oneTimeReveals;
+    this.#governanceEvents = governanceEvents;
     this.#connectUpstream = connectUpstream;
     this.#spend = spend;
     this.#spendPipeline = spendPipeline;
@@ -1052,6 +1072,23 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       },
     });
     return this.#spendProcessing.buildProcessing();
+  }
+
+  /** governance_events_processing for this role: the worker also hands each fact to webhook. */
+  governanceEventsPipeline({
+    participation,
+  }: {
+    participation: EventingParticipation;
+  }): GatewayGovernanceEventsDefinition {
+    const webhooks = participation === "produce" ? void 0 : this.#spendPipeline?.webhooks;
+    return buildGatewayGovernanceEventsPipeline(webhooks ? { webhooks } : {});
+  }
+
+  /** Binds the crossing and lifecycle senders the debit writer and key services record through. */
+  connectGovernanceEvents(
+    commands: Readonly<Record<string, EventingCommandSender<unknown>>>,
+  ): void {
+    this.#governanceEvents?.connect(commands);
   }
 
   /** The registered senders the data plane's /spend-commands and priced spend append through. */

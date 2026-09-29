@@ -15,7 +15,7 @@ import {
 } from "@langwatch/webhook-contract";
 
 import type { WebhookDispatchChannel } from "../channels/webhook-dispatch.channel.ts";
-import type { WebhookSpendDeliveryRequestedEvent } from "../eventing/webhook-spend-delivery.intent.ts";
+import type { WebhookDeliveryEvent } from "../eventing/webhook-governance-delivery.intent.ts";
 import { webhookSpendDeliveryRequestedEventSchema } from "../eventing/webhook-spend-delivery.intent.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -151,7 +151,7 @@ export class WebhookDeliveryService {
     return new WebhookDeliveryService(deps);
   }
 
-  processManager(): ProcessManagerApplier<WebhookSpendDeliveryRequestedEvent> {
+  processManager(): ProcessManagerApplier<WebhookDeliveryEvent> {
     return (process) =>
       process
         .state(webhookProcessStateSchema, INITIAL_WEBHOOK_DELIVERY_STATE)

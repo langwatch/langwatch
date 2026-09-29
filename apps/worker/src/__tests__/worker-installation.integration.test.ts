@@ -288,6 +288,26 @@ describe("the worker process installation", () => {
     }
   });
 
+  /** @scenario "The worker hands gateway's governance facts to webhook delivery" */
+  it("hosts gateway's governance subscriber and webhook's governance delivery under main's names", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const pipeline = (name: string) =>
+        eventing.definitions.find((definition) => definition.metadata.name === name);
+      expect(
+        pipeline("governance_events_processing")?.open((definition) =>
+          definition.eventSubscribers.has("webhookGovernanceDelivery"),
+        ),
+      ).toBe(true);
+      expect(pipeline("webhook_delivery")?.processManagers.has("governanceEventsDelivery")).toBe(
+        true,
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   /** @scenario "A SaaS worker registers the billable-events meter" */
   it("declares the billable-events meter on the roll-up pipeline of a SaaS worker", async () => {
     const { runtime, eventing } = await bootWorker({ saas: true });

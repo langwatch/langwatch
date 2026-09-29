@@ -5,7 +5,6 @@ export {
   type PostgresGovernanceServices,
 } from "./app/governance-policy-composition.build.ts";
 export type { DepartmentService } from "./services/department.service.ts";
-export type { GovernanceSignalService } from "./services/governance-signal.service.ts";
 export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 
 /**
@@ -25,7 +24,6 @@ export type { GovernanceAppDependencies } from "./app/governance.app.ts";
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
-export { GovernanceEventsAdapter } from "./eventing/governance-events.pipeline.ts";
 export type * from "./app/governance.members.ts";
 export type * from "./repositories/ai-tool-catalog.repository.ts";
 export type * from "./repositories/anomaly-rule.repository.ts";
@@ -50,7 +48,6 @@ export {
   COST_ROLLUP_WATCH_MAX_ATTEMPTS,
   CostRollupCheckUnsettledError,
 } from "./eventing/cost-rollup-watch.intent.ts";
-export { GovernanceEventDeliveryProcess } from "./eventing/governance-event-delivery.process.ts";
 export { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
 export { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
 
@@ -61,8 +58,6 @@ export { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process
  */
 export {
   createDepartmentDirectory,
-  createGovernanceEventsPipeline,
-  createGovernanceSignals,
   createIngestionPullEventing,
   createIngestionPullExecution,
   createIngestionPullLifecycle,

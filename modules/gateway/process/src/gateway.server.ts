@@ -9,6 +9,7 @@ import { defineServerModule } from "@langwatch/kernel";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayApp } from "./app/gateway.app.ts";
+import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
 import { gatewayRealtimeSessionEventing } from "./eventing/gateway-realtime-session.pipeline.ts";
 import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
@@ -45,6 +46,7 @@ export const gatewayServer = defineServerModule("gateway")
     gatewayUsageTrpcTransport,
     virtualKeyTrpcTransport,
   )
+  .withEventing(gatewayGovernanceEventsEventing)
   .withEventing(gatewaySpendEventing)
   .withEventing(gatewayRealtimeSessionEventing)
   .withTransportFacts(({ app, dependencies }) => {

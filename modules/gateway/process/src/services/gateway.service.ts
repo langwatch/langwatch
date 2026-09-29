@@ -36,6 +36,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   type GatewayBudgetRepository,
   type ArchiveBudgetInput,
+  type BucketBoundaryRow,
   type BudgetCheckInput,
   type BudgetCheckResult,
   type BudgetListWithHealth,
@@ -255,6 +256,14 @@ export class GatewayService {
 
   resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]> {
     return this.repository.resolveApplicableBudgets(input);
+  }
+
+  /** When each of these budgets' buckets last rolled over, for a boundary-aware spend read. */
+  findBucketBoundaries(input: {
+    organizationId: string;
+    budgetIds: string[];
+  }): Promise<BucketBoundaryRow[]> {
+    return this.repository.findBucketBoundaries(input);
   }
 
   async resolveScopeTargets(

@@ -33,13 +33,6 @@ Feature: Enterprise governance package boundary
     Then the projected cursor remains at the newer completion
 
   @unit
-  Scenario: Governance signals remain idempotent at the event store
-    Given a virtual-key lifecycle event or a budget crossing is recorded
-    When the same governed fact is submitted again
-    Then the lifecycle identity is scoped to its subject and occurrence
-    And the budget identity is scoped to its bucket, kind, and period
-
-  @unit
   Scenario: Pulled usage keeps money lossless
     Given a provider-reported decimal USD value
     When governance prices the observation
