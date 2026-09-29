@@ -217,6 +217,16 @@ Feature: Sign in with Amazon Cognito, OneLogin or any other OIDC provider
     Given the chart is rendered with no identity provider configured
     Then the application container receives no provider credentials at all
 
+  # Charts up to 3.17 rendered the provider as NEXTAUTH_PROVIDER ahead of
+  # app.extraEnvs, so an operator who selected it there won. The chart now
+  # renders AUTH_PROVIDER, which the application ranks above the old name.
+  @integration
+  Scenario: A provider selected in extraEnvs survives the upgrade
+    Given the chart is rendered with app.extraEnvs setting NEXTAUTH_PROVIDER to "okta"
+    And the provider values key is left at its default
+    Then the application container receives the provider as "okta"
+    And the chart renders no AUTH_PROVIDER that would put the install into email mode
+
   # ==========================================================================
   # Proven against a real identity provider
   #

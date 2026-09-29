@@ -11,7 +11,7 @@
  * exactly the fact under test — a diagnostic that fired on everything would
  * pass every positive case here and be worthless in a response.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -25,7 +25,6 @@ import {
   lwqlDiagnostics,
 } from "../diagnostics";
 import type { LangWatchQLColumn } from "../executor";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../executor";
 import { validateLangWatchQL } from "../validation/validate";
 
 const DATABASE = "analytics";
@@ -49,13 +48,11 @@ function diagnose({
   sql,
   columns = [],
   rows = [],
-  truncated = false,
   now = LONG_AFTER,
 }: {
   sql: string;
   columns?: readonly LangWatchQLColumn[];
   rows?: readonly Record<string, unknown>[];
-  truncated?: boolean;
   now?: Date;
 }): readonly LangWatchQLDiagnostic[] {
   const validation = validateLangWatchQL({
@@ -80,9 +77,6 @@ function diagnose({
     views: LWQL_VIEW_CATALOG,
     columns,
     rows,
-    truncated,
-    limits: DEFAULT_LWQL_RESULT_LIMITS,
-    rowsReturned: rows.length,
     now,
   });
 }
@@ -143,19 +137,48 @@ describe("given a LangWatchQL query that ran", () => {
     });
   });
 
-  describe("when a response ceiling cut the result short", () => {
-    it("names the ceiling and how many rows survived it", () => {
+  describe("when the result spans more than one project", () => {
+    const PROJECT_SQL =
+      "SELECT TenantId FROM analytics.traces " +
+      "WHERE OccurredAt >= toDateTime64('2026-02-16 00:00:00', 3)";
+    const TENANT_COLUMN: LangWatchQLColumn = {
+      name: "TenantId",
+      type: "String",
+    };
+
+    /** @scenario "A result spanning several projects carries a diagnostic naming the count" */
+    it("names how many projects contributed", () => {
       const diagnostics = diagnose({
-        sql: BOUNDED_TRACES,
-        rows: [{ TraceId: "a" }, { TraceId: "b" }],
-        truncated: true,
+        sql: PROJECT_SQL,
+        columns: [TENANT_COLUMN],
+        rows: [{ TenantId: "a" }, { TenantId: "b" }, { TenantId: "a" }],
       });
 
-      expect(codesOf(diagnostics)).toEqual(["RESULT_TRUNCATED"]);
-      expect(find(diagnostics, "RESULT_TRUNCATED")!.meta).toMatchObject({
-        maxRows: DEFAULT_LWQL_RESULT_LIMITS.maxRows,
-        rowsReturned: 2,
+      expect(codesOf(diagnostics)).toEqual(["MULTI_PROJECT_RESULT"]);
+      expect(find(diagnostics, "MULTI_PROJECT_RESULT")!.meta).toMatchObject({
+        projectCount: 2,
       });
+    });
+
+    it("stays silent when every row belongs to one project", () => {
+      const diagnostics = diagnose({
+        sql: PROJECT_SQL,
+        columns: [TENANT_COLUMN],
+        rows: [{ TenantId: "a" }, { TenantId: "a" }],
+      });
+
+      expect(codesOf(diagnostics)).toEqual([]);
+    });
+
+    /** @scenario "A result spanning several projects carries a diagnostic naming the count" */
+    it("does not fire when the project column was not selected", () => {
+      const diagnostics = diagnose({
+        sql: BOUNDED_TRACES,
+        columns: [{ name: "TraceId", type: "String" }],
+        rows: [{ TraceId: "a" }, { TraceId: "b" }],
+      });
+
+      expect(codesOf(diagnostics)).toEqual([]);
     });
   });
 
@@ -174,12 +197,12 @@ describe("given a LangWatchQL query that ran", () => {
       const fanout = find(diagnostics, "POSSIBLE_FANOUT");
       expect(codesOf(diagnostics)).toEqual(["POSSIBLE_FANOUT"]);
       expect(fanout!.meta).toMatchObject({
-        dataset: "analytics.traces",
-        multipliedBy: "analytics.spans",
+        view: "analytics.traces",
+        multipliedByView: "analytics.spans",
         unmatchedGrainColumns: ["SpanId"],
         aggregated: true,
       });
-      // The affected columns are the repeated dataset's measures — the ones
+      // The affected columns are the repeated view's measures — the ones
       // where the repetition changes the number rather than only the row count.
       expect(fanout!.meta!.affectedColumns).toContain("TotalDurationMs");
       expect(fanout!.meta!.affectedColumns).toContain("TotalCost");
@@ -238,9 +261,9 @@ describe("given a LangWatchQL query that ran", () => {
 
       // Only one direction: evaluations repeat a trace, a trace never repeats
       // an evaluation.
-      expect(diagnostics.map((diagnostic) => diagnostic.meta?.dataset)).toEqual(
-        ["analytics.traces"],
-      );
+      expect(diagnostics.map((diagnostic) => diagnostic.meta?.view)).toEqual([
+        "analytics.traces",
+      ]);
     });
 
     it("stays quiet when the datasets are joined through a common table expression it cannot resolve", () => {
@@ -262,20 +285,20 @@ describe("given a LangWatchQL query that ran", () => {
     });
   });
 
-  describe("when a dataset is read with no condition on its time column", () => {
-    it("names the dataset and the column that would bound the read", () => {
+  describe("when a view is read with no condition on its time column", () => {
+    it("names the view and the column that would bound the read", () => {
       const diagnostics = diagnose({
         sql: "SELECT count() AS n FROM analytics.traces",
       });
 
       expect(codesOf(diagnostics)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(find(diagnostics, "UNBOUNDED_TIME_RANGE")!.meta).toEqual({
-        dataset: "analytics.traces",
+        view: "analytics.traces",
         timeColumn: "OccurredAt",
       });
     });
 
-    it("reports each unbounded dataset once, and not the bounded one beside it", () => {
+    it("reports each unbounded view once, and not the bounded one beside it", () => {
       const diagnostics = diagnose({
         sql:
           "SELECT count() AS n FROM analytics.traces AS t " +
@@ -287,7 +310,7 @@ describe("given a LangWatchQL query that ran", () => {
       expect(
         diagnostics
           .filter((diagnostic) => diagnostic.code === "UNBOUNDED_TIME_RANGE")
-          .map((diagnostic) => diagnostic.meta?.dataset),
+          .map((diagnostic) => diagnostic.meta?.view),
       ).toEqual(["analytics.spans"]);
     });
 
@@ -537,7 +560,7 @@ describe("given a LangWatchQL query that ran", () => {
   });
 
   describe("when several things are worth reading twice at once", () => {
-    it("carries every one of them, truncation first", () => {
+    it("carries every one of them together", () => {
       const diagnostics = diagnose({
         sql:
           "SELECT toStartOfHour(t.OccurredAt) AS bucket, sum(t.TotalDurationMs) AS total " +
@@ -552,11 +575,9 @@ describe("given a LangWatchQL query that ran", () => {
           hourlyBucket("2026-02-20 11:00:00"),
           hourlyBucket("2026-02-20 14:00:00"),
         ],
-        truncated: true,
       });
 
       expect(codesOf(diagnostics)).toEqual([
-        "RESULT_TRUNCATED",
         "POSSIBLE_FANOUT",
         "UNBOUNDED_TIME_RANGE",
         "UNBOUNDED_TIME_RANGE",

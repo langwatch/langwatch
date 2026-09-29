@@ -93,3 +93,24 @@ func TestRedisDBOverrideParsing(t *testing.T) {
 		})
 	}
 }
+
+// @scenario "LANGWATCH_HAVEN_PUBLIC_URL accepts only http and https schemes"
+func TestPublicURLFromEnvParsing(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"unset", "", ""},
+		{"trims a trailing slash", "https://h:1/", "https://h:1"},
+		{"rejects a non-http(s) scheme", "ftp://h", ""},
+		{"accepts http", "http://h:1", "http://h:1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("LANGWATCH_HAVEN_PUBLIC_URL", tc.value)
+			if got := PublicURLFromEnv(); got != tc.want {
+				t.Fatalf("PublicURLFromEnv() with LANGWATCH_HAVEN_PUBLIC_URL=%q = %q, want %q", tc.value, got, tc.want)
+			}
+		})
+	}
+}

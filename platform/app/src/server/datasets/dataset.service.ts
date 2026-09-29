@@ -18,7 +18,7 @@ import {
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
-import type { ChunkOffset } from "./dataset-chunking";
+import { type ChunkOffset, readValidChunkOffsets } from "./dataset-chunking";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
   DATASET_MUTATION_TXN_TIMEOUT_MS,
@@ -33,6 +33,14 @@ import {
 } from "./dataset-mutations";
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
+import {
+  DATASET_SEARCH_MAX_BYTES,
+  DATASET_SEARCH_MAX_ROWS,
+  DATASET_SEARCH_SCAN_BATCH,
+  matchesDatasetSearch,
+  measureRowsBytes,
+  normalizeDatasetSearch,
+} from "./dataset-search";
 import { getDatasetStorage } from "./dataset-storage";
 import {
   ColumnTypeChangeNotSupportedError,
@@ -41,6 +49,7 @@ import {
   DatasetNotFoundError,
   DatasetNotReadyError,
   DatasetNotRetryableError,
+  DatasetTooLargeToSearchError,
   DirectUploadUnavailableError,
   InvalidColumnError,
   MalformedColumnTypesError,
@@ -744,9 +753,22 @@ export class DatasetService {
     projectId: string;
     page: number;
     limit: number;
+    search?: string;
   }) {
     const { dataset } = params;
     const skip = (params.page - 1) * params.limit;
+
+    // A search narrows the dataset to the rows whose cell values contain the
+    // text, and the pager then pages the MATCHES — so `total` becomes the match
+    // count, not the row count. Neither storage layout can locate matches
+    // cheaply (there is no index over `entry`), so both scan; both bound that
+    // scan — by rows, and by bytes where a size was recorded — and refuse past
+    // it rather than return the matches found so far, which would be a wrong
+    // answer that looks right.
+    const search = normalizeDatasetSearch(params.search);
+    if (search) {
+      return await this.searchResolvedDataset({ ...params, search });
+    }
 
     // ADR-032: s3_jsonl content lives in chunk objects, not the PG
     // DatasetRecord table (I-PG → zero PG rows), so the PG-only paginator would
@@ -776,20 +798,9 @@ export class DatasetService {
       // offsets-absent repair branch (read every chunk + slice) rather than
       // serve a wrong page. The offsets-absent branch already throws loudly on a
       // null chunkCount, so a genuinely-broken dataset surfaces, not silences.
-      const rawOffsets = Array.isArray(dataset.chunkOffsets)
-        ? (dataset.chunkOffsets as unknown as ChunkOffset[])
-        : [];
-      const offsetsValid =
-        rawOffsets.length > 0 &&
-        rawOffsets.every(
-          (o) =>
-            o != null &&
-            Number.isInteger(o.index) &&
-            Number.isFinite(o.startRow) &&
-            Number.isFinite(o.endRow) &&
-            o.endRow >= o.startRow,
-        );
-      const offsets: ChunkOffset[] = offsetsValid ? rawOffsets : [];
+      const offsets: ChunkOffset[] = readValidChunkOffsets(
+        dataset.chunkOffsets,
+      );
 
       // Read only the chunks overlapping [windowStart, windowEnd). With offsets
       // present this touches at most ⌈limit / rows-per-chunk⌉ + 1 chunks.
@@ -868,6 +879,367 @@ export class DatasetService {
   }
 
   /**
+   * One page of the rows MATCHING `search`, for either storage layout.
+   *
+   * There is no index over dataset content (`entry` is opaque JSON in PG,
+   * newline-delimited JSON in object storage), so finding matches means reading
+   * rows. Both branches therefore read incrementally — one chunk, or one batch,
+   * at a time — keeping only the matches that fall inside the requested page
+   * window. Heap holds one unit of input plus at most `limit` matched rows,
+   * whatever the dataset's size — and, while a chunk is being measured, a
+   * second copy of that one chunk, because measuring re-serialises it. Peak is
+   * therefore twice a chunk, not twice the scan; see `measureRowsBytes`.
+   *
+   * Both branches refuse BEFORE reading anything when the dataset's own numbers
+   * already breach a limit, so that refusal costs no reads; neither ever returns
+   * a partial result. Those numbers are fields written when the dataset was last
+   * measured, though, so both branches also count what they actually read — the
+   * s3_jsonl branch measuring each chunk it fetches rather than trusting its
+   * recorded size. A dataset growing during the scan, or one whose recorded
+   * sizes are missing or wrong, is therefore still bounded, at the cost of
+   * overshooting by the one unit of input that carried the total past the limit.
+   *
+   * @throws {DatasetNotReadyError} if an s3_jsonl dataset is still preparing
+   * @throws {DatasetTooLargeToSearchError} past the row or byte limit
+   */
+  private async searchResolvedDataset(params: {
+    dataset: Dataset;
+    projectId: string;
+    page: number;
+    limit: number;
+    search: string;
+  }) {
+    const { dataset, search } = params;
+    const windowStart = (params.page - 1) * params.limit;
+    const windowEnd = windowStart + params.limit; // exclusive
+
+    // Matches are counted as they are found, but only those inside the window
+    // are retained — `matchCount` is the pager's total, `matches` is the page.
+    let matchCount = 0;
+    const matches: DatasetRecord[] = [];
+    const collect = (record: DatasetRecord) => {
+      if (
+        !matchesDatasetSearch({
+          entry: record.entry as Record<string, unknown>,
+          search,
+        })
+      )
+        return;
+      if (matchCount >= windowStart && matchCount < windowEnd) {
+        matches.push(record);
+      }
+      matchCount++;
+    };
+
+    if (dataset.contentLayout === "s3_jsonl") {
+      await this.scanChunksForMatches({
+        dataset,
+        projectId: params.projectId,
+        collect,
+      });
+    } else {
+      await this.scanPostgresRecordsForMatches({
+        dataset,
+        projectId: params.projectId,
+        collect,
+      });
+    }
+
+    return {
+      data: matches,
+      pagination: {
+        page: params.page,
+        limit: params.limit,
+        // The pager pages the MATCHES: a search that matched 3 rows of a
+        // 10,000-row dataset is one page, not two hundred.
+        total: matchCount,
+        totalPages: Math.ceil(matchCount / params.limit),
+      },
+    };
+  }
+
+  /**
+   * Which chunks a scan of the whole dataset has to read, and how many bytes
+   * each of them is recorded as occupying.
+   *
+   * `chunkOffsets` is what ordinary paging trusts to locate rows, so the search
+   * has to agree with it: enumerating by `chunkCount` alone would, on a dataset
+   * whose count has drifted below its offsets, stop early and report "no
+   * matches" for rows the user can page to — the silent wrong answer this path
+   * exists to avoid. Offsets first, `chunkCount` as the fallback for legacy
+   * rows that have none.
+   *
+   * Offsets are validated all-or-nothing, the same way the paged read validates
+   * them. Keeping the individually-valid entries of a half-written array would
+   * scan only the chunks those entries name and report "no matches" for rows
+   * the pager — which rejects the whole array and falls back to `chunkCount` —
+   * still displays: the same dataset answering two ways.
+   *
+   * @throws {DatasetChunkCountMissingError} on an offsets-less dataset whose
+   *   `chunkCount` has gone null (I-COUNT drift). `?? 0` would scan zero chunks
+   *   and report "no matches" for a dataset that has them.
+   */
+  private chunksToScan(
+    dataset: Dataset,
+  ): { index: number; byteSize: number | null }[] {
+    const offsets = readValidChunkOffsets(dataset.chunkOffsets);
+    if (offsets.length > 0) {
+      // `byteSize` rides along so the scan can refuse a chunk it can already
+      // tell is too expensive without fetching it first. It is what the writer
+      // recorded, not a reading, so it only ever brings the refusal forward —
+      // the bound itself comes from measuring each chunk that is read.
+      //
+      // `readValidChunkOffsets` validates the index and the row bounds but not
+      // this, so an otherwise-valid entry can carry no size, or a nonsensical
+      // one; it becomes `null` — one chunk whose cost cannot be guessed at —
+      // rather than a number, because arithmetic on `undefined` yields `NaN`,
+      // and a `NaN` estimate compares false against every limit.
+      //
+      // Negative sizes are normalised for a sharper reason than tidiness: an
+      // estimate is not merely uninformed by one, it is set back by it, so an
+      // entry reading -100 MB would hide the next 100 MB chunk from the
+      // early refusal that exists to catch it.
+      //
+      // No deduplication needed: a repeated index is rejected at validation, so
+      // every entry here names a chunk no other entry names.
+      return offsets
+        .map((offset) => ({
+          index: offset.index,
+          byteSize:
+            Number.isFinite(offset.byteSize) && offset.byteSize >= 0
+              ? offset.byteSize
+              : null,
+        }))
+        .sort((a, b) => a.index - b.index);
+    }
+    if (dataset.chunkCount == null) {
+      throw new DatasetChunkCountMissingError(dataset.id);
+    }
+    // No offsets means no per-chunk sizes either, so nothing here can estimate
+    // what a chunk will cost before it is fetched. The scan measures each chunk
+    // it reads, so the byte limit still holds on this path; what is lost is only
+    // the earlier refusal, not the bound.
+    return Array.from({ length: dataset.chunkCount }, (_, i) => ({
+      index: i,
+      byteSize: null,
+    }));
+  }
+
+  /**
+   * Refuses, before a byte of the dataset is fetched, a search the limits will
+   * not allow — judged on what the dataset row records about itself.
+   *
+   * Both limits are known up front, so the refusal costs nothing. Discovering
+   * it partway through means the reading the limits exist to prevent has
+   * already happened.
+   *
+   * @throws {DatasetNotReadyError} if the dataset is still preparing
+   * @throws {DatasetTooLargeToSearchError} past the row limit, or past the byte
+   *   limit where a size was recorded
+   */
+  private refuseSearchOverRecordedLimits(dataset: Dataset) {
+    if (dataset.status !== "ready") {
+      throw new DatasetNotReadyError({
+        status: dataset.status,
+        statusError: dataset.statusError,
+      });
+    }
+
+    const rowCount = dataset.rowCount ?? 0;
+    if (rowCount > DATASET_SEARCH_MAX_ROWS) {
+      throw new DatasetTooLargeToSearchError({
+        rowCount,
+        maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+
+    // Rows say nothing about what the scan costs — every chunk is fetched whole
+    // and parsed whole, and how many rows that is depends only on how wide they
+    // happen to be. Checked separately from the row cap rather than folded into
+    // it because neither covers the other: a dataset written before its size was
+    // recorded has none, and reading a missing size as zero would make it the
+    // smallest dataset in the platform and wave it straight through.
+    //
+    // `sizeBytes` is a bigint on the row. Compared as one, then narrowed to a
+    // number only to report it: a byte count large enough to lose precision as
+    // a double is nine petabytes, and the comparison that decides the refusal
+    // has already happened by then.
+    const sizeBytes = dataset.sizeBytes ?? null;
+    if (sizeBytes !== null && sizeBytes > BigInt(DATASET_SEARCH_MAX_BYTES)) {
+      throw new DatasetTooLargeToSearchError({
+        sizeBytes: Number(sizeBytes),
+        maxBytes: DATASET_SEARCH_MAX_BYTES,
+      });
+    }
+  }
+
+  /**
+   * Refuses a scan that has outgrown, in what it has actually read, the limits
+   * the dataset's own numbers said it would stay inside.
+   *
+   * Those numbers are fields on a row, written when the dataset was last
+   * measured — not readings taken now. A writer appending during the scan
+   * carries the dataset past a fence that has already been passed, and a size
+   * that was never written, or written wrong, describes no fence at all. Either
+   * way the totals the scan accumulates as it reads have to be held to the same
+   * limits, or the scan runs for as long as the content lasts.
+   *
+   * @throws {DatasetTooLargeToSearchError} past either limit
+   */
+  private refuseScanPastLimits({
+    rowsRead,
+    bytesRead,
+  }: {
+    rowsRead: number;
+    bytesRead: number;
+  }) {
+    if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+      throw new DatasetTooLargeToSearchError({
+        rowCount: rowsRead,
+        maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+    if (bytesRead > DATASET_SEARCH_MAX_BYTES) {
+      throw new DatasetTooLargeToSearchError({
+        sizeBytes: bytesRead,
+        maxBytes: DATASET_SEARCH_MAX_BYTES,
+      });
+    }
+  }
+
+  /**
+   * Reads every chunk of an `s3_jsonl` dataset once, offering each row to
+   * `collect`. One chunk is held in the heap at a time.
+   *
+   * @throws {DatasetNotReadyError} if the dataset is still preparing
+   * @throws {DatasetTooLargeToSearchError} up front past what the dataset
+   *   records, or mid-scan past what it has really read
+   */
+  private async scanChunksForMatches({
+    dataset,
+    projectId,
+    collect,
+  }: {
+    dataset: Dataset;
+    projectId: string;
+    collect: (record: DatasetRecord) => void;
+  }) {
+    this.refuseSearchOverRecordedLimits(dataset);
+
+    const storage = await getDatasetStorage(projectId);
+    // `readChunk` per index, never `readChunks`: the plural form pulls every
+    // chunk into the heap at once, which is exactly what the row cap and the
+    // one-at-a-time read are here to prevent.
+    // Two byte totals over the same chunks, because each covers the other's
+    // blind spot and the scan is refused on whichever is larger.
+    //
+    // What the offsets RECORD can be read before a chunk is fetched, so it can
+    // refuse a doomed chunk rather than pull it down and object afterwards —
+    // but it is absent on legacy rows and on half-written offsets, and nothing
+    // re-checks it on the rest. What the scan MEASURES is always true, and
+    // covers exactly those cases, but only after the fetch it was meant to
+    // bound. Taking the larger keeps the earlier refusal where the metadata is
+    // good, and keeps the bound where it is not.
+    let rowsRead = 0;
+    let bytesRecorded = 0;
+    let bytesMeasured = 0;
+    for (const { index, byteSize } of this.chunksToScan(dataset)) {
+      this.refuseScanPastLimits({
+        rowsRead,
+        bytesRead: Math.max(bytesMeasured, bytesRecorded + (byteSize ?? 0)),
+      });
+
+      const rows = await storage.readChunk({
+        projectId,
+        datasetId: dataset.id,
+        index,
+      });
+
+      // Rows, like the measurement, are only knowable after the read. A chunk
+      // can therefore still be read past the ceiling when nothing recorded its
+      // size: the scan overshoots by the one chunk that carried it over, rather
+      // than by every chunk remaining.
+      rowsRead += rows.length;
+      bytesRecorded += byteSize ?? 0;
+      bytesMeasured += measureRowsBytes(rows);
+      this.refuseScanPastLimits({
+        rowsRead,
+        bytesRead: Math.max(bytesMeasured, bytesRecorded),
+      });
+
+      for (const line of rows) {
+        collect(adaptS3JsonlRecord(line, dataset));
+      }
+    }
+  }
+
+  /**
+   * Walks every record of a Postgres-backed (legacy) dataset once, offering
+   * each to `collect`. One batch is held in the heap at a time.
+   *
+   * `sizeBytes` is null on these rows, so the byte limit can never fire here —
+   * the row limit is the only thing bounding this scan, checked both against
+   * the count taken up front and against what the walk actually reads.
+   *
+   * @throws {DatasetTooLargeToSearchError} past the row limit
+   */
+  private async scanPostgresRecordsForMatches({
+    dataset,
+    projectId,
+    collect,
+  }: {
+    dataset: Dataset;
+    projectId: string;
+    collect: (record: DatasetRecord) => void;
+  }) {
+    const { count: rowCount } =
+      await this.recordRepository.countAndMaxUpdatedAt({
+        datasetId: dataset.id,
+        projectId,
+      });
+    if (rowCount > DATASET_SEARCH_MAX_ROWS) {
+      throw new DatasetTooLargeToSearchError({
+        rowCount,
+        maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+
+    // Keyset-paginate, like the PG→S3 backfill's streaming scan: `skip`/`take`
+    // would re-run a count(*) alongside every page (listPaginated does), so a
+    // scan at the cap would issue ~50 redundant full counts, and OFFSET
+    // degrades as it walks. The cursor is the previous page's last id, in the
+    // same canonical [createdAt asc, id asc] order the paged read uses — so
+    // matches come back in the order the user sees them when not searching.
+    let cursorId: string | undefined;
+    let rowsRead = 0;
+    for (;;) {
+      const records = await this.recordRepository.findDatasetRecordsPage({
+        datasetId: dataset.id,
+        projectId,
+        take: DATASET_SEARCH_SCAN_BATCH,
+        cursorId,
+      });
+      // The same backstop the chunk walk holds, and for the same reason: the
+      // count above was taken before the walk started, so a dataset sitting just
+      // under the cap can be carried past it by rows written while the walk
+      // runs. Without this the loop's only exits are a short batch and a missing
+      // cursor, neither of which a dataset still being written to ever offers —
+      // so the scan runs as long as the writer does.
+      rowsRead += records.length;
+      if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+        throw new DatasetTooLargeToSearchError({
+          rowCount: rowsRead,
+          maxRows: DATASET_SEARCH_MAX_ROWS,
+        });
+      }
+      for (const record of records) collect(record);
+      if (records.length < DATASET_SEARCH_SCAN_BATCH) break;
+      cursorId = records[records.length - 1]?.id;
+      if (!cursorId) break;
+    }
+  }
+
+  /**
    * One page of a dataset for the editor: the dataset's name + columnTypes plus
    * the page's records ({ id, entry }) and the PG-authoritative total. Replaces
    * the editor's whole-dataset `getFullDataset` read (which truncated past a
@@ -883,6 +1255,8 @@ export class DatasetService {
     projectId: string;
     page: number;
     limit: number;
+    /** When set, pages the rows MATCHING it instead of the whole dataset. */
+    search?: string;
   }) {
     const dataset = await this.getBySlugOrId({
       slugOrId: params.slugOrId,
@@ -893,6 +1267,7 @@ export class DatasetService {
       projectId: params.projectId,
       page: params.page,
       limit: params.limit,
+      search: params.search,
     });
     return {
       id: dataset.id,

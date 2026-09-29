@@ -130,11 +130,18 @@ export function createCodingAgentProcessingPipeline(
     // `CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH` and the derivation's
     // model-call chain. Each handler derives its event from its own command
     // alone and never reads back a same-batch append.
-    .withCommand("contributeSpanFacts", ContributeSpanFactsCommand, {
-      coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
-    })
-    // An instance rather than a class: the log-facts command carries the
-    // session-context memo it stamps row-bearing contributions from.
+    // Instances rather than classes: both commands carry the session-context
+    // memo. The log-facts command fills it from a declaration and stamps
+    // row-bearing contributions from it; the span-facts command only reads
+    // it, to stamp the spans that carry a model call.
+    .withCommandInstance(
+      "contributeSpanFacts",
+      ContributeSpanFactsCommand,
+      new ContributeSpanFactsCommand({ contextMemo: deps.sessionContextMemo }),
+      {
+        coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+      },
+    )
     .withCommandInstance(
       "contributeLogFacts",
       ContributeLogFactsCommand,

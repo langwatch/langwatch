@@ -16,6 +16,7 @@ import { Box, Text } from "@chakra-ui/react";
 import { isCancellableStatus } from "~/components/suites/useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { FG_MUTED, TABLE_HEADER_BG } from "../shared/design";
+import { anyRunHasCaller } from "./caller-display";
 import { runHasEvaluators } from "./evaluation-summaries";
 import { RunResultRow } from "./RunResultRow";
 
@@ -28,9 +29,27 @@ import { RunResultRow } from "./RunResultRow";
  * scenario keeps a readable floor, so a narrow table wraps the pills rather
  * than cutting the name.
  */
-const RESULT_COLUMNS = "120px minmax(0,1fr) 130px auto";
-const RESULT_COLUMNS_WITH_EVALUATORS =
-  "120px minmax(160px,1fr) minmax(0,1fr) 130px auto";
+/**
+ * Compose the grid template from the columns actually shown. The Caller column
+ * (AC24) appears only when a run in the table has a caller — text runs never
+ * add it. It sits between the scenario/evaluators columns and Time · cost.
+ */
+function resultColumns({
+  hasEvaluators,
+  hasCaller,
+}: {
+  hasEvaluators: boolean;
+  hasCaller: boolean;
+}): string {
+  return [
+    "120px", // Result
+    hasEvaluators ? "minmax(160px,1fr)" : "minmax(0,1fr)", // Scenario
+    ...(hasEvaluators ? ["minmax(0,1fr)"] : []), // Evaluators
+    ...(hasCaller ? ["90px"] : []), // Caller
+    "130px", // Time · cost
+    "auto", // row menu
+  ].join(" ");
+}
 
 export type RunResultsTableProps = {
   scenarioRuns: ScenarioRunData[];
@@ -60,9 +79,8 @@ export function RunResultsTable({
     !!onCancelRun &&
     scenarioRuns.some((scenarioRun) => isCancellableStatus(scenarioRun.status));
   const hasEvaluators = scenarioRuns.some(runHasEvaluators);
-  const templateColumns = hasEvaluators
-    ? RESULT_COLUMNS_WITH_EVALUATORS
-    : RESULT_COLUMNS;
+  const hasCaller = anyRunHasCaller(scenarioRuns);
+  const templateColumns = resultColumns({ hasEvaluators, hasCaller });
 
   return (
     <Box
@@ -92,6 +110,7 @@ export function RunResultsTable({
         <Text as="span">Result</Text>
         <Text as="span">Scenario</Text>
         {hasEvaluators ? <Text as="span">Evaluators</Text> : null}
+        {hasCaller ? <Text as="span">Caller</Text> : null}
         <Text as="span" textAlign="right">
           Time · cost
         </Text>
@@ -113,6 +132,7 @@ export function RunResultsTable({
             templateColumns={templateColumns}
             hasStoppable={hasStoppable}
             hasEvaluators={hasEvaluators}
+            hasCaller={hasCaller}
             resolveTargetName={resolveTargetName}
             iterationMap={iterationMap}
             onScenarioRunClick={onScenarioRunClick}

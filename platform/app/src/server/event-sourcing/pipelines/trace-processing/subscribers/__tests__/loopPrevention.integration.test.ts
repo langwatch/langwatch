@@ -198,6 +198,61 @@ function buildAppOriginSpan(opts: {
   } as unknown as OtlpSpan;
 }
 
+/**
+ * The shape the production traces actually had: an evaluator-emitted span
+ * whose parent id was fabricated per request and never exported, so the
+ * trace has no root span and its origin cannot be settled from a root.
+ *
+ * Deliberately different from buildAppOriginSpan in three ways that all
+ * matter — origin is `evaluation`, the parent id points at a span that will
+ * never arrive, and there is no depth=0 application span anywhere on the
+ * trace to seed it.
+ */
+function buildOrphanEvaluatorSpan(opts: {
+  traceId: string;
+  spanId: string;
+  parentSpanId: string;
+  depth: number;
+  withOrigin?: boolean;
+}): OtlpSpan {
+  const startNano = BigInt(Date.now()) * 1_000_000n;
+  const endNano = startNano + 1_000_000_000n;
+  const attrs: Array<{
+    key: string;
+    value: { stringValue?: string; intValue?: string };
+  }> = [
+    { key: "langwatch.span.type", value: { stringValue: "workflow" } },
+    {
+      key: "langwatch.reserved.causality_depth",
+      // The OTLP path carries this as an int, which is the case the
+      // accumulation change had to handle.
+      value: { intValue: String(opts.depth) },
+    },
+  ];
+  if (opts.withOrigin !== false) {
+    attrs.push({
+      key: "langwatch.origin",
+      value: { stringValue: "evaluation" },
+    });
+  }
+  return {
+    traceId: opts.traceId,
+    spanId: opts.spanId,
+    parentSpanId: opts.parentSpanId,
+    name: "Random Score",
+    kind: 2,
+    startTimeUnixNano: startNano.toString(),
+    endTimeUnixNano: endNano.toString(),
+    attributes: attrs,
+    events: [],
+    links: [],
+    status: { code: 1, message: null },
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  } as unknown as OtlpSpan;
+}
+
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }
@@ -467,6 +522,114 @@ describe.skipIf(!hasTestcontainers)(
           expect(dispatcher.captured.length).toBe(dispatchesBefore);
           const afterBlocked = await readBlockedCounter("depth_direct");
           expect(afterBlocked - beforeBlocked).toBeGreaterThanOrEqual(1);
+        });
+      });
+    });
+
+    /**
+     * The incident shape, end to end.
+     *
+     * Every other scenario in this file dispatches off a span event, where
+     * the guard reads the depth from the span in hand. The production traces
+     * never took that path: with no root span the origin could not be settled
+     * on arrival, so dispatch happened later on origin_resolved — an event
+     * carrying no span payload at all. The guard had nothing to read and let
+     * the evaluation through, which is what closed the loop.
+     *
+     * This asserts the two halves of the fix against real infrastructure:
+     * the depth survives the fold into ClickHouse and comes back out, and the
+     * subscriber blocks on it when the only thing it has is fold state.
+     */
+    describe("given an orphan evaluator trace with no root span", () => {
+      describe("when dispatch happens on origin_resolved", () => {
+        /** @scenario A trace already produced by the evaluator does not start another evaluation round */
+        it("folds the depth through ClickHouse and blocks the dispatch", async () => {
+          const traceId = generateId("trace");
+
+          // A parent id that no span will ever claim. This is what nlpgo
+          // minted per request, and why these traces have no root.
+          const phantomParent = "8f655e97d0b56ad9";
+
+          await recordSpan(
+            buildOrphanEvaluatorSpan({
+              traceId,
+              spanId: generateId("evalspan"),
+              parentSpanId: phantomParent,
+              depth: 1,
+            }),
+          );
+
+          // Half one: the depth made it through the real fold projection and
+          // the real ClickHouse round trip. Before the accumulation change
+          // this key was dropped, which left the deferred path with nothing
+          // to guard on.
+          const fold = await traceSummaryStore.get(traceId, {
+            tenantId: tenantIdString,
+          } as any);
+          expect(fold).toBeTruthy();
+          expect(fold?.attributes?.["langwatch.reserved.causality_depth"]).toBe(
+            "1",
+          );
+          expect(fold?.attributes?.["langwatch.origin"]).toBe("evaluation");
+
+          // Half two: the subscriber blocks when the only thing it holds is
+          // that fold state. A fresh instance keeps this assertion clear of
+          // whatever the pipeline's own subscriber already did with the span.
+          const deferredDispatcher = makeCapturingEvaluationDispatcher();
+          const subscriber = createEvaluationTriggerSubscriber({
+            monitors: new MonitorService(makeFakeMonitorRepository()),
+            evaluation: deferredDispatcher.dispatch,
+          });
+
+          const originResolvedEvent = {
+            id: generateId("evt"),
+            type: "lw.obs.trace.origin_resolved",
+            version: 1,
+            aggregateType: "trace",
+            aggregateId: traceId,
+            tenantId: tenantIdString,
+            createdAt: Date.now(),
+            occurredAt: Date.now(),
+            data: { origin: "evaluation" },
+            metadata: { traceId },
+          } as unknown as TraceProcessingEvent;
+
+          const context = {
+            tenantId: tenantIdString,
+            aggregateId: traceId,
+            state: fold,
+          } as any;
+
+          const beforeBlocked = await readBlockedCounter("depth_fold");
+          await subscriber.spec.handler(originResolvedEvent, context);
+
+          expect(deferredDispatcher.captured.length).toBe(0);
+          expect(
+            (await readBlockedCounter("depth_fold")) - beforeBlocked,
+          ).toBeGreaterThanOrEqual(1);
+
+          // Control: the same real trace, same deferred path, with only the
+          // depth key removed from the fold — the state this code produced
+          // before the fix. It dispatches, which is the bug. This is what
+          // makes the assertion above a test of the fix rather than of some
+          // other property of the trace.
+          const controlDispatcher = makeCapturingEvaluationDispatcher();
+          const controlSubscriber = createEvaluationTriggerSubscriber({
+            monitors: new MonitorService(makeFakeMonitorRepository()),
+            evaluation: controlDispatcher.dispatch,
+          });
+          const {
+            "langwatch.reserved.causality_depth": _dropped,
+            ...attributesWithoutDepth
+          } = fold?.attributes ?? {};
+
+          await controlSubscriber.spec.handler(originResolvedEvent, {
+            tenantId: tenantIdString,
+            aggregateId: traceId,
+            state: { ...fold, attributes: attributesWithoutDepth },
+          } as any);
+
+          expect(controlDispatcher.captured.length).toBe(1);
         });
       });
     });

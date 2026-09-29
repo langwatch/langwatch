@@ -43,6 +43,13 @@ export interface FacetItem {
    * as "no matches" rather than "loading."
    */
   synthetic?: boolean;
+  /**
+   * What `count` means. `pending`: no filtered count has landed for this
+   * input and the row shows none; `stale`: the previous input's count, shown
+   * muted while the new one loads; absent or `settled`: the count for the
+   * active filter.
+   */
+  countState?: "settled" | "stale" | "pending";
   /** Set only for the evaluator facet — see {@link FacetItemAggregates}. */
   aggregates?: FacetItemAggregates;
   /** Set only for the event facet — see {@link EventMetricValues}. */

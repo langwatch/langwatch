@@ -32,6 +32,19 @@ Feature: Project becomes integrated after first trace ingestion
     Then a "first_trace_integrated" PostHog event is tracked for the org admin user
     And the event carries only sdk_language, sdk_framework and the project id
 
+  # Langy's own model calls trace into the customer's project on purpose
+  # (ADR-061), stamped with origin "langy". On a fresh guided project the
+  # first trace to arrive is Langy's kickoff turn, which the customer never
+  # sent. Every day-zero signal reads the flag this subscriber flips (the home
+  # offer, the onboarding checks, the explorer's empty state, the milestone),
+  # so the exclusion lives here once, next to the seeded-sample one.
+  @unit
+  Scenario: Langy's own turn is not the project's first trace
+    Given a project with firstMessage set to false
+    When one of Langy's own turns is processed through the trace-processing pipeline
+    Then project.firstMessage stays false
+    And no "first_trace_integrated" PostHog event is tracked
+
   @unit
   Scenario: PostHog integration milestone reports unknown when SDK attributes are absent
     Given a project with firstMessage set to false

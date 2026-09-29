@@ -54,6 +54,7 @@ const command = {
   joinRequestId: "jreq_1",
   commandId: "cmd_1",
   occurredAtMs: 1_699_000_000_000,
+  notifyAdmins: true,
   actor: { type: "user" as const, id: "user_ana" },
 };
 

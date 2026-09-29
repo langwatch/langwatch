@@ -151,7 +151,9 @@ export function createUiActionListener({
         entry,
         turnId: adapter?.state.currentTurnId ?? null,
         seen: seenKeys,
-        handlers,
+        // The fake tab has no mounting page: its handlers are registered
+        // before it subscribes, so every read answers the same set.
+        getHandlers: () => handlers,
         ...actionTransport({ cookie, conversationId, record }),
         onHandlerError: ({ kind, message }) =>
           console.log(`[fake-tab] ${kind} failed: ${message.slice(0, 200)}`),

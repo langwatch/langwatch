@@ -1,10 +1,10 @@
+import type { RoleBindingScopeType } from "@langwatch/authz";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { RoleBindingScopeType } from "~/generated/prisma/client";
-import { batchScopePermissions } from "~/server/api/rbac";
 import {
-  checkRoleBindingPermission,
   resolveApiKeyPermission,
-} from "~/server/rbac/role-binding-resolver";
+  resolveApiKeyPermissionProjectBatch,
+} from "~/server/app-layer/authz/credential-permissions";
+import { GrantsAuthzReadRepository } from "../app-layer/authz/repositories/authz-read.grants.repository";
 import { ProjectVisibilityTooWideError } from "./errors";
 
 /**
@@ -13,27 +13,7 @@ import { ProjectVisibilityTooWideError } from "./errors";
  */
 export type VisibleProjects = { kind: "all" } | { kind: "some"; ids: string[] };
 
-/**
- * Which projects an organization-scoped API key credential holds
- * `project:view` on.
- *
- * The answer `GET /api/projects` filters by: a credential whose reach covers
- * the whole organization keeps the full listing, anything narrower gets
- * exactly the projects where key bindings ∩ owner ceiling grant the view —
- * through the resolvers on both heads, never raw grant walks.
- *
- * Shaped to avoid the per-project resolver loop:
- *   1. one org-scope `resolveApiKeyPermission` answers the unchanged fast
- *      path (both heads, ceiling included);
- *   2. the key's bindings enumerate the CANDIDATE projects (org binding →
- *      all, team binding → that team's projects, project binding → itself);
- *   3. the key head is asked once per binding scope via
- *      `checkRoleBindingPermission`, all scopes concurrently;
- *   4. the owner ceiling is applied over all candidates in one
- *      `batchScopePermissions` round.
- *
- * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
- */
+/** Lists live project grants intersected with the stored key owner’s current access. */
 export async function resolveVisibleProjects({
   prisma,
   apiKeyId,
@@ -66,28 +46,20 @@ export async function resolveVisibleProjects({
   });
   if (candidates.length === 0) return { kind: "some", ids: [] };
 
-  const keyVisible = await projectsTheKeyGrants({
+  const decisions = await resolveApiKeyPermissionProjectBatch({
     prisma,
     apiKeyId,
+    userId,
     organizationId,
-    bound,
-    candidates,
+    projects: candidates.map(({ id, teamId }) => ({ projectId: id, teamId })),
+    permissions: ["project:view"],
   });
-  if (keyVisible.length === 0) return { kind: "some", ids: [] };
-
-  // A service key has no owner ceiling; the key head is the whole answer.
-  if (!userId) {
-    return { kind: "some", ids: keyVisible.map((project) => project.id) };
-  }
-
+  const visible = decisions.get("project:view");
   return {
     kind: "some",
-    ids: await narrowToOwnerCeiling({
-      prisma,
-      userId,
-      organizationId,
-      projects: keyVisible,
-    }),
+    ids: candidates
+      .filter(({ id }) => visible?.get(id) === true)
+      .map(({ id }) => id),
   };
 }
 
@@ -117,9 +89,11 @@ async function boundScopes({
   // which would widen this to every binding in the organization.
   if (!apiKeyId) return null;
 
-  const bindings = await prisma.roleBinding.findMany({
-    where: { organizationId, apiKeyId },
-    select: { scopeType: true, scopeId: true },
+  const bindings = await new GrantsAuthzReadRepository(
+    prisma,
+  ).findApiKeyBindings({
+    organizationId,
+    apiKeyId,
   });
   if (bindings.length === 0) return null;
 
@@ -132,10 +106,10 @@ async function boundScopes({
   ];
   return {
     hasOrgBinding: bindings.some(
-      (binding) => binding.scopeType === RoleBindingScopeType.ORGANIZATION,
+      (binding) => binding.scopeType === "ORGANIZATION",
     ),
-    teamIds: idsOfType(RoleBindingScopeType.TEAM),
-    projectIds: idsOfType(RoleBindingScopeType.PROJECT),
+    teamIds: idsOfType("TEAM"),
+    projectIds: idsOfType("PROJECT"),
   };
 }
 
@@ -202,113 +176,4 @@ async function findCandidates({
     // unbounded row set to find out.
     take: MAX_CANDIDATE_PROJECTS + 1,
   });
-}
-
-/**
- * Phase 3: the key head, asked once per binding scope rather than once per
- * project. The scope checks are independent reads, so they run concurrently.
- */
-async function projectsTheKeyGrants({
-  prisma,
-  apiKeyId,
-  organizationId,
-  bound,
-  candidates,
-}: {
-  prisma: PrismaClient;
-  apiKeyId: string;
-  organizationId: string;
-  bound: BoundScopes;
-  candidates: CandidateProject[];
-}): Promise<CandidateProject[]> {
-  const principal = { type: "apiKey" as const, id: apiKeyId };
-  const grants = (
-    scope: Parameters<typeof checkRoleBindingPermission>[0]["scope"],
-  ) =>
-    checkRoleBindingPermission({
-      prisma,
-      principal,
-      organizationId,
-      scope,
-      permission: "project:view",
-    });
-
-  const candidateById = new Map(
-    candidates.map((project) => [project.id, project]),
-  );
-  const boundProjects = bound.projectIds
-    .map((projectId) => candidateById.get(projectId))
-    .filter((project): project is CandidateProject => !!project);
-
-  const [orgWide, teamResults, projectResults] = await Promise.all([
-    bound.hasOrgBinding
-      ? grants({ type: "org", id: organizationId })
-      : Promise.resolve(false),
-    Promise.all(
-      bound.teamIds.map(async (teamId) => ({
-        teamId,
-        granted: await grants({ type: "team", id: teamId }),
-      })),
-    ),
-    Promise.all(
-      boundProjects.map(async (project) => ({
-        projectId: project.id,
-        granted: await grants({
-          type: "project",
-          id: project.id,
-          teamId: project.teamId,
-        }),
-      })),
-    ),
-  ]);
-
-  if (orgWide) return candidates;
-  const keyTeams = new Set(
-    teamResults.filter((r) => r.granted).map((r) => r.teamId),
-  );
-  const keyProjects = new Set(
-    projectResults.filter((r) => r.granted).map((r) => r.projectId),
-  );
-  return candidates.filter(
-    (project) => keyTeams.has(project.teamId) || keyProjects.has(project.id),
-  );
-}
-
-/** Phase 4: the owner ceiling, over all candidates in one batch round. */
-async function narrowToOwnerCeiling({
-  prisma,
-  userId,
-  organizationId,
-  projects,
-}: {
-  prisma: PrismaClient;
-  userId: string;
-  organizationId: string;
-  projects: CandidateProject[];
-}): Promise<string[]> {
-  const owner = await batchScopePermissions(
-    { prisma, session: ownerSession(userId) },
-    {
-      organizationId,
-      teamIds: [],
-      projectIds: projects.map((project) => project.id),
-      projectTeamId: Object.fromEntries(
-        projects.map((project) => [project.id, project.teamId]),
-      ),
-      permission: "project:view",
-    },
-  );
-  return projects
-    .filter((project) => owner.projects.get(project.id) === true)
-    .map((project) => project.id);
-}
-
-/**
- * The minimal session shape the batch resolver reads; only `user.id` is ever
- * accessed (same shape `PermissionService` passes).
- */
-function ownerSession(userId: string) {
-  return { user: { id: userId } } as Parameters<
-    typeof batchScopePermissions
-  >[0]["session"];
 }

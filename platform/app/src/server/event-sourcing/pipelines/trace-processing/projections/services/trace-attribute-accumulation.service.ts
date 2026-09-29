@@ -218,6 +218,12 @@ export const STAMPED_MODEL_ATTRIBUTE = "metadata.model";
 export const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
 export const MODEL_METADATA_STAMPED_MARKER =
   "langwatch.reserved.model_metadata_stamped";
+/**
+ * Depth of the evaluator causality chain a span was emitted under, stamped by
+ * nlpgo's BaggageAttributeProcessor. Folded here and read by the
+ * evaluation-trigger loop guard, so both sides must name the same key.
+ */
+export const RESERVED_CAUSALITY_DEPTH = "langwatch.reserved.causality_depth";
 
 /**
  * Extracts per-span attributes and merges them into trace-level attributes,
@@ -270,6 +276,38 @@ export class TraceAttributeAccumulationService {
 
     const origin = stringAttr(spanAttrs, "langwatch.origin");
     if (origin) result["langwatch.origin"] = origin;
+
+    // Causality depth must survive into the fold state: events that carry no
+    // span payload (origin_resolved) have no other way to see it, and the
+    // evaluation-trigger loop guard reads it there.
+    //
+    // This key IS user-visible, deliberately. Reserved keys are kept by
+    // analytics trimming (00039_create_trace_analytics.sql) and only
+    // `langwatch.reserved.media_refs.*` is hidden from the trace drawer
+    // (TraceSummaryAccordions.filterReservedMediaRefAttributes), so the depth
+    // shows up as a trace metadata row, in the trace-attribute-keys facet, and
+    // in the search/export metadata map. That follows the existing precedent
+    // for `langwatch.reserved.log_record_count` (see trace-summary.mapper.ts),
+    // which flows to external consumers unchanged. It carries no user data —
+    // it is a small integer — so it is surfaced rather than special-cased.
+    //
+    // Arrives as an int on the OTLP path and as a string on others, so accept
+    // both and store the canonical decimal form.
+    //
+    // Blank and fractional values are dropped rather than coerced. Number("")
+    // and Number("  ") are both a finite 0, so without the emptiness check a
+    // span carrying a blank attribute would be recorded as a genuine depth of
+    // zero, and a depth is a count of evaluator hops, so a fraction is
+    // malformed rather than roundable.
+    const causalityDepth = spanAttrs[RESERVED_CAUSALITY_DEPTH];
+    const causalityDepthNum =
+      typeof causalityDepth === "number"
+        ? causalityDepth
+        : typeof causalityDepth === "string" && causalityDepth.trim() !== ""
+          ? Number(causalityDepth)
+          : NaN;
+    if (Number.isInteger(causalityDepthNum))
+      result[RESERVED_CAUSALITY_DEPTH] = String(causalityDepthNum);
 
     const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
     if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
@@ -420,6 +458,22 @@ export class TraceAttributeAccumulationService {
     }
     // Remove the per-span key so it doesn't leak into trace-level attributes
     delete merged["langwatch.prompt.id"];
+
+    // Causality depth: highest across spans, NOT first-wins. A trace can carry
+    // a mix of application spans (depth 0) and evaluator-emitted spans
+    // (depth >= 1) — the origin and subscriber code below explicitly supports
+    // that. Under the plain `{ ...spanAttrs, ...state.attributes }` merge the
+    // first depth seen would stick, so a trace whose depth-0 span folds first
+    // would keep "0" forever and the loop guard would never fire on it. Depth
+    // is a "has this trace been through the evaluator" signal, so it only ever
+    // climbs.
+    const existingDepth = Number(state.attributes[RESERVED_CAUSALITY_DEPTH]);
+    const incomingDepth = Number(spanAttrs[RESERVED_CAUSALITY_DEPTH]);
+    const depths = [existingDepth, incomingDepth].filter((d) =>
+      Number.isFinite(d),
+    );
+    if (depths.length > 0)
+      merged[RESERVED_CAUSALITY_DEPTH] = String(Math.max(...depths));
 
     // Metadata: deep-merge JSON objects, first-wins for primitives
     for (const key of Object.keys(merged)) {

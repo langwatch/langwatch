@@ -1,6 +1,6 @@
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { AiPromptInput } from "../ai/AiPromptInput";
 import { useAiTraceAction } from "../ai/useAiTraceAction";
 
@@ -42,7 +42,7 @@ export const AiQueryComposer: React.FC<AiQueryComposerProps> = ({
     mode: "filter",
     onDone: onClose,
   });
-  const setAiError = useFilterStore((s) => s.setAiError);
+  const setAiError = useExplorerStore((s) => s.setAiError);
 
   useEffect(() => {
     onPendingChange?.(isPending);

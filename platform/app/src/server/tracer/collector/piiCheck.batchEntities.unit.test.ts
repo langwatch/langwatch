@@ -39,7 +39,9 @@ describe("batchPresidioClearPII", () => {
   describe("given a custom entity selection narrower than the level default", () => {
     describe("when the level is STRICT but only PERSON is requested", () => {
       it("sends only the selected entity to the analysis service", async () => {
-        await batchPresidioClearPII(["any text"], "STRICT", ["PERSON"]);
+        await batchPresidioClearPII(["any text"], "STRICT", {
+          entities: ["PERSON"],
+        });
 
         expect(capturedBody.settings.entities).toEqual({ person: true });
       });

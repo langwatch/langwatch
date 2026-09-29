@@ -98,6 +98,58 @@ describe("the grants ledger's wire boundary", () => {
     });
   });
 
+  describe("when a founder membership bootstrap marker is malformed", () => {
+    it("requires a stamped USER ADMIN organization or team grant", () => {
+      expect(
+        parse(
+          {},
+          {
+            membershipBootstrap: true,
+            membershipStamp: "membership_1",
+            roleKey: "admin",
+          },
+        ).success,
+      ).toBe(true);
+      expect(
+        parse(
+          {},
+          {
+            membershipBootstrap: true,
+            roleKey: "admin",
+            principal: { type: "group", id: "group_1" },
+          },
+        ).success,
+      ).toBe(false);
+      expect(
+        parse({}, { membershipBootstrap: true, roleKey: "admin" }).success,
+      ).toBe(false);
+      expect(
+        parse(
+          {},
+          {
+            membershipBootstrap: true,
+            membershipStamp: "membership_1",
+            roleKey: "viewer",
+          },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("requires an organization bootstrap to target its tenant", () => {
+      expect(
+        parse(
+          {},
+          {
+            membershipBootstrap: true,
+            membershipStamp: "membership_1",
+            roleKey: "admin",
+            scope: { type: "ORGANIZATION", id: "org_other" },
+          },
+        ).success,
+      ).toBe(false);
+    });
+  });
+
   describe("when resource terms and scope disagree", () => {
     it("refuses share terms on a team-wide grant", () => {
       expect(parse({}, { resource: SHARE_TERMS }).success).toBe(false);

@@ -51,8 +51,8 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   }),
 }));
 
-vi.mock("../../../stores/filterStore", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
+vi.mock("../../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
     selector({
       setFacetValueAt: vi.fn(),
       debouncedTimeRange: { from: 1, to: 2, label: undefined },

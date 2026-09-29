@@ -32,7 +32,7 @@ import {
   EMPTY_AST,
   parse,
 } from "~/server/app-layer/traces/query-language/parse";
-import { useFilterStore } from "../../../stores/filterStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { EventDrilldown } from "../EventDrilldown";
 import type { FacetItem } from "../types";
 
@@ -264,7 +264,7 @@ describe("EventDrilldown", () => {
    */
   describe("given the drilldown drives the real filter store", () => {
     const renderAgainstStore = () => {
-      useFilterStore.getState().applyQueryText("");
+      useExplorerStore.getState().applyQueryText("");
       const item = buildItem();
       const toggleFacet = ({
         field,
@@ -272,12 +272,12 @@ describe("EventDrilldown", () => {
       }: {
         field: string;
         value: string;
-      }) => useFilterStore.getState().toggleFacet(field, value);
+      }) => useExplorerStore.getState().toggleFacet(field, value);
       const tree = () => (
         <ChakraProvider value={defaultSystem}>
           <EventDrilldown
             item={item}
-            ast={useFilterStore.getState().ast}
+            ast={useExplorerStore.getState().ast}
             toggleFacet={toggleFacet}
           />
         </ChakraProvider>
@@ -300,7 +300,7 @@ describe("EventDrilldown", () => {
       it("writes the anchor and the metric clause as one AND query", () => {
         const { clickThumbsDown } = renderAgainstStore();
         clickThumbsDown();
-        expect(useFilterStore.getState().queryText).toBe(
+        expect(useExplorerStore.getState().queryText).toBe(
           "event:thumbs_up_down AND event.attribute.event.metrics.vote:-1",
         );
       });
@@ -313,7 +313,7 @@ describe("EventDrilldown", () => {
         clickThumbsDown(); // neutral -> include
         clickThumbsDown(); // include -> exclude
         clickThumbsDown(); // exclude -> neutral
-        expect(useFilterStore.getState().queryText).toBe(
+        expect(useExplorerStore.getState().queryText).toBe(
           "event:thumbs_up_down",
         );
       });

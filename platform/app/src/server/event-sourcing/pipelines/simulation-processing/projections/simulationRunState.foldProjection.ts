@@ -20,6 +20,7 @@ import type {
   SimulationMessageSnapshotEvent,
   SimulationRunAgentInstanceRecordedEvent,
   SimulationRunCancelRequestedEvent,
+  SimulationRunCutAtLimitRecordedEvent,
   SimulationRunDeletedEvent,
   SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
@@ -33,6 +34,7 @@ import {
   SimulationMessageSnapshotEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCancelRequestedEventSchema,
+  SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunDeletedEventSchema,
   SimulationRunEvaluatedEventSchema,
   SimulationRunFinishedEventSchema,
@@ -96,6 +98,21 @@ export function withAgentInstance({
   metadata: string | null;
   agentInstance: { hostname: string; label: string | null };
 }): string {
+  return mergeLangwatchNamespace(metadata, { agentInstance });
+}
+
+/**
+ * The stored metadata with `fields` merged into its reserved `langwatch`
+ * namespace, written back as one JSON string. The column holds the metadata as
+ * a JSON string, so the object is parsed, the namespace merged and re-stringified.
+ * Metadata that does not parse as an object is replaced by one holding the
+ * merged namespace alone: the run's other metadata was already unreadable, and
+ * these fields are what the event records.
+ */
+function mergeLangwatchNamespace(
+  metadata: string | null,
+  fields: Record<string, unknown>,
+): string {
   const current = parseMetadataObject(metadata);
   const langwatch =
     typeof current.langwatch === "object" &&
@@ -105,8 +122,18 @@ export function withAgentInstance({
       : {};
   return JSON.stringify({
     ...current,
-    langwatch: { ...langwatch, agentInstance },
+    langwatch: { ...langwatch, ...fields },
   });
+}
+
+/**
+ * The stored metadata with the call-limit cutoff flag written into its
+ * reserved `langwatch` namespace, mirroring {@link withAgentInstance}. The
+ * marker is always `true`: the event's existence is the fact, so folding it a
+ * second time produces byte-identical metadata (idempotent).
+ */
+export function withCutAtLimit(metadata: string | null): string {
+  return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
 }
 
 function parseMetadataObject(metadata: string | null): Record<string, unknown> {
@@ -208,6 +235,8 @@ export interface SimulationRunStateData {
   Reasoning: string | null;
   MetCriteria: string[];
   UnmetCriteria: string[];
+  /** Criteria the judge could not decide; each is also in UnmetCriteria. */
+  InconclusiveCriteria: string[];
   Error: string | null;
   /**
    * One result per evaluator that ran on the scenario, in the order they
@@ -405,6 +434,7 @@ const simulationRunEvents = [
   SimulationRunMetricsComputedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
+  SimulationRunCutAtLimitRecordedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
 
@@ -450,6 +480,7 @@ export class SimulationRunStateFoldProjection
       Reasoning: null,
       MetCriteria: [],
       UnmetCriteria: [],
+      InconclusiveCriteria: [],
       Error: null,
       Evaluations: [],
       DurationMs: null,
@@ -721,6 +752,7 @@ export class SimulationRunStateFoldProjection
       Reasoning: results?.reasoning ?? null,
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
+      InconclusiveCriteria: results?.inconclusiveCriteria ?? [],
       Error: results?.error ?? null,
       // A scenario run from code sends its evaluations with the finished
       // event. An evaluated event that folded before this one (business time
@@ -840,6 +872,17 @@ export class SimulationRunStateFoldProjection
         metadata: state.Metadata,
         agentInstance: event.data.agentInstance,
       }),
+    };
+  }
+
+  handleSimulationRunCutAtLimitRecorded(
+    event: SimulationRunCutAtLimitRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: withCutAtLimit(state.Metadata),
     };
   }
 

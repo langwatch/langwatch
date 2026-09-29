@@ -19,9 +19,9 @@
  *    second call for the same run plan while one is in flight starts no second
  *    run — a different run plan is unaffected.
  *  - {@link runScenarioHealthCanary} is the production entrypoint the route
- *    crosses: it looks up the run plan named by `?runPlanId=`, scoped to
- *    `?projectId=`, validates it, builds the real deps and drives the
- *    single-flight guard.
+ *    crosses: it looks up the run plan named by `?runPlanId=` (id or slug),
+ *    scoped to the project the API key resolved to, validates it, builds the
+ *    real deps and drives the single-flight guard.
  *
  * Two failure modes the injected clock alone cannot bound are handled with a
  * real timer instead: a boundary await (`queueRun` / `getScenarioRunData`) that
@@ -39,6 +39,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { SimulationSuite } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { launchScenarioRun } from "~/server/scenarios/launch-scenario-run.service";
@@ -50,6 +51,7 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioResults } from "~/server/scenarios/schemas/event-schemas";
 import type { SimulationTarget } from "~/server/scenarios/simulation-target";
+import { SuiteRepository } from "~/server/suites/suite.repository";
 import { parseSuiteTargets } from "~/server/suites/types";
 
 const logger = createLogger("langwatch:scenario-canary");
@@ -307,6 +309,12 @@ const CANARY_ACTOR: RunActor = { id: "scenario-canary", label: "api" };
 /** The validated server-side config a canary run needs to launch. */
 export interface CanaryConfig {
   projectId: string;
+  /**
+   * The resolved run plan's own `SimulationSuite.id`, whatever the caller
+   * named it by (id or slug), so the single-flight guard has one canonical key
+   * per plan.
+   */
+  runPlanId: string;
   scenarioId: string;
   target: SimulationTarget;
 }
@@ -325,7 +333,12 @@ export interface CanaryConfig {
  * type system, so an unknown target type is caught here.
  */
 export function parseRunPlanConfig(
-  suite: { projectId: string; scenarioIds: string[]; targets: unknown } | null,
+  suite: {
+    id: string;
+    projectId: string;
+    scenarioIds: string[];
+    targets: unknown;
+  } | null,
 ): CanaryConfig | { invalid: string } {
   if (!suite) {
     return { invalid: "run plan not found" };
@@ -349,9 +362,33 @@ export function parseRunPlanConfig(
   const target = targets[0]!;
   return {
     projectId: suite.projectId,
+    runPlanId: suite.id,
     scenarioId: suite.scenarioIds[0]!,
     target: { type: target.type, referenceId: target.referenceId },
   };
+}
+
+/**
+ * Resolves `runPlanId` (id or slug) to a non-archived `run_plan` suite in
+ * `projectId`, or `null`. Tries the id first: ids are globally unique, so a
+ * `run_plan` hit needs no second read; a miss, or a hit of another kind, falls
+ * back to the per-project slug.
+ */
+async function findRunPlan({
+  projectId,
+  runPlanId,
+}: {
+  projectId: string;
+  runPlanId: string;
+}): Promise<SimulationSuite | null> {
+  const suites = new SuiteRepository(prisma);
+  const byId = await suites.findById({ id: runPlanId, projectId });
+  if (byId?.kind === "run_plan") return byId;
+  // An id hit of the wrong kind is not the plan: ids and per-project slugs are
+  // enforced unique separately, so a `test_suite` id may coincide with a real
+  // run plan's slug — fall through to the slug rather than stop here.
+  const bySlug = await suites.findBySlug({ slug: runPlanId, projectId });
+  return bySlug?.kind === "run_plan" ? bySlug : null;
 }
 
 /**
@@ -372,7 +409,7 @@ export function parseRunPlanConfig(
  * documented 200/503/429 contract.
  *
  * The read is also raced against `raceDeadline` (defaulting to
- * {@link raceAgainstRealDeadline}) so a wedged `findFirst` cannot wedge the
+ * {@link raceAgainstRealDeadline}) so a wedged lookup cannot wedge the
  * endpoint forever. `remainingMs` is what is left of the ONE shared total
  * budget after the caller ({@link runScenarioHealthCanary}) computed its
  * `hardDeadline` — the lookup and the run phase that follows it share a single
@@ -403,15 +440,15 @@ async function resolveCanaryConfigFromRunPlan({
   try {
     const raced = await raceDeadline({
       ms: remainingMs,
-      // `projectId` scopes the read to a plan the caller's project owns and
-      // satisfies the multitenancy guard. `kind: "run_plan"` and
-      // `archivedAt: null` are load-bearing too: a 1×1 `test_suite` or an
-      // archived plan would otherwise launch a real run the operator meant to
-      // retire. Filtering in the query keeps every one of those decisions in a
-      // single place instead of re-checking them after the read.
-      work: prisma.simulationSuite.findFirst({
-        where: { id: runPlanId, projectId, archivedAt: null, kind: "run_plan" },
-      }),
+      // `runPlanId` may be the plan's id or its slug (slugs are unique per
+      // project), resolved through the same repository every other suite read
+      // goes through: by id first, then by slug. Both lookups are scoped to
+      // `projectId` (satisfying the multitenancy guard and confining the canary
+      // to a plan the caller's project owns) and skip archived rows. `kind` is
+      // checked here because the repository has no kind-aware finder: a 1×1
+      // `test_suite` would otherwise launch a real run the operator never meant
+      // to schedule.
+      work: findRunPlan({ projectId, runPlanId }),
     });
     if ("timedOut" in raced) {
       logger.error(
@@ -469,9 +506,9 @@ export function buildProductionDeps(config: CanaryConfig): ScenarioCanaryDeps {
 const singleFlightCanary = createSingleFlightScenarioCanary(runScenarioCanary);
 
 /**
- * The route's single entrypoint. Takes the id of the run plan (a
+ * The route's single entrypoint. Takes the id or slug of the run plan (a
  * `SimulationSuite` with `kind: "run_plan"`) the canary is pointed at and the
- * `projectId` that plan belongs to. The run plan is looked up scoped to that
+ * `projectId` the caller's API key resolved to. The run plan is looked up scoped to that
  * project (both to satisfy the multitenancy guard and to confine the canary to
  * a plan the project owns), and the canary's own scenario and target come from
  * that plan's row — so a runPlanId that does not belong to `projectId`, or a
@@ -533,8 +570,12 @@ export async function runScenarioHealthCanary({
     );
     return { healthy: false, reason: "run_failed", durationMs: 0 };
   }
+  // Keyed per project AND resolved plan id, never the caller's spelling: two
+  // projects may legitimately reuse a slug and must not block each other, and
+  // one plan named by its id in one request and its slug in another is still
+  // ONE plan — the second request must see busy, not launch a parallel run.
   return singleFlightCanary({
-    key: runPlanId,
+    key: `${projectId}/${resolved.runPlanId}`,
     deps: buildProductionDeps(resolved),
     hardDeadline,
   });

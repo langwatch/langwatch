@@ -5,6 +5,7 @@
  * footer holds, what its chips open, and what Save and Run does.
  *
  * @see specs/features/agent-testing/cases-table.feature
+ * @see specs/features/agents/voice-agents-v1.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -154,6 +155,13 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// The caller-voice block is flag-gated (release_voice_agents_enabled).
+// Default on, so its own behavior tests are unaffected by the gate.
+let mockVoiceAgentsEnabled = true;
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
+}));
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
@@ -199,6 +207,7 @@ function openDrawerAs(params: {
 describe("the scenario dialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockVoiceAgentsEnabled = true;
     mockDrawerParams.current = {};
     mockDrawerOpenFor.current = "";
     mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
@@ -590,6 +599,129 @@ describe("the scenario dialog", () => {
       expect(screen.getByTestId("version-row-4")).toBeInTheDocument();
       expect(screen.getByTestId("case-modal")).toBeInTheDocument();
       expect(mockOpenDrawer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the caller voice block", () => {
+    /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
+    it("offers a Caller voice chip alongside parameters, turns and models", async () => {
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      const chips = screen.getByTestId("customize-case-chips");
+      expect(
+        within(chips).getByTestId("customize-chip-case-caller-voice"),
+      ).toHaveTextContent("Caller voice");
+    });
+
+    describe("given the release_voice_agents_enabled flag is off", () => {
+      /** @scenario "The Caller voice chip is hidden while the project's flag is off" */
+      it("does not offer the Caller voice chip", async () => {
+        mockVoiceAgentsEnabled = false;
+        openNew();
+        await screen.findByTestId("case-modal");
+
+        const chips = screen.getByTestId("customize-case-chips");
+        expect(
+          within(chips).queryByTestId("customize-chip-case-caller-voice"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
+    it("opens the Voice picker, the Interrupts slider and Effects on the chip", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      await user.click(screen.getByTestId("customize-chip-case-caller-voice"));
+
+      const block = await screen.findByTestId("case-caller-voice-block");
+      expect(within(block).getByText("Voice")).toBeInTheDocument();
+      expect(within(block).getByLabelText("Interrupts")).toBeInTheDocument();
+      expect(within(block).getByLabelText("Effects")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("customize-chip-case-caller-voice"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
+    it("opens with the saved caller voice values on a stored scenario", async () => {
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          callerVoice: {
+            voiceModel: "openai/nova",
+            interruptProbability: 0.2,
+            effects: "phone_line",
+          },
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const block = await screen.findByTestId("case-caller-voice-block");
+      expect(within(block).getByText("Interrupts: 20%")).toBeInTheDocument();
+      expect(within(block).getByLabelText("Effects")).toHaveValue("phone_line");
+      expect(
+        screen.queryByTestId("customize-chip-case-caller-voice"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
+    it("clears the draft's caller voice back to the project default on remove", async () => {
+      const user = userEvent.setup();
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          callerVoice: {
+            voiceModel: "openai/nova",
+            interruptProbability: 0.2,
+            effects: "phone_line",
+          },
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      await screen.findByTestId("case-caller-voice-block");
+      await user.click(
+        screen.getByRole("button", { name: "Remove the caller voice" }),
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("case-caller-voice-block"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(
+        screen.getByTestId("customize-chip-case-caller-voice"),
+      ).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("case-modal-save"));
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          callerVoice: {
+            voiceModel: null,
+            interruptProbability: 0,
+            effects: "none",
+          },
+        }),
+      );
     });
   });
 

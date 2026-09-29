@@ -339,6 +339,11 @@ export async function makeRequest(
 export async function searchTraces(params: {
   query?: string;
   filters?: Record<string, string[]>;
+  /**
+   * The Trace Explorer's query language, as one string. Combined server-side
+   * with `filters`, `query` and `traceIds` rather than replacing any of them.
+   */
+  filter?: string;
   startDate: number;
   endDate: number;
   pageSize?: number;

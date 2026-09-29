@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
@@ -25,12 +21,7 @@ const workflowFindFirst = vi.fn();
 const evaluatorFindFirst = vi.fn();
 const evaluatorCreate = vi.fn();
 
-// The caller is seeded as an org admin so the REAL rbac middleware resolves
-// and grants project permissions. (No vi.mock on the rbac module: under the
-// unit pool's shared module registry a module mock can silently fail to
-// apply depending on which files preceded this one in the worker, letting
-// the real middleware run against a stub that could not serve it. The
-// seeded-admin path has no such order sensitivity.)
+// Keep authorization real: the caller has a live organization admin grant.
 const prisma = {
   workflow: { findFirst: workflowFindFirst },
   evaluator: {
@@ -49,12 +40,26 @@ const prisma = {
     }),
   },
   groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
-  roleBinding: {
+  grant: {
     findMany: vi.fn().mockResolvedValue([
       {
-        role: TeamUserRole.ADMIN,
-        customRoleId: null,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
+        id: "grant-evaluator-admin",
+        organizationId: "org_1",
+        principalType: "USER",
+        principalId: "user_1",
+        roleKey: "admin",
+        legacyRole: null,
+        source: "grants-service",
+        scopeType: "ORGANIZATION",
+        scopeId: "org_1",
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: null,
+        expiresAt: null,
+        maxViews: null,
+        occurredAt: new Date("2025-01-01T00:00:00.000Z"),
       },
     ]),
   },
