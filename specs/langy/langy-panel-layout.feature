@@ -57,6 +57,13 @@ Feature: Langy panel layout modes
     Then the panel docks flush to the viewport edge at full height
     And the page reserves the panel's width so content is not covered
 
+  @integration
+  Scenario: A full-height page still fills the content card around the dock wrapper
+    Given a page that uses the app shell and draws itself at full height, like the prompt playground
+    When the page renders, with the Langy panel open or closed
+    Then the page fills the content card down to the bottom of the viewport
+    And it does not collapse to the height of its own content
+
   Scenario: Closing the dock returns the page to full width
     Given the Langy panel is open in sidebar mode
     When I close the panel
