@@ -4,7 +4,6 @@ import {
   EvaluatorInputTooLargeError,
 } from "@langwatch/evaluation-contract";
 import {
-  batchEvaluationResultSchema,
   type BatchEvaluationResult,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
@@ -17,6 +16,7 @@ import {
 } from "../app/evaluation.members.ts";
 import { type LangevalsChannel, PayloadTooLargeError } from "../channels/langevals.channel.ts";
 import { toLangevalsContexts } from "../rules/langevals-contexts.rules.ts";
+import { langevalsBatchResultSchema } from "../rules/langevals-results.rules.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 
@@ -167,7 +167,7 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
     const duration = performance.now() - startTime;
     let results: BatchEvaluationResult;
     try {
-      results = batchEvaluationResultSchema.parse(await response.json());
+      results = langevalsBatchResultSchema.parse(await response.json());
     } catch (error) {
       this.telemetry?.record({ evaluatorType, status: "error", durationMs: duration });
       throw new EvaluatorExecutionError("Unexpected response: invalid results", {

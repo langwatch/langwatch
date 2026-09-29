@@ -92,5 +92,21 @@ describe("LangevalsPiiDetectionService", () => {
         "Unexpected batch response: expected 2 results, got 1",
       );
     });
+
+    /** @scenario "A PII answer whose unset fields langevals sends as null reads them as absent" */
+    it("reads null-valued fields as absent", async () => {
+      const { langevals, service } = setup(ENDPOINT);
+      langevals.answerWith(
+        Response.json([
+          { ...PROCESSED, score: null, passed: null, label: null, details: null, cost: null },
+          { ...SKIPPED, cost: null },
+        ]),
+      );
+
+      await expect(service.detect(request(["call 555-0100", "hello"]))).resolves.toEqual({
+        kind: "detected",
+        results: [PROCESSED, SKIPPED],
+      });
+    });
   });
 });

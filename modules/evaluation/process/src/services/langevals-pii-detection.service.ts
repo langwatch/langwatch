@@ -3,9 +3,9 @@ import {
   type PiiDetectionOutcome,
   type PiiDetectionRequest,
 } from "@langwatch/evaluation-contract";
-import { batchEvaluationResultSchema } from "@langwatch/evaluator-contract";
 
 import type { LangevalsChannel } from "../channels/langevals.channel.ts";
+import { langevalsBatchResultSchema } from "../rules/langevals-results.rules.ts";
 
 const PII_DETECTION_PATH = "/presidio/pii_detection/evaluate";
 const PII_DETECTION_MIN_THRESHOLD = 0.5;
@@ -52,7 +52,7 @@ export class LangevalsPiiDetectionService {
     }
 
     const answer: unknown = await response.json();
-    const parsed = batchEvaluationResultSchema.safeParse(answer);
+    const parsed = langevalsBatchResultSchema.safeParse(answer);
     if (!parsed.success || parsed.data.length !== input.texts.length) {
       throw new LangevalsPiiDetectionError(
         `Unexpected batch response: expected ${input.texts.length} results, got ${

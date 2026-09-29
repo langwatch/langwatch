@@ -20,8 +20,8 @@ const params: LangevalsEvaluateParams = {
   env: {},
 };
 
-async function evaluationFailure(): Promise<EvaluatorExecutionError> {
-  const service = LangevalsEvaluatorService.create({
+function httpService(): LangevalsEvaluatorService {
+  return LangevalsEvaluatorService.create({
     config: { endpoint: ENDPOINT, maxRetries: 0, timeoutMs: 10 },
     langevals: HttpLangevalsChannel.create({
       config: {
@@ -33,11 +33,23 @@ async function evaluationFailure(): Promise<EvaluatorExecutionError> {
       staging: createApiFixture<LangevalsPayloadStaging>(),
     }),
   });
-  const thrown = await service.evaluate(params).catch((error: unknown) => error);
+}
+
+async function evaluationFailure(): Promise<EvaluatorExecutionError> {
+  const thrown = await httpService()
+    .evaluate(params)
+    .catch((error: unknown) => error);
   if (!(thrown instanceof EvaluatorExecutionError)) {
     throw new Error("expected the evaluation to fail with EvaluatorExecutionError");
   }
   return thrown;
+}
+
+function answerWith(body: unknown) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => Promise.resolve(Response.json(body))),
+  );
 }
 
 function failFetchWith(error: Error) {
@@ -84,6 +96,52 @@ describe("LangevalsEvaluatorService", () => {
         });
         expect(JSON.stringify(error)).not.toContain("cluster.local");
       });
+    });
+  });
+
+  describe("given langevals sends an unset optional field as null", () => {
+    /** @scenario "An evaluator result whose unset fields langevals sends as null reads them as absent" */
+    it("answers the processed result without the null-valued fields", async () => {
+      answerWith([
+        {
+          status: "processed",
+          score: 1.0,
+          passed: true,
+          label: null,
+          details: "hello == hello",
+          cost: null,
+        },
+      ]);
+
+      await expect(httpService().evaluate(params)).resolves.toStrictEqual({
+        status: "processed",
+        score: 1,
+        passed: true,
+        details: "hello == hello",
+      });
+    });
+
+    /** @scenario "A skipped evaluator result whose unset fields langevals sends as null reads them as absent" */
+    it("answers the skipped result without the null-valued fields", async () => {
+      answerWith([{ status: "skipped", details: "no expected output", cost: null }]);
+
+      await expect(httpService().evaluate(params)).resolves.toStrictEqual({
+        status: "skipped",
+        details: "no expected output",
+      });
+    });
+  });
+
+  describe("given langevals answers with something that is not an evaluation result", () => {
+    /** @scenario "A langevals answer that is not an evaluation result fails the run naming the evaluator" */
+    it("fails with an unexpected-response error carrying the validation issues", async () => {
+      answerWith([{ status: "processed", score: "high" }]);
+
+      const error = await evaluationFailure();
+
+      expect(error.message).toBe("Unexpected response: invalid results");
+      expect(error.meta).toEqual({ evaluatorType: "langevals/llm_boolean" });
+      expect(error.reasons).toHaveLength(1);
     });
   });
 
