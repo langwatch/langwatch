@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { BillingTenantOrganizationCache } from "../services/tenant-organization.service.ts";
 import type { BillableEventsMeterRepository } from "./billable-events-meter.repository.ts";
 import type { BillableEventsRepository } from "./billable-events.repository.ts";
 import type { BillingAccountFactsRepository } from "./billing-account-facts.repository.ts";
@@ -23,6 +24,7 @@ import type { TenantOrganizationRepository } from "./tenant-organization.reposit
  */
 export interface BillingRepositories {
   readonly billableEvents: BillableEventsRepository;
+  readonly billableEventsMeter: BillableEventsMeterRepository;
   readonly checkpoints: BillingCheckpointRepository;
   readonly connectedBilling: ConnectedBillingRepository;
   readonly duplicateSubscriptionsReports: DuplicateSubscriptionsReportRepository;
@@ -36,6 +38,7 @@ export interface BillingRepositories {
   readonly seatEventSubscriptions: SeatEventSubscriptionRepository;
   readonly subscriptions: BillingSubscriptionRepository;
   readonly tenantOrganizations: TenantOrganizationRepository;
+  readonly tenantOrganizationCache: BillingTenantOrganizationCache;
   readonly webhookOrganizations: BillingWebhookOrganizationRepository;
   readonly webhookSubscriptions: BillingWebhookSubscriptionRepository;
 }
@@ -43,7 +46,11 @@ export interface BillingRepositories {
 /** ClickHouse-backed billing rows, selected through their own registry and store tier. */
 export type BillingPostgresRepositories = Omit<
   BillingRepositories,
-  "billableEvents" | "organizationCache" | "scenarioRunMilestoneClaims"
+  | "billableEvents"
+  | "billableEventsMeter"
+  | "organizationCache"
+  | "scenarioRunMilestoneClaims"
+  | "tenantOrganizationCache"
 >;
 
 export interface BillingClickHouseRepositories {

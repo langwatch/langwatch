@@ -46,6 +46,18 @@ Feature: Every installed module boots in the process that installs it
     Then the job registry it consumes routes the trace pipeline's recordSpan command
 
   @integration
+  Scenario: The worker hosts the gateway's spend settlement sweeper
+    Given the worker's installed modules over memory stores
+    When the worker process boots
+    Then the gateway spend pipeline hosts the settlement sweeper on its five-minute schedule
+
+  @integration
+  Scenario: A SaaS worker registers the billable-events meter
+    Given the worker's installed modules over memory stores on a SaaS deployment
+    When the worker process boots
+    Then the monthly roll-up pipeline declares the billable-events meter as a global projection
+
+  @integration
   Scenario: Two process installations share no state
     Given two api processes booted over memory stores
     When one of them records a prompt tag

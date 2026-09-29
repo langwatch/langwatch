@@ -106,6 +106,7 @@ import { StripeErrorTranslatorService } from "../services/stripe-error-translato
 import { StripeWebhookSignatureService } from "../services/stripe-webhook-signature.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 import { BillingSubscriptionService } from "../services/subscription.service.ts";
+import { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -359,6 +360,9 @@ export class BillingApp
       | "webhookOrganizations"
       | "seatEventSubscriptions"
       | "organizations"
+      | "billableEventsMeter"
+      | "tenantOrganizations"
+      | "tenantOrganizationCache"
     >;
     config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
     peers: ConnectedBillingPeers;
@@ -405,6 +409,7 @@ export class BillingApp
         repositories,
         peers,
         facts,
+        isSaas,
         usageReporting: isSaas
           ? () =>
               StripeUsageReportingBuilder.create({
@@ -794,14 +799,23 @@ export class BillingApp
     repositories,
     peers,
     facts,
+    isSaas,
     usageReporting,
   }: {
     repositories: Pick<
       BillingRepositories,
-      "checkpoints" | "reportOrganizations" | "billableEvents" | "organizationCache"
+      | "checkpoints"
+      | "reportOrganizations"
+      | "billableEvents"
+      | "organizationCache"
+      | "billableEventsMeter"
+      | "tenantOrganizations"
+      | "tenantOrganizationCache"
     >;
     peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
     facts: ConnectedCustomerFactsService;
+    /** Main registered the billable-events meter on SaaS only. */
+    isSaas: boolean;
     usageReporting: (() => UsageReportingService) | undefined;
   }): BillingReportingPipeline {
     const billableEvents = BillableEventsQueryService.create(repositories.billableEvents);
@@ -832,6 +846,15 @@ export class BillingApp
         const answer = await ceiling.getRemaining(input);
         return answer.kind === "capped" ? answer.remainingUnits : null;
       },
+      meter: isSaas
+        ? {
+            meter: repositories.billableEventsMeter,
+            organizations: BillingTenantOrganizationService.create({
+              organizations: repositories.tenantOrganizations,
+              cache: repositories.tenantOrganizationCache,
+            }),
+          }
+        : void 0,
     });
   }
 

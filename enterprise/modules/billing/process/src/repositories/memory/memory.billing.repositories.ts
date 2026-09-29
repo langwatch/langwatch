@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { BillingRepositories } from "../billing.repositories.ts";
+import { MemoryBillableEventsMeterRepository } from "./memory.billable-events-meter.repository.ts";
 import { MemoryBillableEventsRepository } from "./memory.billable-events.repository.ts";
 import { MemoryBillingOrganizationRepository } from "./memory.billing-account-facts.repository.ts";
 import { MemoryBillingCheckpointRepository } from "./memory.billing-checkpoint.repository.ts";
@@ -17,6 +18,7 @@ import { MemoryProjectActiveDayRepository } from "./memory.project-active-day.re
 import { MemoryScenarioRunMilestoneClaimRepository } from "./memory.scenario-run-milestone-claim.repository.ts";
 import { MemorySeatEventSubscriptionRepository } from "./memory.seat-event-subscription.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "./memory.subscription.repository.ts";
+import { MemoryBillingTenantOrganizationCacheRepository } from "./memory.tenant-organization-cache.repository.ts";
 import { MemoryBillingTenantOrganizationRepository } from "./memory.tenant-organization.repository.ts";
 
 /** The "memory" tier: every billing repository, with no database behind it. */
@@ -32,6 +34,7 @@ export class MemoryBillingRepositories {
 
     return {
       billableEvents: MemoryBillableEventsRepository.create(store),
+      billableEventsMeter: MemoryBillableEventsMeterRepository.create(store),
       checkpoints: MemoryBillingCheckpointRepository.create(store),
       connectedBilling: MemoryConnectedBillingRepository.create(store),
       duplicateSubscriptionsReports: MemoryDuplicateSubscriptionsReportRepository.create(store),
@@ -45,6 +48,7 @@ export class MemoryBillingRepositories {
       seatEventSubscriptions: MemorySeatEventSubscriptionRepository.create(store),
       subscriptions,
       tenantOrganizations: MemoryBillingTenantOrganizationRepository.create(store),
+      tenantOrganizationCache: MemoryBillingTenantOrganizationCacheRepository.create(),
       webhookOrganizations: MemoryBillingWebhookOrganizationRepository.create(store),
       webhookSubscriptions: MemoryBillingWebhookSubscriptionRepository.create({
         subscriptions,

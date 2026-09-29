@@ -38,6 +38,7 @@ class RecordingDriver implements QueryDriver {
 
 describe("BillableEventsMeterClickHouseRepository", () => {
   describe("when a billable event is inserted", () => {
+    /** @scenario "A worker routes the meter by organization, not by tenant" */
     it("routes by organization while retaining the event tenant on the guarded row", async () => {
       const driver = new RecordingDriver();
       const repository = BillableEventsMeterClickHouseRepository.create(

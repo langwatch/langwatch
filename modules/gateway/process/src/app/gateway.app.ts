@@ -153,8 +153,10 @@ import {
   GatewaySpendProducerAdapter,
 } from "../eventing/gateway-spend.pipeline.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewayOpenAdmissionsRepository } from "../repositories/gateway-open-admissions.repository.ts";
 import type { GatewayPrincipalSpendRepository } from "../repositories/gateway-principal-spend.repository.ts";
 import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
+import type { GatewaySpendFoldCacheRepository } from "../repositories/gateway-spend-fold-cache.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
@@ -165,6 +167,7 @@ import {
   type GatewayAgentCacheEntryStore,
   RedisGatewayAgentCacheEntryRepository,
 } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import { RedisGatewaySpendFoldCacheRepository } from "../repositories/redis/redis.gateway-spend-fold-cache.repository.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 import {
@@ -660,11 +663,14 @@ function spendCommandRecord(command: string, payload: unknown): Record<string, u
   throw new TypeError(`gateway_spend ${command} was handed a payload that is not a record.`);
 }
 
-/** The ledger gateway_spend folds into and the senders registration hands back. */
+/** The ledger gateway_spend folds into, its settlement read, and its registered senders. */
 type GatewaySpendPipelineParts = Readonly<{
   ledger: GatewaySpendEventsRepository;
   commands: Record<string, GatewaySpendCommandSender | undefined>;
   webhooks: Pick<WebhookApi, "requestSpendDelivery">;
+  openAdmissions: GatewayOpenAdmissionsRepository;
+  settlementGraceMs: number;
+  foldCache: GatewaySpendFoldCacheRepository;
 }>;
 
 type GatewaySpendDefinition = StaticPipelineDefinition<
@@ -815,6 +821,10 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       virtualKeyPepper: secrets.virtualKeyPepper,
     });
     const internalCollaborators = setup.members.gatewayInternalProtocol;
+    // `settlementGraceMs` owns the parse, the bound and the warning on the raw
+    // `LW_SPEND_SETTLEMENT_GRACE_MS` string, so the reconciliation door and the
+    // sweeper carry one answer. `setup.config` is undefined only in a test stub.
+    const graceMs = settlementGraceMs(setup.config?.spendSettlementGraceMs);
     const connectUpstream = GatewayConnectUpstreamService.create({
       repository: PrismaGatewayConnectUpstreamRepository.create(setup.members.prisma),
       cipher: setup.members.encryption,
@@ -902,16 +912,14 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
         ledger: controlPlane.spendLedger,
         commands: spendCommands,
         webhooks: setup.dependencies.webhooks,
+        openAdmissions: controlPlane.openAdmissions,
+        settlementGraceMs: graceMs,
+        foldCache: RedisGatewaySpendFoldCacheRepository.create(setup.members.redis),
       },
       spend: {
         prisma: setup.members.prisma,
         webhooks: setup.dependencies.webhooks,
-        // `settlementGraceMs` owns the parse, the bound and the warning on the
-        // raw `LW_SPEND_SETTLEMENT_GRACE_MS` string, so this carries it as
-        // written and never reads a second answer out of it. `setup.config`
-        // is undefined only in a test stub that does not care about billing
-        // config; a real boot always states one through the process parse.
-        settlementGraceMs: settlementGraceMs(setup.config?.spendSettlementGraceMs),
+        settlementGraceMs: graceMs,
       },
       budgetOverviewDeps: {
         organizations: setup.dependencies.organizations,
@@ -934,6 +942,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
   #voice: GatewayVoiceServices;
   #spend: GatewaySpendCollaborators | undefined;
   #spendPipeline: GatewaySpendPipelineParts | undefined;
+  #spendProcessing: EventingGatewaySpendAdapter | undefined;
   #spendScope: PrismaGatewaySpendScopeRepository | undefined;
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
@@ -1005,12 +1014,19 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
         processName: "langwatch-api",
       });
     }
-    const ledger = this.#spendPipeline?.ledger;
-    if (!ledger) throw this.spendStoreUnavailable();
-    return EventingGatewaySpendAdapter.create({
-      spendEvents: ledger,
-      webhookSpendDelivery: this.#spendPipeline?.webhooks,
-    }).buildProcessing();
+    const parts = this.#spendPipeline;
+    if (!parts) throw this.spendStoreUnavailable();
+    const { openAdmissions, foldCache } = parts;
+    this.#spendProcessing = EventingGatewaySpendAdapter.create({
+      spendEvents: parts.ledger,
+      cacheStore: (inner) => foldCache.cached(inner),
+      webhookSpendDelivery: parts.webhooks,
+      settlement: {
+        findOpenAdmissions: (query) => openAdmissions.findOpenAdmissions(query),
+        graceMs: parts.settlementGraceMs,
+      },
+    });
+    return this.#spendProcessing.buildProcessing();
   }
 
   /** The registered senders the data plane's /spend-commands and priced spend append through. */
@@ -1023,6 +1039,12 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
         sendBatch: (payloads) =>
           sender.sendBatch(payloads.map((payload) => spendCommandRecord(name, payload))),
       };
+    }
+    const settle = commands.settleSpend;
+    if (settle) {
+      this.#spendProcessing?.connectSettlement(async (data) => {
+        await settle.send(spendCommandRecord("settleSpend", data));
+      });
     }
   }
 
