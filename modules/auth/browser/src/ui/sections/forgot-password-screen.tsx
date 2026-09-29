@@ -12,10 +12,19 @@ import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
+import { FrontDoorShell } from "./front-door-shell.tsx";
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
 
 export default function ForgotPassword() {
+  return (
+    <FrontDoorShell>
+      <ForgotPasswordScreen />
+    </FrontDoorShell>
+  );
+}
+
+function ForgotPasswordScreen() {
   const publicEnv = usePublicEnv();
   const frontDoor = useIdentityFrontDoor();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
@@ -31,7 +40,7 @@ export default function ForgotPassword() {
 
   if (deploymentHoldsNoPasswords) {
     return (
-      <AuthCard title="Forgot password">
+      <AuthCard title="Forgot your password?">
         <Text>
           Your password is managed by your identity provider. Use your organization single sign-on
           to access LangWatch.
@@ -47,7 +56,7 @@ export default function ForgotPassword() {
   // email rather than as a deployment that was never able to send it.
   if (!publicEnv.data.HAS_EMAIL_PROVIDER_KEY) {
     return (
-      <AuthCard title="Forgot password">
+      <AuthCard title="Forgot your password?">
         <Text>
           This deployment cannot send email, so it cannot send you a reset link. Ask whoever
           operates it to reset your password for you, or to configure an email provider.
@@ -106,7 +115,7 @@ function ForgotPasswordForm() {
   }
 
   return (
-    <AuthCard title="Forgot password">
+    <AuthCard title="Forgot your password?">
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <VStack width="full" align="stretch" gap="14px">
           <Text color="fg.muted" fontSize="13.5px" lineHeight="1.65">
