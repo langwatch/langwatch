@@ -109,7 +109,7 @@ function AnnotationScoreRow({
   onDelete: (scoreId: string) => void;
 }) {
   return (
-    <Table.Row>
+    <Table.Row data-testid={`annotation-score-row-${score.name}`}>
       <Table.Cell>{score.name}</Table.Cell>
       <Table.Cell>{score.description}</Table.Cell>
       <Table.Cell width="20%">
@@ -129,7 +129,12 @@ function AnnotationScoreRow({
       </Table.Cell>
       {canManage && (
         <Table.Cell>
-          <ScoreActions scoreId={score.id} onEdit={onEdit} onDelete={onDelete} />
+          <ScoreActions
+            scoreId={score.id}
+            scoreName={score.name}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         </Table.Cell>
       )}
     </Table.Row>
@@ -138,28 +143,38 @@ function AnnotationScoreRow({
 
 function ScoreActions({
   scoreId,
+  scoreName,
   onEdit,
   onDelete,
 }: {
   scoreId: string;
+  scoreName: string;
   onEdit: (scoreId: string) => void;
   onDelete: (scoreId: string) => void;
 }) {
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button variant="ghost">
+        <Button variant="ghost" aria-label={`Actions for score ${scoreName}`}>
           <MoreVertical />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item value="edit" onClick={() => onEdit(scoreId)}>
+        <Menu.Item
+          value="edit"
+          onClick={() => onEdit(scoreId)}
+          data-testid="annotation-score-action-edit"
+        >
           <Box display="flex" alignItems="center" gap={2}>
             <Edit size={14} />
             Edit
           </Box>
         </Menu.Item>
-        <Menu.Item value="delete" onClick={() => onDelete(scoreId)}>
+        <Menu.Item
+          value="delete"
+          onClick={() => onDelete(scoreId)}
+          data-testid="annotation-score-action-delete"
+        >
           <Box display="flex" alignItems="center" gap={2} color="red.600">
             <Trash size={14} />
             Delete
@@ -241,7 +256,10 @@ export default function AnnotationScoresScreen() {
           <Heading as="h2">Annotation Scoring</Heading>
           <Spacer />
           {canManage && (
-            <PageLayout.HeaderButton onClick={() => host.openEditor()}>
+            <PageLayout.HeaderButton
+              onClick={() => host.openEditor()}
+              data-testid="annotation-score-add"
+            >
               <Plus /> Add new score metric
             </PageLayout.HeaderButton>
           )}

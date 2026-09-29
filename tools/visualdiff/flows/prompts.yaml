@@ -1,0 +1,108 @@
+# Prompts beyond create, version, deploy and delete in prompts-automations.yaml: duplicate
+# and rename the handle, each read back from the API and the list after a reload. Prompt
+# variable mappings live in the experiment workbench and are not scripted yet.
+# Unrun: written under load.
+flows:
+  - id: prompt-duplicate
+    title: Duplicate a prompt and see two rows for it after a reload
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          testId: prompt-new-button
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "You are the duplicate source."
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: fill
+        with:
+          testId: prompt-handle-input
+          value: vd-pdup-{uid}
+      - action: click
+        with:
+          testId: prompt-handle-submit
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-pdup-{uid}
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          testId: prompt-actions-menu-vd-pdup-{uid}
+      - action: click
+        with:
+          testId: prompt-actions-duplicate
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: expect
+        with:
+          testIdPrefix: prompt-row-
+          hasText: vd-pdup-{uid}
+          min: "2"
+          timeout: "20000"
+
+  - id: prompt-rename-handle
+    title: Rename a prompt handle and find only the new handle after a reload
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          testId: prompt-new-button
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "You are the rename source."
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: fill
+        with:
+          testId: prompt-handle-input
+          value: vd-pren-{uid}
+      - action: click
+        with:
+          testId: prompt-handle-submit
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-pren-{uid}
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          testId: prompt-actions-menu-vd-pren-{uid}
+      - action: click
+        with:
+          testId: prompt-actions-rename-handle
+      - action: fill
+        with:
+          testId: prompt-handle-input
+          value: vd-pren-{uid}-renamed
+      - action: click
+        with:
+          testId: prompt-handle-submit
+      - action: expect
+        with:
+          api: /api/prompts/vd-pren-{uid}-renamed
+          status: "200"
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: expect
+        with:
+          testId: prompt-row-vd-pren-{uid}-renamed
+      - action: expect
+        with:
+          testId: prompt-row-vd-pren-{uid}
+          equals: "0"

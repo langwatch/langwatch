@@ -1,0 +1,105 @@
+# Automations beyond the email flows in prompts-automations.yaml: a webhook channel and a
+# condition built from the query chips, each read back from the API and the list after a
+# reload. Slack is not scripted: new Slack automations need a connected Slack app.
+# Unrun: written under load.
+flows:
+  - id: automation-channel-webhook
+    title: Deliver an automation to a webhook and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: click
+        with:
+          testId: automation-add-automations
+      - action: fill
+        with:
+          testId: automation-name-input
+          value: vd-hook-{uid}
+      - action: click
+        with:
+          testId: automation-subject-code
+      - action: click
+        with:
+          testId: automation-subject-example-status:error
+      - action: click
+        with:
+          testId: automation-delivery-send-webhook
+      - action: fill
+        with:
+          testId: automation-webhook-url-input
+          value: https://example.com/hooks/vd-{uid}
+      - action: click
+        with:
+          testId: automation-setup-done
+      - action: click
+        with:
+          testId: automation-save-automation
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: vd-hook-{uid}
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: https://example.com/hooks/vd-{uid}
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          testId: automation-row-actions-vd-hook-{uid}
+
+  - id: automation-condition-preview-and-save
+    title: Build a condition from the query chips, see the trace preview and keep it after saving
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: click
+        with:
+          testId: automation-add-automations
+      - action: fill
+        with:
+          testId: automation-name-input
+          value: vd-cond-{uid}
+      - action: click
+        with:
+          testId: automation-subject-code
+      - action: click
+        with:
+          testId: automation-subject-example-model:gpt*
+      - action: expect
+        with:
+          text: /matched/
+          timeout: "20000"
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          testId: automation-email-input
+          value: vd-{uid}@example.com
+      - action: click
+        with:
+          testId: automation-email-add
+      - action: click
+        with:
+          testId: automation-setup-done
+      - action: click
+        with:
+          testId: automation-save-automation
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: vd-cond-{uid}
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: model:gpt*
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          testId: automation-row-actions-vd-cond-{uid}

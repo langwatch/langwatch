@@ -52,12 +52,17 @@ flows:
       - action: openTrace
         with:
           traceId: trace_visualdiff_0
+      - action: click
+        with:
+          testId: trace-mode-tab-trace
       - action: expect
         with:
-          text: handle_request
+          testId: waterfall-row
+          hasText: handle_request
       - action: expect
         with:
-          text: retrieve_documents
+          testId: waterfall-row
+          hasText: retrieve_documents
 
   - id: automation-create
     title: Create an automation using every part of its form
@@ -145,6 +150,9 @@ flows:
     title: Add an experiment and read it back
     steps:
       - action: createExperiment
+      - action: click
+        with:
+          testId: experiment-new-create
       - action: expect
         with:
           text: Datasets

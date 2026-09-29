@@ -245,10 +245,16 @@ export const AnnotationScoreForm = ({ onClose, annotationScoreId }: AnnotationSc
     <form onSubmit={handleSubmit(onSubmit)}>
       <AnnotationScoreEditor
         formError={null}
-        nameField={<Input {...register("name")} required />}
+        nameField={<Input {...register("name")} required data-testid="annotation-score-name" />}
         nameError={errors.name?.message}
         descriptionField={
-          <Textarea {...register("description")} required autoresize maxHeight="6lh" />
+          <Textarea
+            {...register("description")}
+            required
+            autoresize
+            maxHeight="6lh"
+            data-testid="annotation-score-description"
+          />
         }
         descriptionError={errors.description?.message}
         dataType={watchDataType}

@@ -1,0 +1,172 @@
+# Annotations beyond the trace drawer flows in observability.yaml: score metrics in
+# settings and editing a queue. Unrun: written under load.
+flows:
+  - id: annotation-score-create
+    title: Add a score metric in settings and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          testId: annotation-score-add
+      - action: fill
+        with:
+          testId: annotation-score-name
+          value: vd-score-{uid}
+      - action: fill
+        with:
+          testId: annotation-score-description
+          value: Score made by the visual diff flow {uid}
+      - action: fill
+        with:
+          label: Option 1
+          value: good
+      - action: click
+        with:
+          testId: annotation-score-submit
+      - action: expect
+        with:
+          testId: annotation-score-row-vd-score-{uid}
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          testId: annotation-score-row-vd-score-{uid}
+
+  - id: annotation-score-edit-and-delete
+    title: Rename a score metric, then delete it, each read back after a reload
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          testId: annotation-score-add
+      - action: fill
+        with:
+          testId: annotation-score-name
+          value: vd-scoreed-{uid}
+      - action: fill
+        with:
+          testId: annotation-score-description
+          value: Score made by the visual diff flow {uid}
+      - action: fill
+        with:
+          label: Option 1
+          value: good
+      - action: click
+        with:
+          testId: annotation-score-submit
+      - action: expect
+        with:
+          testId: annotation-score-row-vd-scoreed-{uid}
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          testId: annotation-score-row-vd-scoreed-{uid}
+      - action: click
+        with:
+          label: Actions for score vd-scoreed-{uid}
+      - action: click
+        with:
+          testId: annotation-score-action-edit
+      - action: fill
+        with:
+          testId: annotation-score-name
+          value: vd-scoreed-{uid}-renamed
+      - action: click
+        with:
+          testId: annotation-score-submit
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          testId: annotation-score-row-vd-scoreed-{uid}-renamed
+      - action: click
+        with:
+          label: Actions for score vd-scoreed-{uid}-renamed
+      - action: click
+        with:
+          testId: annotation-score-action-delete
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: expect
+        with:
+          testId: annotation-score-row-vd-scoreed-{uid}-renamed
+          equals: "0"
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          testId: annotation-score-row-vd-scoreed-{uid}-renamed
+          equals: "0"
+
+  - id: annotation-queue-edit-rename
+    title: Rename an annotation queue from its sidebar menu and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          testId: annotation-queue-create
+      - action: fill
+        with:
+          testId: annotation-queue-editor-name
+          value: vd-qedit-{uid}
+      - action: fill
+        with:
+          testId: annotation-queue-editor-description
+          value: Created by the visual diff flow {uid}
+      - action: click
+        with:
+          testId: annotation-queue-editor-participants
+      - action: click
+        with:
+          testId: annotation-queue-editor-participant-option
+      - action: click
+        with:
+          testId: annotation-queue-editor-description
+      - action: click
+        with:
+          testId: annotation-queue-editor-score-types
+      - action: click
+        with:
+          testId: annotation-queue-editor-score-option
+      - action: click
+        with:
+          testId: annotation-queue-editor-description
+      - action: click
+        with:
+          testId: annotation-queue-editor-save
+      - action: expect
+        with:
+          testId: annotation-queue-entry
+          hasText: vd-qedit-{uid}
+      - action: click
+        with:
+          label: Actions for queue vd-qedit-{uid}
+      - action: click
+        with:
+          text: Edit queue
+      - action: fill
+        with:
+          testId: annotation-queue-editor-name
+          value: vd-qedit-{uid}-renamed
+      - action: click
+        with:
+          testId: annotation-queue-editor-save
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          testId: annotation-queue-entry
+          hasText: vd-qedit-{uid}-renamed

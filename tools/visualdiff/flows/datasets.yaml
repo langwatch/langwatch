@@ -1,0 +1,214 @@
+# Datasets, beyond create and CSV upload in evaluations.yaml: open the seeded one, search
+# its rows, send it to an experiment, rename it, add rows from a CSV and delete it. Each
+# outcome is read back from the API or the list after a reload. Unrun: written under load.
+flows:
+  - id: dataset-open-seeded-and-search-rows
+    title: Open the seeded dataset, see its rows and narrow them with the row search
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: dataset-row-{dataset}
+      - action: expect
+        with:
+          testId: dataset-editor-grid
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^3 records/
+      - action: fill
+        with:
+          testId: dataset-row-search
+          value: fixture
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 of 3 records/
+          timeout: "15000"
+
+  - id: dataset-run-experiment-from-dataset
+    title: Send the seeded dataset to a new experiment and see it selected there
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: dataset-row-{dataset}
+      - action: click
+        with:
+          testId: run-experiment-from-dataset
+      - action: expect
+        with:
+          url: /experiments/workbench
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          min: "1"
+
+  - id: dataset-rename-through-edit
+    title: Rename a dataset from its row menu and find the new name after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          testId: dataset-menu-create
+      - action: fill
+        with:
+          testId: dataset-name-input
+          value: vd-dsren-{uid}
+      - action: click
+        with:
+          testId: dataset-form-submit
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-dsren-{uid}
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          label: Actions for vd-dsren-{uid}
+      - action: click
+        with:
+          text: Edit dataset
+      - action: fill
+        with:
+          testId: dataset-name-input
+          value: vd-dsren-{uid}-renamed
+      - action: click
+        with:
+          testId: dataset-form-submit
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-dsren-{uid}-renamed
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: expect
+        with:
+          testIdPrefix: dataset-row-
+          hasText: vd-dsren-{uid}-renamed
+
+  - id: dataset-add-rows-from-csv
+    title: Add rows to an existing dataset from a CSV and see the row count after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          testId: dataset-menu-create
+      - action: fill
+        with:
+          testId: dataset-name-input
+          value: vd-dsrows-{uid}
+      - action: click
+        with:
+          testId: dataset-form-submit
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-dsrows-{uid}
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testIdPrefix: dataset-row-
+          hasText: vd-dsrows-{uid}
+      - action: click
+        with:
+          testId: add-rows-from-csv
+      - action: upload
+        with:
+          fixture: sample.csv
+      - action: click
+        with:
+          testId: dataset-add-rows-submit
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^2 records/
+          timeout: "20000"
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testIdPrefix: dataset-row-
+          hasText: vd-dsrows-{uid}
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^2 records/
+
+  - id: dataset-delete
+    title: Delete a dataset behind its typed confirmation and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          testId: dataset-menu-create
+      - action: fill
+        with:
+          testId: dataset-name-input
+          value: vd-dsdel-{uid}
+      - action: click
+        with:
+          testId: dataset-form-submit
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-dsdel-{uid}
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: expect
+        with:
+          testIdPrefix: dataset-row-
+          hasText: vd-dsdel-{uid}
+      - action: click
+        with:
+          label: Actions for vd-dsdel-{uid}
+      - action: click
+        with:
+          text: Delete dataset
+      - action: fill
+        with:
+          testId: delete-dataset-confirmation
+          value: delete
+      - action: click
+        with:
+          testId: delete-dataset-confirm
+      - action: expect
+        with:
+          count: '[data-testid^="dataset-row-"]:has-text("vd-dsdel-{uid}")'
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: expect
+        with:
+          testId: upload-or-create-dataset
+      - action: expect
+        with:
+          count: '[data-testid^="dataset-row-"]:has-text("vd-dsdel-{uid}")'
+          equals: "0"

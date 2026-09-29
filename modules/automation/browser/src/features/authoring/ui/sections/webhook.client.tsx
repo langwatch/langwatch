@@ -389,6 +389,7 @@ function WebhookConfigForm({
           value={slice.url}
           onChange={(e) => onChange({ ...slice, url: e.target.value })}
           placeholder="https://example.com/hooks/langwatch"
+          data-testid="automation-webhook-url-input"
         />
         {urlProblem ? (
           <Field.ErrorText>{urlProblem}</Field.ErrorText>

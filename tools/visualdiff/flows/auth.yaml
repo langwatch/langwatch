@@ -1,0 +1,76 @@
+# Auth beyond sign-in and sign-out: a wrong password is refused and leaves the visitor
+# signed out, and a password-reset mail carries a live link. Both run in a fresh cookieless
+# context. The reset form is never submitted: resetting signs every other device out, and
+# every flow on the stack shares this account. Unrun: written under load.
+flows:
+  - id: auth-wrong-password-refused
+    title: A wrong password is refused and the visitor stays signed out
+    steps:
+      - action: go
+        with:
+          path: /auth/signin
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Email
+          value: "{actor}"
+          anonymous: "true"
+      - action: click
+        with:
+          text: Continue
+          optional: "true"
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Password
+          value: not-the-password-{uid}
+          anonymous: "true"
+      - action: click
+        with:
+          text: /^\s*(sign in|log in)\s*$/i
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: signin-failure
+          anonymous: "true"
+      - action: go
+        with:
+          path: /{slug}/traces
+          anonymous: "true"
+      - action: expect
+        with:
+          url: /auth/signin
+          anonymous: "true"
+
+  - id: auth-password-reset-link-opens
+    title: A reset request mails a link that opens the choose-a-password form
+    steps:
+      - action: go
+        with:
+          path: /auth/forgot-password
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Email
+          value: "{actor}"
+          anonymous: "true"
+      - action: click
+        with:
+          text: Send reset link
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verification-sent
+          anonymous: "true"
+      - action: mail
+        with:
+          to: "{actor}"
+          subject: password
+      - action: go
+        with:
+          path: "{mailLink}"
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Choose a new password
+          anonymous: "true"

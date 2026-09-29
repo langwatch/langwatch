@@ -1,0 +1,148 @@
+# Agents beyond the HTTP agent in simulations.yaml: code, workflow, connect-from-code
+# and deleting one. Voice agents are not scripted: release_voice_agents_enabled is off in
+# the check stack and the type selector has no voice card. Unrun: written under load.
+flows:
+  - id: agent-create-code
+    title: Create a code agent with the default template and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          testId: agents-new-agent
+      - action: click
+        with:
+          testId: agent-type-code
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-code-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-code-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          testId: agent-card-name-vd-code-agent-{uid}
+
+  - id: agent-create-workflow
+    title: Create a workflow agent, land in its studio and find the agent after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          testId: agents-new-agent
+      - action: click
+        with:
+          testId: agent-type-workflow
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-wf-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          url: /studio/
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-wf-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          testId: agent-card-name-vd-wf-agent-{uid}
+
+  - id: agent-connect-from-code-drawer
+    title: Open the connect-from-code drawer and see its snippet and listening state
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          testId: agents-new-agent
+      - action: click
+        with:
+          testId: agent-type-connected
+      - action: expect
+        with:
+          testId: connect-from-code-drawer
+      - action: expect
+        with:
+          testIdPrefix: connect-code-
+          min: "1"
+      - action: expect
+        with:
+          testId: connect-agent-listening
+
+  - id: agent-delete
+    title: Delete an agent behind its typed confirmation and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          testId: agents-new-agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-del-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-del-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-del-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          label: Actions for vd-agent-del-{uid}
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: fill
+        with:
+          testId: cascade-archive-confirm-input
+          value: delete
+      - action: click
+        with:
+          testId: cascade-archive-confirm-button
+      - action: expect
+        with:
+          testId: agent-card-name-vd-agent-del-{uid}
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          testId: agents-new-agent
+      - action: expect
+        with:
+          testId: agent-card-name-vd-agent-del-{uid}
+          equals: "0"

@@ -82,6 +82,7 @@ export default function WorkflowsScreen() {
                   workflows={workflows.data}
                   name={workflow.name}
                   icon={workflow.icon}
+                  data-testid={`workflow-card-${workflow.name}`}
                   onClick={(event: MouseEvent<HTMLElement>) => {
                     if (isInnerMenuClick(event)) {
                       event.stopPropagation();

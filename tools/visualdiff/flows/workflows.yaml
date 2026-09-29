@@ -1,0 +1,125 @@
+# The studio journey beyond create-blank and publish in evaluations.yaml: attach a dataset to
+# the entry node and keep it through a saved version, open a workflow from the list, delete
+# one. Node wiring by drag is not scripted. Unrun: written under load.
+flows:
+  - id: workflow-attach-dataset-and-save-version
+    title: Attach the seeded dataset to the entry node, save a version and find it attached after reopening
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          testId: workflow-new-open
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          testId: workflow-create-name
+          value: vd-wfds-{uid}
+      - action: click
+        with:
+          testId: workflow-create-submit
+      - action: expect
+        with:
+          testId: workflow-node-entry
+          timeout: "30000"
+      - action: expect
+        with:
+          api: /api/workflows
+          contains: vd-wfds-{uid}
+      - action: click
+        with:
+          testId: workflow-node-entry
+      - action: click
+        with:
+          testId: attach-dataset-button
+      - action: click
+        with:
+          testId: dataset-card-Visual Diff QA
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          hasText: Visual Diff QA
+      - action: click
+        with:
+          testId: workflow-history-open
+      - action: click
+        with:
+          testId: workflow-version-save
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          label: vd-wfds-{uid}
+      - action: click
+        with:
+          testId: workflow-node-entry
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          hasText: Visual Diff QA
+          timeout: "20000"
+
+  - id: workflow-delete
+    title: Delete a workflow behind its typed confirmation and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          testId: workflow-new-open
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          testId: workflow-create-name
+          value: vd-wfdel-{uid}
+      - action: click
+        with:
+          testId: workflow-create-submit
+      - action: expect
+        with:
+          testId: workflow-node-entry
+          timeout: "30000"
+      - action: expect
+        with:
+          api: /api/workflows
+          contains: vd-wfdel-{uid}
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          testId: workflow-card-vd-wfdel-{uid}
+      - action: click
+        with:
+          selector: '[data-testid="workflow-card-vd-wfdel-{uid}"] [aria-label="Workflow actions"]'
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: fill
+        with:
+          testId: cascade-archive-confirm-input
+          value: delete
+      - action: click
+        with:
+          testId: cascade-archive-confirm-button
+      - action: expect
+        with:
+          testId: workflow-card-vd-wfdel-{uid}
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          testId: workflow-new-open
+      - action: expect
+        with:
+          testId: workflow-card-vd-wfdel-{uid}
+          equals: "0"

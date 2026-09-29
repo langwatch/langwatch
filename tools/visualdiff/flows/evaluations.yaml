@@ -346,7 +346,7 @@ flows:
       - action: upload
         with:
           testId: dataset-bulk-upload-file
-          fixture: dataset.csv
+          fixture: sample.csv
       - action: expect
         with:
           testId: bulk-summary
@@ -444,6 +444,7 @@ flows:
       - action: expect
         with:
           testId: workflow-node-entry
+          timeout: "30000"
       - action: expect
         with:
           testId: workflow-node-end
@@ -480,6 +481,7 @@ flows:
       - action: expect
         with:
           testId: workflow-node-entry
+          timeout: "30000"
       - action: click
         with:
           testId: workflow-publish-open

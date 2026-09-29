@@ -139,7 +139,13 @@ export function AnnotationScoreEditor({
 
       <HStack width="full">
         <Spacer />
-        <Button colorPalette="orange" type="submit" minWidth="fit-content" loading={isSaving}>
+        <Button
+          colorPalette="orange"
+          type="submit"
+          minWidth="fit-content"
+          loading={isSaving}
+          data-testid="annotation-score-submit"
+        >
           {submitLabel}
         </Button>
       </HStack>
