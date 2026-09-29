@@ -67,6 +67,14 @@ export const processOwner = {
         .optional()
         .transform((value) => value === "1" || value === "true"),
     ),
+    /** What the development badge reads instead of "DEV": a haven stack's slug. */
+    devIndicatorLabel: c.env(
+      "DEV_INDICATOR_LABEL",
+      z
+        .string()
+        .optional()
+        .transform((value) => value?.trim() || void 0),
+    ),
     /**
      * This deployment's public origin: a process fact drilled to the modules
      * that link back, never a config key each of them declares. Absent and

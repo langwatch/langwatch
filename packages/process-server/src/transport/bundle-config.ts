@@ -71,6 +71,7 @@ const processFacts = z.object({
   isSaas: z.boolean().optional(),
   nlpServiceUrl: z.string().optional(),
   hideDevIndicator: z.boolean().optional(),
+  devIndicatorLabel: z.string().optional(),
 });
 
 /** An unrecognised NODE_ENV is production-shaped, as every default is (§6). */
@@ -84,5 +85,6 @@ function projectProcessConfig(config: Readonly<Record<string, unknown>>): Proces
     deployment: facts.isSaas ? "saas" : "self-hosted",
     nlp: Boolean(facts.nlpServiceUrl),
     ...(facts.hideDevIndicator ? { hideDevIndicator: true } : {}),
+    ...(facts.devIndicatorLabel ? { devIndicatorLabel: facts.devIndicatorLabel } : {}),
   });
 }

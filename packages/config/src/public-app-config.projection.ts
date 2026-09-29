@@ -74,6 +74,13 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
   },
   licensePaymentUrl: c.env("STRIPE_LICENSE_PAYMENT_LINK_URL", z.string().min(1).optional()),
   hideDevIndicator: c.env("HIDE_DEV_INDICATOR", onOff),
+  devIndicatorLabel: c.env(
+    "DEV_INDICATOR_LABEL",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
+  ),
 }));
 
 type PublicAppConfigValues = ConfigOf<typeof publicAppConfigProjectionDefinition>;
@@ -232,6 +239,7 @@ function projectPublicAppConfig(
       deployment: config.isSaas ? "saas" : "self-hosted",
       nlp: Boolean(config.capabilities.nlpService || credentials.nlpLambdaConfig),
       ...(config.hideDevIndicator ? { hideDevIndicator: true } : {}),
+      ...(config.devIndicatorLabel ? { devIndicatorLabel: config.devIndicatorLabel } : {}),
     }),
     auth: {
       passkeys: config.identity.passkeys !== "off",

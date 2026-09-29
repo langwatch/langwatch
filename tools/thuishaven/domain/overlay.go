@@ -68,6 +68,8 @@ func (s Stack) OverlayEnv() []string {
 	env := []string{
 		"LANGWATCH_PORTLESS=1",
 		"LANGWATCH_SLUG=" + s.Slug,
+		// The app's development badge names the stack instead of reading "DEV".
+		"DEV_INDICATOR_LABEL=" + s.Slug,
 		fmt.Sprintf("LANGWATCH_APP_PORT=%d", app.Port),
 		fmt.Sprintf("LANGWATCH_API_PORT=%d", s.APIPort),
 		// The api application's own name for the port it binds

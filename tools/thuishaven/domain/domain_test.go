@@ -345,6 +345,14 @@ func TestOverlayPinsTheSevenDayRetentionDefault(t *testing.T) {
 	}
 }
 
+// @scenario "haven names the development badge after its stack"
+func TestOverlayLabelsTheDevelopmentBadgeWithTheSlug(t *testing.T) {
+	st := Stack{Slug: "feat-strict-feature-layout-v0", APIPort: 1, Services: []Service{{Name: "app"}}}
+	if got := valueOf(st.OverlayEnv(), "DEV_INDICATOR_LABEL"); got != st.Slug {
+		t.Errorf("DEV_INDICATOR_LABEL = %q, want the stack slug %q", got, st.Slug)
+	}
+}
+
 // TestOverlayNeverEmitsLangwatchApiKey is the watertight guard: haven must NEVER put
 // LANGWATCH_API_KEY (the langwatch SDK's own key contract) into a platform child's env.
 // A platform process that saw it would self-instrument into its own trace ingest — a

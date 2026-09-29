@@ -53,6 +53,20 @@ describe("public application configuration projection", () => {
     expect(processSlice(base)).not.toHaveProperty("hideDevIndicator");
   });
 
+  /** @scenario "the browser is handed the badge label only when the deployment names one" */
+  it("hands the browser DEV_INDICATOR_LABEL only when it names a stack", () => {
+    const base = { BASE_HOST: "https://app.example.test", NODE_ENV: "development" };
+    const processSlice = (source: Record<string, string>) => resolvePublicAppConfig(source).process;
+
+    expect(
+      processSlice({ ...base, DEV_INDICATOR_LABEL: "feat-strict-feature-layout-v0" }),
+    ).toMatchObject({ devIndicatorLabel: "feat-strict-feature-layout-v0" });
+    expect(processSlice({ ...base, DEV_INDICATOR_LABEL: "  " })).not.toHaveProperty(
+      "devIndicatorLabel",
+    );
+    expect(processSlice(base)).not.toHaveProperty("devIndicatorLabel");
+  });
+
   describe("given the passkey switch the dev server projects for auth", () => {
     const base = { BASE_HOST: "https://app.example.test", NODE_ENV: "development" };
     const passkeys = (source: Record<string, string>) =>

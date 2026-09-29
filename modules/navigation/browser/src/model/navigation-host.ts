@@ -64,6 +64,8 @@ export type NavigationDeployment = {
   isDevelopment: boolean;
   /** A development build that asked to draw without the development badge. */
   hideDevIndicator?: boolean;
+  /** What the development badge reads instead of "DEV": a haven stack's slug. */
+  devIndicatorLabel?: string;
   /** The shared demo project, when this deployment configures one. */
   demoProjectSlug?: string;
   hasNlpService: boolean;
