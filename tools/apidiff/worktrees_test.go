@@ -155,6 +155,14 @@ func TestAPersistentWorktreeIsPreparedOnlyWhenItsTreeChanged(t *testing.T) {
 	root := t.TempDir()
 	dir := persistentWorktree(root, "main")
 	monolithTree(t, dir)
+	for _, made := range []string{"node_modules", "platform/app/src/generated/prisma"} {
+		if err := os.MkdirAll(filepath.Join(dir, made), 0o750); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "node_modules", ".modules.yaml"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	recorder := &prepareRecorder{}
 	prepare := func(tree string) int {
 		state := &bootState{cfg: BootConfig{BranchDir: root}, stderr: &lockedWriter{out: io.Discard}, run: recorder.run}
@@ -174,6 +182,12 @@ func TestAPersistentWorktreeIsPreparedOnlyWhenItsTreeChanged(t *testing.T) {
 	}
 	if ran := prepare("tree-2"); ran != steps {
 		t.Errorf("a moved tree ran %d prepare steps, want %d", ran, steps)
+	}
+	if err := os.RemoveAll(filepath.Join(dir, "platform", "app", "src", "generated")); err != nil {
+		t.Fatal(err)
+	}
+	if ran := prepare("tree-2"); ran != steps {
+		t.Errorf("a tree whose Prisma client was deleted ran %d prepare steps, want %d", ran, steps)
 	}
 }
 

@@ -57,6 +57,9 @@ func TestEachSideReusesOneWorktreeBetweenRuns(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(PersistentWorktree(options.Root, side), "node_modules"), 0o750); err != nil {
 			t.Fatal(err)
 		}
+		if err := os.MkdirAll(filepath.Join(PersistentWorktree(options.Root, side), "packages", "prisma-client", "src", "generated"), 0o750); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(PersistentWorktree(options.Root, side), "node_modules", ".modules.yaml"), nil, 0o600); err != nil {
 			t.Fatal(err)
 		}

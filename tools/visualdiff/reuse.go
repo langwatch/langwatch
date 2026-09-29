@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/langwatch/langwatch/tools/havenrun"
 )
 
 // A persistent worktree skips a prepare step whose inputs are unchanged since
@@ -112,7 +114,7 @@ func prepared(stack Stack, index int, spec commandSpec, key string) bool {
 	if key == "" || readStepKey(stack.Dir, index) != key {
 		return false
 	}
-	return prepareStepName(spec) != "install" || fileExists(filepath.Join(stack.Dir, "node_modules", ".modules.yaml"))
+	return havenrun.PreparedOutputsExist(stack.Dir, havenrun.Layout(stack.Layout))
 }
 
 func keyed(layout Layout, spec commandSpec, inputs string) string {

@@ -92,7 +92,7 @@ func (state *bootState) preparedAlready(side runSide, layout havenrun.Layout, st
 		return "", false
 	}
 	key := prepareKey(layout, checkout.tree, steps)
-	if preparedKey(side.dir) == key {
+	if preparedKey(side.dir) == key && havenrun.PreparedOutputsExist(side.dir, layout) {
 		return key, true
 	}
 	if err := recordPrepared(side.dir, ""); err != nil {

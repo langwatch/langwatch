@@ -235,3 +235,19 @@ func PinDotenvOrigin(dir, origin string) error {
 	}
 	return nil
 }
+
+// PreparedOutputsExist reports whether dir still holds what PrepareCommands
+// makes for layout: the install and the Prisma client. A cached prepare key
+// is only trusted while they exist; something can delete them after it ran.
+func PreparedOutputsExist(dir string, layout Layout) bool {
+	client := "packages/prisma-client/src/generated"
+	if layout == LayoutMonolith {
+		client = "platform/app/src/generated/prisma"
+	}
+	for _, path := range []string{"node_modules/.modules.yaml", client} {
+		if _, err := os.Stat(filepath.Join(dir, path)); err != nil {
+			return false
+		}
+	}
+	return true
+}
