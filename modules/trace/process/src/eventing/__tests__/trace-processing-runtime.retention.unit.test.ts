@@ -8,15 +8,15 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   type TraceProcessingPipelineInput,
-  TraceProcessingPipelineService,
-} from "../trace-processing-pipeline.service.ts";
+  TraceProcessingRuntimeAdapter,
+} from "../trace-processing-runtime.pipeline.ts";
 
 const RETAINED = { traces: 365, scenarios: 30, experiments: 30 };
 
-describe("TraceProcessingPipelineService", () => {
+describe("TraceProcessingRuntimeAdapter", () => {
   describe("given a consuming role", () => {
     /** @scenario "A module's pipeline declares each tenant's retention from data retention" */
     it("declares each tenant's retention as data retention resolves it", async () => {
@@ -25,7 +25,7 @@ describe("TraceProcessingPipelineService", () => {
           getResolvedForProject: async () => RETAINED,
         }),
       });
-      const pipeline = TraceProcessingPipelineService.create({
+      const pipeline = TraceProcessingRuntimeAdapter.create({
         processName: "langwatch-test",
         tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
         peers,
