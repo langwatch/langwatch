@@ -12,7 +12,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
-  SLACK_BOT_TOKEN_KEPT,
   type SlackActionParams,
   type SlackDeliveryMethod,
   type SlackPreview,
@@ -144,14 +143,18 @@ function fromTriggerRow(row: SavedTriggerRow): SlackSlice {
   };
 }
 
-/** The legacy row as it was read, with its hidden token asked to be kept. */
+/** The legacy row as it was read: the server moves the secret it still
+ *  stores into a connection on save (ADR-093 §5a). */
 function legacyWriteBack(
   params: Partial<SlackActionParams>,
 ): Partial<SlackActionParams> {
-  const { slackBotTokenSet, slackBotToken: _hidden, ...rest } = params;
-  return slackBotTokenSet
-    ? { ...rest, slackBotToken: SLACK_BOT_TOKEN_KEPT }
-    : rest;
+  const {
+    slackBotTokenSet: _set,
+    slackBotToken: _token,
+    slackWebhook: _webhook,
+    ...rest
+  } = params;
+  return rest;
 }
 
 function toActionParams(slice: SlackSlice): Partial<SlackActionParams> {
@@ -479,9 +482,7 @@ function templatesFromSlice(slice: SlackSlice) {
 function previewOptions({ slice }: { slice: SlackSlice }): {
   allowGatedBlocks: boolean;
 } {
-  const hasLegacyBotToken = usesLegacySecret(slice)
-    ? slice.legacyParams?.slackBotTokenSet === true
-    : false;
+  const hasLegacyBotToken = usesLegacySecret(slice);
   return {
     allowGatedBlocks:
       slice.deliveryMethod === "bot" &&

@@ -35,6 +35,7 @@ export const registerRedactionProject = (ns: string) => {
   let project: Project | undefined;
 
   const projectId = () => project!.id;
+  const organizationId = () => organization!.id;
 
   const headers = () => ({
     "X-Auth-Token": project!.apiKey,
@@ -117,5 +118,5 @@ export const registerRedactionProject = (ns: string) => {
     }
   });
 
-  return { projectId, headers, storeTrigger, makeWriteBack };
+  return { projectId, organizationId, headers, storeTrigger, makeWriteBack };
 };

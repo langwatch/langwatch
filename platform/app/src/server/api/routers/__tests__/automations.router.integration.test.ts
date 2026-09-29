@@ -19,6 +19,7 @@ import {
   vi,
 } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
+import { encrypt } from "~/utils/encryption";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { globalForApp } from "../../../app-layer/app";
@@ -56,7 +57,14 @@ const {
   mockTriggerSentFindMany,
   mockFeatureFlagIsEnabled,
   mockRateLimit,
+  mockConnectActionParams,
 } = vi.hoisted(() => ({
+  mockConnectActionParams: vi.fn(
+    async ({ actionParams }: { actionParams: Record<string, unknown> }) => ({
+      ...actionParams,
+      slackIntegrationId: actionParams.slackIntegrationId ?? "conn-test",
+    }),
+  ),
   mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
   mockTriggerUpdate: vi.fn(),
   mockTriggerCreate: vi.fn(),
@@ -118,16 +126,12 @@ vi.mock("@ee/audit-log/auditLog", () => ({
 }));
 
 // Slack connections have their own suites; this file pins the router's other
-// rules, so a Slack save passes its params through unchanged here.
+// rules, so a Slack save lands on a stand-in connection here.
 vi.mock(
   "~/server/app-layer/automations/slack-integration/slack-integration.wiring",
   () => ({
     createSlackIntegrationService: () => ({
-      connectActionParams: async ({
-        actionParams,
-      }: {
-        actionParams: Record<string, unknown>;
-      }) => actionParams,
+      connectActionParams: mockConnectActionParams,
       findUsableSecret: async () => null,
     }),
   }),
@@ -429,7 +433,7 @@ describe("automationRouter", () => {
           // Threshold rule is merged into actionParams so the dispatcher
           // sees ONE shape regardless of which creation path was used.
           expect(createArgs.data.actionParams).toMatchObject({
-            slackWebhook: "https://hooks.slack.com/services/abc",
+            slackIntegrationId: "conn-test",
             threshold: 250,
             operator: "gt",
             timePeriod: 60,
@@ -443,7 +447,7 @@ describe("automationRouter", () => {
       });
 
       describe("on create when the saved row carries an encrypted bot token", () => {
-        it("redacts slackBotToken from the mutation response (ADR-041)", async () => {
+        it("returns no slackBotToken and no set flag in the mutation response (ADR-093 §5a)", async () => {
           mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
           mockTriggerCreate.mockResolvedValueOnce({
             id: "trigger_new",
@@ -462,7 +466,7 @@ describe("automationRouter", () => {
           ).toBeUndefined();
           expect(
             (result.actionParams as Record<string, unknown>).slackBotTokenSet,
-          ).toBe(true);
+          ).toBeUndefined();
         });
       });
 
@@ -601,7 +605,7 @@ describe("automationRouter", () => {
         // Same builder-shaped row as the create path: threshold rule merged
         // into actionParams, filters forced to {}, name "Alert: "-prefixed.
         expect(updateArgs.data.actionParams).toMatchObject({
-          slackWebhook: "https://hooks.slack.com/services/abc",
+          slackIntegrationId: "conn-test",
           threshold: 250,
           operator: "gt",
           timePeriod: 60,
@@ -612,6 +616,52 @@ describe("automationRouter", () => {
         expect(updateArgs.data.triggerKind).toBe("ALERT");
         expect(updateArgs.data.alertType).toBe("WARNING");
         expect(updateArgs.data.customGraphId).toBe("graph_1");
+      });
+    });
+
+    describe("when a Slack alert not yet migrated is saved without its token retyped", () => {
+      /** @scenario Saving an automation not yet migrated from the dashboard moves its token into a connection */
+      it("hands the stored token to the connect step and writes no token back", async () => {
+        const token = ["xoxb", "fake", "stored"].join("-");
+        mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+        mockTriggerFindUnique.mockResolvedValue({
+          id: "trigger-legacy",
+          projectId: "proj_123",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          actionParams: {
+            slackDelivery: "bot",
+            slackChannelId: "C0123",
+            slackBotToken: encrypt(token),
+          },
+        });
+        mockTriggerUpdate.mockResolvedValueOnce({
+          id: "trigger-legacy",
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+        });
+
+        try {
+          await caller.upsert({
+            ...baseGraphAlertInput,
+            triggerId: "trigger-legacy",
+            actionParams: { slackDelivery: "bot", slackChannelId: "C0123" },
+          } as any);
+        } finally {
+          mockTriggerFindUnique.mockReset();
+        }
+
+        expect(mockConnectActionParams).toHaveBeenCalledWith(
+          expect.objectContaining({
+            actionParams: expect.objectContaining({ slackBotToken: token }),
+          }),
+        );
+        const saved = mockTriggerUpdate.mock.calls[0]![0].data.actionParams;
+        expect(saved).toMatchObject({
+          slackIntegrationId: "conn-test",
+          slackDelivery: "bot",
+          slackChannelId: "C0123",
+        });
+        expect(saved).not.toHaveProperty("slackBotToken");
+        expect(JSON.stringify(saved)).not.toContain("fake");
       });
     });
 

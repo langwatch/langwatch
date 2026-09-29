@@ -28715,8 +28715,14 @@ type PostApiTriggerSlackJSONBody struct {
 	// Name How the trigger is listed in the app
 	Name string `json:"name"`
 
-	// SlackWebhook Incoming webhook URL the alert is posted to
-	SlackWebhook string `json:"slack_webhook"`
+	// SlackChannelId The channel a bot connection posts in; required with one. Invite the LangWatch app to it first.
+	SlackChannelId *string `json:"slack_channel_id,omitempty"`
+
+	// SlackConnectionId The Slack connection the alert posts through: an organization connection or one of this project's, as `GET /api/slack-connections` and `langwatch slack-connection list` list them. Send this or `slack_webhook`, not both.
+	SlackConnectionId *string `json:"slack_connection_id,omitempty"`
+
+	// SlackWebhook Incoming webhook URL the alert is posted to. It is stored as a Slack connection this project can use (an existing one holding the same URL, else a new project connection). Send this or `slack_connection_id`, not both.
+	SlackWebhook *string `json:"slack_webhook,omitempty"`
 }
 
 // PostApiTriggerSlackJSONBodyAlertType defines parameters for PostApiTriggerSlack.
@@ -29128,6 +29134,20 @@ type PostApiTriggerSlack403JSONResponseBody struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
+// PostApiTriggerSlack422JSONResponseBody defines parameters for PostApiTriggerSlack.
+type PostApiTriggerSlack422JSONResponseBody struct {
+	DocsUrl *string `json:"docsUrl,omitempty"`
+
+	// Error Stable failure code; branch on this
+	Error string `json:"error"`
+
+	// Fault Who the failure is attributable to: customer, platform, provider
+	Fault                *string                `json:"fault,omitempty"`
+	Message              *string                `json:"message,omitempty"`
+	Tips                 *[]string              `json:"tips,omitempty"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
 // GetApiTriggers200JSONResponseBodyAction defines parameters for GetApiTriggers.
 type GetApiTriggers200JSONResponseBodyAction string
 
@@ -29409,7 +29429,7 @@ type PostApiTriggersJSONBody_1_ActionParams struct {
 	// SlackBotToken Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead.
 	SlackBotToken *string `json:"slackBotToken,omitempty"`
 
-	// SlackBotTokenSet Legacy. Read: whether an automation not yet moved to a connection still stores its own bot token. Write: `true` keeps it.
+	// SlackBotTokenSet Legacy and ignored: no read returns it. An update that retypes no secret moves an automation's own stored secret into a connection.
 	SlackBotTokenSet *bool `json:"slackBotTokenSet,omitempty"`
 
 	// SlackChannelId The channel the bot posts in, for a bot connection or `bot` delivery. Invite the LangWatch app to it first.
@@ -30113,7 +30133,7 @@ type GetApiTriggersById200JSONResponseBodyTemplatesSlackTemplateType string
 type PatchApiTriggersByIdJSONBody struct {
 	Action *PatchApiTriggersByIdJSONBodyAction `json:"action,omitempty"`
 
-	// ActionParams Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder (or, for a legacy Slack bot token, the `slackBotTokenSet` flag the read echoes) and the stored credential is kept, so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`.
+	// ActionParams Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder and the stored credential is kept (a Slack automation not yet on a connection has its stored secret moved into one), so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`.
 	ActionParams *PatchApiTriggersByIdJSONBody_ActionParams `json:"actionParams,omitempty"`
 	Active       *bool                                      `json:"active,omitempty"`
 	AlertType    *PatchApiTriggersByIdJSONBodyAlertType     `json:"alertType,omitempty"`
@@ -30172,7 +30192,7 @@ type PatchApiTriggersByIdJSONBodyActionParams1 struct {
 	// SlackBotToken Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead.
 	SlackBotToken *string `json:"slackBotToken,omitempty"`
 
-	// SlackBotTokenSet Legacy. Read: whether an automation not yet moved to a connection still stores its own bot token. Write: `true` keeps it.
+	// SlackBotTokenSet Legacy and ignored: no read returns it. An update that retypes no secret moves an automation's own stored secret into a connection.
 	SlackBotTokenSet *bool `json:"slackBotTokenSet,omitempty"`
 
 	// SlackChannelId The channel the bot posts in, for a bot connection or `bot` delivery. Invite the LangWatch app to it first.
@@ -39447,6 +39467,132 @@ func (a *PostApiTriggerSlack403JSONResponseBody) UnmarshalJSON(b []byte) error {
 
 // Override default JSON handling for PostApiTriggerSlack403JSONResponseBody to handle AdditionalProperties
 func (a PostApiTriggerSlack403JSONResponseBody) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.DocsUrl != nil {
+		object["docsUrl"], err = json.Marshal(a.DocsUrl)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'docsUrl': %w", err)
+		}
+	}
+
+	object["error"], err = json.Marshal(a.Error)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'error': %w", err)
+	}
+
+	if a.Fault != nil {
+		object["fault"], err = json.Marshal(a.Fault)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'fault': %w", err)
+		}
+	}
+
+	if a.Message != nil {
+		object["message"], err = json.Marshal(a.Message)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'message': %w", err)
+		}
+	}
+
+	if a.Tips != nil {
+		object["tips"], err = json.Marshal(a.Tips)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'tips': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for PostApiTriggerSlack422JSONResponseBody. Returns the specified
+// element and whether it was found
+func (a PostApiTriggerSlack422JSONResponseBody) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for PostApiTriggerSlack422JSONResponseBody
+func (a *PostApiTriggerSlack422JSONResponseBody) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for PostApiTriggerSlack422JSONResponseBody to handle AdditionalProperties
+func (a *PostApiTriggerSlack422JSONResponseBody) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["docsUrl"]; found {
+		err = json.Unmarshal(raw, &a.DocsUrl)
+		if err != nil {
+			return fmt.Errorf("error reading 'docsUrl': %w", err)
+		}
+		delete(object, "docsUrl")
+	}
+
+	if raw, found := object["error"]; found {
+		err = json.Unmarshal(raw, &a.Error)
+		if err != nil {
+			return fmt.Errorf("error reading 'error': %w", err)
+		}
+		delete(object, "error")
+	}
+
+	if raw, found := object["fault"]; found {
+		err = json.Unmarshal(raw, &a.Fault)
+		if err != nil {
+			return fmt.Errorf("error reading 'fault': %w", err)
+		}
+		delete(object, "fault")
+	}
+
+	if raw, found := object["message"]; found {
+		err = json.Unmarshal(raw, &a.Message)
+		if err != nil {
+			return fmt.Errorf("error reading 'message': %w", err)
+		}
+		delete(object, "message")
+	}
+
+	if raw, found := object["tips"]; found {
+		err = json.Unmarshal(raw, &a.Tips)
+		if err != nil {
+			return fmt.Errorf("error reading 'tips': %w", err)
+		}
+		delete(object, "tips")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for PostApiTriggerSlack422JSONResponseBody to handle AdditionalProperties
+func (a PostApiTriggerSlack422JSONResponseBody) MarshalJSON() ([]byte, error) {
 	var err error
 	object := make(map[string]json.RawMessage)
 
@@ -117853,6 +117999,7 @@ type PostApiTriggerSlackResponse struct {
 		Message string `json:"message"`
 	}
 	JSON403 *PostApiTriggerSlack403JSONResponseBody
+	JSON422 *PostApiTriggerSlack422JSONResponseBody
 }
 
 // Status returns HTTPResponse.Status
@@ -145348,6 +145495,13 @@ func ParsePostApiTriggerSlackResponse(rsp *http.Response) (*PostApiTriggerSlackR
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest PostApiTriggerSlack422JSONResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
 
 	}
 

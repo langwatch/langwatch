@@ -6,6 +6,7 @@
  */
 import { nanoid } from "nanoid";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { TriggerAction } from "~/generated/prisma/client";
 import {
   decryptWebhookHeaders,
@@ -13,6 +14,7 @@ import {
 } from "~/server/app-layer/automations/providers/webhook/server";
 import { PrismaTriggerRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import { createSlackDestinationResolver } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
+import { slackSecretFingerprint } from "~/server/app-layer/automations/slack-integration/slack-secret-fingerprint";
 import { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import { REDACTED_CREDENTIAL } from "~/server/app-layer/automations/trigger-redaction";
 import { prisma } from "~/server/db";
@@ -41,7 +43,7 @@ import { app } from "../[[...route]]/app";
 
 describe("Feature: delivery credentials survive the REST write paths redacted", () => {
   const ns = `triggers-redaction-write-${nanoid(8)}`;
-  const { projectId, headers, storeTrigger, makeWriteBack } =
+  const { projectId, organizationId, headers, storeTrigger, makeWriteBack } =
     registerRedactionProject(ns);
   const writeBack = makeWriteBack((input, init) => app.request(input, init));
   const slackDestination = createSlackDestinationResolver({ prisma });
@@ -136,12 +138,13 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
       expect(response.status).toBe(200);
       const body = await response.text();
       expect(body).not.toContain(SLACK_WEBHOOK);
-      expect(JSON.parse(body).actionParams.slackWebhook).toBe(
-        REDACTED_CREDENTIAL,
-      );
+      expect(JSON.parse(body).actionParams).toEqual({
+        slackDelivery: "webhook",
+      });
     });
 
-    it("keeps the stored destination when the caller writes the response back", async () => {
+    /** @scenario Writing back what the API read moves a legacy webhook URL into a connection */
+    it("moves the stored URL into a project connection when the caller writes the response back", async () => {
       const stored = await storeTrigger({
         name: `Round trip ${ns}`,
         action: TriggerAction.SEND_SLACK_MESSAGE,
@@ -154,11 +157,24 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
       const response = await writeBack(stored.id);
 
       expect(response.status).toBe(200);
+      const { actionParams } = await prisma.trigger.findUniqueOrThrow({
+        where: { id: stored.id, projectId: projectId() },
+      });
+      expect(actionParams).toEqual({
+        slackDelivery: "webhook",
+        slackIntegrationId: expect.any(String),
+      });
+      const { slackIntegrationId } = z
+        .object({ slackIntegrationId: z.string() })
+        .parse(actionParams);
       expect(
-        await prisma.trigger.findUniqueOrThrow({
-          where: { id: stored.id, projectId: projectId() },
+        await prisma.slackIntegration.findUniqueOrThrow({
+          where: { id: slackIntegrationId },
         }),
-      ).toMatchObject({ actionParams: { slackWebhook: SLACK_WEBHOOK } });
+      ).toMatchObject({ scopeType: "PROJECT", scopeId: projectId() });
+      expect(
+        await slackDestination({ projectId: projectId(), actionParams }),
+      ).toEqual({ kind: "webhook", url: SLACK_WEBHOOK });
     });
 
     /** @scenario "A destination the caller did type is the one that is saved" */
@@ -225,7 +241,25 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
     });
 
     /** @scenario "Writing back a Slack bot connection keeps its saved token" */
-    it("keeps the saved bot token of a Slack bot connection", async () => {
+    it("keeps delivering with the saved bot token of a Slack bot automation, stored on a connection", async () => {
+      // The project already holds the token, so the move reuses that
+      // connection instead of asking Slack about a fixture token.
+      const holder = await prisma.slackIntegration.create({
+        data: {
+          name: `Bot ${ns}`,
+          kind: "BOT",
+          scopeType: "PROJECT",
+          scopeId: projectId(),
+          organizationId: organizationId(),
+          botTokenEncrypted: encrypt(SLACK_BOT_TOKEN),
+          secretFingerprint: slackSecretFingerprint({
+            secret: SLACK_BOT_TOKEN,
+          }),
+          secretHint: SLACK_BOT_TOKEN.slice(-4),
+          createdById: "test",
+          updatedById: "test",
+        },
+      });
       const stored = await storeTrigger({
         name: `Bot round trip ${ns}`,
         action: TriggerAction.SEND_SLACK_MESSAGE,
@@ -239,13 +273,17 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
       const response = await writeBack(stored.id);
 
       expect(response.status).toBe(200);
-      const saved = (
-        await prisma.trigger.findUniqueOrThrow({
-          where: { id: stored.id, projectId: projectId() },
-        })
-      ).actionParams as { slackBotToken: string; slackChannelId: string };
-      expect(decrypt(saved.slackBotToken)).toBe(SLACK_BOT_TOKEN);
-      expect(saved.slackChannelId).toBe("C123");
+      const { actionParams } = await prisma.trigger.findUniqueOrThrow({
+        where: { id: stored.id, projectId: projectId() },
+      });
+      expect(actionParams).toEqual({
+        slackIntegrationId: holder.id,
+        slackDelivery: "bot",
+        slackChannelId: "C123",
+      });
+      expect(
+        await slackDestination({ projectId: projectId(), actionParams }),
+      ).toEqual({ kind: "bot", token: SLACK_BOT_TOKEN, channel: "C123" });
     });
 
     /** @scenario "Leaving a header out of an update removes it" */

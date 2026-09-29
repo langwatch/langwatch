@@ -10,9 +10,9 @@ import {
 } from "../slack-secret-fingerprint";
 
 /**
- * The pure half of `migrateSlackConnections` (ADR-093 §5a): from one
- * organization's Slack automations and connections, decide which connections
- * to create, reuse or widen and which automation points at which.
+ * The pure half of `migrateSlackConnections` (ADR-093 §5a): which connections to
+ * create or reuse, which automation points at which, whose own secret is
+ * cleared. No scope is ever widened.
  */
 
 /** A stored Slack `actionParams`, read leniently: a legacy row may lack any field. */
@@ -22,6 +22,13 @@ const storedSlackParamsSchema = z.object({
   slackBotToken: z.string().nullish(),
   slackIntegrationId: z.string().nullish(),
 });
+
+/** The fields that hold an automation's own Slack secret, or say it has one. */
+export const LEGACY_SLACK_SECRET_FIELDS = [
+  "slackWebhook",
+  "slackBotToken",
+  "slackBotTokenSet",
+] as const;
 
 export type SlackMigrationSkipReason =
   | "archived project"
@@ -69,11 +76,10 @@ export interface CreatedConnection extends ConnectionTarget {
   secretHint: string;
 }
 
-/** An existing connection the plan links to, widened when it must reach more projects. */
+/** An existing connection the plan links to: the project's own, else its organization's. */
 export interface ReusedConnection extends ConnectionTarget {
   action: "reuse";
   connectionId: string;
-  widenedFromProjectId?: string;
 }
 
 export type PlannedConnection = CreatedConnection | ReusedConnection;
@@ -81,6 +87,8 @@ export type PlannedConnection = CreatedConnection | ReusedConnection;
 export interface OrganizationMigrationPlan {
   organizationId: string;
   connections: PlannedConnection[];
+  /** Already on a connection, still storing a secret of their own to clear. */
+  cleared: MigrationAutomation[];
   skipped: SkippedAutomation[];
 }
 
@@ -101,22 +109,43 @@ type Classified =
   | Joined;
 
 interface Group {
+  projectId: string;
   fingerprint: string;
   kind: SlackIntegrationKind;
   secret?: string;
-  /** Every connection holding the secret; the unique index allows one per scope. */
+  /** The connections holding the secret that the project can already use. */
   holders: MigrationConnection[];
   members: MigrationAutomation[];
 }
 
-/** True when the automation already points at a connection: the migration leaves it alone. */
-export function isLinkedToConnection({
+function isLinkedToConnection({
   actionParams,
 }: {
   actionParams: unknown;
 }): boolean {
   const parsed = storedSlackParamsSchema.safeParse(actionParams);
   return parsed.success && !!parsed.data.slackIntegrationId?.trim();
+}
+
+function carriesLegacySecret({
+  actionParams,
+}: {
+  actionParams: unknown;
+}): boolean {
+  if (typeof actionParams !== "object" || actionParams === null) return false;
+  return LEGACY_SLACK_SECRET_FIELDS.some((field) => field in actionParams);
+}
+
+/** True unless the automation points at a connection and stores no secret of its own. */
+export function needsSlackMigration({
+  actionParams,
+}: {
+  actionParams: unknown;
+}): boolean {
+  return (
+    !isLinkedToConnection({ actionParams }) ||
+    carriesLegacySecret({ actionParams })
+  );
 }
 
 /** A tokenless bot posted through its project's §5 row, so it joins that row. */
@@ -189,68 +218,34 @@ function classify({
   return { outcome: "join", kind, secret, fingerprint };
 }
 
-/** The row a group reuses: the organization's, else one in a member's project, else any. */
+/** The row a group reuses: its project's own, else its organization's (the save path's rule). */
 function reusedHolder({
   group,
 }: {
   group: Group;
 }): MigrationConnection | undefined {
-  const projects = new Set(group.members.map((member) => member.projectId));
   return (
     group.holders.find(
-      (holder) => holder.scopeType === SlackIntegrationScopeType.ORGANIZATION,
-    ) ??
-    group.holders.find((holder) => projects.has(holder.scopeId)) ??
-    group.holders[0]
+      (holder) => holder.scopeType === SlackIntegrationScopeType.PROJECT,
+    ) ?? group.holders[0]
   );
-}
-
-/** One project when every member (and the reused row) sits in it, else the organization. */
-function scopeFor({
-  group,
-  existing,
-  organizationId,
-}: {
-  group: Group;
-  existing: MigrationConnection | undefined;
-  organizationId: string;
-}): Pick<ConnectionTarget, "scopeType" | "scopeId"> {
-  if (existing?.scopeType === SlackIntegrationScopeType.ORGANIZATION) {
-    return { scopeType: existing.scopeType, scopeId: organizationId };
-  }
-  const projects = new Set(group.members.map((member) => member.projectId));
-  if (existing) projects.add(existing.scopeId);
-  const [only] = projects;
-  if (projects.size === 1 && only) {
-    return { scopeType: SlackIntegrationScopeType.PROJECT, scopeId: only };
-  }
-  return {
-    scopeType: SlackIntegrationScopeType.ORGANIZATION,
-    scopeId: organizationId,
-  };
 }
 
 function plannedConnectionFor({
   group,
-  organizationId,
 }: {
   group: Group;
-  organizationId: string;
 }): PlannedConnection | undefined {
   const existing = reusedHolder({ group });
-  const scope = scopeFor({ group, existing, organizationId });
   if (existing) {
-    const widened =
-      existing.scopeType === SlackIntegrationScopeType.PROJECT &&
-      scope.scopeType === SlackIntegrationScopeType.ORGANIZATION;
     return {
       action: "reuse",
       connectionId: existing.id,
       name: existing.name,
       kind: existing.kind,
-      ...scope,
+      scopeType: existing.scopeType,
+      scopeId: existing.scopeId,
       members: group.members,
-      ...(widened ? { widenedFromProjectId: existing.scopeId } : {}),
     };
   }
   if (group.secret === undefined) return undefined;
@@ -265,40 +260,52 @@ function plannedConnectionFor({
       secret: group.secret,
     }),
     kind: group.kind,
-    ...scope,
+    scopeType: SlackIntegrationScopeType.PROJECT,
+    scopeId: group.projectId,
     members: group.members,
   };
 }
 
-/** The group for a fingerprint, opened on first sight with the connections already holding it. */
+/**
+ * The group for one project's secret, opened on first sight with the
+ * connections holding it that the project can already use. Another project's
+ * copy is never among them, so it is never borrowed or widened.
+ */
 function groupFor({
   groups,
   connections,
+  projectId,
   joined,
 }: {
   groups: Map<string, Group>;
   connections: MigrationConnection[];
+  projectId: string;
   joined: Joined;
 }): Group {
-  const found = groups.get(joined.fingerprint);
+  const key = `${projectId}\u0000${joined.fingerprint}`;
+  const found = groups.get(key);
   if (found) return found;
   const holders = connections.filter(
-    (connection) => connection.secretFingerprint === joined.fingerprint,
+    (connection) =>
+      connection.secretFingerprint === joined.fingerprint &&
+      (connection.scopeType === SlackIntegrationScopeType.ORGANIZATION ||
+        connection.scopeId === projectId),
   );
   const group: Group = {
+    projectId,
     fingerprint: joined.fingerprint,
     kind: holders[0]?.kind ?? joined.kind,
     holders,
     members: [],
   };
-  groups.set(joined.fingerprint, group);
+  groups.set(key, group);
   return group;
 }
 
 /**
- * Groups one organization's automations by their secret's fingerprint, reusing
- * (never duplicating) a connection that already holds it. A tokenless bot joins
- * its project's bot connection; archived projects and anything unusable are skipped.
+ * Groups one organization's automations by project and secret, reusing a
+ * connection the project can already use that holds it. A tokenless bot joins
+ * its project's bot connection; archived or unusable rows are skipped.
  */
 export function planSlackConnectionMigration({
   organizationId,
@@ -317,6 +324,7 @@ export function planSlackConnectionMigration({
   fingerprintSecret: Fingerprinter;
 }): OrganizationMigrationPlan {
   const groups = new Map<string, Group>();
+  const cleared: MigrationAutomation[] = [];
   const skipped: SkippedAutomation[] = [];
   const archived = new Set(archivedProjectIds);
 
@@ -328,12 +336,20 @@ export function planSlackConnectionMigration({
       decryptSecret,
       fingerprintSecret,
     });
-    if (classified.outcome === "linked") continue;
+    if (classified.outcome === "linked") {
+      if (carriesLegacySecret(automation)) cleared.push(automation);
+      continue;
+    }
     if (classified.outcome === "skip") {
       skipped.push({ automation, reason: classified.reason });
       continue;
     }
-    const group = groupFor({ groups, connections, joined: classified });
+    const group = groupFor({
+      groups,
+      connections,
+      projectId: automation.projectId,
+      joined: classified,
+    });
     if (group.kind !== classified.kind) {
       skipped.push({ automation, reason: "kind conflict" });
       continue;
@@ -344,8 +360,8 @@ export function planSlackConnectionMigration({
 
   const planned = [...groups.values()]
     .filter((group) => group.members.length > 0)
-    .map((group) => plannedConnectionFor({ group, organizationId }))
+    .map((group) => plannedConnectionFor({ group }))
     .filter((connection) => connection !== undefined);
 
-  return { organizationId, connections: planned, skipped };
+  return { organizationId, connections: planned, cleared, skipped };
 }

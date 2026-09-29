@@ -13,7 +13,10 @@ vi.mock("../slack-secret-fingerprint", () => ({
 }));
 
 import type { SlackWorkspaceIdentity } from "../../delivery/slackWebApi";
-import { SlackIntegrationService } from "../slack-integration.service";
+import {
+  SlackIntegrationService,
+  withKeptLegacySlackSecret,
+} from "../slack-integration.service";
 import {
   FakeSlackIntegrationRepository,
   PROJECTS,
@@ -677,6 +680,81 @@ describe("SlackIntegrationService", () => {
         ).resolves.toBe(actionParams);
         expect(repo.rows.size).toBe(0);
       });
+    });
+  });
+});
+
+describe("withKeptLegacySlackSecret", () => {
+  // Built at runtime so no fixture reads as a real credential.
+  const token = ["xoxb", "fake", "kept"].join("-");
+  const url = ["https://hooks.slack.com", "services", "fake"].join("/");
+
+  describe("given a bot row not yet migrated saved without its token", () => {
+    /** @scenario Editing a bot automation without re-entering the token */
+    it("puts the stored token back for the save to move", () => {
+      for (const slackBotToken of [undefined, "", "__kept__", "[redacted]"]) {
+        expect(
+          withKeptLegacySlackSecret({
+            actionParams: {
+              slackDelivery: "bot",
+              slackChannelId: "C1",
+              slackBotToken,
+            },
+            stored: { slackDelivery: "bot", slackBotToken: `enc(${token})` },
+          }),
+        ).toMatchObject({ slackBotToken: token });
+      }
+    });
+  });
+
+  describe("given a webhook row not yet migrated written back as read", () => {
+    it("puts the stored URL back for the save to move", () => {
+      expect(
+        withKeptLegacySlackSecret({
+          actionParams: { slackDelivery: "webhook" },
+          stored: { slackWebhook: url },
+        }),
+      ).toEqual({ slackDelivery: "webhook", slackWebhook: url });
+    });
+  });
+
+  describe("given a save that types its own secret or names a connection", () => {
+    it("leaves the save as it is", () => {
+      const typed = { slackDelivery: "webhook", slackWebhook: `${url}/new` };
+      const named = { slackIntegrationId: "conn-1" };
+      const stored = { slackWebhook: url };
+      expect(withKeptLegacySlackSecret({ actionParams: typed, stored })).toBe(
+        typed,
+      );
+      expect(withKeptLegacySlackSecret({ actionParams: named, stored })).toBe(
+        named,
+      );
+    });
+  });
+
+  describe("given a stored row already on a connection, or none", () => {
+    it("adds nothing", () => {
+      const save = { slackDelivery: "webhook" };
+      for (const stored of [
+        undefined,
+        { slackIntegrationId: "conn-1", slackWebhook: url },
+      ]) {
+        expect(withKeptLegacySlackSecret({ actionParams: save, stored })).toBe(
+          save,
+        );
+      }
+    });
+  });
+
+  describe("given a stored token it cannot read", () => {
+    it("adds nothing, so the save stores no secret", () => {
+      const save = { slackDelivery: "bot", slackChannelId: "C1" };
+      expect(
+        withKeptLegacySlackSecret({
+          actionParams: save,
+          stored: { slackDelivery: "bot", slackBotToken: 42 },
+        }),
+      ).toBe(save);
     });
   });
 });

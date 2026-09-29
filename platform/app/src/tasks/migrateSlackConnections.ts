@@ -1,7 +1,7 @@
 /**
- * One-off (ADR-093 §5a): points every Slack automation without a connection at
- * one holding its secret. `pnpm run task migrateSlackConnections` is a dry run;
- * `--apply` writes, one transaction per organization.
+ * One-off (ADR-093 §5a): points every Slack automation at a connection holding
+ * its secret and clears the secret it stored. `pnpm run task
+ * migrateSlackConnections` is a dry run; `--apply` writes, per organization.
  */
 
 import {
@@ -11,8 +11,9 @@ import {
   TriggerAction,
 } from "~/generated/prisma/client";
 import {
-  isLinkedToConnection,
+  LEGACY_SLACK_SECRET_FIELDS,
   type MigrationAutomation,
+  needsSlackMigration,
   type OrganizationMigrationPlan,
   type PlannedConnection,
   planSlackConnectionMigration,
@@ -74,7 +75,7 @@ function loadSlackAutomations({
   });
 }
 
-/** The organizations holding a Slack automation not yet on a connection, within `scope` when given. */
+/** The organizations holding a Slack automation still to move or clear, within `scope` when given. */
 async function findOrganizationsToMigrate({
   projectOrganizations,
   scope,
@@ -89,7 +90,7 @@ async function findOrganizationsToMigrate({
       projectIds: projectIds.slice(start, start + ID_CHUNK),
     });
     for (const automation of automations) {
-      if (isLinkedToConnection(automation)) continue;
+      if (!needsSlackMigration(automation)) continue;
       const organizationId = projectOrganizations.get(automation.projectId);
       if (organizationId) organizationIds.add(organizationId);
     }
@@ -151,7 +152,7 @@ async function findActorId({
   return admin?.userId ?? MIGRATION_ACTOR_ID;
 }
 
-/** Creates the connection, or widens the reused one when the plan says so; returns its id. */
+/** Creates the connection, or returns the reused one's id as it is. */
 async function storeConnection({
   tx,
   connection,
@@ -163,19 +164,7 @@ async function storeConnection({
   organizationId: string;
   actorId: string;
 }): Promise<string> {
-  if (connection.action === "reuse") {
-    if (connection.widenedFromProjectId) {
-      await tx.slackIntegration.update({
-        where: { id: connection.connectionId, organizationId },
-        data: {
-          scopeType: connection.scopeType,
-          scopeId: connection.scopeId,
-          updatedById: actorId,
-        },
-      });
-    }
-    return connection.connectionId;
-  }
+  if (connection.action === "reuse") return connection.connectionId;
   const isBot = connection.kind === SlackIntegrationKind.BOT;
   const ciphertext = encrypt(connection.secret);
   const created = await tx.slackIntegration.create({
@@ -198,9 +187,9 @@ async function storeConnection({
 }
 
 /**
- * Merges `slackIntegrationId` into the stored settings, keeping every legacy
- * field. Lands only while the settings are exactly what the plan read and carry
- * no connection yet; false means the automation changed underneath the run.
+ * Sets `slackIntegrationId` and drops the legacy secret fields. Lands only while
+ * the settings are exactly what the plan read and carry no connection yet;
+ * false means the automation changed underneath the run.
  */
 async function linkAutomation({
   tx,
@@ -213,7 +202,8 @@ async function linkAutomation({
 }): Promise<boolean> {
   const updated = await tx.$executeRaw`
     UPDATE "Trigger"
-    SET "actionParams" = "actionParams" || jsonb_build_object('slackIntegrationId', ${connectionId}::text),
+    SET "actionParams" = ("actionParams" - ${LEGACY_SLACK_SECRET_FIELDS}::text[])
+          || jsonb_build_object('slackIntegrationId', ${connectionId}::text),
         "updatedAt" = NOW()
     WHERE "id" = ${automation.id}
       AND "projectId" = ${automation.projectId}
@@ -222,34 +212,94 @@ async function linkAutomation({
   return updated === 1;
 }
 
+/** Drops the legacy secret fields of an automation already on a connection, on the same terms. */
+async function clearLegacySecret({
+  tx,
+  automation,
+}: {
+  tx: Transaction;
+  automation: MigrationAutomation;
+}): Promise<boolean> {
+  const updated = await tx.$executeRaw`
+    UPDATE "Trigger"
+    SET "actionParams" = "actionParams" - ${LEGACY_SLACK_SECRET_FIELDS}::text[],
+        "updatedAt" = NOW()
+    WHERE "id" = ${automation.id}
+      AND "projectId" = ${automation.projectId}
+      AND "actionParams" = ${JSON.stringify(automation.actionParams)}::jsonb`;
+  return updated === 1;
+}
+
+/** Stores or reuses each planned connection and links its members; the rest are reported changed. */
+async function linkPlannedMembers({
+  tx,
+  plan,
+  actorId,
+}: {
+  tx: Transaction;
+  plan: OrganizationMigrationPlan;
+  actorId: string;
+}): Promise<{ linkedIds: string[]; changed: SkippedAutomation[] }> {
+  const linkedIds: string[] = [];
+  const changed: SkippedAutomation[] = [];
+  for (const connection of plan.connections) {
+    const connectionId = await storeConnection({
+      tx,
+      connection,
+      organizationId: plan.organizationId,
+      actorId,
+    });
+    for (const automation of connection.members) {
+      if (await linkAutomation({ tx, automation, connectionId })) {
+        linkedIds.push(automation.id);
+      } else {
+        changed.push({ automation, reason: "changed during migration" });
+      }
+    }
+  }
+  return { linkedIds, changed };
+}
+
+/** Clears each already-linked automation's own secret; the rest are reported changed. */
+async function clearPlannedSecrets({
+  tx,
+  plan,
+}: {
+  tx: Transaction;
+  plan: OrganizationMigrationPlan;
+}): Promise<{ clearedIds: string[]; changed: SkippedAutomation[] }> {
+  const clearedIds: string[] = [];
+  const changed: SkippedAutomation[] = [];
+  for (const automation of plan.cleared) {
+    if (await clearLegacySecret({ tx, automation })) {
+      clearedIds.push(automation.id);
+    } else {
+      changed.push({ automation, reason: "changed during migration" });
+    }
+  }
+  return { clearedIds, changed };
+}
+
 /** Writes one organization's plan in one transaction. */
 function applyPlan({
   plan,
 }: {
   plan: OrganizationMigrationPlan;
 }): Promise<OrganizationMigrationOutcome> {
-  const { organizationId } = plan;
   return prisma.$transaction(
     async (tx) => {
-      const actorId = await findActorId({ tx, organizationId });
-      const linkedIds: string[] = [];
-      const changed: SkippedAutomation[] = [];
-      for (const connection of plan.connections) {
-        const connectionId = await storeConnection({
-          tx,
-          connection,
-          organizationId,
-          actorId,
-        });
-        for (const automation of connection.members) {
-          if (await linkAutomation({ tx, automation, connectionId })) {
-            linkedIds.push(automation.id);
-          } else {
-            changed.push({ automation, reason: "changed during migration" });
-          }
-        }
-      }
-      return { plan, linkedIds, skipped: [...plan.skipped, ...changed] };
+      const actorId = await findActorId({
+        tx,
+        organizationId: plan.organizationId,
+      });
+      const linked = await linkPlannedMembers({ tx, plan, actorId });
+      const cleared = await clearPlannedSecrets({ tx, plan });
+      return {
+        plan,
+        linkedIds: linked.linkedIds,
+        clearedIds: cleared.clearedIds,
+        skipped: [...plan.skipped, ...linked.changed, ...cleared.changed],
+      };
     },
     { timeout: 120_000 },
   );

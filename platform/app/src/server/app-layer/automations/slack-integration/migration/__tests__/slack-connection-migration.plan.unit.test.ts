@@ -6,6 +6,7 @@ import {
 import {
   type MigrationAutomation,
   type MigrationConnection,
+  needsSlackMigration,
   planSlackConnectionMigration,
 } from "../slack-connection-migration.plan";
 import {
@@ -158,20 +159,27 @@ describe("planSlackConnectionMigration", () => {
   });
 
   describe("given one secret used in two projects", () => {
-    /** @scenario A secret shared across projects becomes an organization connection */
-    it("plans one organization connection holding both automations", () => {
+    /** @scenario A secret shared across projects becomes one connection per project */
+    it("plans one project connection in each, and no organization connection", () => {
       const first = webhookAutomation({ projectId: "p1" });
       const second = webhookAutomation({ projectId: "p2" });
 
       const result = plan({ automations: [first, second] });
 
-      expect(result.connections).toHaveLength(1);
-      expect(result.connections[0]).toMatchObject({
-        action: "create",
-        scopeType: SlackIntegrationScopeType.ORGANIZATION,
-        scopeId: ORG,
-        members: [first, second],
-      });
+      expect(result.connections).toEqual([
+        expect.objectContaining({
+          action: "create",
+          scopeType: SlackIntegrationScopeType.PROJECT,
+          scopeId: "p1",
+          members: [first],
+        }),
+        expect.objectContaining({
+          action: "create",
+          scopeType: SlackIntegrationScopeType.PROJECT,
+          scopeId: "p2",
+          members: [second],
+        }),
+      ]);
     });
   });
 
@@ -240,7 +248,8 @@ describe("planSlackConnectionMigration", () => {
       ]);
     });
 
-    it("widens it to the organization when another project's automation shares its token", () => {
+    /** @scenario Another project's connection is never widened or borrowed */
+    it("gives another project's automation sharing its token a connection of its own", () => {
       const existing = projectBotConnection({ projectId: "p1" });
       const elsewhere = botAutomation({ projectId: "p2", token: TOKEN });
 
@@ -249,13 +258,14 @@ describe("planSlackConnectionMigration", () => {
         connections: [existing],
       });
 
-      expect(result.connections[0]).toMatchObject({
-        action: "reuse",
-        connectionId: existing.id,
-        scopeType: SlackIntegrationScopeType.ORGANIZATION,
-        scopeId: ORG,
-        widenedFromProjectId: "p1",
-      });
+      expect(result.connections).toEqual([
+        expect.objectContaining({
+          action: "create",
+          scopeType: SlackIntegrationScopeType.PROJECT,
+          scopeId: "p2",
+          members: [elsewhere],
+        }),
+      ]);
     });
 
     it("keeps an organization connection as it is", () => {
@@ -276,10 +286,9 @@ describe("planSlackConnectionMigration", () => {
         scopeType: SlackIntegrationScopeType.ORGANIZATION,
         scopeId: ORG,
       });
-      expect(reused).not.toHaveProperty("widenedFromProjectId");
     });
 
-    it("reuses the organization's row when projects also hold their own copies", () => {
+    it("reuses the project's own row before the organization's, as a save does", () => {
       const shared: MigrationConnection = {
         ...projectBotConnection({ projectId: "p1", id: "org-row" }),
         scopeType: SlackIntegrationScopeType.ORGANIZATION,
@@ -297,10 +306,10 @@ describe("planSlackConnectionMigration", () => {
 
       expect(reused).toMatchObject({
         action: "reuse",
-        connectionId: "org-row",
-        scopeType: SlackIntegrationScopeType.ORGANIZATION,
+        connectionId: "p1-row",
+        scopeType: SlackIntegrationScopeType.PROJECT,
+        scopeId: "p1",
       });
-      expect(reused).not.toHaveProperty("widenedFromProjectId");
     });
 
     it("reuses the copy in its members' project rather than widening another's", () => {
@@ -320,7 +329,6 @@ describe("planSlackConnectionMigration", () => {
         scopeType: SlackIntegrationScopeType.PROJECT,
         scopeId: "p2",
       });
-      expect(reused).not.toHaveProperty("widenedFromProjectId");
     });
 
     it("skips a tokenless bot whose project has two bot connections to choose from", () => {
@@ -343,14 +351,14 @@ describe("planSlackConnectionMigration", () => {
 
   describe("given automations that already point at a connection", () => {
     /** @scenario The migration changes nothing unless applied, and nothing twice */
-    it("plans nothing for them, so a second run creates and links nothing", () => {
+    it("plans nothing for one storing no secret, so a second run changes nothing", () => {
       const linked: MigrationAutomation = {
         id: "done",
         projectId: "p1",
         name: "Already migrated",
         actionParams: {
           slackDelivery: "bot",
-          slackBotToken: `enc1:${TOKEN}`,
+          slackChannelId: "C0123",
           slackIntegrationId: "conn-1",
         },
       };
@@ -360,8 +368,37 @@ describe("planSlackConnectionMigration", () => {
       expect(result).toEqual({
         organizationId: ORG,
         connections: [],
+        cleared: [],
         skipped: [],
       });
+      expect(needsSlackMigration(linked)).toBe(false);
+    });
+
+    /** @scenario The migration clears the secret each automation stored */
+    it("clears the secret one an earlier run linked still stores", () => {
+      const linked: MigrationAutomation = {
+        id: "half-done",
+        projectId: "p1",
+        name: "Linked, secret kept",
+        actionParams: {
+          slackDelivery: "bot",
+          slackBotToken: `enc1:${TOKEN}`,
+          slackIntegrationId: "conn-1",
+        },
+      };
+
+      const result = plan({ automations: [linked] });
+
+      expect(result.connections).toEqual([]);
+      expect(result.cleared).toEqual([linked]);
+      expect(needsSlackMigration(linked)).toBe(true);
+      const lines = formatOrganizationOutcome({
+        outcome: dryRunOutcome({ plan: result }),
+        organizationName: "Acme",
+      });
+      expect(lines).toContain(
+        '  clear   half-done "Linked, secret kept" (project p1)',
+      );
     });
 
     /** @scenario The migration changes nothing unless applied, and nothing twice */
@@ -389,7 +426,7 @@ describe("planSlackConnectionMigration", () => {
       expect(
         formatTally({ tally: tallyOutcomes({ outcomes: [outcome] }) }),
       ).toBe(
-        "Connections created 2, reused 0, widened 0; automations linked 2, skipped 0",
+        "Connections created 2, reused 0; automations linked 2, cleared 0, skipped 0",
       );
     });
   });
@@ -419,7 +456,7 @@ describe("planSlackConnectionMigration", () => {
           tally: tallyOutcomes({ outcomes: [dryRunOutcome({ plan: result })] }),
         }),
       ).toBe(
-        "Connections created 1, reused 0, widened 0; automations linked 1, skipped 1 (cannot decrypt: 1)",
+        "Connections created 1, reused 0; automations linked 1, cleared 0, skipped 1 (cannot decrypt: 1)",
       );
     });
   });
@@ -568,6 +605,7 @@ describe("planSlackConnectionMigration", () => {
   });
 
   describe("given an organization connection already holding the secret", () => {
+    /** @scenario An organization connection holding the secret is reused as it is */
     it("reuses it for members in several projects without renaming, widening or re-storing it", () => {
       const existing: MigrationConnection = {
         id: "org-hook",
@@ -585,17 +623,16 @@ describe("planSlackConnectionMigration", () => {
         connections: [existing],
       });
 
-      expect(result.connections).toEqual([
-        {
-          action: "reuse",
-          connectionId: "org-hook",
-          name: "Company alerts",
-          kind: SlackIntegrationKind.INCOMING_WEBHOOK,
-          scopeType: SlackIntegrationScopeType.ORGANIZATION,
-          scopeId: ORG,
-          members: [first, second],
-        },
-      ]);
+      const reuse = (member: MigrationAutomation) => ({
+        action: "reuse",
+        connectionId: "org-hook",
+        name: "Company alerts",
+        kind: SlackIntegrationKind.INCOMING_WEBHOOK,
+        scopeType: SlackIntegrationScopeType.ORGANIZATION,
+        scopeId: ORG,
+        members: [member],
+      });
+      expect(result.connections).toEqual([reuse(first), reuse(second)]);
     });
   });
 
@@ -622,13 +659,13 @@ describe("planSlackConnectionMigration", () => {
 });
 
 describe("formatOrganizationOutcome", () => {
-  describe("given connections created, reused, widened and automations skipped", () => {
+  describe("given connections created, reused and automations skipped", () => {
     /** @scenario The migration report never prints a secret */
     it("names each connection by its hint and prints no token, URL or ciphertext", () => {
       const bot = botAutomation({ projectId: "p1", token: TOKEN });
       const hook = webhookAutomation({ projectId: "p1" });
-      const widening = botAutomation({
-        projectId: "p2",
+      const reusing = botAutomation({
+        projectId: "p3",
         token: "xoxb-other-77aa",
       });
       const broken: MigrationAutomation = {
@@ -641,7 +678,7 @@ describe("formatOrganizationOutcome", () => {
         },
       };
       const result = plan({
-        automations: [bot, hook, widening, broken],
+        automations: [bot, hook, reusing, broken],
         connections: [
           projectBotConnection({
             projectId: "p3",
@@ -668,7 +705,7 @@ describe("formatOrganizationOutcome", () => {
         '  create  "Slack webhook ••••7c21"  webhook  project p1  1 automation',
       );
       expect(lines).toContain(
-        '  reuse   "Acme workspace" (conn-p3)  bot  organization  1 automation  (widened from project p3)',
+        '  reuse   "Acme workspace" (conn-p3)  bot  project p3  1 automation',
       );
       expect(lines).toContain(
         '  skip    broken "Broken" (project p1): cannot decrypt',
@@ -685,7 +722,7 @@ describe("formatOrganizationOutcome", () => {
         expect(printed).not.toContain(secret);
       }
       expect(tally).toBe(
-        "Connections created 2, reused 1, widened 1; automations linked 3, skipped 1 (cannot decrypt: 1)",
+        "Connections created 2, reused 1; automations linked 3, cleared 0, skipped 1 (cannot decrypt: 1)",
       );
     });
   });
@@ -700,6 +737,7 @@ describe("formatOrganizationOutcome", () => {
         outcome: {
           plan: planned,
           linkedIds: [kept.id],
+          clearedIds: [],
           skipped: [{ automation: edited, reason: "changed during migration" }],
         },
         organizationName: "Acme",

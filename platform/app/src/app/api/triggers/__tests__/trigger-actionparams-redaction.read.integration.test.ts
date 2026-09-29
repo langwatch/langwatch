@@ -84,10 +84,8 @@ describe("Feature: delivery credentials are redacted on the REST read paths", ()
           actionParams: Record<string, unknown>;
         }[];
         const slackRow = listed.find((row) => row.id === slack.id);
-        expect(slackRow?.actionParams).toEqual({
-          slackDelivery: "webhook",
-          slackWebhook: REDACTED_CREDENTIAL,
-        });
+        // Slack carries no credential to hold a place for (ADR-093 §5a).
+        expect(slackRow?.actionParams).toEqual({ slackDelivery: "webhook" });
 
         const endpointRow = listed.find((row) => row.id === endpoint.id);
         // The delivery shape stays readable: the destination and the header
@@ -119,9 +117,9 @@ describe("Feature: delivery credentials are redacted on the REST read paths", ()
         expect(response.status).toBe(200);
         const body = await response.text();
         expect(body).not.toContain(SLACK_WEBHOOK);
-        expect(JSON.parse(body).actionParams.slackWebhook).toBe(
-          REDACTED_CREDENTIAL,
-        );
+        expect(JSON.parse(body).actionParams).toEqual({
+          slackDelivery: "webhook",
+        });
       });
     });
   });

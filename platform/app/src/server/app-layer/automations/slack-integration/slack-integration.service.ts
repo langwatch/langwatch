@@ -613,6 +613,60 @@ export class SlackIntegrationService implements SlackConnectionReader {
   }
 }
 
+/**
+ * A save of a row not yet migrated that types no secret keeps the one the row
+ * stores: it is put back into the payload, in plaintext, so the save moves it
+ * into a connection like a typed one instead of writing it back (ADR-093 §5a).
+ */
+export function withKeptLegacySlackSecret({
+  actionParams,
+  stored,
+}: {
+  actionParams: Record<string, unknown>;
+  stored: unknown;
+}): Record<string, unknown> {
+  const incoming = slackSaveFieldsSchema.safeParse(actionParams);
+  const kept = slackSaveFieldsSchema.safeParse(stored ?? {});
+  if (!incoming.success || !kept.success) return actionParams;
+  if (incoming.data.slackIntegrationId || kept.data.slackIntegrationId) {
+    return actionParams;
+  }
+  const secret = keptLegacySecret({ incoming: incoming.data, kept: kept.data });
+  return secret ? { ...actionParams, ...secret } : actionParams;
+}
+
+type SlackSaveFields = z.infer<typeof slackSaveFieldsSchema>;
+
+/** The stored secret for the save's method, unless the save typed its own. */
+function keptLegacySecret({
+  incoming,
+  kept,
+}: {
+  incoming: SlackSaveFields;
+  kept: SlackSaveFields;
+}): { slackBotToken: string } | { slackWebhook: string } | null {
+  if (incoming.slackDelivery === "bot") {
+    if (freshSecret(incoming.slackBotToken)) return null;
+    const token = decryptedLegacyToken(kept.slackBotToken);
+    return token ? { slackBotToken: token } : null;
+  }
+  if (freshSecret(incoming.slackWebhook)) return null;
+  const url = freshSecret(kept.slackWebhook);
+  return url ? { slackWebhook: url } : null;
+}
+
+/** A stored token that cannot be decrypted is no secret: the save keeps none. */
+function decryptedLegacyToken(
+  ciphertext: string | null | undefined,
+): string | null {
+  if (!ciphertext) return null;
+  try {
+    return freshSecret(decrypt(ciphertext));
+  } catch {
+    return null;
+  }
+}
+
 function slackChannelRequired(): InvalidActionParamsError {
   return new InvalidActionParamsError(
     "A Slack channel is required for a bot connection.",

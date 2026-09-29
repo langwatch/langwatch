@@ -82,10 +82,10 @@ Feature: Automations over the public API
   Rule: Writing the read response back keeps the stored credential
 
     An integrator reads an automation, changes one thing and writes the whole
-    object back. Every credential in that payload is the placeholder, or — for
-    a stored Slack bot token — the flag saying one is set. Each of them means
-    "keep what is stored", whichever channel it belongs to and whether the
-    value is held as it was given or encrypted at rest.
+    object back. Every credential in that payload is the placeholder, and it
+    means "keep what is stored". A Slack automation reads back as its
+    connection and carries no credential at all; one not yet migrated has its
+    stored secret moved into a connection by that write (slack-connections.feature).
 
     @integration
     Scenario: An integrator writes the read response back and the stored credential survives
@@ -415,6 +415,56 @@ Feature: Automations over the public API
       Given the API returns an automation with redacted delivery credentials
       When a user runs the trigger read command
       Then the machine output carries exactly the fields the API returned
+
+  Rule: The narrow Slack alert endpoint takes a connection as well as a webhook URL
+
+    `POST /api/trigger/slack` predates `/api/triggers` and stays for callers
+    written against it. It takes exactly one destination: a webhook URL, which
+    is stored as a connection, or the id of a connection the project can use.
+
+    @integration
+    Scenario: A Slack alert is created through a webhook connection
+      Given a webhook Slack connection this project can use
+      When a Slack alert is created through the narrow endpoint naming that connection
+      Then the automation points at that connection and stores no secret
+
+    @integration
+    Scenario: A Slack alert is created through a bot connection and a channel
+      Given a bot Slack connection this project can use
+      When a Slack alert is created through the narrow endpoint naming that connection and a channel
+      Then the automation points at that connection and posts to that channel
+
+    @integration
+    Scenario: A Slack alert through a bot connection needs a channel
+      Given a bot Slack connection this project can use
+      When a Slack alert is created through the narrow endpoint naming that connection and no channel
+      Then the save is refused as an unusable delivery configuration
+      And no automation is created
+
+    @integration
+    Scenario: A Slack alert with a webhook URL is stored as a connection
+      When a Slack alert is created through the narrow endpoint with a webhook URL
+      Then the automation points at a connection this project can use holding that URL
+      And stores no secret of its own
+
+    @integration
+    Scenario: A Slack alert naming no destination is refused
+      When a Slack alert is created through the narrow endpoint with neither a webhook URL nor a connection
+      Then the request is refused as invalid
+      And no automation is created
+
+    @integration
+    Scenario: A Slack alert naming two destinations is refused
+      When a Slack alert is created through the narrow endpoint with both a webhook URL and a connection
+      Then the request is refused as invalid
+      And no automation is created
+
+    @integration
+    Scenario: A Slack alert naming a connection the project cannot use is refused
+      Given a Slack connection scoped to another project of the same organization
+      When a Slack alert is created through the narrow endpoint naming that connection, or an unknown one
+      Then the save is refused with the integration-missing code
+      And no automation is created
 
   Rule: Slack connections are listed by name, never by secret
 

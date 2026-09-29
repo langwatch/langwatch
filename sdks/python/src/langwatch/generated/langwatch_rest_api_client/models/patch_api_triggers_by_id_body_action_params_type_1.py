@@ -35,8 +35,8 @@ class PatchApiTriggersByIdBodyActionParamsType1:
             slack_bot_token (str | Unset): Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored
                 as a Slack connection (an existing one holding the same token, else a new project connection) and never reads
                 back. Send `slackIntegrationId` instead.
-            slack_bot_token_set (bool | Unset): Legacy. Read: whether an automation not yet moved to a connection still
-                stores its own bot token. Write: `true` keeps it.
+            slack_bot_token_set (bool | Unset): Legacy and ignored: no read returns it. An update that retypes no secret
+                moves an automation's own stored secret into a connection.
     """
 
     slack_integration_id: str | Unset = UNSET

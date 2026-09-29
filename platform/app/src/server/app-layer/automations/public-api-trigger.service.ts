@@ -60,7 +60,10 @@ import type {
   TriggerFirePage,
 } from "./repositories/trigger-fire-history.repository";
 import { findSlackDestination } from "./slack-integration/slack-destination-resolver";
-import type { SlackIntegrationService } from "./slack-integration/slack-integration.service";
+import {
+  type SlackIntegrationService,
+  withKeptLegacySlackSecret,
+} from "./slack-integration/slack-integration.service";
 import type { TriggerService } from "./trigger.service";
 import type { TriggerFilterValidationService } from "./trigger-filter-validation.service";
 import type { TriggerFireHistoryService } from "./trigger-fire-history.service";
@@ -575,6 +578,7 @@ export class PublicApiTriggerService {
               projectId,
               actorId,
               actionParams: input.actionParams,
+              stored: stored.actionParams,
             })),
             ...(rule ?? {}),
           },
@@ -763,23 +767,32 @@ export class PublicApiTriggerService {
     }
   }
 
-  /** Point Slack params at a connection before the provider persists them. */
+  /**
+   * Point Slack params at a connection before the provider persists them. On
+   * an update, a secret the row still stores and the caller did not retype is
+   * moved into a connection too, never written back (ADR-093 §5a).
+   */
   private async connectSlackParams({
     action,
     projectId,
     actorId,
     actionParams,
+    stored,
   }: {
     action: TriggerAction;
     projectId: string;
     actorId: string;
     actionParams: Record<string, unknown>;
+    stored?: unknown;
   }): Promise<Record<string, unknown>> {
     if (action !== TriggerAction.SEND_SLACK_MESSAGE) return actionParams;
     return this.deps.slackConnections.connectActionParams({
       projectId,
       actorId,
-      actionParams,
+      actionParams:
+        stored === undefined
+          ? actionParams
+          : withKeptLegacySlackSecret({ actionParams, stored }),
     });
   }
 

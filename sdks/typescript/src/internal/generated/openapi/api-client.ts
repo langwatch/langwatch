@@ -1951,7 +1951,7 @@ export interface paths {
         put?: never;
         /**
          * Create a Slack alert trigger
-         * @description Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
+         * @description Create a trigger that posts to Slack when traces match its filters, through a Slack connection (`slack_connection_id`, plus `slack_channel_id` for a bot) or an incoming webhook URL (`slack_webhook`), which is stored as a connection. The trigger stores no secret of its own. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
          */
         post: operations["postApiTriggerSlack"];
         delete?: never;
@@ -14113,9 +14113,13 @@ export interface operations {
                 "application/json": {
                     /**
                      * Format: uri
-                     * @description Incoming webhook URL the alert is posted to
+                     * @description Incoming webhook URL the alert is posted to. It is stored as a Slack connection this project can use (an existing one holding the same URL, else a new project connection). Send this or `slack_connection_id`, not both.
                      */
-                    slack_webhook: string;
+                    slack_webhook?: string;
+                    /** @description The Slack connection the alert posts through: an organization connection or one of this project's, as `GET /api/slack-connections` and `langwatch slack-connection list` list them. Send this or `slack_webhook`, not both. */
+                    slack_connection_id?: string;
+                    /** @description The channel a bot connection posts in; required with one. Invite the LangWatch app to it first. */
+                    slack_channel_id?: string;
                     /** @description How the trigger is listed in the app */
                     name: string;
                     /** @description Extra line included with each alert */
@@ -14368,6 +14372,25 @@ export interface operations {
             };
             /** @description The API key lacks triggers:manage */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description The connection is not one this project can use (`slack_integration_missing`), or a bot connection was named without `slack_channel_id` (`invalid_action_params`) */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -32583,7 +32606,7 @@ export interface operations {
                         slackChannelId?: string;
                         /** @description Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead. */
                         slackBotToken?: string;
-                        /** @description Legacy. Read: whether an automation not yet moved to a connection still stores its own bot token. Write: `true` keeps it. */
+                        /** @description Legacy and ignored: no read returns it. An update that retypes no secret moves an automation's own stored secret into a connection. */
                         slackBotTokenSet?: boolean;
                     } & {
                         [key: string]: unknown;
@@ -33321,7 +33344,7 @@ export interface operations {
                     filterQuery?: string | null;
                     /** @enum {string} */
                     action?: "SEND_EMAIL" | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
-                    /** @description Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder (or, for a legacy Slack bot token, the `slackBotTokenSet` flag the read echoes) and the stored credential is kept, so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`. */
+                    /** @description Replaces the delivery configuration as a whole rather than merging into it: send the fields this automation should have from now on, and anything left out is removed — omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one exception is a credential the read hid: send back the `[redacted]` placeholder and the stored credential is kept (a Slack automation not yet on a connection has its stored secret moved into one), so reading an automation, changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`. */
                     actionParams?: ({
                         /** @description Who receives the email. Any address, not only teammates. */
                         members: string[];
@@ -33341,7 +33364,7 @@ export interface operations {
                         slackChannelId?: string;
                         /** @description Legacy, accepted for one release: a bot token, for `bot` delivery. It is stored as a Slack connection (an existing one holding the same token, else a new project connection) and never reads back. Send `slackIntegrationId` instead. */
                         slackBotToken?: string;
-                        /** @description Legacy. Read: whether an automation not yet moved to a connection still stores its own bot token. Write: `true` keeps it. */
+                        /** @description Legacy and ignored: no read returns it. An update that retypes no secret moves an automation's own stored secret into a connection. */
                         slackBotTokenSet?: boolean;
                     } & {
                         [key: string]: unknown;

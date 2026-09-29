@@ -5966,6 +5966,7 @@ from .post_api_trigger_slack_response_400 import PostApiTriggerSlackResponse400
 from .post_api_trigger_slack_response_400_errors_item import PostApiTriggerSlackResponse400ErrorsItem
 from .post_api_trigger_slack_response_401 import PostApiTriggerSlackResponse401
 from .post_api_trigger_slack_response_403 import PostApiTriggerSlackResponse403
+from .post_api_trigger_slack_response_422 import PostApiTriggerSlackResponse422
 from .post_api_triggers_body_type_0 import PostApiTriggersBodyType0
 from .post_api_triggers_body_type_0_action_params import PostApiTriggersBodyType0ActionParams
 from .post_api_triggers_body_type_0_alert_type import PostApiTriggersBodyType0AlertType
@@ -10716,6 +10717,7 @@ __all__ = (
     "PostApiTriggerSlackResponse400ErrorsItem",
     "PostApiTriggerSlackResponse401",
     "PostApiTriggerSlackResponse403",
+    "PostApiTriggerSlackResponse422",
     "PostApiTriggersResponse201",
     "PostApiTriggersResponse201Action",
     "PostApiTriggersResponse201ActionParams",

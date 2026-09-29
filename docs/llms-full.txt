@@ -72232,7 +72232,9 @@ A `SEND_SLACK_MESSAGE` automation posts through a Slack connection, named by `ac
 Reading the automation back returns `slackIntegrationId` and never a token or URL. A connection that is deleted, or that belongs to another project, fails delivery with `slack_integration_missing`.
 
 <Note>
-For one release the API still accepts the legacy fields: `slackWebhook` (an incoming webhook URL, with `slackDelivery` absent or `"webhook"`) or `slackBotToken` with `slackChannelId` (with `slackDelivery: "bot"`). The server stores the secret as a connection, reusing the organization's connection that already holds it or creating a project connection, and the automation keeps only that connection's id. Send `slackIntegrationId` in new integrations.
+For one release the API still accepts the legacy fields: `slackWebhook` (an incoming webhook URL, with `slackDelivery` absent or `"webhook"`) or `slackBotToken` with `slackChannelId` (with `slackDelivery: "bot"`). The server stores the secret as a connection, reusing a connection this project can already use that holds it (its own, else its organization's) or creating a project connection, and the automation keeps only that connection's id. An automation saved before connections existed has its stored secret moved into a connection the same way the next time it is updated. Send `slackIntegrationId` in new integrations.
+
+The older [`POST /api/trigger/slack`](/api-reference/triggers/create-a-slack-alert-trigger) takes exactly one destination: `slack_connection_id` (plus `slack_channel_id` for a bot connection), or `slack_webhook`, which is stored as a connection in the same way.
 </Note>
 
 ## Alerts on a graph

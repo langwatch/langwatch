@@ -209,6 +209,44 @@ Feature: Slack connections
       And no connection's scope is changed
       And the automation points at it and stores no secret of its own
 
+  Rule: No save writes a Slack secret onto an automation
+
+    An automation not yet migrated still holds its own secret. Saving it moves
+    that secret into a connection rather than writing it back, so the only
+    rows that ever carry one are rows nobody has saved since.
+
+    @integration
+    Scenario: Saving an automation not yet migrated from the dashboard moves its token into a connection
+      Given an automation with no connection that still stores its own bot token
+      When the user saves it from the dashboard without retyping the token
+      Then it points at a connection of this project holding that token
+      And it stores no token of its own
+      And it still delivers with that token
+
+    @integration
+    Scenario: Writing back what the API read moves a legacy webhook URL into a connection
+      Given an automation with no connection that still stores its own webhook URL
+      When the integrator reads it over the API and writes the response back unchanged
+      Then it points at a connection of this project holding that URL
+      And it stores no URL of its own
+      And it still delivers to that URL
+
+    @unit
+    Scenario: A save with no connection stores no secret
+      Given a Slack save that names no connection
+      When its delivery configuration is prepared for storage
+      Then no bot token, webhook URL or token-set flag is kept
+
+  Rule: A read returns a Slack automation's connection, never a secret
+
+    @unit
+    Scenario: Reading an automation returns only its connection, method and channel
+      Given an automation not yet migrated that stores its own bot token and webhook URL
+      When it is read by the dashboard or the API
+      Then its Slack settings carry only the connection id, delivery method and channel
+      And no token, webhook URL, ciphertext or token-set flag appears
+      And the rule a graph alert or report fires by is returned as stored
+
   Rule: One migration moves every automation's secret into connections
 
     @integration
@@ -220,11 +258,12 @@ Feature: Slack connections
       And each automation points at the connection holding its secret
 
     @integration
-    Scenario: A secret shared across projects becomes an organization connection
+    Scenario: A secret shared across projects becomes one connection per project
       Given automations in two projects with the same webhook URL
       When the Slack connection migration runs with apply
-      Then one organization connection holds that URL
-      And both automations point at it
+      Then each project has its own project connection holding that URL
+      And no organization connection is created
+      And each automation points at its own project's connection
 
     @integration
     Scenario: A project's existing connection absorbs matching automations
@@ -249,12 +288,22 @@ Feature: Slack connections
       Then that automation is reported as skipped and left unchanged
 
     @integration
-    Scenario: A project connection shared with another project widens to the organization
+    Scenario: Another project's connection is never widened or borrowed
       Given a project whose Slack integration was set up before this change
       And an automation in another project with the same token
       When the Slack connection migration runs with apply
-      Then that connection becomes an organization connection, keeping its name and secret
-      And both automations point at it
+      Then that connection keeps its project scope
+      And the other project's automation points at a new connection of its own project
+
+    @integration
+    Scenario: The migration clears the secret each automation stored
+      Given automations that still store their own bot token or webhook URL
+      And an automation an earlier run pointed at a connection that still stores its own token
+      When the Slack connection migration runs with apply
+      Then every one of them points at a connection
+      And none stores a bot token, webhook URL or token-set flag
+      When it runs with apply again
+      Then nothing changes
 
     @integration
     Scenario: An organization connection holding the secret is reused as it is
@@ -266,7 +315,7 @@ Feature: Slack connections
 
     @integration
     Scenario: Automations the migration must not touch are left unchanged
-      Given a deleted automation, an automation in an archived project and an automation already pointing at a connection
+      Given a deleted automation, an automation in an archived project and an automation already pointing at a connection with no secret of its own
       When the Slack connection migration runs with apply
       Then none of them changes
       And no connection is created for them

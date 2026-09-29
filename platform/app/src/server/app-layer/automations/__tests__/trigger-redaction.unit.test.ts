@@ -16,21 +16,19 @@ const SIGNING_SECRET = "whsec-abcdefghijklmnopqrstuvwxyz";
 
 describe("redactTriggerForPublicApi", () => {
   describe("given a Slack automation", () => {
-    it("replaces the incoming webhook URL with the placeholder", () => {
+    /** @scenario Reading an automation returns only its connection, method and channel */
+    it("returns no webhook URL at all, not even as a placeholder", () => {
       const redacted = redactTriggerForPublicApi({
         action: TriggerAction.SEND_SLACK_MESSAGE,
         actionParams: { slackDelivery: "webhook", slackWebhook: SLACK_WEBHOOK },
       });
 
-      expect(redacted.actionParams).toEqual({
-        slackDelivery: "webhook",
-        slackWebhook: REDACTED_CREDENTIAL,
-      });
+      expect(redacted.actionParams).toEqual({ slackDelivery: "webhook" });
       expect(JSON.stringify(redacted)).not.toContain("hooks.slack.com");
     });
 
     /** @scenario "The bot token is protected at rest" */
-    it("keeps the stored bot token out and reports that one is set", () => {
+    it("returns no bot token and no flag saying one is stored", () => {
       const redacted = redactTriggerForPublicApi({
         action: TriggerAction.SEND_SLACK_MESSAGE,
         actionParams: {
@@ -43,7 +41,6 @@ describe("redactTriggerForPublicApi", () => {
       expect(redacted.actionParams).toEqual({
         slackDelivery: "bot",
         slackChannelId: "C123",
-        slackBotTokenSet: true,
       });
     });
   });
@@ -168,16 +165,13 @@ describe("redactTriggerForPublicApi", () => {
 describe("redactTriggerForRead", () => {
   describe("given a Slack automation the dashboard is about to edit", () => {
     /** @scenario "The bot token is protected at rest" */
-    it("keeps the fields the composer round-trips and drops the token", () => {
+    it("returns the method the composer round-trips and no secret", () => {
       const redacted = redactTriggerForRead({
         action: TriggerAction.SEND_SLACK_MESSAGE,
         actionParams: { slackWebhook: SLACK_WEBHOOK, slackBotToken: "cipher" },
       });
 
-      expect(redacted.actionParams).toEqual({
-        slackWebhook: SLACK_WEBHOOK,
-        slackBotTokenSet: true,
-      });
+      expect(redacted.actionParams).toEqual({ slackDelivery: "webhook" });
     });
   });
 });
@@ -211,59 +205,24 @@ describe("persistPublicApiActionParams", () => {
     });
   });
 
-  describe("given the read response written back for a Slack bot connection", () => {
-    it("keeps the stored bot token", async () => {
-      const stored = {
-        slackDelivery: "bot",
-        slackChannelId: "C123",
-        slackBotToken: encrypt("xoxb-000000000000-abcdefghijkl"),
-      };
-      const read = redactTriggerForPublicApi({
+  describe("given a Slack save that names no connection", () => {
+    /** @scenario A save with no connection stores no secret */
+    it("stores neither the typed nor the stored secret", async () => {
+      const saved = await persistPublicApiActionParams({
         action: TriggerAction.SEND_SLACK_MESSAGE,
-        actionParams: stored,
+        incoming: {
+          slackDelivery: "bot",
+          slackChannelId: "C123",
+          slackBotToken: REDACTED_CREDENTIAL,
+        },
+        stored: {
+          slackDelivery: "bot",
+          slackChannelId: "C123",
+          slackBotToken: encrypt("stored-bot-token"),
+        },
       });
 
-      const saved = (await persistPublicApiActionParams({
-        action: TriggerAction.SEND_SLACK_MESSAGE,
-        incoming: read.actionParams,
-        stored,
-      })) as { slackBotToken: string };
-
-      expect(decrypt(saved.slackBotToken)).toBe(
-        "xoxb-000000000000-abcdefghijkl",
-      );
-    });
-  });
-
-  describe("given the read response written back for a Slack incoming webhook", () => {
-    it("keeps the stored webhook URL", async () => {
-      const stored = { slackDelivery: "webhook", slackWebhook: SLACK_WEBHOOK };
-      const read = redactTriggerForPublicApi({
-        action: TriggerAction.SEND_SLACK_MESSAGE,
-        actionParams: stored,
-      });
-
-      expect(
-        await persistPublicApiActionParams({
-          action: TriggerAction.SEND_SLACK_MESSAGE,
-          incoming: read.actionParams,
-          stored,
-        }),
-      ).toEqual(stored);
-    });
-  });
-
-  describe("given a destination the caller typed", () => {
-    it("saves what the caller typed", async () => {
-      const typed = "https://hooks.slack.com/services/T1/B1/typed";
-
-      expect(
-        await persistPublicApiActionParams({
-          action: TriggerAction.SEND_SLACK_MESSAGE,
-          incoming: { slackDelivery: "webhook", slackWebhook: typed },
-          stored: { slackDelivery: "webhook", slackWebhook: SLACK_WEBHOOK },
-        }),
-      ).toEqual({ slackDelivery: "webhook", slackWebhook: typed });
+      expect(saved).toEqual({ slackDelivery: "bot", slackChannelId: "C123" });
     });
   });
 
@@ -316,11 +275,7 @@ describe("persistPublicApiActionParams", () => {
             ...rule,
           },
         }),
-      ).toEqual({
-        ...rule,
-        slackDelivery: "webhook",
-        slackWebhook: SLACK_WEBHOOK,
-      });
+      ).toEqual({ ...rule, slackDelivery: "webhook" });
     });
 
     it("still lets the channel drop a credential from another delivery method", async () => {

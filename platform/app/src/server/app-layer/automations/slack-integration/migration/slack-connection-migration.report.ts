@@ -13,18 +13,20 @@ import type {
 export interface OrganizationMigrationOutcome {
   plan: OrganizationMigrationPlan;
   linkedIds: string[];
+  /** Already on a connection; their own secret was (or would be) cleared. */
+  clearedIds: string[];
   skipped: SkippedAutomation[];
 }
 
 export interface SlackMigrationTally {
   created: number;
   reused: number;
-  widened: number;
   linked: number;
+  cleared: number;
   skipped: Partial<Record<SlackMigrationSkipReason, number>>;
 }
 
-/** A dry run's outcome: every planned member would be linked. */
+/** A dry run's outcome: every planned member would be linked, every stale secret cleared. */
 export function dryRunOutcome({
   plan,
 }: {
@@ -35,23 +37,9 @@ export function dryRunOutcome({
     linkedIds: plan.connections.flatMap((connection) =>
       connection.members.map((member) => member.id),
     ),
+    clearedIds: plan.cleared.map((automation) => automation.id),
     skipped: plan.skipped,
   };
-}
-
-function countConnection({
-  tally,
-  connection,
-}: {
-  tally: SlackMigrationTally;
-  connection: PlannedConnection;
-}): void {
-  if (connection.action === "create") {
-    tally.created += 1;
-    return;
-  }
-  tally.reused += 1;
-  if (connection.widenedFromProjectId) tally.widened += 1;
 }
 
 export function tallyOutcomes({
@@ -62,15 +50,17 @@ export function tallyOutcomes({
   const tally: SlackMigrationTally = {
     created: 0,
     reused: 0,
-    widened: 0,
     linked: 0,
+    cleared: 0,
     skipped: {},
   };
-  for (const { plan, linkedIds, skipped } of outcomes) {
+  for (const { plan, linkedIds, clearedIds, skipped } of outcomes) {
     for (const connection of plan.connections) {
-      countConnection({ tally, connection });
+      if (connection.action === "create") tally.created += 1;
+      else tally.reused += 1;
     }
     tally.linked += linkedIds.length;
+    tally.cleared += clearedIds.length;
     for (const { reason } of skipped) {
       tally.skipped[reason] = (tally.skipped[reason] ?? 0) + 1;
     }
@@ -93,10 +83,7 @@ function connectionLine({
   if (connection.action === "create") {
     return `  create  "${connection.name}"  ${kind}  ${scope}  ${count}`;
   }
-  const widened = connection.widenedFromProjectId
-    ? `  (widened from project ${connection.widenedFromProjectId})`
-    : "";
-  return `  reuse   "${connection.name}" (${connection.connectionId})  ${kind}  ${scope}  ${count}${widened}`;
+  return `  reuse   "${connection.name}" (${connection.connectionId})  ${kind}  ${scope}  ${count}`;
 }
 
 /** The per-organization block: each connection, the automations it links, then the skips. */
@@ -119,6 +106,13 @@ export function formatOrganizationOutcome({
       );
     }
   }
+  const cleared = new Set(outcome.clearedIds);
+  for (const automation of outcome.plan.cleared) {
+    if (!cleared.has(automation.id)) continue;
+    lines.push(
+      `  clear   ${automation.id} "${automation.name}" (project ${automation.projectId})`,
+    );
+  }
   for (const { automation, reason } of outcome.skipped) {
     lines.push(
       `  skip    ${automation.id} "${automation.name}" (project ${automation.projectId}): ${reason}`,
@@ -136,5 +130,5 @@ export function formatTally({ tally }: { tally: SlackMigrationTally }): string {
     0,
   );
   const skipped = reasons ? `${skippedTotal} (${reasons})` : "0";
-  return `Connections created ${tally.created}, reused ${tally.reused}, widened ${tally.widened}; automations linked ${tally.linked}, skipped ${skipped}`;
+  return `Connections created ${tally.created}, reused ${tally.reused}; automations linked ${tally.linked}, cleared ${tally.cleared}, skipped ${skipped}`;
 }

@@ -131,8 +131,8 @@ const slackActionParamsSchema = z
       .boolean()
       .optional()
       .describe(
-        "Legacy. Read: whether an automation not yet moved to a connection " +
-          "still stores its own bot token. Write: `true` keeps it.",
+        "Legacy and ignored: no read returns it. An update that retypes no " +
+          "secret moves an automation's own stored secret into a connection.",
       ),
   })
   .passthrough()
@@ -414,9 +414,9 @@ const updateTriggerSchema = z.object({
         "and anything left out is removed — omit `headers` and it delivers " +
         "with none, omit `signingSecret` and its deliveries are no longer " +
         "signed. The one exception is a credential the read hid: send back " +
-        "the `[redacted]` placeholder (or, for a legacy Slack bot token, the " +
-        "`slackBotTokenSet` flag the read echoes) and the stored credential " +
-        "is kept, so reading an automation, changing one field and writing " +
+        "the `[redacted]` placeholder and the stored credential is kept (a " +
+        "Slack automation not yet on a connection has its stored secret " +
+        "moved into one), so reading an automation, changing one field and writing " +
         "the whole object back is safe. Only this channel's fields are " +
         "accepted; anything else is refused rather than dropped, and the " +
         "rule this automation fires by belongs in `graphAlert` or `report`.",

@@ -1,10 +1,7 @@
 import { annotationQueueActionParamsSchema } from "@langwatch/automations/providers/annotationQueue";
 import { datasetActionParamsSchema } from "@langwatch/automations/providers/dataset";
 import { emailActionParamsSchema } from "@langwatch/automations/providers/email";
-import {
-  SLACK_BOT_TOKEN_KEPT,
-  slackActionParamsSchema,
-} from "@langwatch/automations/providers/slack";
+import { slackActionParamsSchema } from "@langwatch/automations/providers/slack";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import { describe, expect, it } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
@@ -237,22 +234,19 @@ describe("provider slice round trips", () => {
       });
     });
 
-    describe("when a redacted legacy bot row is read and written back", () => {
-      it("asks the server to keep the token it never sent", () => {
-        // The server strips the token and echoes a "set" flag before the row
-        // reaches the browser (see `redactSlackActionParams`).
+    describe("when a legacy bot row is read and written back", () => {
+      it("writes back its method and channel, and the server moves the token it stores", () => {
+        // The read returns no token (see `readableSlackActionParams`).
         const slice = client.fromTriggerRow(
           rowFrom(TriggerAction.SEND_SLACK_MESSAGE, {
             slackDelivery: "bot",
             slackChannelId: "C0123",
-            slackBotTokenSet: true,
           }),
         ) as SlackSlice;
 
         expect(client.toActionParams(slice)).toEqual({
           slackDelivery: "bot",
           slackChannelId: "C0123",
-          slackBotToken: SLACK_BOT_TOKEN_KEPT,
         });
       });
     });

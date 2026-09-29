@@ -90,7 +90,7 @@ Feature: Slack delivery
     Scenario: Editing a bot automation without re-entering the token
       Given a saved legacy Slack automation with its own bot token
       When the author edits it and leaves the token blank
-      Then the existing token is kept
+      Then the existing token is kept, moved into a connection rather than written back
 
   Rule: The composer asks only for what the author owns
 

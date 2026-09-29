@@ -1,7 +1,7 @@
 /**
  * One organization's migration against real rows, scoped to its own tenant:
- * one connection per secret, legacy fields kept, rows it must not touch, no
- * second write, and the race with a concurrent run or edit.
+ * one connection per project and secret, legacy fields cleared, rows it must
+ * not touch, no second write, and the race with a concurrent run or edit.
  */
 
 import { nanoid } from "nanoid";
@@ -35,6 +35,17 @@ const TOKEN = "xoxb-migration-test-token-a1b2";
 const WEBHOOK = "https://hooks.slack.com/services/T0/B0/migrationtest9z8y";
 
 const linkedParams = z.object({ slackIntegrationId: z.string() });
+
+/** What an automation stores once migrated: its settings less its own secret. */
+const withoutSecret = (params: Record<string, unknown>) => {
+  const {
+    slackWebhook: _webhook,
+    slackBotToken: _token,
+    slackBotTokenSet: _set,
+    ...rest
+  } = params;
+  return rest;
+};
 
 describe("migrateSlackConnections", () => {
   let tenant: SlackMigrationTenant | undefined;
@@ -113,19 +124,20 @@ describe("migrateSlackConnections", () => {
     expect(decrypt(hook?.webhookUrlEncrypted ?? "")).toBe(WEBHOOK);
     for (const automation of bots) {
       expect(await readParams(automation)).toEqual({
-        ...automation.actionParams,
+        ...withoutSecret(automation.actionParams),
         slackIntegrationId: bot?.id,
       });
     }
     for (const automation of hooks) {
       expect(await readParams(automation)).toEqual({
-        ...automation.actionParams,
+        ...withoutSecret(automation.actionParams),
         slackIntegrationId: hook?.id,
       });
     }
   });
 
-  it("encrypts the plaintext webhook URL into the connection and keeps every legacy field on the automation", async () => {
+  /** @scenario The migration clears the secret each automation stored */
+  it("encrypts the plaintext webhook URL into the connection and keeps every other field on the automation", async () => {
     const legacy = await storeSlackAutomation({
       projectId: projectA(),
       actionParams: {
@@ -150,13 +162,63 @@ describe("migrateSlackConnections", () => {
     expect(hook?.webhookUrlEncrypted).not.toContain("hooks.slack.com");
     expect(decrypt(hook?.webhookUrlEncrypted ?? "")).toBe(WEBHOOK);
     expect(await readParams(legacy)).toEqual({
-      ...legacy.actionParams,
+      ...withoutSecret(legacy.actionParams),
       slackIntegrationId: hook?.id,
     });
   });
 
-  /** @scenario A secret shared across projects becomes an organization connection */
-  it("stores one organization connection for a URL used in two projects", async () => {
+  /** @scenario The migration clears the secret each automation stored */
+  it("clears the secret an automation an earlier run linked still stores, once", async () => {
+    const existing = await storeSlackConnection({
+      organizationId: organizationId(),
+      kind: SlackIntegrationKind.BOT,
+      scopeType: SlackIntegrationScopeType.PROJECT,
+      scopeId: projectA(),
+      secret: TOKEN,
+      name: "Acme HQ",
+    });
+    const halfDone = await storeSlackAutomation({
+      projectId: projectA(),
+      actionParams: {
+        slackDelivery: "bot",
+        slackChannelId: "C0123",
+        slackBotToken: encrypt(TOKEN),
+        slackBotTokenSet: true,
+        slackIntegrationId: existing.id,
+      },
+    });
+    const fresh = await storeWebhookAutomation({
+      projectId: projectA(),
+      url: WEBHOOK,
+    });
+
+    const first = await run({ apply: true });
+
+    expect(first.clearedIds).toEqual([halfDone.id]);
+    expect(first.linkedIds).toEqual([fresh.id]);
+    expect(await readParams(halfDone)).toEqual({
+      slackDelivery: "bot",
+      slackChannelId: "C0123",
+      slackIntegrationId: existing.id,
+    });
+    expect(await readParams(fresh)).toEqual({
+      slackDelivery: "webhook",
+      slackIntegrationId: expect.any(String),
+    });
+    const afterFirst = await Promise.all(
+      [halfDone, fresh].map((a) => readAutomation(a)),
+    );
+
+    const second = await run({ apply: true });
+    expect(second.clearedIds).toEqual([]);
+    expect(second.linkedIds).toEqual([]);
+    expect(
+      await Promise.all([halfDone, fresh].map((a) => readAutomation(a))),
+    ).toEqual(afterFirst);
+  });
+
+  /** @scenario A secret shared across projects becomes one connection per project */
+  it("stores one project connection in each project for a URL used in both", async () => {
     const first = await storeWebhookAutomation({
       projectId: projectA(),
       url: WEBHOOK,
@@ -168,17 +230,19 @@ describe("migrateSlackConnections", () => {
 
     await run({ apply: true });
 
-    const [only, ...rest] = await connections();
-    expect(rest).toEqual([]);
-    expect(only).toMatchObject({
-      scopeType: SlackIntegrationScopeType.ORGANIZATION,
-      scopeId: organizationId(),
-    });
+    const stored = await connections();
+    expect(stored.map((c) => [c.scopeType, c.scopeId]).sort()).toEqual(
+      [
+        [SlackIntegrationScopeType.PROJECT, projectA()],
+        [SlackIntegrationScopeType.PROJECT, projectB()],
+      ].sort(),
+    );
+    const inProject = (id: string) => stored.find((c) => c.scopeId === id);
     expect(await readParams(first)).toMatchObject({
-      slackIntegrationId: only?.id,
+      slackIntegrationId: inProject(projectA())?.id,
     });
     expect(await readParams(second)).toMatchObject({
-      slackIntegrationId: only?.id,
+      slackIntegrationId: inProject(projectB())?.id,
     });
   });
 
@@ -209,8 +273,8 @@ describe("migrateSlackConnections", () => {
     });
   });
 
-  /** @scenario A project connection shared with another project widens to the organization */
-  it("widens the project connection in place, naming the organization's admin as the actor", async () => {
+  /** @scenario Another project's connection is never widened or borrowed */
+  it("leaves the project connection as it is and gives the other project its own", async () => {
     const adminId = await addOrganizationAdmin({ tenant: current() });
     const existing = await storeSlackConnection({
       organizationId: organizationId(),
@@ -229,30 +293,22 @@ describe("migrateSlackConnections", () => {
       token: TOKEN,
     });
 
-    const outcome = await run({ apply: true });
+    await run({ apply: true });
 
-    const [widened, ...rest] = await connections();
-    expect(rest).toEqual([]);
-    expect(widened).toMatchObject({
-      id: existing.id,
-      name: "Acme HQ",
-      scopeType: SlackIntegrationScopeType.ORGANIZATION,
-      scopeId: organizationId(),
-      botTokenEncrypted: existing.botTokenEncrypted,
-      createdById: "user-settings",
-      updatedById: adminId,
+    const stored = await connections();
+    expect(stored).toHaveLength(2);
+    expect(stored.find((c) => c.id === existing.id)).toEqual(existing);
+    const own = stored.find((c) => c.id !== existing.id);
+    expect(own).toMatchObject({
+      scopeType: SlackIntegrationScopeType.PROJECT,
+      scopeId: projectB(),
+      createdById: adminId,
     });
-    expect(outcome.plan.connections).toEqual([
-      expect.objectContaining({
-        action: "reuse",
-        widenedFromProjectId: projectA(),
-      }),
-    ]);
     expect(await readParams(home)).toMatchObject({
       slackIntegrationId: existing.id,
     });
     expect(await readParams(elsewhere)).toMatchObject({
-      slackIntegrationId: existing.id,
+      slackIntegrationId: own?.id,
     });
   });
 
@@ -333,7 +389,6 @@ describe("migrateSlackConnections", () => {
       actionParams: {
         slackDelivery: "bot",
         slackChannelId: "C0123",
-        slackBotToken: encrypt(TOKEN),
         slackIntegrationId: "conn-chosen-by-a-user",
       },
     });

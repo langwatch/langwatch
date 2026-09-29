@@ -1,18 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
-// Fake cipher so the test exercises the secret module's orchestration
-// (encrypt-on-new / keep-on-blank / redact / decrypt), not AES itself.
+// Fake cipher so the test exercises the module's orchestration, not AES itself.
 vi.mock("~/utils/encryption", () => ({
   encrypt: (s: string) => `enc(${s})`,
   decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
 }));
 
-import { SLACK_BOT_TOKEN_KEPT } from "@langwatch/automations/providers/slack";
-import {
+import slackServer, {
   decryptSlackBotToken,
   persistSlackActionParams,
-  redactSlackActionParams,
+  readableSlackActionParams,
 } from "../server";
+
+// Built at runtime so no fixture reads as a real credential.
+const BOT_TOKEN = ["xoxb", "fake", "token"].join("-");
+const WEBHOOK_URL = ["https://hooks.slack.com", "services", "fake"].join("/");
 
 describe("persistSlackActionParams", () => {
   describe("when the params point at a connection", () => {
@@ -22,8 +24,8 @@ describe("persistSlackActionParams", () => {
           slackIntegrationId: "conn-1",
           slackDelivery: "bot",
           slackChannelId: " C1 ",
-          slackBotToken: "xoxb-leaked",
-          slackWebhook: "https://hooks.slack.com/x",
+          slackBotToken: BOT_TOKEN,
+          slackWebhook: WEBHOOK_URL,
         },
       });
       expect(stored).toEqual({
@@ -31,124 +33,92 @@ describe("persistSlackActionParams", () => {
         slackDelivery: "bot",
         slackChannelId: "C1",
       });
-      // `toEqual` treats an absent key and an explicit `undefined` alike, so
-      // the absence needs its own assertion to mean anything.
-      expect(stored).not.toHaveProperty("slackBotToken");
     });
   });
 
-  describe("when the kept sentinel arrives on a row that already has one", () => {
-    it("keeps the stored ciphertext", () => {
-      expect(
-        persistSlackActionParams({
-          incoming: {
-            slackDelivery: "bot",
-            slackChannelId: "C1",
-            slackBotToken: SLACK_BOT_TOKEN_KEPT,
-          },
-          existing: { slackDelivery: "bot", slackBotToken: "enc(xoxb-old)" },
-        }).slackBotToken,
-      ).toBe("enc(xoxb-old)");
-    });
-  });
-
-  it("keeps only the webhook in webhook mode (no stale bot fields)", () => {
-    expect(
-      persistSlackActionParams({
-        incoming: {
-          slackDelivery: "webhook",
-          slackWebhook: "https://hooks.slack.com/x",
-          slackBotToken: "leaked",
+  describe("when the params name no connection", () => {
+    /** @scenario A save with no connection stores no secret */
+    it("keeps no bot token, webhook URL or token-set flag", () => {
+      for (const incoming of [
+        {
+          slackDelivery: "bot" as const,
           slackChannelId: "C1",
+          slackBotToken: BOT_TOKEN,
         },
-      }),
-    ).toEqual({
-      slackDelivery: "webhook",
-      slackWebhook: "https://hooks.slack.com/x",
-    });
-  });
-
-  it("encrypts a freshly-entered bot token", () => {
-    expect(
-      persistSlackActionParams({
-        incoming: {
-          slackDelivery: "bot",
+        { slackDelivery: "webhook" as const, slackWebhook: WEBHOOK_URL },
+        {
+          slackDelivery: "bot" as const,
           slackChannelId: "C1",
-          slackBotToken: "xoxb-new",
+          slackBotTokenSet: true,
         },
-      }),
-    ).toEqual({
-      slackDelivery: "bot",
-      slackChannelId: "C1",
-      slackBotToken: "enc(xoxb-new)",
+      ]) {
+        const stored = persistSlackActionParams({ incoming });
+        expect(stored).not.toHaveProperty("slackBotToken");
+        expect(stored).not.toHaveProperty("slackWebhook");
+        expect(stored).not.toHaveProperty("slackBotTokenSet");
+      }
     });
   });
 
-  /** @scenario "Editing a bot automation without re-entering the token" */
-  it("keeps the stored ciphertext when the token is left blank on edit", () => {
-    expect(
-      persistSlackActionParams({
-        incoming: { slackDelivery: "bot", slackChannelId: "C1" },
-        existing: { slackDelivery: "bot", slackBotToken: "enc(xoxb-old)" },
-      }).slackBotToken,
-    ).toBe("enc(xoxb-old)");
-  });
-
-  it("routes the token through encrypt() before persisting (never raw)", () => {
-    // The fake cipher wraps as enc(…); a raw token would be stored verbatim.
-    // The real no-plaintext guarantee is AES in encryption.ts — here we assert
-    // the token was handed to the cipher rather than stored as-is.
-    const out = persistSlackActionParams({
-      incoming: {
-        slackDelivery: "bot",
-        slackChannelId: "C1",
-        slackBotToken: "xoxb-secret",
-      },
+  describe("when the provider hook persists a save", () => {
+    it("never reads the saved row, since nothing of it is kept", async () => {
+      const loadExisting = vi.fn();
+      const stored = await slackServer.persistActionParams?.({
+        incoming: { slackDelivery: "webhook", slackWebhook: WEBHOOK_URL },
+        loadExisting,
+      });
+      expect(stored).toEqual({ slackDelivery: "webhook" });
+      expect(loadExisting).not.toHaveBeenCalled();
     });
-    expect(out.slackBotToken).toBe("enc(xoxb-secret)");
-    expect(out.slackBotToken).not.toBe("xoxb-secret");
   });
 });
 
-describe("redactSlackActionParams", () => {
-  it("drops a migrated row's legacy secrets once it points at a connection", () => {
-    expect(
-      redactSlackActionParams({
-        slackIntegrationId: "conn-1",
-        slackDelivery: "webhook",
-        slackWebhook: "https://hooks.slack.com/x",
-        slackBotToken: "enc(xoxb-old)",
-      }),
-    ).toEqual({ slackIntegrationId: "conn-1", slackDelivery: "webhook" });
-  });
-
-  it("replaces the ciphertext with a set flag", () => {
-    expect(
-      redactSlackActionParams({
-        slackDelivery: "bot",
-        slackChannelId: "C1",
-        slackBotToken: "enc(xoxb)",
-      }),
-    ).toEqual({
+describe("readableSlackActionParams", () => {
+  /** @scenario Reading an automation returns only its connection, method and channel */
+  it("returns only the connection, method and channel of a row not yet migrated", () => {
+    const read = readableSlackActionParams({
+      slackIntegrationId: "conn-1",
       slackDelivery: "bot",
       slackChannelId: "C1",
+      slackBotToken: `enc(${BOT_TOKEN})`,
+      slackWebhook: WEBHOOK_URL,
       slackBotTokenSet: true,
+    });
+    expect(read).toEqual({
+      slackIntegrationId: "conn-1",
+      slackDelivery: "bot",
+      slackChannelId: "C1",
+    });
+    expect(JSON.stringify(read)).not.toContain("fake");
+  });
+
+  /** @scenario Reading an automation returns only its connection, method and channel */
+  it("returns the rule a graph alert or report fires by as stored", () => {
+    const rule = { threshold: 3, operator: "gt", timePeriod: 60 };
+    expect(
+      readableSlackActionParams({
+        ...rule,
+        slackDelivery: "webhook",
+        slackWebhook: WEBHOOK_URL,
+      }),
+    ).toEqual({ ...rule, slackDelivery: "webhook" });
+  });
+
+  it("reads a legacy row saved before the delivery method existed as a webhook", () => {
+    expect(readableSlackActionParams({ slackWebhook: WEBHOOK_URL })).toEqual({
+      slackDelivery: "webhook",
     });
   });
 
-  it("passes webhook params through untouched", () => {
-    const params = {
-      slackDelivery: "webhook" as const,
-      slackWebhook: "https://x",
-    };
-    expect(redactSlackActionParams(params)).toEqual(params);
+  it("returns nothing for params that are not an object", () => {
+    expect(readableSlackActionParams(null)).toEqual({});
   });
 });
 
 describe("decryptSlackBotToken", () => {
   it("decrypts the stored token", () => {
-    expect(decryptSlackBotToken({ slackBotToken: "enc(xoxb-live)" })).toBe(
-      "xoxb-live",
+    expect(decryptSlackBotToken({ slackBotToken: `enc(${BOT_TOKEN})` })).toBe(
+      BOT_TOKEN,
     );
   });
 

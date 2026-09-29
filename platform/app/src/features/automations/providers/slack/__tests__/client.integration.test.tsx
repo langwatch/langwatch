@@ -141,10 +141,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import {
-  SLACK_BOT_TOKEN_KEPT,
-  type SlackPreview,
-} from "@langwatch/automations/providers/slack";
+import type { SlackPreview } from "@langwatch/automations/providers/slack";
 import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 import slackClient, { type SlackSlice } from "../client";
 import {
@@ -243,13 +240,12 @@ const webhookSlice = (overrides: Partial<SlackSlice> = {}): SlackSlice => ({
   ...overrides,
 });
 
-/** A row saved before connections, carrying its own (hidden) bot token. */
+/** A row saved before connections, as the read returns it: no token of its own. */
 const legacyBotRow = (): SavedTriggerRow =>
   ({
     actionParams: {
       slackDelivery: "bot",
       slackChannelId: "C0999",
-      slackBotTokenSet: true,
     },
     slackTemplate: null,
     slackTemplateType: "block_kit",
@@ -602,10 +598,10 @@ describe("SlackConfigForm connection", () => {
       expect(screen.getByTestId("slack-legacy-secret")).toHaveTextContent(
         /uses a slack secret stored on this automation/i,
       );
+      // The server moves the token the row stores into a connection on save.
       expect(slackClient.toActionParams(slice)).toEqual({
         slackDelivery: "bot",
         slackChannelId: "C0999",
-        slackBotToken: SLACK_BOT_TOKEN_KEPT,
       });
     });
 

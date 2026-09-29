@@ -216,7 +216,7 @@ export const TRIGGER_FILTER_QUERY_DESCRIPTION = [
 
 /** Stated on the create tool: Slack needs a connection or it never posts. */
 export const SLACK_DELIVERY_NOTE =
-  'For SEND_SLACK_MESSAGE, send {"slackIntegrationId":"<connection id>"} for a webhook connection, or {"slackIntegrationId":"<connection id>","slackChannelId":"C..."} for a bot connection. Slack connections are listed and added in LangWatch under Settings, Integrations, Slack (organization-wide or for one project); there is no tool that lists them, so ask the user for the id. slackIntegrationId is preferred: a legacy {"slackWebhook":"https://hooks.slack.com/..."} or {"slackDelivery":"bot","slackBotToken":"xoxb-...","slackChannelId":"C..."} is still accepted for one release and is stored as a connection. A Slack automation with no connection will never post.';
+  'For SEND_SLACK_MESSAGE, send {"slackIntegrationId":"<connection id>"} for a webhook connection, or {"slackIntegrationId":"<connection id>","slackChannelId":"C..."} for a bot connection. Slack connections are listed and added in LangWatch under Settings, Integrations, Slack (organization-wide or for one project); they are also listed by GET /api/slack-connections and `langwatch slack-connection list`, or ask the user for the id. slackIntegrationId is preferred: a legacy {"slackWebhook":"https://hooks.slack.com/..."} or {"slackDelivery":"bot","slackBotToken":"xoxb-...","slackChannelId":"C..."} is still accepted for one release and is stored as a connection. A Slack automation with no connection will never post.';
 
 export const graphAlertSchema = z
   .object({

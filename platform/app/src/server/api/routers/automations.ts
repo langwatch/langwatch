@@ -65,6 +65,7 @@ import {
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
 import { findSlackDestination } from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
+import { withKeptLegacySlackSecret } from "~/server/app-layer/automations/slack-integration/slack-integration.service";
 import { createSlackIntegrationService } from "~/server/app-layer/automations/slack-integration/slack-integration.wiring";
 import { createTriggerFilterValidationService } from "~/server/app-layer/automations/trigger-filter-validation.wiring";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
@@ -1155,6 +1156,15 @@ export const automationRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const isGraphAlert = !!input.customGraphId;
       const isReport = !isGraphAlert && !!input.report;
+      const loadExisting = async () =>
+        input.triggerId
+          ? (
+              await getApp().triggers.getById({
+                triggerId: input.triggerId,
+                projectId: input.projectId,
+              })
+            )?.actionParams
+          : undefined;
       let parsedActionParams: Record<string, unknown> = {};
       try {
         validateTemplateDraft(input.templates);
@@ -1217,7 +1227,16 @@ export const automationRouter = createTRPCRouter({
         // accidentally save a dataset config (and ADD_TO_DATASET can't
         // persist an empty datasetId, etc.).
         const perAction = actionParamsSchemaFor(input.action);
-        const perActionParsed = perAction.safeParse(input.actionParams);
+        // A Slack row not yet migrated, saved without its secret retyped,
+        // keeps the stored one, which the connect step below moves (§5a).
+        const perActionParsed = perAction.safeParse(
+          input.action === TriggerAction.SEND_SLACK_MESSAGE
+            ? withKeptLegacySlackSecret({
+                actionParams: input.actionParams,
+                stored: await loadExisting(),
+              })
+            : input.actionParams,
+        );
         if (!perActionParsed.success) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -1303,16 +1322,11 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
-      // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or
-      // keep the stored ciphertext when the field was left blank on edit), and
-      // reject a bot connection saved with no token at all. The token is never
-      // returned to the client, so honouring "kept" means reading the saved row.
-      // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt secrets,
-      // resolve kept sentinels against the saved row (loaded lazily only
-      // when a provider needs it), and reject invalid payloads (missing bot
-      // token, kept headers after a URL change) as typed HandledErrors.
-      // ADR-093 §5a: a Slack save points at a usable connection (a freshly
-      // typed legacy secret becomes one) and takes its kind as the method.
+      // Provider persist hooks (ADR-040 §3): encrypt webhook secrets, resolve
+      // kept sentinels against the saved row, reject invalid payloads as typed
+      // HandledErrors. ADR-093 §5a: a Slack save points at a usable connection
+      // (a typed or still-stored legacy secret becomes one), so no Slack
+      // secret is ever written back onto the row.
       const connectedActionParams =
         input.action === TriggerAction.SEND_SLACK_MESSAGE
           ? await createSlackIntegrationService({
@@ -1325,15 +1339,7 @@ export const automationRouter = createTRPCRouter({
           : parsedActionParams;
       const storedActionParams = await persistActionParamsFor(input.action, {
         incoming: connectedActionParams,
-        loadExisting: async () =>
-          input.triggerId
-            ? (
-                await getApp().triggers.getById({
-                  triggerId: input.triggerId,
-                  projectId: input.projectId,
-                })
-              )?.actionParams
-            : undefined,
+        loadExisting,
       });
 
       // Annotation-queue dispatch attributes created queue items to a user

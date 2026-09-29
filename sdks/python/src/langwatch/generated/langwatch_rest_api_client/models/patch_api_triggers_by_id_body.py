@@ -46,8 +46,8 @@ class PatchApiTriggersByIdBody:
             PatchApiTriggersByIdBodyActionParamsType4 | Unset): Replaces the delivery configuration as a whole rather than
             merging into it: send the fields this automation should have from now on, and anything left out is removed —
             omit `headers` and it delivers with none, omit `signingSecret` and its deliveries are no longer signed. The one
-            exception is a credential the read hid: send back the `[redacted]` placeholder (or, for a legacy Slack bot
-            token, the `slackBotTokenSet` flag the read echoes) and the stored credential is kept, so reading an automation,
+            exception is a credential the read hid: send back the `[redacted]` placeholder and the stored credential is kept
+            (a Slack automation not yet on a connection has its stored secret moved into one), so reading an automation,
             changing one field and writing the whole object back is safe. Only this channel's fields are accepted; anything
             else is refused rather than dropped, and the rule this automation fires by belongs in `graphAlert` or `report`.
         graph_alert (PatchApiTriggersByIdBodyGraphAlert | Unset): The rule this alert fires by. Only for an automation

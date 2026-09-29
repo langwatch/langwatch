@@ -63,7 +63,12 @@ describe("Feature: rule-carrying automations survive redacted round trips", () =
           where: { id: stored.id, projectId: projectId() },
         })
       ).actionParams;
-      expect(saved).toMatchObject({ ...rule, slackWebhook: SLACK_WEBHOOK });
+      expect(saved).toMatchObject({
+        ...rule,
+        slackDelivery: "webhook",
+        slackIntegrationId: expect.any(String),
+      });
+      expect(JSON.stringify(saved)).not.toContain("hooks.slack.com");
       // The evaluator reads the rule straight off the row, so what matters is
       // that it still parses as a complete one.
       expect(graphAlertActionParamsSchema.safeParse(saved).success).toBe(true);

@@ -4115,7 +4115,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--report <json>", "Make this a scheduled report, as JSON: {\"source\":{\"kind\":\"dashboard\",\"dashboardId\":\"...\"},\"schedule\":{\"cron\":\"0 9 * * 1\",\"timezone\":\"UTC\"}}. source.kind is dashboard, customGraph or traceQuery")
       .option("--message <text>", "Custom alert message")
       .option("--alert-type <type>", "Alert severity: CRITICAL, WARNING, INFO")
-      .option("--slack-connection <id>", "The Slack connection to post through, for SEND_SLACK_MESSAGE. Connections are listed under Settings, Integrations, Slack")
+      .option("--slack-connection <id>", "The Slack connection to post through, for SEND_SLACK_MESSAGE. List them with `langwatch slack-connection list`")
       .option("--slack-channel <id>", "The Slack channel to post in, e.g. C0123. Needed with a bot connection")
       .option("--slack-webhook <url>", "Legacy: a Slack incoming webhook URL, stored as a Slack connection. Prefer --slack-connection")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -4138,7 +4138,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--graph-alert <json>", "The rule an alert fires by, as JSON (only for an automation that is already an alert)")
       .option("--report <json>", "What a report renders and when, as JSON (only for an automation that is already a report)")
       .option("--action-params <json>", "The delivery configuration this trigger should have from now on, as JSON. Replaces the stored one; send [redacted] back for a credential to keep it")
-      .option("--slack-connection <id>", "The Slack connection to post through from now on. Replaces the delivery configuration, so pass --slack-channel with a bot connection")
+      .option("--slack-connection <id>", "The Slack connection to post through from now on (see `langwatch slack-connection list`). Replaces the delivery configuration, so pass --slack-channel with a bot connection")
       .option("--slack-channel <id>", "The Slack channel to post in, e.g. C0123, for a bot connection")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string; filters?: string; filterQuery?: string; actionParams?: string; slackConnection?: string; slackChannel?: string; graphAlert?: string; report?: string }) => {
