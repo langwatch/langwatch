@@ -47,6 +47,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/mail": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

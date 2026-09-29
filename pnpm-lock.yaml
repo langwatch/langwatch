@@ -5918,6 +5918,9 @@ importers:
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../../notification/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -8938,6 +8941,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../../notification/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -14619,6 +14625,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../../notification/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
