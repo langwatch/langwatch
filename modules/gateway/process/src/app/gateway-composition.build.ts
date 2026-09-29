@@ -78,6 +78,7 @@ class GatewayClickHouseSession implements GatewayClickHouseClient {
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, string | number | boolean | undefined>;
     unscoped?: { reason: string };
+    tenantIds?: readonly string[];
   }): Promise<{ json<T = unknown>(): Promise<T[]> }> {
     const { rows } = await this.clickhouse.query<unknown>({
       tenantId: this.tenantId,
@@ -85,6 +86,7 @@ class GatewayClickHouseSession implements GatewayClickHouseClient {
       params: input.query_params,
       settings: input.clickhouse_settings as Record<string, string | number> | undefined,
       ...(input.unscoped ? { unscoped: input.unscoped } : {}),
+      ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
     });
 
     return { json: <T = unknown>() => Promise.resolve(rows as T[]) };

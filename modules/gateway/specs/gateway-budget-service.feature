@@ -29,3 +29,15 @@ Feature: Gateway budget decision service
     Given an organization has enabled and archived cache rules and a virtual key targets a trace project
     When the Gateway materialises its configuration bundle
     Then it includes only enabled non-archived cache rules and guardrail attachments present in that project catalogue
+
+  @unit
+  Scenario: A budget's spend and recent ledger read across its organisation's projects under the tenant guard
+    Given a budget whose organisation has two projects writing to the ledger
+    When its detail reads the recent ledger, the spend per target and the spend per bucket
+    Then each read is one statement declaring both projects as its tenant set, which the tenant guard accepts
+
+  @unit
+  Scenario: A budget whose organisation has no projects reads no ledger
+    Given a budget whose organisation has no projects
+    When its detail reads the recent ledger and its spend
+    Then each read answers empty without sending a statement
