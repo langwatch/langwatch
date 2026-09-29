@@ -256,6 +256,7 @@ void describe("given the outcomes of a whole run", () => {
 
 void describe("given the job is split into shards", () => {
   void describe("when every shard of a split takes its share", () => {
+    /** @scenario "Every package lands on exactly one shard" */
     void it("runs each package on exactly one shard", () => {
       const names = ["a", "b", "c", "d", "e", "f", "g"];
       const shares = [1, 2, 3].map((index) => shardOf(names, { index, total: 3 }));
@@ -271,6 +272,7 @@ void describe("given the job is split into shards", () => {
   });
 
   void describe("when the shard value is malformed", () => {
+    /** @scenario "A malformed shard value is refused" */
     void it("refuses it rather than running everything on every leg", () => {
       assert.throws(() => parseShard("0/4"));
       assert.throws(() => parseShard("5/4"));
