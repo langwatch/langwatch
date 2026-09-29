@@ -481,6 +481,25 @@ describe("ViewAutomationDrawer", () => {
     });
   });
 
+  describe("given a link to an automation that does not exist", () => {
+    beforeEach(() => {
+      mockTriggerRow = null;
+    });
+
+    describe("when the drawer renders", () => {
+      /** @scenario "A link to an automation that does not exist says so" */
+      it("says the automation no longer exists and offers no Edit", () => {
+        renderDrawer();
+
+        expect(screen.getByTestId("automation-not-found")).toHaveTextContent(
+          "This automation no longer exists",
+        );
+        expect(screen.queryByText("Destination")).toBeNull();
+        expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+      });
+    });
+  });
+
   describe("given a trace automation that never fired", () => {
     beforeEach(() => {
       mockTriggerRow = {

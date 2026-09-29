@@ -94,6 +94,7 @@ import {
 } from "./logic/draftReducer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { nextStep, previousStep } from "./logic/wizardSteps";
+import { useDatasetName } from "./providers/dataset/datasetName";
 import {
   useSlackConnectionName,
   withSlackConnectionName,
@@ -185,9 +186,31 @@ function saveDisabledReason({
   if (draft.source === "customGraph" && draft.alertType === null)
     missing.push("set a severity");
   if (!actionPicked) missing.push("pick a delivery channel");
-  else if (!configComplete) missing.push("complete the setup");
+  else if (!configComplete) missing.push(deliveryTodo(draft));
   if (missing.length === 0) return "";
   return `To save, ${missing.join(" and ")}.`;
+}
+
+/** What the chosen delivery still lacks, in its own words where they are known. */
+function deliveryTodo(draft: AutomationDraft): string {
+  switch (draft.action) {
+    case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
+      return "choose at least one annotator";
+    case TriggerAction.SEND_EMAIL:
+      return "add at least one recipient";
+    case TriggerAction.ADD_TO_DATASET:
+      return draft.slices[TriggerAction.ADD_TO_DATASET].datasetId
+        ? "map the dataset's columns"
+        : "choose a dataset";
+    case TriggerAction.SEND_WEBHOOK:
+      return "enter a valid endpoint URL and content type";
+    case TriggerAction.SEND_SLACK_MESSAGE:
+      return draft.slices[TriggerAction.SEND_SLACK_MESSAGE].slackIntegrationId
+        ? "choose a Slack channel"
+        : "choose a Slack connection";
+    default:
+      return "complete the setup";
+  }
 }
 
 function subjectTodo(draft: AutomationDraft): string {
@@ -212,11 +235,11 @@ function cadenceTodo(draft: AutomationDraft): string {
   }
 }
 
-/** The draft as the close guard compares it. The Slack connection's name is
- *  filled in when the list loads, so it is display only, never an edit. */
+/** The draft as the close guard compares it. The Slack connection's and the
+ *  dataset's names are filled in when their lists load: display, never edits. */
 function draftFingerprint(draft: AutomationDraft): string {
   return JSON.stringify(draft, (key, value) =>
-    key === "connectionName" ? undefined : value,
+    key === "connectionName" || key === "namedDataset" ? undefined : value,
   );
 }
 
@@ -544,6 +567,7 @@ export function AutomationDrawer({
     draft,
     dispatch,
   });
+  useDatasetName({ projectId, draft, dispatch });
 
   // Edit prefill from the saved trigger.
   const triggerQuery = api.automation.getTriggerById.useQuery(

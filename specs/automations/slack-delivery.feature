@@ -52,6 +52,25 @@ Feature: Slack delivery
       When the automation uses a bot connection
       Then those templates become selectable
 
+  Rule: A failed Slack test says what went wrong
+
+    A webhook Slack no longer accepts, or a Slack that cannot be reached, is
+    something the author can act on, so the test names it instead of reading
+    as an unexplained failure.
+
+    @unit
+    Scenario: A test to a webhook Slack refuses names the refusal
+      Given a Slack automation whose incoming webhook Slack answers as revoked or removed
+      When the author sends a test
+      Then it is refused with the machine-readable notification-delivery code
+      And the message says the webhook no longer works and how to replace it
+
+    @unit
+    Scenario: A test that cannot reach Slack says so
+      Given Slack cannot be reached
+      When the author sends a test to an incoming webhook
+      Then the message says Slack could not be reached and to try again
+
   Rule: A Slack bot token never leaves the server
 
     Encryption is the same AES-256-GCM helper the rest of the platform uses.

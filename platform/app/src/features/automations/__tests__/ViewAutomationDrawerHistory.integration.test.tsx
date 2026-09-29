@@ -143,6 +143,29 @@ describe("ViewAutomationDrawer history", () => {
     mockEvaluationFails = false;
   });
 
+  describe("given a report that has not been sent yet", () => {
+    describe("when the drawer renders", () => {
+      /** @scenario "A report that has not been sent yet says it sends on its schedule" */
+      it("says it sends on its schedule and never mentions matching traces", () => {
+        mockTriggerRow = {
+          ...TRACE_AUTOMATION_ROW,
+          name: "Weekly quality report",
+          filterQuery: null,
+          triggerKind: "REPORT",
+        };
+
+        renderDrawer();
+
+        expect(
+          screen.getByText(
+            "This report has not been sent yet. It sends on its schedule.",
+          ),
+        ).toBeDefined();
+        expect(screen.queryByText(/traces that match/)).toBeNull();
+      });
+    });
+  });
+
   describe("given a trace automation whose fire history fails to load", () => {
     describe("when the drawer renders", () => {
       it("says the history couldn't load instead of claiming it never fired", () => {

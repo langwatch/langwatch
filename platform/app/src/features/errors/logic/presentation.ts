@@ -1008,6 +1008,11 @@ const presentations = {
     describe: () =>
       "It may have been removed along with its run. Reload to see the current steps.",
   },
+  email_provider_not_configured: {
+    title: "Email is not set up on this installation",
+    describe: () =>
+      "No email was sent. An administrator has to set up an email provider before LangWatch can send email.",
+  },
   email_already_registered: {
     // Reached from the sign-up screen, and the reader there is usually looking
     // at their own account: either a previous sign-up created it and could not

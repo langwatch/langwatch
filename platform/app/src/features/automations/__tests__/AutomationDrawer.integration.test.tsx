@@ -167,6 +167,9 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: null, isLoading: false }),
       },
     },
+    dataset: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
@@ -370,6 +373,38 @@ describe("AutomationDrawer", () => {
             ),
           ).toBeInTheDocument();
         });
+      });
+    });
+
+    describe("when the delivery is an annotation queue with no annotator", () => {
+      /** @scenario "Saving with an unfinished delivery names what is missing" */
+      it("asks for an annotator rather than to complete the setup", async () => {
+        const user = userEvent.setup();
+        renderDrawer();
+        useAutomationStore.getState().dispatch({
+          type: "SET_ACTION",
+          value: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+        });
+        useAutomationStore.getState().dispatch({
+          type: "SET_NAME",
+          value: "Label refusals",
+        });
+        useAutomationStore.getState().setStep("review");
+
+        await user.click(
+          await screen.findByRole("button", { name: "Create automation" }),
+        );
+
+        expect(mockUpsertMutate).not.toHaveBeenCalled();
+        expect(toaster.create).toHaveBeenCalledWith({
+          title: expect.stringMatching(/choose at least one annotator\.$/),
+          type: "warning",
+        });
+        expect(toaster.create).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: expect.stringMatching(/complete the setup/),
+          }),
+        );
       });
     });
 

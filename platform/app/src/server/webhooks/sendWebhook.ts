@@ -4,10 +4,14 @@ import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "@langwatch/automations/providers/webhook";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import {
+  DispatchError,
+  isDispatchError,
+} from "~/server/event-sourcing/queues/dispatchError";
 import { assertDispatchBudget } from "./dispatchBudget";
 import { sendHttpDestination } from "./httpDestination";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "./signature";
+import { describeTransportFailure } from "./transportFailure";
 import { assertWebhookUrlAllowed, webhookUrlValidator } from "./urlPolicy";
 
 /**
@@ -201,8 +205,22 @@ export async function sendWebhook({
     body,
     contextLabel: label,
     validateUrl: webhookUrlValidator(allowInsecureLocal),
+  }).catch((error: unknown) => {
+    throw withTransportFailureNamed(error);
   });
   return { ...response, eventId: resolvedEventId };
+}
+
+/** The author supplied this endpoint, so a failure to reach it is named. */
+function withTransportFailureNamed(error: unknown): unknown {
+  if (!isDispatchError(error) || error.customerMessage) return error;
+  return new DispatchError({
+    message: error.message,
+    retryable: error.retryable,
+    cause: error.cause,
+    retryAfterMs: error.retryAfterMs,
+    customerMessage: describeTransportFailure(error.cause),
+  });
 }
 
 /** How much of the receiver's response rides in an error message. */
@@ -248,6 +266,7 @@ export function assertWebhookDelivered({
       `Webhook for trigger "${triggerName}" received HTTP ${status}` +
       (snippet ? `: ${snippet}` : ""),
     retryable,
+    customerMessage: `The endpoint answered HTTP ${status}.`,
     // Honor the receiver's backpressure on a retryable status (ADR-040 §5);
     // the queue folds it into its backoff as a floor.
     retryAfterMs: retryable ? result.retryAfterMs : undefined,

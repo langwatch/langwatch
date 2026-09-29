@@ -18,6 +18,7 @@ import { EmailList } from "~/features/automations/components/page/AutomationTabl
 import { HistorySection } from "~/features/automations/components/view/HistorySection";
 import { MatchingTracesSection } from "~/features/automations/components/view/MatchingTracesSection";
 import { NextFiringSection } from "~/features/automations/components/view/NextFiringSection";
+import { UnavailableAutomationDrawer } from "~/features/automations/components/view/UnavailableAutomationDrawer";
 import { WebhookDeliverySection } from "~/features/automations/components/view/WebhookDeliverySection";
 import {
   OPERATOR_LABELS,
@@ -231,6 +232,16 @@ export function ViewAutomationDrawer({
     );
   };
 
+  // `null` is the server's settled "no such automation"; pending is undefined.
+  if (triggerQuery.error || triggerQuery.data === null) {
+    return (
+      <UnavailableAutomationDrawer
+        error={triggerQuery.error}
+        onClose={closeDrawer}
+      />
+    );
+  }
+
   return (
     <Drawer.Root
       open={true}
@@ -337,6 +348,7 @@ export function ViewAutomationDrawer({
                 isGraphAlert={isGraphAlert}
                 canRunConditions={!!traceQuery}
                 isUnconditioned={isUnconditioned}
+                isReport={isSchedule}
               />
             ) : null}
 

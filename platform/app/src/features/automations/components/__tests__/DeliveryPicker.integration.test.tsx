@@ -109,6 +109,17 @@ describe("DeliveryPicker", () => {
   });
 
   describe("given a report draft", () => {
+    /** @scenario "Report delivery options describe sending on a schedule" */
+    it("describes Slack as posting the report on its schedule", () => {
+      renderPicker({ source: "report" });
+
+      const slack = screen.getByRole("button", { name: /^Slack/ });
+      expect(slack).toHaveTextContent(
+        "Post the report to Slack on its schedule.",
+      );
+      expect(slack).not.toHaveTextContent(/when a trace matches/);
+    });
+
     it("does not offer the webhook card, which reports cannot deliver on", () => {
       renderPicker({ source: "report" });
 

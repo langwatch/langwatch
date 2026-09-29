@@ -27,6 +27,8 @@ interface HistorySectionProps {
   canRunConditions: boolean;
   /** No condition at all: the empty state must not promise it filters. */
   isUnconditioned?: boolean;
+  /** A report sends on its schedule, so its empty state never mentions traces. */
+  isReport?: boolean;
 }
 
 /**
@@ -46,6 +48,7 @@ export function HistorySection({
   isGraphAlert,
   canRunConditions,
   isUnconditioned = false,
+  isReport = false,
 }: HistorySectionProps) {
   const historyQuery = api.automation.getFireHistory.useInfiniteQuery(
     { projectId, triggerId: automationId, limit: FIRE_PAGE_SIZE },
@@ -85,6 +88,7 @@ export function HistorySection({
         isGraphAlert={isGraphAlert}
         canRunConditions={canRunConditions}
         isUnconditioned={isUnconditioned}
+        isReport={isReport}
       />
       {historyQuery.hasNextPage ? (
         <Button
@@ -233,6 +237,7 @@ function HistoryBody({
   isGraphAlert,
   canRunConditions,
   isUnconditioned,
+  isReport,
 }: {
   isLoading: boolean;
   isError: boolean;
@@ -241,6 +246,7 @@ function HistoryBody({
   isGraphAlert: boolean;
   canRunConditions: boolean;
   isUnconditioned: boolean;
+  isReport: boolean;
 }) {
   if (isLoading) return <Skeleton height="60px" width="full" />;
   if (isError) {
@@ -256,6 +262,7 @@ function HistoryBody({
         isGraphAlert={isGraphAlert}
         canRunConditions={canRunConditions}
         isUnconditioned={isUnconditioned}
+        isReport={isReport}
       />
     );
   }
@@ -272,11 +279,20 @@ function EmptyHistory({
   isGraphAlert,
   canRunConditions,
   isUnconditioned,
+  isReport,
 }: {
   isGraphAlert: boolean;
   canRunConditions: boolean;
   isUnconditioned: boolean;
+  isReport: boolean;
 }) {
+  if (isReport) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        This report has not been sent yet. It sends on its schedule.
+      </Text>
+    );
+  }
   if (isGraphAlert) {
     return (
       <Text textStyle="sm" color="fg.muted">

@@ -202,6 +202,7 @@ export async function sendHttpDestination({
     throw new DispatchError({
       message: `${contextLabel}: HTTP request failed — ${message}`,
       retryable: !ssrfBlocked,
+      cause: err,
     });
   }
 

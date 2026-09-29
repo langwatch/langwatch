@@ -127,6 +127,9 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isLoading: true }),
       },
     },
+    dataset: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },

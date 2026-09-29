@@ -34,6 +34,9 @@ interface DatasetMapping {
 export interface DatasetSlice {
   datasetId: string;
   mapping: DatasetMapping;
+  /** Display only, filled once the dataset list loads; trusted only while its
+   *  id is still the chosen one. */
+  namedDataset?: { id: string; name: string };
 }
 
 const EMPTY_MAPPING: DatasetMapping = { mapping: {}, expansions: [] };
@@ -120,7 +123,10 @@ function isComplete(slice: DatasetSlice): boolean {
 
 function summary(slice: DatasetSlice, identity: SummaryIdentity): string {
   const name = identity.name || "(unnamed)";
-  return `${name} → dataset ${slice.datasetId || "(not chosen)"}`;
+  if (!slice.datasetId) return `${name} → dataset (not chosen)`;
+  return slice.namedDataset?.id === slice.datasetId
+    ? `${name} → dataset ${slice.namedDataset.name}`
+    : `${name} → a dataset`;
 }
 
 function fromTriggerRow(row: SavedTriggerRow): DatasetSlice {

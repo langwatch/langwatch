@@ -98,6 +98,7 @@ const def: SharedDef = {
   label: "Slack",
   description: "Post a message to Slack when a trace matches.",
   alertDescription: "Post a message to Slack when it fires.",
+  reportDescription: "Post the report to Slack on its schedule.",
   actionParamsSchema: slackActionParamsSchema,
 };
 

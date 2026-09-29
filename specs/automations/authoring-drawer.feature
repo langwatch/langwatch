@@ -193,6 +193,13 @@ Feature: Staged automation authoring drawer
       When the app resolves that URL
       Then it opens the automation authoring drawer
 
+    @integration
+    Scenario: A link to an automation that does not exist says so
+      Given a link to view an automation that does not exist
+      When the user opens it
+      Then the drawer says the automation no longer exists
+      And it offers no Edit button
+
   Rule: An alert needs a custom graph to watch
 
     An alert's Subject is a series on a custom graph — there is nothing to
@@ -288,6 +295,29 @@ Feature: Staged automation authoring drawer
       And the user goes to another page instead of returning
       And the user starts a new automation later
       Then the new automation starts empty
+
+  Rule: A dataset delivery is named by its dataset
+
+    @unit
+    Scenario: The dataset delivery summary names the dataset
+      Given an automation that adds matched traces to a dataset
+      When the delivery summary is shown
+      Then it names the dataset by its name, never its id
+
+  Rule: A report is described by its schedule, not by matching traces
+
+    @integration
+    Scenario: Report delivery options describe sending on a schedule
+      Given the user is choosing where a report is delivered
+      Then the Slack option says it posts the report on its schedule
+      And it does not say it acts when a trace matches
+
+    @integration
+    Scenario: A report that has not been sent yet says it sends on its schedule
+      Given a report with no sends yet
+      When the user views it
+      Then its history says it sends on its schedule
+      And it does not mention traces matching its conditions
 
   Rule: The Slack channel list never claims to be complete when it isn't
 
@@ -451,6 +481,20 @@ Feature: Staged automation authoring drawer
       Given the user has not yet set a destination
       Then test fire is unavailable
 
+    @integration
+    Scenario: Email delivery setup warns when the installation cannot send email
+      Given the installation has no email provider configured
+      When the user sets up email delivery
+      Then the setup warns that this installation cannot send email
+      And the automation can still be saved
+
+    @unit
+    Scenario: An email test on an installation without email says email is not set up
+      Given the installation has no email provider configured
+      When the user sends a test email
+      Then it is refused with the machine-readable email-not-configured code
+      And the message says email is not set up on this installation
+
   Rule: Saving persists the whole automation at once
 
     Scenario: Saving a fully configured automation creates it
@@ -471,6 +515,12 @@ Feature: Staged automation authoring drawer
       Given the user has completed every section except the name
       When the user tries to save
       Then the name field shows that a name is required
+
+    @integration
+    Scenario: Saving with an unfinished delivery names what is missing
+      Given the automation delivers to an annotation queue with no annotator chosen
+      When the user tries to save
+      Then the reason asks for at least one annotator rather than to complete the setup
 
   Rule: Editing reuses the same staged drawer
 

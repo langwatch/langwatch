@@ -142,6 +142,26 @@ Feature: Webhook (generic HTTP) automation action
       Then the test fire is refused and asks for the new URL to be saved first
       And nothing is sent
 
+    @unit
+    Scenario: A test that cannot reach the endpoint names the transport failure
+      Given the endpoint's host does not resolve, refuses the connection, times out or fails TLS
+      When the test fire completes
+      Then the error names which of those happened
+      And it carries no socket detail, address or stack
+
+    @unit
+    Scenario: A test answered with an error status names the status
+      Given the endpoint answers 500
+      When the test fire completes
+      Then the error says the endpoint answered HTTP 500
+
+    @unit
+    Scenario: The development request log never shows header values or the signing secret
+      Given the browser logs each request in development
+      When a webhook automation is test-fired or saved with header values and a signing secret
+      Then the logged request shows the header names with their values redacted
+      And the signing secret is redacted
+
   Rule: Delivery is SSRF-fenced
 
     @unit

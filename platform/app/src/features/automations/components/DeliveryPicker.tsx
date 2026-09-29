@@ -81,7 +81,7 @@ export function DeliveryPicker({
             entries={notify}
             value={value}
             onChange={pick}
-            isAlertKind={isAlertKind}
+            source={source}
             accent={accent}
           />
         ) : null}
@@ -92,7 +92,7 @@ export function DeliveryPicker({
             entries={action}
             value={value}
             onChange={pick}
-            isAlertKind={isAlertKind}
+            source={source}
             accent={accent}
           />
         ) : null}
@@ -130,7 +130,7 @@ function DeliveryGroup({
   entries,
   value,
   onChange,
-  isAlertKind,
+  source,
   accent,
 }: {
   label: string;
@@ -138,7 +138,7 @@ function DeliveryGroup({
   entries: ClientEntry[];
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
-  isAlertKind: boolean;
+  source: ConditionSource;
   accent: string;
 }) {
   return (
@@ -164,7 +164,7 @@ function DeliveryGroup({
             entry={entry}
             active={entry.shared.action === value}
             onClick={() => onChange(entry.shared.action)}
-            isAlertKind={isAlertKind}
+            source={source}
             accent={accent}
           />
         ))}
@@ -177,19 +177,17 @@ function DeliveryCard({
   entry,
   active,
   onClick,
-  isAlertKind,
+  source,
   accent,
 }: {
   entry: ClientEntry;
   active: boolean;
   onClick: () => void;
-  isAlertKind: boolean;
+  source: ConditionSource;
   accent: string;
 }) {
   const Icon = entry.client.Icon;
-  const description = isAlertKind
-    ? (entry.shared.alertDescription ?? entry.shared.description)
-    : entry.shared.description;
+  const description = descriptionFor({ shared: entry.shared, source });
   return (
     <chakra.button
       type="button"
@@ -212,4 +210,20 @@ function DeliveryCard({
       </Text>
     </chakra.button>
   );
+}
+
+/** The card's line in the words of what is being delivered. */
+function descriptionFor({
+  shared,
+  source,
+}: {
+  shared: ClientEntry["shared"];
+  source: ConditionSource;
+}): string {
+  if (source === "customGraph") {
+    return shared.alertDescription ?? shared.description;
+  }
+  if (source === "report")
+    return shared.reportDescription ?? shared.description;
+  return shared.description;
 }

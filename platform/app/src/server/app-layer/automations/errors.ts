@@ -594,8 +594,8 @@ export class NotificationDeliveryError extends HandledError {
     options: {
       /**
        * The remediation sentence, unprefixed, as a person would write it.
-       * Omit for a transport failure — there is nothing customer-safe to say
-       * about a socket.
+       * Never a transport failure's raw text; at most fixed copy naming its
+       * kind (see `describeTransportFailure`).
        */
       customerMessage?: string;
     } = {},
