@@ -1255,8 +1255,10 @@ describe("guardProjectId — SlackIntegration", () => {
           action: "findUnique",
           args: {
             where: {
-              organizationId_secretFingerprint: {
+              organizationId_scopeType_scopeId_secretFingerprint: {
                 organizationId: "org-1",
+                scopeType: "PROJECT",
+                scopeId: "project-1",
                 secretFingerprint: "fp",
               },
             },

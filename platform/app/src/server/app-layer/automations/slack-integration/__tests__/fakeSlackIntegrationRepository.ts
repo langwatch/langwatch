@@ -54,19 +54,35 @@ export class FakeSlackIntegrationRepository
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async findByFingerprint({
+  async findAllByFingerprint({
     organizationId,
     secretFingerprint,
+    scopes,
   }: {
     organizationId: string;
     secretFingerprint: string;
+    scopes: Pick<SlackConnectionRecord, "scopeType" | "scopeId">[];
   }) {
-    return (
-      [...this.rows.values()].find(
-        (row) =>
-          row.organizationId === organizationId &&
-          row.secretFingerprint === secretFingerprint,
-      ) ?? null
+    return [...this.rows.values()].filter(
+      (row) =>
+        row.organizationId === organizationId &&
+        row.secretFingerprint === secretFingerprint &&
+        scopes.some(
+          (scope) =>
+            scope.scopeType === row.scopeType && scope.scopeId === row.scopeId,
+        ),
+    );
+  }
+
+  /** The unique index: one fingerprint per (organization, scope). */
+  private collides(candidate: SlackConnectionRecord & { id?: string }) {
+    return [...this.rows.values()].some(
+      (row) =>
+        row.id !== candidate.id &&
+        row.organizationId === candidate.organizationId &&
+        row.scopeType === candidate.scopeType &&
+        row.scopeId === candidate.scopeId &&
+        row.secretFingerprint === candidate.secretFingerprint,
     );
   }
 
@@ -77,6 +93,7 @@ export class FakeSlackIntegrationRepository
     record: SlackConnectionRecord;
     actorId: string;
   }) {
+    if (this.collides(record)) return null;
     const row: SlackIntegration = {
       ...record,
       id: `conn-${this.next++}`,
@@ -102,6 +119,7 @@ export class FakeSlackIntegrationRepository
     const row = this.rows.get(id);
     if (!row) return null;
     const updated = { ...row, ...changes, updatedById: actorId };
+    if (this.collides(updated)) return null;
     this.rows.set(id, updated);
     return updated;
   }

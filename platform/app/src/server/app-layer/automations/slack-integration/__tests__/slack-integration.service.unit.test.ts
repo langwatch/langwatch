@@ -46,6 +46,40 @@ describe("SlackIntegrationService", () => {
       actorId: "user-1",
     });
 
+  const addProjectWebhook = ({
+    projectId,
+    secret,
+  }: {
+    projectId: string;
+    secret: string;
+  }) =>
+    service.create({
+      scope: PROJECTS[projectId]!,
+      name: `${projectId} alerts`,
+      kind: "INCOMING_WEBHOOK",
+      scopeType: "PROJECT",
+      scopeId: projectId,
+      secret,
+      actorId: "user-1",
+    });
+
+  const saveLegacy = ({
+    projectId,
+    kind = "INCOMING_WEBHOOK",
+    secret,
+  }: {
+    projectId: string;
+    kind?: "BOT" | "INCOMING_WEBHOOK";
+    secret: string;
+  }) =>
+    service.findOrCreateForSecret({
+      organizationId: "org-1",
+      projectId,
+      kind,
+      secret,
+      actorId: "user-1",
+    });
+
   beforeEach(() => {
     repo = new FakeSlackIntegrationRepository();
     verify = vi.fn(async () => acme);
@@ -131,8 +165,8 @@ describe("SlackIntegrationService", () => {
       });
     });
 
-    describe("given the organization already stores the same token", () => {
-      /** @scenario "The same secret cannot be stored twice in an organization" */
+    describe("given the same scope already stores the same token", () => {
+      /** @scenario "The same secret cannot be stored twice in one scope" */
       it("refuses with the connection-exists code naming the existing connection", async () => {
         await addBot({ name: "Alerts bot" });
 
@@ -141,6 +175,89 @@ describe("SlackIntegrationService", () => {
           meta: { connectionName: "Alerts bot" },
         });
         expect(repo.rows.size).toBe(1);
+      });
+    });
+
+    describe("given the organization holds the token a project connection is added with", () => {
+      /** @scenario "A project connection is refused when its organization already holds the secret" */
+      it("refuses with the connection-exists code naming the organization connection", async () => {
+        await addBot({ name: "Alerts bot" });
+
+        await expect(
+          service.create({
+            scope: PROJECTS["project-1"]!,
+            name: "Checkout copy",
+            kind: "BOT",
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+            secret: "xoxb-alerts-1234",
+            actorId: "user-1",
+          }),
+        ).rejects.toMatchObject({
+          code: "slack_connection_exists",
+          meta: { connectionName: "Alerts bot" },
+        });
+        expect(repo.rows.size).toBe(1);
+      });
+    });
+
+    describe("given only another project holds the webhook URL", () => {
+      const url = "https://hooks.slack.com/services/T/B/shared";
+
+      /** @scenario "A secret only another project holds can still be stored for this project" */
+      it("stores a project connection for this project and leaves the other as it was", async () => {
+        const other = await addProjectWebhook({
+          projectId: "project-2",
+          secret: url,
+        });
+        const before = repo.rows.get(other.id);
+
+        const own = await addProjectWebhook({
+          projectId: "project-1",
+          secret: url,
+        });
+
+        expect(own).toMatchObject({
+          scopeType: "PROJECT",
+          scopeId: "project-1",
+        });
+        expect(own.id).not.toBe(other.id);
+        expect(repo.rows.get(other.id)).toEqual(before);
+      });
+    });
+
+    describe("given projects that each hold a webhook URL as a legacy secret", () => {
+      const url = "https://hooks.slack.com/services/T/B/everyone";
+
+      /** @scenario "Only an explicit organization-scoped create makes an organization connection" */
+      it("stays project-scoped until an organization connection is created explicitly", async () => {
+        const first = await saveLegacy({ projectId: "project-1", secret: url });
+        const second = await saveLegacy({
+          projectId: "project-2",
+          secret: url,
+        });
+        const projectRows = [...repo.rows.values()];
+
+        expect(first.id).not.toBe(second.id);
+        expect(projectRows.map((row) => row.scopeType)).toEqual([
+          "PROJECT",
+          "PROJECT",
+        ]);
+
+        const shared = await service.create({
+          scope: PROJECTS["project-1"]!,
+          name: "Everyone",
+          kind: "INCOMING_WEBHOOK",
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          secret: url,
+          actorId: "user-1",
+        });
+
+        expect(shared.scopeType).toBe("ORGANIZATION");
+        for (const row of projectRows) {
+          expect(repo.rows.get(row.id)).toEqual(row);
+        }
       });
     });
   });
@@ -226,6 +343,39 @@ describe("SlackIntegrationService", () => {
         });
       });
     });
+
+    describe("given a move into a scope that already holds its secret", () => {
+      it("refuses with the connection-exists code and leaves both in place", async () => {
+        const url = "https://hooks.slack.com/services/T/B/move";
+        const own = await addProjectWebhook({
+          projectId: "project-2",
+          secret: url,
+        });
+        const shared = await service.create({
+          scope: PROJECTS["project-1"]!,
+          name: "Shared",
+          kind: "INCOMING_WEBHOOK",
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          secret: url,
+          actorId: "user-1",
+        });
+
+        await expect(
+          service.update({
+            scope: PROJECTS["project-2"]!,
+            connection: repo.rows.get(own.id)!,
+            scopeType: "ORGANIZATION",
+            scopeId: "org-1",
+            actorId: "user-1",
+          }),
+        ).rejects.toMatchObject({
+          code: "slack_connection_exists",
+          meta: { connectionId: shared.id },
+        });
+        expect(repo.rows.get(own.id)?.scopeType).toBe("PROJECT");
+      });
+    });
   });
 
   describe("delete()", () => {
@@ -256,15 +406,12 @@ describe("SlackIntegrationService", () => {
     const webhook = "https://hooks.slack.com/services/T/B/abcd";
 
     it("creates a project connection named from the hint for a new webhook", async () => {
-      const result = await service.findOrCreateForSecret({
-        organizationId: "org-1",
+      const result = await saveLegacy({
         projectId: "project-1",
-        kind: "INCOMING_WEBHOOK",
         secret: webhook,
-        actorId: "user-1",
       });
 
-      expect(result.created).toBe(true);
+      expect(result.wasCreated).toBe(true);
       expect(repo.rows.get(result.id)).toMatchObject({
         name: "Slack webhook ••••abcd",
         scopeType: "PROJECT",
@@ -273,20 +420,16 @@ describe("SlackIntegrationService", () => {
     });
 
     it("names a bot connection from its workspace, and keeps a token Slack refuses", async () => {
-      const named = await service.findOrCreateForSecret({
-        organizationId: "org-1",
+      const named = await saveLegacy({
         projectId: "project-1",
         kind: "BOT",
         secret: "xoxb-good-1234",
-        actorId: "user-1",
       });
       verify.mockResolvedValue({ ok: false, error: "token_revoked" });
-      const refused = await service.findOrCreateForSecret({
-        organizationId: "org-1",
+      const refused = await saveLegacy({
         projectId: "project-1",
         kind: "BOT",
         secret: "xoxb-bad-5678",
-        actorId: "user-1",
       });
 
       expect(repo.rows.get(named.id)?.name).toBe("Acme Workspace");
@@ -296,26 +439,90 @@ describe("SlackIntegrationService", () => {
       });
     });
 
-    it("reuses the existing connection, widening it when another project holds it", async () => {
-      const first = await service.findOrCreateForSecret({
-        organizationId: "org-1",
+    it("reuses the project's own connection on a second save", async () => {
+      const first = await saveLegacy({
         projectId: "project-1",
-        kind: "INCOMING_WEBHOOK",
         secret: webhook,
-        actorId: "user-1",
-      });
-      const again = await service.findOrCreateForSecret({
-        organizationId: "org-1",
-        projectId: "project-2",
-        kind: "INCOMING_WEBHOOK",
-        secret: webhook,
-        actorId: "user-2",
       });
 
-      expect(again).toEqual({ id: first.id, created: false });
-      expect(repo.rows.get(first.id)).toMatchObject({
-        scopeType: "ORGANIZATION",
-        scopeId: "org-1",
+      const again = await saveLegacy({
+        projectId: "project-1",
+        secret: webhook,
+      });
+
+      expect(again).toEqual({ id: first.id, wasCreated: false });
+      expect(repo.rows.size).toBe(1);
+    });
+
+    describe("given only another project holds the secret", () => {
+      /** @scenario "A legacy secret held only by another project creates a connection for this project" */
+      it("creates a project connection for this project and never widens the other", async () => {
+        const other = await saveLegacy({
+          projectId: "project-2",
+          secret: webhook,
+        });
+        const before = repo.rows.get(other.id);
+
+        const own = await saveLegacy({
+          projectId: "project-1",
+          secret: webhook,
+        });
+
+        expect(own.wasCreated).toBe(true);
+        expect(own.id).not.toBe(other.id);
+        expect(repo.rows.get(own.id)).toMatchObject({
+          scopeType: "PROJECT",
+          scopeId: "project-1",
+        });
+        expect(repo.rows.get(other.id)).toEqual(before);
+        expect(repo.rows.get(other.id)).toMatchObject({
+          scopeType: "PROJECT",
+          scopeId: "project-2",
+        });
+      });
+    });
+
+    describe("given an organization connection holds the secret", () => {
+      /** @scenario "A legacy secret this project can already use reuses that connection" */
+      it("points at the organization connection and changes nothing", async () => {
+        const shared = await addBot();
+        const before = new Map(repo.rows);
+
+        const result = await saveLegacy({
+          projectId: "project-2",
+          kind: "BOT",
+          secret: "xoxb-alerts-1234",
+        });
+
+        expect(result).toEqual({ id: shared.id, wasCreated: false });
+        expect(repo.rows).toEqual(before);
+      });
+    });
+
+    describe("given a concurrent save stores the secret into this project first", () => {
+      /** @scenario "Two saves of one legacy secret racing in one project share one connection" */
+      it("answers the row stored first without changing any scope", async () => {
+        const other = await saveLegacy({
+          projectId: "project-2",
+          secret: webhook,
+        });
+        const rival = await saveLegacy({
+          projectId: "project-1",
+          secret: webhook,
+        });
+        const before = new Map(repo.rows);
+        const lookups = vi.spyOn(repo, "findAllByFingerprint");
+        lookups.mockResolvedValueOnce([]);
+
+        const result = await saveLegacy({
+          projectId: "project-1",
+          secret: webhook,
+        });
+
+        expect(result).toEqual({ id: rival.id, wasCreated: false });
+        expect(lookups).toHaveBeenCalledTimes(2);
+        expect(repo.rows).toEqual(before);
+        expect(repo.rows.get(other.id)?.scopeType).toBe("PROJECT");
       });
     });
   });

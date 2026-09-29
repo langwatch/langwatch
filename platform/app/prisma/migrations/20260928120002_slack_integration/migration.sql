@@ -11,7 +11,7 @@
 -- (AES-256-GCM, CREDENTIALS_SECRET); exactly one is set, matching kind, and
 -- neither is ever read back to a client. The ciphertext has a random IV, so
 -- secretFingerprint (an HMAC of the plaintext) is what makes one secret one
--- connection per organization: the unique index is the merge rule.
+-- connection per scope: a save never widens another project's connection.
 -- secretHint is the last four characters, for display. slackTeamId /
 -- slackTeamName are what auth.test returned for a bot token; null for webhooks.
 
@@ -44,7 +44,7 @@ CREATE TABLE "SlackIntegration" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "SlackIntegration_organizationId_secretFingerprint_key" ON "SlackIntegration"("organizationId", "secretFingerprint");
+CREATE UNIQUE INDEX "SlackIntegration_organizationId_scopeType_scopeId_secretFin_key" ON "SlackIntegration"("organizationId", "scopeType", "scopeId", "secretFingerprint");
 
 -- CreateIndex
 CREATE INDEX "SlackIntegration_scopeType_scopeId_idx" ON "SlackIntegration"("scopeType", "scopeId");

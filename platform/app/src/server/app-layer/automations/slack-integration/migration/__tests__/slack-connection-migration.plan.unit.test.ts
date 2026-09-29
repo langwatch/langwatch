@@ -279,6 +279,50 @@ describe("planSlackConnectionMigration", () => {
       expect(reused).not.toHaveProperty("widenedFromProjectId");
     });
 
+    it("reuses the organization's row when projects also hold their own copies", () => {
+      const shared: MigrationConnection = {
+        ...projectBotConnection({ projectId: "p1", id: "org-row" }),
+        scopeType: SlackIntegrationScopeType.ORGANIZATION,
+        scopeId: ORG,
+      };
+      const member = botAutomation({ projectId: "p1", token: TOKEN });
+
+      const [reused] = plan({
+        automations: [member],
+        connections: [
+          projectBotConnection({ projectId: "p1", id: "p1-row" }),
+          shared,
+        ],
+      }).connections;
+
+      expect(reused).toMatchObject({
+        action: "reuse",
+        connectionId: "org-row",
+        scopeType: SlackIntegrationScopeType.ORGANIZATION,
+      });
+      expect(reused).not.toHaveProperty("widenedFromProjectId");
+    });
+
+    it("reuses the copy in its members' project rather than widening another's", () => {
+      const member = botAutomation({ projectId: "p2", token: TOKEN });
+
+      const [reused] = plan({
+        automations: [member],
+        connections: [
+          projectBotConnection({ projectId: "p1", id: "p1-row" }),
+          projectBotConnection({ projectId: "p2", id: "p2-row" }),
+        ],
+      }).connections;
+
+      expect(reused).toMatchObject({
+        action: "reuse",
+        connectionId: "p2-row",
+        scopeType: SlackIntegrationScopeType.PROJECT,
+        scopeId: "p2",
+      });
+      expect(reused).not.toHaveProperty("widenedFromProjectId");
+    });
+
     it("skips a tokenless bot whose project has two bot connections to choose from", () => {
       const tokenless = botAutomation({ projectId: "p1" });
 

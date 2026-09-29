@@ -20,6 +20,7 @@ import {
 } from "../errors";
 import type {
   SlackConnectionChanges,
+  SlackConnectionRecord,
   SlackIntegrationRepository,
   SlackProjectScope,
 } from "./repositories/slack-integration.repository";
@@ -84,11 +85,24 @@ const defaultName = ({
 }): string =>
   `${kind === "BOT" ? "Slack bot" : "Slack webhook"} ••••${slackSecretHint({ secret })}`;
 
+type SlackScope = Pick<SlackConnectionRecord, "scopeType" | "scopeId">;
+
+/** A secret's stored form: ciphertext, fingerprint, hint and Slack workspace. */
+type StoredSecret = Pick<
+  SlackConnectionRecord,
+  | "botTokenEncrypted"
+  | "webhookUrlEncrypted"
+  | "secretFingerprint"
+  | "secretHint"
+  | "slackTeamId"
+  | "slackTeamName"
+>;
+
 /**
  * Named Slack connections (ADR-093 §5a): any number per organization, each a
  * bot token or an incoming webhook, scoped to the organization or one project.
- * One secret is one connection per organization; a bot token is checked with
- * Slack before it is stored, and no secret is ever returned to a client.
+ * One secret is one connection per scope and no save widens a scope; a bot
+ * token is checked with Slack before it is stored, and no secret is returned.
  */
 export class SlackIntegrationService implements SlackConnectionReader {
   constructor(
@@ -163,14 +177,13 @@ export class SlackIntegrationService implements SlackConnectionReader {
     secret: string;
     actorId: string;
   }): Promise<SlackConnectionView> {
-    const value = secret.trim();
-    const identity =
-      kind === "BOT" ? await this.verifyBotToken({ token: value }) : null;
-    const secretFingerprint = slackSecretFingerprint({ secret: value });
-    await this.assertSecretFree({
+    const stored = await this.storedSecret({ kind, secret: secret.trim() });
+    const guard = {
       organizationId: scope.organizationId,
-      secretFingerprint,
-    });
+      target: { scopeType, scopeId },
+      secretFingerprint: stored.secretFingerprint,
+    };
+    await this.assertSecretFree(guard);
     const row = await this.repo.create({
       record: {
         name: name.trim(),
@@ -178,19 +191,12 @@ export class SlackIntegrationService implements SlackConnectionReader {
         scopeType,
         scopeId,
         organizationId: scope.organizationId,
-        ...encryptedSecret({ kind, secret: value }),
-        secretFingerprint,
-        secretHint: slackSecretHint({ secret: value }),
-        slackTeamId: identity?.teamId ?? null,
-        slackTeamName: identity?.teamName ?? null,
+        ...stored,
       },
       actorId,
     });
     if (!row) {
-      await this.assertSecretFree({
-        organizationId: scope.organizationId,
-        secretFingerprint,
-      });
+      await this.assertSecretFree(guard);
       throw new Error("Slack connection create lost a race it cannot name");
     }
     return this.toView({ row, scope, dependentAutomations: 0 });
@@ -221,23 +227,23 @@ export class SlackIntegrationService implements SlackConnectionReader {
     };
     const value = secret?.trim();
     if (value) {
-      const identity =
-        connection.kind === "BOT"
-          ? await this.verifyBotToken({ token: value })
-          : null;
-      const secretFingerprint = slackSecretFingerprint({ secret: value });
-      await this.assertSecretFree({
-        organizationId: connection.organizationId,
-        secretFingerprint,
-        exceptId: connection.id,
-      });
-      Object.assign(changes, {
-        ...encryptedSecret({ kind: connection.kind, secret: value }),
-        secretFingerprint,
-        secretHint: slackSecretHint({ secret: value }),
-        slackTeamId: identity?.teamId ?? null,
-        slackTeamName: identity?.teamName ?? null,
-      });
+      Object.assign(
+        changes,
+        await this.storedSecret({ kind: connection.kind, secret: value }),
+      );
+    }
+    const guard = {
+      organizationId: connection.organizationId,
+      target: {
+        scopeType: changes.scopeType ?? connection.scopeType,
+        scopeId: changes.scopeId ?? connection.scopeId,
+      },
+      secretFingerprint:
+        changes.secretFingerprint ?? connection.secretFingerprint,
+      exceptId: connection.id,
+    };
+    if (value || scopeType !== undefined || scopeId !== undefined) {
+      await this.assertSecretFree(guard);
     }
     const row = await this.repo.update({
       id: connection.id,
@@ -246,11 +252,7 @@ export class SlackIntegrationService implements SlackConnectionReader {
       actorId,
     });
     if (!row) {
-      await this.assertSecretFree({
-        organizationId: connection.organizationId,
-        secretFingerprint: changes.secretFingerprint ?? "",
-        exceptId: connection.id,
-      });
+      await this.assertSecretFree(guard);
       throw new Error("Slack connection update lost a race it cannot name");
     }
     const counts = await this.repo.countDependentAutomations({
@@ -288,10 +290,9 @@ export class SlackIntegrationService implements SlackConnectionReader {
   }
 
   /**
-   * The connection holding this secret, created project-scoped if there is
-   * none. A match scoped to another project widens to the organization: both
-   * projects already hold the secret, the same rule as the migration (§5a).
-   * A bot token Slack refuses is still stored, named from its hint.
+   * A connection this project can already use holding the secret, else a new
+   * project connection. Never widens a scope: another project's copy is left
+   * as it is (§5a). A bot token Slack refuses is still stored, named from its hint.
    */
   async findOrCreateForSecret({
     organizationId,
@@ -305,21 +306,12 @@ export class SlackIntegrationService implements SlackConnectionReader {
     kind: SlackIntegrationKind;
     secret: string;
     actorId: string;
-  }): Promise<{ id: string; created: boolean }> {
+  }): Promise<{ id: string; wasCreated: boolean }> {
     const value = secret.trim();
     const secretFingerprint = slackSecretFingerprint({ secret: value });
-    const existing = await this.repo.findByFingerprint({
-      organizationId,
-      secretFingerprint,
-    });
-    if (existing) {
-      await this.widenToOrganization({
-        connection: existing,
-        projectId,
-        actorId,
-      });
-      return { id: existing.id, created: false };
-    }
+    const reach = { organizationId, projectId, secretFingerprint };
+    const existing = await this.findReachableHolder(reach);
+    if (existing) return { id: existing.id, wasCreated: false };
 
     const verified = kind === "BOT" ? await this.verifyToken(value) : null;
     const identity = verified?.ok ? verified.identity : null;
@@ -338,16 +330,12 @@ export class SlackIntegrationService implements SlackConnectionReader {
       },
       actorId,
     });
-    if (row) return { id: row.id, created: true };
+    if (row) return { id: row.id, wasCreated: true };
 
-    // Lost a race to a concurrent save of the same secret: that row is ours too.
-    const raced = await this.repo.findByFingerprint({
-      organizationId,
-      secretFingerprint,
-    });
+    // Lost a race to a concurrent save of this secret into this project.
+    const raced = await this.findReachableHolder(reach);
     if (!raced) throw new Error("Slack connection create lost a race");
-    await this.widenToOrganization({ connection: raced, projectId, actorId });
-    return { id: raced.id, created: false };
+    return { id: raced.id, wasCreated: false };
   }
 
   /** The dispatch reader: the decrypted secret, or null when out of reach. */
@@ -465,30 +453,43 @@ export class SlackIntegrationService implements SlackConnectionReader {
     return !!scope && isUsableBy({ connection, scope });
   }
 
-  private async widenToOrganization({
-    connection,
+  /** The project's own connection holding the secret, else its organization's. */
+  private async findReachableHolder({
+    organizationId,
     projectId,
-    actorId,
+    secretFingerprint,
   }: {
-    connection: SlackIntegration;
+    organizationId: string;
     projectId: string;
-    actorId: string;
-  }): Promise<void> {
-    if (
-      connection.scopeType !== "PROJECT" ||
-      connection.scopeId === projectId
-    ) {
-      return;
-    }
-    await this.repo.update({
-      id: connection.id,
-      organizationId: connection.organizationId,
-      changes: {
-        scopeType: "ORGANIZATION",
-        scopeId: connection.organizationId,
-      },
-      actorId,
+    secretFingerprint: string;
+  }): Promise<SlackIntegration | undefined> {
+    const holders = await this.repo.findAllByFingerprint({
+      organizationId,
+      secretFingerprint,
+      scopes: reachableScopes({ organizationId, projectId }),
     });
+    return (
+      holders.find((holder) => holder.scopeType === "PROJECT") ?? holders[0]
+    );
+  }
+
+  /** A typed secret's stored form; a bot token must be accepted by Slack first. */
+  private async storedSecret({
+    kind,
+    secret,
+  }: {
+    kind: SlackIntegrationKind;
+    secret: string;
+  }): Promise<StoredSecret> {
+    const identity =
+      kind === "BOT" ? await this.verifyBotToken({ token: secret }) : null;
+    return {
+      ...encryptedSecret({ kind, secret }),
+      secretFingerprint: slackSecretFingerprint({ secret }),
+      secretHint: slackSecretHint({ secret }),
+      slackTeamId: identity?.teamId ?? null,
+      slackTeamName: identity?.teamName ?? null,
+    };
   }
 
   /**
@@ -512,20 +513,32 @@ export class SlackIntegrationService implements SlackConnectionReader {
     throw new SlackIntegrationInvalidTokenError(verified.error);
   }
 
+  /**
+   * Refuses a write whose secret its target scope already holds. A project
+   * write also counts its organization's connections, which the project can
+   * already use; another project's copy never counts, nor is it named.
+   */
   private async assertSecretFree({
     organizationId,
+    target,
     secretFingerprint,
     exceptId,
   }: {
     organizationId: string;
+    target: SlackScope;
     secretFingerprint: string;
     exceptId?: string;
   }): Promise<void> {
-    const holder = await this.repo.findByFingerprint({
+    const holders = await this.repo.findAllByFingerprint({
       organizationId,
       secretFingerprint,
+      scopes:
+        target.scopeType === "ORGANIZATION"
+          ? [target]
+          : reachableScopes({ organizationId, projectId: target.scopeId }),
     });
-    if (holder && holder.id !== exceptId) {
+    const holder = holders.find((each) => each.id !== exceptId);
+    if (holder) {
       throw new SlackConnectionExistsError({
         connectionId: holder.id,
         connectionName: holder.name,
@@ -561,6 +574,20 @@ export class SlackIntegrationService implements SlackConnectionReader {
       updatedAt: row.updatedAt,
     };
   }
+}
+
+/** The scopes a project reaches: its organization's and its own (ADR-093 §5a). */
+function reachableScopes({
+  organizationId,
+  projectId,
+}: {
+  organizationId: string;
+  projectId: string;
+}): SlackScope[] {
+  return [
+    { scopeType: "ORGANIZATION", scopeId: organizationId },
+    { scopeType: "PROJECT", scopeId: projectId },
+  ];
 }
 
 /** Whether the project may deliver through the connection (ADR-093 §5a). */

@@ -1,8 +1,8 @@
 /**
  * Slack connection storage against a real database: the claims here are about
  * rows and the tenancy regime (an org-scoped model outside every regime makes
- * each query throw, which a mock cannot notice), the fingerprint unique index,
- * and counting automations across an organization's projects.
+ * each query throw, which a mock cannot notice), the per-scope fingerprint
+ * unique index, and counting automations across an organization's projects.
  */
 
 import { nanoid } from "nanoid";
@@ -152,7 +152,7 @@ describe("Feature: Slack connections storage", () => {
     });
   });
 
-  describe("given a fingerprint the organization already holds", () => {
+  describe("given a fingerprint the scope already holds", () => {
     it("create answers null instead of storing a second copy", async () => {
       await repo.create({
         record: record({ secretFingerprint: "same" }),
@@ -166,11 +166,39 @@ describe("Feature: Slack connections storage", () => {
 
       expect(second).toBeNull();
       await expect(
-        repo.findByFingerprint({
+        repo.findAllByFingerprint({
           organizationId: orgId(),
           secretFingerprint: "same",
+          scopes: [{ scopeType: "PROJECT", scopeId: project!.id }],
         }),
-      ).resolves.toMatchObject({ name: "Connection" });
+      ).resolves.toEqual([expect.objectContaining({ name: "Connection" })]);
+    });
+  });
+
+  describe("given one fingerprint held in several scopes", () => {
+    it("stores one copy per scope and reads only the scopes asked for", async () => {
+      const scopes: Pick<SlackConnectionRecord, "scopeType" | "scopeId">[] = [
+        { scopeType: "ORGANIZATION", scopeId: orgId() },
+        { scopeType: "PROJECT", scopeId: project!.id },
+        { scopeType: "PROJECT", scopeId: otherProject!.id },
+      ];
+      for (const scope of scopes) {
+        const stored = await repo.create({
+          record: record({ ...scope, secretFingerprint: "shared" }),
+          actorId: "user-1",
+        });
+        expect(stored).not.toBeNull();
+      }
+
+      const reachable = await repo.findAllByFingerprint({
+        organizationId: orgId(),
+        secretFingerprint: "shared",
+        scopes: scopes.slice(0, 2),
+      });
+
+      expect(reachable.map((row) => row.scopeId).sort()).toEqual(
+        [orgId(), project!.id].sort(),
+      );
     });
   });
 

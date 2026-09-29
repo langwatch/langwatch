@@ -50,18 +50,20 @@ export interface SlackIntegrationRepository {
     projectId: string;
   }): Promise<SlackIntegration[]>;
 
-  findByFingerprint(params: {
+  /** The connections holding this secret in any of `scopes`, at most one per scope. */
+  findAllByFingerprint(params: {
     organizationId: string;
     secretFingerprint: string;
-  }): Promise<SlackIntegration | null>;
+    scopes: Pick<SlackConnectionRecord, "scopeType" | "scopeId">[];
+  }): Promise<SlackIntegration[]>;
 
-  /** Null when the organization already holds this fingerprint (the unique index). */
+  /** Null when the scope already holds this fingerprint (the unique index). */
   create(params: {
     record: SlackConnectionRecord;
     actorId: string;
   }): Promise<SlackIntegration | null>;
 
-  /** Null when the new fingerprint collides with another connection. */
+  /** Null when the new fingerprint or scope collides with another connection. */
   update(params: {
     id: string;
     organizationId: string;

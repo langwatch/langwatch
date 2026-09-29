@@ -796,7 +796,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
   // Named Slack connections (ADR-021, ADR-093 section 5a), many per scope. A
   // query is bounded by a row id, the organizationId anchor (bare, or inside
-  // the (organizationId, secretFingerprint) compound unique), or a
+  // the per-scope secretFingerprint compound unique), or a
   // (scopeType, scopeId) predicate. No projectId column.
   SlackIntegration: {
     validateWhere: (where) => {
@@ -810,8 +810,8 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           typeof c.organizationId === "string" ||
           (c.organizationId && Array.isArray(c.organizationId.in)) ||
           hasScopePredicate(c) ||
-          typeof c.organizationId_secretFingerprint?.organizationId ===
-            "string",
+          typeof c.organizationId_scopeType_scopeId_secretFingerprint
+            ?.organizationId === "string",
       );
       return ok ? null : reason;
     },

@@ -1,7 +1,7 @@
 /**
  * SlackIntegration as migration 20260928120002_slack_integration deploys it:
- * the (organizationId, secretFingerprint) unique index the re-plan relies on,
- * plus the scope index and enums the code reads.
+ * the per-scope (organizationId, scopeType, scopeId, secretFingerprint) unique
+ * index the re-plan relies on, plus the scope index and enums the code reads.
  */
 
 import { nanoid } from "nanoid";
@@ -20,16 +20,20 @@ describe("SlackIntegration table", () => {
   const store = ({
     organizationId,
     fingerprint,
+    projectId,
   }: {
     organizationId: string;
     fingerprint: string;
+    projectId?: string;
   }) =>
     prisma.slackIntegration.create({
       data: {
         name: "Table test",
         kind: SlackIntegrationKind.INCOMING_WEBHOOK,
-        scopeType: SlackIntegrationScopeType.ORGANIZATION,
-        scopeId: organizationId,
+        scopeType: projectId
+          ? SlackIntegrationScopeType.PROJECT
+          : SlackIntegrationScopeType.ORGANIZATION,
+        scopeId: projectId ?? organizationId,
         organizationId,
         webhookUrlEncrypted: "iv:ciphertext:tag",
         secretFingerprint: fingerprint,
@@ -45,7 +49,7 @@ describe("SlackIntegration table", () => {
     });
   });
 
-  it("refuses a second connection for one secret in one organization with a unique violation", async () => {
+  it("refuses a second connection for one secret in one scope with a unique violation", async () => {
     await store({
       organizationId: firstOrganization,
       fingerprint: "fp-shared",
@@ -60,21 +64,36 @@ describe("SlackIntegration table", () => {
     expect(refused).toMatchObject({ code: "P2002" });
   });
 
-  it("accepts that secret in another organization and another secret in the same one", async () => {
+  it("accepts that secret in another organization or scope, and another secret in the same scope", async () => {
     await store({ organizationId: firstOrganization, fingerprint: "fp-own" });
     await store({ organizationId: secondOrganization, fingerprint: "fp-own" });
     await store({ organizationId: firstOrganization, fingerprint: "fp-other" });
+    for (const projectId of ["project-a", "project-b"]) {
+      await store({
+        organizationId: firstOrganization,
+        fingerprint: "fp-own",
+        projectId,
+      });
+    }
 
     const stored = await prisma.slackIntegration.findMany({
       where: { organizationId: { in: organizationIds } },
-      select: { organizationId: true, secretFingerprint: true },
+      select: { organizationId: true, scopeId: true, secretFingerprint: true },
     });
     expect(stored).toEqual(
-      expect.arrayContaining([
-        { organizationId: firstOrganization, secretFingerprint: "fp-own" },
-        { organizationId: secondOrganization, secretFingerprint: "fp-own" },
-        { organizationId: firstOrganization, secretFingerprint: "fp-other" },
-      ]),
+      expect.arrayContaining(
+        [
+          [firstOrganization, firstOrganization, "fp-own"],
+          [secondOrganization, secondOrganization, "fp-own"],
+          [firstOrganization, firstOrganization, "fp-other"],
+          [firstOrganization, "project-a", "fp-own"],
+          [firstOrganization, "project-b", "fp-own"],
+        ].map(([organizationId, scopeId, secretFingerprint]) => ({
+          organizationId,
+          scopeId,
+          secretFingerprint,
+        })),
+      ),
     );
   });
 
@@ -92,7 +111,7 @@ describe("SlackIntegration table", () => {
     expect(indexes.map((index) => index.indexdef)).toEqual(
       expect.arrayContaining([
         expect.stringMatching(
-          /UNIQUE INDEX "SlackIntegration_organizationId_secretFingerprint_key" .*\("organizationId", "secretFingerprint"\)/,
+          /UNIQUE INDEX "SlackIntegration_organizationId_scopeType_scopeId_secretFin_key" .*\("organizationId", "scopeType", "scopeId", "secretFingerprint"\)/,
         ),
         expect.stringMatching(
           /INDEX "SlackIntegration_scopeType_scopeId_idx" .*\("scopeType", "scopeId"\)/,

@@ -70,17 +70,23 @@ export class PrismaSlackIntegrationRepository
     });
   }
 
-  async findByFingerprint({
+  async findAllByFingerprint({
     organizationId,
     secretFingerprint,
+    scopes,
   }: {
     organizationId: string;
     secretFingerprint: string;
-  }): Promise<SlackIntegration | null> {
-    return this.prisma.slackIntegration.findUnique({
+    scopes: Pick<SlackConnectionRecord, "scopeType" | "scopeId">[];
+  }): Promise<SlackIntegration[]> {
+    if (scopes.length === 0) return [];
+    return this.prisma.slackIntegration.findMany({
       where: {
-        organizationId_secretFingerprint: { organizationId, secretFingerprint },
+        organizationId,
+        secretFingerprint,
+        OR: scopes.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
       },
+      orderBy: { createdAt: "asc" },
     });
   }
 

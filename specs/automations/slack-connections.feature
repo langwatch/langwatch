@@ -3,7 +3,7 @@ Feature: Slack connections
   An organization keeps any number of named Slack connections, each a bot
   token or an incoming webhook, each usable by the whole organization or by
   one project. Automations point at a connection instead of carrying their own
-  copy of the secret, so a secret is stored once and rotated in one place.
+  copy of the secret, so a secret is stored once per scope and rotated there.
 
   Supersedes the "Slack is set up once per project" and "An automation's own
   stored token outranks the project integration" rules that lived in
@@ -45,10 +45,24 @@ Feature: Slack connections
       And no connection is stored
 
     @integration
-    Scenario: The same secret cannot be stored twice in an organization
+    Scenario: The same secret cannot be stored twice in one scope
       Given the organization already has a connection named "Alerts bot" with a bot token
-      When the user adds another connection with the same token
+      When the user adds another connection with the same token in the same scope
       Then it is refused with the machine-readable connection-exists code naming "Alerts bot"
+
+    @unit
+    Scenario: A project connection is refused when its organization already holds the secret
+      Given the organization has an organization connection named "Alerts bot" with a bot token
+      When the user adds a project connection with the same token
+      # The project can already use that connection, so a copy adds nothing.
+      Then it is refused with the machine-readable connection-exists code naming "Alerts bot"
+
+    @unit
+    Scenario: A secret only another project holds can still be stored for this project
+      Given another project has a project connection holding a webhook URL
+      When the user adds a project connection with the same URL
+      Then a project connection for this project holds it
+      And the other project's connection is unchanged and still project-scoped
 
     @integration
     Scenario: Scope decides who may change a connection
@@ -87,6 +101,42 @@ Feature: Slack connections
       And nothing is deleted yet
       When the user confirms
       Then the connection is removed
+
+  Rule: Saving never widens a connection's scope
+
+    A save only ever writes the scope the caller asked for. Legacy secrets from
+    the API, MCP, CLI or an automation save reuse a connection this project can
+    already use, or become a new project connection. Only an explicit
+    organization-scoped create or move makes an organization connection.
+
+    @unit
+    Scenario: A legacy secret held only by another project creates a connection for this project
+      Given another project has a project connection holding a webhook URL
+      When an automation in this project is saved with that webhook URL as a legacy secret
+      Then a new project connection for this project holds it and the automation points at it
+      And the other project's connection is unchanged and still project-scoped
+
+    @unit
+    Scenario: A legacy secret this project can already use reuses that connection
+      Given the organization has an organization connection holding a bot token
+      When an automation in this project is saved with that bot token as a legacy secret
+      Then the automation points at the organization connection
+      And no connection is created or changed
+
+    @unit
+    Scenario: Two saves of one legacy secret racing in one project share one connection
+      Given two automations in this project are saved with the same new webhook URL at once
+      When one save's insert is refused by the unique secret index
+      Then that save points at the connection the other stored
+      And no connection's scope is changed
+
+    @unit
+    Scenario: Only an explicit organization-scoped create makes an organization connection
+      Given two projects that each saved the same webhook URL as a legacy secret
+      Then each holds its own project connection and none is organization-scoped
+      When a user who can manage the organization adds a connection with that URL scoped to the organization
+      Then an organization connection holds it
+      And both project connections are left as they were
 
   Rule: The settings page and the automation drawer share one connection drawer
 
@@ -146,7 +196,8 @@ Feature: Slack connections
     @integration
     Scenario: A legacy secret over the API is stored as a connection
       When an API client creates a Slack automation with a webhook URL
-      Then a project connection for that URL is found or created
+      Then a connection for that URL this project can already use is reused, or a project connection is created
+      And no connection's scope is changed
       And the automation points at it and stores no secret of its own
 
   Rule: One migration moves every automation's secret into connections

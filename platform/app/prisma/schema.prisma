@@ -2318,8 +2318,8 @@ enum SlackIntegrationKind {
 /// One named Slack connection (ADR-093 §5a); an organization holds as many as
 /// it likes, each scoped to the organization or to one project. The secret is
 /// AES-256-GCM ciphertext and never returned to a client. `secretFingerprint`
-/// is an HMAC of the plaintext, so one secret is one connection per
-/// organization without decrypting anything. No foreign key: `scopeId` is
+/// is an HMAC of the plaintext, so one secret is one connection per scope
+/// without decrypting anything. No foreign key: `scopeId` is
 /// polymorphic (ADR-021), as on RetentionPolicy and CustomLLMModelCost.
 model SlackIntegration {
   id                  String                    @id @default(nanoid())
@@ -2339,7 +2339,7 @@ model SlackIntegration {
   createdAt           DateTime                  @default(now())
   updatedAt           DateTime                  @default(now()) @updatedAt
 
-  @@unique([organizationId, secretFingerprint])
+  @@unique([organizationId, scopeType, scopeId, secretFingerprint])
   @@index([scopeType, scopeId])
 }
 

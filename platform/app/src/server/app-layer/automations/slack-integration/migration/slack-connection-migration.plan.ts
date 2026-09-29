@@ -104,7 +104,8 @@ interface Group {
   fingerprint: string;
   kind: SlackIntegrationKind;
   secret?: string;
-  existing?: MigrationConnection;
+  /** Every connection holding the secret; the unique index allows one per scope. */
+  holders: MigrationConnection[];
   members: MigrationAutomation[];
 }
 
@@ -188,19 +189,37 @@ function classify({
   return { outcome: "join", kind, secret, fingerprint };
 }
 
+/** The row a group reuses: the organization's, else one in a member's project, else any. */
+function reusedHolder({
+  group,
+}: {
+  group: Group;
+}): MigrationConnection | undefined {
+  const projects = new Set(group.members.map((member) => member.projectId));
+  return (
+    group.holders.find(
+      (holder) => holder.scopeType === SlackIntegrationScopeType.ORGANIZATION,
+    ) ??
+    group.holders.find((holder) => projects.has(holder.scopeId)) ??
+    group.holders[0]
+  );
+}
+
 /** One project when every member (and the reused row) sits in it, else the organization. */
 function scopeFor({
   group,
+  existing,
   organizationId,
 }: {
   group: Group;
+  existing: MigrationConnection | undefined;
   organizationId: string;
 }): Pick<ConnectionTarget, "scopeType" | "scopeId"> {
-  if (group.existing?.scopeType === SlackIntegrationScopeType.ORGANIZATION) {
-    return { scopeType: group.existing.scopeType, scopeId: organizationId };
+  if (existing?.scopeType === SlackIntegrationScopeType.ORGANIZATION) {
+    return { scopeType: existing.scopeType, scopeId: organizationId };
   }
   const projects = new Set(group.members.map((member) => member.projectId));
-  if (group.existing) projects.add(group.existing.scopeId);
+  if (existing) projects.add(existing.scopeId);
   const [only] = projects;
   if (projects.size === 1 && only) {
     return { scopeType: SlackIntegrationScopeType.PROJECT, scopeId: only };
@@ -218,19 +237,20 @@ function plannedConnectionFor({
   group: Group;
   organizationId: string;
 }): PlannedConnection | undefined {
-  const scope = scopeFor({ group, organizationId });
-  if (group.existing) {
+  const existing = reusedHolder({ group });
+  const scope = scopeFor({ group, existing, organizationId });
+  if (existing) {
     const widened =
-      group.existing.scopeType === SlackIntegrationScopeType.PROJECT &&
+      existing.scopeType === SlackIntegrationScopeType.PROJECT &&
       scope.scopeType === SlackIntegrationScopeType.ORGANIZATION;
     return {
       action: "reuse",
-      connectionId: group.existing.id,
-      name: group.existing.name,
-      kind: group.existing.kind,
+      connectionId: existing.id,
+      name: existing.name,
+      kind: existing.kind,
       ...scope,
       members: group.members,
-      ...(widened ? { widenedFromProjectId: group.existing.scopeId } : {}),
+      ...(widened ? { widenedFromProjectId: existing.scopeId } : {}),
     };
   }
   if (group.secret === undefined) return undefined;
@@ -250,23 +270,25 @@ function plannedConnectionFor({
   };
 }
 
-/** The group for a fingerprint, opened on first sight with any connection already holding it. */
+/** The group for a fingerprint, opened on first sight with the connections already holding it. */
 function groupFor({
   groups,
-  byFingerprint,
+  connections,
   joined,
 }: {
   groups: Map<string, Group>;
-  byFingerprint: Map<string, MigrationConnection>;
+  connections: MigrationConnection[];
   joined: Joined;
 }): Group {
   const found = groups.get(joined.fingerprint);
   if (found) return found;
-  const existing = byFingerprint.get(joined.fingerprint);
+  const holders = connections.filter(
+    (connection) => connection.secretFingerprint === joined.fingerprint,
+  );
   const group: Group = {
     fingerprint: joined.fingerprint,
-    kind: existing?.kind ?? joined.kind,
-    existing,
+    kind: holders[0]?.kind ?? joined.kind,
+    holders,
     members: [],
   };
   groups.set(joined.fingerprint, group);
@@ -294,9 +316,6 @@ export function planSlackConnectionMigration({
   decryptSecret: SecretReader;
   fingerprintSecret: Fingerprinter;
 }): OrganizationMigrationPlan {
-  const byFingerprint = new Map(
-    connections.map((connection) => [connection.secretFingerprint, connection]),
-  );
   const groups = new Map<string, Group>();
   const skipped: SkippedAutomation[] = [];
   const archived = new Set(archivedProjectIds);
@@ -314,7 +333,7 @@ export function planSlackConnectionMigration({
       skipped.push({ automation, reason: classified.reason });
       continue;
     }
-    const group = groupFor({ groups, byFingerprint, joined: classified });
+    const group = groupFor({ groups, connections, joined: classified });
     if (group.kind !== classified.kind) {
       skipped.push({ automation, reason: "kind conflict" });
       continue;

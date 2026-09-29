@@ -95,7 +95,7 @@ describe("PublicApiTriggerService.create() for Slack", () => {
   describe("given a connection id and a channel", () => {
     /** @scenario "The API accepts a connection id" */
     it("points the automation at the connection and reads back no secret", async () => {
-      const { id } = await repo.create({
+      const stored = await repo.create({
         record: {
           name: "Alerts bot",
           kind: "BOT",
@@ -111,6 +111,7 @@ describe("PublicApiTriggerService.create() for Slack", () => {
         },
         actorId: "user-1",
       });
+      const id = stored!.id;
 
       const trigger = await createSlack({
         slackIntegrationId: id,
@@ -131,9 +132,30 @@ describe("PublicApiTriggerService.create() for Slack", () => {
   describe("given a legacy webhook URL", () => {
     /** @scenario "A legacy secret over the API is stored as a connection" */
     it("finds or creates a project connection and stores no secret of its own", async () => {
+      const other = await repo.create({
+        record: {
+          name: "Search alerts",
+          kind: "INCOMING_WEBHOOK",
+          scopeType: "PROJECT",
+          scopeId: "project-2",
+          organizationId: "org-1",
+          botTokenEncrypted: null,
+          webhookUrlEncrypted: `enc(${WEBHOOK})`,
+          secretFingerprint: `fp(${WEBHOOK})`,
+          secretHint: "abcd",
+          slackTeamId: null,
+          slackTeamName: null,
+        },
+        actorId: "user-2",
+      });
+      const otherBefore = { ...other! };
+
       const trigger = await createSlack({ slackWebhook: WEBHOOK });
 
-      const [connection] = [...repo.rows.values()];
+      expect(repo.rows.get(otherBefore.id)).toEqual(otherBefore);
+      const connection = [...repo.rows.values()].find(
+        (row) => row.id !== otherBefore.id,
+      );
       expect(connection).toMatchObject({
         kind: "INCOMING_WEBHOOK",
         scopeType: "PROJECT",
@@ -147,7 +169,8 @@ describe("PublicApiTriggerService.create() for Slack", () => {
       expect(JSON.stringify(trigger.actionParams)).not.toContain(WEBHOOK);
 
       await createSlack({ slackWebhook: WEBHOOK });
-      expect(repo.rows.size).toBe(1);
+      expect(repo.rows.size).toBe(2);
+      expect(repo.rows.get(otherBefore.id)).toEqual(otherBefore);
     });
   });
 });
