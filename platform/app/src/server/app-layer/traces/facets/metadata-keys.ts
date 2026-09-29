@@ -18,7 +18,7 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 export function buildMetadataKeysFacetQuery(
   ctx: FacetQueryContext,
 ): FacetQuery {
-  const where = buildTimeWhere("OccurredAt");
+  const where = buildTimeWhere("OccurredAt", ctx);
   const prefixFilter = ctx.prefix
     ? "AND lower(key) ILIKE concat({prefix:String}, '%')"
     : "";

@@ -45,6 +45,12 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
+// The guided tour host reads the guided onboarding state over tRPC; this
+// suite covers the layout, not the tour.
+vi.mock("~/features/guided-onboarding/tour/GuidedOnboardingHost", () => ({
+  GuidedOnboardingHost: () => null,
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const { useSyncExternalStore } = await import("react");
   return {

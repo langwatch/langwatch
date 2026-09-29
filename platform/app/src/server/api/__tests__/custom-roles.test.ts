@@ -1,35 +1,21 @@
+import { permissionSatisfiedBy } from "@langwatch/authz";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { hasProjectPermission, type Permission } from "../rbac";
+import { OrganizationUserRole } from "~/generated/prisma/client";
+import {
+  hasProjectPermission,
+  type Permission,
+} from "~/server/app-layer/authz/permission-adapters";
 
-// Helper function to test permission hierarchy logic
-function hasPermissionWithHierarchy(
-  permissions: string[],
+// Custom-role JSON is intentionally tested as arbitrary strings; the
+// canonical matcher owns manage-to-action hierarchy semantics.
+const hasPermissionWithHierarchy = (
+  permissions: readonly string[] | null | undefined,
   requestedPermission: string,
-): boolean {
-  // Handle undefined or null permissions
-  if (!permissions || !Array.isArray(permissions)) {
-    return false;
-  }
-
-  // Direct match
-  if (permissions.includes(requestedPermission)) {
-    return true;
-  }
-
-  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
-  const actionSuffixes = [":view", ":create", ":update", ":delete"];
-  for (const suffix of actionSuffixes) {
-    if (requestedPermission.endsWith(suffix)) {
-      const managePermission = requestedPermission.replace(suffix, ":manage");
-      if (permissions.includes(managePermission)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
+): boolean =>
+  permissionSatisfiedBy({
+    granted: new Set(permissions ?? []),
+    requested: requestedPermission,
+  });
 
 // Default project mock — returns team+org info in the shape resolveProjectPermission expects
 const mockProjectResult = {
@@ -57,15 +43,16 @@ const mockPrisma = {
   teamUserCustomRole: {
     findFirst: vi.fn(),
   },
-  customRole: {
+  role: {
+    findMany: vi.fn(),
     findFirst: vi.fn(),
-    findUnique: vi.fn(),
   },
   groupMembership: {
     findMany: vi.fn(),
   },
-  roleBinding: {
+  grant: {
     findMany: vi.fn(),
+    findFirst: vi.fn(),
   },
 } as any;
 
@@ -93,13 +80,33 @@ describe("Custom Role Functionality Tests", () => {
 
   describe("Custom Role Permission Inheritance", () => {
     it("allows custom role with manage permission to access view permission", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: ["workflows:manage"],
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: ["workflows:manage"],
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -111,13 +118,33 @@ describe("Custom Role Functionality Tests", () => {
     });
 
     it("allows custom role with manage permission to access create permission", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: ["workflows:manage"],
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: ["workflows:manage"],
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -129,13 +156,33 @@ describe("Custom Role Functionality Tests", () => {
     });
 
     it("allows custom role with manage permission to access update permission", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: ["workflows:manage"],
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: ["workflows:manage"],
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -147,13 +194,33 @@ describe("Custom Role Functionality Tests", () => {
     });
 
     it("allows custom role with manage permission to access delete permission", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: ["workflows:manage"],
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: ["workflows:manage"],
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -165,13 +232,33 @@ describe("Custom Role Functionality Tests", () => {
     });
 
     it("does not allow custom role with only view permission to access manage permission", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: ["workflows:view"],
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: ["workflows:view"],
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -185,19 +272,39 @@ describe("Custom Role Functionality Tests", () => {
 
   describe("Complex Custom Role Scenarios", () => {
     it("handles custom role with mixed permissions correctly", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: [
-          "workflows:manage",
-          "datasets:view",
-          "analytics:manage",
-          "traces:share",
-          "traces:view",
-        ],
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: [
+            "workflows:manage",
+            "datasets:view",
+            "analytics:manage",
+            "traces:share",
+            "traces:view",
+          ],
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       // Should have workflows:manage -> can access all workflows permissions
       expect(
@@ -301,14 +408,34 @@ describe("Custom Role Functionality Tests", () => {
       ).toBe(true);
     });
 
-    it("handles custom role with no permissions", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+    it("denies a custom role with no permissions", async () => {
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: [], // No permissions — falls back to built-in role
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: [], // No permissions — falls back to built-in role,
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -316,18 +443,39 @@ describe("Custom Role Functionality Tests", () => {
         "workflows:view" as Permission,
       );
 
-      // Falls back to built-in role (VIEWER can view workflows)
-      expect(result).toBe(true);
+      // An empty custom role is authoritative and fails closed in the
+      // canonical grants engine; it does not regain the viewer bag.
+      expect(result).toBe(false);
     });
 
     it("handles custom role with invalid permission format", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: ["invalid-permission", "workflows:view"],
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: ["invalid-permission", "workflows:view"],
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       // Should still work with valid permissions
       const result = await hasProjectPermission(
@@ -342,10 +490,21 @@ describe("Custom Role Functionality Tests", () => {
 
   describe("Edge Cases and Error Handling", () => {
     it("handles null custom role gracefully", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.ADMIN, customRoleId: null },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "admin",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue(null);
+      mockPrisma.role.findMany.mockResolvedValue([]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -356,14 +515,34 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("handles custom role with null permissions", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.ADMIN, customRoleId: "custom-role-123" },
+    it("denies a custom role with null permissions", async () => {
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "custom:custom-role-123",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue({
-        id: "custom-role-123",
-        permissions: null,
-      });
+      mockPrisma.role.findMany.mockResolvedValue([
+        {
+          id: "custom-role-123",
+          organizationId: "org-123",
+          name: "Custom role",
+          description: null,
+          kind: "custom",
+          permissions: null,
+          deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -371,14 +550,26 @@ describe("Custom Role Functionality Tests", () => {
         "workflows:view" as Permission,
       );
 
-      expect(result).toBe(true); // Falls back to built-in role
+      // Malformed custom-role payloads are parsed as an empty permission set.
+      expect(result).toBe(false);
     });
 
     it("handles team with null default custom role", async () => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.VIEWER, customRoleId: null },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          id: "grant-123",
+          organizationId: "org-123",
+          principalType: "USER",
+          principalId: "user-123",
+          roleKey: "viewer",
+          scopeType: "PROJECT",
+          scopeId: "project-123",
+          revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
+        },
       ]);
-      mockPrisma.customRole.findFirst.mockResolvedValue(null);
+      mockPrisma.role.findMany.mockResolvedValue([]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },

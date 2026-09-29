@@ -38,6 +38,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 
 /**
  * Every outbound request the probe could make, recorded.
@@ -138,14 +139,12 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: orgId,
-        userId: admin.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: orgId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: orgId,
+      userId: admin.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: orgId,
     });
 
     // A plain MEMBER of this organization. Holds `organization:view` and
@@ -196,14 +195,12 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: outsiderOrgId,
-        userId: outsider.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: outsiderOrgId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: outsiderOrgId,
+      userId: outsider.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: outsiderOrgId,
     });
   });
 
@@ -213,6 +210,7 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
       // not an in-list, so one entry per organization.
       ["modelProvider", { organizationId: orgId }],
       ["modelProvider", { organizationId: outsiderOrgId }],
+      ["grant", { organizationId: { in: [orgId, outsiderOrgId] } }],
       ["roleBinding", { organizationId: { in: [orgId, outsiderOrgId] } }],
       ["organizationUser", { organizationId: { in: [orgId, outsiderOrgId] } }],
       ["team", { id: teamId }],

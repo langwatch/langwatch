@@ -117,6 +117,10 @@ describe("routing handle", () => {
       }
     });
 
+    it("refuses the family a connected install routes managed models through", () => {
+      expect(check("langwatch")).toBe("reserved");
+    });
+
     it("refuses the application's own model wire prefix", () => {
       expect(check("mp")).toBe("reserved");
     });

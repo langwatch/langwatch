@@ -4,6 +4,7 @@ type AgentEditorDrawerName =
   | "agentCodeEditor"
   | "agentConnectedDetail"
   | "agentHttpEditor"
+  | "agentVoiceEditor"
   | "agentWorkflowEditor";
 
 export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawerName {
@@ -12,6 +13,8 @@ export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawerName {
       return "agentCodeEditor";
     case "http":
       return "agentHttpEditor";
+    case "voice":
+      return "agentVoiceEditor";
     case "workflow":
       return "agentWorkflowEditor";
     case "signature":

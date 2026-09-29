@@ -16,15 +16,21 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service";
-import type { TraceOriginService } from "../trace-origin.service";
+import { TraceOriginService } from "../trace-origin.service";
 
 function makeService() {
   return new TraceAttributeAccumulationService(
     // extractAttributes never touches the origin service.
     {} as TraceOriginService,
   );
+}
+
+function makeAccumulationService() {
+  // accumulateAttributes does reach the origin service, so use the real one.
+  return new TraceAttributeAccumulationService(new TraceOriginService());
 }
 
 function makeSpan(
@@ -305,6 +311,139 @@ describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata chann
       expect(
         Object.keys(result).filter((key) => key.startsWith("metadata.")),
       ).toEqual([]);
+    });
+  });
+
+  describe("when a span carries a causality depth", () => {
+    /**
+     * The evaluation-trigger loop guard reads this key off the fold state on
+     * events that carry no span payload (origin_resolved). If accumulation
+     * drops it, evaluator-emitted traces dispatch unguarded and evaluate
+     * their own output.
+     */
+    it("folds an integer depth into the trace attributes", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": 1 },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBe("1");
+    });
+
+    it("folds a string depth into the trace attributes", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": "2" },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBe("2");
+    });
+
+    it("drops a non-numeric depth", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": "deep" },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBeUndefined();
+    });
+
+    /**
+     * Number("") and Number("  ") are both a finite 0, so a blank attribute
+     * would otherwise be stored as a real depth of zero — metadata the span
+     * never carried.
+     */
+    it.each([
+      ["empty", ""],
+      ["whitespace", "   "],
+    ])("drops a %s depth rather than reading it as zero", (_label, value) => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": value },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBeUndefined();
+    });
+
+    it("drops a fractional depth, which is not a count of hops", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": "1.5" },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * A trace can carry both application spans (depth 0) and evaluator-emitted
+ * spans (depth >= 1). The ordinary attribute merge is existing-wins, which
+ * would let whichever span folded first pin the depth for the whole trace —
+ * so an application span arriving before the evaluator's would hold the
+ * trace at "0" and the loop guard would never fire on it. Depth answers
+ * "has this trace been through the evaluator", so it only climbs.
+ */
+describe("TraceAttributeAccumulationService.accumulateAttributes", () => {
+  function accumulate(
+    existingDepth: string | undefined,
+    incomingDepth: number | string | undefined,
+  ): Record<string, string> {
+    const attributes: Record<string, string> = {};
+    if (existingDepth !== void 0) {
+      attributes["langwatch.reserved.causality_depth"] = existingDepth;
+    }
+    const spanAttributes: Record<string, unknown> = {};
+    if (incomingDepth !== void 0) {
+      spanAttributes["langwatch.reserved.causality_depth"] = incomingDepth;
+    }
+    return makeAccumulationService().accumulateAttributes({
+      state: { attributes } as unknown as TraceSummaryData,
+      span: makeSpan({
+        spanAttributes: spanAttributes as NormalizedSpan["spanAttributes"],
+      }),
+      outputSource: "span",
+      inputIsFallback: false,
+      outputIsFallback: false,
+      inputMediaRefs: null,
+      outputMediaRefs: null,
+    });
+  }
+
+  describe("when a depth-0 span folded before the evaluator's depth-1 span", () => {
+    /** @scenario "A trace keeps the highest evaluator depth any of its spans carried" */
+    it("raises the trace to the evaluator depth", () => {
+      const result = accumulate("0", 1);
+      expect(result["langwatch.reserved.causality_depth"]).toBe("1");
+    });
+  });
+
+  describe("when a depth-1 span folded before a later depth-0 span", () => {
+    it("keeps the evaluator depth", () => {
+      const result = accumulate("1", 0);
+      expect(result["langwatch.reserved.causality_depth"]).toBe("1");
+    });
+  });
+
+  describe("when only one side carries a depth", () => {
+    it("takes the incoming depth when the trace has none", () => {
+      expect(accumulate(void 0, 2)["langwatch.reserved.causality_depth"]).toBe(
+        "2",
+      );
+    });
+
+    it("keeps the trace depth when the span has none", () => {
+      expect(
+        accumulate("3", void 0)["langwatch.reserved.causality_depth"],
+      ).toBe("3");
+    });
+  });
+
+  describe("when neither side carries a depth", () => {
+    it("leaves the key off the trace", () => {
+      expect(
+        accumulate(void 0, void 0)["langwatch.reserved.causality_depth"],
+      ).toBeUndefined();
     });
   });
 });

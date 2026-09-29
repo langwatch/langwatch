@@ -28,7 +28,7 @@ export function newJoinRequestCommandId(): string {
  * redelivered by a lagged worker derives byte-identical idempotency keys and
  * the event store dedupes it. A wake that fires twice must cost one event.
  */
-export function expireJoinCommandId({
+function expireJoinCommandId({
   joinRequestId,
   scheduledFor,
 }: {

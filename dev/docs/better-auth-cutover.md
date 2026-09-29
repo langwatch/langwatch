@@ -118,3 +118,14 @@ Run this in order on prod:
 - **OAuth callback errors**: the migration preserves the legacy NextAuth callback paths via a Next.js rewrite + a `redirectURI` override on the genericOAuth providers (auth0/okta). Existing customer applications in Auth0/Okta should continue to work without updating their allowed callbacks. If errors persist, double-check that the customer's IdP has `${NEXTAUTH_URL}/api/auth/callback/{provider}` (NOT `/api/auth/oauth2/callback/{provider}`) in its allowed redirect URI list — that's the path we pin to.
 - **Admin impersonation broken**: verify the legacy `Session.impersonating` JSON column is still present — it's preserved by the migration but worth double-checking in prod.
 - **SSO domain auto-add silently not firing**: BetterAuth lowercases emails on signup/signin, so the `extractEmailDomain` runtime lookup always queries with lowercase. If `Organization.ssoDomain` was stored with mixed case (e.g. "ACME.COM") before the iter-30 fix, the lookup won't match. One-time fix: `UPDATE "Organization" SET "ssoDomain" = LOWER("ssoDomain") WHERE "ssoDomain" IS NOT NULL;`. The iter-30 fix in `src/pages/api/admin/[resource].ts` ensures future admin writes are normalized.
+
+## Documentation screenshots
+
+Set `HIDE_DEV_INDICATOR=1` before starting the app to hide the DEV badge and
+orange header tint. Restart the API and reload the browser after changing it.
+Keep `NODE_ENV=development`; this flag changes only the presentation.
+Impersonation indicators remain visible.
+
+Use a local test organization, hide tokens and invite links, and capture the
+actual page in both themes after its state has settled. User guides live in
+`docs/platform/`; update their navigation labels and screenshots together.

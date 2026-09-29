@@ -7,10 +7,13 @@
  * - GET /api/health/processor   (sends canary traces + polls until processed)
  * - GET /api/health/triggers    (checks a trigger fired within the last hour)
  * - GET /api/health/workflows   (runs a sample workflow)
+ * - GET /api/health/scenarios   (runs a scenario plan and waits for the judge)
+ * - GET /api/health/langy       (sends Langy one greeting turn and waits for it)
  *
  * NOTE: The simple GET /api/health (204) is already handled in health.ts.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type {
   ESpanKind,
@@ -21,8 +24,11 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { TokenResolver } from "~/server/api-key/token-resolver";
+import { authorizeLangyApiKey } from "~/server/app-layer/langy/langyApiKeyAuthorization";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
+import { runLangyHealthCanary } from "~/server/health-probes/langy-canary.service";
 import { runScenarioHealthCanary } from "~/server/health-probes/scenario-canary.service";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
@@ -36,7 +42,25 @@ const sleep = (ms: number): Promise<void> =>
 
 // ── shared auth helper ───────────────────────────────────────────────
 
-async function authenticateProject(c: {
+const tokenResolver = TokenResolver.create(prisma);
+
+/**
+ * Resolves the project credential behind a health probe, or the refusal body to
+ * answer with.
+ *
+ * Routed through {@link TokenResolver.resolve} rather than a bespoke
+ * `prisma.project.findUnique({ where: { apiKey } })`, so an API key that
+ * self-scopes to exactly one project (not just a legacy project key) can
+ * authenticate a health probe too. Legacy project keys still resolve exactly
+ * as before (the resolver's legacy path is an exact `Project.apiKey` match),
+ * and an unknown, revoked, or ambiguous (multi-project) key gets the same
+ * vague "Invalid auth token" refusal. `authToken` is the raw token the caller
+ * sent, which the probes forward to their downstream canary requests.
+ *
+ * Returns either a refusal carrying the `status` and JSON `body` to answer with,
+ * or the resolved project plus that raw token.
+ */
+export async function authenticateProject(c: {
   req: { header: (name: string) => string | undefined };
 }) {
   const xAuthToken = c.req.header("x-auth-token");
@@ -47,22 +71,27 @@ async function authenticateProject(c: {
 
   if (!authToken) {
     return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
       status: 401 as const,
+      body: {
+        message:
+          "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+      } as Record<string, unknown>,
     };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
+  const resolved = await tokenResolver.resolve({
+    token: authToken,
+    projectId: c.req.header("x-project-id") ?? null,
   });
 
-  if (!project) {
-    return { error: "Invalid auth token.", status: 401 as const };
+  if (!resolved) {
+    return {
+      status: 401 as const,
+      body: { message: "Invalid auth token." } as Record<string, unknown>,
+    };
   }
 
-  return { project, authToken };
+  return { project: resolved.project, authToken };
 }
 
 // ── GET /collector ───────────────────────────────────────────────────
@@ -71,10 +100,10 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/collector", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     const restParams: CollectorRESTParams = {
       spans: [
@@ -147,6 +176,7 @@ secured
         transport: "rest",
         url: `${env.BASE_HOST}/api/collector`,
         authToken,
+        projectId: project.id,
         body: restParams,
       }),
       sendCanary({
@@ -154,6 +184,7 @@ secured
         transport: "otlp",
         url: `${env.BASE_HOST}/api/otel/v1/traces`,
         authToken,
+        projectId: project.id,
         body: otelParams,
       }),
     ]);
@@ -171,10 +202,10 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/evaluations", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     let response: Response | null = null;
     let attempts = 0;
@@ -186,6 +217,7 @@ secured
           method: "POST",
           headers: {
             "X-Auth-Token": authToken,
+            "X-Project-Id": project.id,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -229,10 +261,10 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/processor", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     const restTraceId = `trace_${nanoid()}`;
     const restParams: CollectorRESTParams = {
@@ -314,6 +346,7 @@ secured
         transport: "rest",
         url: `${env.BASE_HOST}/api/collector`,
         authToken,
+        projectId: project.id,
         body: restParams,
       }),
       sendCanary({
@@ -321,6 +354,7 @@ secured
         transport: "otlp",
         url: `${env.BASE_HOST}/api/otel/v1/traces`,
         authToken,
+        projectId: project.id,
         body: otelParams,
       }),
     ]);
@@ -355,7 +389,10 @@ secured
           const traceResponse = await fetch(
             `${env.BASE_HOST}/api/traces/${encodeURIComponent(traceId)}`,
             {
-              headers: { "X-Auth-Token": authToken },
+              headers: {
+                "X-Auth-Token": authToken,
+                "X-Project-Id": project.id,
+              },
             },
           );
           const fetchMs = Date.now() - fetchStart;
@@ -436,8 +473,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/triggers", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project } = auth;
 
@@ -482,8 +519,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/workflows", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project, authToken } = auth;
 
@@ -507,6 +544,7 @@ secured
           method: "POST",
           headers: {
             "X-Auth-Token": authToken,
+            "X-Project-Id": project.id,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ input: "\u{1F425}" }),
@@ -609,8 +647,8 @@ secured
     c.header("Cache-Control", "no-store");
 
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project } = auth;
 
@@ -637,6 +675,88 @@ secured
       runPlanId: query.runPlanId,
     });
     return canaryResultToResponse({ c, result });
+  });
+
+/**
+ * The Langy probe's auth, in the shape of `authenticateProject` above: the
+ * shared Langy chain (credential, surface flag, `langy:create` ceiling,
+ * cohort, actor) answers a refusal as `{ error, status }` for the handler to
+ * serialise like its siblings, a dark surface as `{ dark: true }`, and a
+ * pass as the actor the turn runs as. It is the key's OWNER who sends the
+ * greeting, so a plain project key with no owner is refused here.
+ */
+async function authenticateLangyActor(
+  c: Context,
+): Promise<
+  | { error: string; status: 401 | 403 }
+  | Awaited<ReturnType<typeof authorizeLangyApiKey>>
+> {
+  try {
+    return await authorizeLangyApiKey(c);
+  } catch (error) {
+    if (error instanceof HandledError) {
+      // The chain refuses with 401 (no or unknown credential) or 403 (ceiling,
+      // cohort, actor); Hono's json init needs the literal union, not `number`.
+      return { error: error.message, status: error.httpStatus as 401 | 403 };
+    }
+    throw error;
+  }
+}
+
+// Same job as `canaryResultToResponse` for the Langy probe, whose ids are a
+// conversation and a turn rather than a scenario run.
+function langyCanaryResultToResponse({
+  c,
+  result,
+}: {
+  c: Context;
+  result: Awaited<ReturnType<typeof runLangyHealthCanary>>;
+}) {
+  if ("busy" in result) {
+    return c.json({ status: "busy" }, { status: 429 });
+  }
+  const { healthy, conversationId, turnId, durationMs } = result;
+  if (healthy) {
+    return c.json({ status: "ok", conversationId, turnId, durationMs });
+  }
+  return c.json(
+    {
+      status: "unhealthy",
+      reason: result.reason,
+      conversationId,
+      turnId,
+      durationMs,
+    },
+    { status: 503 },
+  );
+}
+
+secured
+  .access(publicEndpoint("subsystem health probe"))
+  .get("/langy", async (c) => {
+    // A monitor polls this on an interval; a cached 200/503 would hide the
+    // next turn's real result, so no response on any path is cacheable.
+    c.header("Cache-Control", "no-store");
+
+    const auth = await authenticateLangyActor(c);
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, { status: auth.status });
+    }
+    // The Langy API surface is dark for this project: answer as the turn
+    // routes do, with the same 404 an unmounted path gives. Headers included:
+    // the no-store set above would itself reveal that the surface exists, and
+    // Hono's not-found keeps headers already staged on the context.
+    if (auth.dark) {
+      c.header("Cache-Control", undefined);
+      return c.notFound();
+    }
+
+    const result = await runLangyHealthCanary({
+      projectId: auth.projectId,
+      session: auth.session,
+    });
+    auth.markUsed();
+    return langyCanaryResultToResponse({ c, result });
   });
 
 export const app = secured.hono;

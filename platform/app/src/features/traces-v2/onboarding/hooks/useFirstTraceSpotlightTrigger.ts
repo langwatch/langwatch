@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useGuidedPathActive } from "~/features/guided-onboarding/guidedPathActive";
 import { writeSpotlightFragment } from "../spotlights/SpotlightOverlay";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../spotlights/spotlights";
 import { useOnboardingStore } from "../store/onboardingStore";
@@ -27,6 +28,9 @@ interface UseFirstTraceSpotlightTriggerArgs {
  *   - the user is mid-legacy-tour (`tourActive` is true) — the legacy
  *     journey is dormant for new users but defensive in case it's
  *     somehow on
+ *   - a guided onboarding path is being set up: Langy navigates here in
+ *     the middle of it, and a coach mark over the page while it works is
+ *     noise. Nothing is marked fired, so it starts once the path is done
  */
 export function useFirstTraceSpotlightTrigger({
   projectId,
@@ -50,6 +54,7 @@ export function useFirstTraceSpotlightTrigger({
   const setCurrentSpotlightId = useOnboardingStore(
     (s) => s.setCurrentSpotlightId,
   );
+  const guidedPathActive = useGuidedPathActive();
   const hasLegacyTourHistoryOnMount = useRef(
     firstTraceSpotlightFired || Object.keys(seenDrawerSpotlights).length > 0,
   ).current;
@@ -72,6 +77,7 @@ export function useFirstTraceSpotlightTrigger({
     if (!projectId) return;
     if (hasAnyTraces !== true) return;
     if (isDismissed) return;
+    if (guidedPathActive) return;
     if (firstTraceSpotlightFired) return;
     if (spotlightsActive || tourActive) {
       // The user is already mid-tour or mid-journey — don't yank them
@@ -109,6 +115,7 @@ export function useFirstTraceSpotlightTrigger({
     projectId,
     hasAnyTraces,
     isDismissed,
+    guidedPathActive,
     firstTraceSpotlightFired,
     spotlightsActive,
     tourActive,

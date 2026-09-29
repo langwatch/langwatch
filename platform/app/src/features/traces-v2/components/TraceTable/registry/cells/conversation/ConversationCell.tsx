@@ -1,8 +1,7 @@
 import { Box, Circle, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import { AlertTriangle, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import type React from "react";
-import { useFilterStore } from "../../../../../stores/filterStore";
-import { useViewStore } from "../../../../../stores/viewStore";
+import { useExplorerStore } from "../../../../../stores/explorerStore";
 import { truncateId } from "../../../../../utils/formatters";
 import type { ConversationGroup } from "../../../conversationGroups";
 import { IOPreview } from "../../../IOPreview";
@@ -76,8 +75,8 @@ const ConversationIdLabel: React.FC<{
   label: string;
   comfortable?: boolean;
 }> = ({ conversationId, label, comfortable = false }) => {
-  const selectLens = useViewStore((s) => s.selectLens);
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const selectLens = useExplorerStore((s) => s.selectLens);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
 
   const filterToConversation = (e: React.MouseEvent) => {
     e.stopPropagation();

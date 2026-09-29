@@ -77,6 +77,19 @@ export interface CioPersonTraits {
   // Billing
   plan: string;
   has_subscription: boolean;
+
+  // Guided onboarding (guidedOnboarding hook and the first-login backfill).
+  // "guided" | "classic"; absent for organizations that predate the experiment.
+  onboarding_variant?: string;
+  // Comma list of the picked paths in pick order, e.g. "gateway,llmops".
+  onboarding_paths?: string;
+  onboarding_primary_path?: string;
+  guided_onboarding_provider?: string;
+  // "completed" | "skipped"
+  guided_onboarding_tour?: string;
+  // Comma list of the paths whose setup completed.
+  guided_onboarding_completed_paths?: string;
+  guided_onboarding_completed_at?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +102,28 @@ export interface CioOrgTraits {
   company_size: string;
   member_count: number;
   project_count: number;
+  onboarding_variant?: string;
+  onboarding_paths?: string;
+  onboarding_primary_path?: string;
+  guided_onboarding_completed_paths?: string;
+
+  // Self-hosted (ADR-141, section 10). Set from the daily usage report of an
+  // install whose license binds it to this organization, so a customer running
+  // LangWatch on their own infrastructure is segmented on what that install
+  // actually does rather than on their Cloud account, which may be empty.
+  /** Whether a self-hosted install reports against this organization. */
+  self_hosted?: boolean;
+  self_hosted_version?: string;
+  /** docker, helm, or whatever the install says it was installed with. */
+  self_hosted_install_method?: string;
+  self_hosted_users?: number;
+  self_hosted_projects?: number;
+  self_hosted_traces_28d?: number;
+  self_hosted_active_users_28d?: number;
+  self_hosted_first_seen_at?: string;
+  self_hosted_last_report_at?: string;
+  /** Comma list of the signals raised so far, in the order they were raised. */
+  self_hosted_signals?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +142,21 @@ export type CioEventName =
   | "first_prompt_created"
   | "first_simulation_ran"
   | "joined_via_invite"
-  | "joined_via_sso";
+  | "joined_via_sso"
+  | "onboarding_paths_selected"
+  | "onboarding_path_llmops"
+  | "onboarding_path_coding_agents"
+  | "onboarding_path_gateway"
+  | "onboarding_path_governance"
+  | "guided_onboarding_path_completed"
+  // Self-hosted lead signals (ADR-141, section 10). One per install, not one
+  // per report: a campaign keyed on these fires when something changed.
+  | "self_hosted_seats_crossed_threshold"
+  | "self_hosted_sustained_ingestion"
+  | "self_hosted_licensed_feature_without_license"
+  | "self_hosted_license_expiring"
+  | "self_hosted_domain_has_cloud_account"
+  | "self_hosted_license_sync_stale";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

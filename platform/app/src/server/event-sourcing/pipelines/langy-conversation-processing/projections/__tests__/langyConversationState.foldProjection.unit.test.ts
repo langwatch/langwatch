@@ -125,6 +125,8 @@ describe("LangyConversationStateFoldProjection", () => {
     });
 
     describe("when the first message is sent", () => {
+      /** @scenario "Sending the first message creates the conversation from its events" */
+      /** @scenario "A message and its activity bump are one command, not two writes" */
       it("sets the owner, title, active status, and a message count of 1", () => {
         const state = fold.apply(
           fold.init(),
@@ -175,12 +177,14 @@ describe("LangyConversationStateFoldProjection", () => {
       ),
     );
 
+    /** @scenario "Starting an agent response records the turn in operational state" */
     it("marks the conversation running and records the current turn", () => {
       expect(started.Status).toBe(LANGY_CONVERSATION_STATUS.RUNNING);
       expect(started.CurrentTurnId).toBe("turn-1");
     });
 
     describe("when the turn is finalized as completed", () => {
+      /** @scenario "The finalized response carries the whole answer as the source of truth" */
       it("appends the assistant message, returns to idle, and clears the turn", () => {
         const state = fold.apply(
           started,
@@ -237,6 +241,7 @@ describe("LangyConversationStateFoldProjection", () => {
     });
 
     describe("when a failure event arrives for the turn in flight", () => {
+      /** @scenario "A stalled response with no answer to carry fails distinctly" */
       it("fails the conversation and records the error", () => {
         const state = fold.apply(
           started,
@@ -310,6 +315,7 @@ describe("LangyConversationStateFoldProjection", () => {
     });
 
     describe("when the turn is finalized as failed", () => {
+      /** @scenario "A failed response is recorded without an assistant message loss" */
       it("records the failure status and error", () => {
         const state = fold.apply(
           started,
@@ -340,6 +346,7 @@ describe("LangyConversationStateFoldProjection", () => {
       event("ARCHIVED", LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED, {}, 3000),
     );
 
+    /** @scenario "Deleting a conversation archives it rather than hard-deleting" */
     it("flips status to archived and stamps ArchivedAt", () => {
       expect(archived.Status).toBe(LANGY_CONVERSATION_STATUS.ARCHIVED);
       expect(archived.ArchivedAt).toBe(3000);
@@ -357,6 +364,7 @@ describe("LangyConversationStateFoldProjection", () => {
   });
 
   describe("given a conversation the owner renames and shares", () => {
+    /** @scenario "Renaming or sharing updates metadata via one event" */
     it("applies the metadata update without touching other fields", () => {
       const base = fold.apply(fold.init(), messageSent({ title: "old" }, 1000));
       const state = fold.apply(

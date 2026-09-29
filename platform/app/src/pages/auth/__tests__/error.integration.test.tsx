@@ -6,10 +6,17 @@
  * the user back to `document.referrer` after a 5s countdown, but only when
  * that referrer is same-origin — otherwise it falls back to "/". Exercises
  * the real `isSameOrigin` guard via `importOriginal`, not a reimplementation.
+ *
+ * The stable failures are the other half: an arrival the next attempt would
+ * only repeat must NOT be bounced anywhere, because the identity provider
+ * still holds the session that produced it (specs/auth/sso-wrong-provider-
+ * recovery.feature).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { signIn } = vi.hoisted(() => ({ signIn: vi.fn() }));
 
 const { sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() => ({
   sessionRef: { current: { data: null as unknown } },
@@ -24,6 +31,7 @@ vi.mock("~/utils/auth-client", async (importOriginal) => {
   return {
     ...actual,
     useSession: () => sessionRef.current,
+    signIn,
   };
 });
 
@@ -68,12 +76,73 @@ describe("Auth error page referrer redirect", () => {
     originalReferrer = document.referrer;
     origin = window.location.origin;
     hardNavigate.mockClear();
+    signIn.mockClear();
   });
 
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
     setReferrer(originalReferrer);
+  });
+
+  /**
+   * The native-social bounce (specs/identity/native-social-at-a-claimed-domain.feature).
+   *
+   * The refusal reaches this page as a code plus the connection that made it,
+   * and the page spends it by dialling that connection. What it must NOT do is
+   * treat the parameter as somewhere to navigate: it arrives over the wire, so
+   * anybody can write one.
+   */
+  describe("given a refusal that named the organization's connection", () => {
+    /** @scenario "The error route dials the connection the refusal named" */
+    it("sends them straight to that connection without asking anything", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_acme",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      expect(signIn).toHaveBeenCalledWith("ssoc_acme", { callbackUrl: "/" });
+      // And no error card: they are on their way somewhere, not being told
+      // why they failed.
+      expect(
+        screen.getByText(/Taking you to your organization's sign-in/i),
+      ).toBeTruthy();
+    });
+
+    it("does not also run the countdown that would take them elsewhere", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=ssoc_acme",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(hardNavigate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A bounce target that is not a connection identifier is refused" */
+    it("dials nothing when the named target is an address rather than a connection", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_REQUIRED_BY_ORGANIZATION&error_description=https://evil.example.com",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      expect(signIn).not.toHaveBeenCalled();
+      // The ordinary refusal instead, which is a dead end but a safe one.
+      expect(screen.getByText(/Use your organization's sign-in/i)).toBeTruthy();
+    });
   });
 
   describe("given a same-origin referrer", () => {
@@ -118,6 +187,52 @@ describe("Auth error page referrer redirect", () => {
       await vi.advanceTimersByTimeAsync(5000);
 
       expect(hardNavigate).toHaveBeenCalledWith("/");
+    });
+  });
+
+  describe("given the account already exists under another sign-in method", () => {
+    /** @scenario The error page does not auto-redirect back to the identity provider */
+    it("stays on the page past the countdown, with the referrer pointing at the provider", async () => {
+      // Arriving from the identity provider is exactly when a bounce would
+      // re-run the same sign-in with the same live session.
+      setReferrer(`${origin}/api/auth/callback/okta`);
+      searchParamsRef.current = new URLSearchParams(
+        "error=OAuthAccountNotLinked",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(hardNavigate).not.toHaveBeenCalled();
+      expect(screen.getByText("Account already exists")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the provider's only live session is one that cannot sign in", () => {
+    /** @scenario A blocked returning user is not trapped bouncing between the app and the IdP */
+    it("rests on a stable page that offers the way out, instead of bouncing", async () => {
+      setReferrer(`${origin}/api/auth/callback/okta`);
+      searchParamsRef.current = new URLSearchParams(
+        "error=SSO_PROVIDER_NOT_ALLOWED",
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Error />
+        </ChakraProvider>,
+      );
+
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(hardNavigate).not.toHaveBeenCalled();
+      // The recovery clears the provider's session too, which is what breaks
+      // the loop on the next attempt.
+      expect(
+        screen.getByRole("link", { name: /sign out.*try again/i }),
+      ).toHaveAttribute("href", "/api/auth/logout");
     });
   });
 });

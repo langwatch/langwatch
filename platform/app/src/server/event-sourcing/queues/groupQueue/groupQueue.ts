@@ -37,6 +37,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { tryGetApp } from "../../../app-layer/app";
 import {
   createContextFromJobData,
+  getCurrentContext,
   getJobContextMetadata,
   type JobContextMetadata,
   runWithContext,
@@ -90,7 +91,6 @@ import {
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
   gqJobsDelayedTotal,
-  gqJobsDroppedTotal,
   gqJobsExhaustedTotal,
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
@@ -99,6 +99,7 @@ import {
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   gqRetryEncodeFailuresTotal,
+  recordDroppedJob,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import {
@@ -110,6 +111,7 @@ import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
+  type PreflightTargetsState,
   readBisectionSplitBudget,
   readConfirmedDeathThreshold,
   readGroupQuarantineThreshold,
@@ -149,6 +151,19 @@ export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil(
  */
 function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Renders the groups a preflight refusal is about. A boot error naming counts
+ * tells an operator nothing they can act on; the ids are the whole remedy, and
+ * the list is capped so one wide fan-out cannot turn a log line into a dump.
+ */
+function namedGroups(groupIds: readonly string[], total: number): string {
+  if (groupIds.length === 0) return `${total} group(s)`;
+  const undisclosed = total - groupIds.length;
+  return undisclosed > 0
+    ? `${groupIds.join(", ")} and ${undisclosed} more`
+    : groupIds.join(", ");
 }
 
 /**
@@ -335,6 +350,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly rateTracker!: TenantRateTracker;
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
+  private readonly dispatchGroupAllowListKey?: string;
+  private readonly preflightDrainTimeoutMs: number;
   private readonly dispatcher: GroupQueueDispatcher | null;
   private readonly metricsCollector: GroupQueueMetricsCollector | null;
   /**
@@ -421,6 +438,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     redisConnection?: IORedis | Cluster,
     options?: {
       consumerEnabled?: boolean;
+      dispatchGroupAllowListKey?: string;
+      preflightDrainTimeoutMs?: number;
       objectStoreFor?: (projectId: string) => ObjectStore;
       resolveStorageDestination?: (
         projectId: string,
@@ -464,6 +483,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     this.redisConnection = effectiveConnection;
     this.consumerEnabled = options?.consumerEnabled ?? true;
+    this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
+    this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 60_000;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
     // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
@@ -557,6 +578,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
         signalTimeoutSec: GROUP_QUEUE_CONFIG.signalTimeoutSec,
         logger: this.logger,
+        dispatchGroupAllowListKey: this.dispatchGroupAllowListKey
+          ? `${this.dispatchGroupAllowListKey}:candidates`
+          : undefined,
       });
       this.dispatcher.start();
 
@@ -656,6 +680,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const dedup = options?.deduplication ?? this.deduplication;
 
     const groupId = this.groupKey(payload);
+    await this.registerPreflightGroup(groupId);
     const stagedJobId = this.generateStagedJobId(payload);
     // Not `?? Date.now()`: a score function returning 0 or NaN (a payload with
     // no usable occurrence time) survives `??` and stages the job at the epoch.
@@ -677,7 +702,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
 
     // Attach context metadata to the payload
-    const contextMetadata = getJobContextMetadata();
+    const contextMetadata = {
+      ...getJobContextMetadata(),
+      queueDispatchScopeKey:
+        getCurrentContext()?.queueDispatchScopeKey ??
+        this.dispatchGroupAllowListKey,
+    };
     const payloadWithContext = {
       ...(payload as Record<string, unknown>),
       __context: contextMetadata,
@@ -708,6 +738,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       shouldReplace,
       shouldSurviveDispatch,
     });
+    await this.activatePreflightGroup(groupId);
 
     if (isNew) {
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
@@ -777,7 +808,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const delay = options?.delay ?? this.delay;
     const dedup = options?.deduplication ?? this.deduplication;
 
-    const contextMetadata = getJobContextMetadata();
+    const contextMetadata = {
+      ...getJobContextMetadata(),
+      queueDispatchScopeKey:
+        getCurrentContext()?.queueDispatchScopeKey ??
+        this.dispatchGroupAllowListKey,
+    };
     const now = Date.now();
 
     const shouldExtend = dedup ? dedup.extend !== false : true;
@@ -826,7 +862,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
     );
 
+    await Promise.all(
+      jobsToStage.map((job) => this.registerPreflightGroup(job.groupId)),
+    );
+
     const { newStagedCount } = await this.scripts.stageBatch(jobsToStage);
+    await Promise.all(
+      jobsToStage.map((job) => this.activatePreflightGroup(job.groupId)),
+    );
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -1095,7 +1138,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // so the drain is exclusive. Drained siblings are re-staged on failure so
     // they are not lost. When disabled (maxBatch <= 1) this is a no-op and the
     // per-job path below is unchanged.
-    const maxBatch = this.coalesceMaxBatch?.(payload) ?? 1;
+    // A preflight scope must propagate through every individual causal chain.
+    // Coalescing jobs from two concurrent scopes would retain only the first
+    // delivery's context and let the other preflight miss downstream fan-out.
+    const maxBatch = contextMetadata?.queueDispatchScopeKey
+      ? 1
+      : (this.coalesceMaxBatch?.(payload) ?? 1);
     let batchPayloads: Payload[] | null = null;
     // Staged-job id per batch member, index-aligned with batchPayloads, so a
     // bisected failure can name the payload it narrowed to.
@@ -1176,12 +1224,25 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               this.parseDrainedPayload({ sibling, groupId }),
             ),
           );
-          const liveSiblings = drainedSiblings.filter(
-            (_, index) => parsedSiblings[index] !== null,
-          );
-          const siblingPayloads = parsedSiblings.filter(
-            (parsed) => parsed !== null,
-          ) as Payload[];
+          const liveSiblings: DrainedJob[] = [];
+          const siblingPayloads: Payload[] = [];
+          const differentlyScoped: DrainedJob[] = [];
+          for (const [index, parsed] of parsedSiblings.entries()) {
+            if (!parsed) continue;
+            const sibling = drainedSiblings[index]!;
+            if (
+              parsed.queueDispatchScopeKey !==
+              contextMetadata?.queueDispatchScopeKey
+            ) {
+              differentlyScoped.push(sibling);
+              continue;
+            }
+            liveSiblings.push(sibling);
+            siblingPayloads.push(parsed.payload);
+          }
+          if (differentlyScoped.length > 0) {
+            await this.restageDrainedSiblings(groupId, differentlyScoped);
+          }
           drainedSiblings = liveSiblings;
           if (siblingPayloads.length > 0) {
             batchPayloads = [payload, ...siblingPayloads];
@@ -1810,13 +1871,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }: {
     sibling: DrainedJob;
     groupId: string;
-  }): Promise<Payload | null> {
+  }): Promise<{
+    payload: Payload;
+    queueDispatchScopeKey?: string;
+  } | null> {
     try {
       const jobData = await this.blobLifecycle.decode({
         value: sibling.jobDataJson,
         groupId,
       });
-      return this.stripInternalFields(jobData);
+      const contextMetadata = jobData.__context as
+        | JobContextMetadata
+        | undefined;
+      return {
+        payload: this.stripInternalFields(jobData),
+        queueDispatchScopeKey: contextMetadata?.queueDispatchScopeKey,
+      };
     } catch (err) {
       // A transient blob-store error on a sibling MUST NOT drop it to replay —
       // the dispatched job's decode routes transient errors through
@@ -2471,7 +2541,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const { pipelineName, jobType, jobName } = readJobRoutingMeta(jobDataJson);
     const descriptor = readEnvelopeDescriptor(jobDataJson);
 
-    gqJobsDroppedTotal.inc({
+    recordDroppedJob({
       queue_name: this.queueName,
       pipeline_name: pipelineName ?? "unknown",
       job_type: jobType ?? "unknown",
@@ -2754,6 +2824,164 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       bc.once("end", onEnd);
       bc.on("error", onError);
     });
+  }
+
+  private async registerPreflightGroup(groupId: string): Promise<void> {
+    const key =
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
+    if (!key) return;
+    await this.registerPreflightGroups(() => [groupId]);
+  }
+
+  async registerPreflightGroups(
+    resolveGroupIds: () => readonly (string | undefined)[],
+  ): Promise<void> {
+    const key =
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
+    if (!key) return;
+    const groupIds = resolveGroupIds();
+    const unresolved = groupIds.find(
+      (groupId) => groupId === "__unknown__" || groupId === "__legacy_outbox__",
+    );
+    if (unresolved) {
+      throw new QueueError(
+        this.queueName,
+        "registerPreflightGroups",
+        `Migration preflight refused unresolved group ${unresolved}`,
+      );
+    }
+    if (groupIds.some((groupId) => !groupId)) {
+      throw new QueueError(
+        this.queueName,
+        "registerPreflightGroups",
+        "Migration preflight refused a pipeline with custom group routing",
+      );
+    }
+    if (!key.startsWith(`${this.queueName}:gq:`)) {
+      throw new QueueError(
+        this.queueName,
+        "registerPreflightGroups",
+        "Migration preflight refused a dispatch scope outside the canonical queue slot",
+      );
+    }
+    await this.scripts.registerPreflightTargets({
+      targetKey: key,
+      groupIds: groupIds as readonly string[],
+    });
+  }
+
+  private async activatePreflightGroup(groupId: string): Promise<void> {
+    const key =
+      getCurrentContext()?.queueDispatchScopeKey ??
+      this.dispatchGroupAllowListKey;
+    if (!key) return;
+    await this.registerPreflightGroups(() => [groupId]);
+  }
+
+  async waitUntilPreflightIdle(): Promise<void> {
+    const key = this.dispatchGroupAllowListKey;
+    if (!key) {
+      throw new QueueError(
+        this.queueName,
+        "waitUntilPreflightIdle",
+        "Queue has no preflight allow-list",
+      );
+    }
+    const deadline = Date.now() + this.preflightDrainTimeoutMs;
+    let reportedHeld = false;
+    while (true) {
+      const state = await this.scripts.inspectPreflightTargets(key);
+      if (!reportedHeld && state.heldFromBefore > 0) {
+        reportedHeld = true;
+        this.logHeldFromBefore(state);
+      }
+      if (this.preflightHasSettled(state)) return;
+      if (Date.now() >= deadline) return this.settlePastDrainTimeout(state);
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    }
+  }
+
+  /**
+   * Gives up waiting for work that has not drained, rather than refusing.
+   *
+   * This barrier runs before this process consumes anything, so the work it
+   * waits on drains only if some OTHER process is already serving the queue.
+   * On a fleet booting together there is none — and a claim whose worker a
+   * previous crash-loop killed outlives it and blocks its group's head, so
+   * every boot queues more behind that head and refuses over it, which is
+   * precisely what keeps the consumer that would drain it from starting.
+   * Refusing to start fixes none of it; it is the thing sustaining it.
+   *
+   * Undrained work leaves its tenant HELD, and a held tenant already starts on
+   * the legacy path with its migration gate closed. The wait is how a pass
+   * finalizes that tenant sooner, not how it stays safe, so giving up costs a
+   * later pass rather than correctness.
+   *
+   * Work that FAILED is a different thing and still refuses: a later pass will
+   * not clear a fault, so that half of the barrier is the half worth keeping.
+   */
+  private settlePastDrainTimeout(state: PreflightTargetsState): void {
+    this.assertPreflightTargetsSucceeded(state);
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        pending: state.pending,
+        active: state.active,
+        stillWorking: namedGroups(state.pendingGroupIds, state.pendingGroups),
+        timeoutMs: this.preflightDrainTimeoutMs,
+      },
+      "Migration preflight stopped waiting for work that had not drained and is starting anyway; the tenants it covers stay held for a later pass, and these groups are for operator triage",
+    );
+  }
+
+  /** Throws on the way past when the settled work did not all succeed. */
+  private preflightHasSettled(state: PreflightTargetsState): boolean {
+    if (state.pending > 0 || state.active > 0) return false;
+    this.assertPreflightTargetsSucceeded(state);
+    return this.processingQueue.idle();
+  }
+
+  /**
+   * A group already blocked when the preflight adopted it was wedged under the
+   * previous release: its jobs cannot dispatch, so the barrier neither waits
+   * for them nor refuses over them, and this line is how an operator learns
+   * which groups the upgrade booted past.
+   */
+  private logHeldFromBefore(state: PreflightTargetsState): void {
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        heldFromBefore: state.heldFromBefore,
+        heldFromBeforeGroupIds: state.heldFromBeforeGroupIds,
+      },
+      "Migration preflight is settling past groups that were already blocked before it started; their work is not migrated and they stay blocked for operator triage",
+    );
+  }
+
+  private assertPreflightTargetsSucceeded(state: PreflightTargetsState): void {
+    if (state.failed === 0 && state.blocked === 0) return;
+    const faults: string[] = [];
+    if (state.failed > 0) {
+      faults.push(`failed: ${namedGroups(state.failedGroupIds, state.failed)}`);
+    }
+    if (state.blocked > 0) {
+      faults.push(
+        `blocked: ${namedGroups(state.blockedGroupIds, state.blocked)}`,
+      );
+    }
+    throw new QueueError(
+      this.queueName,
+      "waitUntilPreflightIdle",
+      `Migration preflight work did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
+      {
+        failed: state.failed,
+        blocked: state.blocked,
+        failedGroupIds: state.failedGroupIds,
+        blockedGroupIds: state.blockedGroupIds,
+      },
+    );
   }
 
   async close(): Promise<void> {

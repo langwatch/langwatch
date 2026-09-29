@@ -4,6 +4,7 @@ import {
   ensureHiddenGovernanceProject,
   PROJECT_KIND,
 } from "../governanceProject.service";
+import { schedulerWillPull } from "../logic/schedulerWillPull";
 
 const logger = createLogger("langwatch:governance:ingestion-pull-lifecycle");
 
@@ -45,10 +46,7 @@ export async function syncIngestionPullSource(params: {
   );
   const occurredAt = Date.now();
   const configVersion = `${source.updatedAt.getTime()}:${source.status}:${source.pullSchedule}:${source.archivedAt?.getTime() ?? "live"}`;
-  const enabled =
-    source.pullSchedule !== null &&
-    source.archivedAt === null &&
-    (source.status === "active" || source.status === "awaiting_first_event");
+  const enabled = schedulerWillPull(source);
   if (enabled && source.pullSchedule) {
     await params.commands.configure({
       tenantId: project.id,

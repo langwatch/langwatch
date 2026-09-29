@@ -77,7 +77,12 @@ export async function runCodeEvaluator({
         workflow: buildCodeEvaluatorDsl({ name: evaluator.name, config }),
         inputs: [inputs],
         manual_execution_mode: false,
-        do_not_trace: false,
+        // Without a parent link the engine cannot join the caller's trace:
+        // it mints a fresh trace id and the evaluator's spans become a
+        // separate evaluation-origin trace that flows back through the
+        // trace pipeline. Emit spans only when they can land under the
+        // target trace.
+        do_not_trace: parentTrace === undefined,
         run_evaluations: false,
         origin: "evaluation",
       },

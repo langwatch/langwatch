@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
@@ -99,6 +100,9 @@ export const smtpProvider: EmailProviderPort = {
         to: toAddresses,
         subject: content.subject,
         html: content.html,
+        ...(content.idempotencyKey && {
+          messageId: `<${createHash("sha256").update(content.idempotencyKey).digest("hex")}@notifications.langwatch.ai>`,
+        }),
         ...(bccAddresses.length > 0 && {
           envelope: { from, to: [...toAddresses, ...bccAddresses] },
         }),

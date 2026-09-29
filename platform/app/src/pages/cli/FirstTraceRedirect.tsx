@@ -92,16 +92,27 @@ type FirstTraceWatchState = "hidden" | "waiting" | "redirecting";
  * "waiting" is the confirmed never-synced poll, "redirecting" the brief
  * announcement before navigation; "hidden" covers every case that keeps the
  * current close-this-tab behavior.
+ *
+ * The personal project is resolved within the organization the approval was
+ * granted against — the one the page passes in, the same id it sends to
+ * /api/auth/cli/approve and names in the card above this widget. NOT the
+ * ambient organization: a user who picks a different organization in the
+ * chooser would otherwise be watched against the one they navigated in with.
  */
-function useFirstTraceWatch(): FirstTraceWatchState {
+function useFirstTraceWatch({
+  organizationId,
+}: {
+  organizationId: string | null | undefined;
+}): FirstTraceWatchState {
   const router = useRouter();
   const { data: session } = useSession();
   const { organizations } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
+  const userId = session?.user?.id;
   const personalProject = useMemo(
-    () => findPersonalProject({ organizations, userId: session?.user?.id }),
-    [organizations, session?.user?.id],
+    () => findPersonalProject({ organizations, userId, organizationId }),
+    [organizations, userId, organizationId],
   );
 
   const [hasResult, setHasResult] = useState(false);
@@ -173,8 +184,13 @@ function useFirstTraceWatch(): FirstTraceWatchState {
   return "hidden";
 }
 
-export function FirstTraceRedirect() {
-  const watchState = useFirstTraceWatch();
+export function FirstTraceRedirect({
+  organizationId,
+}: {
+  /** The organization the CLI approval was granted against. */
+  organizationId: string | null | undefined;
+}) {
+  const watchState = useFirstTraceWatch({ organizationId });
 
   if (watchState === "redirecting") {
     return (

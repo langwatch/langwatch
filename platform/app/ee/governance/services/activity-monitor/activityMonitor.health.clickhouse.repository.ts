@@ -44,7 +44,9 @@ export class ActivityMonitorHealthClickHouseRepository {
           countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
           countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
           count() AS c30,
-          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastMs
+          (SELECT toString(toUnixTimestamp64Milli(max(OccurredAt)))
+           FROM trace_summaries
+           WHERE TenantId = {tenantId:String} AND Attributes[{originKey:String}] = {originValue:String} AND Attributes[{sourceKey:String}] = {sourceId:String}) AS lastMs
         FROM trace_summaries ts
         WHERE ts.TenantId = {tenantId:String}
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({since30d:UInt64})
@@ -95,7 +97,9 @@ export class ActivityMonitorHealthClickHouseRepository {
           countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
           countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
           count() AS c30,
-          toString(toUnixTimestamp64Milli(max(lr.TimeUnixMs))) AS lastMs
+          (SELECT toString(toUnixTimestamp64Milli(max(TimeUnixMs)))
+           FROM stored_log_records
+           WHERE TenantId = {tenantId:String} AND Attributes[{originKey:String}] = {originValue:String} AND Attributes[{sourceKey:String}] = {sourceId:String}) AS lastMs
         FROM stored_log_records lr
         WHERE lr.TenantId = {tenantId:String}
           AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since30d:UInt64})
@@ -139,7 +143,9 @@ export class ActivityMonitorHealthClickHouseRepository {
           countIf(EventTime >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
           countIf(EventTime >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
           count() AS c30,
-          toString(toUnixTimestamp64Milli(max(EventTime))) AS lastMs
+          (SELECT toString(toUnixTimestamp64Milli(max(EventTime)))
+           FROM governance_ocsf_events
+           WHERE TenantId = {tenantId:String} AND startsWith(TraceId, 'pull:') AND SourceId = {sourceId:String}) AS lastMs
         FROM governance_ocsf_events
         WHERE TenantId = {tenantId:String}
           AND startsWith(TraceId, 'pull:')

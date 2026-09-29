@@ -18,12 +18,16 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import type { EventSourcing } from "~/server/event-sourcing";
 import {
   verifyWebhookSignature,
   WEBHOOK_SIGNATURE_HEADER,
 } from "~/server/webhooks/signature";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { expectCanonicalError } from "~/test-utils/expectCanonicalError";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
@@ -34,6 +38,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 // resolves (unmocked here, same as before this repository moved off the
 // route's own inline resolver).
 let planHasWebhookEndpoints = true;
+let eventSourcing: EventSourcing;
 vi.mock("~/server/app-layer/app", async () => {
   // The REST org-auth middleware decides through
   // appFromContext(c).permissions (ADR-092); the fake carries the real
@@ -43,27 +48,24 @@ vi.mock("~/server/app-layer/app", async () => {
   );
   const { prisma: dbForPermissions } = await import("~/server/db");
   const permissions = permissionsServiceFor(dbForPermissions);
-  return {
-    // Consumers that degrade without Redis read through this one.
-    tryGetApp: () => null,
-    getApp: () => ({
-      permissions,
-      planProvider: {
-        getActivePlan: async () => ({
-          webhookEndpointsEnabled: planHasWebhookEndpoints,
-        }),
-      },
-      gateway: {
-        webhookEvents: new WebhookEventsClickHouseRepository(
-          async (tenantId) => {
-            const client = await getClickHouseClientForTenant(tenantId);
-            if (!client) throw new Error("ClickHouse is not configured");
-            return client;
-          },
-        ),
-      },
-    }),
-  };
+  const testApp = () => ({
+    eventSourcing,
+    redis: null,
+    permissions,
+    planProvider: {
+      getActivePlan: async () => ({
+        webhookEndpointsEnabled: planHasWebhookEndpoints,
+      }),
+    },
+    gateway: {
+      webhookEvents: new WebhookEventsClickHouseRepository(async (tenantId) => {
+        const client = await getClickHouseClientForTenant(tenantId);
+        if (!client) throw new Error("ClickHouse is not configured");
+        return client;
+      }),
+    },
+  });
+  return { tryGetApp: testApp, getApp: testApp };
 });
 
 import { app } from "../[[...route]]/app";
@@ -89,6 +91,8 @@ describe("Feature: Webhook endpoints REST API", () => {
   };
 
   beforeAll(async () => {
+    resetAuthzGrantsCommandsForTests();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     organization = await prisma.organization.create({
       data: { name: "Webhooks API Org", slug: `--test-org-${ns}` },
     });
@@ -103,15 +107,13 @@ describe("Feature: Webhook endpoints REST API", () => {
         role: OrganizationUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: organization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId: organization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organization.id,
     });
     const apiKeyService = ApiKeyService.create(prisma);
     const created = await apiKeyService.create({
@@ -132,6 +134,8 @@ describe("Feature: Webhook endpoints REST API", () => {
   });
 
   afterAll(async () => {
+    await eventSourcing?.close();
+    resetAuthzGrantsCommandsForTests();
     if (!organization?.id) return;
     await prisma.webhookEndpointDelivery.deleteMany({
       where: { organizationId: organization.id },

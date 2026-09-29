@@ -2,7 +2,7 @@
   "name": "@langwatch/identity-server",
   "version": "0.1.0",
   "private": true,
-  "description": "The server-side runtime of the identity platform (ADR-101, ADR-115): IdentityGuards, IdentityService, the verification ceremony, the backfill pass, the better-auth ceremonies and the storage ports they run on. Storage-engine-free and better-auth-free - the app implements the repository interfaces with Prisma, binds the ceremonies to better-auth's databaseHooks, and implements the ledger port over its event-sourcing pipeline.",
+  "description": "The server-side runtime of the identity platform (ADR-101, ADR-115): IdentityGuards, IdentityService, the verification ceremony, the backfill pass, the better-auth ceremonies and the storage ports they run on. Storage-engine-free: the app implements the repository interfaces with Prisma and the ledger port over its event-sourcing pipeline. The root export is better-auth-free; the ./better-auth subpath is the adapter that binds the ceremonies to better-auth's databaseHooks, and it is the only part that imports it.",
   "license": "MIT",
   "type": "module",
   "exports": {

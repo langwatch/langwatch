@@ -23,6 +23,7 @@ const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([
   "code",
   "workflow",
   "connected",
+  "voice",
 ]);
 
 /** What the picker reads off an agent row. */
@@ -40,7 +41,12 @@ export type AgentLike = {
   owner?: { userId: string; name: string | null } | null;
 };
 
-export type ScenarioAgentType = "http" | "code" | "workflow" | "connected";
+export type ScenarioAgentType =
+  | "http"
+  | "code"
+  | "workflow"
+  | "connected"
+  | "voice";
 
 /** One agent as the picker offers it. */
 export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {

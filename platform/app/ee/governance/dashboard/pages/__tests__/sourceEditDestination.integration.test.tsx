@@ -117,6 +117,17 @@ const renderDrawer = (source = sourceLandingInAnalytics) =>
     </ChakraProvider>,
   );
 
+/**
+ * The destination sits behind the drawer's "Advanced" group, so every test
+ * that touches the picker has to open it first. Kept as its own step rather
+ * than folded into `renderDrawer`, because the one test that saves without
+ * ever opening the group is making a claim about exactly that.
+ */
+const openAdvanced = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByText("Advanced"));
+  await screen.findByTestId("ingestion-trace-destination");
+};
+
 const pickDestination = async ({
   user,
   projectName,
@@ -142,14 +153,20 @@ describe("given a Genie source that already lands in Analytics", () => {
      * second half — changing it and saving — is the test below.
      */
     /** @scenario "The edit drawer changes a destination and says history stays" */
-    it("shows Analytics as the destination it is stored with, and says routed history stays", () => {
+    it("shows Analytics as the destination it is stored with, and says routed history stays", async () => {
+      const user = userEvent.setup();
       renderDrawer();
+      await openAdvanced(user);
+
       expect(
         within(screen.getByRole("combobox")).getByText("Analytics · Data"),
       ).toBeTruthy();
+
+      await user.click(screen.getByTestId("ingestion-trace-destination-info"));
+      const tooltip = await screen.findByText(/data-privacy policy/);
       expect(
-        screen.getByTestId("ingestion-trace-destination-history"),
-      ).toBeTruthy();
+        tooltip.closest('[data-scope="popover"]')?.textContent ?? "",
+      ).toContain("stay where they are");
     });
   });
 
@@ -159,6 +176,7 @@ describe("given a Genie source that already lands in Analytics", () => {
       const user = userEvent.setup();
       renderDrawer();
 
+      await openAdvanced(user);
       await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
@@ -182,6 +200,7 @@ describe("given a Genie source that already lands in Analytics", () => {
       const user = userEvent.setup();
       renderDrawer();
 
+      await openAdvanced(user);
       await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
@@ -203,6 +222,10 @@ describe("given a Genie source that already lands in Analytics", () => {
      * (`ingestionSource.service.ts:529-539`) and would reject a stored id
      * whose project has since been archived — locking the admin out of
      * renaming the source, let alone repointing it.
+     *
+     * This one deliberately never opens Advanced: the group unmounts what it
+     * holds, and a destination that only exists while the group is open must
+     * still leave the save alone when it was never opened at all.
      */
     it("sends no destination key, rather than echoing the stored one", async () => {
       const user = userEvent.setup();
@@ -232,6 +255,7 @@ describe("given a Genie source whose destination project has been archived", () 
     it("shows the replacement in the picker and drops the archived warning", async () => {
       const user = userEvent.setup();
       renderDrawer(sourceLandingInAnArchivedProject);
+      await openAdvanced(user);
 
       expect(
         screen.getByTestId("ingestion-trace-destination-archived"),
@@ -255,6 +279,7 @@ describe("given a Genie source whose destination project has been archived", () 
       const user = userEvent.setup();
       renderDrawer(sourceLandingInAnArchivedProject);
 
+      await openAdvanced(user);
       await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 

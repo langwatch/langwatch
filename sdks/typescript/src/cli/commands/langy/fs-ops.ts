@@ -9,13 +9,15 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type {
-  LocalEditParams,
-  LocalFindParams,
-  LocalGrepParams,
-  LocalLsParams,
-  LocalReadParams,
-  LocalWriteParams,
+import {
+  isAppendEdit,
+  type LocalEditParams,
+  type LocalFindParams,
+  type LocalGrepParams,
+  type LocalLangwatchEnvParams,
+  type LocalLsParams,
+  type LocalReadParams,
+  type LocalWriteParams,
 } from "../../../agent/local-control-protocol";
 import { LocalCallFailure } from "./errors";
 import { resolvePathInsideRoot } from "./policy";
@@ -106,9 +108,10 @@ export function writeFile({
 }
 
 /**
- * Applies the replacements in order. Each `oldText` must appear exactly once,
- * so an edit is never applied to the wrong place; anything else is an error
- * the model can act on.
+ * Applies the edits in order. Each `oldText` must appear exactly once, so an
+ * edit is never applied to the wrong place; anything else is an error the
+ * model can act on. An append goes at the end of the file, on its own line,
+ * and creates the file when there is none.
  */
 export function editFile({
   params,
@@ -122,9 +125,16 @@ export function editFile({
   try {
     content = fs.readFileSync(target, "utf8");
   } catch {
-    throw notFound({ target: params.path });
+    if (!params.edits.every(isAppendEdit)) {
+      throw notFound({ target: params.path });
+    }
+    content = "";
   }
   for (const [index, edit] of params.edits.entries()) {
+    if (isAppendEdit(edit)) {
+      content = appendText({ content, text: edit.append });
+      continue;
+    }
     const occurrences = content.split(edit.oldText).length - 1;
     if (occurrences === 0) {
       throw new LocalCallFailure({
@@ -141,8 +151,75 @@ export function editFile({
     content = content.replace(edit.oldText, edit.newText);
   }
   insideRoot({ target, root });
+  fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, content, "utf8");
   return `Applied ${params.edits.length} edit${params.edits.length === 1 ? "" : "s"} to ${path.relative(root, target)}.`;
+}
+
+/** The content with `text` added as its last line(s), never mid-line. */
+function appendText({
+  content,
+  text,
+}: {
+  content: string;
+  text: string;
+}): string {
+  const joined =
+    content === "" || content.endsWith("\n") ? content : `${content}\n`;
+  return text.endsWith("\n") ? `${joined}${text}` : `${joined}${text}\n`;
+}
+
+/** The variables the app reads to send traces to this project. */
+const LANGWATCH_ENV_VARIABLES = ["LANGWATCH_API_KEY", "LANGWATCH_ENDPOINT"] as const;
+
+/**
+ * Sets LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in the env file, replacing the
+ * lines that already set them and appending the others, so every other line
+ * stays as it was. Creates the file when there is none. Answers with the
+ * variable names only: the key is written, never reported.
+ */
+export function writeLangwatchEnv({
+  params,
+  root,
+  apiKey,
+  endpoint,
+  projectName,
+}: {
+  params: LocalLangwatchEnvParams;
+  root: string;
+  apiKey: string;
+  endpoint: string;
+  projectName: string;
+}): string {
+  const relative = params.path ?? ".env";
+  const target = insideRoot({ target: relative, root });
+  let content = "";
+  try {
+    content = fs.readFileSync(target, "utf8");
+  } catch {
+    content = "";
+  }
+  const values: Record<(typeof LANGWATCH_ENV_VARIABLES)[number], string> = {
+    LANGWATCH_API_KEY: apiKey,
+    LANGWATCH_ENDPOINT: endpoint,
+  };
+  const seen = new Set<string>();
+  const lines = content === "" ? [] : content.split("\n");
+  const kept = lines.map((line) => {
+    const match = /^\s*(?:export\s+)?([A-Z0-9_]+)\s*=/.exec(line);
+    const name = match?.[1];
+    if (name === undefined || !(name in values) || seen.has(name)) return line;
+    seen.add(name);
+    return `${name}=${values[name as keyof typeof values]}`;
+  });
+  if (kept.length > 0 && kept[kept.length - 1] === "") kept.pop();
+  for (const name of LANGWATCH_ENV_VARIABLES) {
+    if (!seen.has(name)) kept.push(`${name}=${values[name]}`);
+  }
+  insideRoot({ target, root });
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, `${kept.join("\n")}\n`, "utf8");
+  return `Set LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in ${path.relative(root, target)} for project ${projectName}.`;
 }
 
 /** The names in one directory, directories first, marked with a trailing slash. */

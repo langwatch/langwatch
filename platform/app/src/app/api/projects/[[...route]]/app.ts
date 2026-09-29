@@ -5,7 +5,6 @@ import {
   anyAuthenticated,
   createOrgApp,
   requires,
-  requiresOnProject,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
@@ -13,6 +12,8 @@ import { resolveVisibleProjects } from "~/server/api-key/project-visibility";
 import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
 import {
   DestinationTeamNotFoundError,
+  GovernanceProjectProtectedError,
+  governanceProjectRouteViolation,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
@@ -21,7 +22,6 @@ import {
   TeamNotInOrganizationError,
 } from "~/server/app-layer/projects/project.service";
 import { prisma } from "~/server/db";
-import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
@@ -235,6 +235,36 @@ secured
     },
   );
 
+/**
+ * One project of this organization, addressed by id — and never the hidden
+ * governance project.
+ *
+ * The governance project is excluded from every listing surface, so answering a
+ * read about it is the one thing left that would confirm it exists. It reads as
+ * not found, which is what it is as far as this API is concerned: the id
+ * belongs to an internal tenancy record, not to a workspace anybody can open
+ * (ADR-128 §11).
+ */
+async function readableProject({
+  id,
+  organizationId,
+  service,
+}: {
+  id: string;
+  organizationId: string;
+  service: ProjectService;
+}) {
+  const project = await service.getWithTeam(id);
+  if (
+    !project ||
+    project.team.organizationId !== organizationId ||
+    governanceProjectRouteViolation(project.kind)
+  ) {
+    throw new NotFoundError("Project not found");
+  }
+  return project;
+}
+
 secured
   .access(requires("project:view"))
   .get(
@@ -246,10 +276,11 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
-      }
+      const project = await readableProject({
+        id,
+        organizationId: organization.id,
+        service,
+      });
 
       return c.json(projectResponse(project));
     },
@@ -264,6 +295,12 @@ function asProjectUpdateHttpError(error: unknown): unknown {
     return new BadRequestError(error.message);
   }
   if (error instanceof PersonalWorkspaceBoundaryError) {
+    return new ForbiddenError(error.message);
+  }
+  // A write names an id the caller already holds, so the refusal says what the
+  // record is rather than pretending it is missing — a mystery 404 on a project
+  // an admin can see the id of is a support ticket.
+  if (error instanceof GovernanceProjectProtectedError) {
     return new ForbiddenError(error.message);
   }
   return error;
@@ -323,7 +360,10 @@ secured
         if (error instanceof ProjectNotFoundError) {
           throw new NotFoundError("Project not found");
         }
-        if (error instanceof PersonalProjectProtectedError) {
+        if (
+          error instanceof PersonalProjectProtectedError ||
+          error instanceof GovernanceProjectProtectedError
+        ) {
           throw new ForbiddenError(error.message);
         }
         throw error;
@@ -339,56 +379,26 @@ secured
 
 // ── API Key management ───────────────────────────────────────────────────────
 
-/**
- * The base key is a project-level write credential, so reading it is gated
- * with `project:update` to match the access it grants — not `project:view`.
- * `requiresOnProject` resolves that at the named project's scope rather than
- * the organization's, so one org-wide grant does not reach every project.
- */
+function refuseLegacyProjectKeyApiToken(): never {
+  throw new ForbiddenError(
+    "A signed-in project administrator must manage the base API key in the browser",
+  );
+}
+
 secured
-  .access(requiresOnProject("project:update"))
+  .access(anyAuthenticated())
   .get(
     "/:id/api-key",
-    projectServiceMiddleware,
     describeRoute(GET_PROJECT_API_KEY),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("projectService") as ProjectService;
-
-      const project = await service.getWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
-      }
-
-      return c.json({ apiKey: project.apiKey });
-    },
+    refuseLegacyProjectKeyApiToken,
   );
 
 secured
-  .access(requires("project:manage"))
+  .access(anyAuthenticated())
   .post(
     "/:id/regenerate-api-key",
-    projectServiceMiddleware,
     describeRoute(REGENERATE_PROJECT_API_KEY),
-    async (c) => {
-      const { id } = c.req.param();
-      const organization = c.get("organization") as Organization;
-      const service = c.get("projectService") as ProjectService;
-
-      const project = await service.getWithTeam(id);
-      if (!project || project.team.organizationId !== organization.id) {
-        throw new NotFoundError("Project not found");
-      }
-
-      const newApiKey = generateApiKey();
-      await prisma.project.update({
-        where: { id },
-        data: { apiKey: newApiKey },
-      });
-
-      return c.json({ apiKey: newApiKey });
-    },
+    refuseLegacyProjectKeyApiToken,
   );
 
 export const app = secured.hono;
