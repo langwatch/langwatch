@@ -422,6 +422,14 @@ The shell's lent services (session, navigation, storage, toasts, drawers) are **
 services**, not capabilities (§16). Enforcement is prose for now; a lint rule follows once email is
 converted (no availability logic in `*.config.ts` projections; off states use the shared notice).
 
+**Ops and Cloud admin are split by audience** (Alex, 2026-09-29). **Ops** (`/ops/**`) is for every
+instance operator, self-hosted included: the dashboard, event sourcing, the foundry, flags,
+migrations, and instance administration (users, organizations, projects, SSO connections,
+identity lookup, directory sync). **Cloud admin** (`/ops/cloud/**`) is LangWatch's own company
+tooling (subscriptions, licences, self-hosted instances, bug reports): the ops gate plus the SaaS
+deployment fact, invisible and refused elsewhere. `/ops/backoffice/**` redirects; "backoffice" is
+a deleted name (§15).
+
 ---
 
 ## 4. A process, whole
@@ -2040,7 +2048,7 @@ collapsed into `withStores`) · absence classes (`Logged*Absence`, `Absent*`) ·
 composition files under `apps/*` · hand-projected per-module config · bespoke
 member bags · `*App` classes inside modules · `defineServerModule` /
 `defineWebModule` (renamed) · `RestErrorHandler` · error envelopes in
-transports · re-exports for backwards compatibility · `refusing*` twins ·
+transports · re-exports for backwards compatibility · the ops "backoffice" (now Ops instance admin or Cloud admin, §3.5) · `refusing*` twins ·
 `try*`/`require*` method names · `T | null` returns in new code (`find*` =
 array; `get*` = one or throws; `list*` = a page, Alex 2026-09-24) · `static readonly configSchema` and its
 `*AppConfigSchema`/`*ServerConfigSchema` consts · a module declaring an env
