@@ -37,7 +37,7 @@ export const scope = async (page: Page): Promise<Page | Locator> => {
 export const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const asRegExp = (value: string): RegExp =>
-  value.startsWith("/") && value.lastIndexOf("/") > 0
+  /^\/.+\/[dgimsuvy]*$/.test(value)
     ? new RegExp(value.slice(1, value.lastIndexOf("/")), value.slice(value.lastIndexOf("/") + 1))
     : new RegExp(escapeRegExp(value), "i");
 

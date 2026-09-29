@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fillPath, sideFixtures } from "../flows/context";
+import { asRegExp, fillPath, sideFixtures } from "../flows/context";
 
 describe("fillPath", () => {
   describe("given a route with the project slug and a seeded fixture placeholder", () => {
@@ -46,6 +46,20 @@ describe("sideFixtures", () => {
       expect(sideFixtures({ plan: { fixtures: { team: "t" }, sides: [] }, side: "base" })).toEqual({
         team: "t",
       });
+    });
+  });
+});
+
+describe("asRegExp", () => {
+  describe("given a path with two slashes", () => {
+    it("matches it literally, not as /pattern/flags", () => {
+      expect(asRegExp("/simulations/scenarios").test("/p/simulations/scenarios")).toBe(true);
+    });
+  });
+
+  describe("given a regex literal with real flags", () => {
+    it("builds that regex", () => {
+      expect(asRegExp("/comparison/i").test("Comparison")).toBe(true);
     });
   });
 });
