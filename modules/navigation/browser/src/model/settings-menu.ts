@@ -324,55 +324,32 @@ export function opsGroup(): SettingsMenuGroup {
   };
 }
 
-export function backofficeGroup(): SettingsMenuGroup {
+/** Instance administration, for every instance operator, self-hosted included (§3.5). */
+export function instanceGroup(): SettingsMenuGroup {
   return {
-    id: "settings-backoffice",
-    label: "Backoffice",
+    id: "settings-ops-instance",
+    label: "Instance",
     items: [
-      {
-        label: "Users",
-        href: "/ops/backoffice/users",
-        // The backoffice root redirects onto the users page.
-        alsoActiveAt: ["/ops/backoffice"],
-        icon: UserCog,
-      },
-      {
-        label: "Organizations",
-        href: "/ops/backoffice/organizations",
-        icon: Building2,
-      },
-      { label: "Projects", href: "/ops/backoffice/projects", icon: FolderOpen },
-      {
-        label: "Subscriptions",
-        href: "/ops/backoffice/subscriptions",
-        icon: CreditCard,
-      },
-      {
-        label: "Single Sign-On",
-        href: "/ops/backoffice/sso-connections",
-        icon: ShieldCheck,
-      },
-      { label: "Licenses", href: "/ops/backoffice/licenses", icon: KeyRound },
-      {
-        label: "Self-hosted installs",
-        href: "/ops/backoffice/self-hosted-instances",
-        icon: Server,
-      },
-      {
-        label: "Identity Lookup",
-        href: "/ops/backoffice/identity-lookup",
-        icon: UserSearch,
-      },
-      {
-        label: "Directory Sync",
-        href: "/ops/backoffice/directory-sync",
-        icon: RefreshCw,
-      },
-      {
-        label: "Bug Reports",
-        href: "/ops/backoffice/bug-reports",
-        icon: Bug,
-      },
+      { label: "Users", href: "/ops/users", icon: UserCog },
+      { label: "Organizations", href: "/ops/organizations", icon: Building2 },
+      { label: "Projects", href: "/ops/projects", icon: FolderOpen },
+      { label: "Single Sign-On", href: "/ops/sso-connections", icon: ShieldCheck },
+      { label: "Identity Lookup", href: "/ops/identity-lookup", icon: UserSearch },
+      { label: "Directory Sync", href: "/ops/directory-sync", icon: RefreshCw },
+    ],
+  };
+}
+
+/** LangWatch's own company tooling, offered only on SaaS (ARCHITECTURE.md §3.5). */
+export function cloudAdminGroup(): SettingsMenuGroup {
+  return {
+    id: "settings-cloud-admin",
+    label: "Cloud admin",
+    items: [
+      { label: "Subscriptions", href: "/ops/cloud/subscriptions", icon: CreditCard },
+      { label: "Licenses", href: "/ops/cloud/licenses", icon: KeyRound },
+      { label: "Self-hosted installs", href: "/ops/cloud/self-hosted-instances", icon: Server },
+      { label: "Bug Reports", href: "/ops/cloud/bug-reports", icon: Bug },
     ],
   };
 }
@@ -387,7 +364,8 @@ export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
     dataControlsGroup(gates),
     projectGroup(gates),
     ...(gates.hasOpsAccess ? [opsGroup()] : []),
-    ...(gates.isPlatformAdmin ? [backofficeGroup()] : []),
+    ...(gates.isPlatformAdmin ? [instanceGroup()] : []),
+    ...(gates.isPlatformAdmin && gates.isSaaS ? [cloudAdminGroup()] : []),
   ];
 
   return groups.filter((group) => group.items.length > 0);

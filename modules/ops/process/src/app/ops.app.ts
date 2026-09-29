@@ -266,6 +266,7 @@ import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
 import { OpsCheckupService } from "../services/ops-checkup.service.ts";
+import { OpsHealthService } from "../services/ops-health.service.ts";
 import type { OpsService } from "../services/ops.service.ts";
 import type { ProjectionReplayRequestSender } from "../services/replay.service.ts";
 import { SignUpHealthService } from "../services/sign-up-health.service.ts";
@@ -610,6 +611,8 @@ export interface OpsAppInfrastructure {
    * package reads none.
    */
   isProduction: boolean;
+  /** Whether this is LangWatch's own SaaS; Cloud admin answers nowhere else (§3.5). */
+  isSaas: boolean;
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
@@ -637,6 +640,7 @@ type OpsRuntimeDependencies = Readonly<{
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   isProduction: boolean;
+  isSaas: boolean;
 }>;
 
 /** {@link OpsAppDependencies} plus the contract peers only `create()` itself reads. */
@@ -755,6 +759,12 @@ export class OpsApp implements OpsApi {
         usageReport: HttpUsageReportChannel.create(),
         probes: HttpCheckupProbeChannel.create(),
       },
+      // Read only when a report is taken, by which time `app` below exists.
+      opsHealth: OpsHealthService.create({
+        findDashboardData: () => app.findDashboardData(),
+        getFleetSummary: () => app.getFleetSummary(),
+        listSystemMigrations: () => app.listSystemMigrations(),
+      }),
     });
 
     const anomalies = AnomalyDetectorService.create({
@@ -773,7 +783,7 @@ export class OpsApp implements OpsApi {
       logger: members.logger,
     });
 
-    return OpsApp.fromInfrastructure({
+    const app = OpsApp.fromInfrastructure({
       infrastructure,
       dependencies,
       repositories: setup.repositories,
@@ -785,6 +795,7 @@ export class OpsApp implements OpsApi {
         identity: dependencies.identity,
       }),
     });
+    return app;
   }
 
   /**
@@ -839,6 +850,7 @@ export class OpsApp implements OpsApi {
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
       isProduction: members.isProduction,
+      isSaas: members.isSaas,
     });
   }
 
@@ -1139,6 +1151,7 @@ export class OpsApp implements OpsApi {
         meta: { fieldErrors: { resource: ["This isn't a resource the admin API serves."] } },
       });
     }
+    if (resource.data === "subscription") this.#refuseOffSaas();
 
     return this.#dependencies.ops.adminOperation({
       resource: resource.data,
@@ -1610,6 +1623,7 @@ export class OpsApp implements OpsApi {
   async listBugReports(
     input: ListBugReportsInput & { actorUserId: string },
   ): Promise<BugReportListing> {
+    this.#refuseOffSaas();
     await this.#recordBugReportRead({
       actorUserId: input.actorUserId,
       action: "bugReports.getAll",
@@ -1630,6 +1644,7 @@ export class OpsApp implements OpsApi {
   }
 
   async getBugReport(input: { id: string; actorUserId: string }): Promise<BugReport> {
+    this.#refuseOffSaas();
     await this.#recordBugReportRead({
       actorUserId: input.actorUserId,
       action: "bugReports.getById",
@@ -1843,6 +1858,11 @@ export class OpsApp implements OpsApi {
     const { signUpHealth } = this.#dependencies;
     if (!signUpHealth) throw new OpsCapabilityUnavailableError("the sign-up health reading");
     return signUpHealth;
+  }
+
+  /** Cloud admin is LangWatch's own tooling: elsewhere it answers as not found (§3.5). */
+  #refuseOffSaas(): void {
+    if (!this.#dependencies.isSaas) throw new AdminSurfaceHiddenError();
   }
 
   get #checkup(): OpsCheckupService {

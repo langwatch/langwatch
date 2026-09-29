@@ -1,4 +1,4 @@
-/** A registry row as the Backoffice reads it (ADR-156). Declared here, not
+/** A registry row as Cloud admin reads it (ADR-156). Declared here, not
  * derived from `RouterOutputs`: model stays pure and behavior depends on it,
  * never the reverse. */
 export interface License {

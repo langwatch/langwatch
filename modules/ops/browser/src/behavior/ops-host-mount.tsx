@@ -21,7 +21,7 @@ import {
   type OpsSuccessNotice,
 } from "../model/ops-host.ts";
 
-/** The two grants the Ops workspace and its strictly narrower Backoffice sit behind. */
+/** The two grants the Ops workspace and its strictly narrower admin pages sit behind. */
 const OPS_VIEW_PERMISSION = "ops:view";
 const OPS_MANAGE_PERMISSION = "ops:manage";
 

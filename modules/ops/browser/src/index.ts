@@ -1,6 +1,6 @@
-export * from "./features/backoffice/behavior/admin-client.ts";
-export * from "./features/backoffice/ui/elements/backoffice-cells.tsx";
-export * from "./features/backoffice/ui/blocks/backoffice-table.tsx";
+export * from "./features/admin/behavior/admin-client.ts";
+export * from "./features/admin/ui/elements/backoffice-cells.tsx";
+export * from "./features/admin/ui/blocks/backoffice-table.tsx";
 export * from "./features/blob-store/model/blob-formatters.ts";
 export * from "./features/blob-store/ui/elements/blob-filters.tsx";
 export * from "./features/blob-store/ui/blocks/blob-toolbar.tsx";
@@ -80,4 +80,4 @@ export * from "./features/foundry/behavior/trace.store.ts";
 export * from "./features/event-store/ui/elements/cowboy-animation.tsx";
 export * from "./features/event-store/ui/elements/throughput-chart.tsx";
 export * from "./ui/elements/ops-virtualized-table-rows.tsx";
-export * from "./features/backoffice/behavior/use-admin-resource.ts";
+export * from "./features/admin/behavior/use-admin-resource.ts";

@@ -42,6 +42,7 @@ function renderSettingsSidebar({
   isEnterprise = true,
   hasOpsAccess = false,
   isOpsAdmin = false,
+  isSaaS = false,
   permissions = ["organization:view", "auditLog:view", "triggers:view", "sso:view"],
 }: {
   pathname?: string;
@@ -49,6 +50,7 @@ function renderSettingsSidebar({
   isEnterprise?: boolean;
   hasOpsAccess?: boolean;
   isOpsAdmin?: boolean;
+  isSaaS?: boolean;
   permissions?: string[];
 } = {}) {
   return render(
@@ -61,6 +63,7 @@ function renderSettingsSidebar({
           permissions,
           plan: { isEnterprise, isLoading: false, isLiteMember },
           opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
+          deployment: { isSaaS },
           commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
         }}
       >
@@ -346,16 +349,23 @@ describe("the settings shell in a new navigation mode", () => {
 
   describe("when the reader has ops access and is an admin", () => {
     /** @scenario The settings menu holds the ops groups at the bottom */
-    it("puts Ops and Backoffice last", () => {
-      renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true });
+    it("puts Ops, Instance and Cloud admin last on SaaS", () => {
+      renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true, isSaaS: true });
 
       const groupLabels = screen
         .getAllByText(
-          /^(You|Organization|People & access|AI Infrastructure|Data Controls|Project|Ops|Backoffice)$/,
+          /^(You|Organization|People & access|AI Infrastructure|Data Controls|Project|Ops|Instance|Cloud admin)$/,
         )
         .map((node) => node.textContent);
 
-      expect(groupLabels.slice(-2)).toEqual(["Ops", "Backoffice"]);
+      expect(groupLabels.slice(-3)).toEqual(["Ops", "Instance", "Cloud admin"]);
+    });
+
+    it("hides Cloud admin off SaaS", () => {
+      renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true });
+
+      expect(screen.getByText("Instance")).toBeInTheDocument();
+      expect(screen.queryByText("Cloud admin")).not.toBeInTheDocument();
     });
   });
 
@@ -371,11 +381,12 @@ describe("the settings shell in a new navigation mode", () => {
 
   describe("when the reader has no ops access", () => {
     /** @scenario A reader without ops access sees no ops groups */
-    it("shows neither the Ops group nor the Backoffice group", () => {
-      renderSettingsSidebar();
+    it("shows neither the Ops group nor its admin groups", () => {
+      renderSettingsSidebar({ isSaaS: true });
 
       expect(screen.queryByText("Ops")).not.toBeInTheDocument();
-      expect(screen.queryByText("Backoffice")).not.toBeInTheDocument();
+      expect(screen.queryByText("Instance")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cloud admin")).not.toBeInTheDocument();
     });
   });
 

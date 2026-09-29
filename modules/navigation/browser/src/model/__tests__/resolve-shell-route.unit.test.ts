@@ -57,7 +57,7 @@ describe("resolveShellRoute", () => {
      * @scenario Internal ops pages render in the new settings shell
      */
     it("is not a product, and carries organization scope", () => {
-      for (const pathname of ["/settings/members", "/ops/backoffice/users"]) {
+      for (const pathname of ["/settings/members", "/ops/users", "/ops/cloud/licenses"]) {
         expect(resolve(pathname)).toEqual({
           isSettingsRoute: true,
           isPersonalScopeRoute: false,

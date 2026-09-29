@@ -1,4 +1,4 @@
-/** An activation code as the Backoffice reads it (ADR-156, section 5).
+/** An activation code as Cloud admin reads it (ADR-156, section 5).
  * Declared here, not derived from `RouterOutputs`: model stays pure and
  * behavior depends on it, never the reverse. */
 export interface ActivationCode {

@@ -26,7 +26,7 @@ export function useOpsPermission(): OpsPermissionReading {
   );
 }
 
-/** Whether the reader may see the Backoffice, which is strictly narrower. */
+/** Whether the reader may see instance and Cloud admin, which is strictly narrower. */
 export function useIsOpsAdmin(): boolean {
   return useOpsHost().isOpsAdmin();
 }

@@ -43,9 +43,10 @@ describe("given a reader with no grants on a self-hosted deployment", () => {
       expect(hrefsIn({})).not.toContain("/settings/subscription");
     });
 
-    it("offers neither the operations nor the backoffice group", () => {
+    it("offers neither the operations nor its admin groups", () => {
       expect(groupIdsIn({})).not.toContain("settings-ops");
-      expect(groupIdsIn({})).not.toContain("settings-backoffice");
+      expect(groupIdsIn({})).not.toContain("settings-ops-instance");
+      expect(groupIdsIn({})).not.toContain("settings-cloud-admin");
     });
   });
 });
@@ -155,11 +156,22 @@ describe("given an operator", () => {
       expect(hrefsIn({ hasOpsAccess: true })).toContain("/ops/event-sourcing");
     });
 
-    it("offers the backoffice group only to a platform administrator", () => {
-      expect(groupIdsIn({ hasOpsAccess: true })).not.toContain("settings-backoffice");
+    it("offers instance administration only to a platform administrator", () => {
+      expect(groupIdsIn({ hasOpsAccess: true })).not.toContain("settings-ops-instance");
       expect(groupIdsIn({ hasOpsAccess: true, isPlatformAdmin: true })).toContain(
-        "settings-backoffice",
+        "settings-ops-instance",
       );
+      expect(hrefsIn({ hasOpsAccess: true, isPlatformAdmin: true })).toContain("/ops/users");
+    });
+
+    it("offers Cloud admin only to a platform administrator on SaaS", () => {
+      const admin = { hasOpsAccess: true, isPlatformAdmin: true };
+      expect(groupIdsIn(admin)).not.toContain("settings-cloud-admin");
+      expect(groupIdsIn({ ...admin, isSaaS: true })).toContain("settings-cloud-admin");
+      expect(groupIdsIn({ hasOpsAccess: true, isSaaS: true })).not.toContain(
+        "settings-cloud-admin",
+      );
+      expect(hrefsIn({ ...admin, isSaaS: true })).toContain("/ops/cloud/licenses");
     });
   });
 });

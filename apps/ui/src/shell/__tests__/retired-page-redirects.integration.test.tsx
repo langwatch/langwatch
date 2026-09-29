@@ -226,12 +226,33 @@ describe("given the retired ops addresses", () => {
     });
   });
 
-  describe("when the backoffice entry is opened", () => {
-    it("lands on the default resource", async () => {
+  describe("when the retired back-office address is opened", () => {
+    it("lands on Cloud admin's default page", async () => {
       const router = open("/ops/backoffice");
 
       await waitFor(() => {
-        expect(addressOf(router)).toBe("/ops/backoffice/users");
+        expect(addressOf(router)).toBe("/ops/cloud/subscriptions");
+      }, LAZY_CHROME);
+    });
+  });
+
+  describe("when a retired back-office page is opened", () => {
+    it.each([
+      ["/ops/backoffice/users", "/ops/users"],
+      ["/ops/backoffice/organizations?q=org_1", "/ops/organizations?q=org_1"],
+      ["/ops/backoffice/projects", "/ops/projects"],
+      ["/ops/backoffice/sso-connections", "/ops/sso-connections"],
+      ["/ops/backoffice/identity-lookup", "/ops/identity-lookup"],
+      ["/ops/backoffice/directory-sync", "/ops/directory-sync"],
+      ["/ops/backoffice/subscriptions", "/ops/cloud/subscriptions"],
+      ["/ops/backoffice/licenses", "/ops/cloud/licenses"],
+      ["/ops/backoffice/self-hosted-instances", "/ops/cloud/self-hosted-instances"],
+      ["/ops/backoffice/bug-reports", "/ops/cloud/bug-reports"],
+    ])("%s lands on %s", async (from, to) => {
+      const router = open(from);
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe(to);
       }, LAZY_CHROME);
     });
   });
@@ -239,11 +260,11 @@ describe("given the retired ops addresses", () => {
 
 describe("given the retired admin addresses", () => {
   describe("when the bare admin address is opened", () => {
-    it("lands on the backoffice, which forwards on to its default resource", async () => {
+    it("lands on Cloud admin, which forwards on to its default page", async () => {
       const router = open("/admin");
 
       await waitFor(() => {
-        expect(addressOf(router)).toBe("/ops/backoffice/users");
+        expect(addressOf(router)).toBe("/ops/cloud/subscriptions");
       }, LAZY_CHROME);
     });
   });
@@ -253,7 +274,7 @@ describe("given the retired admin addresses", () => {
       const router = open("/admin/user/u_1");
 
       await waitFor(() => {
-        expect(addressOf(router)).toBe("/ops/backoffice/users/u_1");
+        expect(addressOf(router)).toBe("/ops/users/u_1");
       }, LAZY_CHROME);
     });
 
@@ -261,7 +282,7 @@ describe("given the retired admin addresses", () => {
       const router = open("/admin/Subscription");
 
       await waitFor(() => {
-        expect(addressOf(router)).toBe("/ops/backoffice/subscriptions");
+        expect(addressOf(router)).toBe("/ops/cloud/subscriptions");
       }, LAZY_CHROME);
     });
 
@@ -269,17 +290,17 @@ describe("given the retired admin addresses", () => {
       const router = open("/admin/organizations?page=2#row_7");
 
       await waitFor(() => {
-        expect(addressOf(router)).toBe("/ops/backoffice/organizations?page=2#row_7");
+        expect(addressOf(router)).toBe("/ops/organizations?page=2#row_7");
       }, LAZY_CHROME);
     });
   });
 
-  describe("when a resource the backoffice never took over is opened", () => {
-    it("lands on the backoffice home rather than a fabricated address", async () => {
+  describe("when a resource the admin pages never took over is opened", () => {
+    it("lands on the Ops home rather than a fabricated address", async () => {
       const router = open("/admin/coupons/c_1");
 
       await waitFor(() => {
-        expect(addressOf(router)).toBe("/ops/backoffice/users");
+        expect(addressOf(router)).toBe("/ops");
       }, LAZY_CHROME);
     });
   });

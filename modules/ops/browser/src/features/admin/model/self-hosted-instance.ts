@@ -1,4 +1,4 @@
-/** A self-hosted install as the Backoffice reads it (ADR-156, section 10).
+/** A self-hosted install as Cloud admin reads it (ADR-156, section 10).
  * Declared here, not derived from `RouterOutputs`: model stays pure and
  * behavior depends on it, never the reverse. */
 export interface SelfHostedInstance {

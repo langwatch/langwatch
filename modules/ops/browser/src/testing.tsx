@@ -36,7 +36,7 @@ export type FakeOpsHostOptions = {
    */
   hasOpsAccess?: boolean;
   sharedInstall?: boolean;
-  /** Whether the reader may see the Backoffice, which is strictly narrower. */
+  /** Whether the reader may see instance and Cloud admin, which is strictly narrower. */
   isOpsAdmin?: boolean;
   project?: OpsProject | null;
   /** Path parameters the screen was opened with, for example `{ runId: "r_1" }`. */

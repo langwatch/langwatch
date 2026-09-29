@@ -63,57 +63,50 @@ export const opsWeb = defineWebModule("ops")
     "pages/ops/projections/[runId]": {
       load: () => import("./ui/sections/ops/ops-replay-progress.screen.tsx"),
     },
-    "pages/ops/backoffice/users": {
+    "pages/ops/users": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx")).BackofficeUsersScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).UsersScreen,
       }),
     },
-    "pages/ops/backoffice/organizations": {
+    "pages/ops/organizations": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
-          .BackofficeOrganizationsScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).OrganizationsScreen,
       }),
     },
-    "pages/ops/backoffice/projects": {
+    "pages/ops/projects": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
-          .BackofficeProjectsScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).ProjectsScreen,
       }),
     },
-    "pages/ops/backoffice/subscriptions": {
+    "pages/ops/sso-connections": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
-          .BackofficeSubscriptionsScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).SsoConnectionsScreen,
       }),
     },
-    "pages/ops/backoffice/sso-connections": {
+    "pages/ops/identity-lookup": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
-          .BackofficeSsoConnectionsScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).IdentityLookupScreen,
       }),
     },
-    "pages/ops/backoffice/bug-reports": {
+    "pages/ops/cloud/subscriptions": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
-          .BackofficeBugReportsScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudSubscriptionsScreen,
       }),
     },
-    "pages/ops/backoffice/licenses": {
+    "pages/ops/cloud/licenses": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
-          .BackofficeLicensesScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudLicensesScreen,
       }),
     },
-    "pages/ops/backoffice/self-hosted-instances": {
+    "pages/ops/cloud/self-hosted-instances": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
-          .BackofficeSelfHostedInstancesScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx"))
+          .CloudSelfHostedInstancesScreen,
       }),
     },
-    "pages/ops/backoffice/identity-lookup": {
+    "pages/ops/cloud/bug-reports": {
       load: async () => ({
-        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
-          .BackofficeIdentityLookupScreen,
+        default: (await import("./ui/sections/ops/admin-screens.tsx")).CloudBugReportsScreen,
       }),
     },
   })

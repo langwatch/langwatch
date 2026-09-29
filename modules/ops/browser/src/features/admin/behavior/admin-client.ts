@@ -23,7 +23,7 @@ export interface DataResult<T> {
 }
 
 /** Carries Hono error shape; readHandledError reads code/meta from error object.
- * Lets backoffice surface actual failure reasons (was generic before). */
+ * Lets the admin pages surface actual failure reasons (was generic before). */
 class AdminRequestError extends Error {
   constructor(message: string, body: object, status: number) {
     super(message);

@@ -132,7 +132,7 @@ function CustomerValue({ instance }: { instance: SelfHostedInstance }) {
     <HStack gap={2}>
       <Text>{instance.organizationName ?? "license not linked yet"}</Text>
       <Link
-        href="/ops/backoffice/licenses"
+        href="/ops/cloud/licenses"
         fontSize="xs"
         color="fg.muted"
         onClick={(event) => event.stopPropagation()}

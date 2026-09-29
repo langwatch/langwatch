@@ -50,7 +50,7 @@ const PAGE_SIZE = 25;
 
 export default function ProjectsView() {
   const router = useRouter();
-  // Deep-link support: /ops/backoffice/projects?q=<projectId> — seed the
+  // Deep-link support: /ops/projects?q=<projectId> — seed the
   // search input once from the URL so chips on the Users table drop the user
   // straight onto the matching row.
   const initialQueryRef = useRef<string>(typeof router.query.q === "string" ? router.query.q : "");

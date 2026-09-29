@@ -2,7 +2,7 @@
   "name": "@langwatch/ops-browser",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe platform operations and backoffice UI.",
+  "description": "Browser-safe platform operations, instance admin and Cloud admin UI.",
   "files": [
     "src"
   ],

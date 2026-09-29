@@ -20,9 +20,9 @@ export const scimWeb = defineWebModule("scim")
       label: "Connectors",
       load: () => import("./ui/sections/connectors.screen.tsx"),
     },
-    // The back office's directory sync across every customer; the server
-    // answers operators only and refuses everyone else as not found.
-    "pages/ops/backoffice/directory-sync": {
+    // Ops' directory sync across every customer; the server answers
+    // operators only and refuses everyone else as not found.
+    "pages/ops/directory-sync": {
       load: () => import("./ui/sections/directory-sync-view.screen.tsx"),
     },
   })

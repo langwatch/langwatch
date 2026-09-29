@@ -14,7 +14,7 @@ import { LicenseRevokeDialog } from "./license-revoke-dialog.tsx";
 const PAGE_SIZE = 25;
 
 /**
- * The backoffice's license registry (ADR-156). Every write is a verb with
+ * Cloud admin's license registry (ADR-156). Every write is a verb with
  * the operator recorded on it; a signed license is shown exactly once.
  */
 export default function LicensesView() {

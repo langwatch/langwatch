@@ -22,7 +22,7 @@ export type UiRedirectDescriptor = {
   readonly renameParams?: Readonly<Record<string, string>>;
   /**
    * A rename table for the first sub-path segment: `/admin/user/u_1`
-   * reaches `/ops/backoffice/users/u_1`. Case-insensitive; an unnamed
+   * reaches `/ops/users/u_1`. Case-insensitive; an unnamed
    * segment lands on the destination's own home.
    */
   readonly mapSegment?: Readonly<Record<string, string>>;
@@ -76,6 +76,24 @@ export function uiRouteDescriptors(table: readonly UiRouteDescriptor[]): UiRoute
       : [descriptor, ...uiRouteDescriptors(descriptor.children ?? [])],
   );
 }
+
+/** Retired admin and back-office segments -> their home under `/ops`; others land on `/ops`. */
+const RETIRED_ADMIN_SEGMENTS: Readonly<Record<string, string>> = {
+  user: "users",
+  users: "users",
+  organization: "organizations",
+  organizations: "organizations",
+  project: "projects",
+  projects: "projects",
+  "sso-connections": "sso-connections",
+  "identity-lookup": "identity-lookup",
+  "directory-sync": "directory-sync",
+  subscription: "cloud/subscriptions",
+  subscriptions: "cloud/subscriptions",
+  licenses: "cloud/licenses",
+  "self-hosted-instances": "cloud/self-hosted-instances",
+  "bug-reports": "cloud/bug-reports",
+};
 
 /**
  * Prefixes that moved to a new top-level home — the whole prefix
@@ -201,27 +219,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   },
 
   // Top-level pages
+  // The admin CRUD UI's addresses; singular resource names travel as a
+  // segment map. The bare address lands on Cloud admin (ARCHITECTURE.md §3.5).
+  { path: "/admin", redirect: { from: "/admin", to: "/ops/cloud" } },
   {
-    // The admin CRUD UI became the Backoffice module inside Ops (#3247,
-    // #3245). The singular resource names it served are the only thing that
-    // has to change on the way over, so they travel as a segment map rather
-    // than as a page: /admin/user/u_1 lands on /ops/backoffice/users/u_1, and
-    // an unrecognised resource lands on the Backoffice home.
     path: "/admin/*",
-    redirect: {
-      from: "/admin",
-      to: "/ops/backoffice",
-      mapSegment: {
-        user: "users",
-        users: "users",
-        organization: "organizations",
-        organizations: "organizations",
-        project: "projects",
-        projects: "projects",
-        subscription: "subscriptions",
-        subscriptions: "subscriptions",
-      },
-    },
+    redirect: { from: "/admin", to: "/ops", mapSegment: RETIRED_ADMIN_SEGMENTS },
   },
   { path: "/share/:id", page: "pages/share/[id]" },
   // Public — no auth required; token in query-string is the authorisation
@@ -899,51 +902,34 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         path: "/ops/projections/:runId",
         page: "pages/ops/projections/[runId]",
       },
+      // Instance administration, for every instance operator (ARCHITECTURE.md §3.5).
+      { path: "/ops/users", page: "pages/ops/users" },
+      { path: "/ops/organizations", page: "pages/ops/organizations" },
+      { path: "/ops/projects", page: "pages/ops/projects" },
+      { path: "/ops/sso-connections", page: "pages/ops/sso-connections" },
+      { path: "/ops/identity-lookup", page: "pages/ops/identity-lookup" },
+      { path: "/ops/directory-sync", page: "pages/ops/directory-sync" },
+      // Cloud admin: its screens refuse opaquely off SaaS (ARCHITECTURE.md §3.5).
       {
-        // The Backoffice entry has no surface of its own: Users is the default
-        // resource, and the per-resource pages below are the real surfaces.
+        path: "/ops/cloud",
+        redirect: { from: "/ops/cloud", to: "/ops/cloud/subscriptions" },
+      },
+      { path: "/ops/cloud/subscriptions", page: "pages/ops/cloud/subscriptions" },
+      { path: "/ops/cloud/licenses", page: "pages/ops/cloud/licenses" },
+      {
+        path: "/ops/cloud/self-hosted-instances",
+        page: "pages/ops/cloud/self-hosted-instances",
+      },
+      { path: "/ops/cloud/bug-reports", page: "pages/ops/cloud/bug-reports" },
+      // The retired back-office addresses: the bare one lands on Cloud admin,
+      // each page on its new home, anything else on the Ops home.
+      {
         path: "/ops/backoffice",
-        redirect: { from: "/ops/backoffice", to: "/ops/backoffice/users" },
+        redirect: { from: "/ops/backoffice", to: "/ops/cloud" },
       },
       {
-        path: "/ops/backoffice/bug-reports",
-        page: "pages/ops/backoffice/bug-reports",
-      },
-      {
-        path: "/ops/backoffice/licenses",
-        page: "pages/ops/backoffice/licenses",
-      },
-      {
-        path: "/ops/backoffice/self-hosted-instances",
-        page: "pages/ops/backoffice/self-hosted-instances",
-      },
-      {
-        path: "/ops/backoffice/identity-lookup",
-        page: "pages/ops/backoffice/identity-lookup",
-      },
-      {
-        path: "/ops/backoffice/users",
-        page: "pages/ops/backoffice/users",
-      },
-      {
-        path: "/ops/backoffice/organizations",
-        page: "pages/ops/backoffice/organizations",
-      },
-      {
-        path: "/ops/backoffice/projects",
-        page: "pages/ops/backoffice/projects",
-      },
-      {
-        path: "/ops/backoffice/subscriptions",
-        page: "pages/ops/backoffice/subscriptions",
-      },
-      {
-        path: "/ops/backoffice/sso-connections",
-        page: "pages/ops/backoffice/sso-connections",
-      },
-      {
-        path: "/ops/backoffice/directory-sync",
-        page: "pages/ops/backoffice/directory-sync",
+        path: "/ops/backoffice/*",
+        redirect: { from: "/ops/backoffice", to: "/ops", mapSegment: RETIRED_ADMIN_SEGMENTS },
       },
 
       // Both read the navigation host, which only this layout mounts; main drew

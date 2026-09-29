@@ -161,9 +161,11 @@ describe("ops app installation", () => {
           },
         });
 
+        expect(filed.id).toEqual(expect.any(String));
+        // Intake answers everywhere; the inbox is Cloud admin, and this install is not SaaS.
         await expect(
           app.getBugReport({ id: filed.id, actorUserId: "user_alex" }),
-        ).resolves.toMatchObject({ title: "The CLI could not reach the API" });
+        ).rejects.toMatchObject({ code: "not_found" });
       } finally {
         await runtime.stop();
       }

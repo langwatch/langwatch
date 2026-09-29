@@ -48,9 +48,9 @@ export abstract class OpsHostApi {
   abstract hasOpsAccess(): boolean;
 
   /**
-   * Whether the reader may see the Backoffice, which is strictly narrower.
+   * Whether the reader may see instance and Cloud admin, which is strictly narrower.
    * Kept apart from {@link hasOpsAccess}: if ops access ever broadens past
-   * operators, the Backoffice must not broaden with it.
+   * operators, the admin pages must not broaden with it.
    */
   abstract isOpsAdmin(): boolean;
 

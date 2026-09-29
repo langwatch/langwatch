@@ -350,6 +350,7 @@ export function buildOpsInfrastructure(input: {
       return key ? [{ key, ...(host ? { host } : {}) }] : [];
     },
     isProduction: members.nodeEnvironment === "production",
+    isSaas: members.isSaas,
   };
 }
 

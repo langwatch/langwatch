@@ -63,7 +63,7 @@ const PAGE_SIZE = 25;
 
 export default function UsersView() {
   const router = useRouter();
-  // Deep-link support: /ops/backoffice/users?q=<orgId|userId|email>. The
+  // Deep-link support: /ops/users?q=<orgId|userId|email>. The
   // RefChipList on this view already builds those URLs for Org / Project
   // chips, and Customer Pulse links to this page from its registry. Seed the
   // search input once from the URL so an external link lands on the matching
@@ -470,7 +470,7 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
 
 /**
  * Renders clickable chips for the Users table's Organizations/Projects
- * columns. Each chip deep-links to the matching Backoffice list page with
+ * columns. Each chip deep-links to the matching instance admin list page with
  * the row's id pre-loaded into `q`, landing on a filtered single-row view.
  */
 function RefChipList({
@@ -498,7 +498,7 @@ function RefChipList({
           color="fg"
           _hover={{ textDecoration: "underline" }}
         >
-          <RoutedLink href={`/ops/backoffice/${resource}?q=${ref.id}`}>
+          <RoutedLink href={`/ops/${resource}?q=${ref.id}`}>
             <Box
               as="span"
               paddingX={2}

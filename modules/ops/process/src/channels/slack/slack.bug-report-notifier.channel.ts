@@ -20,7 +20,7 @@ export interface SlackBugReportNotifierConfig {
   botToken?: string | undefined;
   /** Destination channel; defaults to `#dev` the way the application did. */
   channel?: string | undefined;
-  /** Public application origin the backoffice deep link is built from. */
+  /** Public application origin the Cloud admin deep link is built from. */
   baseHost?: string | undefined;
 }
 
@@ -51,7 +51,7 @@ export class SlackBugReportNotifierChannel implements BugReportNotifier {
     const channel = this.config.channel ?? DEFAULT_CHANNEL;
 
     const base = (this.config.baseHost ?? DEFAULT_BASE_HOST).replace(/\/+$/, "");
-    const adminUrl = `${base}/ops/backoffice/bug-reports?report=${report.id}`;
+    const adminUrl = `${base}/ops/cloud/bug-reports?report=${report.id}`;
 
     const summaryExcerpt = (report.summary ?? "").trim().slice(0, 600);
     const facts = [
@@ -92,7 +92,7 @@ export class SlackBugReportNotifierChannel implements BugReportNotifier {
             : []),
           {
             type: "section",
-            text: { type: "mrkdwn", text: `<${adminUrl}|Open in backoffice>` },
+            text: { type: "mrkdwn", text: `<${adminUrl}|Open in Cloud admin>` },
           },
         ],
       },

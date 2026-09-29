@@ -9,16 +9,16 @@ import { describe, expect, it } from "vitest";
 
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
-const { backofficeGroup, isSettingsMenuItemActive, opsGroup } =
+const { cloudAdminGroup, instanceGroup, isSettingsMenuItemActive, opsGroup } =
   await navigationWeb.installation.capabilities.chrome.load();
 
 /**
- * Every `/ops` address the route table registers. Parameter segments are
- * dropped to their parent, since a detail page is reached from the page
- * that lists it rather than from the menu.
+ * Every `/ops` page the route table registers; a detail page drops to its parent, reached
+ * from the list rather than the menu, and a retired address that only forwards is no page.
  */
 function registeredOpsRoutes(): string[] {
   const paths = uiRouteDescriptors(uiRouteTable)
+    .filter((descriptor) => !("redirect" in descriptor))
     .map((descriptor) => descriptor.path)
     .filter((path): path is string => typeof path === "string");
   return [
@@ -45,7 +45,7 @@ function isClaimedBy({
 
 describe("given the internal ops pages the route table registers", () => {
   const addresses = registeredOpsRoutes();
-  const menu = [opsGroup(), backofficeGroup()];
+  const menu = [opsGroup(), instanceGroup(), cloudAdminGroup()];
 
   // Both readings are of hand-maintained tables, so a rename that stops one
   // matching would otherwise leave a test passing on nothing at all.
@@ -63,12 +63,12 @@ describe("given the internal ops pages the route table registers", () => {
   });
 
   describe("when the single sign-on connections entry is resolved", () => {
-    const CONNECTIONS = "/ops/backoffice/sso-connections";
+    const CONNECTIONS = "/ops/sso-connections";
 
     /** @scenario "The connections page is reachable from the operator menu" */
     it("resolves to a route registered for that exact path", () => {
       // The menu offers it...
-      const offered = backofficeGroup().items.find((item) => item.href === CONNECTIONS);
+      const offered = instanceGroup().items.find((item) => item.href === CONNECTIONS);
       expect(offered).toBeDefined();
 
       // ...and the route table registers that exact path, rather than the

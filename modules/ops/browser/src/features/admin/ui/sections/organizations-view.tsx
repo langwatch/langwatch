@@ -54,7 +54,7 @@ const PAGE_SIZE = 25;
 
 export default function OrganizationsView() {
   const router = useRouter();
-  // `q` deep-links from other Backoffice pages (e.g. clicking an org chip on
+  // `q` deep-links from other instance admin pages (e.g. clicking an org chip on
   // the Users table lands here with ?q=<orgId>). Seed once on mount so the
   // list comes up pre-filtered without fighting the user's subsequent typing.
   const initialQueryRef = useRef<string>(typeof router.query.q === "string" ? router.query.q : "");
@@ -456,7 +456,7 @@ function AuthenticationSection() {
       {/* SSO is a guarded connection lifecycle now, not a free-text
           field; editing one here is refused once routing is enforced. */}
       <Text fontSize="sm" color="fg.muted">
-        Single sign-on for this organization is set up on its connection, under Backoffice &rarr;
+        Single sign-on for this organization is set up on its connection, under Ops, Instance &rarr;
         Single Sign-On.
       </Text>
     </>
@@ -478,7 +478,7 @@ function LicenseFields({ form, setField }: SectionProps) {
           fontSize="xs"
         />
         <Field.HelperText>
-          Leave empty to keep the current license. Issue and manage licenses under Backoffice,
+          Leave empty to keep the current license. Issue and manage licenses under Cloud admin,
           Licenses.
         </Field.HelperText>
       </Field.Root>
