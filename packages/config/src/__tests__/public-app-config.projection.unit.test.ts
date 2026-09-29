@@ -36,7 +36,10 @@ describe("public application configuration projection", () => {
   });
 
   it("hands the browser an ops slice with Cloud admin off, which the ops schema requires", () => {
-    const config = resolvePublicAppConfig({ BASE_HOST: "https://app.example.test" });
+    const config = resolvePublicAppConfig({
+      BASE_HOST: "https://app.example.test",
+      NODE_ENV: "production",
+    });
 
     expect(config.ops).toEqual({ cloudOps: false });
   });
