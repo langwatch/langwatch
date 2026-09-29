@@ -469,7 +469,6 @@ export function subjectIsSet(draft: AutomationDraft): boolean {
   return filterQueryIsSet(draft.filterQuery) || filtersAreSet(draft.filters);
 }
 
-/** A trace-subject query is set when it has non-whitespace content. */
 /**
  * `subjectIsSet`, and for a trace query also that it parses and names nothing
  * suspicious: the green check means "this will match", not "this is filled".
@@ -482,6 +481,7 @@ export function subjectIsValid(draft: AutomationDraft): boolean {
   return queryIsValid(draft.filterQuery);
 }
 
+/** A trace-subject query is set when it has non-whitespace content. */
 export function filterQueryIsSet(filterQuery: string | null): boolean {
   return (filterQuery ?? "").trim().length > 0;
 }
