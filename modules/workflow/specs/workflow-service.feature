@@ -225,3 +225,15 @@ Feature: Workflow service boundary
     Then each evaluator workflow comes back carrying only the version it published
     And an evaluator workflow that never published comes back with no version
     And no workflow of another project comes back
+
+  @unit
+  Scenario: Archiving a workflow takes its evaluators, agents and monitors with it
+    Given a workflow backs an evaluator that a monitor uses, and an agent runs it
+    When the workflow is archived with its dependants
+    Then the monitor is deleted, the evaluator and the agent are archived, then the workflow
+
+  @unit
+  Scenario: The workflows list reads copy lineage on a process that supplies only declared members
+    Given the workflow module is installed from its declared members alone
+    When the project's workflows are listed with their copy lineage
+    Then the list answers instead of failing on a member the process never supplied

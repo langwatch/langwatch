@@ -4,13 +4,15 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 
+import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { WorkflowApp, type WorkflowPublicationReads } from "../workflow.app.ts";
+import { WorkflowApp } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 class NoopTestEncryption {
@@ -38,13 +40,13 @@ const existingEvaluator: Evaluator = {
 };
 
 function appWith({
-  publications,
+  lineage,
   evaluators,
 }: {
-  publications: WorkflowPublicationReads;
+  lineage: Partial<WorkflowLineageRepository>;
   evaluators: EvaluatorApi;
 }): WorkflowApp {
-  const members = createWorkflowTestInfrastructure({ publications, evaluators });
+  const members = createWorkflowTestInfrastructure({ evaluators });
 
   return WorkflowApp.create({
     members: {
@@ -61,6 +63,7 @@ function appWith({
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: members.datasets,
+      monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
     },
     config: {
       stagingThresholdBytes: void 0,
@@ -75,6 +78,7 @@ function appWith({
         {},
         "WorkflowProjectEnvironmentRepository",
       ),
+      lineage: createApiFixture<WorkflowLineageRepository>(lineage, "WorkflowLineageRepository"),
     },
   });
 }
@@ -82,23 +86,18 @@ function appWith({
 describe("workflow evaluator publication", () => {
   /** @scenario "An archived workflow keeps its evaluator publication behaviour" */
   it("uses the publication row's name when the ordinary workflow row is archived", async () => {
-    const findFlags = vi.fn<WorkflowPublicationReads["findFlags"]>(async () => ({
+    const findFlags = vi.fn<WorkflowLineageRepository["findFlags"]>(async () => ({
       id: "workflow_archived",
       name: "Archived quality check",
       publishedId: "published_1",
       isComponent: false,
       isEvaluator: false,
     }));
-    const setFlags = vi.fn<WorkflowPublicationReads["setFlags"]>(async () => undefined);
+    const setFlags = vi.fn<WorkflowLineageRepository["setFlags"]>(async () => undefined);
     const listByWorkflow = vi.fn<EvaluatorApi["listByWorkflow"]>(async () => [existingEvaluator]);
     const update = vi.fn<EvaluatorApi["update"]>(async () => existingEvaluator);
     const app = appWith({
-      publications: {
-        findFlags,
-        setFlags,
-        findVersion: async () => null,
-        listPublishedComponents: async () => [],
-      },
+      lineage: { findFlags, setFlags },
       evaluators: createApiFixture<EvaluatorApi>({ listByWorkflow, update }, "EvaluatorApi"),
     });
 
@@ -123,14 +122,9 @@ describe("workflow evaluator publication", () => {
 
   /** @scenario "Saving a missing workflow as an evaluator refuses before publication changes" */
   it("refuses before publication flags or evaluator rows change", async () => {
-    const setFlags = vi.fn<WorkflowPublicationReads["setFlags"]>(async () => undefined);
+    const setFlags = vi.fn<WorkflowLineageRepository["setFlags"]>(async () => undefined);
     const app = appWith({
-      publications: {
-        findFlags: async () => null,
-        setFlags,
-        findVersion: async () => null,
-        listPublishedComponents: async () => [],
-      },
+      lineage: { findFlags: async () => null, setFlags },
       evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
     });
 

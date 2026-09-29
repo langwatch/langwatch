@@ -9,12 +9,14 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { Temporal } from "@langwatch/time";
 import { NlpLambdaFleetNotComposedError } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import { WorkflowApp, type NlpLambdaFleet } from "../workflow.app.ts";
@@ -53,6 +55,7 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: members.datasets,
+      monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
     },
     config: {
       stagingThresholdBytes: undefined,
@@ -67,6 +70,7 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
         {},
         "WorkflowProjectEnvironmentRepository",
       ),
+      lineage: createApiFixture<WorkflowLineageRepository>({}, "WorkflowLineageRepository"),
     },
   });
 }

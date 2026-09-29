@@ -17,6 +17,7 @@ import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -84,6 +85,7 @@ import {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
 } from "../channels/http/http.workflow-studio-stream.channel.ts";
+import type { WorkflowLineageRepository } from "../repositories/workflow-lineage.repository.ts";
 import {
   workflowRepositories,
   type WorkflowRepositories,
@@ -102,10 +104,12 @@ import { WorkflowCodeCompletionService } from "../services/workflow-code-complet
 import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
 import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
+import { WorkflowLinkedRowsService } from "../services/workflow-linked-rows.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
 import { WorkflowPermissionService } from "../services/workflow-permission.service.ts";
 import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
 import { WorkflowPublicationService } from "../services/workflow-publication.service.ts";
+import { LoggedWorkflowSignalsService } from "../services/workflow-signals.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
 import { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
@@ -335,6 +339,9 @@ export type WorkflowHostMembers = Omit<
   | "studioDispatch"
   | "publicBaseUrl"
   | "evaluations"
+  | "lineage"
+  | "publications"
+  | "signals"
 >;
 
 /** The engine address and public origin are process facts, not this module's env spellings. */
@@ -349,6 +356,37 @@ type WorkflowSetup = FeatureSetup<
   WorkflowServerConfig,
   WorkflowRepositories
 >;
+
+/** The lineage reads: the workflow's own rows, and what hangs off it through its owners. */
+function lineageOf({
+  rows,
+  linked,
+}: {
+  rows: WorkflowLineageRepository;
+  linked: WorkflowLinkedRowsService;
+}): WorkflowLineageReads {
+  return {
+    listWithCopyLineage: (input) => rows.findWithCopyLineage(input),
+    findWorkflow: (input) => rows.findWorkflow(input),
+    findCopiesWithPath: (input) => rows.findCopiesWithPath(input),
+    findWorkflowWithSource: (input) => rows.findWorkflowWithSource(input),
+    findWorkflowWithCopies: (input) => rows.findWorkflowWithCopies(input),
+    findLatestVersionNumber: (input) => rows.findLatestVersionNumber(input),
+    listAgents: (input) => linked.listAgents(input),
+    listMonitorsForEvaluators: (input) => linked.listMonitorsForEvaluators(input),
+    cascadeArchive: (input) => linked.cascadeArchive(input),
+  };
+}
+
+/** The Optimization Studio's publication flags, off the workflow's own rows. */
+function publicationsOf(rows: WorkflowLineageRepository): WorkflowPublicationReads {
+  return {
+    findFlags: (input) => rows.findFlags(input),
+    findVersion: (input) => rows.findVersion(input),
+    setFlags: (input) => rows.setFlags(input),
+    listPublishedComponents: (input) => rows.findPublishedComponents(input),
+  };
+}
 
 /** The module's own id generator - the same ksuid the worker's copy used. */
 class KsuidWorkflowId implements WorkflowId {
@@ -433,6 +471,8 @@ export class WorkflowApp implements WorkflowApi {
     authz: AuthzApi,
     /** Registers and runs a workflow's evaluation over its batch. */
     experiments: ExperimentApi,
+    /** The monitors an archived workflow's evaluators back, deleted with it. */
+    monitors: MonitorApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -508,6 +548,17 @@ export class WorkflowApp implements WorkflowApi {
       evaluations: {
         trigger: (input) => setup.dependencies.experiments.triggerWorkflowEvaluation(input),
       },
+      lineage: lineageOf({
+        rows: setup.repositories.lineage,
+        linked: WorkflowLinkedRowsService.create({
+          workflows,
+          agents: setup.dependencies.agents,
+          evaluators: setup.dependencies.evaluators,
+          monitors: setup.dependencies.monitors,
+        }),
+      }),
+      publications: publicationsOf(setup.repositories.lineage),
+      signals: LoggedWorkflowSignalsService.create(),
     });
   }
 

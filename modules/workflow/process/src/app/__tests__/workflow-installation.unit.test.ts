@@ -58,6 +58,7 @@ function process_() {
       agent: createApiFixture({}, "AgentApi"),
       "model-provider": createApiFixture({}, "ModelProviderApi"),
       experiment: createApiFixture({}, "ExperimentApi"),
+      monitor: createApiFixture({}, "MonitorApi"),
     });
 }
 
@@ -71,6 +72,22 @@ describe("workflow app installation", () => {
 
         expect(runtime.module(workflowServer).provided).toBe(app);
         await expect(app.list({ projectId: "project-1" })).resolves.toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+  describe("given a process that supplies only the members the module declares", () => {
+    /** @scenario "The workflows list reads copy lineage on a process that supplies only declared members" */
+    it("lists the project's workflows with their copy lineage", async () => {
+      const runtime = await process_().boot();
+
+      try {
+        const app = runtime.service(WorkflowApi);
+
+        await expect(
+          app.listWithCopyLineage({ projectId: "project-1", viewerUserId: "user-1" }),
+        ).resolves.toEqual([]);
       } finally {
         await runtime.stop();
       }

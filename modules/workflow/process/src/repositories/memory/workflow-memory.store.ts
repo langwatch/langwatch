@@ -3,7 +3,7 @@
  * One store behind every row, like one Prisma client: a workflow written
  * through the lifecycle is the workflow a copy row reads back.
  */
-import type { Workflow, WorkflowVersion } from "@langwatch/workflow-contract";
+import type { Workflow, WorkflowProjectPath, WorkflowVersion } from "@langwatch/workflow-contract";
 
 /** A project's stored run environment, as the memory tier holds it. */
 export type StoredEnvironmentRow = {
@@ -21,6 +21,8 @@ export class WorkflowMemoryStore {
   readonly environments = new Map<string, StoredEnvironmentRow>();
   /** Author display rows a version history joins, keyed by author id. */
   readonly authors = new Map<string, { name: string | null; image: string | null }>();
+  /** The organization, team and project a copy's path names, keyed by project id. */
+  readonly projectPaths = new Map<string, WorkflowProjectPath>();
 
   private constructor() {}
 
