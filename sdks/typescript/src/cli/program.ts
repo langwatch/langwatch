@@ -4198,6 +4198,24 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // Add Slack connection command group
+  const slackConnectionCmd = program
+    .command("slack-connection")
+    .description("Slack connections automations post through, listed by name (never their secrets)");
+
+  emitsResult(
+    slackConnectionCmd
+      .command("list")
+      .description("List the Slack connections this project can deliver through")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listSlackConnectionsCommand: impl } = await import(
+        "./commands/slack-connections/list.js"
+      );
+      return impl();
+    },
+  );
+
   // Add secret command group
   const secretCmd = program
     .command("secret")

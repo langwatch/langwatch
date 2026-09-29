@@ -145,3 +145,11 @@ def test_errors_map_to_exceptions(status: int, error: type):
 
     with pytest.raises(error):
         facade(handler).test_fire("t_1")
+
+
+def test_list_slack_connections_route():
+    connection = {"id": "si_1", "name": "Alerts bot", "kind": "bot"}
+    handler, calls = recorder({("GET", "/api/slack-connections"): [connection]})
+
+    assert facade(handler).list_slack_connections() == [connection]
+    assert calls == [("GET", "http://langwatch.test/api/slack-connections", None)]

@@ -45,6 +45,7 @@ export interface SlackConnectionView {
   slackTeamId: string | null;
   slackTeamName: string | null;
   dependentAutomations: number;
+  createdAt: Date;
   updatedAt: Date;
 }
 
@@ -606,6 +607,7 @@ export class SlackIntegrationService implements SlackConnectionReader {
       slackTeamId: row.slackTeamId,
       slackTeamName: row.slackTeamName,
       dependentAutomations: dependentAutomations ?? 0,
+      createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
   }

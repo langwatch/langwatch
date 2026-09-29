@@ -91,6 +91,16 @@ class TriggersFacade:
         _raise_for_status(response, operation="list")
         return response.json()
 
+    def list_slack_connections(self) -> "list[dict[str, Any]]":
+        """
+        List the Slack connections this project can deliver through: its own
+        and its organization's. Name one by ``id`` as ``slackIntegrationId``
+        in ``actionParams``. Tokens and webhook URLs are never returned.
+        """
+        response = self._http().get("/api/slack-connections")
+        _raise_for_status(response, operation="list_slack_connections")
+        return response.json()
+
     def get(self, trigger_id: str) -> dict[str, Any]:
         """
         Retrieve a single trigger by ID.

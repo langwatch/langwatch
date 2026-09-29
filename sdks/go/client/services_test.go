@@ -299,6 +299,21 @@ func TestTriggersService(t *testing.T) {
 		})
 	})
 
+	t.Run("given Slack connections exist", func(t *testing.T) {
+		t.Run("when listing", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/api/slack-connections", r.URL.Path)
+				_, _ = w.Write([]byte(`[{"id":"si_1","name":"Alerts bot","kind":"bot","scopeType":"ORGANIZATION","scopeId":"org_1","scopeName":"Acme","slackTeamName":"Acme Workspace","createdAt":""}]`))
+			})
+			connections, err := c.SlackConnections.List(context.Background())
+			require.NoError(t, err)
+			require.Len(t, connections, 1)
+			assert.Equal(t, "si_1", connections[0].ID)
+			assert.Equal(t, "bot", connections[0].Kind)
+			assert.Equal(t, "Acme", connections[0].ScopeName)
+		})
+	})
+
 	triggerJSON := `{"id":"trig_1","name":"Errors","kind":"ALERT","active":true,"action":"SEND_SLACK_MESSAGE","actionParams":{"slackIntegrationId":"si_1"},"customGraphId":"g_1","graphAlert":{"threshold":5,"operator":"gt","timePeriod":60,"seriesName":"errors"},"report":null,"filters":{},"platformUrl":"https://x","createdAt":"","updatedAt":""}`
 
 	t.Run("given a graph alert to create", func(t *testing.T) {

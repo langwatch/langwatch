@@ -11256,19 +11256,19 @@ func (e UpdateRoleBinding200JSONResponseBodyRole) Valid() bool {
 
 // Defines values for UpdateRoleBinding200JSONResponseBodyScopeType.
 const (
-	ORGANIZATION UpdateRoleBinding200JSONResponseBodyScopeType = "ORGANIZATION"
-	PROJECT      UpdateRoleBinding200JSONResponseBodyScopeType = "PROJECT"
-	TEAM         UpdateRoleBinding200JSONResponseBodyScopeType = "TEAM"
+	UpdateRoleBinding200JSONResponseBodyScopeTypeORGANIZATION UpdateRoleBinding200JSONResponseBodyScopeType = "ORGANIZATION"
+	UpdateRoleBinding200JSONResponseBodyScopeTypePROJECT      UpdateRoleBinding200JSONResponseBodyScopeType = "PROJECT"
+	UpdateRoleBinding200JSONResponseBodyScopeTypeTEAM         UpdateRoleBinding200JSONResponseBodyScopeType = "TEAM"
 )
 
 // Valid indicates whether the value is a known member of the UpdateRoleBinding200JSONResponseBodyScopeType enum.
 func (e UpdateRoleBinding200JSONResponseBodyScopeType) Valid() bool {
 	switch e {
-	case ORGANIZATION:
+	case UpdateRoleBinding200JSONResponseBodyScopeTypeORGANIZATION:
 		return true
-	case PROJECT:
+	case UpdateRoleBinding200JSONResponseBodyScopeTypePROJECT:
 		return true
-	case TEAM:
+	case UpdateRoleBinding200JSONResponseBodyScopeTypeTEAM:
 		return true
 	default:
 		return false
@@ -11872,6 +11872,42 @@ func (e GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluations
 	case GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatusScored:
 		return true
 	case GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatusSkipped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSlackConnections200JSONResponseBodyKind.
+const (
+	GetApiSlackConnections200JSONResponseBodyKindBot     GetApiSlackConnections200JSONResponseBodyKind = "bot"
+	GetApiSlackConnections200JSONResponseBodyKindWebhook GetApiSlackConnections200JSONResponseBodyKind = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the GetApiSlackConnections200JSONResponseBodyKind enum.
+func (e GetApiSlackConnections200JSONResponseBodyKind) Valid() bool {
+	switch e {
+	case GetApiSlackConnections200JSONResponseBodyKindBot:
+		return true
+	case GetApiSlackConnections200JSONResponseBodyKindWebhook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiSlackConnections200JSONResponseBodyScopeType.
+const (
+	GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION GetApiSlackConnections200JSONResponseBodyScopeType = "ORGANIZATION"
+	GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT      GetApiSlackConnections200JSONResponseBodyScopeType = "PROJECT"
+)
+
+// Valid indicates whether the value is a known member of the GetApiSlackConnections200JSONResponseBodyScopeType enum.
+func (e GetApiSlackConnections200JSONResponseBodyScopeType) Valid() bool {
+	switch e {
+	case GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION:
+		return true
+	case GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT:
 		return true
 	default:
 		return false
@@ -15981,19 +16017,19 @@ func (e PostApiTriggersByIdEnable200JSONResponseBodyTemplatesSlackTemplateType) 
 
 // Defines values for PostApiTriggersByIdTestFire200JSONResponseBodyChannel.
 const (
-	Email   PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "email"
-	Slack   PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "slack"
-	Webhook PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "webhook"
+	PostApiTriggersByIdTestFire200JSONResponseBodyChannelEmail   PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "email"
+	PostApiTriggersByIdTestFire200JSONResponseBodyChannelSlack   PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "slack"
+	PostApiTriggersByIdTestFire200JSONResponseBodyChannelWebhook PostApiTriggersByIdTestFire200JSONResponseBodyChannel = "webhook"
 )
 
 // Valid indicates whether the value is a known member of the PostApiTriggersByIdTestFire200JSONResponseBodyChannel enum.
 func (e PostApiTriggersByIdTestFire200JSONResponseBodyChannel) Valid() bool {
 	switch e {
-	case Email:
+	case PostApiTriggersByIdTestFire200JSONResponseBodyChannelEmail:
 		return true
-	case Slack:
+	case PostApiTriggersByIdTestFire200JSONResponseBodyChannelSlack:
 		return true
-	case Webhook:
+	case PostApiTriggersByIdTestFire200JSONResponseBodyChannelWebhook:
 		return true
 	default:
 		return false
@@ -27445,6 +27481,12 @@ type GetApiSimulationRunsBatchesListParams struct {
 
 // GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatus defines parameters for GetApiSimulationRunsByScenarioRunId.
 type GetApiSimulationRunsByScenarioRunId200JSONResponseBodyResultsEvaluationsStatus string
+
+// GetApiSlackConnections200JSONResponseBodyKind defines parameters for GetApiSlackConnections.
+type GetApiSlackConnections200JSONResponseBodyKind string
+
+// GetApiSlackConnections200JSONResponseBodyScopeType defines parameters for GetApiSlackConnections.
+type GetApiSlackConnections200JSONResponseBodyScopeType string
 
 // GetApiSuitesParams defines parameters for GetApiSuites.
 type GetApiSuitesParams struct {
@@ -81406,6 +81448,9 @@ type ClientInterface interface {
 	// GetApiSimulationRunsByScenarioRunId request
 	GetApiSimulationRunsByScenarioRunId(ctx context.Context, scenarioRunId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiSlackConnections request
+	GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetApiSuites request
 	GetApiSuites(ctx context.Context, params *GetApiSuitesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -85366,6 +85411,18 @@ func (c *Client) GetApiSimulationRunsBatchesByBatchRunId(ctx context.Context, ba
 
 func (c *Client) GetApiSimulationRunsByScenarioRunId(ctx context.Context, scenarioRunId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiSimulationRunsByScenarioRunIdRequest(c.Server, scenarioRunId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiSlackConnectionsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -97007,6 +97064,33 @@ func NewGetApiSimulationRunsByScenarioRunIdRequest(server string, scenarioRunId 
 	return req, nil
 }
 
+// NewGetApiSlackConnectionsRequest generates requests for GetApiSlackConnections
+func NewGetApiSlackConnectionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/slack-connections")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetApiSuitesRequest generates requests for GetApiSuites
 func NewGetApiSuitesRequest(server string, params *GetApiSuitesParams) (*http.Request, error) {
 	var err error
@@ -102513,6 +102597,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetApiSimulationRunsByScenarioRunIdWithResponse request
 	GetApiSimulationRunsByScenarioRunIdWithResponse(ctx context.Context, scenarioRunId string, reqEditors ...RequestEditorFn) (*GetApiSimulationRunsByScenarioRunIdResponse, error)
+
+	// GetApiSlackConnectionsWithResponse request
+	GetApiSlackConnectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiSlackConnectionsResponse, error)
 
 	// GetApiSuitesWithResponse request
 	GetApiSuitesWithResponse(ctx context.Context, params *GetApiSuitesParams, reqEditors ...RequestEditorFn) (*GetApiSuitesResponse, error)
@@ -116354,6 +116441,67 @@ func (r GetApiSimulationRunsByScenarioRunIdResponse) ContentType() string {
 	return ""
 }
 
+type GetApiSlackConnectionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]struct {
+		CreatedAt string `json:"createdAt"`
+
+		// Id What an automation's `slackIntegrationId` names to post through this connection.
+		Id string `json:"id"`
+
+		// Kind `bot` posts as the LangWatch Slack app and needs a `slackChannelId` on the automation; `webhook` posts to its incoming webhook's channel.
+		Kind      GetApiSlackConnections200JSONResponseBodyKind      `json:"kind"`
+		Name      string                                             `json:"name"`
+		ScopeId   string                                             `json:"scopeId"`
+		ScopeName string                                             `json:"scopeName"`
+		ScopeType GetApiSlackConnections200JSONResponseBodyScopeType `json:"scopeType"`
+
+		// SlackTeamName The Slack workspace a bot connection posts into.
+		SlackTeamName *string `json:"slackTeamName"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiSlackConnectionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiSlackConnectionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiSlackConnectionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetApiSuitesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -126500,6 +126648,15 @@ func (c *ClientWithResponses) GetApiSimulationRunsByScenarioRunIdWithResponse(ct
 		return nil, err
 	}
 	return ParseGetApiSimulationRunsByScenarioRunIdResponse(rsp)
+}
+
+// GetApiSlackConnectionsWithResponse request returning *GetApiSlackConnectionsResponse
+func (c *ClientWithResponses) GetApiSlackConnectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiSlackConnectionsResponse, error) {
+	rsp, err := c.GetApiSlackConnections(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiSlackConnectionsResponse(rsp)
 }
 
 // GetApiSuitesWithResponse request returning *GetApiSuitesResponse
@@ -143500,6 +143657,87 @@ func ParseGetApiSimulationRunsByScenarioRunIdResponse(rsp *http.Response) (*GetA
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiSlackConnectionsResponse parses an HTTP response from a GetApiSlackConnectionsWithResponse call
+func ParseGetApiSlackConnectionsResponse(rsp *http.Response) (*GetApiSlackConnectionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiSlackConnectionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []struct {
+			CreatedAt string `json:"createdAt"`
+
+			// Id What an automation's `slackIntegrationId` names to post through this connection.
+			Id string `json:"id"`
+
+			// Kind `bot` posts as the LangWatch Slack app and needs a `slackChannelId` on the automation; `webhook` posts to its incoming webhook's channel.
+			Kind      GetApiSlackConnections200JSONResponseBodyKind      `json:"kind"`
+			Name      string                                             `json:"name"`
+			ScopeId   string                                             `json:"scopeId"`
+			ScopeName string                                             `json:"scopeName"`
+			ScopeType GetApiSlackConnections200JSONResponseBodyScopeType `json:"scopeType"`
+
+			// SlackTeamName The Slack workspace a bot connection posts into.
+			SlackTeamName *string `json:"slackTeamName"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest struct {

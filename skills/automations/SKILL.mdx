@@ -52,7 +52,13 @@ Slack bot tokens, Slack webhook URLs, webhook signing secrets and webhook header
 
 A Slack automation posts through a **Slack connection** the project can already use, named with `--slack-connection <id>`. A bot connection also needs `--slack-channel`, which takes a channel id (`C0123…`) or its name (`#support-alerts`). An incoming-webhook connection posts to its own channel and needs nothing else.
 
-1. When the user named a connection, or an existing Slack automation shows the one to reuse, create with it.
+List the connections this project can use first, by name, kind (`bot` or `webhook`) and scope; the list never carries a secret:
+
+```bash
+langwatch slack-connection list --format json
+```
+
+1. When the user named a connection, take the `id` of the one whose `name` matches; when an existing Slack automation shows the one to reuse, take that. Create with it.
 2. Otherwise create the automation with `--action SEND_SLACK_MESSAGE` and the channel, and no connection. The refusal is expected: the user's panel shows the Slack connections this project can use, each with a button that answers you with its name and id, and, when there is none, a button that opens the Slack connection form on the Automations page. Say in one line that they should pick or add a connection, and stop the turn.
 3. When the answer names a connection id, run the same create again with `--slack-connection <id>`.
 

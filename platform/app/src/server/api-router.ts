@@ -53,6 +53,7 @@ import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as testSuitesApp } from "../app/api/test-suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
+import { app as slackConnectionsApp } from "../app/api/slack-connections/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
 import { app as voiceSessionApp } from "../app/api/voice/[[...route]]/app";
@@ -198,6 +199,7 @@ export function createApiRouter() {
   api.route("/", gatewaySpendApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
+  api.route("/", slackConnectionsApp);
   api.route("/", userAvatarApp); // /api/user-avatar/:projectId/:id — user avatars
   api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
 

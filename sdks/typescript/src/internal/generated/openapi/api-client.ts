@@ -4393,6 +4393,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/slack-connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the Slack connections this project can deliver through: its own and its organization's, by name. Never returns a token or webhook URL. */
+        get: operations["getApiSlackConnections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/webhooks/v1/endpoints": {
         parameters: {
             query?: never;
@@ -34031,6 +34048,90 @@ export interface operations {
             };
             /** @description Trigger not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSlackConnections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description What an automation's `slackIntegrationId` names to post through this connection. */
+                        id: string;
+                        name: string;
+                        /**
+                         * @description `bot` posts as the LangWatch Slack app and needs a `slackChannelId` on the automation; `webhook` posts to its incoming webhook's channel.
+                         * @enum {string}
+                         */
+                        kind: "bot" | "webhook";
+                        /** @enum {string} */
+                        scopeType: "ORGANIZATION" | "PROJECT";
+                        scopeId: string;
+                        scopeName: string;
+                        /** @description The Slack workspace a bot connection posts into. */
+                        slackTeamName: string | null;
+                        createdAt: string;
+                    }[];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

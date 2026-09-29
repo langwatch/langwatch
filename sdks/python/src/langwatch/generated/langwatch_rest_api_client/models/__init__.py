@@ -1573,6 +1573,13 @@ from .get_api_simulation_runs_response_400 import GetApiSimulationRunsResponse40
 from .get_api_simulation_runs_response_401 import GetApiSimulationRunsResponse401
 from .get_api_simulation_runs_response_422 import GetApiSimulationRunsResponse422
 from .get_api_simulation_runs_response_500 import GetApiSimulationRunsResponse500
+from .get_api_slack_connections_response_200_item import GetApiSlackConnectionsResponse200Item
+from .get_api_slack_connections_response_200_item_kind import GetApiSlackConnectionsResponse200ItemKind
+from .get_api_slack_connections_response_200_item_scope_type import GetApiSlackConnectionsResponse200ItemScopeType
+from .get_api_slack_connections_response_400 import GetApiSlackConnectionsResponse400
+from .get_api_slack_connections_response_401 import GetApiSlackConnectionsResponse401
+from .get_api_slack_connections_response_422 import GetApiSlackConnectionsResponse422
+from .get_api_slack_connections_response_500 import GetApiSlackConnectionsResponse500
 from .get_api_suites_by_id_response_200 import GetApiSuitesByIdResponse200
 from .get_api_suites_by_id_response_200_kind import GetApiSuitesByIdResponse200Kind
 from .get_api_suites_by_id_response_200_scope_type_0 import GetApiSuitesByIdResponse200ScopeType0
@@ -8331,6 +8338,13 @@ __all__ = (
     "GetApiSimulationRunsResponse401",
     "GetApiSimulationRunsResponse422",
     "GetApiSimulationRunsResponse500",
+    "GetApiSlackConnectionsResponse200Item",
+    "GetApiSlackConnectionsResponse200ItemKind",
+    "GetApiSlackConnectionsResponse200ItemScopeType",
+    "GetApiSlackConnectionsResponse400",
+    "GetApiSlackConnectionsResponse401",
+    "GetApiSlackConnectionsResponse422",
+    "GetApiSlackConnectionsResponse500",
     "GetApiSuitesByIdResponse200",
     "GetApiSuitesByIdResponse200Kind",
     "GetApiSuitesByIdResponse200ScopeType0",

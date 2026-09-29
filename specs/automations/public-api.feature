@@ -415,3 +415,36 @@ Feature: Automations over the public API
       Given the API returns an automation with redacted delivery credentials
       When a user runs the trigger read command
       Then the machine output carries exactly the fields the API returned
+
+  Rule: Slack connections are listed by name, never by secret
+
+    @unit
+    Scenario: A project lists the Slack connections it can deliver through
+      Given an organization Slack bot connection and a webhook connection of this project
+      When the Slack connections are listed over the API
+      Then each is returned with its id, name, kind, scope and creation time
+      And an automation can name one by that id as its slackIntegrationId
+
+    @unit
+    Scenario: A listed Slack connection never carries its secret
+      Given Slack connections holding a bot token and an incoming webhook URL
+      When the Slack connections are listed over the API
+      Then no token, webhook URL, stored ciphertext or secret fingerprint appears anywhere in the response
+
+    @unit
+    Scenario: Another project's Slack connections are not listed
+      Given a Slack connection scoped to another project of the same organization
+      When this project's Slack connections are listed over the API
+      Then that connection is not among them
+
+    @unit
+    Scenario: Listing Slack connections without an API key is refused
+      When the Slack connections are listed over the API without an API key
+      Then the API answers unauthorized and lists nothing
+
+    @unit
+    Scenario: The command line lists Slack connections by name
+      Given the API returns the project's Slack connections
+      When a user runs the Slack connection list command
+      Then it prints each connection's name, kind, scope and id
+      And with the JSON format it prints exactly what the API returned
