@@ -48,7 +48,8 @@ func Refusals(conditions Conditions, maxLoad float64) []string {
 }
 
 // PageWidth is how many pages each side captures on: the asked number, or
-// half the CPUs, never more than the CPUs the load leaves free, never under one.
+// half the CPUs, shrunk by load but never under min(4, half the CPUs): pages
+// wait on the stacks, not the CPU, and the load gate already refuses a bad run.
 func PageWidth(asked int, conditions Conditions) int {
 	width := asked
 	if width <= 0 {
@@ -57,7 +58,11 @@ func PageWidth(asked int, conditions Conditions) int {
 	if conditions.Load >= 0 && conditions.CPUs > 0 {
 		width = min(width, conditions.CPUs-int(math.Ceil(conditions.Load)))
 	}
-	return max(width, 1)
+	floor := min(4, conditions.CPUs/2)
+	if asked > 0 {
+		floor = min(floor, asked)
+	}
+	return max(width, floor, 1)
 }
 
 // refuse stops a run the machine cannot carry, unless -force; then sizes its pages.

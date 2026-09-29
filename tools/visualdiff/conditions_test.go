@@ -51,13 +51,13 @@ func TestARunRefusesBadConditionsUpFront(t *testing.T) {
 		if _, err := Execute(context.Background(), Request{Options: options, Config: testConfig(), Deps: deps}, Streams{Out: io.Discard, Err: io.Discard}); err != nil {
 			t.Fatal(err)
 		}
-		if handed.Concurrency != (Concurrency{Routes: 1, Flows: 1}) {
-			t.Fatalf("a machine with no CPU free still got %+v pages", handed.Concurrency)
+		if handed.Concurrency != (Concurrency{Routes: 4, Flows: 4}) {
+			t.Fatalf("a loaded machine must still get the 4-page floor, got %+v", handed.Concurrency)
 		}
 	})
 }
 
-func TestPagesDefaultToHalfTheCPUsAndShrinkUnderLoad(t *testing.T) {
+func TestPagesDefaultToHalfTheCPUsAndShrinkUnderLoadToAFloorOfFour(t *testing.T) {
 	cases := []struct {
 		asked      int
 		conditions Conditions
@@ -66,7 +66,9 @@ func TestPagesDefaultToHalfTheCPUsAndShrinkUnderLoad(t *testing.T) {
 		{0, Conditions{CPUs: 16, Load: 2}, 8},
 		{0, Conditions{CPUs: 16, Load: 11.2}, 4},
 		{12, Conditions{CPUs: 16, Load: -1}, 12},
-		{0, Conditions{CPUs: 4, Load: 9}, 1},
+		{0, Conditions{CPUs: 4, Load: 9}, 2},
+		{0, Conditions{CPUs: 10, Load: 41.5}, 4},
+		{2, Conditions{CPUs: 10, Load: 41.5}, 2},
 	}
 	for _, each := range cases {
 		if got := PageWidth(each.asked, each.conditions); got != each.want {
