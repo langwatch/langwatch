@@ -119,6 +119,18 @@ describe("given the text has bare words", () => {
     });
   });
 
+  describe("when the sentence is a plain-language question", () => {
+    it.each([
+      "where did a member ask about cover their plan doesn't include?",
+      "where did a member ask about cover that is not in their plan?",
+    ])("sends %j to the router whole, with no parse error", (question) => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch(question));
+      expect(lastCall().input.text).toBe(question);
+      expect(useFilterStore.getState().parseError).toBeNull();
+    });
+  });
+
   describe("when the router answers filter", () => {
     /** @scenario "A sentence the filter language can express becomes chips" */
     it("applies the query and records the sentence for the notice", () => {

@@ -113,8 +113,8 @@ a run id is never reused, so a finished run's flag stops nothing else.
     `readRunProgress` (the pollers, the SSE start and abort read it there; abort takes the run's
     experimentId and project from it). Its store reads another experiment's run of the same runId as
     empty, the collision main's key had. It holds main's poller JSON (`runId, projectId, experimentId,
-    experimentSlug, status, progress, total, startedAt, finishedAt, summary` with `runUrl`, `error,
-    domainError, traceId`), `recentEvents` (last 50, each `{seq, eventId, frame}`), `seq`, `failed`,
+experimentSlug, status, progress, total, startedAt, finishedAt, summary` with `runUrl`, `error,
+domainError, traceId`), `recentEvents` (last 50, each `{seq, eventId, frame}`), `seq`, `failed`,
     the finished-cell bitmap, each row's target outputs, traces and scored verdicts for comparison
     cells, and each result's frame when the run writes its cells back. A cell is counted once, so a
     redelivered finish neither recounts nor streams; a redelivered start or completion changes nothing.

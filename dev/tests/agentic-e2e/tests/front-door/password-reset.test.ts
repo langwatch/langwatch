@@ -7,7 +7,6 @@ import { findUserIdByEmail } from "./db";
  * shows "Continue" (signs in) and an "Add a passkey" action in place.
  */
 import { expect, test } from "./fixtures";
-import { closeRedis, findPasswordResetToken } from "./verification-store";
 import {
   betterAuthRequestHeaders,
   FRONT_DOOR_PASSWORD,
@@ -15,6 +14,7 @@ import {
   givenARegisteredAccount,
   whenISignOut,
 } from "./steps";
+import { closeRedis, findPasswordResetToken } from "./verification-store";
 import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 
 test.use({ storageState: { cookies: [], origins: [] } });
