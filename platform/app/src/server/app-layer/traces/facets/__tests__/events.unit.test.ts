@@ -54,6 +54,37 @@ describe("buildEventsFacetQuery", () => {
       });
     });
 
+    describe("when the two halves of the facet are read", () => {
+      it("counts names without touching the attributes map", () => {
+        const { sql } = buildEventsFacetQuery(ctx());
+        const names = sql.slice(sql.indexOf("FROM ("), sql.indexOf("AS names"));
+        // The name counts are the part every sidebar load needs; reading the
+        // map here would put every payload value back on that path.
+        expect(names).toMatch(/arrayJoin\(`Events\.Name`\) AS name/);
+        expect(names).not.toMatch(/Events\.Attributes/);
+      });
+
+      it("reads the map only for spans whose keys hold a metric", () => {
+        const { sql } = buildEventsFacetQuery(ctx());
+        const metrics = sql.slice(
+          sql.indexOf("AS names"),
+          sql.indexOf("AS metrics"),
+        );
+        // Gated on the keys subcolumn, which reaches PREWHERE and never opens
+        // the values column, so granules with no metric-bearing span skip the
+        // values entirely.
+        expect(metrics).toMatch(
+          /arrayExists\(\s*keys -> arrayExists\(k -> startsWith\(k, 'event\.metrics\.'\), keys\),\s*`Events\.Attributes`\.keys\s*\)/,
+        );
+      });
+
+      it("keeps an event name with no metrics as an empty bucket list", () => {
+        const { sql, settings } = buildEventsFacetQuery(ctx());
+        expect(sql).toMatch(/LEFT JOIN/);
+        expect(settings?.join_use_nulls).toBe("0");
+      });
+    });
+
     describe("when a search prefix is given", () => {
       it("filters event names by the prefix", () => {
         const { sql, params } = buildEventsFacetQuery(ctx({ prefix: "thu" }));
