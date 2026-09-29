@@ -106,7 +106,7 @@ pnpm generate:modules               # after editing modules/catalogue.json
 pnpm sync:references                # after adding/removing a workspace package
 pnpm test:affected / typecheck:affected   # Nx: only packages this change reached, cached
 pnpm prisma:migrate / clickhouse:migrate  # run via @langwatch/tasks
-make go-lint-changed                # Go: exactly what CI runs (never raw golangci-lint)
+make go-lint-changed                # Go: lints your uncommitted edits (never raw golangci-lint)
 ```
 
 Nx (ADR-150) sits beside the root scripts, not in front of them: prefer the

@@ -48,7 +48,7 @@ help:
 	@echo "    make lint-rules-changed             ...over lines this branch changed (what CI reports)"
 	@echo "    make lint-rules-test                prove the semgrep ruleset parses"
 	@echo "    make go-lint                        golangci-lint at the pinned version CI uses"
-	@echo "    make go-lint-changed                ...new/changed lines only"
+	@echo "    make go-lint-changed                ...uncommitted edits only"
 	@echo ""
 	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
 	@echo "    make boxd-help                      full boxd target reference"
@@ -267,17 +267,23 @@ GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
 # golangci-lint saturates cores the same way a whole-tree typecheck does, so it
 # takes a slot from the same machine-wide counter (`haven slot run`) before it
 # runs, and queues behind a typecheck already running rather than piling onto
-# it. go-lint-changed stays direct: it scans only the diff against
-# origin/main, not the whole tree, and is not the cost this queue exists for.
+# it. go-lint-changed stays direct: it scans only the packages of uncommitted
+# edits, not the whole tree, and is not the cost this queue exists for.
 go-lint-slot:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
 	@$(HAVEN) slot run --label golangci-lint -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run $(GO_LINT_PKGS)
 
 go-lint: go-lint-slot
 
+# Lints only the packages of uncommitted .go edits (untracked included) and
+# reports only issues on those lines; it never diffs against a branch.
 go-lint-changed:
-	@echo "==> golangci-lint $(GOLANGCI_VERSION) (new/changed lines only)"
-	@env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --new-from-merge-base=origin/main $(GO_LINT_PKGS)
+	@pkgs=$$( { git diff --name-only HEAD -- '*.go'; git ls-files -o --exclude-standard -- '*.go'; } \
+		| grep -E '^(services/(aigateway|idpsim|langyagent|mailsim|nlpgo)|pkg|cmd|tools)/' | grep -v '/testdata/' \
+		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "./$$d"; done); \
+	if [ -z "$$pkgs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
+	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$pkgs" | wc -l | tr -d ' ') packages)"; \
+	env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --new-from-rev=HEAD $$pkgs
 
 # Stop all services
 down:
