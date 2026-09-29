@@ -2,7 +2,8 @@ import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
+import { reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 /**
  * The onboarding answers a new person gives, as this signal reads them.
@@ -45,6 +46,7 @@ function pickDefined<T extends Record<string, unknown>>(
  * Identifies a new user in Customer.io during onboarding.
  */
 export function fireSignup({
+  nurturing,
   userId,
   email,
   name,
@@ -53,6 +55,7 @@ export function fireSignup({
   signUpData,
   primaryIntent,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   email: string | null | undefined;
   name: string | null | undefined;
@@ -62,7 +65,6 @@ export function fireSignup({
   /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
   primaryIntent?: OrganizationIntent | null;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }

@@ -102,6 +102,14 @@ Feature: Customer.io nurturing integration
     Given createTestApp is called
     Then nurturing is undefined
 
+  # Billing composes the sink from its own `customerIoApiKey` secret handle (region stays config)
+  # and hands it to every signal; there is no process-wide registry.
+  @unit
+  Scenario: Billing hands its composed Customer.io sink to a created workflow's signal
+    Given billing was assembled with a Customer.io sink
+    When a created workflow is recorded
+    Then the workflow count is identified and workflow_created is tracked through that sink
+
   # ---------------------------------------------------------------------------
   # R2: Signup identification — onboarding hook
   # ---------------------------------------------------------------------------

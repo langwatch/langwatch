@@ -9,10 +9,11 @@ import {
   afterPromptCreated,
   firePromptCreated,
 } from "../../rules/nurturing-prompt-creation-service.rules.ts";
-import { setOrganizationAdminResolver } from "../../rules/nurturing-sink-registry-service.rules.ts";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
+  registerOrganizationAdminResolver,
+  wiring,
   settle,
 } from "./support/nurturing-harness.ts";
 
@@ -31,7 +32,7 @@ function repositoryCounting(orgPromptCount: number): NurturingPromptCountReposit
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => {
   registerNoNurturingSink();
-  setOrganizationAdminResolver(null);
+  registerOrganizationAdminResolver(null);
 });
 
 describe("firePromptCreated", () => {
@@ -42,6 +43,7 @@ describe("firePromptCreated", () => {
       beforeEach(async () => {
         sink = registerNurturingSink();
         firePromptCreated({
+          ...wiring(),
           userId: "user-1",
           projectId: "project-1",
           orgPromptCount: 1,
@@ -74,6 +76,7 @@ describe("firePromptCreated", () => {
         const sink = registerNurturingSink();
 
         firePromptCreated({
+          ...wiring(),
           userId: "user-1",
           projectId: "project-2",
           orgPromptCount: 4,
@@ -95,12 +98,13 @@ describe("afterPromptCreated", () => {
       /** @scenario "Prompt creation tracked regardless of whether created via platform UI or API" */
       it("resolves the organization admin and reports the milestone all the same", async () => {
         const sink = registerNurturingSink();
-        setOrganizationAdminResolver(async () => ({
+        registerOrganizationAdminResolver(async () => ({
           userId: "admin-1",
           organizationId: "org-1",
         }));
 
         afterPromptCreated({
+          ...wiring(),
           repository: repositoryCounting(1),
           projectId: "project-1",
         });
@@ -123,6 +127,7 @@ describe("afterPromptCreated", () => {
 
         expect(() =>
           afterPromptCreated({
+            ...wiring(),
             repository: repositoryCounting(1),
             projectId: "project-1",
             userId: "user-1",

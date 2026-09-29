@@ -27,9 +27,11 @@ import type {
   BillingWebhookSubscriptionRepository,
   SubscriptionWithOrg,
 } from "../repositories/billing-webhook-subscription.repository.ts";
+import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
 import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import { BestEffortService } from "./best-effort.service.ts";
+import type { NurturingService } from "./nurturing.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
@@ -50,6 +52,9 @@ type BillingSubscriptionLifecycleOptions = {
   host: BillingWebhookHost;
   /** Data-retention's rules, which a first seat activation stamps at the platform default. */
   retention: SeatRetentionRules;
+  /** Customer.io and the members its has_subscription trait goes to; absent, nothing is sent. */
+  nurturing?: NurturingService;
+  nurturingProfiles?: NurturingProfileRepository;
 };
 
 /** The two data-retention operations seat provisioning reads and writes. */
@@ -66,6 +71,8 @@ export class BillingSubscriptionLifecycleService {
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
   private readonly retention: SeatRetentionRules;
+  private readonly nurturing?: NurturingService;
+  private readonly nurturingProfiles?: NurturingProfileRepository;
   private readonly bestEffort = BestEffortService.create();
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
@@ -75,6 +82,8 @@ export class BillingSubscriptionLifecycleService {
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
     this.retention = options.retention;
+    this.nurturing = options.nurturing;
+    this.nurturingProfiles = options.nurturingProfiles;
   }
 
   async handleSubscriptionDeleted({
@@ -130,6 +139,8 @@ export class BillingSubscriptionLifecycleService {
       existingSubscription.organizationId,
     );
     fireSubscriptionSync({
+      nurturing: this.nurturing,
+      profiles: this.nurturingProfiles,
       organizationId: existingSubscription.organizationId,
       hasSubscription: !!remainingActive,
     });
@@ -180,6 +191,8 @@ export class BillingSubscriptionLifecycleService {
       existing.organizationId,
     );
     fireSubscriptionSync({
+      nurturing: this.nurturing,
+      profiles: this.nurturingProfiles,
       organizationId: existing.organizationId,
       hasSubscription: !!remainingActive,
     });
@@ -337,6 +350,8 @@ export class BillingSubscriptionLifecycleService {
       });
 
       fireSubscriptionSync({
+        nurturing: this.nurturing,
+        profiles: this.nurturingProfiles,
         organizationId: updatedSubscription.organizationId,
         hasSubscription: true,
       });

@@ -1,18 +1,20 @@
-import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
+import { reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 /**
  * Fires nurturing calls when a team member is invited.
  */
 export function fireTeamMemberInvited({
+  nurturing,
   userId,
   teamMemberCount,
   role,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   teamMemberCount: number;
   role: string;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }
@@ -36,17 +38,18 @@ export function fireTeamMemberInvited({
  * Fires nurturing calls when a workflow is created.
  */
 export function fireWorkflowCreated({
+  nurturing,
   userId,
   workflowCount,
   workflowId,
   projectId,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   workflowCount: number;
   workflowId: string;
   projectId: string;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }
@@ -71,17 +74,18 @@ export function fireWorkflowCreated({
  * Fires nurturing calls when a scenario is created.
  */
 export function fireScenarioCreated({
+  nurturing,
   userId,
   scenarioCount,
   scenarioId,
   projectId,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   scenarioCount: number;
   scenarioId: string;
   projectId: string;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }
@@ -108,15 +112,16 @@ export function fireScenarioCreated({
  * Fire-and-forget.
  */
 export function fireExperimentRan({
+  nurturing,
   userId,
   experimentId,
   projectId,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   experimentId?: string;
   projectId: string;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }

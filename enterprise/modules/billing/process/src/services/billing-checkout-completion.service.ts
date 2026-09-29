@@ -14,12 +14,14 @@ import type Stripe from "stripe";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
+import type { NurturingProfileRepository } from "../repositories/nurturing-profile.repository.ts";
 import { AnnualEventsBillingThresholdService } from "./annual-events-billing-threshold.service.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import {
   BillingSubscriptionLifecycleService,
   type SeatRetentionRules,
 } from "./billing-subscription-lifecycle.service.ts";
+import type { NurturingService } from "./nurturing.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:checkoutCompletion");
@@ -45,6 +47,9 @@ type BillingCheckoutCompletionOptions = {
   getPostHog?: () => PostHog | null;
   host: BillingWebhookHost;
   retention: SeatRetentionRules;
+  /** Customer.io and the members its has_subscription trait goes to; absent, nothing is sent. */
+  nurturing?: NurturingService;
+  nurturingProfiles?: NurturingProfileRepository;
 };
 
 export class BillingCheckoutCompletionService {
@@ -78,6 +83,8 @@ export class BillingCheckoutCompletionService {
       itemCalculator: options.itemCalculator,
       host: options.host,
       retention: options.retention,
+      nurturing: options.nurturing,
+      nurturingProfiles: options.nurturingProfiles,
     });
   }
 

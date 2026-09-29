@@ -3,10 +3,32 @@
  */
 import { vi } from "vitest";
 
-import type { NurturingProfile } from "../../../repositories/nurturing-profile.repository.ts";
-import { setProfiles, setSink } from "../../../rules/nurturing-sink-registry-service.rules.ts";
+import type {
+  NurturingProfile,
+  NurturingProfileRepository,
+} from "../../../repositories/nurturing-profile.repository.ts";
+import type { OrganizationAdminResolver } from "../../../rules/nurturing-sink-registry-service.rules.ts";
 import { BillingErrorReporter } from "../../billing-error-reporter.service.ts";
 import { NurturingService } from "../../nurturing.service.ts";
+
+/** What the suite composed, as `BillingApp` composes it: each signal is handed these. */
+export type NurturingWiring = {
+  nurturing: NurturingService | undefined;
+  profiles: NurturingProfileRepository | undefined;
+  resolveOrgAdmin: OrganizationAdminResolver | undefined;
+};
+
+let current: NurturingWiring = { nurturing: void 0, profiles: void 0, resolveOrgAdmin: void 0 };
+
+/** The sink, reader and resolver the suite registered last, to hand to a signal. */
+export function wiring(): NurturingWiring {
+  return current;
+}
+
+/** Registers how an organization admin is resolved, or none. */
+export function registerOrganizationAdminResolver(resolve: OrganizationAdminResolver | null): void {
+  current = { ...current, resolveOrgAdmin: resolve ?? void 0 };
+}
 
 export class RecordingErrorReporter extends BillingErrorReporter {
   readonly capture = vi.fn();
@@ -35,13 +57,14 @@ export function registerNurturingSink({ failing = false, hanging = false } = {})
   });
   const errorReporter = new RecordingErrorReporter();
 
-  setSink(
-    NurturingService.create({
+  current = {
+    ...current,
+    nurturing: NurturingService.create({
       config: { customerIoApiKey: "test-key", customerIoRegion: "us" },
       fetchFn,
       errorReporter,
     }),
-  );
+  };
 
   const sent = (): SentCall[] =>
     fetchFn.mock.calls.map(([url, options]) => ({
@@ -62,7 +85,7 @@ export function registerNurturingSink({ failing = false, hanging = false } = {})
 
 /** Registers no sink at all, as a deployment with no Customer.io key composes. */
 export function registerNoNurturingSink(): void {
-  setSink(null);
+  current = { ...current, nurturing: void 0 };
 }
 
 /** Registers a profile reader that answers one fixed profile, or none, for every lookup. */
@@ -70,25 +93,31 @@ export function registerProfileReader(
   profile: NurturingProfile | null,
   memberUserIds: string[] = [],
 ): void {
-  setProfiles({
-    findProfile: async () => profile,
-    memberUserIds: async () => memberUserIds,
-  });
+  current = {
+    ...current,
+    profiles: {
+      findProfile: async () => profile,
+      memberUserIds: async () => memberUserIds,
+    },
+  };
 }
 
 /** Registers a profile reader whose lookup rejects, for failure-path tests. */
 export function registerFailingProfileReader(error: unknown): void {
-  setProfiles({
-    findProfile: async () => {
-      throw error;
+  current = {
+    ...current,
+    profiles: {
+      findProfile: async () => {
+        throw error;
+      },
+      memberUserIds: async () => [],
     },
-    memberUserIds: async () => [],
-  });
+  };
 }
 
 /** Registers no profile reader at all. */
 export function registerNoProfileReader(): void {
-  setProfiles(null);
+  current = { ...current, profiles: void 0 };
 }
 
 /** Lets the fire-and-forget calls settle before the assertions read them. */

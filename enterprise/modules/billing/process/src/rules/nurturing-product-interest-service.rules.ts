@@ -1,6 +1,7 @@
 import type { CioPersonTraits } from "@langwatch/enterprise-billing-contract";
 
-import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
+import { reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 /**
  * Valid integration method trait values sent to Customer.io.
@@ -29,13 +30,14 @@ export function integrationMethodFor(selection: string): IntegrationMethodValue 
  * Fires a separate identifyUser call to set the integration_method trait.
  */
 export function fireIntegrationMethod({
+  nurturing,
   userId,
   integrationMethod,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   integrationMethod: IntegrationMethodValue;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }

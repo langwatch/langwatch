@@ -16,6 +16,7 @@ import {
   registerNoProfileReader,
   registerNurturingSink,
   registerProfileReader,
+  wiring,
   settle,
 } from "./support/nurturing-harness.ts";
 
@@ -55,7 +56,7 @@ describe("ensureUserSynced()", () => {
       const sink = registerNurturingSink();
       registerProfileReader(PROFILE);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(sink.sentTo("/identify")[0]).toMatchObject({
@@ -74,7 +75,7 @@ describe("ensureUserSynced()", () => {
       const sink = registerNurturingSink();
       registerProfileReader(PROFILE);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(sink.sentTo("/group")[0]).toMatchObject({
@@ -88,7 +89,7 @@ describe("ensureUserSynced()", () => {
       registerNurturingSink();
       registerProfileReader(PROFILE);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(userSyncCacheSize()).toBe(1);
@@ -101,12 +102,12 @@ describe("ensureUserSynced()", () => {
       const sink = registerNurturingSink();
       registerProfileReader(PROFILE);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
       expect(sink.sentTo("/identify")).toHaveLength(1);
 
       registerProfileReader(PROFILE);
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(sink.sentTo("/identify")).toHaveLength(1);
@@ -118,7 +119,7 @@ describe("ensureUserSynced()", () => {
       const sink = registerNurturingSink();
       registerProfileReader(PROFILE);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: false });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: false });
       await settle();
 
       expect(sink.sent()).toHaveLength(0);
@@ -131,7 +132,7 @@ describe("ensureUserSynced()", () => {
       registerNoNurturingSink();
       registerProfileReader(PROFILE);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(userSyncCacheSize()).toBe(0);
@@ -144,7 +145,7 @@ describe("ensureUserSynced()", () => {
       const sink = registerNurturingSink();
       registerProfileReader(null);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(sink.sent()).toHaveLength(0);
@@ -154,7 +155,7 @@ describe("ensureUserSynced()", () => {
       registerNurturingSink();
       registerProfileReader(null);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(userSyncCacheSize()).toBe(1);
@@ -167,7 +168,9 @@ describe("ensureUserSynced()", () => {
       registerNurturingSink();
       registerFailingProfileReader(new Error("reader unreachable"));
 
-      expect(() => ensureUserSynced({ userId: "user-1", hasOrganization: true })).not.toThrow();
+      expect(() =>
+        ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true }),
+      ).not.toThrow();
       await settle();
 
       expect(userSyncCacheSize()).toBe(0);
@@ -179,7 +182,7 @@ describe("ensureUserSynced()", () => {
       const sink = registerNurturingSink();
       registerProfileReader({ ...PROFILE, hasTraces: false });
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(sink.sentTo("/identify")[0]).toMatchObject({ traits: { has_traces: false } });
@@ -209,7 +212,7 @@ describe("ensureUserSynced()", () => {
       const sink = registerNurturingSink();
       registerProfileReader(guidedProfile);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       expect(sink.sentTo("/identify")[0]).toMatchObject({
@@ -239,7 +242,7 @@ describe("ensureUserSynced()", () => {
       const sink = registerNurturingSink();
       registerProfileReader(PROFILE);
 
-      ensureUserSynced({ userId: "user-1", hasOrganization: true });
+      ensureUserSynced({ ...wiring(), userId: "user-1", hasOrganization: true });
       await settle();
 
       const traits = sink.sentTo("/identify")[0]!;

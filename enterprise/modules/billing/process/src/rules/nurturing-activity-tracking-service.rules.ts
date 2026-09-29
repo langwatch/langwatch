@@ -1,6 +1,7 @@
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
+import { reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -36,14 +37,15 @@ function sweepExpiredEntries({ now }: { now: number }): void {
 
 /** Pushes last_active_at to Customer.io for inactivity detection. */
 export function fire({
+  nurturing,
   userId,
   hasOrganization = true,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   /** False when onboarding incomplete; skips identify to avoid ghosts. */
   hasOrganization?: boolean;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }

@@ -24,6 +24,8 @@ export const billingConfig = Config.define((c) => ({
   hubspotFormId: c.env("HUBSPOT_FORM_ID", z.string().optional()),
   hubspotReachedLimitFormId: c.env("HUBSPOT_REACHED_LIMIT_FORM_ID", z.string().optional()),
   bankDetails: c.env("LANGWATCH_BILLING_BANK_DETAILS", z.string().optional()),
+  /** Customer.io's data centre; the channel sends to the EU one unless this names "us". */
+  customerIoRegion: c.env("CUSTOMER_IO_REGION", z.enum(["us", "eu"]).optional()),
 }));
 
 export type BillingServerConfig = ConfigOf<typeof billingConfig>;
@@ -40,6 +42,8 @@ export const billingSecrets = {
   internalSlackSubscriptionsWebhook: Secret.load("SLACK_CHANNEL_SUBSCRIPTIONS", { optional: true }),
   internalSlackSelfHostedWebhook: Secret.load("SLACK_CHANNEL_SELF_HOSTED", { optional: true }),
   internalSlackSignupsWebhook,
+  /** Customer.io's track API key; absent, no lifecycle signal is sent, as on main. */
+  customerIoApiKey: Secret.load("CUSTOMER_IO_API_KEY", { optional: true }),
 } as const;
 
 /** Refuses a payment provider that is half configured, at boot. */

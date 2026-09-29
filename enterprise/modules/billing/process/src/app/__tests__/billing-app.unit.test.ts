@@ -11,6 +11,7 @@ import {
   registerNoNurturingSink,
   registerNurturingSink,
   settle,
+  wiring,
 } from "../../services/__tests__/support/nurturing-harness.ts";
 import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
@@ -92,6 +93,7 @@ function billingApp({
     config: { bankDetails: undefined, licensePaymentLinkId: undefined },
     peers: registry.peers,
     stripeSecretKey,
+    nurturing: wiring().nurturing,
     webhook: {
       signing: StripeWebhookSignatureService.create(webhookSecret),
       host: MemoryBillingWebhookHostChannel.create(),
@@ -384,6 +386,7 @@ describe("the created workflow BillingApp records", () => {
 
   describe("given Customer.io nurturing is configured", () => {
     /** @scenario "Billing records a created workflow for nurturing" */
+    /** @scenario "Billing hands its composed Customer.io sink to a created workflow's signal" */
     it("identifies the workflow count and tracks workflow_created", async () => {
       const sink = registerNurturingSink();
       const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
