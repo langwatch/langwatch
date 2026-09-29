@@ -17,6 +17,7 @@ import {
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Switch } from "@langwatch/design-system/switch";
 import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "lucide-react";
@@ -25,7 +26,6 @@ import { useEffect, useState } from "react";
 import { annotationScoresApi } from "../../behavior/annotation-scores-api.ts";
 import { AnnotationScoreDataType } from "../../model/annotation-score-data-type.ts";
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
-import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 
 type AnnotationScore = {
   id: string;

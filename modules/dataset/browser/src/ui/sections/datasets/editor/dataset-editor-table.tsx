@@ -37,6 +37,7 @@ import type {
 } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
@@ -154,7 +155,7 @@ function EditorTableHeading({
   title?: React.ReactNode;
 }) {
   if (title === undefined && datasetName) {
-    return <Heading data-testid="dataset-title">{datasetName}</Heading>;
+    return <PageLayout.Heading data-testid="dataset-title">{datasetName}</PageLayout.Heading>;
   }
   if (typeof title === "string") return <Heading size="md">{title}</Heading>;
 

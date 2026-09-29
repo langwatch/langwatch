@@ -1,4 +1,4 @@
-import { Button, Field, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
@@ -40,7 +40,7 @@ export function AgentWorkflowTargetEditorDrawer(props: AgentWorkflowTargetEditor
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Workflow Agent</Heading>
+            <Drawer.Title>Workflow Agent</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>

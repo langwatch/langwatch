@@ -68,29 +68,33 @@ export default function WorkflowsScreen() {
           </PageLayout.Content>
         </PageLayout.Container>
       ) : (
-        <VStack gap={6} width="full" align="start" padding={6}>
-          <Grid templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={6} width="full">
-            {workflows.isLoading &&
-              Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} height="200px" />)}
-            {workflows.data?.map((workflow) => (
-              <WorkflowListCard
-                key={workflow.id}
-                workflowId={workflow.id}
-                workflows={workflows.data}
-                name={workflow.name}
-                icon={workflow.icon}
-                onClick={(event: MouseEvent<HTMLElement>) => {
-                  if (isInnerMenuClick(event)) {
-                    event.stopPropagation();
-                    event.preventDefault();
-                    return;
-                  }
-                  host.navigate(`/${projectSlug ?? ""}/studio/${workflow.id}`);
-                }}
-              />
-            ))}
-          </Grid>
-        </VStack>
+        <PageLayout.Container>
+          <VStack gap={6} width="full" align="start">
+            <Grid templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={6} width="full">
+              {workflows.isLoading &&
+                Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={index} height="200px" />
+                ))}
+              {workflows.data?.map((workflow) => (
+                <WorkflowListCard
+                  key={workflow.id}
+                  workflowId={workflow.id}
+                  workflows={workflows.data}
+                  name={workflow.name}
+                  icon={workflow.icon}
+                  onClick={(event: MouseEvent<HTMLElement>) => {
+                    if (isInnerMenuClick(event)) {
+                      event.stopPropagation();
+                      event.preventDefault();
+                      return;
+                    }
+                    host.navigate(`/${projectSlug ?? ""}/studio/${workflow.id}`);
+                  }}
+                />
+              ))}
+            </Grid>
+          </VStack>
+        </PageLayout.Container>
       )}
 
       <WorkflowCreateDialogHost open={open} onClose={onClose} />

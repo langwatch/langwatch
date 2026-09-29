@@ -1,4 +1,4 @@
-import { Button, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spinner, VStack } from "@chakra-ui/react";
 /**
  * "Choose Evaluator": the picker every flow opens, a REGISTERED drawer
  * belonging to the family that owns evaluators. KNOWN GAP: "New
@@ -111,7 +111,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2} justify="space-between" width="full">
-            <Heading>{title}</Heading>
+            <Drawer.Title>{title}</Drawer.Title>
             <Button
               size="sm"
               colorScheme="blue"

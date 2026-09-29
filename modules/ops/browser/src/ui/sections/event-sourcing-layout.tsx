@@ -1,7 +1,11 @@
-/** Frame for /ops/event-sourcing/* pages; section rail and content column. */
+/** Frame for /ops/event-sourcing/* pages; title bar, section rail and content column. */
 
-import { Badge, Box, Container, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
-import { Link } from "@langwatch/browser-host/link";
+import { Badge, HStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  SectionNavigationFrame,
+  type SectionNavigationLink,
+} from "@langwatch/design-system/section-navigation-frame";
 import {
   Activity,
   CalendarClock,
@@ -12,30 +16,28 @@ import {
   Skull,
   Workflow,
 } from "lucide-react";
-import type { PropsWithChildren, ReactNode } from "react";
+import type { PropsWithChildren } from "react";
 
 import { api } from "../../behavior/ops-api.ts";
+import { useOpsRouter } from "../../behavior/ops-router.ts";
 
 const SECTION_LABEL = "Event Sourcing";
 
-type EventSourcingNavItem = {
-  label: string;
-  href: string;
-  icon: ReactNode;
-  menuEnd?: ReactNode;
-};
-
 export function EventSourcingLayout({
   children,
-  pageTitle: _pageTitle,
+  pageTitle,
 }: PropsWithChildren<{ pageTitle?: string }>) {
-  const items: EventSourcingNavItem[] = [
+  const items: SectionNavigationLink[] = [
     { label: "Overview", href: "/ops/event-sourcing", icon: <Activity size={14} /> },
     {
       label: "Dead Letters",
       href: "/ops/event-sourcing/dead-letters",
-      icon: <Skull size={14} />,
-      menuEnd: <DeadLetterBadge />,
+      icon: (
+        <HStack gap={1}>
+          <Skull size={14} />
+          <DeadLetterBadge />
+        </HStack>
+      ),
     },
     { label: "Processes", href: "/ops/event-sourcing/processes", icon: <Workflow size={14} /> },
     { label: "Projections", href: "/ops/event-sourcing/projections", icon: <Layers size={14} /> },
@@ -54,81 +56,31 @@ export function EventSourcingLayout({
     { label: "Deja View", href: "/ops/dejaview", icon: <History size={14} /> },
   ];
 
-  return (
-    <Box width="full" padding={4} data-testid="section-navigation-layout">
-      <Container maxW="1600px" paddingX={0} data-testid="section-navigation-container">
-        <Stack
-          direction={{ base: "column", md: "row" }}
-          alignItems={{ base: "stretch", md: "start" }}
-          gap={{ base: 3, md: 6 }}
-          width="full"
-        >
-          <Box
-            as="nav"
-            aria-label={`${SECTION_LABEL} navigation`}
-            width={{ base: "full", md: "220px" }}
-            minWidth={{ base: 0, md: "220px" }}
-            flexShrink={0}
-            borderRightWidth={{ base: 0, md: "1px" }}
-            borderRightColor="border.muted"
-            borderBottomWidth={{ base: "1px", md: 0 }}
-            borderBottomColor="border.muted"
-            paddingRight={{ base: 0, md: 4 }}
-            paddingBottom={{ base: 2, md: 0 }}
-          >
-            <Text
-              data-testid="section-navigation-title"
-              display={{ base: "none", md: "block" }}
-              fontSize="xs"
-              fontWeight="semibold"
-              color="fg.muted"
-              paddingX={3}
-              paddingTop={1}
-              paddingBottom={2}
-              textTransform="uppercase"
-              letterSpacing="wider"
-            >
-              {SECTION_LABEL}
-            </Text>
-            <Stack
-              data-testid="section-navigation-links"
-              direction={{ base: "row", md: "column" }}
-              alignItems="stretch"
-              gap={1}
-              overflowX={{ base: "auto", md: "visible" }}
-              paddingBottom={{ base: 1, md: 0 }}
-            >
-              {items.map((item) => (
-                // Each link keeps its intrinsic width in the horizontal strip,
-                // so the strip scrolls rather than squeezing the labels.
-                <Box key={`${item.href}:${item.label}`} flexShrink={0}>
-                  <Link
-                    href={item.href}
-                    variant="plain"
-                    paddingX={4}
-                    paddingY={1}
-                    width="full"
-                    borderRadius="lg"
-                    _hover={{ background: "bg.muted" }}
-                  >
-                    <HStack width="full" gap={2}>
-                      {item.icon}
-                      <Text>{item.label}</Text>
-                      <Spacer />
-                      {item.menuEnd}
-                    </HStack>
-                  </Link>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
+  const router = useOpsRouter();
+  const pathname = router.asPath.split(/[?#]/)[0] ?? "";
+  const activeHref =
+    items
+      .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+      .toSorted((a, b) => b.href.length - a.href.length)[0]?.href ?? "";
 
-          <Box flex={1} minWidth={0} data-testid="section-navigation-content">
-            {children}
-          </Box>
-        </Stack>
-      </Container>
-    </Box>
+  return (
+    <>
+      {pageTitle && (
+        <PageLayout.Header>
+          <PageLayout.Heading>{pageTitle}</PageLayout.Heading>
+        </PageLayout.Header>
+      )}
+      <PageLayout.Container>
+        <SectionNavigationFrame
+          label={SECTION_LABEL}
+          links={items}
+          activeHref={activeHref}
+          onNavigate={(href) => router.push(href)}
+        >
+          {children}
+        </SectionNavigationFrame>
+      </PageLayout.Container>
+    </>
   );
 }
 

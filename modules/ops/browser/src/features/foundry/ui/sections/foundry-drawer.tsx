@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Heading, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { UiFoundryDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { nowInstant } from "@langwatch/time";
@@ -66,7 +66,7 @@ export function FoundryDrawer({ onClose }: UiFoundryDrawerProps) {
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full">
-            <Heading size="md">The Foundry</Heading>
+            <Drawer.Title>The Foundry</Drawer.Title>
             <Spacer />
             <Button size="xs" variant="ghost" onClick={resetTrace}>
               <RotateCcw size={14} />

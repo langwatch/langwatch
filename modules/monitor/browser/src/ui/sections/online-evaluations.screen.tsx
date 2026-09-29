@@ -4,8 +4,9 @@
  * platform/app drawers; analytics uses real links, not overlays.
  */
 
-import { Box, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Activity, Plus, Shield } from "lucide-react";
 import { useState } from "react";
@@ -17,7 +18,6 @@ import { onlineEvaluationListState } from "../../model/online-evaluation-list-st
 import { OnlineEvaluationsTable } from "../blocks/online-evaluations-table.tsx";
 import { FullWidthListPageContent } from "../elements/full-width-list-page-content.tsx";
 import { MonitorLink } from "../elements/monitor-link.tsx";
-import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 import { MonitorReplicateDialog } from "./monitor-replicate-dialog.tsx";
 
 const DOCS_URL = "https://langwatch.ai/docs/evaluations/online-evaluation/overview";
@@ -118,14 +118,14 @@ export default function OnlineEvaluationsScreen() {
       </PageLayout.Header>
 
       {listState === "loading" && (
-        <Box display="flex" justifyContent="center" paddingY={8}>
-          <Spinner />
-        </Box>
+        <PageLayout.Container>
+          <Skeleton height="200px" />
+        </PageLayout.Container>
       )}
       {listState === "error" && (
-        <Box padding={6}>
+        <PageLayout.Container>
           <Text color="red.500">Error loading online evaluations</Text>
-        </Box>
+        </PageLayout.Container>
       )}
       {listState === "empty" && (
         <PageLayout.Container>

@@ -2,7 +2,6 @@ import {
   Box,
   Button,
   Field,
-  Heading,
   HStack,
   Input,
   Text,
@@ -172,7 +171,7 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
                   <LuArrowLeft size={20} />
                 </Button>
               )}
-              <Heading>Create Workflow Evaluator</Heading>
+              <Drawer.Title>Create Workflow Evaluator</Drawer.Title>
             </HStack>
           </Drawer.Header>
           <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>

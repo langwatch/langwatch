@@ -6,7 +6,6 @@
 
 import {
   Badge,
-  Box,
   Button,
   HStack,
   Input,
@@ -27,6 +26,7 @@ import {
 } from "@langwatch/dataset-contract";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   ChevronDown,
@@ -45,7 +45,6 @@ import { datasetApi } from "../../behavior/dataset-api.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { readableDate } from "../../model/readable-date.ts";
 import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog.tsx";
-import { NoDataInfoBlock } from "../../ui/elements/no-data-info-block.tsx";
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
 import { BulkUploadDrawer } from "./bulk-upload-drawer.tsx";
 import { CopyDatasetDialog } from "./copy-dataset-dialog.tsx";
@@ -361,7 +360,7 @@ export default function DatasetsScreen() {
           </Button>
         </UploadOrCreateDatasetMenu>
       </PageLayout.Header>
-      <Box width="full" maxW="calc(100vw - 200px)" paddingX={6} paddingY={6}>
+      <PageLayout.Container>
         {datasets.data && datasets.data.length === 0 ? (
           <NoDataInfoBlock
             title="No datasets yet"
@@ -427,7 +426,7 @@ export default function DatasetsScreen() {
             </Table.Body>
           </ListTable>
         )}
-      </Box>
+      </PageLayout.Container>
 
       <AddOrEditDatasetDrawer
         open={addEditDatasetDrawer.open}

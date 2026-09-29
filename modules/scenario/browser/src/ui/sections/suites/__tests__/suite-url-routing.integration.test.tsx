@@ -175,12 +175,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   }),
 }));
 
-vi.mock("../../dashboard-layout.tsx", () => ({
-  DashboardLayout: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="dashboard-layout">{children}</div>
-  ),
-}));
-
 vi.mock("../run-history-panel.tsx", () => ({
   RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));

@@ -4,7 +4,8 @@
  * family doesn't own — written via `host.openOverlay`.
  */
 
-import { Center, EmptyState, Grid, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Grid, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { CheckSquare, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -156,53 +157,51 @@ export default function EvaluatorsScreen() {
       </PageLayout.Header>
 
       {showEmptyState ? (
-        <Center flex={1} padding={6}>
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <CheckSquare size={32} />
-              </EmptyState.Indicator>
-              <EmptyState.Title>No evaluators yet</EmptyState.Title>
-              <EmptyState.Description>
-                Create reusable scoring functions for experiments, online evaluations, and
-                guardrails.
-              </EmptyState.Description>
-              <HStack gap={2}>
-                <PageLayout.HeaderButton data-testid="evaluator-new-open" onClick={openCreate}>
-                  <Plus size={16} /> Create your first evaluator
-                </PageLayout.HeaderButton>
-              </HStack>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </Center>
+        <PageLayout.Container>
+          <PageLayout.Content>
+            <NoDataInfoBlock
+              title="No evaluators yet"
+              description="Create reusable scoring functions for experiments, online evaluations, and guardrails."
+              icon={<CheckSquare size={24} />}
+            >
+              <PageLayout.HeaderButton data-testid="evaluator-new-open" onClick={openCreate}>
+                <Plus size={16} /> Create your first evaluator
+              </PageLayout.HeaderButton>
+            </NoDataInfoBlock>
+          </PageLayout.Content>
+        </PageLayout.Container>
       ) : (
-        <VStack gap={6} width="full" align="start" padding={6}>
-          <Text color="fg.muted">
-            Evaluators are reusable scoring functions for experiments, online evaluations, and
-            guardrails.
-          </Text>
-          <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={4} width="full">
-            {evaluatorsQuery.isLoading &&
-              Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton key={index} height="100px" borderRadius="md" />
+        <PageLayout.Container>
+          <VStack gap={6} width="full" align="start">
+            <Text color="fg.muted">
+              Evaluators are reusable scoring functions for experiments, online evaluations, and
+              guardrails.
+            </Text>
+            <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={4} width="full">
+              {evaluatorsQuery.isLoading &&
+                Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={index} height="100px" borderRadius="md" />
+                ))}
+              {evaluatorsQuery.data?.map((evaluator) => (
+                <EvaluatorGridCard
+                  key={evaluator.id}
+                  evaluator={evaluator}
+                  onClick={() => openEditor(evaluator)}
+                  onEdit={() => openEditor(evaluator)}
+                  onDelete={() => setEvaluatorToDelete({ id: evaluator.id, name: evaluator.name })}
+                  onReplicate={() =>
+                    setEvaluatorForCopy({ id: evaluator.id, name: evaluator.name })
+                  }
+                  onPushToCopies={() =>
+                    setEvaluatorForPush({ id: evaluator.id, name: evaluator.name })
+                  }
+                  onSyncFromSource={() => handleSyncFromSource(evaluator.id)}
+                  onViewHistory={() => openHistory(evaluator.id)}
+                />
               ))}
-            {evaluatorsQuery.data?.map((evaluator) => (
-              <EvaluatorGridCard
-                key={evaluator.id}
-                evaluator={evaluator}
-                onClick={() => openEditor(evaluator)}
-                onEdit={() => openEditor(evaluator)}
-                onDelete={() => setEvaluatorToDelete({ id: evaluator.id, name: evaluator.name })}
-                onReplicate={() => setEvaluatorForCopy({ id: evaluator.id, name: evaluator.name })}
-                onPushToCopies={() =>
-                  setEvaluatorForPush({ id: evaluator.id, name: evaluator.name })
-                }
-                onSyncFromSource={() => handleSyncFromSource(evaluator.id)}
-                onViewHistory={() => openHistory(evaluator.id)}
-              />
-            ))}
-          </Grid>
-        </VStack>
+            </Grid>
+          </VStack>
+        </PageLayout.Container>
       )}
 
       <EvaluatorDeleteDialog

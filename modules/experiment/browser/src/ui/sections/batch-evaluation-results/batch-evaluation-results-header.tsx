@@ -1,4 +1,4 @@
-import { Button, Heading, HStack, Skeleton, Spacer, Text } from "@chakra-ui/react";
+import { HStack, Skeleton, Spacer, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -26,9 +26,9 @@ const ExperimentTitle = ({
   shownRunId?: string;
 }) => (
   <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
-    <Heading whiteSpace="nowrap" flexShrink={0}>
+    <PageLayout.Heading whiteSpace="nowrap" flexShrink={0}>
       {experiment ? (experiment.name ?? experiment.slug) : <Skeleton width="200px" height="28px" />}
-    </Heading>
+    </PageLayout.Heading>
     {experiment && shownRunId && (
       <Text
         textStyle={"xs"}
@@ -56,16 +56,16 @@ const ExperimentLinks = ({
   <>
     {experiment?.workflowId && (
       <Link target="_blank" href={`/${project?.slug}/studio/${experiment.workflowId}`} asChild>
-        <Button size="sm" variant="outline" textDecoration="none">
+        <PageLayout.HeaderButton textDecoration="none">
           <ExternalLink size={16} /> Open Workflow
-        </Button>
+        </PageLayout.HeaderButton>
       </Link>
     )}
     {experiment?.type === "EVALUATIONS_V3" && (
       <Link href={`/${project?.slug}/experiments/workbench/${experiment.slug}`} asChild>
-        <Button size="sm" variant="outline" textDecoration="none">
+        <PageLayout.HeaderButton textDecoration="none">
           <ExternalLink size={16} /> Open Experiment
-        </Button>
+        </PageLayout.HeaderButton>
       </Link>
     )}
   </>
@@ -93,22 +93,21 @@ export const BatchEvaluationResultsHeader = ({
       <ExperimentTitle experiment={experiment} shownRunId={shownRunId} />
       <Spacer />
       {charts.available && (
-        <Button
-          size="sm"
+        <PageLayout.HeaderButton
           variant={charts.visible ? "solid" : "outline"}
           onClick={() => charts.onChange(!charts.visible)}
           data-testid="toggle-charts-button"
         >
           <BarChart2 size={16} />
           Charts
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {data && data.targetColumns.length > 0 && displayControls}
       {data && data.datasetColumns.length > 0 && columnControls}
       {!isLiteMember && (
-        <Button size="sm" variant="outline" onClick={onDownloadCsv} disabled={!hasRows}>
+        <PageLayout.HeaderButton onClick={onDownloadCsv} disabled={!hasRows}>
           <Download size={16} /> Export to CSV
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       <ExperimentLinks project={project} experiment={experiment} />
     </PageLayout.Header>

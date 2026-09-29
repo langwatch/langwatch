@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Heading,
   HStack,
   Spacer,
   Spinner,
@@ -176,7 +175,7 @@ export function UploadCSVDrawer({
         <Drawer.Content bg="bg">
           <Drawer.CloseTrigger />
           <Drawer.Header>
-            <Heading>Upload CSV</Heading>
+            <Drawer.Title>Upload CSV</Drawer.Title>
           </Drawer.Header>
           <Drawer.Body>
             {processingDatasetId && project ? (

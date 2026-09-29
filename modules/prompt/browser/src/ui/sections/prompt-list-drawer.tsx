@@ -4,17 +4,7 @@
  * still asks for `promptEditor`, whose own navigation isn't wired here yet.
  */
 
-import {
-  Box,
-  Button,
-  Collapsible,
-  Heading,
-  HStack,
-  Input,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Collapsible, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { UiPromptListDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -126,7 +116,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
                   <LuArrowLeft size={20} />
                 </Button>
               )}
-              <Heading>Choose Prompt</Heading>
+              <Drawer.Title>Choose Prompt</Drawer.Title>
             </HStack>
             <Button
               size="sm"

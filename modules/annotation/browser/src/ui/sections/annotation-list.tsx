@@ -1,6 +1,6 @@
 /** One table renders every annotations view. */
 
-import { Box, Button, Flex, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Flex, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   annotationQueueItemStatusSchema,
   type AnnotationQueueItemStatus,
@@ -9,6 +9,8 @@ import { Link } from "@langwatch/browser-host/link";
 import { downloadCsv } from "@langwatch/csv/download";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -53,7 +55,6 @@ import { AnnotationTable, AnnotationTableSkeleton } from "../blocks/annotation-t
 import { PersonalFeatureGateDialog } from "../blocks/personal-feature-gate-dialog.tsx";
 import { AnnotationColumnsMenu } from "../elements/annotation-columns-menu.tsx";
 import { annotationColumnOptions } from "../elements/annotation-columns.ts";
-import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 import { PeriodPicker } from "../elements/period-picker.tsx";
 import { RedactedField } from "../elements/redacted-field.tsx";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
@@ -425,20 +426,8 @@ export function AnnotationList({
 
   return (
     <Flex direction="column" width="full" minWidth={0} height="full" flex={1}>
-      <HStack
-        width="full"
-        padding={6}
-        paddingBottom={4}
-        alignItems="flex-end"
-        flexWrap="wrap"
-        gap={3}
-        minWidth={0}
-      >
-        {titleContent ?? (
-          <Heading as="h1" size="lg">
-            {copy.heading}
-          </Heading>
-        )}
+      <PageLayout.Header>
+        {titleContent ?? <PageLayout.Heading>{copy.heading}</PageLayout.Heading>}
         <Spacer />
         {copy.showStatusFilter && (
           <StatusFilterMenu value={statusFilter} onChange={setStatusFilter} />
@@ -457,10 +446,10 @@ export function AnnotationList({
           waitsForPick={!isPageProvidedRows && !rangeIsPicked}
           clearable={!isPageProvidedRows}
         />
-        <Button variant="ghost" onClick={onExport ?? exportPage}>
+        <PageLayout.HeaderButton onClick={onExport ?? exportPage}>
           {exportLabel ?? "Export"} <Download size={16} />
-        </Button>
-      </HStack>
+        </PageLayout.HeaderButton>
+      </PageLayout.Header>
 
       {isLoading && <AnnotationTableSkeleton />}
       {showEmptyState && (

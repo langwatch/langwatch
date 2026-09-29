@@ -28,7 +28,6 @@ import {
   ScenarioWelcomeScreen,
 } from "../../../ui/elements/scenario-welcome.tsx";
 import { ScenarioTable } from "../../../ui/elements/scenarios/scenario-table.tsx";
-import { DashboardLayout } from "../../../ui/sections/dashboard-layout.tsx";
 import { ScenarioCreateModal } from "../../../ui/sections/scenarios/scenario-create-modal.tsx";
 
 function ScenarioLibraryPage() {
@@ -158,7 +157,7 @@ function ScenarioLibraryPage() {
   if (deciding) return null;
 
   return (
-    <DashboardLayout>
+    <>
       <PageLayout.Header>
         <HStack justify="space-between" align="center" w="full">
           <PageLayout.Heading>Scenario Library</PageLayout.Heading>
@@ -229,7 +228,7 @@ function ScenarioLibraryPage() {
         scenarios={scenariosToArchive}
         isLoading={archiveMutation.isPending || batchArchiveMutation.isPending}
       />
-    </DashboardLayout>
+    </>
   );
 }
 

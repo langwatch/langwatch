@@ -1,4 +1,4 @@
-import { Box, Button, Heading, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Link } from "@langwatch/browser-host/link";
@@ -295,7 +295,7 @@ EOF
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
-          <Heading size="md">New Guardrail</Heading>
+          <Drawer.Title>New Guardrail</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body>
           <VStack gap={0} align="stretch">

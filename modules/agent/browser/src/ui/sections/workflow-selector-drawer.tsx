@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   Field,
-  Heading,
   HStack,
   Input,
   Text,
@@ -85,7 +84,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Create Workflow Agent</Heading>
+            <Drawer.Title>Create Workflow Agent</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>

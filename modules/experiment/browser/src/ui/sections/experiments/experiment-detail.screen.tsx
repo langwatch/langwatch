@@ -3,6 +3,7 @@ import { isNotFoundError as isNotFound } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HandledErrorAlert } from "@langwatch/workflow-browser-kit";
 
 import { useLegacyBatchEvaluations } from "../../../behavior/experiments/use-legacy-batch-evaluations.ts";
@@ -44,7 +45,7 @@ export default function ExperimentPage() {
   if (experimentNotFound) {
     return (
       <Box width="full">
-        <Box padding={6}>
+        <PageLayout.Container>
           <Alert.Root status="warning">
             <Alert.Indicator />
             <Alert.Title>Experiment not found</Alert.Title>
@@ -53,7 +54,7 @@ export default function ExperimentPage() {
               access to it.
             </Alert.Description>
           </Alert.Root>
-        </Box>
+        </PageLayout.Container>
       </Box>
     );
   }
@@ -61,12 +62,12 @@ export default function ExperimentPage() {
   if (isError) {
     return (
       <Box width="full">
-        <Box padding={6}>
+        <PageLayout.Container>
           <HandledErrorAlert
             error={experiment.error}
             fallbackTitle="Couldn't load this experiment"
           />
-        </Box>
+        </PageLayout.Container>
       </Box>
     );
   }
@@ -106,7 +107,7 @@ export default function ExperimentPage() {
 
   return (
     <Box width="full">
-      <Box padding={6}>
+      <PageLayout.Container>
         <Alert.Root status="warning">
           <Alert.Indicator />
           <Alert.Title>Unknown experiment type</Alert.Title>
@@ -114,7 +115,7 @@ export default function ExperimentPage() {
             This experiment has an unrecognized type: {experiment.data.type}
           </Alert.Description>
         </Alert.Root>
-      </Box>
+      </PageLayout.Container>
     </Box>
   );
 }

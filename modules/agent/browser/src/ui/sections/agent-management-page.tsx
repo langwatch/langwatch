@@ -7,13 +7,15 @@ export type {
   AgentManagementFeedback,
   AgentManagementLifecycle,
 } from "../../behavior/use-agent-management.ts";
-import { Button, Center, EmptyState, Grid, Skeleton, VStack } from "@chakra-ui/react";
+import { Grid, Skeleton, VStack } from "@chakra-ui/react";
 import type {
   AgentCopy,
   AgentWithFields as StoredAgentWithFields,
   RelatedAgentEntities,
 } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Bot, Plus } from "lucide-react";
 import { Fragment, type ComponentType, type ReactNode } from "react";
 
@@ -174,70 +176,69 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
       })}
 
       {showEmptyState ? (
-        <Center flex={1} padding={6}>
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <Bot size={32} />
-              </EmptyState.Indicator>
-              <EmptyState.Title>No agents yet</EmptyState.Title>
-              <EmptyState.Description>
-                Create reusable agents for your evaluations.
-              </EmptyState.Description>
-              <Button
-                colorPalette="blue"
+        <PageLayout.Container>
+          <PageLayout.Content>
+            <NoDataInfoBlock
+              title="No agents yet"
+              description="Create reusable agents for your evaluations."
+              icon={<Bot size={24} />}
+            >
+              <PageLayout.HeaderButton
                 onClick={() => props.navigation.openTypeSelector()}
                 data-testid="agents-first-agent-create"
+                marginTop={4}
               >
                 <Plus size={16} /> Create your first agent
-              </Button>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </Center>
+              </PageLayout.HeaderButton>
+            </NoDataInfoBlock>
+          </PageLayout.Content>
+        </PageLayout.Container>
       ) : (
-        <VStack gap={6} width="full" align="start" padding={6}>
-          <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={4} width="full">
-            {props.data.isLoading &&
-              Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton key={index} height="100px" borderRadius="md" />
+        <PageLayout.Container>
+          <VStack gap={6} width="full" align="start">
+            <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={4} width="full">
+              {props.data.isLoading &&
+                Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={index} height="100px" borderRadius="md" />
+                ))}
+              {props.connectedSection && (
+                <props.connectedSection.Component
+                  agents={props.connectedSection.agents}
+                  onOpen={props.connectedSection.onOpen}
+                  onTest={props.onTest ? (agent) => props.onTest?.(agent.id) : void 0}
+                  onDelete={(connected) =>
+                    setAgentToDelete(
+                      props.data.items.find((item) => item.id === connected.id) ?? null,
+                    )
+                  }
+                />
+              )}
+              {otherItems.map((agent) => (
+                <Fragment key={agent.id}>
+                  {props.card.render({
+                    agent,
+                    onClick: () => props.navigation.openEditor(agent),
+                    onEdit: () => props.navigation.openEditor(agent),
+                    onDelete: () => setAgentToDelete(agent),
+                    onOpenWorkflow: () => props.navigation.openWorkflow(agent),
+                    onReplicate: () => setAgentForCopy({ id: agent.id, name: agent.name }),
+                    onPushToCopies: () => setAgentForPush({ id: agent.id, name: agent.name }),
+                    onSyncFromSource: () => void handleSync(agent.id),
+                    onViewHistory: () => props.navigation.openHistory(agent),
+                    onTest:
+                      props.onTest && agent.type !== "signature" && agent.type !== "voice"
+                        ? () => props.onTest?.(agent.id)
+                        : void 0,
+                    onTalkToIt:
+                      agent.type === "voice" && props.onTalkToIt
+                        ? () => props.onTalkToIt?.(agent)
+                        : void 0,
+                  })}
+                </Fragment>
               ))}
-            {props.connectedSection && (
-              <props.connectedSection.Component
-                agents={props.connectedSection.agents}
-                onOpen={props.connectedSection.onOpen}
-                onTest={props.onTest ? (agent) => props.onTest?.(agent.id) : void 0}
-                onDelete={(connected) =>
-                  setAgentToDelete(
-                    props.data.items.find((item) => item.id === connected.id) ?? null,
-                  )
-                }
-              />
-            )}
-            {otherItems.map((agent) => (
-              <Fragment key={agent.id}>
-                {props.card.render({
-                  agent,
-                  onClick: () => props.navigation.openEditor(agent),
-                  onEdit: () => props.navigation.openEditor(agent),
-                  onDelete: () => setAgentToDelete(agent),
-                  onOpenWorkflow: () => props.navigation.openWorkflow(agent),
-                  onReplicate: () => setAgentForCopy({ id: agent.id, name: agent.name }),
-                  onPushToCopies: () => setAgentForPush({ id: agent.id, name: agent.name }),
-                  onSyncFromSource: () => void handleSync(agent.id),
-                  onViewHistory: () => props.navigation.openHistory(agent),
-                  onTest:
-                    props.onTest && agent.type !== "signature" && agent.type !== "voice"
-                      ? () => props.onTest?.(agent.id)
-                      : void 0,
-                  onTalkToIt:
-                    agent.type === "voice" && props.onTalkToIt
-                      ? () => props.onTalkToIt?.(agent)
-                      : void 0,
-                })}
-              </Fragment>
-            ))}
-          </Grid>
-        </VStack>
+            </Grid>
+          </VStack>
+        </PageLayout.Container>
       )}
 
       {props.composition.renderArchiveDialog({

@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Center,
-  Container,
   createListCollection,
   Field,
   Grid,
@@ -368,7 +367,7 @@ function AnalyticsCustomGraphContent({
           setRelativePeriod={setRelativePeriod}
         />
       </PageLayout.Header>
-      <Container maxWidth="1600" padding={6}>
+      <PageLayout.Container>
         <VStack width="full" align="start" gap={6}>
           <HStack width="full" align="start" gap={8}>
             <CustomGraphForm
@@ -425,7 +424,7 @@ function AnalyticsCustomGraphContent({
             {showFilters && <FilterSidebar hideTopics={true} />}
           </HStack>
         </VStack>
-      </Container>
+      </PageLayout.Container>
       <Dialog.Root
         open={jsonModal.open}
         onOpenChange={({ open }) => jsonModal.setOpen(open)}

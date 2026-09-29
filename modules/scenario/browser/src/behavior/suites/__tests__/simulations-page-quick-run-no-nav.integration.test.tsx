@@ -130,12 +130,6 @@ vi.mock("../../use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: () => undefined,
 }));
 
-vi.mock("../../../ui/sections/dashboard-layout.tsx", () => ({
-  DashboardLayout: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="dashboard-layout">{children}</div>
-  ),
-}));
-
 vi.mock("../../../ui/sections/suites/run-history-panel.tsx", () => ({
   RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));

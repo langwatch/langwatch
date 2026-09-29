@@ -360,9 +360,7 @@ function EditorHeader({
             <LuArrowLeft size={20} />
           </Button>
         )}
-        <Text fontSize="lg" fontWeight="semibold">
-          {isEditing ? "Edit Code Evaluator" : "New Code Evaluator"}
-        </Text>
+        <Drawer.Title>{isEditing ? "Edit Code Evaluator" : "New Code Evaluator"}</Drawer.Title>
       </HStack>
     </Drawer.Header>
   );

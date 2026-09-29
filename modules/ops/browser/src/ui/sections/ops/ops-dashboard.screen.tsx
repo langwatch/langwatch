@@ -1,4 +1,4 @@
-import { Button, Center, EmptyState, Spacer, Spinner } from "@chakra-ui/react";
+import { Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Database } from "lucide-react";
 
@@ -36,9 +36,9 @@ export default function OpsDashboardScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Ops Dashboard</PageLayout.Heading>
         <Spacer />
-        <Button size="xs" variant="outline" onClick={() => payloadStore.open("open")}>
-          <Database size={12} /> Payload store
-        </Button>
+        <PageLayout.HeaderButton onClick={() => payloadStore.open("open")}>
+          <Database size={16} /> Payload store
+        </PageLayout.HeaderButton>
         {/* The snapshot's own age, not just the poll's health: this page can be
             reading numbers no writer has refreshed. */}
         <ConnectionStatusIndicator
@@ -50,19 +50,10 @@ export default function OpsDashboardScreen() {
         {data ? (
           <OpsDashboardContent data={data} />
         ) : (
-          <Center paddingY={20}>
-            <EmptyState.Root>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <Spinner size="lg" />
-                </EmptyState.Indicator>
-                <EmptyState.Title>Loading metrics</EmptyState.Title>
-                <EmptyState.Description>
-                  Waiting for the first collection cycle...
-                </EmptyState.Description>
-              </EmptyState.Content>
-            </EmptyState.Root>
-          </Center>
+          <VStack gap={3} align="stretch" aria-label="Loading metrics">
+            <Skeleton height="96px" />
+            <Skeleton height="240px" />
+          </VStack>
         )}
       </PageLayout.Container>
       {payloadStore.value !== null && <OpsBlobsDrawer onClose={payloadStore.close} />}

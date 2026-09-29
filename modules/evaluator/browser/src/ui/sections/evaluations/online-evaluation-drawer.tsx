@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Heading,
   HStack,
   Input,
   NativeSelect,
@@ -449,9 +448,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading size="md">
+            <Drawer.Title>
               {monitorId ? "Edit Online Evaluation" : "New Online Evaluation"}
-            </Heading>
+            </Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>

@@ -43,9 +43,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
         <Drawer.Header>
           <HStack gap={2}>
             <Database size={20} />
-            <Text fontSize="xl" fontWeight="semibold">
-              Choose Dataset
-            </Text>
+            <Drawer.Title>Choose Dataset</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body

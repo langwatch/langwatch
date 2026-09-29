@@ -1,21 +1,11 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  Container,
-  Heading,
-  HStack,
-  Skeleton,
-  Spacer,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Card, Skeleton, Spacer, VStack } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { useState } from "react";
 import { MoreVertical } from "react-feather";
 
@@ -118,27 +108,24 @@ export default function EditTraceCheck() {
           );
         }}
       />
-      <Container maxWidth="1200" padding={6}>
+      <PageLayout.Header>
+        <PageLayout.Heading>Editing Evaluation</PageLayout.Heading>
+        <Spacer />
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <PageLayout.HeaderButton>
+              <MoreVertical />
+            </PageLayout.HeaderButton>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item value="delete" color="red.fg" onClick={handleDeleteCheck}>
+              Delete Check
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      </PageLayout.Header>
+      <PageLayout.Container>
         <VStack align="start" gap={4}>
-          <HStack align="end" width="full">
-            <Heading as="h1" size="xl" textAlign="center" paddingTop={4}>
-              Editing Evaluation
-            </Heading>
-            <Spacer />
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button>
-                  <MoreVertical />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content>
-                <Menu.Item value="delete" color="red.fg" onClick={handleDeleteCheck}>
-                  Delete Check
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Root>
-          </HStack>
-
           {check.isLoading && (
             <Card.Root width="full">
               <Card.Body>
@@ -165,7 +152,7 @@ export default function EditTraceCheck() {
             />
           )}
         </VStack>
-      </Container>
+      </PageLayout.Container>
     </Box>
   );
 }

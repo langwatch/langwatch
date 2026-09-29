@@ -1,13 +1,4 @@
-import {
-  Button,
-  Field,
-  Heading,
-  HStack,
-  IconButton,
-  Input,
-  NativeSelect,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Field, HStack, IconButton, Input, NativeSelect, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { WireOf } from "@langwatch/api/web";
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
@@ -315,12 +306,12 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack>
-            <Heading>
+            <Drawer.Title>
               {datasetDrawerHeading({
                 datasetToSave: props.datasetToSave,
                 isEditing: Boolean(props.datasetToSave?.datasetId || props.localOnly),
               })}
-            </Heading>
+            </Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>

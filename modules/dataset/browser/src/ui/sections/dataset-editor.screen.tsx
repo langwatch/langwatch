@@ -1,6 +1,7 @@
 // Dataset editor respecting I-READY gate; dataset ID from host route (screen decides readiness).
 
-import { Alert, Box, Button, Spinner, Text } from "@chakra-ui/react";
+import { Alert, Button, Spinner, Text } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { datasetContextChip, useRegisterLangyPageContext } from "@langwatch/langy-browser-kit";
 import { FlaskConical } from "lucide-react";
 import { useState } from "react";
@@ -75,7 +76,7 @@ export default function DatasetEditorScreen() {
   };
 
   return (
-    <Box width="full" paddingX={6} paddingY={6}>
+    <PageLayout.Container>
       {(status === "uploading" || status === "processing") && (
         <Alert.Root status="info" marginBottom={4}>
           <Alert.Indicator>
@@ -115,14 +116,12 @@ export default function DatasetEditorScreen() {
           floatingSelectionBar
           headerActions={
             host.hasPermission(EXPERIMENT_PERMISSION) ? (
-              <Button
-                size="sm"
-                colorPalette="blue"
+              <PageLayout.HeaderButton
                 data-testid="run-experiment-from-dataset"
                 onClick={runExperiment}
               >
-                <FlaskConical size={14} /> Run experiment
-              </Button>
+                <FlaskConical size={16} /> Run experiment
+              </PageLayout.HeaderButton>
             ) : undefined
           }
         />
@@ -132,6 +131,6 @@ export default function DatasetEditorScreen() {
           <Text color="fg.muted">Your dataset will appear here once it is ready.</Text>
         )
       )}
-    </Box>
+    </PageLayout.Container>
   );
 }

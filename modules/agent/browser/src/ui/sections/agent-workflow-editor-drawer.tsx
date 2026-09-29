@@ -1,14 +1,4 @@
-import {
-  Box,
-  Button,
-  Field,
-  Heading,
-  HStack,
-  Input,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type {
   UiAgentWorkflowEditorDrawerProps,
   UiAgentWorkflowMappingProps,
@@ -51,7 +41,7 @@ export function AgentWorkflowEditorDrawer(props: AgentWorkflowEditorDrawerProps)
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Edit Workflow Agent</Heading>
+            <Drawer.Title>Edit Workflow Agent</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>

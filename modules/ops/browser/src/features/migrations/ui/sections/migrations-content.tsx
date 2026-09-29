@@ -130,7 +130,7 @@ export function MigrationsContent() {
   const enrollments = enrollmentsQuery.data?.enrollments ?? [];
 
   return (
-    <Stack gap={8} paddingY={4} maxWidth="1200px">
+    <Stack gap={8}>
       <HStack alignItems="flex-start">
         <Stack gap={2} maxWidth="720px">
           <Text fontSize="sm" color="fg.muted">

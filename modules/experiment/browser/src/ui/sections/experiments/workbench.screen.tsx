@@ -1,6 +1,7 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   type ProposalHandlers,
   useRegisterLangyActions,
@@ -169,8 +170,8 @@ export default function ExperimentsWorkbenchPage() {
   // Show 404 if experiment doesn't exist
   if (!slug || isNotFound) {
     return (
-      <Box width="full" background="bg.panel">
-        <Box padding={6}>
+      <Box width="full">
+        <PageLayout.Container>
           <Alert.Root status="warning">
             <Alert.Indicator />
             <Alert.Title>Experiment not found</Alert.Title>
@@ -179,7 +180,7 @@ export default function ExperimentsWorkbenchPage() {
               access to it.
             </Alert.Description>
           </Alert.Root>
-        </Box>
+        </PageLayout.Container>
       </Box>
     );
   }
@@ -187,16 +188,16 @@ export default function ExperimentsWorkbenchPage() {
   // Show error for other failures (permissions, network, etc.)
   if (isError) {
     return (
-      <Box width="full" background="bg.panel">
-        <Box padding={6}>
+      <Box width="full">
+        <PageLayout.Container>
           <HandledErrorAlert error={error} fallbackTitle="Couldn't load this experiment" />
-        </Box>
+        </PageLayout.Container>
       </Box>
     );
   }
 
   return (
-    <Box width="full" background="bg.panel">
+    <Box width="full">
       <PromptTemplateFieldsProvider>
         <VStack width="full" height="calc(100vh - 50px)" gap={0} align="stretch" overflow="hidden">
           {/* Header */}

@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import type { UiAgentListDrawerProps } from "@langwatch/browser-host/drawer";
@@ -38,7 +38,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
           <Drawer.CloseTrigger />
           <Drawer.Header>
             <HStack gap={2} justify="space-between" width="full">
-              <Heading>Choose Agent</Heading>
+              <Drawer.Title>Choose Agent</Drawer.Title>
               <Button
                 size="sm"
                 colorPalette="blue"

@@ -56,9 +56,7 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Text fontWeight="semibold" fontSize="lg">
-            {`${props.agentName} history`}
-          </Text>
+          <Drawer.Title>{`${props.agentName} history`}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

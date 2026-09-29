@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   chakra,
-  Heading,
   HStack,
   Icon,
   Input,
@@ -668,7 +667,7 @@ export function BulkUploadDrawer({
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <VStack align="start" gap={1}>
-            <Heading>Upload datasets</Heading>
+            <Drawer.Title>Upload datasets</Drawer.Title>
             <Text fontSize="sm" color="fg.muted" fontWeight="normal">
               Bring CSV or JSON files into LangWatch to build evaluation sets, review past
               generations, and turn real data into new test cases.

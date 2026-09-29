@@ -2,7 +2,7 @@
  * `targetTypeSelector`: the picker that adds a column to an evaluation.
  */
 
-import { Badge, Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
@@ -144,7 +144,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
                 <LuArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Add to Evaluation</Heading>
+            <Drawer.Title>Add to Evaluation</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>

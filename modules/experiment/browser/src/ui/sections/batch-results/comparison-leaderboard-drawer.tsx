@@ -279,9 +279,7 @@ function LeaderboardNeedsResultsPage({ evaluatorId }: { evaluatorId: string }) {
     <Drawer.Root open={true} placement="end" size="lg" onOpenChange={closeDrawer}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Text fontWeight="semibold" fontSize="lg">
-            Leaderboard
-          </Text>
+          <Drawer.Title>Leaderboard</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -353,9 +351,7 @@ function LoadedComparisonLeaderboardDrawer({
     <Drawer.Root open={true} placement="end" size="lg" onOpenChange={closeDrawer}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Text fontWeight="semibold" fontSize="lg">
-            {column.name}: leaderboard
-          </Text>
+          <Drawer.Title>{column.name}: leaderboard</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

@@ -4,7 +4,6 @@ import {
   Button,
   chakra,
   Field,
-  Heading,
   HStack,
   Input,
   Spinner,
@@ -92,7 +91,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                   <ArrowLeft size={20} />
                 </Button>
               )}
-              <Heading>{agentId ? "Edit Code Agent" : "New Code Agent"}</Heading>
+              <Drawer.Title>{agentId ? "Edit Code Agent" : "New Code Agent"}</Drawer.Title>
             </HStack>
           </Drawer.Header>
           <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>

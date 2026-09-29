@@ -1,4 +1,4 @@
-import { Box, Button, Field, Heading, HStack, Input, Spinner, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Input, Spinner, VStack } from "@chakra-ui/react";
 import type { HttpTestErrorExplanation } from "@langwatch/agent-contract/http-test";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowLeft } from "lucide-react";
@@ -52,7 +52,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading>{props.agentId ? "Edit HTTP Agent" : "New HTTP Agent"}</Heading>
+            <Drawer.Title>{props.agentId ? "Edit HTTP Agent" : "New HTTP Agent"}</Drawer.Title>
           </HStack>
         </Drawer.Header>
         {form.isUnavailable && !props.isLoadingAgent && (

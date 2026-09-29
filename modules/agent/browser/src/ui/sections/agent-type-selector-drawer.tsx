@@ -1,4 +1,4 @@
-import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { UiAgentTypeSelectorDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowLeft, Cable, Code, Globe, Workflow } from "lucide-react";
@@ -68,7 +68,7 @@ export function AgentTypeSelectorDrawer({
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Choose Agent Connection Type</Heading>
+            <Drawer.Title>Choose Agent Connection Type</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>

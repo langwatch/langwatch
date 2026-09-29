@@ -4,7 +4,6 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
-import { Text } from "@chakra-ui/react";
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 
@@ -28,9 +27,7 @@ export function ScenarioVersionHistoryDrawer({ open }: { open?: boolean }) {
     >
       <Drawer.Content bg="bg" data-testid="scenario-version-history">
         <Drawer.Header>
-          <Text fontWeight="semibold" fontSize="lg">
-            Version history
-          </Text>
+          <Drawer.Title>Version history</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

@@ -1,6 +1,6 @@
 // Create/edit datasets with validation for required name and no duplicate column names.
 
-import { Button, Field, Heading, HStack, Input, NativeSelect, VStack } from "@chakra-ui/react";
+import { Button, Field, HStack, Input, NativeSelect, VStack } from "@chakra-ui/react";
 import {
   type DatasetColumns,
   type DatasetColumnType,
@@ -223,7 +223,7 @@ export function AddOrEditDatasetDrawer({
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack>
-            <Heading>{heading}</Heading>
+            <Drawer.Title>{heading}</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>

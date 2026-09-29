@@ -1,4 +1,3 @@
-import { Heading } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
 
 import { BlobStoreContent } from "./blob-store-content.tsx";
@@ -13,7 +12,7 @@ export function OpsBlobsDrawer({ onClose }: { onClose: () => void }) {
     <Drawer.Root open={true} placement="end" size="xl" onOpenChange={() => onClose()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">Payload store</Heading>
+          <Drawer.Title>Payload store</Drawer.Title>
         </Drawer.Header>
         <Drawer.Body>
           <BlobStoreContent />

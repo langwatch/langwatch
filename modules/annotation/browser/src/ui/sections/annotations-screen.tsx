@@ -1,8 +1,10 @@
 /** Renders the selected annotation list view. */
 
-import { Box, Flex, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Flex, HStack, Text } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { downloadCsv } from "@langwatch/csv/download";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { Inbox } from "lucide-react";
@@ -24,7 +26,6 @@ import {
   type AnnotationTrace,
 } from "../../model/annotation-row.ts";
 import type { AnnotationView } from "../../model/annotation-view.ts";
-import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 import { ReviewerAvatar } from "../elements/reviewer-avatar.tsx";
 import { AnnotationList, type PageQueue } from "./annotation-list.tsx";
 import { AnnotationQueueEditor } from "./annotation-queue-editor.tsx";
@@ -146,8 +147,8 @@ function QueueList({ host }: { host: AnnotationHostApi }) {
   const members = queue.data?.members.map((member) => member.user);
 
   const titleContent = queue.data ? (
-    <VStack align="start" minWidth={0}>
-      <Heading size="lg">{queue.data.name}</Heading>
+    <>
+      <PageLayout.Heading>{queue.data.name}</PageLayout.Heading>
       <HStack>
         <Text fontSize="sm">Members: </Text>
         {members?.map((member) => (
@@ -158,7 +159,7 @@ function QueueList({ host }: { host: AnnotationHostApi }) {
           </Tooltip>
         ))}
       </HStack>
-    </VStack>
+    </>
   ) : null;
 
   // The page IS this queue, so moving a selection elsewhere starts from the

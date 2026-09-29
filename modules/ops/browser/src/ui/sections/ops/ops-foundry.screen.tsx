@@ -1,4 +1,4 @@
-import { Box, Button, Center, Flex, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Center, Flex, HStack, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -54,10 +54,10 @@ export default function OpsFoundryScreen() {
             <GenerateConversationDialog />
             <GenerateTraceDialog />
             <PresetPicker />
-            <Button size="xs" variant="outline" onClick={resetTrace}>
-              <RotateCcw size={14} />
+            <PageLayout.HeaderButton onClick={resetTrace}>
+              <RotateCcw size={16} />
               Reset
-            </Button>
+            </PageLayout.HeaderButton>
           </HStack>
         </Flex>
       </PageLayout.Header>

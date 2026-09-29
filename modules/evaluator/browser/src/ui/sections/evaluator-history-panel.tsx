@@ -65,9 +65,7 @@ export function EvaluatorHistoryPanel({
     <Drawer.Root open placement="end" size="md" onOpenChange={() => onClose()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Text fontWeight="semibold" fontSize="lg">
-            {`${evaluatorName} history`}
-          </Text>
+          <Drawer.Title>{`${evaluatorName} history`}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

@@ -110,7 +110,7 @@ export default function NewExperimentWorkbench() {
   }, [project, router, createExperiment, isDatasetReady, datasetId, datasetQuery.data]);
 
   return (
-    <Box width="full" background="bg.panel">
+    <Box width="full">
       <Center height="calc(100vh - 100px)">
         {createExperiment.isError ? (
           <Box padding={6} maxWidth="500px">

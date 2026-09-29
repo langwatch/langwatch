@@ -1,15 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Input,
-  Spacer,
-  Spinner,
-  Table,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Input, Spacer, Spinner, Table, Text } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type { ProcessInstanceRow } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
@@ -208,7 +197,7 @@ export function ProcessInstancesDrawer({ processName, onClose, onOpenInstance }:
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack gap={2} width="full">
-            <Heading size="md">Process instances</Heading>
+            <Drawer.Title>Process instances</Drawer.Title>
             {allProcesses ? (
               <Badge size="sm" variant="subtle" colorPalette="gray">
                 all processes

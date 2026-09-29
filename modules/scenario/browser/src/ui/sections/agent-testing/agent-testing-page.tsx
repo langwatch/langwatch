@@ -12,7 +12,6 @@ import { useAgentTestingRouting } from "../../../behavior/agent-testing/use-agen
 import { api } from "../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
-import { DashboardLayout } from "../dashboard-layout.tsx";
 import { AgentTestingHeader } from "./agent-testing-header.tsx";
 import { AgentTestingCaseEditor } from "./cases/agent-testing-case-editor.tsx";
 import { TestCasesTab } from "./cases/test-cases-tab.tsx";
@@ -53,28 +52,26 @@ export function AgentTestingPage() {
 
   return (
     <NowProvider>
-      <DashboardLayout>
-        <VStack width="full" height="full" gap={0}>
-          <AgentTestingHeader
-            tab={routing.tab}
-            onTabChange={routing.setTab}
-            casesCount={casesCount}
-            plansCount={plansCount}
-            openPlan={routing.tab === "results" ? openPlanTitle : null}
-          />
+      <VStack width="full" height="full" gap={0}>
+        <AgentTestingHeader
+          tab={routing.tab}
+          onTabChange={routing.setTab}
+          casesCount={casesCount}
+          plansCount={plansCount}
+          openPlan={routing.tab === "results" ? openPlanTitle : null}
+        />
 
-          <Box flex={1} width="full" minHeight={0} overflow="hidden">
-            {routing.tab === "cases" ? (
-              <TestCasesTab />
-            ) : (
-              <ResultsTab isSseConnected={isSseConnected} />
-            )}
-          </Box>
-        </VStack>
+        <Box flex={1} width="full" minHeight={0} overflow="hidden">
+          {routing.tab === "cases" ? (
+            <TestCasesTab />
+          ) : (
+            <ResultsTab isSseConnected={isSseConnected} />
+          )}
+        </Box>
+      </VStack>
 
-        <AgentTestingCaseEditor />
-        <RunPlanDialogHost />
-      </DashboardLayout>
+      <AgentTestingCaseEditor />
+      <RunPlanDialogHost />
     </NowProvider>
   );
 }

@@ -408,14 +408,14 @@ export function ExperimentsPage() {
         </HStack>
       </PageLayout.Header>
       {pageState === "loading" && (
-        <Box display="flex" justifyContent="center" py={8}>
-          <Spinner />
-        </Box>
+        <PageLayout.Container>
+          <Skeleton height="200px" />
+        </PageLayout.Container>
       )}
       {pageState === "error" && (
-        <Box padding={6}>
+        <PageLayout.Container>
           <Text color="red.500">Error loading experiments</Text>
-        </Box>
+        </PageLayout.Container>
       )}
       {pageState === "empty" && (
         <PageLayout.Container>

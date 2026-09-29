@@ -1,15 +1,5 @@
-import {
-  Box,
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Input,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Card, HStack, Input, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -53,39 +43,42 @@ export function BackofficeTable({
   children,
 }: BackofficeTableProps) {
   return (
-    <VStack gap={6} width="full" align="start">
-      <HStack width="full">
-        <Heading>{title}</Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>{title}</PageLayout.Heading>
         <Spacer />
         {createAction}
-      </HStack>
+      </PageLayout.Header>
+      <PageLayout.Container>
+        <VStack gap={6} width="full" align="start">
+          {searchInput ?? (
+            <Input
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder={searchPlaceholder}
+              width="full"
+              maxWidth="480px"
+            />
+          )}
 
-      {searchInput ?? (
-        <Input
-          value={searchValue}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder={searchPlaceholder}
-          width="full"
-          maxWidth="480px"
-        />
-      )}
+          <Card.Root width="full" overflow="hidden">
+            <Card.Body paddingY={0} paddingX={0}>
+              <BackofficeTableContent
+                title={title}
+                error={error}
+                errorContent={errorContent}
+                isLoading={isLoading}
+                isFetching={isFetching}
+              >
+                {children}
+              </BackofficeTableContent>
+            </Card.Body>
+          </Card.Root>
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0}>
-          <BackofficeTableContent
-            title={title}
-            error={error}
-            errorContent={errorContent}
-            isLoading={isLoading}
-            isFetching={isFetching}
-          >
-            {children}
-          </BackofficeTableContent>
-        </Card.Body>
-      </Card.Root>
-
-      {pagination && pagination.total > 0 && <PaginationBar {...pagination} />}
-    </VStack>
+          {pagination && pagination.total > 0 && <PaginationBar {...pagination} />}
+        </VStack>
+      </PageLayout.Container>
+    </>
   );
 }
 

@@ -275,7 +275,7 @@ function WalkedItemBody({
 /** What crowns a walk once the sitting has been answered for. */
 function AllTasksCompleteScreen() {
   return (
-    <VStack height="100%" width="full" justify="center" backgroundColor="bg.muted">
+    <VStack height="100%" width="full" justify="center">
       <TasksDone />
       <Text fontSize="xl" fontWeight="500">
         All tasks complete

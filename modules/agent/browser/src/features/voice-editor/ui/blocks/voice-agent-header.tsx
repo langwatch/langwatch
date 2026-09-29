@@ -1,4 +1,4 @@
-import { Button, Heading, HStack } from "@chakra-ui/react";
+import { Button, HStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowLeft } from "lucide-react";
 
@@ -26,7 +26,7 @@ export function VoiceAgentHeader({
             <ArrowLeft size={20} />
           </Button>
         )}
-        <Heading>{isEditing ? "Edit Voice Agent" : "New Voice Agent"}</Heading>
+        <Drawer.Title>{isEditing ? "Edit Voice Agent" : "New Voice Agent"}</Drawer.Title>
       </HStack>
     </Drawer.Header>
   );

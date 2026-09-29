@@ -33,7 +33,6 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { useScenarioTabFollow } from "../../../behavior/use-scenario-tab-follow.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
-import { DashboardLayout } from "../dashboard-layout.tsx";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel.tsx";
 import { RunHistoryPanel } from "./run-history-panel.tsx";
 import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel.tsx";
@@ -273,99 +272,97 @@ export default function SimulationsPage() {
 
   return (
     <NowProvider>
-      <DashboardLayout>
-        <VStack width="full" height="full" gap={0}>
-          {/* Top row: heading + buttons */}
-          <PageLayout.Header withBorder={false}>
-            <HStack justify="space-between" align="center" w="full">
-              <PageLayout.Heading>Simulations</PageLayout.Heading>
-              <HStack>
-                <PeriodSelector
-                  period={period}
-                  mode={mode}
-                  setPeriod={setPeriod}
-                  setRelativePeriod={setRelativePeriod}
-                />
-                <PageLayout.HeaderButton onClick={handleNewSuite}>
-                  <Plus size={16} /> New Run Plan
-                </PageLayout.HeaderButton>
-              </HStack>
+      <VStack width="full" height="full" gap={0}>
+        {/* Top row: heading + buttons */}
+        <PageLayout.Header withBorder={false}>
+          <HStack justify="space-between" align="center" w="full">
+            <PageLayout.Heading>Simulations</PageLayout.Heading>
+            <HStack>
+              <PeriodSelector
+                period={period}
+                mode={mode}
+                setPeriod={setPeriod}
+                setRelativePeriod={setRelativePeriod}
+              />
+              <PageLayout.HeaderButton onClick={handleNewSuite}>
+                <Plus size={16} /> New Run Plan
+              </PageLayout.HeaderButton>
             </HStack>
-          </PageLayout.Header>
-
-          {/* Second row: sidebar + content box */}
-          <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>
-            {/* Sidebar */}
-            <SuiteSidebar
-              projectSlug={project?.slug ?? ""}
-              suites={suites ?? []}
-              selectedSuiteSlug={selectedSuiteSlug}
-              runSummaries={runSummaries}
-              externalSets={externalSets ?? []}
-              onSelectSuite={navigateToSuite}
-              onRunSuite={handleRunSuite}
-              onContextMenu={handleContextMenu}
-              onNewSuite={handleNewSuite}
-              isLoading={isLoading || isExternalSetsLoading}
-            />
-
-            {/* Content box */}
-            <Box flex={1} height="full" minWidth={0} paddingBottom={3} paddingRight={4}>
-              <Box
-                height="full"
-                width="full"
-                borderRadius="lg"
-                boxShadow="0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)"
-                border="1px solid"
-                borderColor="border.muted"
-                background="bg.panel"
-                overflow="auto"
-              >
-                <MainPanel
-                  error={error ?? null}
-                  selectedSuiteSlug={selectedSuiteSlug}
-                  selectedSuite={selectedSuite}
-                  selectedExternalSetId={selectedExternalSetId}
-                  isLoading={isLoading}
-                  onNewSuite={handleNewSuite}
-                  onEditSuite={handleEditSuite}
-                  onRunSuite={handleRunSuite}
-                  isRunning={isRunPending}
-                  pendingBatchRunId={pendingBatchRunId ?? urlPendingBatchId}
-                  period={period}
-                  suiteNameMap={suiteNameMap}
-                  highlightBatchId={highlightBatchId}
-                  connectedToLocalRun={!!scenarioTab.tabKey}
-                />
-              </Box>
-            </Box>
           </HStack>
-        </VStack>
+        </PageLayout.Header>
 
-        {/* Context menu */}
-        {contextMenu && (
-          <SuiteContextMenu
-            x={contextMenu.x}
-            y={contextMenu.y}
-            onEdit={() => handleEditSuite(contextMenu.suiteId)}
-            onDuplicate={() => handleDuplicateSuite(contextMenu.suiteId)}
-            onArchive={() => handleArchiveSuite(contextMenu.suiteId)}
-            onClose={() => setContextMenu(null)}
+        {/* Second row: sidebar + content box */}
+        <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>
+          {/* Sidebar */}
+          <SuiteSidebar
+            projectSlug={project?.slug ?? ""}
+            suites={suites ?? []}
+            selectedSuiteSlug={selectedSuiteSlug}
+            runSummaries={runSummaries}
+            externalSets={externalSets ?? []}
+            onSelectSuite={navigateToSuite}
+            onRunSuite={handleRunSuite}
+            onContextMenu={handleContextMenu}
+            onNewSuite={handleNewSuite}
+            isLoading={isLoading || isExternalSetsLoading}
           />
-        )}
 
-        {/* Archive confirmation dialog */}
-        <SuiteArchiveDialog
-          open={!!archiveConfirmId}
-          onClose={() => setArchiveConfirmId(null)}
-          onConfirm={confirmArchive}
-          suiteName={archiveTargetSuite?.name ?? ""}
-          isLoading={archiveMutation.isPending}
+          {/* Content box */}
+          <Box flex={1} height="full" minWidth={0} paddingBottom={3} paddingRight={4}>
+            <Box
+              height="full"
+              width="full"
+              borderRadius="lg"
+              boxShadow="0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)"
+              border="1px solid"
+              borderColor="border.muted"
+              background="bg.panel"
+              overflow="auto"
+            >
+              <MainPanel
+                error={error ?? null}
+                selectedSuiteSlug={selectedSuiteSlug}
+                selectedSuite={selectedSuite}
+                selectedExternalSetId={selectedExternalSetId}
+                isLoading={isLoading}
+                onNewSuite={handleNewSuite}
+                onEditSuite={handleEditSuite}
+                onRunSuite={handleRunSuite}
+                isRunning={isRunPending}
+                pendingBatchRunId={pendingBatchRunId ?? urlPendingBatchId}
+                period={period}
+                suiteNameMap={suiteNameMap}
+                highlightBatchId={highlightBatchId}
+                connectedToLocalRun={!!scenarioTab.tabKey}
+              />
+            </Box>
+          </Box>
+        </HStack>
+      </VStack>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <SuiteContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onEdit={() => handleEditSuite(contextMenu.suiteId)}
+          onDuplicate={() => handleDuplicateSuite(contextMenu.suiteId)}
+          onArchive={() => handleArchiveSuite(contextMenu.suiteId)}
+          onClose={() => setContextMenu(null)}
         />
+      )}
 
-        {/* Run confirmation dialog */}
-        <SuiteRunConfirmationDialog {...runDialogProps} />
-      </DashboardLayout>
+      {/* Archive confirmation dialog */}
+      <SuiteArchiveDialog
+        open={!!archiveConfirmId}
+        onClose={() => setArchiveConfirmId(null)}
+        onConfirm={confirmArchive}
+        suiteName={archiveTargetSuite?.name ?? ""}
+        isLoading={archiveMutation.isPending}
+      />
+
+      {/* Run confirmation dialog */}
+      <SuiteRunConfirmationDialog {...runDialogProps} />
     </NowProvider>
   );
 }
