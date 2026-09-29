@@ -52,8 +52,9 @@ the registry is checked against the folder, so a template cannot go missing.
 
 Mail is **expressive**, not **productive** — the pair of names is IBM Carbon's.
 Expressive is the marketing site's language and the front door's: cream page, paper
-card, serif display line, an ink pill for the action, the brand orange kept for
-details. Productive is the application's own working surface, with its own orange
+card, one system sans for heading and body alike (no web font is fetched), an
+ink pill for the action, the brand orange kept for details. No kickers over
+headings, no spaced capitals; monospace only for text a reader copies exactly. Productive is the application's own working surface, with its own orange
 (`#ED8926`), and it belongs nowhere in an email: these are read outside the product
 by somebody usually not signed in, and the link lands them on the front door.
 

@@ -34,7 +34,6 @@ export const OrganizationMfaRequirementEmail = ({
   required,
 }: OrganizationMfaRequirementEmailProps) => (
   <EmailLayout
-    eyebrow="SECURITY"
     preview={`${requirementTitle(required)} for ${organizationName}`}
     heading={requirementTitle(required)}
   >

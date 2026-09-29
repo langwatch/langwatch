@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { HighlightedCode, InlineLink, Muted, Paragraph } from "../email-layout.tsx";
+import { HighlightedCode, InlineLink, Muted, Paragraph, PlainBlock } from "../email-layout.tsx";
 
 /**
  * First steps in the language of their intent (SDK default for unknown).
@@ -31,10 +31,16 @@ export const FIRST_STEPS_LINKS = {
   cli: "https://docs.langwatch.ai/integration/cli",
 } as const;
 
-/** The three lines, as each language's own documentation writes them. */
+/**
+ * The install and the code as separate blocks, never one shell-and-TypeScript
+ * mix; the import is broken where a formatter would, so it never wraps mid-path.
+ */
 export const FIRST_STEPS_SNIPPETS = {
-  typescript: `npm install langwatch
-import { setupObservability } from "langwatch/observability/node";
+  install: "npm install langwatch",
+  typescript: `import {
+  setupObservability,
+} from "langwatch/observability/node";
+
 await setupObservability();`,
   cli: `npm install -g langwatch
 langwatch login
@@ -45,11 +51,11 @@ claude`,
 export const SKILLS_INSTALL_COMMAND = "npx skills add langwatch/skills";
 
 /**
- * What to paste into a coding agent, in the tracing skill's own words —
- * "instrument my code with LangWatch" — so the agent reaches for that skill
- * rather than improvising. The key is named, never carried: no secret in an email.
+ * What to paste into a coding agent, in the tracing skill's own words, so the
+ * agent reaches for that skill rather than improvising. No key is named: the
+ * skill signs the command line in, and the reader may not have a key yet.
  */
-export const AGENT_PROMPT = `Install the LangWatch skills with ${SKILLS_INSTALL_COMMAND}, then instrument my code with LangWatch following the tracing skill. My API key is in LANGWATCH_API_KEY.`;
+export const AGENT_PROMPT = `Install the LangWatch skills with ${SKILLS_INSTALL_COMMAND}, then instrument my code with LangWatch following the tracing skill.`;
 
 export const FirstSteps = ({ intent }: FirstSteps) => (
   <>
@@ -63,10 +69,10 @@ export const FirstSteps = ({ intent }: FirstSteps) => (
     <Muted>Add the LangWatch skills:</Muted>
     <HighlightedCode code={SKILLS_INSTALL_COMMAND} language="bash" />
     <Muted>Then paste this into your agent:</Muted>
-    <HighlightedCode code={AGENT_PROMPT} language="bash" />
+    <PlainBlock>{AGENT_PROMPT}</PlainBlock>
     <Muted>
-      <InlineLink href={FIRST_STEPS_LINKS.typescript}>Open the quickstart</InlineLink> for every
-      line here with a copy button.
+      <InlineLink href={FIRST_STEPS_LINKS.typescript}>Open the quickstart</InlineLink> to copy each
+      step.
     </Muted>
   </>
 );
@@ -94,7 +100,9 @@ const AgentGovernanceSteps = () => (
  */
 const SoftwareKitSteps = () => (
   <>
-    <Muted>Tracing a TypeScript application takes three lines.</Muted>
+    <Muted>Install the TypeScript SDK:</Muted>
+    <HighlightedCode code={FIRST_STEPS_SNIPPETS.install} language="bash" />
+    <Muted>Then set up tracing where your application starts:</Muted>
     <HighlightedCode code={FIRST_STEPS_SNIPPETS.typescript} language="typescript" />
     <Muted>
       Working in something else? <InlineLink href={FIRST_STEPS_LINKS.python}>Python</InlineLink> and{" "}

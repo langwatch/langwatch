@@ -6,11 +6,13 @@ import { render } from "@react-email/render";
 import { describe, expect, it } from "vitest";
 
 import { DataTable } from "../email-layout.tsx";
+import { mailTemplates } from "../index.ts";
 import { inviteEmailTemplate } from "../invite-email.tsx";
 import { joinRequestApprovedTemplate } from "../join-request-emails.tsx";
 import {
   AGENT_PROMPT,
   FIRST_STEPS_LINKS,
+  FIRST_STEPS_SNIPPETS,
   SKILLS_INSTALL_COMMAND,
 } from "../onboarding/first-steps.tsx";
 import { tokenize } from "../onboarding/highlight.ts";
@@ -79,28 +81,38 @@ describe("given the mail's syntax highlighter", () => {
 });
 
 describe("given every message's shared shell", () => {
-  describe("when the rendered head is read", () => {
-    /** @scenario "Every message asks for the display face" */
-    it("links the stylesheet that serves the display face", async () => {
-      const rendered = await html(signUpVerificationEmailTemplate, {
-        email: "morgan@acme.example",
-        verificationUrl: "https://app.langwatch.ai/v/1",
-      });
-
-      expect(rendered).toContain("https://api.fontshare.com/v2/css?f[]=sentient@400");
-      expect(rendered).toContain("@font-face");
-      expect(rendered).toContain("Sentient");
+  const rendered = () =>
+    html(signUpVerificationEmailTemplate, {
+      email: "morgan@acme.example",
+      verificationUrl: "https://app.langwatch.ai/v/1",
     });
 
-    /** @scenario "A client that drops the face keeps the designed fallback" */
-    it("names a real serif after the display face rather than the body sans", async () => {
-      const rendered = await html(signUpVerificationEmailTemplate, {
-        email: "morgan@acme.example",
-        verificationUrl: "https://app.langwatch.ai/v/1",
-      });
+  describe("when the rendered head and heading are read", () => {
+    /** @scenario "Every message is set in the system face and fetches no font" */
+    it("links and declares no web font, and sets the heading in the body face", async () => {
+      const document = await rendered();
+      const heading = /<h1[^>]*style="([^"]*)"/.exec(document)?.[1] ?? "";
 
-      expect(rendered).toContain("ui-serif");
-      expect(rendered).toContain("letter-spacing:-0.03em");
+      expect(document).not.toContain("fontshare");
+      expect(document).not.toContain("@font-face");
+      expect(document).not.toContain("ui-serif");
+      expect(heading).toContain("-apple-system");
+    });
+  });
+
+  describe("when every message's styles are read", () => {
+    /** @scenario "No message carries a kicker in spaced capitals" */
+    it("transforms no text to capitals, spaces none apart, and names LangWatch plainly", async () => {
+      for (const template of mailTemplates) {
+        for (const fixture of template.fixtures) {
+          const document = await html(template, fixture.props);
+
+          expect(document).not.toContain("text-transform:uppercase");
+          expect(document).not.toMatch(/letter-spacing:0?\.\d+em/);
+          expect(document).not.toContain("LANGWATCH");
+        }
+      }
+      expect(visibleText(await rendered())).toContain("LangWatch · Documentation");
     });
   });
 });
@@ -148,16 +160,17 @@ describe("given the shared data table", () => {
 });
 
 describe("given the first-steps block", () => {
-  const signUpBase = {
-    email: "morgan@acme.example",
-    verificationUrl: "https://app.langwatch.ai/v/1",
+  const welcomeBase = {
+    requesterEmail: "morgan@acme.example",
+    organizationName: "Acme Corp",
+    organizationUrl: "https://app.langwatch.ai/acme-corp",
   };
 
   describe("when nobody has said why they came", () => {
     /** @scenario "Unknown intent shows the software development kit steps" */
     it("shows the TypeScript lines and links Python and Go", async () => {
-      const rendered = await html(signUpVerificationEmailTemplate, {
-        ...signUpBase,
+      const rendered = await html(joinRequestApprovedTemplate, {
+        ...welcomeBase,
         firstSteps: {},
       });
 
@@ -168,14 +181,43 @@ describe("given the first-steps block", () => {
 
     /** @scenario "The first-steps block carries the skills command and the agent prompt" */
     it("carries the skills command and the agent prompt", async () => {
-      const rendered = await html(signUpVerificationEmailTemplate, {
-        ...signUpBase,
+      const rendered = await html(joinRequestApprovedTemplate, {
+        ...welcomeBase,
         firstSteps: {},
       });
 
       expect(visibleText(rendered)).toContain(SKILLS_INSTALL_COMMAND);
       expect(visibleText(rendered)).toContain(AGENT_PROMPT);
       expect(rendered).toContain(FIRST_STEPS_LINKS.typescript);
+    });
+  });
+
+  describe("when the agent prompt is drawn", () => {
+    /** @scenario "The agent prompt reads as prose, not code" */
+    it("sets it in the body face, outside any code block, naming no key", async () => {
+      const rendered = await html(joinRequestApprovedTemplate, { ...welcomeBase, firstSteps: {} });
+      const blocks = [...rendered.matchAll(/<pre[^>]*>([\s\S]*?)<\/pre>/g)].map((m) => m[1] ?? "");
+
+      expect(rendered).toContain(`>${AGENT_PROMPT}</p>`);
+      expect(blocks.some((block) => block.includes("instrument my code"))).toBe(false);
+      expect(AGENT_PROMPT).not.toContain("API_KEY");
+    });
+  });
+
+  describe("when the software development kit steps are drawn", () => {
+    /** @scenario "The install command and the code are separate blocks" */
+    it("puts the install in its own shell block and breaks the import deliberately", async () => {
+      const rendered = await html(joinRequestApprovedTemplate, { ...welcomeBase, firstSteps: {} });
+      const blocks = [...rendered.matchAll(/<pre[^>]*>([\s\S]*?)<\/pre>/g)].map((m) =>
+        visibleText(m[1] ?? "").trim(),
+      );
+      const code = blocks.find((block) => block.includes("setupObservability")) ?? "";
+
+      expect(blocks).toContain(FIRST_STEPS_SNIPPETS.install);
+      expect(code).not.toContain("npm install");
+      expect(FIRST_STEPS_SNIPPETS.typescript.split("\n").every((line) => line.length <= 40)).toBe(
+        true,
+      );
     });
   });
 

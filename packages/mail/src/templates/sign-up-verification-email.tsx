@@ -2,8 +2,7 @@ import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
 import type { EmailDelivery } from "../providers/types.ts";
-import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
-import { FirstSteps, firstStepsSchema } from "./onboarding/first-steps.tsx";
+import { ActionRow, EmailLayout, Paragraph } from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 /**
@@ -14,11 +13,6 @@ import { defineTemplate, renderMailTemplate } from "./registry.ts";
 export const signUpVerificationEmailProps = z.object({
   email: z.email(),
   verificationUrl: z.url(),
-  /**
-   * First steps shown after confirmation (if present). Defaults used (organization
-   * not yet created).
-   */
-  firstSteps: firstStepsSchema.optional(),
 });
 
 export type SignUpVerificationEmailProps = z.infer<typeof signUpVerificationEmailProps>;
@@ -26,27 +20,23 @@ export type SignUpVerificationEmailProps = z.infer<typeof signUpVerificationEmai
 export const signUpVerificationEmailSubject = (): string =>
   "Confirm your email address for LangWatch";
 
+/** A security message does one job: no onboarding rides along with it. */
 export const SignUpVerificationEmail = ({
   email,
   verificationUrl,
-  firstSteps,
 }: SignUpVerificationEmailProps) => (
   <EmailLayout
-    eyebrow="ACCOUNT"
-    preview="Confirm your address and carry on"
+    preview="Confirm your address to finish signing up"
     heading="Confirm your email address"
   >
     <Paragraph>
-      Someone started creating a LangWatch account with this address (<strong>{email}</strong>).
-      Confirm it below to carry on.
+      Someone started creating a LangWatch account with <strong>{email}</strong>. Confirm the
+      address to finish signing up.
     </Paragraph>
-    <PrimaryButton href={verificationUrl}>Confirm my email address</PrimaryButton>
-    {firstSteps && <FirstSteps {...firstSteps} />}
-    <Paragraph>
-      This link expires in 1 hour and can be used once. If this was not you, you can ignore this
-      email — the account cannot sign anybody in until this address is confirmed, and it will not be
-      used for anything else.
-    </Paragraph>
+    <ActionRow
+      primary={{ href: verificationUrl, label: "Confirm my email address" }}
+      note="This link expires in 1 hour and can be used once. If this was not you, you can ignore this email: nobody can sign in to the account until the address is confirmed, and it is not used for anything else."
+    />
   </EmailLayout>
 );
 
@@ -59,11 +49,6 @@ export const signUpVerificationEmailTemplate = defineTemplate({
   Component: SignUpVerificationEmail,
   fixtures: {
     default: {
-      email: "morgan@acme.example",
-      verificationUrl: "https://app.langwatch.ai/auth/verify/ver_71c0aa93f5",
-      firstSteps: {},
-    },
-    "without the first steps": {
       email: "morgan@acme.example",
       verificationUrl: "https://app.langwatch.ai/auth/verify/ver_71c0aa93f5",
     },
