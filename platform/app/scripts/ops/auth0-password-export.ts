@@ -26,31 +26,50 @@ const BCRYPT_SHAPE = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 const ENCODINGS = new Set(["base64", "hex", "utf8"]);
 
 /**
- * A JSON array or newline-delimited JSON. A line that does not parse is
- * reported by line number only: V8's message quotes the text, which here
- * is a password hash.
+ * A stop the import words itself. Its message never quotes the export, so,
+ * unlike any other error here, it is safe to print in full.
+ */
+export class ImportStoppedError extends Error {
+  readonly name = "ImportStoppedError";
+}
+
+/**
+ * A JSON array or newline-delimited JSON of objects. A line that does not
+ * parse is reported by line number only: V8's message quotes the text, which
+ * here is a password hash. A record that is not an object is refused here,
+ * before anything is written, rather than crashing the run midway.
  */
 export function parseExport(raw: string): Auth0ExportRecord[] {
+  const records = parseJsonRecords(raw);
+  records.forEach((record, index) => {
+    if (!isObject(record) || Array.isArray(record)) {
+      throw new ImportStoppedError(`Export record ${index + 1} is not a JSON object.`);
+    }
+  });
+  return records as Auth0ExportRecord[];
+}
+
+function parseJsonRecords(raw: string): unknown[] {
   const trimmed = raw.trim();
   if (trimmed.startsWith("[")) {
     let parsed: unknown;
     try {
       parsed = JSON.parse(trimmed);
     } catch {
-      throw new Error("Export starts with '[' but is not valid JSON.");
+      throw new ImportStoppedError("Export starts with '[' but is not valid JSON.");
     }
     if (!Array.isArray(parsed)) {
-      throw new Error("Export starts with '[' but is not a JSON array.");
+      throw new ImportStoppedError("Export starts with '[' but is not a JSON array.");
     }
-    return parsed as Auth0ExportRecord[];
+    return parsed;
   }
   return trimmed.split("\n").flatMap((line, index) => {
     const content = line.trim();
     if (content.length === 0) return [];
     try {
-      return [JSON.parse(content) as Auth0ExportRecord];
+      return [JSON.parse(content) as unknown];
     } catch {
-      throw new Error(`Export line ${index + 1} is not valid JSON.`);
+      throw new ImportStoppedError(`Export line ${index + 1} is not valid JSON.`);
     }
   });
 }
@@ -70,10 +89,20 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/**
+ * `$2y$` is PHP's name for the same bcrypt as `$2b$`, but the bcrypt library
+ * sign-in verifies with refuses it, which would lock the user out.
+ */
+function asVerifiable(hash: string): string {
+  return hash.startsWith("$2y$") ? `$2b$${hash.slice(4)}` : hash;
+}
+
 /** The bcrypt hash this record carries, or null when it carries none. */
 export function bcryptHashOf(record: Auth0ExportRecord): string | null {
   const plain = record.password_hash ?? record.passwordHash;
-  if (typeof plain === "string" && BCRYPT_SHAPE.test(plain)) return plain;
+  if (typeof plain === "string" && BCRYPT_SHAPE.test(plain)) {
+    return asVerifiable(plain);
+  }
 
   const custom = record.custom_password_hash;
   if (!isObject(custom)) return null;
@@ -93,7 +122,7 @@ export function bcryptHashOf(record: Auth0ExportRecord): string | null {
     encoding === "utf8"
       ? hash.value
       : Buffer.from(hash.value, encoding as BufferEncoding).toString("utf8");
-  return BCRYPT_SHAPE.test(decoded) ? decoded : null;
+  return BCRYPT_SHAPE.test(decoded) ? asVerifiable(decoded) : null;
 }
 
 /**
@@ -101,6 +130,7 @@ export function bcryptHashOf(record: Auth0ExportRecord): string | null {
  * Prisma and JSON errors quote their input, and the input is a hash.
  */
 export function describeErrorSafely(error: unknown): string {
+  if (error instanceof ImportStoppedError) return error.message;
   if (!(error instanceof Error)) return "non-Error thrown";
   const code =
     "code" in error && typeof error.code === "string" ? ` (${error.code})` : "";

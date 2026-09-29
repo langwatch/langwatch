@@ -23,9 +23,10 @@
  * `migration` role (as the system-migrations task does): it folds only the
  * identity events it staged itself, on an isolated dispatch allow-list, and
  * waits for them to drain before exiting. It therefore needs the target's
- * REDIS_URL, CLICKHOUSE_URL, BASE_HOST and ENVIRONMENT beside DATABASE_URL, all
- * pointing at the SAME deployment, and refuses to start without them. It asks
- * for "yes" before writing.
+ * CLICKHOUSE_URL, BASE_HOST, ENVIRONMENT and exactly one of REDIS_URL and
+ * REDIS_CLUSTER_ENDPOINTS beside DATABASE_URL, all pointing at the SAME
+ * deployment, and refuses to start without them. It asks for "yes" before
+ * writing, after showing every target.
  *
  * Nothing here loads `.env`: the shell is the whole environment, and the app's
  * own env validation is skipped (skip-app-env-validation.ts) in favour of the
@@ -35,13 +36,25 @@
  * through the same path sign-in uses, and one that does not read back as
  * holding a password is listed and fails the run.
  *
- * Reruns are safe by construction. Before an APPLY writes a user it appends
- * their user id to a ledger beside the export (`<export>.applied`), and every
- * run skips a user already in it. A latched user who errored or has not
- * folded may already have an attach event in the log, and a second attach
- * would mint another credential identifier and break a later identity
- * replay on the Account unique key. Retrying one is a decision: check the
- * user, then delete their line from the ledger.
+ * Every record is resolved to its local user before anything is written,
+ * and the whole plan prints before the "yes" prompt. A person who appears
+ * more than once is not imported at all: for a latched user two writes
+ * attach two credential identifiers, the second before the first folds,
+ * and that collides on Account's unique key and blocks every later account
+ * write for them. Which of the hashes is current cannot be told from the
+ * file, so they stay on the live Auth0 fallback and are listed.
+ *
+ * Reruns are safe too. Before an APPLY writes a user it appends their user
+ * id to a ledger beside the export (`<export>.applied`), and every run skips
+ * a user already in it, for the same reason: a latched user who errored may
+ * already have an attach staged. Error and skip lines say "(latched)" where
+ * it applies. Retrying an errored user is a decision: check them, then
+ * delete their line from the ledger. A latched write that outlasts the
+ * writer's wait for the fold reports as an error; if it reads back after
+ * the drain it is listed as landed, and needs nothing.
+ *
+ * $2y$ hashes (PHP's name for the same bcrypt) are stored as $2b$: the
+ * bcrypt library sign-in uses refuses the $2y$ prefix.
  *
  * Usage, from platform/app:
  *   AUTH0_EXPORT_PATH=/path/to/export.json DATABASE_URL=<url> \
@@ -75,25 +88,27 @@ import {
   auth0UserIdOf,
   bcryptHashOf,
   describeErrorSafely,
+  ImportStoppedError,
   parseExport,
 } from "./auth0-password-export";
 
 const APPLY = process.env.APPLY === "1";
 
 const REQUIRED = APPLY
-  ? [
-      "AUTH0_EXPORT_PATH",
-      "DATABASE_URL",
-      "REDIS_URL",
-      "CLICKHOUSE_URL",
-      "BASE_HOST",
-      "ENVIRONMENT",
-    ]
+  ? ["AUTH0_EXPORT_PATH", "DATABASE_URL", "CLICKHOUSE_URL", "BASE_HOST", "ENVIRONMENT"]
   : ["AUTH0_EXPORT_PATH", "DATABASE_URL"];
 const missing = REQUIRED.filter((name) => !process.env[name]);
 if (missing.length > 0) {
   console.error(
     `ERROR: ${missing.join(", ")} not set. Nothing was read or written.`,
+  );
+  process.exit(1);
+}
+// The app connects to REDIS_CLUSTER_ENDPOINTS when it is set, whatever
+// REDIS_URL says, so exactly one may be set or the target shown is a guess.
+if (APPLY && !process.env.REDIS_URL === !process.env.REDIS_CLUSTER_ENDPOINTS) {
+  console.error(
+    "ERROR: set exactly one of REDIS_URL and REDIS_CLUSTER_ENDPOINTS, the one the target deployment uses. Nothing was read or written.",
   );
   process.exit(1);
 }
@@ -106,6 +121,16 @@ function hostOf(url: string | undefined): string {
   } catch {
     return "<invalid url>";
   }
+}
+
+/** Cluster endpoints are `host:port` pairs, sometimes with credentials. */
+function redisTarget(): string {
+  const cluster = process.env.REDIS_CLUSTER_ENDPOINTS;
+  if (!cluster) return hostOf(process.env.REDIS_URL);
+  const hosts = cluster
+    .split(",")
+    .map((endpoint) => endpoint.trim().replace(/^.*@/, ""));
+  return `cluster ${hosts.join(", ")}`;
 }
 
 /** User ids an earlier APPLY began writing; see the header on reruns. */
@@ -122,9 +147,9 @@ function readLedger(): Set<string> {
 }
 
 async function confirmApply(): Promise<void> {
-  console.log("About to WRITE credentials into:");
+  console.log("\nAbout to WRITE credentials into:");
   console.log(`  postgres:    ${hostOf(process.env.DATABASE_URL)}`);
-  console.log(`  redis:       ${hostOf(process.env.REDIS_URL)}`);
+  console.log(`  redis:       ${redisTarget()}`);
   console.log(`  clickhouse:  ${hostOf(process.env.CLICKHOUSE_URL)}`);
   console.log(`  environment: ${process.env.ENVIRONMENT}`);
   console.log(`  ledger:      ${LEDGER_PATH}`);
@@ -132,7 +157,7 @@ async function confirmApply(): Promise<void> {
   const answer = await rl.question('Type "yes" to continue: ');
   rl.close();
   if (answer.trim().toLowerCase() !== "yes") {
-    throw new Error("Aborted. Nothing was written.");
+    throw new ImportStoppedError("Aborted. Nothing was written.");
   }
 }
 
@@ -144,7 +169,9 @@ async function bootEventStack(): Promise<() => Promise<void>> {
   const queue = getApp().eventSourcing?.globalQueue;
   const waitUntilIdle = queue?.waitUntilPreflightIdle;
   if (!queue || !waitUntilIdle) {
-    throw new Error("The migration queue exposes no completion barrier.");
+    throw new ImportStoppedError(
+      "The migration queue exposes no completion barrier.",
+    );
   }
   return () => waitUntilIdle.call(queue);
 }
@@ -152,8 +179,10 @@ async function bootEventStack(): Promise<() => Promise<void>> {
 type Listed =
   | "non_bcrypt"
   | "no_account"
+  | "duplicate"
   | "in_ledger"
   | "errored"
+  | "landed_late"
   | "not_visible";
 type Counted =
   | Listed
@@ -166,11 +195,9 @@ type Counted =
 
 interface Tally {
   count(key: Counted): void;
-  skip(key: Listed, auth0UserId: string): void;
+  skip(key: Listed, line: string): void;
   n(key: Counted): number;
   listed: Record<Listed, string[]>;
-  /** Users an APPLY wrote, or may have written before it threw. */
-  toVerify: { auth0UserId: string; userId: string }[];
 }
 
 function newTally(): Tally {
@@ -178,112 +205,174 @@ function newTally(): Tally {
   const listed: Record<Listed, string[]> = {
     non_bcrypt: [],
     no_account: [],
+    duplicate: [],
     in_ledger: [],
     errored: [],
+    landed_late: [],
     not_visible: [],
   };
   const count = (key: Counted) => counts.set(key, (counts.get(key) ?? 0) + 1);
   return {
     count,
-    skip: (key, auth0UserId) => {
+    skip: (key, line) => {
       count(key);
-      listed[key].push(auth0UserId);
+      listed[key].push(line);
     },
     n: (key) => counts.get(key) ?? 0,
     listed,
-    toVerify: [],
   };
 }
 
 type Credentials = ReturnType<typeof credentialAccounts>;
 
-async function writeRecord({
-  auth0UserId,
-  userId,
-  hash,
-  credentials,
-  tally,
-}: {
+/** One export record resolved to the local user it names, read-only. */
+interface Candidate {
   auth0UserId: string;
   userId: string;
   hash: string;
-  credentials: Credentials;
-  tally: Tally;
-}): Promise<void> {
-  const latched = await isLatched({ userId });
-  const planned = await credentials.planPasswordImport({ userId });
-  // Ledgered BEFORE the write: a write that throws may still have staged an
-  // attach, and that is exactly the user a rerun must not touch again.
-  if (APPLY && planned !== "already_has_password") {
-    appendFileSync(LEDGER_PATH, `${userId}\n`, { mode: 0o600 });
-  }
-  const outcome: PasswordImportOutcome =
-    APPLY && planned !== "already_has_password"
-      ? await credentials.importPasswordHash({ userId, passwordHash: hash })
-      : planned;
-  tally.count(outcome);
-  if (outcome !== "already_has_password") {
-    tally.count(latched ? "via_identity_events" : "via_legacy_row");
-    if (APPLY) tally.toVerify.push({ auth0UserId, userId });
-  }
-  const tag = APPLY ? "OK " : "DRY";
-  const note = latched ? " (latched)" : "";
-  console.log(`  [${tag}] ${auth0UserId} -> ${outcome}${note}`);
+  latched: boolean;
 }
 
-async function tallyRecord({
-  record,
+const latchNote = (latched: boolean) => (latched ? " (latched)" : "");
+
+/**
+ * Resolves every record before anything is written, so the whole plan,
+ * duplicates included, is known before the "yes" prompt. Reads only.
+ */
+async function resolveRecords({
+  records,
+  credentials,
+  tally,
+}: {
+  records: Auth0ExportRecord[];
+  credentials: Credentials;
+  tally: Tally;
+}): Promise<Candidate[]> {
+  const resolved: Candidate[] = [];
+  for (const record of records) {
+    const auth0UserId = auth0UserIdOf(record);
+    if (!auth0UserId) {
+      tally.count("no_user_id");
+      continue;
+    }
+    // A social or enterprise identity has no password to import.
+    if (!auth0UserId.startsWith("auth0|")) {
+      tally.count("not_database_connection");
+      continue;
+    }
+    const hash = bcryptHashOf(record);
+    if (!hash) {
+      tally.skip("non_bcrypt", auth0UserId);
+      continue;
+    }
+    const userId = await credentials.findUserIdForFederatedPasswordAccount({
+      federatedUserId: auth0UserId,
+    });
+    if (!userId) {
+      tally.skip("no_account", auth0UserId);
+      continue;
+    }
+    const latched = await isLatched({ userId });
+    resolved.push({ auth0UserId, userId, hash, latched });
+  }
+
+  // Two records for one person cannot both be written: for a latched user
+  // the second attach lands before the first folds and collides on the
+  // Account unique key, blocking every later account write for them. Which
+  // hash is current cannot be told from the file, so neither is imported.
+  const perUser = new Map<string, number>();
+  for (const { userId } of resolved) {
+    perUser.set(userId, (perUser.get(userId) ?? 0) + 1);
+  }
+  return resolved.filter((candidate) => {
+    if ((perUser.get(candidate.userId) ?? 0) < 2) return true;
+    tally.skip(
+      "duplicate",
+      `${candidate.auth0UserId}${latchNote(candidate.latched)}`,
+    );
+    return false;
+  });
+}
+
+async function writeCandidate({
+  candidate: { auth0UserId, userId, hash, latched },
   credentials,
   ledger,
   tally,
+  written,
 }: {
-  record: Auth0ExportRecord;
+  candidate: Candidate;
   credentials: Credentials;
   ledger: Set<string>;
   tally: Tally;
+  written: Candidate[];
 }): Promise<void> {
-  const auth0UserId = auth0UserIdOf(record);
-  if (!auth0UserId) return tally.count("no_user_id");
-  // A social or enterprise identity has no password to import.
-  if (!auth0UserId.startsWith("auth0|")) {
-    return tally.count("not_database_connection");
-  }
-  const hash = bcryptHashOf(record);
-  if (!hash) return tally.skip("non_bcrypt", auth0UserId);
-
-  let userId: string | null = null;
+  const note = latchNote(latched);
+  if (ledger.has(userId)) return tally.skip("in_ledger", auth0UserId + note);
   try {
-    userId = await credentials.findUserIdForFederatedPasswordAccount({
-      federatedUserId: auth0UserId,
-    });
-    if (!userId) return tally.skip("no_account", auth0UserId);
-    if (ledger.has(userId)) return tally.skip("in_ledger", auth0UserId);
-    ledger.add(userId);
-    await writeRecord({ auth0UserId, userId, hash, credentials, tally });
+    const planned = await credentials.planPasswordImport({ userId });
+    if (APPLY && planned !== "already_has_password") {
+      // Ledgered BEFORE the write: a write that throws may still have staged
+      // an attach, and that is exactly the user a rerun must not touch again.
+      appendFileSync(LEDGER_PATH, `${userId}\n`, { mode: 0o600 });
+      written.push({ auth0UserId, userId, hash, latched });
+    }
+    const outcome: PasswordImportOutcome =
+      APPLY && planned !== "already_has_password"
+        ? await credentials.importPasswordHash({ userId, passwordHash: hash })
+        : planned;
+    tally.count(outcome);
+    if (outcome !== "already_has_password") {
+      tally.count(latched ? "via_identity_events" : "via_legacy_row");
+    }
+    console.log(`  [${APPLY ? "OK " : "DRY"}] ${auth0UserId} -> ${outcome}${note}`);
   } catch (error) {
-    tally.skip("errored", auth0UserId);
-    if (APPLY && userId) tally.toVerify.push({ auth0UserId, userId });
-    console.error(`  [ERR] ${auth0UserId} -> ${describeErrorSafely(error)}`);
+    tally.skip("errored", auth0UserId + note);
+    console.error(
+      `  [ERR] ${auth0UserId}${note} -> ${describeErrorSafely(error)}`,
+    );
   }
 }
 
-/** Reads every write back the way sign-in will, after the events folded. */
+/**
+ * Reads every write back the way sign-in will, after the events folded. A
+ * latched write can outlast the writer's read-your-writes wait and be
+ * reported as an error although its attach was staged; if it reads back
+ * now, it landed, and moves from errored to done.
+ */
 async function verifyWrites({
   credentials,
   tally,
+  written,
 }: {
   credentials: Credentials;
   tally: Tally;
+  written: Candidate[];
 }): Promise<void> {
-  for (const { auth0UserId, userId } of tally.toVerify) {
-    const now = await credentials.planPasswordImport({ userId });
-    if (now === "already_has_password") tally.count("verified");
-    else tally.skip("not_visible", auth0UserId);
+  for (const { auth0UserId, userId, latched } of written) {
+    const line = auth0UserId + latchNote(latched);
+    let readable = false;
+    try {
+      readable =
+        (await credentials.planPasswordImport({ userId })) ===
+        "already_has_password";
+    } catch (error) {
+      console.error(`  [ERR] read-back ${line} -> ${describeErrorSafely(error)}`);
+    }
+    const erroredAt = tally.listed.errored.indexOf(line);
+    if (readable && erroredAt >= 0) {
+      tally.listed.errored.splice(erroredAt, 1);
+      tally.skip("landed_late", line);
+    } else if (readable) {
+      tally.count("verified");
+    } else if (erroredAt < 0) {
+      tally.skip("not_visible", line);
+    }
   }
 }
 
 function printSummary({ total, tally }: { total: number; tally: Tally }) {
-  const { n } = tally;
+  const { n, listed } = tally;
   const verb = APPLY ? "" : "would ";
   console.log("\nSummary:");
   const row = (label: string, value: number) =>
@@ -293,32 +382,36 @@ function printSummary({ total, tally }: { total: number; tally: Tally }) {
   row("skipped, not auth0| (no password):", n("not_database_connection"));
   row("skipped, not bcrypt:", n("non_bcrypt"));
   row("skipped, no matching account:", n("no_account"));
+  row("skipped, same person twice:", n("duplicate"));
   row("skipped, already a password:", n("already_has_password"));
   row("skipped, in ledger (earlier run):", n("in_ledger"));
   row(`${verb}create a credential:`, n("creates_credential"));
   row(`${verb}fill a passkey placeholder:`, n("fills_placeholder"));
   row("  of which latched (events):", n("via_identity_events"));
   row("  of which legacy (backfill):", n("via_legacy_row"));
-  row("errored:", n("errored"));
+  row("errored:", listed.errored.length);
   if (APPLY) {
     row("read back with a password:", n("verified"));
+    row("errored, but landed after the wait:", n("landed_late"));
     row("NOT readable yet:", n("not_visible"));
   }
 
   for (const [label, ids] of [
-    ["Not bcrypt, still on live Auth0", tally.listed.non_bcrypt],
-    ["No matching account here", tally.listed.no_account],
+    ["Not bcrypt, still on live Auth0", listed.non_bcrypt],
+    ["No matching account here", listed.no_account],
+    ["Same person more than once in the export, none imported", listed.duplicate],
     [
       "Already attempted by an earlier APPLY (see the ledger to retry)",
-      tally.listed.in_ledger,
+      listed.in_ledger,
     ],
     [
       "Errored, needs a look (ledgered: a rerun skips them)",
-      tally.listed.errored,
+      listed.errored,
     ],
+    ["Errored but landed after the wait (done)", listed.landed_late],
     [
       "Written but not readable yet (wait for the fold, then check)",
-      tally.listed.not_visible,
+      listed.not_visible,
     ],
   ] as const) {
     if (ids.length === 0) continue;
@@ -335,40 +428,47 @@ async function main(): Promise<void> {
   );
   console.log(`Export file: ${records.length} record(s)`);
 
+  const credentials = credentialAccounts();
+  const tally = newTally();
+  const candidates = await resolveRecords({ records, credentials, tally });
+
   let drain: (() => Promise<void>) | null = null;
   if (APPLY) {
     await confirmApply();
     drain = await bootEventStack();
   }
-  const credentials = credentialAccounts();
+
+  // From the first write on, the summary is what says who is safe to rerun,
+  // so it prints whatever happens after this point.
   const ledger = readLedger();
-  const tally = newTally();
-
-  for (const record of records) {
-    await tallyRecord({ record, credentials, ledger, tally });
-  }
-
+  const written: Candidate[] = [];
   let drainFailure: string | null = null;
-  if (drain) {
-    console.log("\nWaiting for the staged identity events to fold...");
-    await drain().catch((error: unknown) => {
-      // The queue's own failure: identity events carry no hash.
-      drainFailure = error instanceof Error ? error.message : String(error);
-    });
-    await verifyWrites({ credentials, tally });
+  try {
+    for (const candidate of candidates) {
+      await writeCandidate({ candidate, credentials, ledger, tally, written });
+    }
+    if (drain) {
+      console.log("\nWaiting for the staged identity events to fold...");
+      await drain().catch((error: unknown) => {
+        // The queue's own failure: identity events carry no hash.
+        drainFailure = error instanceof Error ? error.message : String(error);
+      });
+      await verifyWrites({ credentials, tally, written });
+    }
+  } finally {
+    printSummary({ total: records.length, tally });
   }
 
-  printSummary({ total: records.length, tally });
   if (drainFailure) console.error(`\nDraining failed: ${drainFailure}`);
-  const failed = tally.n("errored") + tally.n("not_visible") > 0;
+  const failed = tally.listed.errored.length + tally.n("not_visible") > 0;
   if (failed || drainFailure) process.exitCode = 1;
 }
 
 main()
   .catch((error: unknown) => {
-    // Every per-record failure is caught in tallyRecord, and parseExport
-    // never quotes its input, so what reaches here carries no hash.
-    console.error(error instanceof Error ? error.message : error);
+    // Per-record failures are caught in writeCandidate, and parseExport never
+    // quotes its input; anything else prints as name and code only.
+    console.error(`ERROR: ${describeErrorSafely(error)}`);
     process.exitCode = 1;
   })
   .finally(async () => {

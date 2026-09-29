@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  */
+import { compare, hash } from "bcrypt";
 import { describe, expect, it } from "vitest";
 import {
   auth0UserIdOf,
@@ -39,6 +40,17 @@ describe("parseExport", () => {
   });
 });
 
+describe("when a record is not an object", () => {
+  it("refuses the whole export before anything is written", () => {
+    expect(() => parseExport(`{"_id":"a"}\nnull\n`)).toThrow(
+      "Export record 2 is not a JSON object.",
+    );
+    expect(() => parseExport(`[{"_id":"a"}, [1]]`)).toThrow(
+      "Export record 2 is not a JSON object.",
+    );
+  });
+});
+
 describe("auth0UserIdOf", () => {
   describe("when the record comes from the support-issued hash export", () => {
     it("prefixes the bare object id with auth0|", () => {
@@ -68,6 +80,18 @@ describe("bcryptHashOf", () => {
     it("returns it from either field spelling", () => {
       expect(bcryptHashOf({ passwordHash: BCRYPT })).toBe(BCRYPT);
       expect(bcryptHashOf({ password_hash: BCRYPT })).toBe(BCRYPT);
+    });
+  });
+
+  describe("when the hash carries PHP's $2y$ prefix", () => {
+    it("returns it as $2b$, which sign-in's bcrypt verifies", async () => {
+      const stored = await hash("Auth0-Password-1!", 4);
+      const php = stored.replace(/^\$2b\$/, "$2y$");
+      const imported = bcryptHashOf({ passwordHash: php });
+      expect(imported).toBe(stored);
+      expect(await compare("Auth0-Password-1!", imported ?? "")).toBe(
+        true,
+      );
     });
   });
 
