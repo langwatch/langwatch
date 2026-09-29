@@ -58,7 +58,7 @@ const (
 	// refuse to boot, so the run supplies its own rather than inheriting them —
 	// the same reason CREDENTIALS_SECRET is composed above. Never the
 	// developer's real values: a diff harness has no business handling them,
-	// and the gateway is excluded from probing by default anyway.
+	// and the gateway's control plane never calls an LLM provider.
 	throwawayGatewayInternalSecret = "apidiff-gateway-internal-secret-000000000000000000000000000000"
 	throwawayGatewayJWTSecret      = "apidiff-gateway-jwt-secret-0000000000000000000000000000000000"
 	throwawayVirtualKeyPepper      = "apidiff-virtual-key-pepper-0000000000000000000000000000000000"

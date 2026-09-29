@@ -177,8 +177,7 @@ deterministic summary, or the machine report with `-json` (optionally to
   `-exact-status` restores exact-code and error-body comparison. The summary
   ends with a `suppressed: N same-class status differences, M error-body
 comparisons` line.
-- `/api/gateway` operations are excluded by default (they egress to real LLM
-  providers); repeat `-exclude-prefix` to add more.
+- Nothing is excluded by default; repeat `-exclude-prefix` to skip a family.
 - Idempotent probes (GET/HEAD/OPTIONS) retry up to 2 times on 5xx with
   backoff (500ms, 1s), so a momentary database restart or recovery window
   degrades into a slow probe instead of false findings. Mutations are never
