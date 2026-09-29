@@ -13,10 +13,24 @@ import { InstantEvalOptInNotOfferedError } from "../errors";
 import {
   enableInstantEvals,
   instantEvalOptInOffer,
+  instantEvalSwitchOffered,
   switchInstantEvalsOn,
 } from "../opt-in";
 
 describe("given a self-serve organization on the hosted service", () => {
+  describe("when the switch path asks whether the organization is offered it", () => {
+    /** @scenario "A self-serve organization is offered the switch" */
+    it("says yes from the plan and the deployment alone", async () => {
+      await expect(
+        instantEvalSwitchOffered({
+          organizationId: "organization",
+          isSaas: () => true,
+          planTypeOf: async () => "PRO",
+        }),
+      ).resolves.toBe(true);
+    });
+  });
+
   describe("when a member who may manage it asks what to offer", () => {
     /** @scenario "A self-serve organization is offered the switch" */
     it("offers the switch", async () => {

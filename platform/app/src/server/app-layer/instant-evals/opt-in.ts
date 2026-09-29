@@ -55,24 +55,48 @@ export async function instantEvalsOptedIn({
 }
 
 /**
- * The offer for one organization, decided from its plan, the deployment, and
- * whether the member asking may throw the switch.
+ * Whether the organization is one the switch is offered to at all: on the
+ * hosted service, and not on an enterprise plan. This is the organization's
+ * half of the offer; whether the member asking may throw the switch is the
+ * other half, and `instantEvalOptInOffer` puts the two together.
  *
  * The plan and the deployment are injectable so a test can state them; the
  * defaults read the process. The plan is resolved with the caller's user
  * because the SaaS provider needs it to answer at all for an impersonated
- * session. Whether the member may switch is the caller's to answer, from the
- * same authority the `enable` mutation declares, so the popover never offers
- * a button the server would refuse: a member without it is told to ask an
- * organization admin instead.
+ * session.
+ */
+export async function instantEvalSwitchOffered({
+  organizationId,
+  user,
+  isSaas = () => env.IS_SAAS === true,
+  planTypeOf = async () =>
+    (await getApp().planProvider.getActivePlan({ organizationId, user })).type,
+}: {
+  organizationId: string;
+  user?: PlanProviderUser;
+  isSaas?: () => boolean;
+  planTypeOf?: () => Promise<string>;
+}): Promise<boolean> {
+  if (!isSaas()) return false;
+  return !isEnterpriseTier(await planTypeOf());
+}
+
+/**
+ * The offer for one organization, decided from its plan, the deployment, and
+ * whether the member asking may throw the switch.
+ *
+ * Whether the member may switch is the caller's to answer, from the same
+ * authority the `enable` mutation declares, so the popover never offers a
+ * button the server would refuse: a member without it is told to ask an
+ * organization admin instead. It is only asked once the organization itself
+ * is one the switch is offered to.
  */
 export async function instantEvalOptInOffer({
   organizationId,
   user,
   maySwitch,
-  isSaas = () => env.IS_SAAS === true,
-  planTypeOf = async () =>
-    (await getApp().planProvider.getActivePlan({ organizationId, user })).type,
+  isSaas,
+  planTypeOf,
 }: {
   organizationId: string;
   user?: PlanProviderUser;
@@ -80,8 +104,13 @@ export async function instantEvalOptInOffer({
   isSaas?: () => boolean;
   planTypeOf?: () => Promise<string>;
 }): Promise<InstantEvalOptInOffer> {
-  if (!isSaas()) return "contact_us";
-  if (isEnterpriseTier(await planTypeOf())) return "contact_us";
+  const offered = await instantEvalSwitchOffered({
+    organizationId,
+    ...(user ? { user } : {}),
+    ...(isSaas ? { isSaas } : {}),
+    ...(planTypeOf ? { planTypeOf } : {}),
+  });
+  if (!offered) return "contact_us";
   if (!(await maySwitch())) return "ask_admin";
   return "enable";
 }
@@ -93,7 +122,8 @@ export async function instantEvalOptInOffer({
  * Returns what the access read will now say.
  *
  * The member's authority is not asked again here: the `enable` mutation
- * declares it, and a request that reached this far has passed that check.
+ * declares it, and a request that reached this far has passed that check. So
+ * only the organization's half of the offer is checked, directly.
  */
 export async function switchInstantEvalsOn({
   prisma,
@@ -112,14 +142,13 @@ export async function switchInstantEvalsOn({
   planTypeOf?: () => Promise<string>;
   now?: () => Date;
 }): Promise<{ released: true; offer: "enable" }> {
-  const offer = await instantEvalOptInOffer({
+  const offered = await instantEvalSwitchOffered({
     organizationId,
-    maySwitch: async () => true,
     ...(user ? { user } : {}),
     ...(isSaas ? { isSaas } : {}),
     ...(planTypeOf ? { planTypeOf } : {}),
   });
-  if (offer !== "enable") throw new InstantEvalOptInNotOfferedError();
+  if (!offered) throw new InstantEvalOptInNotOfferedError();
   await enableInstantEvals({
     prisma,
     organizationId,
