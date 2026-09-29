@@ -8,6 +8,7 @@ import {
   defineRepositories,
   withMemoryRepositories,
   type FeatureSetup,
+  type Tier,
 } from "../src/index.ts";
 import { MissingMemberError } from "../src/module-members.ts";
 import type { MemberSource } from "../src/module-members.ts";
@@ -45,10 +46,14 @@ class App {
   static readonly dependencies = {};
   static create({
     repositories,
+    tier,
   }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): App {
-    return new App(repositories.value.read());
+    return new App(repositories.value.read(), tier);
   }
-  constructor(readonly value: string) {}
+  constructor(
+    readonly value: string,
+    readonly tier: Tier | undefined,
+  ) {}
 }
 
 class ConfiguredApp {
@@ -173,6 +178,7 @@ describe("given a module that declares both repository tiers", () => {
         .boot();
 
       expect(runtime.module(feature).provided.value).toBe("postgres");
+      expect(runtime.module(feature).provided.tier).toBe("live");
       expect(liveCreates).toBe(1);
       expect(memoryCreates).toBe(0);
       await runtime.stop();
@@ -202,6 +208,7 @@ describe("given a module that declares both repository tiers", () => {
         .boot();
 
       expect(runtime.module(feature).provided.value).toBe("memory");
+      expect(runtime.module(feature).provided.tier).toBe("memory");
       expect(liveCreates).toBe(0);
       expect(memoryCreates).toBe(1);
       await runtime.stop();

@@ -63,7 +63,13 @@ export type FeatureSetup<
   readonly role?: ServerRole;
 }> &
   ([Members] extends [never] ? object : Readonly<{ readonly members: Members }>) &
-  ([Repositories] extends [never] ? object : Readonly<{ readonly repositories: Repositories }>);
+  ([Repositories] extends [never]
+    ? object
+    : Readonly<{
+        readonly repositories: Repositories;
+        /** The tier the repositories came from, so channels follow it; absent if built by hand. */
+        readonly tier?: Tier;
+      }>);
 
 type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{
@@ -1353,6 +1359,7 @@ class RepositoryAppBuilder<
           resources,
           role,
           repositories,
+          repositorySelection,
         }): App | Promise<App> => {
           return app.create({
             dependencies,
@@ -1362,6 +1369,7 @@ class RepositoryAppBuilder<
             resources,
             role,
             repositories: repositories as ModuleRepositories<Live, Memory>,
+            ...(repositorySelection ? { tier: repositorySelection.tier } : {}),
           });
         },
       )

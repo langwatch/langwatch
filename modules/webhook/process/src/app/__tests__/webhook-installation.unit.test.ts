@@ -117,4 +117,32 @@ describe("webhook app installation", () => {
       }
     });
   });
+  describe("when an SQS endpoint is test-fired over memory stores", () => {
+    it("sends through the memory SQS channel, never real AWS", async () => {
+      const runtime = await process("api").boot();
+
+      try {
+        const app = runtime.service(WebhookApi);
+        const { endpoint } = await app.create({
+          organizationId: ORGANIZATION_ID,
+          destinationKind: "sqs",
+          sqs: {
+            queueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/deliveries",
+            roleArn: "arn:aws:iam::123456789012:role/webhook-delivery",
+          },
+          enabledEvents: ["gateway.request.completed"],
+        });
+
+        await expect(
+          app.testFire({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id }),
+        ).resolves.toMatchObject({
+          delivered: true,
+          responseStatus: null,
+          responseBody: "memory-sqs-1",
+        });
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
 });

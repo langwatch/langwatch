@@ -56,11 +56,11 @@ function mountWithPlan(planType: "FREE" | "ENTERPRISE") {
   }));
 
   const { request } = mountWebhookRest({
-    endpoints: {
+    endpoints: createApiFixture<WebhookEndpointRepository>({
       findSigningSecrets: async () => [],
       getDestinationConfig: async () => ({ kind: "http", url: "https://example.test/hook" }),
       recordDeliveryAttempt: async () => {},
-    } as never,
+    }),
     dispatch,
     testFireBounds: WebhookTestBoundsService.create({
       entitlement: entitlementOf(planType),

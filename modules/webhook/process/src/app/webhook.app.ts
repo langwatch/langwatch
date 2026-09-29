@@ -22,6 +22,7 @@ import {
 } from "@langwatch/webhook-contract";
 
 import { HttpWebhookDispatchChannel } from "../channels/http/http.webhook-dispatch.channel.ts";
+import { MemorySqsWebhookDestinationChannel } from "../channels/memory/memory.sqs-webhook-destination.channel.ts";
 import { SqsWebhookDestinationChannel } from "../channels/sqs/sqs.webhook-destination.channel.ts";
 import {
   buildWebhookDeliveryPipeline,
@@ -173,9 +174,12 @@ export class WebhookApp implements WebhookApiContract {
       destinations: WebhookDestinationDispatchService.create({
         egress: http,
         allowInsecureLocal: input.config.allowInsecureLocalUrls,
-        sqs: SqsWebhookDestinationChannel.create({
-          awsClientConfig: (config) => aws.build(config),
-        }),
+        sqs:
+          input.tier === "memory"
+            ? MemorySqsWebhookDestinationChannel.create()
+            : SqsWebhookDestinationChannel.create({
+                awsClientConfig: (config) => aws.build(config),
+              }),
         rateLimiter: http.rateLimiter,
       }),
     });

@@ -14,6 +14,7 @@
  * or in a burst of parallel POSTs at a receiver that was already struggling.
  */
 
+import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -24,14 +25,27 @@ import {
 
 const NOW = 1_000_000;
 
-function endpoint(over: Record<string, unknown> = {}) {
+function endpoint(over: Partial<WebhookEndpointView> = {}): WebhookEndpointView {
   return {
     id: "endpoint-1",
+    organizationId: "organization-1",
+    destinationKind: "http",
+    url: "https://example.test/hook",
+    sqs: null,
+    enabledEvents: [],
+    status: "ACTIVE",
+    disabledReason: null,
+    disabledAt: null,
+    failingSince: null,
+    lastSuccessAt: null,
+    lastFailureAt: null,
     maxBatchSize: 3,
     maxBatchDelayMs: 1_000,
     maxInFlight: 2,
+    createdAt: new Date(NOW),
+    updatedAt: new Date(NOW),
     ...over,
-  } as never;
+  };
 }
 
 function pending(count: number, appendedAtMs = NOW): PendingEnvelope[] {
@@ -48,7 +62,7 @@ function pending(count: number, appendedAtMs = NOW): PendingEnvelope[] {
 }
 
 function plan(
-  over: Record<string, unknown>,
+  over: Partial<WebhookEndpointView>,
   input: { pending: PendingEnvelope[]; outstanding?: number; now?: number },
 ) {
   return WebhookBatchPlannerService.create({ endpoint: endpoint(over) }).plan({

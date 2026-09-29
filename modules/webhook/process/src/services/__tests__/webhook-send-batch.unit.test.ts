@@ -14,13 +14,42 @@
  * failure it would be a backoff floor on a batch that is already dead.
  */
 
-import { DispatchError } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/api-fixture";
+import { DispatchError, type IntentContext, type ProcessStore } from "@langwatch/eventing";
+import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
-import type { WebhookDispatchResult } from "../../rules/webhook-delivery-contract.rules.ts";
-import { WebhookDeliveryService } from "../webhook-delivery.service.ts";
+import type {
+  SendBatchPayload,
+  WebhookDeliveryEndpointService,
+  WebhookDispatchResult,
+} from "../../rules/webhook-delivery-contract.rules.ts";
+import {
+  WebhookDeliveryService,
+  type WebhookDeliveryProcessDeps,
+} from "../webhook-delivery.service.ts";
 
 type Recorded = Record<string, unknown>;
+
+const DELIVERABLE: WebhookEndpointView = {
+  id: "endpoint-1",
+  organizationId: "organization-1",
+  destinationKind: "http",
+  url: "https://example.test/hook",
+  sqs: null,
+  enabledEvents: [],
+  status: "ACTIVE",
+  disabledReason: null,
+  disabledAt: null,
+  failingSince: null,
+  lastSuccessAt: null,
+  lastFailureAt: null,
+  maxBatchSize: 3,
+  maxBatchDelayMs: 1_000,
+  maxInFlight: 2,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+};
 
 function sendBatchWith(options: {
   deliverable?: boolean;
@@ -30,15 +59,18 @@ function sendBatchWith(options: {
 }) {
   const recorded: Recorded[] = [];
   let calls = 0;
-  const deps = {
-    endpoints: {
-      findDeliverable: async () => ((options.deliverable ?? true) ? { id: "endpoint-1" } : null),
+  const deps: WebhookDeliveryProcessDeps = {
+    processStore: createApiFixture<ProcessStore>({}),
+    pruneExpiredIdempotencyReceipts: async () => 0,
+    getPlan: async () => ({ webhookEndpointsEnabled: true }),
+    endpoints: createApiFixture<WebhookDeliveryEndpointService>({
+      findDeliverable: async () => ((options.deliverable ?? true) ? DELIVERABLE : null),
       findSigningSecrets: async () => ["secret"],
-      getDestinationConfig: async () => ({ kind: "http" }),
-      recordDeliveryAttempt: async (attempt: Recorded) => {
+      getDestinationConfig: async () => ({ kind: "http", url: "https://example.test/hook" }),
+      recordDeliveryAttempt: async (attempt) => {
         recorded.push(attempt);
       },
-    },
+    }),
     dispatch: async () => {
       if (options.dispatchThrows !== undefined) throw options.dispatchThrows;
       return options.result ?? { verdict: "success" as const, status: 200 };
@@ -49,7 +81,7 @@ function sendBatchWith(options: {
     },
   };
 
-  const payload = {
+  const payload: SendBatchPayload = {
     organizationId: "organization-1",
     endpointId: "endpoint-1",
     batchId: "endpoint-1:abc123",
@@ -58,11 +90,19 @@ function sendBatchWith(options: {
       { id: "envelope-2", type: "t", created: "c", schema_version: "1", data: {} },
     ],
   };
+  const context: IntentContext = {
+    processName: "webhook-delivery",
+    projectId: "organization-1",
+    processKey: "endpoint:endpoint-1",
+    tenantId: "organization-1",
+    messageKey: "endpoint-1:abc123",
+    attempt: 3,
+  };
 
-  const run = WebhookDeliveryService.create(deps as never).runWebhookSendBatch();
+  const run = WebhookDeliveryService.create(deps).runWebhookSendBatch();
   return {
     recorded,
-    send: () => run(payload as never, { attempt: 3 } as never),
+    send: () => run(payload, context),
   };
 }
 
@@ -70,7 +110,8 @@ async function thrownBy(send: () => Promise<unknown>): Promise<DispatchError> {
   try {
     await send();
   } catch (error) {
-    return error as DispatchError;
+    if (error instanceof DispatchError) return error;
+    throw error;
   }
   throw new Error("expected the send to throw");
 }
