@@ -30,23 +30,24 @@ export const processWebConfigSchema = z.strictObject({
 export type ProcessWebConfig = z.infer<typeof processWebConfigSchema>;
 
 /** A contract's browser projection: its schema, and its parsed slice to the values it admits. */
-export type BrowserConfigDeclaration<Config, Schema extends ZodType> = Readonly<{
+export type BrowserConfigDeclaration<Config, Api, Schema extends ZodType> = Readonly<{
   schema: Schema;
-  project: (config: Config) => output<Schema>;
+  project: (config: Config, api: Api) => Promise<output<Schema>>;
 }>;
 
 /**
- * Declares an owner's browser projection. `project` reads the owner's parsed
- * config only, which never holds a secret (`ConfigClaimsSecretError`), and its
- * answer is parsed by the strict schema, so an undeclared key refuses boot.
+ * Declares an owner's browser projection: its parsed config, and its own
+ * running contract, which answers what the deployment has. Never a secret;
+ * the strict schema parses the answer, so an undeclared key refuses boot.
  */
-export function defineBrowserConfig<Config, Schema extends ZodType>(declaration: {
+export function defineBrowserConfig<Config, Api, Schema extends ZodType>(declaration: {
   schema: Schema;
-  project: (config: Config) => input<Schema>;
-}): BrowserConfigDeclaration<Config, Schema> {
+  project: (config: Config, api: Api) => input<Schema> | Promise<input<Schema>>;
+}): BrowserConfigDeclaration<Config, Api, Schema> {
   return {
     schema: declaration.schema,
-    project: (config) => declaration.schema.parse(declaration.project(config)),
+    project: async (config, api) =>
+      declaration.schema.parse(await declaration.project(config, api)),
   };
 }
 

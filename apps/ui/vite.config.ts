@@ -9,6 +9,7 @@ import {
 // projection module rather than being re-exported to browser code.
 import { resolveUiPublicBootstrap } from "@langwatch/config/public-app-config/projection";
 import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
+import { pickMailGateway } from "@langwatch/notification-contract";
 import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
@@ -206,6 +207,20 @@ function logDevelopmentTlsState(
   devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
+/** The dev server cannot ask the running module, so it feeds the module's own pick from env. */
+function devMailAvailable(env: NodeJS.ProcessEnv): boolean {
+  const pick = pickMailGateway({
+    provider: env.EMAIL_PROVIDER,
+    available: {
+      ses: Boolean(env.USE_AWS_SES && env.AWS_REGION),
+      sendgrid: Boolean(env.SENDGRID_API_KEY),
+      smtp: Boolean(env.SMTP_URL || env.SMTP_HOST),
+      resend: Boolean(env.RESEND_API_KEY),
+    },
+  });
+  return "gateway" in pick && pick.gateway !== null;
+}
+
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
   // The dev server is its own public address. `dev-stack.sh` aligns BASE_HOST
@@ -213,10 +228,13 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
   // same answer here instead of a boot refusal naming an env var.
   const publicConfig =
     command === "serve"
-      ? resolveUiPublicBootstrap({
-          ...process.env,
-          BASE_HOST: process.env.BASE_HOST ?? `http://localhost:${FRONTEND_PORT}`,
-        }).publicConfig
+      ? resolveUiPublicBootstrap(
+          {
+            ...process.env,
+            BASE_HOST: process.env.BASE_HOST ?? `http://localhost:${FRONTEND_PORT}`,
+          },
+          { mailAvailable: devMailAvailable(process.env) },
+        ).publicConfig
       : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is

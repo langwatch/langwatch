@@ -27,7 +27,7 @@ describe("given the browser's public-config reader", () => {
 
     it("keeps the projection reachable on its own subpath", () => {
       const source = readSource("public-app-config.projection.ts");
-      expect(source).toContain("SENDGRID_API_KEY");
+      expect(source).toContain("LW_GATEWAY_PUBLIC_URL");
     });
   });
 });

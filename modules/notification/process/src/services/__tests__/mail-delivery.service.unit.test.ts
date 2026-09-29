@@ -1,3 +1,7 @@
+import {
+  notificationBrowserConfig,
+  type NotificationServerConfig,
+} from "@langwatch/notification-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,11 +21,28 @@ function settingsWith(overrides: Partial<MailGatewaySettings> = {}): MailGateway
   };
 }
 
+const config: NotificationServerConfig = {
+  defaultFrom: undefined,
+  provider: undefined,
+  ses: { enabled: undefined, region: undefined, endpoint: undefined },
+  smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
+};
+
 function serviceOver(settings: MailGatewaySettings) {
   return MailDeliveryService.create({ settings: () => Promise.resolve(settings) });
 }
 
 describe("MailDeliveryService", () => {
+  describe("when the public config asks it, with EMAIL_PROVIDER unset and only a SendGrid credential", () => {
+    it("projects email on from the member's own answer", async () => {
+      const member = serviceOver(settingsWith({ sendgrid: { apiKey: "SG.test" } }));
+
+      await expect(
+        notificationBrowserConfig.project(config, { getMailDelivery: () => member.getView() }),
+      ).resolves.toEqual({ email: true });
+    });
+  });
+
   describe("when EMAIL_PROVIDER names SMTP and a relay is set", () => {
     it("names the gateway and says SMTP is configured", async () => {
       const view = await serviceOver(

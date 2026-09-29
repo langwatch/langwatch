@@ -289,7 +289,7 @@ export interface InstallableServerFeature<Members, Name extends string = string,
   readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
   /** The cross-organization reads this module declared (§7), for the root to scope. */
   readonly operatorReads?: Readonly<Record<string, unknown>>;
-  readonly publicConfig?: (config: unknown) => unknown;
+  readonly publicConfig?: (config: unknown, api: unknown) => unknown;
   /** Every door this feature declared, for the process root to mount at boot. */
   readonly transports?: readonly FeatureTransportDescriptor[];
   readonly repositories?: FeatureRepositories;
@@ -1876,13 +1876,13 @@ function declaredOwner(app: object): {
   config?: ConfigSlice;
   secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
   operatorReads?: Readonly<Record<string, unknown>>;
-  publicConfig?: (config: unknown) => unknown;
+  publicConfig?: (config: unknown, api: unknown) => unknown;
 } {
   const owner = app as {
     config?: ConfigSlice;
     secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
     operatorReads?: Readonly<Record<string, unknown>>;
-    publicConfig?: (config: unknown) => unknown;
+    publicConfig?: (config: unknown, api: unknown) => unknown;
   };
   return {
     config: owner.config,

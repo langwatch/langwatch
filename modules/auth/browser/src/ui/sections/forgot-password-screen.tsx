@@ -50,16 +50,16 @@ function ForgotPasswordScreen() {
     );
   }
 
-  // A self-hosted deployment with no mail transport cannot send the link this
-  // form promises. Offering it anyway ends with "if an account exists we have
-  // sent a link" and an inbox that never receives one, which reads as a lost
-  // email rather than as a deployment that was never able to send it.
+  // Without mail the form would promise a link nobody can send. The screen
+  // does not say why; it says who can help (ARCHITECTURE.md §6, mail off).
   if (!publicEnv.data.HAS_EMAIL_PROVIDER_KEY) {
     return (
       <AuthCard title="Forgot your password?">
         <Text>
-          This deployment cannot send email, so it cannot send you a reset link. Ask whoever
-          operates it to reset your password for you, or to configure an email provider.
+          Password reset by email is not available.{" "}
+          {publicEnv.data.IS_SAAS
+            ? "Contact LangWatch support to get back into your account."
+            : "Contact your administrator to get back into your account."}
         </Text>
         <BackToSignInLink />
       </AuthCard>

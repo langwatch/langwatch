@@ -2,6 +2,7 @@ import { RawHttpHost, RawSocketHost, WebSocketHost } from "@langwatch/api";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import {
   bootInstalledProcess,
+  ModuleApiToken,
   storesBackedMembers,
   type ExposedSurface,
   type TransportPeers,
@@ -141,6 +142,7 @@ export class ProcessServer implements ProcessBoot {
       operatorReads = operatorReadsResolver;
       let surface: ((peers: TransportPeers) => ExposedSurface<unknown, unknown>) | undefined;
       let doors: RawHttpHost | undefined;
+      const page: Record<string, unknown> = {};
       if (role === "api" && transports) {
         const sockets = WebSocketHost.create();
         doors = RawHttpHost.create();
@@ -152,7 +154,7 @@ export class ProcessServer implements ProcessBoot {
           members,
           secrets: this.resolver.scopeTo(apiOwner.name, Object.values(apiOwner.secrets)),
           selection: transports,
-          publicConfig: projectPublicConfig({ modules, config: this.config }),
+          publicConfig: page,
           sockets,
           doors,
         });
@@ -215,6 +217,17 @@ export class ProcessServer implements ProcessBoot {
         },
         ...(surface ? { surface } : {}),
       });
+      if (role === "api") {
+        Object.assign(
+          page,
+          await projectPublicConfig({
+            modules,
+            config: this.config,
+            runningApi: (contract) =>
+              contract instanceof ModuleApiToken ? runtime.service(contract) : void 0,
+          }),
+        );
+      }
       this.server.with(hostedMembers(members));
       // Hosted after the members, so the doors close their sessions while the stores are open.
       const hosted = doors;

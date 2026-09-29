@@ -55,10 +55,11 @@ function servedMetaContent(head: string): string {
 
 describe("given the page the api serves", () => {
   describe("when installed modules declare browser projections", () => {
-    it("carries a meta tag the browser's reader parses, namespaced by owner", () => {
-      const publicConfig = projectPublicConfig({
+    it("carries a meta tag the browser's reader parses, namespaced by owner", async () => {
+      const publicConfig = await projectPublicConfig({
         modules: [{ name: "mail", publicConfig: mailBrowserConfig.project }],
         config: parsedConfig(),
+        runningApi: () => undefined,
       });
       const bundle = resolveUiBundle({ directory, publicConfig });
 
@@ -82,31 +83,58 @@ describe("given the page the api serves", () => {
     });
   });
 
+  describe("when a projection asks its module's running contract", () => {
+    it("answers from what the module says, not from config", async () => {
+      const asking = defineBrowserConfig({
+        schema: mailWebConfigSchema,
+        project: (_config: unknown, api: unknown) => ({
+          email: z.object({ canSend: z.boolean() }).parse(api).canSend,
+        }),
+      });
+
+      const served = await projectPublicConfig({
+        modules: [{ name: "mail", publicConfig: asking.project }],
+        config: parsedConfig(),
+        runningApi: () => ({ canSend: true }),
+      });
+
+      expect(
+        parsePublicConfigSlice({ config: served, owner: "mail", schema: mailWebConfigSchema }),
+      ).toEqual({
+        email: true,
+      });
+    });
+  });
+
   describe("when the deployment names a haven stack", () => {
     /** @scenario "the browser is handed the badge label only when the deployment names one" */
-    it("hands the process slice the stack's slug as the badge label", () => {
-      const slice = (environment: Record<string, string>) =>
+    it("hands the process slice the stack's slug as the badge label", async () => {
+      const slice = async (environment: Record<string, string>) =>
         parsePublicConfigSlice({
-          config: projectPublicConfig({
+          config: await projectPublicConfig({
             modules: [],
             config: parseProcessConfig({ owners: [processOwner], environment }),
+            runningApi: () => undefined,
           }),
           owner: "process",
           schema: processWebConfigSchema,
         });
 
       expect(
-        slice({ NODE_ENV: "development", DEV_INDICATOR_LABEL: "feat-strict-feature-layout-v0" }),
+        await slice({
+          NODE_ENV: "development",
+          DEV_INDICATOR_LABEL: "feat-strict-feature-layout-v0",
+        }),
       ).toMatchObject({ devIndicatorLabel: "feat-strict-feature-layout-v0" });
-      expect(slice({ NODE_ENV: "development", DEV_INDICATOR_LABEL: " " })).not.toHaveProperty(
+      expect(await slice({ NODE_ENV: "development", DEV_INDICATOR_LABEL: " " })).not.toHaveProperty(
         "devIndicatorLabel",
       );
-      expect(slice({ NODE_ENV: "development" })).not.toHaveProperty("devIndicatorLabel");
+      expect(await slice({ NODE_ENV: "development" })).not.toHaveProperty("devIndicatorLabel");
     });
   });
 
   describe("when a projection answers a key its schema does not declare", () => {
-    it("refuses the boot, naming the module", () => {
+    it("refuses the boot, naming the module", async () => {
       const leaking = defineBrowserConfig({
         schema: mailWebConfigSchema,
         project: (config: unknown) => ({
@@ -115,23 +143,25 @@ describe("given the page the api serves", () => {
         }),
       });
 
-      expect(() =>
+      await expect(
         projectPublicConfig({
           modules: [{ name: "mail", publicConfig: leaking.project }],
           config: parsedConfig(),
+          runningApi: () => undefined,
         }),
-      ).toThrow(/"mail"/);
+      ).rejects.toThrow(/"mail"/);
     });
   });
 
   describe("when a module claims the process owner's namespace", () => {
-    it("refuses the boot rather than overwriting the process slice", () => {
-      expect(() =>
+    it("refuses the boot rather than overwriting the process slice", async () => {
+      await expect(
         projectPublicConfig({
           modules: [{ name: "process", publicConfig: mailBrowserConfig.project }],
           config: parsedConfig(),
+          runningApi: () => undefined,
         }),
-      ).toThrow(/"process"/);
+      ).rejects.toThrow(/"process"/);
     });
   });
 

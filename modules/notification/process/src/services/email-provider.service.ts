@@ -1,3 +1,5 @@
+import { pickMailGateway } from "@langwatch/notification-contract";
+
 import {
   EMAIL_PROVIDER_NAMES,
   EmailProviderConfigurationError,
@@ -51,44 +53,20 @@ export class EmailProviderService {
    * misconfiguration.
    */
   pickProviderName(): EmailProviderName | null {
-    const configured = this.configuration.provider?.trim().toLowerCase();
     const available = this.configured();
+    const pick = pickMailGateway({ provider: this.configuration.provider, available });
 
-    if (configured) {
-      return this.selected(configured, available);
-    }
+    if ("gateway" in pick) return pick.gateway;
 
-    // Legacy inference, in the order the old mailer branched.
-    if (available.ses) {
-      return "ses";
-    }
-
-    if (available.sendgrid) {
-      return "sendgrid";
-    }
-
-    return null;
-  }
-
-  private selected(
-    configured: string,
-    available: Record<EmailProviderName, boolean>,
-  ): EmailProviderName {
-    if (!EmailProviderService.isKnownProvider(configured)) {
+    if (pick.refused === "unknown") {
       throw new EmailProviderConfigurationError(
-        `Unknown EMAIL_PROVIDER "${configured}". Supported providers: ${EMAIL_PROVIDER_NAMES.join(", ")}.`,
+        `Unknown EMAIL_PROVIDER "${pick.named}". Supported providers: ${EMAIL_PROVIDER_NAMES.join(", ")}.`,
       );
     }
 
-    if (!available[configured]) {
-      const hint = this.inferredHint(configured, available);
-
-      throw new EmailProviderConfigurationError(
-        `EMAIL_PROVIDER is "${configured}" but it is not configured: ${MISSING_SETTING_HINT[configured]}.${hint}`,
-      );
-    }
-
-    return configured;
+    throw new EmailProviderConfigurationError(
+      `EMAIL_PROVIDER is "${pick.wanted}" but it is not configured: ${MISSING_SETTING_HINT[pick.wanted]}.${this.inferredHint(pick.wanted, available)}`,
+    );
   }
 
   private inferredHint(
@@ -100,9 +78,5 @@ export class EmailProviderService {
     return alternative
       ? ` Settings for "${alternative}" are present, did you mean EMAIL_PROVIDER=${alternative}?`
       : "";
-  }
-
-  private static isKnownProvider(value: string): value is EmailProviderName {
-    return (EMAIL_PROVIDER_NAMES as readonly string[]).includes(value);
   }
 }

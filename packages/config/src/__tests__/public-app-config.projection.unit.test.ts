@@ -9,20 +9,18 @@ import {
 
 describe("public application configuration projection", () => {
   it("maps declared private deployment inputs and leaves credentials behind", () => {
-    // The credential is a handle its owner resolves; the projection is handed
-    // presence, so no secret value is in scope here to leave behind.
+    // Mail availability is the notification member's answer, handed in as a boolean.
     const config = resolvePublicAppConfig(
       {
         BASE_HOST: "https://app.example.test",
         NODE_ENV: "production",
         IS_SAAS: "false",
         LW_GATEWAY_PUBLIC_URL: "https://gateway.example.test",
-        EMAIL_PROVIDER: "resend",
         RUM_ENABLED: "true",
         OTEL_EXPORTER_OTLP_ENDPOINT: "https://collector.example.test",
         NEXTAUTH_SECRET: "must-not-cross-the-browser-boundary",
       },
-      { resend: true },
+      { mailAvailable: true },
     );
 
     expect(config).toMatchObject({

@@ -135,15 +135,23 @@ describe("ForgotPassword page", () => {
     it("says so instead of offering a form that would promise a link", () => {
       renderPage();
 
-      expect(screen.getByText(/cannot send email/i)).toBeTruthy();
+      expect(screen.getByText(/reset by email is not available/i)).toBeTruthy();
+      expect(screen.queryByText(/cannot send email|configure/i)).toBeNull();
       expect(screen.queryByRole("textbox")).toBeNull();
       expect(screen.queryByRole("button", { name: /send reset link/i })).toBeNull();
     });
 
-    it("points at the operator rather than leaving the user with nothing", () => {
+    it("points a self-hosted user at their administrator", () => {
       renderPage();
 
-      expect(screen.getByText(/whoever operates it/i)).toBeTruthy();
+      expect(screen.getByText(/contact your administrator/i)).toBeTruthy();
+    });
+
+    it("points a SaaS user at support", () => {
+      publicEnvRef.current = { ...publicEnvRef.current, IS_SAAS: true, NEXTAUTH_PROVIDER: "email" };
+      renderPage();
+
+      expect(screen.getByText(/contact langwatch support/i)).toBeTruthy();
     });
   });
 

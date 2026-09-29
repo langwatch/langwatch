@@ -61,10 +61,10 @@ describe("a declared browser projection", () => {
     }),
   });
 
-  it("refuses a projection that answers a key its schema does not declare", () => {
-    expect(() => declaration.project({ provider: "smtp", apiKey: "sk-private" })).toThrow(
-      /unrecognized key/i,
-    );
+  it("refuses a projection that answers a key its schema does not declare", async () => {
+    await expect(
+      declaration.project({ provider: "smtp", apiKey: "sk-private" }, undefined),
+    ).rejects.toThrow(/unrecognized key/i);
   });
 
   it("reads one owner's slice through that owner's schema, and names the owner it refuses", () => {

@@ -61,10 +61,6 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
     posthogHost: c.env("POSTHOG_HOST", z.string().min(1).optional()),
   },
   capabilities: {
-    emailProvider: c.env("EMAIL_PROVIDER", z.string().optional()),
-    useAwsSes: c.env("USE_AWS_SES", z.union([z.string(), z.boolean()]).optional()),
-    awsRegion: c.env("AWS_REGION", z.string().optional()),
-    smtpHost: c.env("SMTP_HOST", z.string().optional()),
     nlpService: c.env("LANGWATCH_NLP_SERVICE", z.string().optional()),
     langevalsEndpoint: c.env("LANGEVALS_ENDPOINT", z.string().optional()),
   },
@@ -103,14 +99,12 @@ export type UiPublicBootstrap = Readonly<{
 }>;
 
 /**
- * Whether each credential-carrying input resolved — never the value. The
- * handles themselves are declared at the owner that resolves them (ADR-132);
- * this file is on the browser build path and must not name the secrets runtime.
+ * What the caller answers for the dev server, which cannot ask a running
+ * module: whether mail can be sent (the notification module's own pick) and
+ * whether the NLP lambda is configured. Never a value.
  */
 export type CredentialPresence = Readonly<{
-  sendgrid?: boolean;
-  resend?: boolean;
-  smtpUrl?: boolean;
+  mailAvailable?: boolean;
   nlpLambdaConfig?: boolean;
 }>;
 
@@ -123,13 +117,6 @@ export type PublicAppConfigSource = Readonly<{
   DEMO_PROJECT_SLUG?: string;
   NODE_ENV?: string;
   UI_PROCESS_ROLE?: string;
-  EMAIL_PROVIDER?: string;
-  USE_AWS_SES?: string | boolean;
-  AWS_REGION?: string;
-  SENDGRID_API_KEY?: string;
-  SMTP_URL?: string;
-  SMTP_HOST?: string;
-  RESEND_API_KEY?: string;
   IS_SAAS?: string | boolean;
   NEXTAUTH_PROVIDER?: string;
   LW_GATEWAY_PUBLIC_URL?: string;
@@ -250,7 +237,7 @@ function projectPublicAppConfig(
     billing: { licensePaymentUrl: config.licensePaymentUrl },
     evaluation: { langevals: Boolean(config.capabilities.langevalsEndpoint) },
     gateway: { gatewayBaseUrl: resolveGatewayBaseUrl(config) },
-    notification: { email: hasConfiguredEmailDelivery(config, credentials) },
+    notification: { email: Boolean(credentials.mailAvailable) },
     rum: {
       enabled:
         config.rum.enabled && Boolean(config.rum.collectorEndpoint || config.rum.telemetryEndpoint),
@@ -260,23 +247,4 @@ function projectPublicAppConfig(
       ? { posthog: { key: config.telemetry.posthogKey, host: config.telemetry.posthogHost } }
       : {},
   });
-}
-
-function hasConfiguredEmailDelivery(
-  config: PublicAppConfigValues,
-  credentials: CredentialPresence,
-): boolean {
-  const configured = config.capabilities.emailProvider?.trim().toLowerCase();
-  const available = {
-    ses: Boolean(config.capabilities.useAwsSes && config.capabilities.awsRegion),
-    sendgrid: Boolean(credentials.sendgrid),
-    smtp: Boolean(credentials.smtpUrl ?? config.capabilities.smtpHost),
-    resend: Boolean(credentials.resend),
-  } as const;
-
-  if (configured) {
-    return configured in available ? available[configured as keyof typeof available] : false;
-  }
-
-  return available.ses || available.sendgrid;
 }

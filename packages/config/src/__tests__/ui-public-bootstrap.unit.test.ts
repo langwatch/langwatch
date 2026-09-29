@@ -5,17 +5,15 @@ import { resolveUiPublicBootstrap } from "../public-app-config.projection.ts";
 
 describe("UI public bootstrap", () => {
   it("parses one UI process projection and returns only browser-safe values", () => {
-    // The credential itself never reaches the projection (ADR-132): its owner
-    // resolves the handle and passes presence, which is all the browser needs.
+    // No credential reaches the projection (ADR-132); it is handed the member's boolean.
     const boot = resolveUiPublicBootstrap(
       {
         BASE_HOST: "https://app.example.test",
         NODE_ENV: "production",
         UI_PROCESS_ROLE: "ui",
-        EMAIL_PROVIDER: "resend",
         NEXTAUTH_SECRET: "must-not-cross-the-browser-boundary",
       },
-      { resend: true },
+      { mailAvailable: true },
     );
 
     expect(boot).toEqual({

@@ -8,6 +8,7 @@ import {
   type ProcessWebConfig,
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
+import type { FeatureApiIdentity } from "@langwatch/kernel/module-api";
 import { z } from "zod";
 
 import { assetBaseBootstrapScript, assetBaseOrigin, normalizeAssetBase } from "./asset-base.ts";
@@ -22,7 +23,8 @@ export type BundleConfig = Readonly<{
 /** An installed owner as the page's config reads it: its name and its declared projection. */
 export type BrowserConfigOwner = Readonly<{
   name: string;
-  publicConfig?: (config: unknown) => unknown;
+  apiContract?: FeatureApiIdentity;
+  publicConfig?: (config: unknown, api: unknown) => unknown;
 }>;
 
 export function resolveUiBundle(config: BundleConfig): ApiUiBundle | undefined {
@@ -31,7 +33,12 @@ export function resolveUiBundle(config: BundleConfig): ApiUiBundle | undefined {
   const assetBase = normalizeAssetBase(config.assetBase);
   return {
     directory,
-    head: assetBaseBootstrapScript(assetBase) + createPublicAppConfigMetaTag(config.publicConfig),
+    // Read per request: the page's config is filled once the modules exist.
+    get head() {
+      return (
+        assetBaseBootstrapScript(assetBase) + createPublicAppConfigMetaTag(config.publicConfig)
+      );
+    },
     assetOrigin: assetBaseOrigin(assetBase),
   };
 }
@@ -41,13 +48,15 @@ export function resolveUiBundle(config: BundleConfig): ApiUiBundle | undefined {
  * then every installed module's declared projection under its own name. A
  * projection that refuses stops the boot, naming the module.
  */
-export function projectPublicConfig({
+export async function projectPublicConfig({
   modules,
   config,
+  runningApi,
 }: {
   modules: readonly BrowserConfigOwner[];
   config: Readonly<Record<string, unknown>>;
-}): PublicAppConfig {
+  runningApi: (contract: FeatureApiIdentity | undefined) => unknown;
+}): Promise<PublicAppConfig> {
   const projected: Record<string, unknown> = {
     process: projectProcessConfig(config),
   };
@@ -57,7 +66,10 @@ export function projectPublicConfig({
       throw new Error(`Two owners project browser config under "${module.name}".`);
     }
     try {
-      projected[module.name] = module.publicConfig(config[module.name]);
+      projected[module.name] = await module.publicConfig(
+        config[module.name],
+        runningApi(module.apiContract),
+      );
     } catch (cause) {
       throw new Error(`The browser config "${module.name}" projects was refused.`, { cause });
     }
