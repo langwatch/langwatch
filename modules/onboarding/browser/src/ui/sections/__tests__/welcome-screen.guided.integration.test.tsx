@@ -132,6 +132,7 @@ import { WelcomeScreen } from "../welcome-screen.tsx";
 const SAAS_DEPLOYMENT: UiDeployment = {
   isDevelopment: false,
   isSaaS: true,
+  hasCloudOps: false,
   appBaseUrl: "https://app.langwatch.ai",
   hasNlpService: true,
   hasLangevals: true,

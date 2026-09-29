@@ -61,6 +61,7 @@ export function uiDeploymentOf({
     hasEmailProvider: config.notification.email,
     ...(config.auth.authProvider ? { authProvider: config.auth.authProvider } : {}),
     passkeysEnabled: config.auth.passkeys,
+    hasCloudOps: config.ops.cloudOps,
     gatewayBaseUrl: config.gateway.gatewayBaseUrl,
   });
 }

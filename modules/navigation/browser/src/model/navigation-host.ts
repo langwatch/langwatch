@@ -61,6 +61,8 @@ export type NavigationUser = {
 /** What kind of deployment the chrome is drawn on. */
 export type NavigationDeployment = {
   isSaaS: boolean;
+  /** Whether ops offers Cloud admin here. */
+  hasCloudOps: boolean;
   isDevelopment: boolean;
   /** A development build that asked to draw without the development badge. */
   hideDevIndicator?: boolean;

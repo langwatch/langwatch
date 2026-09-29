@@ -16,6 +16,7 @@ import { parseUiFeatureConfig } from "../ui-feature-config";
  */
 const UNCONFIGURED: NavigationDeployment = {
   isSaaS: false,
+  hasCloudOps: false,
   isDevelopment: false,
   hasNlpService: true,
   hasLangevals: true,
@@ -23,9 +24,10 @@ const UNCONFIGURED: NavigationDeployment = {
 
 export function readNavigationDeployment(): NavigationDeployment {
   try {
-    const { process, authz, evaluation } = parseUiFeatureConfig(readPublicAppConfig());
+    const { process, authz, evaluation, ops } = parseUiFeatureConfig(readPublicAppConfig());
     return {
       isSaaS: process.deployment === "saas",
+      hasCloudOps: ops.cloudOps,
       isDevelopment: process.mode === "development",
       ...(process.hideDevIndicator ? { hideDevIndicator: true } : {}),
       ...(process.devIndicatorLabel ? { devIndicatorLabel: process.devIndicatorLabel } : {}),

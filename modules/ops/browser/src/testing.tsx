@@ -36,6 +36,7 @@ export type FakeOpsHostOptions = {
    */
   hasOpsAccess?: boolean;
   sharedInstall?: boolean;
+  cloudOps?: boolean;
   /** Whether the reader may see instance and Cloud admin, which is strictly narrower. */
   isOpsAdmin?: boolean;
   project?: OpsProject | null;
@@ -113,6 +114,10 @@ export class FakeOpsHost extends OpsHostApi {
 
   sharedInstall(): boolean {
     return this.options.sharedInstall ?? false;
+  }
+
+  cloudOps(): boolean {
+    return this.options.cloudOps ?? false;
   }
 
   project(): OpsProject | undefined {

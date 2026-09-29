@@ -61,6 +61,9 @@ export abstract class OpsHostApi {
    */
   abstract sharedInstall(): boolean;
 
+  /** True when ops offers the Cloud admin capability (LangWatch's own cloud). */
+  abstract cloudOps(): boolean;
+
   /** The project this page is about, when the reader is standing in one. */
   abstract project(): OpsProject | undefined;
 

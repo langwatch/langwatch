@@ -28,6 +28,7 @@ const capabilities: UiCapabilities = {
     hasNlpService: false,
     hasLangevals: false,
     hasEmailProvider: false,
+    hasCloudOps: false,
   },
 };
 

@@ -294,6 +294,8 @@ export type UiDeployment = {
   authProvider?: string;
   /** Whether this deployment mounted passkeys; absent reads as no. */
   passkeysEnabled?: boolean;
+  /** Whether ops offers the Cloud admin capability; off unless this is LangWatch's own cloud. */
+  hasCloudOps: boolean;
   /** Where a customer's SDK reaches the gateway, without `/v1`; absent when unconfigured. */
   gatewayBaseUrl?: string;
 };
@@ -308,6 +310,7 @@ const PRODUCTION_UI_DEPLOYMENT: UiDeployment = {
   hasNlpService: true,
   hasLangevals: true,
   hasEmailProvider: false,
+  hasCloudOps: false,
 };
 
 /** Every capability a screen can ask for, all of them answered. */

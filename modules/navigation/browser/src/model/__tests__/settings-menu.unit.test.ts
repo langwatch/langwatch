@@ -11,6 +11,7 @@ import { settingsMenu, type SettingsMenuGates } from "../settings-menu.ts";
 const EVERYTHING_CLOSED: SettingsMenuGates = {
   hasPermission: () => false,
   isSaaS: false,
+  hasCloudOps: false,
   showEnterpriseNav: false,
   isLiteMember: false,
   hasOpsAccess: false,
@@ -164,14 +165,15 @@ describe("given an operator", () => {
       expect(hrefsIn({ hasOpsAccess: true, isPlatformAdmin: true })).toContain("/ops/users");
     });
 
-    it("offers Cloud admin only to a platform administrator on SaaS", () => {
+    it("offers Cloud admin only to a platform administrator where ops offers cloud ops", () => {
       const admin = { hasOpsAccess: true, isPlatformAdmin: true };
       expect(groupIdsIn(admin)).not.toContain("settings-cloud-admin");
-      expect(groupIdsIn({ ...admin, isSaaS: true })).toContain("settings-cloud-admin");
-      expect(groupIdsIn({ hasOpsAccess: true, isSaaS: true })).not.toContain(
+      expect(groupIdsIn({ ...admin, isSaaS: true })).not.toContain("settings-cloud-admin");
+      expect(groupIdsIn({ ...admin, hasCloudOps: true })).toContain("settings-cloud-admin");
+      expect(groupIdsIn({ hasOpsAccess: true, hasCloudOps: true })).not.toContain(
         "settings-cloud-admin",
       );
-      expect(hrefsIn({ ...admin, isSaaS: true })).toContain("/ops/cloud/licenses");
+      expect(hrefsIn({ ...admin, hasCloudOps: true })).toContain("/ops/cloud/licenses");
     });
   });
 });

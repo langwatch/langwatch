@@ -89,6 +89,7 @@ export interface SettingsMenuGroup {
 export interface SettingsMenuGates {
   hasPermission: (permission: string) => boolean;
   isSaaS: boolean;
+  hasCloudOps: boolean;
   showEnterpriseNav: boolean;
   isLiteMember: boolean;
   hasOpsAccess: boolean;
@@ -365,7 +366,7 @@ export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
     projectGroup(gates),
     ...(gates.hasOpsAccess ? [opsGroup()] : []),
     ...(gates.isPlatformAdmin ? [instanceGroup()] : []),
-    ...(gates.isPlatformAdmin && gates.isSaaS ? [cloudAdminGroup()] : []),
+    ...(gates.isPlatformAdmin && gates.hasCloudOps ? [cloudAdminGroup()] : []),
   ];
 
   return groups.filter((group) => group.items.length > 0);

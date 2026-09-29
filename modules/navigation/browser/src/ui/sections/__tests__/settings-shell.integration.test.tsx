@@ -43,6 +43,7 @@ function renderSettingsSidebar({
   hasOpsAccess = false,
   isOpsAdmin = false,
   isSaaS = false,
+  hasCloudOps = false,
   permissions = ["organization:view", "auditLog:view", "triggers:view", "sso:view"],
 }: {
   pathname?: string;
@@ -51,6 +52,7 @@ function renderSettingsSidebar({
   hasOpsAccess?: boolean;
   isOpsAdmin?: boolean;
   isSaaS?: boolean;
+  hasCloudOps?: boolean;
   permissions?: string[];
 } = {}) {
   return render(
@@ -63,7 +65,7 @@ function renderSettingsSidebar({
           permissions,
           plan: { isEnterprise, isLoading: false, isLiteMember },
           opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
-          deployment: { isSaaS },
+          deployment: { isSaaS, hasCloudOps },
           commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
         }}
       >
@@ -349,8 +351,8 @@ describe("the settings shell in a new navigation mode", () => {
 
   describe("when the reader has ops access and is an admin", () => {
     /** @scenario The settings menu holds the ops groups at the bottom */
-    it("puts Ops, Instance and Cloud admin last on SaaS", () => {
-      renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true, isSaaS: true });
+    it("puts Ops, Instance and Cloud admin last with cloud ops", () => {
+      renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true, hasCloudOps: true });
 
       const groupLabels = screen
         .getAllByText(
@@ -361,7 +363,7 @@ describe("the settings shell in a new navigation mode", () => {
       expect(groupLabels.slice(-3)).toEqual(["Ops", "Instance", "Cloud admin"]);
     });
 
-    it("hides Cloud admin off SaaS", () => {
+    it("hides Cloud admin without cloud ops", () => {
       renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true });
 
       expect(screen.getByText("Instance")).toBeInTheDocument();

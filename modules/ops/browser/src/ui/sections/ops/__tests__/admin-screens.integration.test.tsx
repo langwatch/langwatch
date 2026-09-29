@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Cloud admin off SaaS answers as an unknown page and never mounts its view (§3.5).
+ * Cloud admin without cloud ops answers as an unknown page and never mounts its view (§3.5).
  */
 import { screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -14,14 +14,14 @@ vi.mock("../../../../features/admin/ui/sections/licenses-view.tsx", () => ({
 }));
 
 describe("given the Cloud admin licenses page", () => {
-  it("renders the page on SaaS", () => {
-    renderWithOpsHost(<CloudLicensesScreen />, { host: fakeOpsHost({ sharedInstall: true }) });
+  it("renders the page with cloud ops", () => {
+    renderWithOpsHost(<CloudLicensesScreen />, { host: fakeOpsHost({ cloudOps: true }) });
 
     expect(screen.getByText("licenses view")).toBeInTheDocument();
   });
 
-  it("answers as an unknown page off SaaS", () => {
-    renderWithOpsHost(<CloudLicensesScreen />, { host: fakeOpsHost({ sharedInstall: false }) });
+  it("answers as an unknown page without cloud ops", () => {
+    renderWithOpsHost(<CloudLicensesScreen />, { host: fakeOpsHost({ cloudOps: false }) });
 
     expect(screen.getByText("Page not found")).toBeInTheDocument();
     expect(screen.queryByText("licenses view")).not.toBeInTheDocument();

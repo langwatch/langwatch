@@ -90,6 +90,7 @@ function harness(scope: UiActiveScope, gatewayBaseUrl?: string) {
       hasNlpService: true,
       hasLangevals: true,
       hasEmailProvider: false,
+      hasCloudOps: false,
       ...(gatewayBaseUrl ? { gatewayBaseUrl } : {}),
     },
   };

@@ -18,6 +18,7 @@ export type UiDeploymentSlices = Readonly<{
   hasEmailProvider: boolean;
   authProvider?: string;
   passkeysEnabled: boolean;
+  hasCloudOps: boolean;
   gatewayBaseUrl?: string;
 }>;
 
@@ -30,6 +31,7 @@ export function deriveUiDeployment({
   hasEmailProvider,
   authProvider,
   passkeysEnabled,
+  hasCloudOps,
   gatewayBaseUrl,
 }: UiDeploymentSlices): UiDeployment {
   return {
@@ -43,6 +45,7 @@ export function deriveUiDeployment({
     hasEmailProvider,
     ...(authProvider ? { authProvider } : {}),
     passkeysEnabled,
+    hasCloudOps,
     ...(gatewayBaseUrl ? { gatewayBaseUrl } : {}),
   };
 }

@@ -30,6 +30,7 @@ class CapabilityOpsHost extends OpsHostApi {
     private readonly deps: {
       hasPermission: (permission: string) => boolean;
       sharedInstall: boolean;
+      cloudOps: boolean;
       route: OpsRouteReading;
       asPath: string;
       setQuery: (
@@ -53,6 +54,10 @@ class CapabilityOpsHost extends OpsHostApi {
 
   sharedInstall(): boolean {
     return this.deps.sharedInstall;
+  }
+
+  cloudOps(): boolean {
+    return this.deps.cloudOps;
   }
 
   /** No capability carries a project's own API key, so the Foundry gate stays closed. */
@@ -95,7 +100,7 @@ class CapabilityOpsHost extends OpsHostApi {
  */
 export default function OpsHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
-  const { isSaaS } = useUiDeployment();
+  const { isSaaS, hasCloudOps } = useUiDeployment();
   const location = useLocation();
   const reading = route.reading();
   const asPath = `${location.pathname}${location.search}${location.hash}`;
@@ -105,13 +110,14 @@ export default function OpsHostMount({ children }: { children?: ReactNode }) {
       new CapabilityOpsHost({
         hasPermission: (permission) => session.hasPermission(permission),
         sharedInstall: isSaaS,
+        cloudOps: hasCloudOps,
         route: { params: reading.params, query: reading.query },
         asPath,
         setQuery: (next, options) => route.setQuery(next, options),
         navigate: (to) => navigation.navigate(to),
         feedback,
       }),
-    [session, isSaaS, reading, asPath, route, navigation, feedback],
+    [session, isSaaS, hasCloudOps, reading, asPath, route, navigation, feedback],
   );
 
   return <OpsHostProvider value={host}>{children}</OpsHostProvider>;

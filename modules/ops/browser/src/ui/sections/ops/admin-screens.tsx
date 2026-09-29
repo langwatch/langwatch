@@ -27,7 +27,7 @@ export {
 };
 
 function CloudOnly({ children }: { children: ReactNode }) {
-  if (useOpsHost().sharedInstall()) return <>{children}</>;
+  if (useOpsHost().cloudOps()) return <>{children}</>;
   return (
     <NoDataInfoBlock
       title="Page not found"

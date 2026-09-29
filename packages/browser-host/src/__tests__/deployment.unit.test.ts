@@ -15,6 +15,7 @@ function slicesWith(overrides: Partial<UiDeploymentSlices>): UiDeploymentSlices 
     hasLangevals: true,
     hasEmailProvider: true,
     passkeysEnabled: false,
+    hasCloudOps: false,
     ...overrides,
   };
 }
@@ -67,6 +68,13 @@ describe("deriveUiDeployment", () => {
   describe("given a deployment that sells none", () => {
     it("omits the field rather than carrying an empty one", () => {
       expect("licensePaymentUrl" in deriveUiDeployment(slicesWith({}))).toBe(false);
+    });
+  });
+
+  describe("given ops offering cloud ops", () => {
+    it("carries the capability through, and reads it off by default", () => {
+      expect(deriveUiDeployment(slicesWith({ hasCloudOps: true })).hasCloudOps).toBe(true);
+      expect(deriveUiDeployment(slicesWith({})).hasCloudOps).toBe(false);
     });
   });
 

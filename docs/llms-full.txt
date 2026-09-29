@@ -61755,6 +61755,12 @@ The `smtp` gateway ignores these variables on purpose, because an SMTP relay is 
 | `SKIP_ENV_VALIDATION` | Skip environment variable validation on startup | `false` |
 | `SKIP_PRISMA_MIGRATE` | Skip PostgreSQL migrations on startup           | `false` |
 
+## Cloud admin
+
+| Variable | Description | Default |
+| -------- | ----------- | ------- |
+| `LANGWATCH_CLOUD_OPS` | Turns on Cloud admin in Ops (licence and instance registries). For LangWatch's own cloud only; also needs `LANGWATCH_LICENSE_PRIVATE_KEY` matching the release's public key, or boot is refused. Leave unset on every other deployment. | `false` |
+
 ## Telemetry
 
 | Variable              | Description                       | Default |

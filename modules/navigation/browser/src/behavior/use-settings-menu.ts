@@ -14,6 +14,7 @@ export function useSettingsMenu(): SettingsMenuGroup[] {
   return settingsMenu({
     hasPermission: (permission) => host.hasPermission(permission),
     isSaaS: host.deployment().isSaaS,
+    hasCloudOps: host.deployment().hasCloudOps,
     // Fail closed: an unlicensed or still-loading plan must never show the
     // enterprise entries. Showing them while the plan is in flight let a
     // self-hosted install with no license key see them permanently whenever

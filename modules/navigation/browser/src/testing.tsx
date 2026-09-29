@@ -63,6 +63,7 @@ export type StubNavigationActions = {
 
 const SELF_HOSTED_PRODUCTION: NavigationDeployment = {
   isSaaS: false,
+  hasCloudOps: false,
   isDevelopment: false,
   hasNlpService: true,
   hasLangevals: true,
