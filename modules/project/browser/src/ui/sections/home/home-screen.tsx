@@ -9,15 +9,7 @@ import { LuCalendarClock } from "react-icons/lu";
 import { homeApi } from "../../../behavior/home-api.ts";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { safeReturnToPath } from "../../../model/project-switch.ts";
-import { BriefingMockSwitcher, HomeBriefingSection, SetupHairline } from "./briefing/index.ts";
-import {
-  chartVariantFor,
-  type HomeDevState,
-  useHomeDevState,
-} from "./components/dev/home-dev-state.ts";
-import { HomeStateSwitcher } from "./components/dev/home-state-switcher.tsx";
 import { DocsGuides } from "./components/docs-guides.tsx";
-import { HomeFortune } from "./components/home-fortune.tsx";
 import { HomePageBanners } from "./components/home-page-banners.tsx";
 import { LangyHomeHero } from "./components/langy-home-hero.tsx";
 import { LearningResources } from "./components/learning-resources.tsx";
@@ -29,9 +21,8 @@ import { useProjectReach } from "./components/use-project-reach.ts";
 import { WelcomeHeader } from "./components/welcome-header.tsx";
 
 /**
- * The application shell is not this page's — chrome layout draws it. A
- * briefing for the returning user, not a lobby. Three compositions resolve
- * in strict order (SIGNAL-FOCUSED, LANGY, CLASSIC); signal-focused wins outright.
+ * The application shell is not this page's — chrome layout draws it. Two
+ * compositions: the Langy home for a reader with Langy, the classic home otherwise.
  */
 export function HomePage() {
   const composition = useHomeComposition();
@@ -43,8 +34,6 @@ export function HomePage() {
           `overflow: hidden` forces the cross axis to `auto` too, breaking page scroll.
           `overflow-x: clip` clips just the one axis, so DOWN bleed still works. */}
       <Box width="full" position="relative" overflowX="clip">
-        {/* A reading measure, not a dashboard sprawl: the briefing sheet is
-            the page, so the column narrows to keep its lines composed. */}
         <Container maxW="7xl" padding={5} position="relative" zIndex={1}>
           <VStack gap={4} width="full" align="start">
             {/* Positioned above the hero's bleed on purpose: the lantern's
@@ -68,37 +57,6 @@ export function HomePage() {
             </HStack>
 
             {composition === "undecided" && <HomeCompositionSkeleton />}
-            {composition === "signal-focused" && (
-              <>
-                <HomeBriefingSection />
-                {/* The chrome grid: two equal-height columns whose interior
-                    splits OFFSET — the first card in each column sits at its
-                    natural height (they differ), and the second grows to fill
-                    the rest, so the middle seam staggers instead of running
-                    straight across. Content can always take more; nothing is
-                    ever squeezed into overlap. */}
-                <Grid
-                  templateColumns={{ base: "1fr", lg: "1fr 1fr" }}
-                  gap={4}
-                  width="full"
-                  alignItems="stretch"
-                >
-                  <VStack gap={4} align="stretch" minWidth={0}>
-                    <HomePageBanners />
-                    <Box flex="1" display="flex" minHeight="120px">
-                      <DocsGuides />
-                    </Box>
-                  </VStack>
-                  <VStack gap={4} align="stretch" minWidth={0}>
-                    <SetupHairline />
-                    <Box flex="1" display="flex" minHeight="100px">
-                      <HomeFortune />
-                    </Box>
-                  </VStack>
-                </Grid>
-                <RecentItemsSection />
-              </>
-            )}
             {composition === "langy" && <LangyHome />}
             {composition === "classic" && (
               <>
@@ -109,17 +67,7 @@ export function HomePage() {
               </>
             )}
 
-            {/* Dev-only chrome (the briefing mock switcher and the Langy
-                home's state switcher) belongs with the footer links, not next
-                to the greeting. */}
-            <LearningResources
-              trailing={
-                <HStack gap={2}>
-                  <BriefingMockSwitcher />
-                  <HomeStateSwitcher />
-                </HStack>
-              }
-            />
+            <LearningResources />
           </VStack>
         </Container>
       </Box>
@@ -187,7 +135,7 @@ function ConsideringLangWatch() {
 /**
  * What the page shows before it knows which home it is. Flags used to
  * resolve to classic, paint it, then swap, so the home visibly changed
- * shape on cold load. This commits to nothing: just the shape all three share.
+ * shape on cold load. This commits to nothing: just the shape both share.
  */
 function HomeCompositionSkeleton() {
   return (
@@ -202,12 +150,6 @@ function HomeCompositionSkeleton() {
   );
 }
 
-function isNewProjectFor(devState: HomeDevState | null, detected: boolean): boolean {
-  if (devState === "empty") return true;
-  if (devState === "populated") return false;
-  return detected;
-}
-
 /**
  * The Langy home's spine: lit block leads, page continues as before. The
  * setup checklist moves — on a no-data project it takes the figures' place
@@ -215,19 +157,17 @@ function isNewProjectFor(devState: HomeDevState | null, detected: boolean): bool
  */
 function LangyHome() {
   const { isNewProject } = useProjectReach();
-  const devState = useHomeDevState();
-  const empty = isNewProjectFor(devState, isNewProject);
 
   return (
     <>
       <HomePageBanners variant="lantern">
         <LangyHomeHero />
       </HomePageBanners>
-      {empty ? (
+      {isNewProject ? (
         <OnboardingProgress />
       ) : (
         <>
-          <TracesOverview variant={chartVariantFor(devState)} />
+          <TracesOverview variant="strip" />
           <RecentItemsSection />
           <OnboardingProgress />
         </>

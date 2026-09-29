@@ -1,17 +1,6 @@
-import {
-  Box,
-  Button,
-  chakra,
-  Heading,
-  HStack,
-  Icon,
-  IconButton,
-  Kbd,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, chakra, Heading, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
-import { LangyMark, useLangyStore, SERIF } from "@langwatch/langy-browser-kit";
+import { LangyMark, useLangyStore } from "@langwatch/langy-browser-kit";
 import { MeshGradient } from "@paper-design/shaders-react";
 import {
   motion,
@@ -32,7 +21,7 @@ import {
   useState,
 } from "react";
 import type { IconType } from "react-icons";
-import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
+import { LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
@@ -449,7 +438,7 @@ function useBannerAnimation({
   speedRef: MutableRefObject<number>;
   targetColorsRef: MutableRefObject<string[]>;
   targetMeshRef: MutableRefObject<Mesh | undefined>;
-  variant: "briefing" | "legacy" | "lantern";
+  variant: "legacy" | "lantern";
 }) {
   useAnimationFrame((time, delta) => {
     if (eligibleLenRef.current === 0) return;
@@ -495,7 +484,7 @@ function useBannerAnimation({
  * (each owns its own per-project 7-day snooze).
  */
 export function HomePageBanners({
-  variant = "briefing",
+  variant,
   children,
 }: {
   /**
@@ -503,7 +492,7 @@ export function HomePageBanners({
    * announcement compresses to a single line of chrome across the top, and `children` (the
    * composer and its capability row) are laid over the same ground beneath it.
    */
-  variant?: "briefing" | "legacy" | "lantern";
+  variant: "legacy" | "lantern";
   /** Lantern only: what sits under the chrome line, over the same ground. */
   children?: ReactNode;
 }) {
@@ -673,8 +662,7 @@ export function HomePageBanners({
     return <LanternBanner {...bannerProps}>{children}</LanternBanner>;
   }
   if (!slide) return null;
-  if (variant === "legacy") return <LegacyBanner {...bannerProps} />;
-  return <BriefingBanner {...bannerProps} />;
+  return <LegacyBanner {...bannerProps} />;
 }
 
 interface BannerViewProps {
@@ -696,20 +684,6 @@ interface BannerViewProps {
 
 function CarouselOnly({ children, multi }: { children: ReactNode; multi: boolean }) {
   if (!multi) return null;
-  return children;
-}
-
-function isMacKeyboard(): boolean {
-  return typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
-}
-
-function BriefingCtaIcon({ showKeyboard }: { showKeyboard: boolean }) {
-  if (!showKeyboard) return <Icon as={LuArrowRight} boxSize={3.5} />;
-  return <Kbd fontSize="0.6875rem">{isMacKeyboard() ? "⌘I" : "Ctrl+I"}</Kbd>;
-}
-
-function AnimatedBannerOnly({ children, lowPerf }: { children: ReactNode; lowPerf: boolean }) {
-  if (lowPerf) return null;
   return children;
 }
 
@@ -1200,377 +1174,6 @@ function LegacyBanner({
           ))}
         </HStack>
       </CarouselOnly>
-    </Box>
-  );
-}
-
-function BriefingBanner({
-  active,
-  colors,
-  displayMesh,
-  eligible,
-  handleCta,
-  hoveredRef,
-  lowPerf,
-  multi,
-  progress,
-  reduceMotion,
-  selectSlide,
-  slide,
-  slideTransition,
-}: BannerViewProps) {
-  if (!slide) return null;
-
-  return (
-    <Box position="relative" width="full" isolation="isolate">
-      <Box
-        position="relative"
-        width="full"
-        // One card among the page's cards: the app surface, the hairline, the
-        // shared 14px radius. The announcement's colour lives in the icon tile
-        // and a whisper of mesh under the copy — never a billboard — so the
-        // briefing stays the loudest thing on the home.
-        borderRadius="14px"
-        borderWidth="1px"
-        borderColor="border.muted"
-        background="bg.surface"
-        overflow="hidden"
-        onMouseEnter={() => {
-          hoveredRef.current = true;
-        }}
-        onMouseLeave={() => {
-          hoveredRef.current = false;
-        }}
-      >
-        {/* Liquid-glass edges: the slide's colour "refracting" off all four
-            borders — four inset glows, one per edge, that follow every
-            palette morph. Colour at the rim, calm in the middle. */}
-        <Box
-          aria-hidden
-          position="absolute"
-          inset={0}
-          borderRadius="inherit"
-          pointerEvents="none"
-          zIndex={2}
-          opacity={0.45}
-          style={{
-            boxShadow: [
-              `inset 0 10px 18px -14px ${colors[0] ?? "#333"}`,
-              `inset 0 -10px 18px -14px ${colors[2] ?? colors[0] ?? "#333"}`,
-              `inset 10px 0 18px -14px ${colors[1] ?? colors[0] ?? "#333"}`,
-              `inset -10px 0 18px -14px ${colors[1] ?? colors[0] ?? "#333"}`,
-            ].join(", "),
-          }}
-        />
-        {/* The mesh, back inside the card as a subtle wash: the one shared
-            canvas, still morphing palette + shape between slides, dialled to
-            whisper opacity under the copy. */}
-        <Box
-          position="absolute"
-          inset={0}
-          pointerEvents="none"
-          opacity={{ base: 0.09, _dark: 0.14 }}
-        >
-          {/* Static gradient base: the cheap fallback shown alone under a
-              struggling GPU, and a colour bed behind the shader otherwise. */}
-          <Box
-            position="absolute"
-            inset={0}
-            style={{
-              background: `linear-gradient(120deg, ${colors[0] ?? "#333"}, ${
-                colors[1] ?? colors[0] ?? "#333"
-              } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
-            }}
-          />
-          <AnimatedBannerOnly lowPerf={lowPerf}>
-            <Box position="absolute" inset={0}>
-              <MeshGradient
-                colors={colors}
-                distortion={displayMesh.distortion}
-                swirl={displayMesh.swirl}
-                offsetX={displayMesh.offsetX}
-                offsetY={displayMesh.offsetY}
-                rotation={displayMesh.rotation}
-                grainMixer={0.12}
-                grainOverlay={0.12}
-                speed={reduceMotion ? 0 : (slide.speed ?? 0.45)}
-                scale={displayMesh.scale}
-                style={{ width: "100%", height: "100%" }}
-              />
-            </Box>
-          </AnimatedBannerOnly>
-        </Box>
-
-        <HStack
-          position="relative"
-          zIndex={1}
-          align="center"
-          gap={{ base: 3, md: 4 }}
-          paddingX={{ base: 4, md: 5 }}
-          paddingTop={4}
-          paddingBottom={multi ? "22px" : 4}
-          width="full"
-          height="full"
-        >
-          {/* The icon tile: the slide's palette as a plain gradient (it still
-              follows the morph — `colors` interpolates every frame). */}
-          <Box
-            position="relative"
-            flexShrink={0}
-            boxSize="44px"
-            borderRadius="11px"
-            overflow="hidden"
-            boxShadow="inset 0 0 0 1px rgba(255,255,255,0.14)"
-          >
-            <Box
-              position="absolute"
-              inset={0}
-              pointerEvents="none"
-              style={{
-                background: `linear-gradient(120deg, ${colors[0] ?? "#333"}, ${
-                  colors[1] ?? colors[0] ?? "#333"
-                } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
-              }}
-            />
-            {/* Per-slide glyph, crossfading on the morph's clock. */}
-            <Box display="grid" position="relative" width="full" height="full">
-              {eligible.map((s) => (
-                <motion.div
-                  key={s.id}
-                  initial={false}
-                  animate={{ opacity: s.id === slide.id ? 1 : 0 }}
-                  transition={slideTransition}
-                  style={{
-                    gridArea: "1 / 1",
-                    display: "grid",
-                    placeItems: "center",
-                  }}
-                >
-                  {s.iconNode ?? (s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : null)}
-                </motion.div>
-              ))}
-            </Box>
-          </Box>
-
-          {/* Every eligible slide's copy is stacked in one grid cell, so the
-              card is always the tallest slide's height and never resizes
-              mid-change. Only the active slide is visible; a change fades the
-              copy with a small lift on the same clock as the tile morph. */}
-          <Box display="grid" flex={1} minWidth={0}>
-            {eligible.map((s) => {
-              const isActive = s.id === slide.id;
-              return (
-                <motion.div
-                  key={s.id}
-                  inert={!isActive}
-                  initial={false}
-                  animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 6 }}
-                  transition={slideTransition}
-                  style={{
-                    gridArea: "1 / 1",
-                    zIndex: isActive ? 1 : 0,
-                    pointerEvents: isActive ? "auto" : "none",
-                    willChange: "opacity, transform",
-                  }}
-                >
-                  <VStack align="start" gap={1} width="full" minWidth={0}>
-                    <HStack gap={2} minWidth={0}>
-                      <Heading
-                        as="h2"
-                        // The announcement speaks in the page's serif display
-                        // voice, so it reads as the same publication as the
-                        // briefing above it.
-                        fontFamily={SERIF}
-                        fontWeight="500"
-                        fontSize="15px"
-                        letterSpacing="-0.01em"
-                        lineHeight={1.3}
-                        color="fg"
-                      >
-                        {s.heading}
-                      </Heading>
-                      {s.badge ? (
-                        <Box
-                          paddingX="7px"
-                          borderRadius="full"
-                          borderWidth="1px"
-                          borderColor="orange.emphasized"
-                          flexShrink={0}
-                        >
-                          <Text
-                            fontFamily="mono"
-                            fontSize="9.5px"
-                            fontWeight="600"
-                            color="orange.fg"
-                            letterSpacing="0.08em"
-                            textTransform="uppercase"
-                            lineHeight={1.6}
-                          >
-                            {s.badge}
-                          </Text>
-                        </Box>
-                      ) : null}
-                    </HStack>
-                    <Text fontSize="12.5px" color="fg.muted" lineHeight={1.5}>
-                      {s.subtitle}
-                    </Text>
-                    {s.extra ? (
-                      <Box width="full" minWidth={0}>
-                        {s.extra}
-                      </Box>
-                    ) : null}
-                    <chakra.button
-                      type="button"
-                      onClick={() => handleCta(s)}
-                      aria-label={s.ctaLabel}
-                      flexShrink={0}
-                      display="inline-flex"
-                      alignItems="center"
-                      gap={1}
-                      marginTop={1.5}
-                      fontFamily="mono"
-                      fontSize="11.5px"
-                      whiteSpace="nowrap"
-                      cursor="pointer"
-                      // Wears the same orange as the "New" pill beside the
-                      // heading so the call to action reads as the announcement's
-                      // own colour, not a muted default. A filled subtle pill (vs
-                      // the badge's outline) keeps it clearly a button.
-                      color="orange.fg"
-                      borderWidth="1px"
-                      borderColor="orange.emphasized"
-                      borderRadius="8px"
-                      paddingX={2.5}
-                      paddingY="4px"
-                      background="orange.subtle"
-                      transition="background-color 130ms ease, border-color 130ms ease"
-                      _hover={{
-                        background: "orange.muted",
-                        borderColor: "orange.solid",
-                      }}
-                    >
-                      {s.ctaLabel}
-                      <BriefingCtaIcon showKeyboard={s.showCtaKbd === true} />
-                    </chakra.button>
-                  </VStack>
-                </motion.div>
-              );
-            })}
-          </Box>
-        </HStack>
-
-        {/* Countdown ring — sweeps to full over the dwell, and eases to a stop
-            on hover so it never advances under the pointer. */}
-        <CarouselOnly multi={multi}>
-          <Box position="absolute" bottom={2} right={2.5} zIndex={2}>
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                fill="none"
-                stroke="var(--chakra-colors-border-emphasized)"
-                strokeWidth="2.5"
-              />
-              <g transform="rotate(-90 12 12)">
-                <motion.circle
-                  cx="12"
-                  cy="12"
-                  r="9"
-                  fill="none"
-                  stroke="var(--chakra-colors-fg-muted)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  style={{ pathLength: progress }}
-                />
-              </g>
-            </svg>
-          </Box>
-        </CarouselOnly>
-
-        {/* Progress and navigation: the line shows dwell time; the dots and
-            arrows make the carousel explicit and usable without waiting. */}
-        <CarouselOnly multi={multi}>
-          <HStack
-            gap={1}
-            justify="center"
-            position="absolute"
-            bottom="0px"
-            left={0}
-            right={0}
-            zIndex={2}
-          >
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              aria-label="Previous announcement"
-              onClick={() => selectSlide(active - 1)}
-            >
-              <LuArrowLeft />
-            </IconButton>
-            <HStack gap={0}>
-              {eligible.map((s, i) => (
-                <Box
-                  as="button"
-                  key={s.id}
-                  aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
-                  aria-current={i === active ? "true" : undefined}
-                  onClick={() => selectSlide(i)}
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  paddingX="6px"
-                  paddingY="8px"
-                  cursor="pointer"
-                  css={{
-                    "&:hover .banner-dot": {
-                      background: "var(--chakra-colors-fg-muted)",
-                    },
-                  }}
-                >
-                  <Box
-                    className="banner-dot"
-                    width={i === active ? "16px" : "6px"}
-                    height="6px"
-                    borderRadius="full"
-                    background={i === active ? "fg.muted" : "border.emphasized"}
-                    transition="width 0.2s ease, background-color 0.2s ease"
-                  />
-                </Box>
-              ))}
-            </HStack>
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              aria-label="Next announcement"
-              onClick={() => selectSlide(active + 1)}
-            >
-              <LuArrowRight />
-            </IconButton>
-          </HStack>
-        </CarouselOnly>
-        <CarouselOnly multi={multi}>
-          <Box
-            position="absolute"
-            bottom={0}
-            left={0}
-            right={0}
-            height="2px"
-            background="border.muted"
-            zIndex={1}
-            pointerEvents="none"
-          >
-            <motion.div
-              style={{
-                height: "100%",
-                background: "var(--chakra-colors-fg-muted)",
-                scaleX: progress,
-                transformOrigin: "left",
-              }}
-            />
-          </Box>
-        </CarouselOnly>
-      </Box>
     </Box>
   );
 }

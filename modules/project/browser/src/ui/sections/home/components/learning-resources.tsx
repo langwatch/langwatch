@@ -1,4 +1,4 @@
-import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@chakra-ui/react";
 import { nowInstant, toDate } from "@langwatch/time";
 import type { ReactNode } from "react";
 
@@ -9,7 +9,7 @@ import { Link } from "../../../../ui/elements/app-link.tsx";
  * Quiet footer row of documentation and tutorial links; intentionally
  * whisper-weight to not compete with the home's main content.
  */
-export function LearningResources({ trailing }: { trailing?: ReactNode }) {
+export function LearningResources() {
   return (
     <VStack
       width="full"
@@ -48,8 +48,6 @@ export function LearningResources({ trailing }: { trailing?: ReactNode }) {
         <ColophonLink href={LEGAL_LINKS.terms.href}>{LEGAL_LINKS.terms.label}</ColophonLink>
         <ColophonDot />
         <ColophonLink href={LEGAL_LINKS.privacy.href}>{LEGAL_LINKS.privacy.label}</ColophonLink>
-        <Spacer />
-        {trailing}
       </HStack>
     </VStack>
   );

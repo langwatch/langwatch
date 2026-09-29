@@ -13,7 +13,7 @@ import {
 } from "../feature-flag-bucketing.ts";
 
 const FLAG = "release_ui_agent_testing_v2_enabled";
-const OTHER_FLAG = "release_ui_home_signal_focused_enabled";
+const OTHER_FLAG = "release_ui_comparison_leaderboard_enabled";
 
 function subjects(count: number): string[] {
   return Array.from({ length: count }, (_, index) => `user_${index}`);

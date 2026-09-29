@@ -85,10 +85,10 @@ function NewProjectQuickView({ projectSlug }: { projectSlug: string }) {
 
 /**
  * TracesOverview: trace metrics labelled by time window (unlabelled delta
- * is noise). `full` is the classic home's card; `strip`/`trend` are the
- * Langy home's two answers, both offered since which is right depends on usage.
+ * is noise). `full` is the classic home's card; `strip` is the Langy home's,
+ * with the chart behind a control.
  */
-export type TracesOverviewVariant = "full" | "strip" | "trend";
+export type TracesOverviewVariant = "full" | "strip";
 
 /**
  * How many daily readings a curve needs before it's telling the truth: two
@@ -128,8 +128,7 @@ export function TracesOverview({
   // The window is bucketed daily for the curve, so its length IS the number of
   // readings the curve would be drawn through.
   const trendIsMeaningful = daysDifference >= MIN_POINTS_FOR_A_TREND;
-  const showTrend =
-    trendIsMeaningful && (variant === "trend" || (variant === "strip" && chartOpen));
+  const showTrend = trendIsMeaningful && variant === "strip" && chartOpen;
 
   const tracesOverviewGraph: UiCustomGraphProps["input"] = {
     graphId: "tracesOverview",
@@ -226,8 +225,7 @@ export function TracesOverview({
           <Spacer />
           {/* The chart is never deleted, only moved. In `strip` it waits behind
               a named control that says what it will show and over what window,
-              so the click is worth taking rather than a mystery chevron; in
-              `trend` it is simply already there, and needs no control. */}
+              so the click is worth taking rather than a mystery chevron. */}
           {trendIsMeaningful && variant === "strip" && (
             <chakra.button
               type="button"

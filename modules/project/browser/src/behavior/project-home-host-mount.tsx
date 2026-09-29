@@ -12,7 +12,6 @@ import {
   ProjectHomeHost,
   ProjectHomeHostProvider,
   type ProjectHomeDeployment,
-  type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
   type ProjectHomeOrganization,
   type ProjectHomeProject,
@@ -82,11 +81,6 @@ class CapabilityProjectHomeHost extends ProjectHomeHost {
 
   hasPermission(permission: string): boolean {
     return this.hasPermissionOf(permission);
-  }
-
-  featureFlag(flag: string): ProjectHomeFlagReading {
-    const answer = this.featureFlagOf(flag);
-    return { enabled: answer === true, isLoading: answer === void 0 };
   }
 
   langyVisibility(): ProjectHomeLangyVisibility {

@@ -26,7 +26,6 @@ import {
   ProjectHomeHostProvider,
   ProjectHomeHost,
   type ProjectHomeDeployment,
-  type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
   type ProjectHomeOrganization,
   type ProjectHomeProject,
@@ -61,9 +60,6 @@ class StubProjectHomeHost extends ProjectHomeHost {
   }
   hasPermission(): boolean {
     return false;
-  }
-  featureFlag(): ProjectHomeFlagReading {
-    return { enabled: false, isLoading: false };
   }
   langyVisibility(): ProjectHomeLangyVisibility {
     return { show: false, isResolving: false };
@@ -112,7 +108,7 @@ describe("<HomePageBanners />", () => {
   });
 
   it("leads with the automations banner, with dots, when all are eligible", () => {
-    renderWithProviders(<HomePageBanners />);
+    renderWithProviders(<HomePageBanners variant="legacy" />);
     expect(screen.getByRole("heading", { name: "React the moment it matters" })).toBeDefined();
     // Two eligible banners → two navigation dots.
     expect(screen.getByRole("button", { name: "Show announcement 1 of 2" })).toBeDefined();
@@ -129,7 +125,7 @@ describe("<HomePageBanners />", () => {
   it("carries every announcement, with dots to move between them", () => {
     // Every slide in the rotation shows, always — an announcement stands until
     // it is taken out in code, so there is no state that can reduce the set.
-    renderWithProviders(<HomePageBanners />);
+    renderWithProviders(<HomePageBanners variant="legacy" />);
     expect(screen.getByRole("heading", { name: "React the moment it matters" })).toBeDefined();
     expect(screen.getAllByRole("button", { name: /Show announcement/ }).length).toBeGreaterThan(1);
   });
@@ -138,7 +134,7 @@ describe("<HomePageBanners />", () => {
     // The CTA needs the project slug to route, so rendering before it lands
     // would push /undefined/automations.
     hostState.project = undefined;
-    renderWithProviders(<HomePageBanners />);
+    renderWithProviders(<HomePageBanners variant="legacy" />);
     expect(screen.queryByRole("heading", { name: "React the moment it matters" })).toBeNull();
     expect(
       screen.queryByRole("heading", {
@@ -152,13 +148,13 @@ describe("<HomePageBanners />", () => {
     // must not keep an announcement off the page forever.
     localStorage.setItem(AUTOMATIONS_KEY, String(Date.now() + 60_000));
     localStorage.setItem(VOICE_KEY, String(Date.now() + 60_000));
-    renderWithProviders(<HomePageBanners />);
+    renderWithProviders(<HomePageBanners variant="legacy" />);
     expect(screen.getByRole("heading", { name: "React the moment it matters" })).toBeDefined();
   });
 
   describe("when a banner's link is followed", () => {
     it("routes in-app announcements through SPA navigation", () => {
-      renderWithProviders(<HomePageBanners />);
+      renderWithProviders(<HomePageBanners variant="legacy" />);
 
       fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
 
@@ -166,7 +162,7 @@ describe("<HomePageBanners />", () => {
     });
 
     it("keeps the announcement on the page, so the way back is not lost", () => {
-      renderWithProviders(<HomePageBanners />);
+      renderWithProviders(<HomePageBanners variant="legacy" />);
 
       fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
 
@@ -176,7 +172,7 @@ describe("<HomePageBanners />", () => {
     });
 
     it("offers no way to hide an announcement at all", () => {
-      renderWithProviders(<HomePageBanners />);
+      renderWithProviders(<HomePageBanners variant="legacy" />);
 
       expect(screen.queryAllByRole("button", { name: /Hide|Dismiss/ })).toHaveLength(0);
     });
@@ -190,7 +186,7 @@ describe("<HomePageBanners />", () => {
       expect(screen.getByText("Langy can ship the fix, not just find it")).toBeDefined();
 
       cleanup();
-      renderWithProviders(<HomePageBanners />);
+      renderWithProviders(<HomePageBanners variant="legacy" />);
       expect(screen.queryByText("Langy can ship the fix, not just find it")).toBeNull();
     });
 
@@ -206,7 +202,7 @@ describe("<HomePageBanners />", () => {
   });
 
   it("does not reintroduce a Langy promo into the announcement carousel", () => {
-    renderWithProviders(<HomePageBanners />);
+    renderWithProviders(<HomePageBanners variant="legacy" />);
     expect(screen.queryByRole("heading", { name: "Meet Langy" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Langy is on its way" })).toBeNull();
     expect(headingRow("Voice agent simulations are here").getByText("New")).toBeDefined();
