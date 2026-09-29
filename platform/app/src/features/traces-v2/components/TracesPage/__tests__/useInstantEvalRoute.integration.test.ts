@@ -567,6 +567,27 @@ describe("given Instant Evals are off for a self-serve organization", () => {
     });
 
     /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+    it("drops a switch answered after the reader closed the popover, but still records the access", () => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "enable",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+      act(() => result.current.enableInstantEvals());
+      const enable = lastCall<unknown>(mutations.enable);
+      act(() => result.current.dismissRefusal());
+      expect(result.current.refusal).toBeNull();
+
+      act(() =>
+        enable.options.onSuccess?.({ released: true, offer: "enable" }),
+      );
+      expect(mutations.setAccess).toHaveBeenCalledTimes(1);
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Enable switches the organization on and the judgement goes ahead" */
     it("drops a switch answered after a later submit superseded it", () => {
       const { result } = renderHook(() =>
         useInstantEvalRoute({

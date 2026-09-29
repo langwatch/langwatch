@@ -430,55 +430,27 @@ function estimateThenRoute({
 }
 
 /**
- * The Explorer's handler for the `instant_eval` route: the cost rule, the
- * chip and the refusals.
- *
- * A run already registered for the scope is reused with no request. Else an
- * estimate is made; under {@link INSTANT_EVAL_AUTO_RUN_USD} the run starts,
- * otherwise the dialog asks. A started run becomes an `eval` chip beside the
- * other terms and is registered under its key, so the reads send it. A spent
- * budget or a missing judge is a popover, and every refusal ends in the
- * phrase search the router built.
- *
- * An organization Instant Evals are not on for never reaches the estimate:
- * the popover shows straight away, and nothing is sent. A self-serve
- * organization is offered the switch there; once thrown, the same payload
- * goes on to the estimate.
- *
- * Spec: specs/traces-v2/instant-eval-search.feature ("A run starts under
- * the cost rule", "A refusal is a popover, never an error state",
- * "Instant Evals off for a self-serve organization open the enable popover",
- * "Instant Evals off for an enterprise organization open the contact-us
- * popover").
+ * Routes one payload the organization may judge: a run already registered
+ * for the scope is reused with no request, otherwise the estimate decides.
  */
-export function useInstantEvalRoute({
-  isInstantEvalAvailable,
-  optInOffer,
+function useInstantEvalRouter({
+  estimate,
+  outcome,
+  seqRef,
+  applyChip,
+  startRun,
 }: {
-  isInstantEvalAvailable: boolean;
-  /** What the popover offers when unavailable; absent until the server says. */
-  optInOffer?: InstantEvalOptInOffer | undefined;
-}): InstantEvalRouteState {
-  const estimate = api.tracesV2.instantEval.estimate.useMutation();
-  const enable = api.tracesV2.instantEval.enable.useMutation();
-  const utils = api.useUtils();
-  const outcome = useInstantEvalOutcome();
+  estimate: ReturnType<typeof api.tracesV2.instantEval.estimate.useMutation>;
+  outcome: Pick<
+    ReturnType<typeof useInstantEvalOutcome>,
+    "pendingRef" | "setConfirmation" | "setRefusal" | "refuse"
+  >;
+  seqRef: MutableRefObject<number>;
+  applyChip: (args: PendingRoute & { runId: string }) => void;
+  startRun: (args: PendingRoute & { seq: number }) => void;
+}): (payload: InstantEvalRoutePayload) => void {
   const { pendingRef, setConfirmation, setRefusal, refuse } = outcome;
-  const seqRef = useRef(0);
-  // The payload the opt-in popover is about, kept apart from `pendingRef`:
-  // closing that popover must not apply a fallback query.
-  const heldRef = useRef<InstantEvalRoutePayload | null>(null);
-  const { start, applyChip, startRun } = useInstantEvalStarter({
-    outcome,
-    seqRef,
-  });
-  const { confirmRun, abandonPendingRun } = useInstantEvalPendingActions({
-    outcome,
-    seqRef,
-    startRun,
-  });
-
-  const route = useCallback(
+  return useCallback(
     (payload: InstantEvalRoutePayload) => {
       const seq = seqRef.current;
       const { timeRange, evalRuns } = useExplorerStore.getState();
@@ -509,24 +481,39 @@ export function useInstantEvalRoute({
       estimate,
       pendingRef,
       refuse,
+      seqRef,
       setConfirmation,
       setRefusal,
       startRun,
     ],
   );
+}
 
-  const onInstantEvalRoute = useCallback(
-    (payload: InstantEvalRoutePayload) => {
-      ++seqRef.current;
-      if (!isInstantEvalAvailable) {
-        bailUnreleased({ outcome, optInOffer, heldRef, payload });
-        return;
-      }
-      heldRef.current = null;
-      route(payload);
-    },
-    [isInstantEvalAvailable, optInOffer, outcome, route],
-  );
+/**
+ * The organization's switch from the `opt_in` popover, and the popover's
+ * dismissal. Both take the sequence: a switch answered after the reader
+ * closed the popover, or submitted again, is dropped rather than routing a
+ * question nobody is waiting for. The access cache is still written on that
+ * late answer, because the organization really is switched on now.
+ */
+function useInstantEvalSwitch({
+  enable,
+  heldRef,
+  seqRef,
+  route,
+  outcome,
+}: {
+  enable: ReturnType<typeof api.tracesV2.instantEval.enable.useMutation>;
+  heldRef: MutableRefObject<InstantEvalRoutePayload | null>;
+  seqRef: MutableRefObject<number>;
+  route: (payload: InstantEvalRoutePayload) => void;
+  outcome: Pick<
+    ReturnType<typeof useInstantEvalOutcome>,
+    "setRefusal" | "searchWordsInstead"
+  >;
+}): { enableInstantEvals: () => void; dismissRefusal: () => void } {
+  const utils = api.useUtils();
+  const { setRefusal, searchWordsInstead } = outcome;
 
   const enableInstantEvals = useCallback(() => {
     const held = heldRef.current;
@@ -559,7 +546,92 @@ export function useInstantEvalRoute({
         },
       },
     );
-  }, [enable, route, setRefusal, utils]);
+  }, [enable, heldRef, route, seqRef, setRefusal, utils]);
+
+  const dismissRefusal = useCallback(() => {
+    seqRef.current += 1;
+    heldRef.current = null;
+    searchWordsInstead();
+  }, [heldRef, searchWordsInstead, seqRef]);
+
+  return { enableInstantEvals, dismissRefusal };
+}
+
+/**
+ * The Explorer's handler for the `instant_eval` route: the cost rule, the
+ * chip and the refusals.
+ *
+ * A run already registered for the scope is reused with no request. Else an
+ * estimate is made; under {@link INSTANT_EVAL_AUTO_RUN_USD} the run starts,
+ * otherwise the dialog asks. A started run becomes an `eval` chip beside the
+ * other terms and is registered under its key, so the reads send it. A spent
+ * budget or a missing judge is a popover, and every refusal ends in the
+ * phrase search the router built.
+ *
+ * An organization Instant Evals are not on for never reaches the estimate:
+ * the popover shows straight away, and nothing is sent. A self-serve
+ * organization is offered the switch there; once thrown, the same payload
+ * goes on to the estimate.
+ *
+ * Spec: specs/traces-v2/instant-eval-search.feature ("A run starts under
+ * the cost rule", "A refusal is a popover, never an error state",
+ * "Instant Evals off for a self-serve organization open the enable popover",
+ * "Instant Evals off for an enterprise organization open the contact-us
+ * popover").
+ */
+export function useInstantEvalRoute({
+  isInstantEvalAvailable,
+  optInOffer,
+}: {
+  isInstantEvalAvailable: boolean;
+  /** What the popover offers when unavailable; absent until the server says. */
+  optInOffer?: InstantEvalOptInOffer | undefined;
+}): InstantEvalRouteState {
+  const estimate = api.tracesV2.instantEval.estimate.useMutation();
+  const enable = api.tracesV2.instantEval.enable.useMutation();
+  const outcome = useInstantEvalOutcome();
+  const seqRef = useRef(0);
+  // The payload the opt-in popover is about, kept apart from `pendingRef`:
+  // closing that popover must not apply a fallback query.
+  const heldRef = useRef<InstantEvalRoutePayload | null>(null);
+  const { start, applyChip, startRun } = useInstantEvalStarter({
+    outcome,
+    seqRef,
+  });
+  const { confirmRun, abandonPendingRun } = useInstantEvalPendingActions({
+    outcome,
+    seqRef,
+    startRun,
+  });
+
+  const route = useInstantEvalRouter({
+    estimate,
+    outcome,
+    seqRef,
+    applyChip,
+    startRun,
+  });
+
+  const onInstantEvalRoute = useCallback(
+    (payload: InstantEvalRoutePayload) => {
+      ++seqRef.current;
+      if (!isInstantEvalAvailable) {
+        bailUnreleased({ outcome, optInOffer, heldRef, payload });
+        return;
+      }
+      heldRef.current = null;
+      route(payload);
+    },
+    [isInstantEvalAvailable, optInOffer, outcome, route],
+  );
+
+  const { enableInstantEvals, dismissRefusal } = useInstantEvalSwitch({
+    enable,
+    heldRef,
+    seqRef,
+    route,
+    outcome,
+  });
 
   return {
     onInstantEvalRoute,
@@ -568,7 +640,7 @@ export function useInstantEvalRoute({
     confirmRun,
     searchWordsInstead: outcome.searchWordsInstead,
     refusal: outcome.refusal,
-    dismissRefusal: outcome.searchWordsInstead,
+    dismissRefusal,
     enableInstantEvals,
     isEnabling: enable.isPending,
     isEstimating: estimate.isPending,
