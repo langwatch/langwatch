@@ -49,12 +49,16 @@ export function AutomationSeveritySection({
           onChange((nextValues[0] as AlertTypeValue | undefined) ?? null)
         }
       >
-        <Select.Trigger>
+        <Select.Trigger data-testid="automation-severity-trigger">
           <Select.ValueText placeholder="Pick a severity" />
         </Select.Trigger>
         <Select.Content>
           {SEVERITY_OPTIONS.map((option) => (
-            <Select.Item key={option.value} item={option}>
+            <Select.Item
+              key={option.value}
+              item={option}
+              data-testid={`automation-severity-${option.value.toLowerCase()}`}
+            >
               {option.label}
             </Select.Item>
           ))}

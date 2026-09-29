@@ -51,6 +51,7 @@ export function DeleteConfirmationDialog({
             <Text>{description}</Text>
             <Input
               placeholder="Type 'delete' to confirm"
+              data-testid="prompt-delete-confirm-input"
               value={confirmationText}
 
               onChange={(event) => {
@@ -79,6 +80,7 @@ export function DeleteConfirmationDialog({
           </Button>
           <Button
             colorPalette="red"
+            data-testid="prompt-delete-confirm-button"
             onClick={(event) => {
               event.stopPropagation();
               confirm();

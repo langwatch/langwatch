@@ -32,7 +32,7 @@ export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
 
   return (
     <Tooltip content="New Prompt" disabled={!iconOnly}>
-      <PageLayout.HeaderButton onClick={handleClick}>
+      <PageLayout.HeaderButton onClick={handleClick} data-testid="prompt-new-button">
         <LuPlus size={14} />
         {!iconOnly && "New Prompt"}
       </PageLayout.HeaderButton>

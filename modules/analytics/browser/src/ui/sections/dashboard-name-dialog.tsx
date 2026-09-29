@@ -71,6 +71,7 @@ export function DashboardNameDialog({
             </Text>
             <Input
               aria-label="Dashboard name"
+              data-testid="analytics-dashboard-name-input"
               placeholder="Dashboard name"
               value={dashboardName}
               onChange={(event) => setDashboardName(event.target.value)}
@@ -85,6 +86,7 @@ export function DashboardNameDialog({
             <Spacer />
             <Button
               colorPalette="blue"
+              data-testid="analytics-dashboard-create-confirm"
               onClick={handleConfirm}
               disabled={!dashboardName.trim()}
               loading={createDashboard.isPending}

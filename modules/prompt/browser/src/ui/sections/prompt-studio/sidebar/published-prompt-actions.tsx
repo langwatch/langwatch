@@ -162,7 +162,13 @@ export function PublishedPromptActions({
       >
         <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
           <Menu.Trigger asChild>
-            <Button variant="ghost" size="xs" onClick={(event) => event.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label="Prompt actions"
+              data-testid={`prompt-actions-menu-${promptHandle ?? promptId}`}
+              onClick={(event) => event.stopPropagation()}
+            >
               <LuEllipsisVertical size={14} />
             </Button>
           </Menu.Trigger>
@@ -180,11 +186,16 @@ export function PublishedPromptActions({
             <Menu.Item value="copy" onClick={() => setIsCopyDialogOpen(true)}>
               <Copy size={16} /> Replicate to another project
             </Menu.Item>
-            <Menu.Item value="duplicate" onClick={() => void onDuplicate()}>
+            <Menu.Item
+              value="duplicate"
+              data-testid="prompt-actions-duplicate"
+              onClick={() => void onDuplicate()}
+            >
               <LuCopyPlus size={16} /> Duplicate prompt
             </Menu.Item>
             <Menu.Item
               value="view-history"
+              data-testid="prompt-actions-view-history"
               onClick={() => {
                 if (!prompt) return;
                 const defaultValues = computeInitialFormValuesForPrompt({
@@ -216,6 +227,7 @@ export function PublishedPromptActions({
             >
               <Menu.Item
                 value="rename"
+                data-testid="prompt-actions-rename-handle"
                 onClick={canRename ? renameHandle : undefined}
                 disabled={!canRename}
                 opacity={canRename ? 1 : 0.5}
@@ -233,6 +245,7 @@ export function PublishedPromptActions({
             >
               <Menu.Item
                 value="delete"
+                data-testid="prompt-actions-delete"
                 onClick={() => canDelete && setIsDeleteDialogOpen(true)}
                 disabled={!canDelete}
                 opacity={canDelete ? 1 : 0.5}

@@ -94,10 +94,21 @@ export function DashboardWidgetEditDrawer({
           />
         </Drawer.Body>
         <Drawer.Footer flexShrink={0}>
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>
+          <Button
+            variant="outline"
+            data-testid="analytics-widget-cancel"
+            onClick={onClose}
+            disabled={isSaving}
+          >
             Cancel
           </Button>
-          <Button colorPalette="orange" loading={isSaving} disabled={!canSave} onClick={onSave}>
+          <Button
+            colorPalette="orange"
+            data-testid="analytics-widget-save"
+            loading={isSaving}
+            disabled={!canSave}
+            onClick={onSave}
+          >
             Save
           </Button>
         </Drawer.Footer>
@@ -143,8 +154,12 @@ function WidgetEditTabs({
           own recipe to show the selected tab; no hand-rolled
           `Tabs.Indicator`. */}
       <Tabs.List flexShrink={0} alignItems="center" borderBottomWidth="1px" borderColor="border">
-        <Tabs.Trigger value="code">Code</Tabs.Trigger>
-        <Tabs.Trigger value="queries">Queries ({queries.length})</Tabs.Trigger>
+        <Tabs.Trigger value="code" data-testid="analytics-widget-tab-code">
+          Code
+        </Tabs.Trigger>
+        <Tabs.Trigger value="queries" data-testid="analytics-widget-tab-queries">
+          Queries ({queries.length})
+        </Tabs.Trigger>
         <Spacer />
         {activeTab === "queries" && (
           <AddQueryButton queries={queries} onQueriesChange={onQueriesChange} />
@@ -202,6 +217,7 @@ function AddQueryButton({
     <Button
       size="xs"
       variant="ghost"
+      data-testid="analytics-widget-add-query"
       onClick={() => onQueriesChange([...queries, { name: nextQueryName(queries), sql: "" }])}
     >
       <Plus size={14} /> Add query

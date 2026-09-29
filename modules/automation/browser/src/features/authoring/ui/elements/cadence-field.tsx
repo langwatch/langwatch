@@ -32,12 +32,16 @@ export function AutomationCadenceField({
           if (next) onValueChange(next as NotificationCadence);
         }}
       >
-        <Select.Trigger>
+        <Select.Trigger data-testid="automation-cadence-trigger">
           <Select.ValueText />
         </Select.Trigger>
         <Select.Content>
           {CADENCE_OPTIONS.map((option) => (
-            <Select.Item key={option.value} item={option}>
+            <Select.Item
+              key={option.value}
+              item={option}
+              data-testid={`automation-cadence-${option.value}`}
+            >
               {option.label}
             </Select.Item>
           ))}

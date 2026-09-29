@@ -139,6 +139,7 @@ export function DeliveryPicker({
               size="xs"
               variant="outline"
               flexShrink={0}
+              data-testid="automation-delivery-edit-setup"
               onClick={() => setSection("configuration")}
             >
               <Settings2 size={13} /> Edit setup
@@ -245,6 +246,7 @@ function DeliveryCard({
       bg={active ? "colorPalette.subtle" : "bg"}
       cursor={readOnly ? "not-allowed" : "pointer"}
       aria-disabled={readOnly || undefined}
+      data-testid={`automation-delivery-${entry.shared.action.toLowerCase().replaceAll("_", "-")}`}
       onClick={readOnly ? undefined : onClick}
     >
       <HStack gap={2} mb={1}>

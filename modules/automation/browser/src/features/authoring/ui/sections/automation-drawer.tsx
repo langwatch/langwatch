@@ -469,6 +469,7 @@ export function AutomationDrawer({
               onSave={onSave}
               saving={upsert.isPending}
               saveLabel={labels.saveButton}
+              saveTestId={`automation-save-${labels.noun}`}
             />
           </Drawer.Footer>
         </Drawer.Content>
@@ -1193,6 +1194,7 @@ function DrawerFooterActions({
   onSave,
   saving,
   saveLabel,
+  saveTestId,
 }: {
   showTestFire: boolean;
   configComplete: boolean;
@@ -1203,6 +1205,7 @@ function DrawerFooterActions({
   onSave: () => void;
   saving: boolean;
   saveLabel: string;
+  saveTestId: string;
 }) {
   return (
     <HStack width="full">
@@ -1222,7 +1225,13 @@ function DrawerFooterActions({
         </Tooltip>
       ) : null}
       <Tooltip content={saveBlockedReason} disabled={canSave}>
-        <Button colorPalette="orange" onClick={onSave} loading={saving} disabled={!canSave}>
+        <Button
+          colorPalette="orange"
+          data-testid={saveTestId}
+          onClick={onSave}
+          loading={saving}
+          disabled={!canSave}
+        >
           {saveLabel}
         </Button>
       </Tooltip>

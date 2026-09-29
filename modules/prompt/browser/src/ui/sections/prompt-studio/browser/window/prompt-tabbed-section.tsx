@@ -185,12 +185,20 @@ export function PromptTabbedSection({
           margin="0 auto"
           paddingX={3}
         >
-          <Tabs.Trigger value={PromptTab.Conversation}>Conversation</Tabs.Trigger>
-          {hasInputs && <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>}
+          <Tabs.Trigger value={PromptTab.Conversation} data-testid="prompt-tab-conversation">
+            Conversation
+          </Tabs.Trigger>
+          {hasInputs && (
+            <Tabs.Trigger value={PromptTab.Variables} data-testid="prompt-tab-variables">
+              Variables
+            </Tabs.Trigger>
+          )}
           {hasDemonstrations && (
             <Tabs.Trigger value={PromptTab.Demonstrations}>Demonstrations</Tabs.Trigger>
           )}
-          <Tabs.Trigger value={PromptTab.Parameters}>Parameters</Tabs.Trigger>
+          <Tabs.Trigger value={PromptTab.Parameters} data-testid="prompt-tab-parameters">
+            Parameters
+          </Tabs.Trigger>
           <Tabs.Context>
             {(tabs) => (
               <>

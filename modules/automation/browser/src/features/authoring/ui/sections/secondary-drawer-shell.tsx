@@ -66,7 +66,12 @@ export function SecondaryDrawerShell({
         <Drawer.Footer>
           <HStack width="full">
             <Spacer />
-            <Button colorPalette="orange" onClick={onDone} disabled={doneDisabled}>
+            <Button
+              colorPalette="orange"
+              data-testid="automation-setup-done"
+              onClick={onDone}
+              disabled={doneDisabled}
+            >
               Done
             </Button>
           </HStack>

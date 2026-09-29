@@ -149,7 +149,12 @@ export function GraphCardMenu({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button variant="ghost" loading={isDeleting}>
+        <Button
+          variant="ghost"
+          loading={isDeleting}
+          aria-label="Chart actions"
+          data-testid="analytics-chart-menu"
+        >
           <MoreVertical />
         </Button>
       </Menu.Trigger>
@@ -164,6 +169,7 @@ export function GraphCardMenu({
         {!isWorkbenchChart && (!isDashboardWidget || onEdit) && (
           <Menu.Item
             value="edit"
+            data-testid="analytics-chart-edit"
             onClick={() => {
               if (onEdit) {
                 onEdit();
@@ -200,6 +206,7 @@ export function GraphCardMenu({
         {isDashboardWidget && showAddToDashboard && (
           <Menu.Item
             value="add-to-dashboard"
+            data-testid="analytics-chart-add-to-dashboard"
             onClick={handleAddToDashboard}
             disabled={!hasDashboard || isAssigning}
           >
@@ -207,7 +214,12 @@ export function GraphCardMenu({
           </Menu.Item>
         )}
 
-        <Menu.Item value="delete" color="red.600" onClick={onDelete}>
+        <Menu.Item
+          value="delete"
+          color="red.600"
+          data-testid="analytics-chart-delete"
+          onClick={onDelete}
+        >
           <Trash2 /> Delete Graph
         </Menu.Item>
       </Menu.Content>

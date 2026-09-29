@@ -170,7 +170,7 @@ function ModelGroupItems({ group, size }: { group: ModelOptionGroup; size: Selec
             {showDivider && (
               <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />
             )}
-            <Select.Item item={item}>
+            <Select.Item item={item} data-testid={`prompt-model-option-${item.value}`}>
               <HStack gap={2}>
                 {item.icon && (
                   <ProviderIconGlyph
@@ -249,6 +249,7 @@ function ModelSearchInput({
             variant="flushed"
             size="sm"
             placeholder="Search models"
+            data-testid="prompt-model-search-input"
             type="search"
             background="transparent"
             color="fg"
@@ -362,6 +363,7 @@ export const ModelSelector = React.memo(function ModelSelector({
     >
       <Select.Trigger
         className="fix-hidden-inputs"
+        data-testid="prompt-model-selector-trigger"
         width={size === "full" ? "100%" : "auto"}
         background="bg"
         borderRadius="lg"

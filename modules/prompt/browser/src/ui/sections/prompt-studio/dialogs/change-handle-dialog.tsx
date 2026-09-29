@@ -111,6 +111,7 @@ export function ChangeHandleDialog({
                 <Field.Label>Prompt Identifier</Field.Label>
                 <Input
                   placeholder="prompt-name"
+                  data-testid="prompt-handle-input"
 
                   data-1p-ignore
                   {...handleHandler}
@@ -179,6 +180,7 @@ export function ChangeHandleDialog({
             </Button>
             <Button
               colorPalette="green"
+              data-testid="prompt-handle-submit"
               onClick={() => void handleSubmit(submitCallback)()}
               loading={isSubmitting}
               disabled={!isDirty}

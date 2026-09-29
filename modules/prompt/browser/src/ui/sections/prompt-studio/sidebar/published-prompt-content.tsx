@@ -20,7 +20,12 @@ export function PublishedPromptContent({
   prompt,
 }: PublishedPromptContentProps) {
   return (
-    <HStack justify="space-between" width="full" className="group">
+    <HStack
+      justify="space-between"
+      width="full"
+      className="group"
+      data-testid={`prompt-row-${promptHandle ?? promptId}`}
+    >
       {prompt?.scope === "ORGANIZATION" && (
         <Box marginLeft="-12px">
           <OrganizationBadge />

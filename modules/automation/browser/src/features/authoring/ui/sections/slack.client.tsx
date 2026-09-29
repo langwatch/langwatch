@@ -792,6 +792,7 @@ function SlackConnectionSection({
               value={slice.webhook}
               onChange={(e) => onChange({ ...slice, webhook: e.target.value })}
               placeholder="https://hooks.slack.com/services/..."
+              data-testid="automation-slack-webhook-input"
             />
             <ReuseSlackWebhook
               projectId={ctx.projectId}

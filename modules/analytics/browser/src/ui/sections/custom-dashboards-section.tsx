@@ -206,6 +206,7 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
                   {dashboard.name}
                 </MenuLink>
                 <DashboardRowMenu
+                  name={dashboard.name}
                   canMoveUp={canMoveUp}
                   canMoveDown={canMoveDown}
                   canDelete={dashboards.length > 1}
@@ -218,7 +219,13 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
           </Box>
         );
       })}
-      <Button size="sm" width="full" variant="ghost" onClick={handleCreateDashboard}>
+      <Button
+        size="sm"
+        width="full"
+        variant="ghost"
+        data-testid="analytics-dashboard-add"
+        onClick={handleCreateDashboard}
+      >
         <Plus size={14} /> Add Dashboard
       </Button>
     </>
@@ -246,6 +253,7 @@ function swapWithNeighbour({
 }
 
 function DashboardRowMenu({
+  name,
   canMoveUp,
   canMoveDown,
   canDelete,
@@ -253,6 +261,7 @@ function DashboardRowMenu({
   onMove,
   onDelete,
 }: {
+  name: string;
   canMoveUp: boolean;
   canMoveDown: boolean;
   canDelete: boolean;
@@ -266,6 +275,8 @@ function DashboardRowMenu({
         <Box
           as="button"
           className="menu-btn"
+          aria-label={`Actions for dashboard ${name}`}
+          data-testid={`analytics-dashboard-menu-${name}`}
           position="absolute"
           right={1}
           top="50%"
@@ -281,21 +292,34 @@ function DashboardRowMenu({
         </Box>
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item value="rename" onClick={onRename}>
+        <Menu.Item value="rename" data-testid="analytics-dashboard-rename" onClick={onRename}>
           <Edit2 size={14} /> Rename
         </Menu.Item>
         {canMoveUp && (
-          <Menu.Item value="move-up" onClick={() => onMove("up")}>
+          <Menu.Item
+            value="move-up"
+            data-testid="analytics-dashboard-move-up"
+            onClick={() => onMove("up")}
+          >
             <ArrowUp size={14} /> Move Up
           </Menu.Item>
         )}
         {canMoveDown && (
-          <Menu.Item value="move-down" onClick={() => onMove("down")}>
+          <Menu.Item
+            value="move-down"
+            data-testid="analytics-dashboard-move-down"
+            onClick={() => onMove("down")}
+          >
             <ArrowDown size={14} /> Move Down
           </Menu.Item>
         )}
         {canDelete && (
-          <Menu.Item value="delete" color="red.600" onClick={onDelete}>
+          <Menu.Item
+            value="delete"
+            color="red.600"
+            data-testid="analytics-dashboard-delete"
+            onClick={onDelete}
+          >
             <Trash2 size={14} /> Delete
           </Menu.Item>
         )}
@@ -320,6 +344,7 @@ function DashboardNameInput({
   return (
     <Input
       ref={inputRef}
+      data-testid="analytics-dashboard-rename-input"
       size="xs"
       value={value}
       onChange={(e) => onChange(e.target.value)}

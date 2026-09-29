@@ -20,6 +20,7 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
         {...props}
         ref={ref}
         placeholder="Type your message here. Shift+Enter for new line."
+        data-testid="prompt-chat-input"
         resize="none"
         rows={1}
         // Tall enough to read as somewhere you write a message rather than a

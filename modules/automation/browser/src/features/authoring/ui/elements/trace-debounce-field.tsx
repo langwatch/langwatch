@@ -37,6 +37,7 @@ export function AutomationTraceDebounceField({
       <HStack>
         <Input
           type="number"
+          data-testid="automation-settle-window-input"
           min={MIN_SECONDS}
           max={MAX_SECONDS}
           step={1}

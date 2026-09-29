@@ -244,14 +244,19 @@ function AddChartButton({
 }) {
   if (opensDrawer) {
     return (
-      <Button colorPalette="orange" size="sm" onClick={onOpenDrawer}>
+      <Button
+        colorPalette="orange"
+        size="sm"
+        data-testid="analytics-add-chart"
+        onClick={onOpenDrawer}
+      >
         <Plus /> Add chart
       </Button>
     );
   }
   return (
     <Link href={href} asChild>
-      <Button colorPalette="orange" size="sm">
+      <Button colorPalette="orange" size="sm" data-testid="analytics-add-chart">
         <Plus /> Add chart
       </Button>
     </Link>

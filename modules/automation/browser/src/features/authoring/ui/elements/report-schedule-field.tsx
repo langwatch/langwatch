@@ -151,6 +151,7 @@ export function ReportScheduleField({
               <Field.Label>Frequency</Field.Label>
               <NativeSelect.Root>
                 <NativeSelect.Field
+                  data-testid="automation-schedule-frequency-select"
                   value={parts.frequency}
                   onChange={(e) => emitParts({ frequency: e.target.value as Frequency })}
                 >
@@ -168,6 +169,7 @@ export function ReportScheduleField({
               <Field.Label>Time</Field.Label>
               <Input
                 type="time"
+                data-testid="automation-schedule-time-input"
                 value={timeOfDay(parts)}
                 onChange={(e) => onTimeChange(e.target.value)}
               />

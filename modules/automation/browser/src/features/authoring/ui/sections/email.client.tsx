@@ -231,6 +231,7 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, E
           <Input
             value={newEmail}
             placeholder="alerts@partner.com"
+            data-testid="automation-email-input"
             onChange={(e) => {
               setNewEmail(e.target.value);
               setAddError(null);
@@ -242,7 +243,12 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, E
               }
             }}
           />
-          <Button variant="outline" onClick={addExternal} disabled={!newEmail.trim()}>
+          <Button
+            variant="outline"
+            data-testid="automation-email-add"
+            onClick={addExternal}
+            disabled={!newEmail.trim()}
+          >
             Add email
           </Button>
         </HStack>

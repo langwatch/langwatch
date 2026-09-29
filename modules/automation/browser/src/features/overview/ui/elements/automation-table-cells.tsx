@@ -187,7 +187,14 @@ export function SectionHeader({
           {summary}
         </Text>
       </VStack>
-      <Button size="sm" variant="outline" colorPalette={accent} onClick={onAdd} flexShrink={0}>
+      <Button
+        size="sm"
+        variant="outline"
+        colorPalette={accent}
+        data-testid={`automation-add-${title.toLowerCase()}`}
+        onClick={onAdd}
+        flexShrink={0}
+      >
         <Plus size={14} /> {addLabel}
       </Button>
     </HStack>

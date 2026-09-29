@@ -583,6 +583,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
         <Button
           variant={"ghost"}
           aria-label={`Actions for ${trigger.name}`}
+          data-testid={`automation-row-actions-${trigger.name}`}
           onClick={(event) => {
             event.stopPropagation();
           }}
@@ -593,6 +594,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
       <Menu.Content>
         <Menu.Item
           value="view"
+          data-testid="automation-action-view"
           onClick={(event) => {
             event.stopPropagation();
             openView(trigger.id);
@@ -605,6 +607,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
         </Menu.Item>
         <Menu.Item
           value="edit"
+          data-testid="automation-action-edit"
           onClick={(event) => {
             event.stopPropagation();
             openEdit(trigger.id);
@@ -617,6 +620,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
         </Menu.Item>
         <Menu.Item
           value="delete"
+          data-testid="automation-action-delete"
           onClick={(event) => {
             event.stopPropagation();
             deleteTrigger(trigger.id);
@@ -655,6 +659,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
         <VStack gap={1} align="center">
           <Switch
             checked={trigger.active}
+            data-testid={`automation-toggle-${trigger.name}`}
             inputProps={{ "aria-label": `Toggle ${trigger.name}` }}
             onCheckedChange={({ checked }) => {
               handleToggleTrigger(trigger.id, checked);

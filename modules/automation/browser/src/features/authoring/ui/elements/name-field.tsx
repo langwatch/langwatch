@@ -39,6 +39,7 @@ export function AutomationNameField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={NAME_PLACEHOLDER[source]}
+        data-testid="automation-name-input"
       />
       {nameMissing ? <Field.ErrorText>Name this {noun} to save it.</Field.ErrorText> : null}
     </Field.Root>

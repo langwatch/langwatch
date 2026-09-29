@@ -21,7 +21,12 @@ export function NoPromptsOnboardingState() {
             one place.
           </EmptyState.Description>
           <HStack gap={2}>
-            <Button variant="outline" size="sm" onClick={() => void createDraftPrompt()}>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="prompt-new-button"
+              onClick={() => void createDraftPrompt()}
+            >
               Create First Prompt
             </Button>
             <SetupWithAgentButton surface="prompts" />

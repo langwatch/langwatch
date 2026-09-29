@@ -229,6 +229,7 @@ function ActivityRow({
       paddingY={2.5}
       cursor="pointer"
       _hover={{ bg: "bg.muted" }}
+      data-testid={`automation-activity-${entry.kind}`}
       onClick={onOpen}
     >
       <Box color={`${meta.palette}.fg`} display="inline-flex" flexShrink={0}>

@@ -40,6 +40,7 @@ export function SourceCard({
       borderColor={active ? "colorPalette.emphasized" : "border"}
       bg={active ? "colorPalette.subtle" : "bg"}
       aria-disabled={locked}
+      data-testid={`automation-type-${title.toLowerCase()}`}
       opacity={locked && !active ? 0.6 : 1}
       cursor={locked ? "not-allowed" : "pointer"}
       onClick={locked ? undefined : onClick}

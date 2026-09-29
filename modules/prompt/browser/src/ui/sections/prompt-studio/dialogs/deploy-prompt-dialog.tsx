@@ -171,7 +171,7 @@ function TagVersionRow({
             onValueChange={(details) => onSelect(details.value[0] ?? "")}
             aria-label={`${tagName.charAt(0).toUpperCase()}${tagName.slice(1)} version`}
           >
-            <Select.Trigger clearable>
+            <Select.Trigger clearable data-testid={`prompt-deploy-tag-trigger-${tagName}`}>
               <Select.ValueText placeholder="Select version">
                 {(items) => {
                   const item = items[0] as VersionItem | undefined;
@@ -182,7 +182,11 @@ function TagVersionRow({
             </Select.Trigger>
             <Select.Content>
               {versionItems.map((v) => (
-                <Select.Item key={v.value} item={v}>
+                <Select.Item
+                  key={v.value}
+                  item={v}
+                  data-testid={`prompt-deploy-tag-${tagName}-version-${v.version}`}
+                >
                   <Tooltip content={v.commitMessage} openDelay={500}>
                     <VersionLabel version={v.version} commitMessage={v.commitMessage} />
                   </Tooltip>
@@ -221,7 +225,13 @@ function TagVersionRow({
 function AddTagControl({ addTag }: { addTag: DeployTags["addTag"] }) {
   if (!addTag.isAddingTag) {
     return (
-      <Button variant="ghost" size="sm" alignSelf="flex-start" onClick={addTag.startAddTag}>
+      <Button
+        variant="ghost"
+        size="sm"
+        alignSelf="flex-start"
+        data-testid="prompt-deploy-add-tag"
+        onClick={addTag.startAddTag}
+      >
         + Add tag
       </Button>
     );
@@ -231,6 +241,7 @@ function AddTagControl({ addTag }: { addTag: DeployTags["addTag"] }) {
       <Input
         size="sm"
         placeholder="Tag name (e.g. canary)"
+        data-testid="prompt-deploy-tag-name-input"
         value={addTag.newTagName}
         onChange={(e) => addTag.editNewTagName(e.target.value)}
         onKeyDown={(e) => {
@@ -241,6 +252,7 @@ function AddTagControl({ addTag }: { addTag: DeployTags["addTag"] }) {
       <Button
         size="sm"
         colorPalette="orange"
+        data-testid="prompt-deploy-tag-add-confirm"
         onClick={() => void addTag.confirmAddTag()}
         loading={addTag.isSubmittingTag}
       >
@@ -314,6 +326,7 @@ export function DeployPromptDialog({
             <Button
               colorPalette="blue"
               size="sm"
+              data-testid="prompt-deploy-save"
               onClick={() => void tags.handleSave()}
               loading={tags.isSaving}
             >

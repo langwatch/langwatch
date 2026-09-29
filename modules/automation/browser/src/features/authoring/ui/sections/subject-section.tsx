@@ -139,6 +139,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
         <Field.Label>Custom graph</Field.Label>
         <NativeSelect.Root disabled={isPrefilled}>
           <NativeSelect.Field
+            data-testid="automation-alert-graph-select"
             value={draft.customGraphId ?? ""}
             onChange={(e) => {
               const id = e.target.value || null;
@@ -173,6 +174,7 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
         <Field.Label>Series</Field.Label>
         <NativeSelect.Root disabled={!draft.customGraphId || seriesOptions.length === 0}>
           <NativeSelect.Field
+            data-testid="automation-alert-series-select"
             value={draft.graphAlert.seriesName}
             onChange={(e) =>
               dispatch({
@@ -251,6 +253,7 @@ function ReportSubject() {
           <Field.Label>Custom graph</Field.Label>
           <NativeSelect.Root>
             <NativeSelect.Field
+              data-testid="automation-schedule-graph-select"
               value={report.customGraphId ?? ""}
               onChange={(e) =>
                 dispatch({
@@ -277,6 +280,7 @@ function ReportSubject() {
         <Field.Label>Dashboard</Field.Label>
         <NativeSelect.Root>
           <NativeSelect.Field
+            data-testid="automation-schedule-dashboard-select"
             value={report.dashboardId ?? ""}
             onChange={(e) =>
               dispatch({
@@ -305,6 +309,7 @@ function ReportSubject() {
         <Field.Label>What to send</Field.Label>
         <NativeSelect.Root>
           <NativeSelect.Field
+            data-testid="automation-schedule-source-select"
             value={report.sourceKind}
             onChange={(e) =>
               dispatch({
@@ -521,6 +526,7 @@ function TraceQuerySubject({
                 key={ex}
                 size="sm"
                 cursor="pointer"
+                data-testid={`automation-subject-example-${ex}`}
                 onClick={() => onChange(query.trim() ? `${query.trim()} ${ex}` : ex)}
               >
                 {ex}
@@ -566,6 +572,7 @@ function SubjectModeToggle({
       variant={mode === "builder" ? "subtle" : "ghost"}
       borderRadius={0}
       disabled={!builderEnabled}
+      data-testid="automation-subject-builder"
       onClick={() => onMode("builder")}
     >
       Builder
@@ -586,6 +593,7 @@ function SubjectModeToggle({
           size="xs"
           variant={mode === "code" ? "subtle" : "ghost"}
           borderRadius={0}
+          data-testid="automation-subject-code"
           onClick={() => onMode("code")}
         >
           Code

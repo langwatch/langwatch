@@ -68,7 +68,12 @@ export function PromptEditorHeader({
           )}
           {configId && handle && project?.id && (
             <>
-              <Button variant="outline" size="sm" onClick={deployDialog.onOpen}>
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="prompt-deploy-button"
+                onClick={deployDialog.onOpen}
+              >
                 Deploy
               </Button>
               <DeployPromptDialog

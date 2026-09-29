@@ -64,6 +64,7 @@ export function ChatSendButton({
     <chakra.button
       type="button"
       aria-label={isStopping ? "Stop generating" : "Send message"}
+      data-testid="prompt-chat-send"
       onClick={() => (isStopping ? onStop?.() : onSend())}
       disabled={isInactive}
       width="34px"
