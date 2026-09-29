@@ -73,6 +73,14 @@ Feature: A drawer that needs another drawer
       When they save in the editor
       Then they are back in the drawer that opened it, not on the page behind it
 
+    # The type selector is a chooser, not a caller: main closed the drawer after
+    # a save from it rather than reopening "Choose Agent Connection Type".
+    @integration
+    Scenario: Saving an agent chosen in the type selector closes the drawer
+      Given a reader who chose HTTP Agent in the agent type selector
+      When they save the new agent in the editor
+      Then the drawer closes rather than returning to the type selector
+
     @integration @unimplemented
     Scenario: Pressing Escape in a sub-flow returns to the caller
       Given a reader is in a sub-flow opened from another drawer

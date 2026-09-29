@@ -303,7 +303,7 @@ export interface ScenarioApi {
     by: ScenarioCaller,
   ): Promise<Scenario>;
   update(
-    input: Omit<ScenarioUpdateInput, "lastUpdatedById" | "actor">,
+    input: Omit<ScenarioUpdateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario>;
   archive(input: ScenarioIdInput): Promise<Scenario>;

@@ -232,7 +232,12 @@ export function createScenarioRest(): Readonly<{
         await app.getById({ id, projectId: scope.id });
 
         const scenario = await app.update(
-          { id, projectId: scope.id, ...scenarioUpdateData(body) },
+          {
+            id,
+            projectId: scope.id,
+            ...scenarioUpdateData(body),
+            actor: { userId: project.viewerUserId, label: scenarioAuthorLabel(surface) },
+          },
           { id: project.actorId, label: scenarioAuthorLabel(surface) },
         );
         return withPlatformUrl({
@@ -257,7 +262,12 @@ export function createScenarioRest(): Readonly<{
         await app.getById({ id, projectId: scope.id });
 
         const scenario = await app.update(
-          { id, projectId: scope.id, ...scenarioUpdateData(body) },
+          {
+            id,
+            projectId: scope.id,
+            ...scenarioUpdateData(body),
+            actor: { userId: project.viewerUserId, label: scenarioAuthorLabel(surface) },
+          },
           { id: project.actorId, label: scenarioAuthorLabel(surface) },
         );
         return withPlatformUrl({

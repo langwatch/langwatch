@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 const drawer = vi.hoisted(() => ({ closeDrawer: vi.fn(), goBack: vi.fn(), canGoBack: false }));
+const stack = vi.hoisted(() => ({ entries: [] as { drawer: string }[] }));
 const listed = vi.hoisted(() => ({ rows: [] as unknown[] }));
 const calls = vi.hoisted(() => ({
   navigate: [] as string[],
@@ -18,6 +19,7 @@ const calls = vi.hoisted(() => ({
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ ...drawer, openDrawer: vi.fn() }),
+  getDrawerStack: () => stack.entries,
 }));
 
 vi.mock("../../../model/agent-management-host.ts", () => ({
@@ -108,6 +110,7 @@ afterEach(() => {
   drawer.closeDrawer.mockReset();
   drawer.goBack.mockReset();
   drawer.canGoBack = false;
+  stack.entries = [];
   calls.navigate.length = 0;
   calls.workflowCreated.length = 0;
   calls.agentCreated.length = 0;
@@ -221,5 +224,22 @@ describe("the HTTP editor opened from another drawer", () => {
 
     await vi.waitFor(() => expect(drawer.goBack).toHaveBeenCalled());
     expect(drawer.closeDrawer).not.toHaveBeenCalled();
+  });
+});
+
+describe("the HTTP editor chosen in the agent type selector", () => {
+  /** @scenario "Saving an agent chosen in the type selector closes the drawer" */
+  it("closes once the agent is saved rather than reopening the selector", async () => {
+    drawer.canGoBack = true;
+    stack.entries = [{ drawer: "agentTypeSelector" }, { drawer: "agentHttpEditor" }];
+    render(<RoutedAgentHttpEditorDrawer />, { wrapper });
+    const user = userEvent.setup();
+
+    await user.type(screen.getByTestId("agent-name-input"), "Support bot");
+    await user.type(screen.getByTestId("url-input"), "https://example.com/chat");
+    await user.click(screen.getByTestId("save-agent-button"));
+
+    await vi.waitFor(() => expect(drawer.closeDrawer).toHaveBeenCalled());
+    expect(drawer.goBack).not.toHaveBeenCalled();
   });
 });
