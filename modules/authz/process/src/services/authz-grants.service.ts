@@ -42,6 +42,7 @@ import {
   type GrantableAuthzScopeRef,
   scopeOrganizationId,
 } from "@langwatch/authz-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
@@ -139,6 +140,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     role,
     where,
     source = "grants-service",
+    expiresAtMs,
   }: AuthzAttachGrantRequest): Promise<{ bindingId: string }> {
     if (where.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION, {
@@ -147,12 +149,17 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       });
     }
 
+    AuthzGrantGuardsService.assertExpiryInFuture({
+      expiresAtMs,
+      nowMs: this.nowMs(),
+      meta: { scopeType: where.type, scopeId: where.id },
+    });
     const organizationId = scopeOrganizationId(where);
     const { repository } = this.options;
     await this.guards.assertScopeBelongsToOrganization({ where, organizationId });
     await this.guards.assertRoleUsable({ role, organizationId });
 
-    const row = this.bindingRow({ who, role, where, organizationId });
+    const row = this.bindingRow({ who, role, where, organizationId, expiresAtMs });
     try {
       await repository.createBinding({
         row,
@@ -221,10 +228,18 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     from,
     to,
     role,
+    expiresAtMs,
   }: AuthzReplaceGrantRequest): Promise<{ bindingId: string }> {
     if (from.type === "resource" || to.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION);
     }
+
+    // Before the source is revoked: an expired replacement would be a removal shaped as an edit.
+    AuthzGrantGuardsService.assertExpiryInFuture({
+      expiresAtMs,
+      nowMs: this.nowMs(),
+      meta: { scopeType: to.type, scopeId: to.id },
+    });
 
     const organizationId = scopeOrganizationId(from);
     if (scopeOrganizationId(to) !== organizationId) {
@@ -234,7 +249,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     const { repository } = this.options;
     await this.guards.assertScopeBelongsToOrganization({ where: to, organizationId });
     await this.guards.assertRoleUsable({ role, organizationId });
-    const row = this.bindingRow({ who, role, where: to, organizationId });
+    const row = this.bindingRow({ who, role, where: to, organizationId, expiresAtMs });
     try {
       await repository.replaceBinding({
         deleteWhere: {
@@ -289,6 +304,14 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   }
 
   async attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> {
+    const nowMs = this.nowMs();
+    for (const binding of args.bindings) {
+      AuthzGrantGuardsService.assertExpiryInFuture({
+        expiresAtMs: binding.expiresAtMs,
+        nowMs,
+        meta: { scopeType: binding.scopeType, scopeId: binding.scopeId },
+      });
+    }
     return this.options.ledger.attachBindings(args);
   }
 
@@ -384,11 +407,13 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     role,
     where,
     organizationId,
+    expiresAtMs,
   }: {
     who: GrantPrincipal;
     role: GrantRole;
     where: GrantableScope;
     organizationId: string;
+    expiresAtMs: number | undefined;
   }): RoleBindingWrite {
     return {
       bindingId: this.options.newBindingId(),
@@ -398,7 +423,13 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       role: "customRoleId" in role ? "CUSTOM" : role.builtin,
       customRoleId: "customRoleId" in role ? role.customRoleId : null,
       principal: this.principalWhere(who),
+      // Omitted, never `undefined`: a grant with no end date keeps the shape it always had.
+      ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
     };
+  }
+
+  private nowMs(): number {
+    return nowInstant().epochMilliseconds;
   }
 
   private writeActor(actor: { userId: string } | Actor): LedgerActor {

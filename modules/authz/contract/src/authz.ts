@@ -128,6 +128,9 @@ export const collectedBindingSchema = z
     scopeType: roleBindingScopeTypeSchema,
     scopeId: z.string(),
     viaGroupId: z.string().nullable().optional(),
+    /** Reported, never filtered, by the reader: whether an elapsed one still grants is
+     *  the collector's call. */
+    expiresAtMs: z.number().int().nullable().optional(),
   })
   .strict();
 export type CollectedBinding = z.infer<typeof collectedBindingSchema>;

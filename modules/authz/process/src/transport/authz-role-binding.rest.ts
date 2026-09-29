@@ -78,7 +78,7 @@ export const authzRoleBindingRest: Readonly<{
   .withDocs({
     tags: ["Role Bindings"],
     description:
-      "List the organization's role bindings, each naming its principal (user, group or API key), role and scope. Filter by principal or scope; totalCount counts the filtered set.",
+      "List the organization's role bindings, each naming its principal (user, group or API key), role, scope, and the date its access ends if one was set. Filter by principal or scope; totalCount counts the filtered set.",
   })
   .withMiddleware(roleBindingRestFacts)
   .handle(async ({ app, input }, organization) => {
@@ -103,7 +103,7 @@ export const authzRoleBindingRest: Readonly<{
   .withDocs({
     tags: ["Role Bindings"],
     description:
-      "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
+      "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
   })
   .withMiddleware(roleBindingRestFacts)
   .handle(async ({ app, input }, organization) => {
@@ -129,6 +129,7 @@ export const authzRoleBindingRest: Readonly<{
         customRoleId: input.customRoleId,
         scopeType: input.scopeType,
         scopeId: input.scopeId,
+        expiresAt: input.expiresAt,
         now: nowInstant,
       });
 

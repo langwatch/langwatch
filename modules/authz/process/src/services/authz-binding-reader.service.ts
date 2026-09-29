@@ -105,6 +105,7 @@ export class AuthzBindingReaderService {
       scopeName: scopes.names.get(binding.scopeId) ?? null,
       memberUserIds: binding.groupId ? (membersByGroup.get(binding.groupId) ?? []) : [],
       createdAt: binding.createdAt,
+      expiresAt: binding.expiresAt ?? null,
     }));
   }
 

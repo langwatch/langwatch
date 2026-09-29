@@ -25,12 +25,14 @@ import {
 // One class, one status: an organization's membership is the organization
 // feature's fact, and every surface answers this refusal 422.
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
+import { fromDate, nowInstant } from "@langwatch/time";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type {
   AuthzBindingRepository,
   AuthzBindingScopeRow,
 } from "../repositories/authz-binding.repository.ts";
+import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
 
 function assertScopeCanGrantRole({
   binding,
@@ -77,6 +79,12 @@ export class AuthzBindingWriterService {
   ) {}
 
   async create(input: AuthzCreateBindingInput): Promise<AuthzCreateBindingOutput> {
+    const expiresAtMs = input.expiresAt ? fromDate(input.expiresAt).epochMilliseconds : undefined;
+    AuthzGrantGuardsService.assertExpiryInFuture({
+      expiresAtMs,
+      nowMs: nowInstant().epochMilliseconds,
+      meta: { scopeType: input.scopeType, scopeId: input.scopeId },
+    });
     const principal = this.principalOf(input);
     const scopeRows = await this.validateScopes({
       organizationId: input.organizationId,
@@ -111,6 +119,7 @@ export class AuthzBindingWriterService {
             customRoleId: input.role === "CUSTOM" ? (input.customRoleId ?? null) : null,
             scopeType: input.scopeType,
             scopeId: input.scopeId,
+            ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
           },
         ],
         actor: input.actor,

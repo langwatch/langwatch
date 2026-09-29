@@ -67,6 +67,7 @@ export const attachGrantEntrySchema = z
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
+    expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,
     actor: grantsLedgerActorSchema,
     occurredAtMs: z.number().int().nonnegative(),
@@ -200,6 +201,8 @@ export const authzLedgerBindingAttachSchema = z
     customRoleId: z.string().min(1).nullable(),
     scopeType: roleBindingScopeTypeSchema,
     scopeId: z.string().min(1),
+    /** When the binding stops granting; the writing service refuses a moment already passed. */
+    expiresAtMs: z.number().int().optional(),
   })
   .strict();
 export type AuthzLedgerBindingAttach = z.infer<typeof authzLedgerBindingAttachSchema>;
@@ -500,6 +503,8 @@ export const authzAttachGrantInputSchema = z
     who: grantPrincipalSchema,
     role: grantRoleSchema,
     where: grantableAuthzScopeRefSchema,
+    /** When the grant stops granting; absent for a grant that stands until revoked. */
+    expiresAtMs: z.number().int().optional(),
   })
   .strict();
 export type AuthzAttachGrantInput = z.infer<typeof authzAttachGrantInputSchema>;
@@ -537,6 +542,8 @@ export const authzReplaceGrantInputSchema = z
     from: grantableAuthzScopeRefSchema,
     to: grantableAuthzScopeRefSchema,
     role: grantRoleSchema,
+    /** The replacement's own end date, never inferred from the grant it replaces. */
+    expiresAtMs: z.number().int().optional(),
   })
   .strict();
 export type AuthzReplaceGrantInput = z.infer<typeof authzReplaceGrantInputSchema>;

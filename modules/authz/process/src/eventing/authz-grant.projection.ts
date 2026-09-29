@@ -68,6 +68,8 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
 
   mapAuthzGrantAttached(event: GrantAttachedEvent): GrantProjectionWrite {
     const { data } = event;
+    // One column, two tiers: a resource grant states its end inside its terms, a binding on itself.
+    const expiresAtMs = data.resource?.expiresAtMs ?? data.expiresAtMs;
     return {
       kind: "grant.upsert",
       ...(data.membershipStamp ? { membershipStamp: data.membershipStamp } : {}),
@@ -87,9 +89,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
         resourceKind: data.resource ? RESOURCE_KIND_TO_DB[data.resource.kind] : null,
         projectId: data.resource?.projectId ?? null,
         createdByUserId: data.resource?.createdByUserId ?? null,
-        expiresAt: data.resource?.expiresAtMs
-          ? Temporal.Instant.fromEpochMilliseconds(data.resource.expiresAtMs)
-          : null,
+        expiresAt: expiresAtMs ? Temporal.Instant.fromEpochMilliseconds(expiresAtMs) : null,
         maxViews: data.resource?.maxViews ?? null,
         occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
       },

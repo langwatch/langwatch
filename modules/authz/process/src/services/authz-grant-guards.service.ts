@@ -3,6 +3,7 @@
  */
 
 import {
+  GrantExpiryInPastError,
   GrantValidationError,
   isRegistryPermission,
   type GrantRole,
@@ -10,6 +11,7 @@ import {
 } from "@langwatch/authz-contract";
 
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
+import { hasGrantEnded } from "../rules/grant-expiry.rules.ts";
 
 export class AuthzGrantGuardsService {
   static create({ repository }: { repository: AuthzGrantRepository }): AuthzGrantGuardsService {
@@ -25,6 +27,21 @@ export class AuthzGrantGuardsService {
    */
   static bindingNotFound(meta: Record<string, unknown>): GrantValidationError {
     return new GrantValidationError("Role binding not found", meta);
+  }
+
+  /** Refuses an end date already behind `nowMs`; needs no storage, so callers run it first. */
+  static assertExpiryInFuture({
+    expiresAtMs,
+    nowMs,
+    meta = {},
+  }: {
+    expiresAtMs: number | undefined;
+    nowMs: number;
+    meta?: Record<string, unknown>;
+  }): void {
+    if (expiresAtMs !== undefined && hasGrantEnded({ expiresAtMs, nowMs })) {
+      throw new GrantExpiryInPastError({ ...meta, expiresAtMs });
+    }
   }
 
   async assertBindingInOrganization({

@@ -52,11 +52,13 @@ describe("EventingAuthzReadRepository", () => {
   describe("when findUserBindings collects a user's grants", () => {
     it("reads the user's own grants at the three binding scopes", async () => {
       const findMany = vi.fn().mockResolvedValue([
-        { roleKey: "admin", scopeType: "TEAM", scopeId: "team-1" },
+        { roleKey: "admin", scopeType: "TEAM", scopeId: "team-1", expiresAt: null },
         {
           roleKey: "custom:role-9",
           scopeType: "PROJECT",
           scopeId: "proj-1",
+          // Reported as the fact it is; whether an ended one still grants is the collector's call.
+          expiresAt: new Date("2099-01-01T00:00:00.000Z"),
         },
       ]);
       const repository = EventingAuthzReadRepository.create(
@@ -79,7 +81,7 @@ describe("EventingAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true },
+        select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
       });
       expect(bindings).toEqual([
         {
@@ -93,6 +95,7 @@ describe("EventingAuthzReadRepository", () => {
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
+          expiresAtMs: 4_070_908_800_000,
         },
       ]);
     });
@@ -235,6 +238,7 @@ describe("EventingAuthzReadRepository", () => {
           scopeType: true,
           scopeId: true,
           principalId: true,
+          expiresAt: true,
         },
       });
       expect(bindings).toEqual([
@@ -291,7 +295,7 @@ describe("EventingAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true },
+        select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
       });
       expect(bindings).toEqual([
         {

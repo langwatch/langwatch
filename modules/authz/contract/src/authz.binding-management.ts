@@ -69,6 +69,8 @@ export const authzManagedOrganizationBindingSchema = z
     scopeName: nullableTextSchema,
     memberUserIds: z.array(z.string()),
     createdAt: z.date(),
+    /** When the binding stops granting; listed past its own date too. */
+    expiresAt: z.date().nullable().optional(),
   })
   .strict();
 export type AuthzManagedOrganizationBinding = z.infer<typeof authzManagedOrganizationBindingSchema>;
@@ -140,6 +142,8 @@ export const authzCreateBindingInputSchema = authzBindingWriteSchema.safeExtend(
   groupId: z.string().min(1).optional(),
   apiKeyId: z.string().min(1).optional(),
   actor: grantsLedgerActorSchema,
+  /** When the binding stops granting; a moment already passed is refused. */
+  expiresAt: z.date().optional(),
 });
 export type AuthzCreateBindingInput = z.infer<typeof authzCreateBindingInputSchema>;
 

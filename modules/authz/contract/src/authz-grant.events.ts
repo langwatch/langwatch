@@ -85,9 +85,11 @@ export const grantShapeRefinement = {
     roleKey: string | null;
     scope: { type: string; id: string };
     resource?: unknown;
+    expiresAtMs?: number;
   }): boolean => {
     const isResourceScope = grant.scope.type === "RESOURCE";
     if (grant.principal.type === "anyone" && !isResourceScope) return false;
+    if (isResourceScope && grant.expiresAtMs !== undefined) return false;
     const isOwnProjectCredential =
       grant.scope.type === "PROJECT" && grant.principal.id === grant.scope.id;
     if (grant.principal.type === "project" && !isResourceScope && !isOwnProjectCredential) {
@@ -99,7 +101,7 @@ export const grantShapeRefinement = {
     );
   },
   message:
-    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
+    "a RESOURCE grant carries resource terms and a null roleKey, every other scope carries a roleKey and no resource terms; a RESOURCE grant states its expiry inside those terms and never as the grant's own `expiresAtMs`; `anyone` principals exist only at RESOURCE scope, and a `project` principal exists at RESOURCE scope or as its own project's credential (a PROJECT scope whose id is the principal's)",
   path: ["resource"] as const,
 };
 
@@ -111,6 +113,8 @@ export const grantAttachedPayloadSchema = z
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
+    /** When a binding stops granting; absent on every grant that never ends. */
+    expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,
     actor: grantsLedgerActorSchema,
     /** Present on live USER grants; absent on imported history. */
@@ -214,6 +218,7 @@ export const grantFactSchema = z
     scope: ledgerScopeSchema,
     resource: resourceGrantTermsSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
+    expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,
     /** Current USER membership lifetime; absent for non-user/resource facts. */
     membershipStamp: z.string().min(1).optional(),

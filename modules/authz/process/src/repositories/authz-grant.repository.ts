@@ -37,6 +37,9 @@ export type RoleBindingWrite = {
   role: TeamUserRole;
   customRoleId: string | null;
   principal: BindingPrincipalWhere;
+  /** When the binding stops granting. Not part of its identity: the same binding with
+   *  another date is a duplicate. */
+  expiresAtMs?: number;
 };
 
 /**

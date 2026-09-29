@@ -144,6 +144,20 @@ export class DuplicateGrantError extends HandledError {
   }
 }
 
+/** A grant asked to end at a moment already passed: 422, like the family's other input refusals. */
+export class GrantExpiryInPastError extends HandledError {
+  declare readonly code: "grant_expiry_in_past";
+
+  constructor(meta: Record<string, unknown> = {}) {
+    super("grant_expiry_in_past", "A grant's expiry must be in the future", {
+      httpStatus: 422,
+      meta,
+      ...remediation("grant_expiry_in_past"),
+    });
+    this.name = "GrantExpiryInPastError";
+  }
+}
+
 export class RoleBindingNotFoundError extends NotFoundError {
   declare readonly code: "role_binding_not_found";
 

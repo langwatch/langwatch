@@ -228,6 +228,8 @@ export function grantFactToRow({
   grant: GrantFact;
   organizationId: string;
 }): GrantRowShape {
+  // One column, two tiers: the shape refinement keeps a resource fact's end inside its terms.
+  const expiresAtMs = grant.resource?.expiresAtMs ?? grant.expiresAtMs;
   return {
     id: grant.grantId,
     organizationId,
@@ -244,10 +246,7 @@ export function grantFactToRow({
     resourceKind: grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
     projectId: grant.resource?.projectId ?? null,
     createdByUserId: grant.resource?.createdByUserId ?? null,
-    expiresAt:
-      grant.resource?.expiresAtMs != null
-        ? Temporal.Instant.fromEpochMilliseconds(grant.resource.expiresAtMs)
-        : null,
+    expiresAt: expiresAtMs != null ? Temporal.Instant.fromEpochMilliseconds(expiresAtMs) : null,
     maxViews: grant.resource?.maxViews ?? null,
     occurredAt: Temporal.Instant.fromEpochMilliseconds(grant.occurredAtMs),
   };
@@ -303,6 +302,10 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
     if (row.expiresAt != null) resource.expiresAtMs = row.expiresAt.epochMilliseconds;
     if (row.maxViews != null) resource.maxViews = row.maxViews;
     fact.resource = resource;
+  }
+  // A resource row's end lives in its terms above; restating it here fails the shape refinement.
+  if (fact.resource === undefined && row.expiresAt != null) {
+    fact.expiresAtMs = row.expiresAt.epochMilliseconds;
   }
   return fact;
 }

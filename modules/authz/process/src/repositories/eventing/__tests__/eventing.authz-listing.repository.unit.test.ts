@@ -320,6 +320,7 @@ describe("EventingAuthzListingRepository", () => {
           scopeType: "TEAM",
           scopeId: "team-1",
           createdAt: new Date("2026-01-05T00:00:00Z"),
+          expiresAt: null,
           user: { id: "alice", name: "Alice", email: "a@x.io", image: null },
           group: null,
           apiKey: null,

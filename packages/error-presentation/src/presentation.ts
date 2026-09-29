@@ -2161,6 +2161,11 @@ const presentations = {
         : "Ask an organization admin for access.";
     },
   },
+  grant_expiry_in_past: {
+    title: "That expiry date has already passed",
+    describe: () =>
+      "Access can only be set to end at a future date. Pick a later one and try again.",
+  },
   grant_validation_failed: {
     // The engine's grant write surface (attach/update/revoke/replace) rejects
     // duplicates, cross-organization role references, and bindings at scopes

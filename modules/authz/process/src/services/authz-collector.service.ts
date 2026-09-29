@@ -19,10 +19,11 @@ import type {
   CustomRolePermissionsRow,
   ShareLinkRow,
 } from "../repositories/authz-read.repository.ts";
+import { liveBindings } from "../rules/grant-expiry.rules.ts";
 
 export type AuthzCollectorOptions = {
   reader: AuthzReadRepository;
-  /** Injected so share-link liveness is testable at its exact boundary. */
+  /** Injected so binding and share-link liveness are testable at their exact boundary. */
   now?: () => Instant;
 };
 
@@ -255,9 +256,9 @@ export class AuthzCollectorService {
     organizationId: string;
     reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const bindings = await reader.findApiKeyBindings({
-      apiKeyId: principal.id,
-      organizationId,
+    const bindings = liveBindings({
+      bindings: await reader.findApiKeyBindings({ apiKeyId: principal.id, organizationId }),
+      nowMs: this.now().epochMilliseconds,
     });
 
     return {
@@ -303,7 +304,12 @@ export class AuthzCollectorService {
       }),
     ]);
 
-    const bindings = [...directBindings, ...groupBindings];
+    // Ended bindings drop here, once, for every principal: nothing is written when the moment
+    // passes and no epoch is bumped, so a snapshot cached before it answers until its 30s bound.
+    const bindings = liveBindings({
+      bindings: [...directBindings, ...groupBindings],
+      nowMs: this.now().epochMilliseconds,
+    });
     // A seat-disabled membership is NOT a membership: the person keeps their row, their role
     // and everything they did, and holds no access until an admin re-enables them
     // (seat-reconciliation.feature). Reporting it as a membership is what let a disabled

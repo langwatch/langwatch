@@ -24,6 +24,8 @@ export const roleBindingRestSchema = z.object({
   scopeId: z.string(),
   scopeName: z.string().nullable(),
   createdAt: z.date(),
+  /** When this binding stops granting, or null when it never does; listed past its date too. */
+  expiresAt: z.date().nullable(),
 });
 export type RoleBindingRest = z.infer<typeof roleBindingRestSchema>;
 
@@ -53,6 +55,8 @@ export const roleBindingRestCreateSchema = z.object({
   customRoleId: z.string().min(1).optional(),
   scopeType: roleBindingScopeTypeSchema,
   scopeId: z.string().min(1),
+  /** Optional ISO-8601 end date, strictly in the future (`grant_expiry_in_past`, 422 otherwise). */
+  expiresAt: z.coerce.date().optional(),
 });
 export type RoleBindingRestCreate = z.infer<typeof roleBindingRestCreateSchema>;
 

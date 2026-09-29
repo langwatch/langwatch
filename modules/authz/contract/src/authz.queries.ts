@@ -293,6 +293,7 @@ export const authzAccessBindingSchema = z
     scopeType: roleBindingScopeTypeSchema,
     scopeId: z.string(),
     createdAt: z.date(),
+    expiresAt: z.date().nullable().optional(),
     user: authzAccessUserSchema.nullable(),
     group: authzAccessGroupSchema.nullable(),
     apiKey: authzAccessApiKeySchema.nullable(),

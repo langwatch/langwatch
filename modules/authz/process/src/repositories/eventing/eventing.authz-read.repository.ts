@@ -33,6 +33,7 @@ type BindingGrantRow = {
   roleKey: string | null;
   scopeType: string;
   scopeId: string;
+  expiresAt: unknown;
 };
 
 export class EventingAuthzReadRepository extends AuthzReadRepository {
@@ -86,7 +87,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         principalId: userId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
     })) as BindingGrantRow[];
     return this.collectBindings({ rows, viaGroupId: () => null });
   };
@@ -122,6 +123,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         scopeType: true,
         scopeId: true,
         principalId: true,
+        expiresAt: true,
       },
     })) as (BindingGrantRow & { principalId: string })[];
     return this.collectBindings({
@@ -147,7 +149,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         principalId: apiKeyId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
     })) as BindingGrantRow[];
     return this.collectBindings({ rows, viaGroupId: () => null });
   };
@@ -391,9 +393,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
 
   /** Only the role keys a decision can represent. Dormant facts such as
    * lite-member stay migration data instead of becoming permissions. */
-  private collectBindings<
-    TRow extends { roleKey: string | null; scopeType: string; scopeId: string },
-  >({
+  private collectBindings<TRow extends BindingGrantRow>({
     rows,
     viaGroupId,
   }: {
@@ -405,11 +405,14 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       if (!this.isBindingScope(row.scopeType)) continue;
       const roleKey = this.bindingRoleKeyFrom(row.roleKey);
       if (roleKey === null) continue;
+      // Reported, never filtered: whether an elapsed end still grants is the collector's call.
+      const expiresAtMs = findStoredInstant(row.expiresAt)?.epochMilliseconds;
       bindings.push({
         roleKey,
         scopeType: row.scopeType,
         scopeId: row.scopeId,
         viaGroupId: viaGroupId(row),
+        ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
       });
     }
     return bindings;

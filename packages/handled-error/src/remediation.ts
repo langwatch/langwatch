@@ -326,6 +326,13 @@ const registry = {
     ],
     docsPath: "/platform/rbac",
   },
+  grant_expiry_in_past: {
+    tips: [
+      "expiresAt must be strictly in the future at the moment of the write; an instant equal to now is already over",
+      "Send an ISO-8601 timestamp, e.g. 2026-12-31T23:59:59Z; meta.expiresAtMs carries the value that was rejected",
+    ],
+    docsPath: "/platform/rbac",
+  },
   role_binding_already_exists: {
     tips: [
       "An identical binding (same principal, role, and scope) already exists; treat this as already done",

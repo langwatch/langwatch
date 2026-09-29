@@ -24,6 +24,7 @@ export type BindingWire = {
   scopeName: string | null;
   /** The wire's own moment type: the listing contract declares it. */
   createdAt: AuthzManagedOrganizationBinding["createdAt"];
+  expiresAt: RoleBindingRest["expiresAt"];
 };
 
 /** The principal a create names — exactly one of the three id fields. */
@@ -41,6 +42,7 @@ export function optimisticBindingWire({
   customRoleId,
   scopeType,
   scopeId,
+  expiresAt,
   now,
 }: {
   id: string;
@@ -49,6 +51,7 @@ export function optimisticBindingWire({
   customRoleId?: string | undefined;
   scopeType: RoleBindingScopeType;
   scopeId: string;
+  expiresAt?: RoleBindingRest["expiresAt"] | undefined;
   now: () => Instant;
 }): BindingWire {
   return {
@@ -61,6 +64,8 @@ export function optimisticBindingWire({
     scopeId,
     scopeName: null,
     createdAt: toDate(now()),
+    // The caller's own term, so the optimistic answer can state it exactly.
+    expiresAt: expiresAt ?? null,
   };
 }
 
@@ -95,5 +100,6 @@ export function bindingWire(row: AuthzManagedOrganizationBinding): RoleBindingRe
     scopeId: row.scopeId,
     scopeName: row.scopeName,
     createdAt: row.createdAt,
+    expiresAt: row.expiresAt ?? null,
   };
 }

@@ -33,7 +33,24 @@ describe("the binding a create answers with while the projection lags", () => {
         scopeId: "team_1",
         scopeName: null,
         createdAt: toDate(AT),
+        expiresAt: null,
       });
+    });
+
+    /** @scenario "Binding a role with an end date through the API" */
+    it("echoes the end date the request stated", () => {
+      const expiresAt = toDate(AT.add({ hours: 24 * 7 }));
+      const wire = optimisticBindingWire({
+        id: "rb_1",
+        principal: { userId: "user_1" },
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: "team_1",
+        expiresAt,
+        now: () => AT,
+      });
+
+      expect(wire.expiresAt).toEqual(expiresAt);
     });
   });
 

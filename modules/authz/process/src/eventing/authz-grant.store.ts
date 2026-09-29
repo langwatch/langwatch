@@ -246,6 +246,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
             principal: principalForWhere(binding.principal),
             roleKey: roleKeyFor(binding),
             scope: { type: binding.scopeType, id: binding.scopeId },
+            // Omitted when absent: every event before end dates carries no key,
+            // and the two must serialise alike.
+            ...(binding.expiresAtMs !== undefined ? { expiresAtMs: binding.expiresAtMs } : {}),
             source,
             actor,
             occurredAtMs,

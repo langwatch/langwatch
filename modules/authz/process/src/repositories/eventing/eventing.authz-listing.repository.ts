@@ -55,6 +55,7 @@ const GRANT_ROW_SELECT = {
   legacyRole: true,
   scopeType: true,
   scopeId: true,
+  expiresAt: true,
   occurredAt: true,
   updatedAt: true,
 } as const;
@@ -68,6 +69,8 @@ type GrantListRow = {
   legacyRole: string | null;
   scopeType: string;
   scopeId: string;
+  /** The stored end moment as the store hands it back; listed past its own date too. */
+  expiresAt: unknown;
   occurredAt: Instant;
   updatedAt: Instant;
 };
@@ -667,6 +670,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       scopeType: grant.scopeType,
       scopeId: row.scopeId,
       createdAt: toDate(row.occurredAt),
+      expiresAt: row.expiresAt instanceof Date ? row.expiresAt : null,
       user,
       group,
       apiKey,
