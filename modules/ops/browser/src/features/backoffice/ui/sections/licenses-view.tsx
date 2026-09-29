@@ -1,4 +1,3 @@
-import { PageLayout } from "@langwatch/design-system/page-layout";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -65,9 +64,7 @@ export default function LicensesView() {
         />
       </BackofficeTable>
 
-      <PageLayout.Container>
-        <ActivationCodesSection />
-      </PageLayout.Container>
+      <ActivationCodesSection />
 
       <LicenseDetailDrawer
         licenseId={openId}

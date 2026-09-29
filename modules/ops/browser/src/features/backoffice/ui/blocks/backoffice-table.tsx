@@ -49,35 +49,33 @@ export function BackofficeTable({
         <Spacer />
         {createAction}
       </PageLayout.Header>
-      <PageLayout.Container>
-        <VStack gap={6} width="full" align="start">
-          {searchInput ?? (
-            <Input
-              value={searchValue}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder={searchPlaceholder}
-              width="full"
-              maxWidth="480px"
-            />
-          )}
+      <VStack gap={6} width="full" align="start">
+        {searchInput ?? (
+          <Input
+            value={searchValue}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder={searchPlaceholder}
+            width="full"
+            maxWidth="480px"
+          />
+        )}
 
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body paddingY={0} paddingX={0}>
-              <BackofficeTableContent
-                title={title}
-                error={error}
-                errorContent={errorContent}
-                isLoading={isLoading}
-                isFetching={isFetching}
-              >
-                {children}
-              </BackofficeTableContent>
-            </Card.Body>
-          </Card.Root>
+        <Card.Root width="full" overflow="hidden">
+          <Card.Body paddingY={0} paddingX={0}>
+            <BackofficeTableContent
+              title={title}
+              error={error}
+              errorContent={errorContent}
+              isLoading={isLoading}
+              isFetching={isFetching}
+            >
+              {children}
+            </BackofficeTableContent>
+          </Card.Body>
+        </Card.Root>
 
-          {pagination && pagination.total > 0 && <PaginationBar {...pagination} />}
-        </VStack>
-      </PageLayout.Container>
+        {pagination && pagination.total > 0 && <PaginationBar {...pagination} />}
+      </VStack>
     </>
   );
 }
