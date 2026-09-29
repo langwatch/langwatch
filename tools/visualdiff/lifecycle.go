@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // RunLogFile is everything a run wrote to stderr, kept beside its report so
@@ -26,7 +28,7 @@ func openRunLog(options Options, streams *Streams) (func(), error) {
 	if err != nil {
 		return func() {}, fmt.Errorf("run log: %w", err)
 	}
-	streams.Err = io.MultiWriter(streams.Err, newStampedWriter(file, time.Now))
+	streams.Err = io.MultiWriter(streams.Err, diffkit.NewStampedWriter(file, time.Now))
 	unmark, err := MarkRun(options.RunDir, options.Keep)
 	if err != nil {
 		_ = file.Close()

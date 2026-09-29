@@ -197,6 +197,10 @@ server.log
 # visualdiff run directories: worktrees, screenshots, reports
 .visualdiff/
 
+# fuzz and interactionsimulator run directories: findings, screenshots, coverage
+.fuzz/
+.interactionsimulator/
+
 # Prisma client output: prepare regenerates it (pnpm start:prepare:files), never commit it
 packages/prisma-client/src/generated/
 .claims.tsv

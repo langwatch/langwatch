@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // Options is one `visualdiff run` invocation.
@@ -826,7 +828,7 @@ func (run *session) finish(result Result) (Result, error) {
 	if err := WriteVerdictFile(options.RunDir, result.Rows, run.request.Done.skipLines(run.request.Config, options.Editions)); err != nil {
 		return result, fmt.Errorf("write verdict: %w", err)
 	}
-	if err := WriteSignaturesFile(options.RunDir); err != nil {
+	if err := diffkit.WriteSignaturesFile(options.RunDir); err != nil {
 		fmt.Fprintf(run.streams.Err, "signatures: %v\n", err)
 	}
 	result.Summary = summary

@@ -12,9 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/diffkit"
 	"github.com/langwatch/langwatch/tools/havenrun"
 )
 
@@ -282,19 +282,6 @@ func downCheckStack(ctx context.Context, root string, stderr io.Writer) error {
 // lockCheckStack holds check's stack for one lane's boot and seed, so lanes sharing the
 // stack never boot or seed it twice at once. The lock goes when the process does.
 func lockCheckStack(dir string, stderr io.Writer) (func(), error) {
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return nil, err
-	}
-	file, err := os.OpenFile(filepath.Join(dir, "stack.lock"), os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- the tool's own run directory.
-	if err != nil {
-		return nil, err
-	}
-	if syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
-		fmt.Fprintln(stderr, "check: another lane is booting or seeding the shared stack; waiting")
-		if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
-			_ = file.Close()
-			return nil, err
-		}
-	}
-	return func() { _ = file.Close() }, nil
+	return diffkit.Lock(dir, "stack.lock", "check: another lane is booting or seeding the shared stack; waiting",
+		func(line string) { fmt.Fprintln(stderr, line) })
 }

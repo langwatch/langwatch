@@ -2,11 +2,11 @@ package visualdiff
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // FindingsFile is the run-scoped findings stream both `run` and any
@@ -52,49 +52,14 @@ type RunComplete struct {
 	CapturedAt string         `json:"capturedAt"`
 }
 
-// FindingsWriter appends one JSON-encoded value as a line. An implementation
-// must flush before it returns, so a reader tailing the file sees every
-// finding as it lands, not only once the run ends.
-type FindingsWriter interface {
-	WriteLine(value any) error
-}
-
-// fileFindingsWriter appends JSON lines to findings.jsonl, fsyncing after
-// each write so `tail -f` sees every finding as soon as it is decided.
-type fileFindingsWriter struct {
-	file *os.File
-}
+// FindingsWriter and OpenFindingsFile moved to tools/diffkit; kept as thin
+// aliases so this run's tracker and its tests read the same names.
+type FindingsWriter = diffkit.FindingsWriter
 
 // OpenFindingsFile opens (creating if needed) the findings file at path for
-// appending. Both a fresh run and a later recapture use it: a recapture's
-// findings land after whatever the run already wrote, in the same file.
-func OpenFindingsFile(path string) (*fileFindingsWriter, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return nil, err
-	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600) // #nosec G304 -- path is this run's own <rundir>/findings.jsonl.
-	if err != nil {
-		return nil, err
-	}
-	return &fileFindingsWriter{file: file}, nil
-}
-
-// WriteLine marshals value as one JSON line and fsyncs before returning.
-func (writer *fileFindingsWriter) WriteLine(value any) error {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-	encoded = append(encoded, '\n')
-	if _, err := writer.file.Write(encoded); err != nil {
-		return err
-	}
-	return writer.file.Sync()
-}
-
-// Close closes the underlying file.
-func (writer *fileFindingsWriter) Close() error {
-	return writer.file.Close()
+// appending, the run and any later recapture writing to the same file.
+func OpenFindingsFile(path string) (*diffkit.FileFindingsWriter, error) {
+	return diffkit.OpenFindingsFile(path)
 }
 
 // findingsRunInputs groups runWithFindings' arguments so the function itself

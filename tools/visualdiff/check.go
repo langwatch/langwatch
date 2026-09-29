@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 // LoopCandidateURL is the fix loop's candidate stack, which `check -url` can name.
@@ -187,7 +189,7 @@ func checkPlan(parsed checkFlags, side RunnerSide, config *Config) RunnerPlan {
 
 // clockLines opens every line with the wall-clock time, [15:04:05].
 func clockLines(out io.Writer) io.Writer {
-	return &stampedWriter{out: out, now: time.Now, layout: "[15:04:05] "}
+	return diffkit.ClockLines(out)
 }
 
 // checkProgress prints a line as each flow ends: done, the tally, elapsed and what is left.

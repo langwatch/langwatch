@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 func flowRow(index int, class Classification, expect, baseError, candidateError string) Row {
@@ -92,11 +94,11 @@ func TestSignaturesSplitNewOnTheCandidateFromAlsoOnTheBase(t *testing.T) {
 		}
 	}
 
-	signatures, err := ScanSignatures(dir)
+	signatures, err := diffkit.ScanSignatures(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rendered := RenderSignatures(signatures)
+	rendered := diffkit.RenderSignatures(signatures)
 
 	newOnCandidate, alsoOnBase, _ := strings.Cut(rendered, "## also on the base")
 	mustContain(t, newOnCandidate, "2 error candidate-dev.log:2 | ERROR job # failed")
