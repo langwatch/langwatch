@@ -649,6 +649,7 @@ export const prismaModelFieldCatalogue = {
     "reportedMembers",
     "reportedMembersLite",
     "virtualKeyId",
+    "seatsRaisedFrom",
     "createdAt",
     "updatedAt"
   ],
@@ -2605,6 +2606,7 @@ export const prismaModelFieldCatalogue = {
     "id",
     "licenseId",
     "accountId",
+    "organizationId",
     "changedAt",
     "addedSeats",
     "unitAmountCents",

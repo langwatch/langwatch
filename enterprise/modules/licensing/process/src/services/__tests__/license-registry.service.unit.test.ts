@@ -4,7 +4,6 @@ import {
   LicenseAlreadyRegisteredError,
   LicenseSigningNotConfiguredError,
   type IssuedLicenseCustomerRecord,
-  type SeatChangeBillingOutcome,
 } from "@langwatch/enterprise-licensing-contract";
 import { registryHashForToken } from "@langwatch/gateway-contract";
 import { Temporal, type Instant } from "@langwatch/time";
@@ -14,7 +13,7 @@ import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
-import type { ConnectManagedKeys, SeatChangeBilling } from "../../app/licensing.members.ts";
+import type { ConnectManagedKeys } from "../../app/licensing.members.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { LicenseGenerationService } from "../license-generation.service.ts";
 import { LicenseRegistryService } from "../license-registry.service.ts";
@@ -82,32 +81,17 @@ class RecordingBudgets {
   }
 }
 
-class RecordingSeatBilling {
-  readonly invoiced: { previousSeats: number; seats: number }[] = [];
-  readonly calls: Parameters<SeatChangeBilling["invoiceAddedSeats"]>[0][] = [];
-
-  async invoiceAddedSeats(
-    params: Parameters<SeatChangeBilling["invoiceAddedSeats"]>[0],
-  ): Promise<SeatChangeBillingOutcome> {
-    this.invoiced.push({ previousSeats: params.previousSeats, seats: params.seats });
-    this.calls.push(params);
-    return "invoiced";
-  }
-}
-
 function harness({ signingKey = TEST_PRIVATE_KEY }: { signingKey?: string } = {}) {
   const repository = MemoryIssuedLicenseRepository.create();
   const organizations = new RecordingCustomers();
   const managedKeys = new RecordingManagedKeys();
   const contractBudgets = new RecordingBudgets();
-  const seatBilling = new RecordingSeatBilling();
   const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
   const registry = LicenseRegistryService.create({
     repository,
     organizations,
     managedKeys,
     contractBudgets,
-    seatBilling,
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
     cipher: { encrypt: (plain) => `sealed:${plain}`, decrypt: (cipher) => cipher.slice(7) },
@@ -120,7 +104,6 @@ function harness({ signingKey = TEST_PRIVATE_KEY }: { signingKey?: string } = {}
     organizations,
     managedKeys,
     contractBudgets,
-    seatBilling,
     cryptography,
   };
 }
@@ -305,8 +288,8 @@ describe("the license registry", () => {
     ).rejects.toBeInstanceOf(IssuedLicenseNotActiveError);
   });
 
-  it("invoices only the seats a mid-term change added", async () => {
-    const { registry, seatBilling } = harness();
+  it("leaves billing only the seats a mid-term change added", async () => {
+    const { registry } = harness();
     const { license } = await registry.issue(issueInput());
 
     const changed = await registry.changeSeats({
@@ -316,8 +299,10 @@ describe("the license registry", () => {
     });
 
     expect(changed.previousMaxMembers).toBe(50);
-    expect(changed.billing).toBe("invoiced");
-    expect(seatBilling.invoiced).toEqual([{ previousSeats: 50, seats: 58 }]);
+    expect(changed.billing).toBe("pending");
+    await expect(registry.findSeatChanges({})).resolves.toMatchObject([
+      { previousSeats: 50, seats: 58 },
+    ]);
     expect(changed.license.expiresAt).toBe(TERM_END.toString());
   });
 });
@@ -415,8 +400,8 @@ describe("licenses another flow signed", () => {
 
 describe("changing the seats of a running license", () => {
   /** @scenario "An operator changes the seats of a running license" */
-  it("signs a replacement for the same term and has the added seats invoiced", async () => {
-    const { registry, seatBilling, cryptography } = harness();
+  it("signs a replacement for the same term and records the seat change billing reads", async () => {
+    const { registry, repository, cryptography } = harness();
     const { license } = await registry.issue(issueInput());
 
     const result = await registry.changeSeats({
@@ -432,20 +417,40 @@ describe("changing the seats of a running license", () => {
       hasPendingDelivery: true,
     });
     expect(cryptography.parseLicenseKey(result.licenseKey)?.data.plan.maxMembers).toBe(58);
-    expect(seatBilling.calls).toEqual([
+    expect(result.billing).toBe("pending");
+    expect((await repository.findById(result.license.id))?.seatsRaisedFrom).toBe(50);
+    await expect(registry.findSeatChanges({ organizationId: "org-acme" })).resolves.toEqual([
       {
-        organizationId: "org-acme",
         licenseRowId: result.license.id,
+        organizationId: "org-acme",
         previousSeats: 50,
         seats: 58,
-        operatorId: "operator-8",
+        changedAt: NOW.toString(),
       },
     ]);
+    await expect(registry.findSeatChanges({ organizationId: "org-other" })).resolves.toEqual([]);
+  });
+
+  /** @scenario "Seats raised on a license linked to no customer leave billing nothing to invoice" */
+  it("signs a replacement for an unlinked license and records no seat change", async () => {
+    const { registry, repository } = harness();
+    const { license } = await registry.issue(issueInput());
+    await repository.update(license.id, { organizationId: null });
+
+    const result = await registry.changeSeats({
+      id: license.id,
+      maxMembers: 58,
+      operatorId: "operator-8",
+    });
+
+    expect(result.license.maxMembers).toBe(58);
+    expect(result.billing).toBe("nothing_to_invoice");
+    await expect(registry.findSeatChanges({})).resolves.toEqual([]);
   });
 
   /** @scenario "Seats that went down are not credited back mid-term" */
-  it("signs a replacement for fewer seats and asks billing for nothing", async () => {
-    const { registry, seatBilling } = harness();
+  it("signs a replacement for fewer seats and records no seat change", async () => {
+    const { registry } = harness();
     const { license } = await registry.issue(issueInput());
 
     const result = await registry.changeSeats({
@@ -456,7 +461,7 @@ describe("changing the seats of a running license", () => {
 
     expect(result.license.maxMembers).toBe(40);
     expect(result.billing).toBe("nothing_to_invoice");
-    expect(seatBilling.calls).toEqual([]);
+    await expect(registry.findSeatChanges({})).resolves.toEqual([]);
   });
 
   it("refuses a second change on the license the first one replaced", async () => {
@@ -470,15 +475,15 @@ describe("changing the seats of a running license", () => {
   });
 
   /** @scenario "Seats changed on a revoked license are refused" */
-  it("refuses a revoked license and invoices nothing", async () => {
-    const { registry, seatBilling } = harness();
+  it("refuses a revoked license and records no seat change", async () => {
+    const { registry } = harness();
     const { license } = await registry.issue(issueInput());
     await registry.revoke({ id: license.id, operatorId: "operator-8", reason: "leaked" });
 
     await expect(
       registry.changeSeats({ id: license.id, maxMembers: 58, operatorId: "operator-8" }),
     ).rejects.toMatchObject({ code: "issued_license_not_active" });
-    expect(seatBilling.calls).toEqual([]);
+    await expect(registry.findSeatChanges({})).resolves.toEqual([]);
   });
 });
 

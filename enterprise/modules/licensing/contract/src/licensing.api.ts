@@ -29,6 +29,7 @@ import type {
   IssuedLicensePage,
   IssuedLicenseSource,
   IssuedLicenseView,
+  LicenseSeatChange,
   LicenseTermsInput,
   SeatChangeResult,
   SignedIssuedLicense,
@@ -222,6 +223,8 @@ export interface LicensingApi {
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
   /** The seats a connected customer holds and last reported, for its statement and overview. */
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats>;
+  /** Every seat change that raised a linked license, oldest first; one customer's when named. */
+  findSeatChanges(input: { organizationId?: string }): Promise<LicenseSeatChange[]>;
   /** Raises the prepaid commit a renewal or top-up invoice agreed. */
   raiseContractCommit(input: {
     organizationId: string;

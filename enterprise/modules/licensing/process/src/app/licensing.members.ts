@@ -2,7 +2,6 @@ import type {
   ConnectService,
   HostedCaller,
   LicenseData,
-  SeatChangeBillingOutcome,
   SignedLicense,
   ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
@@ -179,21 +178,6 @@ export type HostedServicesInfrastructure = Readonly<{
   spend: HostedSpendRecorder;
 }>;
 
-/**
- * What a mid-term seat change owes. The registry only names the change; billing
- * decides the amount and keeps the invoice from being raised twice.
- */
-export interface SeatChangeBilling {
-  invoiceAddedSeats(params: {
-    organizationId: string;
-    /** The reissued registry row the new seat count is signed into. */
-    licenseRowId: string;
-    previousSeats: number;
-    seats: number;
-    operatorId: string;
-  }): Promise<SeatChangeBillingOutcome>;
-}
-
 /** Whether this license may sync again now (48 calls per license per day). */
 export interface LicenseSyncRateLimit {
   allow(params: { licenseRowId: string }): Promise<boolean>;
@@ -214,7 +198,6 @@ export type LicenseRegistryInfrastructure = Readonly<{
   activationCodes: ActivationCodeRepository;
   /** What bounds guessing a code: one limiter, keyed by the code's own hash. */
   activationRateLimit: ActivationRateLimit;
-  seatBilling: SeatChangeBilling;
   syncRateLimit: LicenseSyncRateLimit;
   cipher: LicenseDeliveryCipher;
   /** The signing key, resolved through the secrets chain. Never a config field. */

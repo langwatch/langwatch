@@ -45,6 +45,7 @@ import {
   type IssuedLicensePage,
   type LicenseStatus,
   type PlanInfo,
+  type LicenseSeatChange,
   type SeatChangeResult,
   type SignedIssuedLicense,
   type StoreLicenseResult,
@@ -699,6 +700,10 @@ export class LicensingApp implements LicensingApiContract {
     return this.#registry.getConnectedSeats(input.organizationId);
   }
 
+  findSeatChanges(input: { organizationId?: string }): Promise<LicenseSeatChange[]> {
+    return this.#registry.findSeatChanges(input);
+  }
+
   raiseContractCommit(input: {
     organizationId: string;
     byUsdCents: number;
@@ -814,7 +819,6 @@ function licenseRegistryParts({
     organizations: infrastructure.organizations,
     managedKeys: infrastructure.managedKeys,
     contractBudgets,
-    seatBilling: infrastructure.seatBilling,
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
     cipher: infrastructure.cipher,
@@ -874,8 +878,8 @@ type LicenseRegistryDatabase = IssuedLicenseDatabase & ActivationCodeDatabase;
 
 /**
  * The licence registry derived from the process's own stores, as main's
- * `registry/composition.ts` built it on every deployment. Seat billing answers
- * `not_onboarded` (invoiced by hand) until its shape is ruled.
+ * `registry/composition.ts` built it on every deployment. Billing reads the seat
+ * changes it records through `findSeatChanges` (ARCHITECTURE.md section 9).
  */
 function licenseRegistryOverPrisma({
   database,
@@ -929,7 +933,6 @@ function licenseRegistryOverPrisma({
     activationRateLimit: {
       allow: ({ codeHash }) => allowed(`activation_code:${codeHash}`, ACTIVATION_ATTEMPTS_LIMIT),
     },
-    seatBilling: { invoiceAddedSeats: () => Promise.resolve("not_onboarded") },
     syncRateLimit: {
       allow: ({ licenseRowId }) => allowed(`license_sync:${licenseRowId}`, LICENSE_SYNCS_LIMIT),
     },

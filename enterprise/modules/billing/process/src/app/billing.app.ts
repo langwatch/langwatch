@@ -29,7 +29,6 @@ import {
   type ReportUsageForMonthCommandData,
   type ScenarioCreatedSignal,
   type WorkflowCreatedSignal,
-  type SeatChangeBillingOutcome,
   type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
   type BillingPricingModel,
@@ -138,6 +137,7 @@ type ConnectedLicensing = Pick<
   | "resetContractBudget"
   | "getConnectedSeats"
   | "getHostedUsage"
+  | "findSeatChanges"
 >;
 
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
@@ -444,7 +444,7 @@ export class BillingApp
       isSaas,
       bankDetails: () => config.bankDetails ?? null,
     });
-    const seats = ConnectedSeatChangeService.create({ repository, invoicing });
+    const seats = ConnectedSeatChangeService.create({ repository, invoicing, licensing });
 
     return new BillingApp({
       ...gate,
@@ -472,7 +472,6 @@ export class BillingApp
         billing,
         seats,
         tick: ConnectedBillingTickService.create({
-          seats,
           statements: statementMail
             ? ConnectedMonthlyStatementService.create({
                 repository,
@@ -990,13 +989,10 @@ export class BillingApp
     });
   }
 
-  invoiceAddedSeats(input: {
-    organizationId: string;
-    licenseRowId: string;
-    previousSeats: number;
-    seats: number;
-  }): Promise<SeatChangeBillingOutcome> {
-    return this.#connectedBilling().seats.invoiceAddedSeats(input);
+  /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */
+  async invoicePendingSeatChanges(): Promise<void> {
+    if (!this.#isSaas) return;
+    await this.#connectedBilling().seats.invoicePendingSeatChanges();
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

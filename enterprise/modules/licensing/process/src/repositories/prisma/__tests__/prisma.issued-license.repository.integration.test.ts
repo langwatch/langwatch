@@ -49,7 +49,6 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
       setLicense: async () => undefined,
     },
     contractBudgets: { sync: async () => undefined },
-    seatBilling: { invoiceAddedSeats: async () => "not_onboarded" },
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
     cipher: { encrypt: (plain) => `sealed:${plain.length}`, decrypt: () => "" },
@@ -92,6 +91,21 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     });
     expect(stored?.tokenHash).toMatch(/^[0-9a-f]{64}$/);
     expect((await repository.findByTokenHash(stored?.tokenHash ?? ""))?.id).toBe(license.id);
+  });
+
+  it("records a raised seat change in the replacement's own insert and reads it back", async () => {
+    const { license } = await issue("ACME Seats");
+    const changed = await registry.changeSeats({
+      id: license.id,
+      maxMembers: 58,
+      operatorId: "user_operator",
+    });
+
+    const stored = await prisma.issuedLicense.findUnique({ where: { id: changed.license.id } });
+    expect(stored?.seatsRaisedFrom).toBe(50);
+    await expect(
+      registry.findSeatChanges({ organizationId: license.organizationId ?? "" }),
+    ).resolves.toMatchObject([{ licenseRowId: changed.license.id, previousSeats: 50, seats: 58 }]);
   });
 
   it("refuses a second reissue of the same license from the table's own unique constraint", async () => {

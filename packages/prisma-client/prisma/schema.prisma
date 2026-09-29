@@ -1336,11 +1336,17 @@ model IssuedLicense {
   /// Created when the license first resolves. A plain column, not a relation.
   virtualKeyId String? @unique
 
+  /// The seats of the license this one replaced, set only when a seat change
+  /// raised a linked license. Billing reads it through licensing to invoice
+  /// the added seats, so the fact commits with the license or not at all.
+  seatsRaisedFrom Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
   @@index([expiresAt])
+  @@index([seatsRaisedFrom])
 }
 
 /// A short code a fresh install pastes instead of a license blob (ADR-139,
@@ -6372,16 +6378,19 @@ model IdentityMatchSuggestion {
 /// the end of the term.
 ///
 /// The row is written before the payment provider is called and completed
-/// after it, so a call that failed halfway is retried by the daily billing
-/// tick without inventing a second invoice. One row per reissued license.
+/// after it, so a call that failed halfway is retried by the next seat
+/// invoicing pass without inventing a second invoice. One row per reissued license.
 model ConnectedSeatChange {
   id              String                   @id @default(nanoid())
   /// The reissued `IssuedLicense` row that carries the new seat count. A
   /// plain column ref, like `replacesId`: relationMode="prisma" carries no
   /// foreign keys.
   licenseId       String                   @unique
-  /// The `ConnectedBillingAccount` row the invoice is raised against.
-  accountId       String
+  /// The `ConnectedBillingAccount` row the invoice is raised against. Null
+  /// when the customer had no billing account (`not_onboarded`).
+  accountId       String?
+  /// The customer organization the license belongs to.
+  organizationId  String?
   /// When the seats changed, which is the day the proration counts from.
   changedAt       DateTime
   /// Seats on the new license above the seats on the one it replaced.
@@ -6390,7 +6399,8 @@ model ConnectedSeatChange {
   unitAmountCents Int
   /// `unitAmountCents` times `addedSeats`. Zero when nothing is owed.
   amountCents     Int
-  currency        Currency
+  /// Null when no billing account named one (`not_onboarded`).
+  currency        Currency?
   /// The one-off invoice the added seats were billed on.
   stripeInvoiceId String?
   state           ConnectedSeatChangeState
@@ -6399,17 +6409,21 @@ model ConnectedSeatChange {
   updatedAt DateTime @updatedAt
 
   @@index([accountId])
+  @@index([organizationId])
   @@index([state])
 }
 
 /// How the invoicing of one seat change ended.
 enum ConnectedSeatChangeState {
-  /// Recorded before the payment provider was called. The daily tick retries it.
+  /// Recorded before the payment provider was called. The next pass retries it.
   intent
   /// The added seats were invoiced.
   invoiced
   /// The change owed nothing: the term had no days left or the seat rate is zero.
   nothing_to_invoice
+  /// The customer had no billing account: finance invoices it by hand, and a
+  /// later onboarding never bills it.
+  not_onboarded
 }
 
 /// The monthly usage statement one connected customer was sent (ADR-139,

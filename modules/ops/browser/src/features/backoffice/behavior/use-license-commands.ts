@@ -21,7 +21,13 @@ export function useLicenseCommands() {
     ),
     updateTerms: api.licenseRegistry.updateTerms.useMutation(after("Terms saved")),
     linkToOrganization: api.licenseRegistry.linkToOrganization.useMutation(after("License linked")),
-    changeSeats: api.licenseRegistry.changeSeats.useMutation(),
+    changeSeats: api.licenseRegistry.changeSeats.useMutation({
+      onSuccess: async () => {
+        await utils.licenseRegistry.invalidate();
+      },
+      onError: (error: unknown) =>
+        showErrorToast({ error, fallbackTitle: "The seats were not changed" }),
+    }),
     reissue: api.licenseRegistry.reissue.useMutation(),
     issue: api.licenseRegistry.issue.useMutation(),
     registerLegacy: api.licenseRegistry.registerLegacy.useMutation(),

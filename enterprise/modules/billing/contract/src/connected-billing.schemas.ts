@@ -92,8 +92,10 @@ export const connectedSeatChangeViewSchema = z.object({
   changedAt: z.string(),
   addedSeats: z.number(),
   amountCents: z.number(),
-  currency: currencySchema,
-  state: z.enum(["intent", "invoiced", "nothing_to_invoice"]),
+  /** Null until billing decided the change against a billing account. */
+  currency: currencySchema.nullable(),
+  /** `awaiting`: licensing recorded the change and billing has not decided it yet. */
+  state: z.enum(["awaiting", "intent", "invoiced", "nothing_to_invoice", "not_onboarded"]),
   stripeInvoiceId: z.string().nullable(),
 });
 

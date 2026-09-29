@@ -1,9 +1,9 @@
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The daily billing tick of connected customers (ADR-156 section 7): a
- * scheduled process with no events of its own. `global`, because one tick
- * walks every connected customer.
+ * Connected customers' billing (ADR-156 section 7): the daily tick, and the seat
+ * invoicing pass every minute over the seat changes licensing recorded. Scheduled
+ * processes with no events of their own; `global`, as each walks every customer.
  */
 import {
   defineAggregate,
@@ -26,15 +26,27 @@ import {
   connectedBillingTickSchema,
   connectedBillingWake,
 } from "./connected-billing.process.ts";
+import { runSeatInvoicingPass } from "./seat-invoicing.intent.ts";
+import {
+  SEAT_INVOICING_INITIAL_STATE,
+  SEAT_INVOICING_INTERVAL_MS,
+  SEAT_INVOICING_PROCESS_NAME,
+  seatInvoicingPassSchema,
+  seatInvoicingStateSchema,
+  seatInvoicingWake,
+} from "./seat-invoicing.process.ts";
 
 export const CONNECTED_BILLING_PIPELINE_NAME = "connected_billing";
 
-/** The pipeline, over only the one app operation it calls. */
+/** The pipeline, over only the app operations it calls. */
 export function buildConnectedBilling({
   app,
   processStore,
   bootedAt = nowInstant().epochMilliseconds,
-}: EventingSetup<unknown, Pick<BillingApi, "runConnectedBillingTick">> & {
+}: EventingSetup<
+  unknown,
+  Pick<BillingApi, "runConnectedBillingTick" | "invoicePendingSeatChanges">
+> & {
   bootedAt?: number;
 }): StaticPipelineDefinition<never> {
   return definePipeline({
@@ -58,6 +70,23 @@ export function buildConnectedBilling({
         )
         // One tick invoices at the payment provider; a retry repeats only what is idempotent.
         .outbox({ maxAttempts: 3, concurrency: 1, batchSize: 1, leaseDurationMs: 10 * 60 * 1000 }),
+    )
+    .withProcessManager(SEAT_INVOICING_PROCESS_NAME, (pm) =>
+      pm
+        .state(seatInvoicingStateSchema, SEAT_INVOICING_INITIAL_STATE)
+        .schedule({ everyMs: SEAT_INVOICING_INTERVAL_MS })
+        .onWake(seatInvoicingWake)
+        .intent(
+          "pass",
+          seatInvoicingPassSchema,
+          runSeatInvoicingPass({
+            pass: () => app.invoicePendingSeatChanges(),
+            deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
+            now: () => nowInstant().epochMilliseconds,
+          }),
+        )
+        // One pass at a time: a pass invoices at the payment provider.
+        .outbox({ maxAttempts: 3, concurrency: 1, batchSize: 1, leaseDurationMs: 5 * 60 * 1000 }),
     )
     .build();
 }

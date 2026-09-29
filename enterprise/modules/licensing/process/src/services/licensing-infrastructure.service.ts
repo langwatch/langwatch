@@ -1,5 +1,3 @@
-import type { SeatChangeBillingOutcome } from "@langwatch/enterprise-licensing-contract";
-
 import type { LicensingInfrastructure } from "../app/licensing.app.ts";
 import type {
   HostedServicesInfrastructure,
@@ -81,6 +79,7 @@ export class LicensingInfrastructureService {
         findByVirtualKeyId: refuse,
         findByReplacesId: refuse,
         findAllByOrganization: () => Promise.resolve([]),
+        findAllSeatsRaised: () => Promise.resolve([]),
         findAllBoundToInstance: () => Promise.resolve([]),
         listAll: () => Promise.resolve({ rows: [], total: 0 }),
         update: refuse,
@@ -111,10 +110,6 @@ export class LicensingInfrastructureService {
         revoke: refuse,
       },
       activationRateLimit: { allow: () => Promise.resolve(false) },
-      seatBilling: {
-        invoiceAddedSeats: (): Promise<SeatChangeBillingOutcome> =>
-          Promise.resolve("not_onboarded"),
-      },
       syncRateLimit: { allow: () => Promise.resolve(false) },
       cipher: {
         encrypt: () => {

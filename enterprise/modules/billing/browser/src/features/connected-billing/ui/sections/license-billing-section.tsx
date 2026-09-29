@@ -14,14 +14,23 @@ import {
   dollarsToCents,
   onboardPayload,
 } from "../../model/connected-billing-form.ts";
+import {
+  hasUnsettledSeatChange,
+  UNSETTLED_SEAT_CHANGE_POLL_MS,
+} from "../../model/seat-change-copy.ts";
 import { ConnectedBillingFields } from "../blocks/connected-billing-fields.tsx";
 import { ConnectedBillingState, OpenInvoices } from "../blocks/connected-billing-state.tsx";
 
 /** Invoice billing for a connected customer, on the license it was sold with. */
 export default function LicenseBillingSection(license: UiLicenseBillingSectionProps) {
+  // A seat change settles on the worker within about a minute; reread until it has.
   const query = connectedBillingApi.connectedBilling.get.useQuery(
     { organizationId: license.organizationId },
-    { retry: false },
+    {
+      retry: false,
+      refetchInterval: (current) =>
+        hasUnsettledSeatChange(current.state.data) ? UNSETTLED_SEAT_CHANGE_POLL_MS : false,
+    },
   );
 
   return (

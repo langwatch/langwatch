@@ -46,6 +46,15 @@ function licensedAt(commitUsdCents: number) {
         lastSyncAt: "2026-11-02T00:00:00Z",
         managedVirtualKeyId: null,
       }),
+      findSeatChanges: async () => [
+        {
+          licenseRowId: "license-2",
+          organizationId: ACME,
+          previousSeats: 10,
+          seats: 12,
+          changedAt: "2026-11-01T00:00:00Z",
+        },
+      ],
     }),
     operators: { isAdmin: ({ email }) => email === STAFF.email },
     auditLog: createApiFixture<ConnectedBillingPeers["auditLog"]>({
@@ -113,10 +122,14 @@ describe("the installed billing application", () => {
       });
     });
 
-    it("runs no billing tick at all", async () => {
-      const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
+    it("runs no billing tick and no seat invoicing pass at all", async () => {
+      const { app, repositories } = billingApp({ isSaas: false, stripeSecretKey: undefined });
 
       await expect(app.runConnectedBillingTick()).resolves.toBeUndefined();
+      await expect(app.invoicePendingSeatChanges()).resolves.toBeUndefined();
+      await expect(
+        repositories.connectedBilling.findSeatChangesByLicenseRows(["license-2"]),
+      ).resolves.toEqual([]);
     });
   });
 
@@ -147,17 +160,17 @@ describe("the installed billing application", () => {
       expect(asked).toEqual([ACME]);
     });
 
-    it("answers a seat change for a customer never onboarded without invoicing it", async () => {
+    /** @scenario "The Billing section shows a seat change until billing decides it" */
+    it("shows a recorded seat change as awaiting, then as not onboarded once a pass decided it", async () => {
       const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
+      const seatChangeState = async () =>
+        (await app.getConnectedBillingOverview({ organizationId: ACME }, STAFF)).seatChanges.map(
+          (change) => change.state,
+        );
 
-      await expect(
-        app.invoiceAddedSeats({
-          organizationId: ACME,
-          licenseRowId: "license-1",
-          previousSeats: 10,
-          seats: 12,
-        }),
-      ).resolves.toBe("not_onboarded");
+      await expect(seatChangeState()).resolves.toEqual(["awaiting"]);
+      await app.invoicePendingSeatChanges();
+      await expect(seatChangeState()).resolves.toEqual(["not_onboarded"]);
     });
   });
 
@@ -188,7 +201,17 @@ describe("the installed billing application", () => {
         spend: { spendAvailable: false, limitUsdCents: 100_00, spentUsdCents: null },
         terms: { commitUsdCents: 100_00, maximumUsdCents: 100_00, overageEnabled: false },
         seats: { licensed: 10, reported: 8, lastSyncAt: "2026-11-02T00:00:00Z" },
-        seatChanges: [],
+        seatChanges: [
+          {
+            licenseId: "license-2",
+            changedAt: "2026-11-01T00:00:00Z",
+            addedSeats: 2,
+            amountCents: 0,
+            currency: null,
+            state: "awaiting",
+            stripeInvoiceId: null,
+          },
+        ],
       });
     });
 

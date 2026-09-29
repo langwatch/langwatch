@@ -75,6 +75,15 @@ export abstract class ConnectedInvoicingChannel {
     metadata: Record<string, string>;
   }): Promise<ProviderInvoice>;
 
+  /**
+   * The customer's invoices raised with every one of these metadata values.
+   * The idempotency key lapses after a day, so a retry past it looks first.
+   */
+  abstract findInvoices(input: {
+    customerId: string;
+    metadata: Record<string, string>;
+  }): Promise<ProviderInvoice[]>;
+
   /** One invoice as the provider holds it now. Throws when it has none. */
   abstract getInvoice(stripeInvoiceId: string): Promise<ProviderInvoice>;
 

@@ -112,6 +112,7 @@ async function bindLicense(licenses: MemoryIssuedLicenseRepository) {
     reportedMembers: null,
     reportedMembersLite: null,
     virtualKeyId: null,
+    seatsRaisedFrom: null,
   });
   await licenses.bindInstance({ id: row.id, instanceId: "instance-1", at: NOW });
   return row;

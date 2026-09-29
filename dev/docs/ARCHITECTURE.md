@@ -1247,6 +1247,12 @@ lease-held writer) is not background work: it stays a service the module owns. `
 A module reacting to a peer's event does it through a subscriber on the event owner's pipeline that sends
 the reacting module a command through its `*Api`, so the reaction lands as a durable event on the
 reacting module's own pipeline (Alex, 2026-09-25).
+When the reacting module already depends on the owner, that subscriber would be a peer cycle, so the owner
+records the fact in the same write as the change and answers it through a `find*` read on its
+`*Api`; the reacting module pulls it from a scheduled process manager on its own pipeline, stores each
+decision once keyed by the fact, and shows a fact it has not decided as awaiting. Seat changes are
+the case: licensing's `IssuedLicense.seatsRaisedFrom` and `LicensingApi.findSeatChanges`, read by
+billing's `seatInvoicing` pass every minute on `connected_billing` (Alex, 2026-09-29).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
 projection state keeps its type from declaration to handler (Alex, 2026-09-24).
