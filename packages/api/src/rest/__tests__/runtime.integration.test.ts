@@ -1747,6 +1747,106 @@ describe("a path the family serves with another method", () => {
   });
 });
 
+// Two families on one namespace, the by-slug reader mounted before the runner,
+// as the experiments reader and the workbench runner are.
+interface RunApi {
+  bySlug(input: { slug: string }): Promise<{ slug: string }>;
+  execute(input: { name: string }): Promise<{ started: string }>;
+}
+
+const RunApi = moduleApi<RunApi>()("experiment");
+
+const runReader = defineRestRouter(RunApi)
+  .withNamespace("runs")
+  .withVersion(VERSION)
+  .get("/:slug", "getRunBySlug")
+  .withParams(z.object({ slug: z.string() }))
+  .withPermission("experiments:view")
+  .withOutput(z.object({ slug: z.string() }))
+  .handle(async ({ app, input }) => app.bySlug({ slug: input.slug }))
+  .build();
+
+const runRunner = defineRestRouter(RunApi)
+  .withNamespace("runs")
+  .withVersion(VERSION)
+  .post("/execute", "executeRun")
+  .withInput(z.object({ name: z.string() }))
+  .withPermission("experiments:manage")
+  .withOutput(z.object({ started: z.string() }))
+  .handle(async ({ app, input }) => app.execute({ name: input.name }))
+  .build();
+
+const runApplication: RunApi = {
+  bySlug: async ({ slug }) => ({ slug }),
+  execute: async ({ name }) => ({ started: name }),
+};
+
+/** Both families on one host, in the order a module lists its transports. */
+function runsHost(): Hono {
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: { tier: "project", id: "project-1" } }),
+    },
+  });
+  const host = new Hono();
+
+  for (const family of [runReader, runRunner]) {
+    host.route(
+      "/",
+      runtime.mount(family.router(), {
+        app: () => runApplication,
+        credential: "project",
+        onError: createErrorHandler(),
+      }),
+    );
+  }
+
+  return host;
+}
+
+describe("a path two families serve with different methods", () => {
+  /** @scenario "A method a later family serves on a path an earlier family guards is answered" */
+  it("reaches the later family's handler, and the earlier family's still answers", async () => {
+    const host = runsHost();
+
+    for (const address of ["/api/runs/execute", "/api/v1/runs/execute"]) {
+      const executed = await post(host, address, "workbench");
+
+      expect(executed.status).toBe(200);
+      expect(await executed.json()).toEqual({ started: "workbench" });
+    }
+
+    const read = await host.request("/api/runs/my-run");
+
+    expect(read.status).toBe(200);
+    expect(await read.json()).toEqual({ slug: "my-run" });
+  });
+
+  /** @scenario "A method no mounted family serves on a path answers 405 naming every family's methods" */
+  it("answers 405 with the union of what every family serves there", async () => {
+    const host = runsHost();
+
+    const nobody = await host.request("/api/runs/execute", { method: "DELETE" });
+
+    expect(nobody.status).toBe(405);
+    expect(nobody.headers.get("allow")).toBe("GET, HEAD, POST");
+    expect(await nobody.text()).toBe("");
+
+    const readerOnly = await post(host, "/api/runs/my-run", "workbench");
+
+    expect(readerOnly.status).toBe(405);
+    expect(readerOnly.headers.get("allow")).toBe("GET, HEAD");
+  });
+
+  /** @scenario "A method no mounted family serves on a path answers 405 naming every family's methods" */
+  it("answers HEAD from the GET route that Allow names", async () => {
+    const head = await runsHost().request("/api/runs/my-run", { method: "HEAD" });
+
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe("");
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // One answer with several shapes, told apart by a field.
 // ─────────────────────────────────────────────────────────────────────────────

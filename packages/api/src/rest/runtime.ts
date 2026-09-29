@@ -9,6 +9,9 @@ import { createLogger, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
+import { matchedRoutes } from "hono/route";
+import type { RouterRoute } from "hono/types";
+import { COMPOSED_HANDLER } from "hono/utils/constants";
 import type { ContentfulStatusCode, StatusCode } from "hono/utils/http-status";
 import { mergePath } from "hono/utils/url";
 import type { z } from "zod";
@@ -2199,7 +2202,7 @@ function register({
   const handlers = stack as [MiddlewareHandler, ...MiddlewareHandler[]];
 
   if (route.anyMethod) {
-    app.all(path, ...handlers);
+    app.all(path, answersEveryMethod(), ...handlers);
 
     return;
   }
@@ -2212,10 +2215,22 @@ function register({
   }
 }
 
+/** The guards and any-method routes mounted, told apart from middleware by identity. */
+const methodGuards = new WeakMap<object, ReadonlySet<HttpMethod>>();
+const anyMethodRoutes = new WeakSet<object>();
+
+/** Marks an any-method route, so no family's method guard answers in front of it. */
+function answersEveryMethod(): MiddlewareHandler {
+  const marker: MiddlewareHandler = async (_context, next) => next();
+
+  anyMethodRoutes.add(marker);
+
+  return marker;
+}
+
 /**
- * A path this family serves, asked for with a method it does not: 405 with the
- * `Allow` header naming what it does serve. Written here rather than thrown,
- * because `Allow` is the whole of the answer the router owes.
+ * A method no mounted route serves on this path: 405, `Allow` naming what every family
+ * serves on it. The router's own match decides, so mount order never shadows a family.
  */
 function mountMethodGuards({
   app,
@@ -2225,18 +2240,39 @@ function mountMethodGuards({
   served: ReadonlyMap<string, Set<HttpMethod>>;
 }): void {
   for (const [path, methods] of served) {
-    const allow = allowHeaderOf(methods);
+    const guard: MiddlewareHandler = async (context, next) => {
+      const routes = matchedRoutes(context);
 
-    app.all(path, async (context, next) => {
-      const asked = context.req.method.toLowerCase() as HttpMethod;
+      if (routes.some(servesTheRequest)) return next();
 
-      if (methods.has(asked)) return next();
-
-      context.header("Allow", allow);
+      context.header("Allow", allowHeaderOf(new Set(routes.flatMap(guardedMethods))));
 
       return context.body(null, 405);
-    });
+    };
+
+    methodGuards.set(guard, methods);
+    app.all(path, guard);
   }
+}
+
+/** The router matches a route by its own method or `ALL`; HEAD is matched as GET. */
+function servesTheRequest(route: RouterRoute): boolean {
+  return route.method !== "ALL" || anyMethodRoutes.has(handlerOf(route));
+}
+
+function guardedMethods(route: RouterRoute): HttpMethod[] {
+  return [...(methodGuards.get(handlerOf(route)) ?? [])];
+}
+
+/** The handler as mounted: `route()` wraps a sub-app's handler to carry its error boundary. */
+function handlerOf(route: RouterRoute): object {
+  return unwrapped(route.handler);
+}
+
+function unwrapped(handler: object): object {
+  const inner: unknown = Reflect.get(handler, COMPOSED_HANDLER);
+
+  return typeof inner === "function" ? unwrapped(inner) : handler;
 }
 
 /** What the path serves, as `Allow` spells it; HEAD rides on GET, as Hono serves it. */

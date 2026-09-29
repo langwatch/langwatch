@@ -132,6 +132,21 @@ Feature: Explicit compatibility version namespaces
     And a path the family serves with that method answers as it always did
 
   @integration
+  Scenario: A method a later family serves on a path an earlier family guards is answered
+    Given one family serving GET on "/:slug", mounted first
+    And a later family serving POST on "/execute" under the same namespace
+    When a caller sends POST to "/execute" at any of its addresses
+    Then the later family's handler answers it
+    And GET on a slug still answers from the earlier family
+
+  @integration
+  Scenario: A method no mounted family serves on a path answers 405 naming every family's methods
+    Given two families serving one path with different methods
+    When a caller sends a method neither serves there
+    Then the answer is 405, naming in Allow every method any family serves on that path
+    And HEAD on a path served by GET answers from the GET route
+
+  @integration
   Scenario: A family at a shared prefix mounts its own paths and their canonical address
     Given a family declares that its published paths are its whole contract
     When it is built
