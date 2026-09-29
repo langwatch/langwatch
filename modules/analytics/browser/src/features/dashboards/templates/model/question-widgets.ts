@@ -5,7 +5,7 @@
  */
 
 import { BLOCK_QUESTION_SECTIONS } from "../../model/block-questions.ts";
-import type { BoardTemplateWidget } from "./board-template.ts";
+import type { BoardTemplate, BoardTemplateWidget } from "./board-template.ts";
 import { QUESTION_TEMPLATES } from "./question-templates.ts";
 
 /**
@@ -38,7 +38,7 @@ const sectionIdByQuestionId: ReadonlyMap<string, string> = new Map(
   ),
 );
 
-const templateById = new Map(
+const templateById: ReadonlyMap<string, BoardTemplate> = new Map(
   QUESTION_TEMPLATES.map((template) => [template.id, template] as const),
 );
 
