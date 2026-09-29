@@ -1392,6 +1392,10 @@ sees when every owner has finished and which has not. Today's breaks (organizati
 organization delete, user's data erase, data-retention's retroactive rewrite over other modules'
 tables) move to this shape in their own changes.
 
+A pinned trace is a bookmark, as on main: retention ignores pins (Alex, 2026-09-29). Until the
+branch matches main, ownership moves that change no behaviour wait; they are listed with their
+rollout checks in `dev/docs/plans/ownership-after-parity.md` (Alex, 2026-09-29).
+
 ---
 
 ## 10. The browser application
