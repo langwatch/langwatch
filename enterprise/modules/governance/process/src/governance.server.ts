@@ -30,10 +30,9 @@ import type {
   IngestionPullRunner,
   IngestionPullSourceReader,
   IngestionPullTenantResolver,
-  AnomalyAlertHttpClient,
-  AnomalySpendReader,
 } from "./app/governance.members.ts";
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
+import { governanceActivityMonitorEventing } from "./eventing/governance-activity-monitor.pipeline.ts";
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
 import {
   IngestionPullEventingAdapter,
@@ -60,12 +59,7 @@ import {
   PrismaIngestionSourceRepository,
   type IngestionSourceDatabase,
 } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
-import {
-  PrismaSpendSpikeAnomalyRepository,
-  type SpendSpikeAnomalyDatabase,
-} from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 import type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
-import { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
 import {
   type DepartmentOrganizations,
   type DepartmentProjects,
@@ -73,7 +67,6 @@ import {
 } from "./services/department.service.ts";
 import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
-import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
 import { aiToolsTrpcTransport } from "./transport/ai-tools.trpc.ts";
 import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";
@@ -136,7 +129,8 @@ export const governanceServer = defineServerModule("governance")
   })
   .withEventing(pulledUsageEventing)
   .withEventing(ingestionPullEventing)
-  .withEventing(ingestionPullReconcileEventing);
+  .withEventing(ingestionPullReconcileEventing)
+  .withEventing(governanceActivityMonitorEventing);
 
 /**
  * The ingestion-pull pipeline: its run-status projection over the process's own
@@ -223,22 +217,6 @@ export function createDepartmentDirectory(
     repository: PrismaDepartmentRepository.create(database),
     organizations,
     projects,
-  });
-}
-
-/**
- * The spend-spike evaluator one scheduler tick runs: the rules it reads, the
- * windows it compares, and where a fire decision is dispatched.
- */
-export function createSpendSpikeAnomalyEvaluator(options: {
-  database: SpendSpikeAnomalyDatabase;
-  spend: AnomalySpendReader;
-  http: AnomalyAlertHttpClient;
-}): SpendSpikeAnomalyEvaluatorService {
-  return SpendSpikeAnomalyEvaluatorService.create({
-    repository: PrismaSpendSpikeAnomalyRepository.create(options.database),
-    spend: options.spend,
-    dispatcher: AnomalyAlertDispatcherService.create({ http: options.http }),
   });
 }
 

@@ -4,6 +4,7 @@ import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { MemoryActivityMonitorRepository } from "./memory.activity-monitor.repository.ts";
 import { MemoryAiToolCatalogRepository } from "./memory.ai-tool-catalog.repository.ts";
 import { MemoryAnomalyRuleRepository } from "./memory.anomaly-rule.repository.ts";
+import { MemoryAnomalySpendRepository } from "./memory.anomaly-spend.repository.ts";
 import { MemoryCostAttributionPolicyRepository } from "./memory.cost-attribution-policy.repository.ts";
 import { MemoryDepartmentRepository } from "./memory.department.repository.ts";
 import { MemoryDiscoveredAgentRepository } from "./memory.discovered-agent.repository.ts";
@@ -55,6 +56,7 @@ export class MemoryGovernanceRepositories {
       ingestionTemplates: MemoryIngestionTemplateRepository.create(store),
       costRollup: MemoryGovernanceCostRollupRepository.create(),
       ocsfEvents: MemoryOcsfEventsRepository.create(),
+      anomalySpend: MemoryAnomalySpendRepository.create(),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
       rollupErasure: MemoryRollupErasureRepository.create(),
       setupState: MemoryGovernanceSetupStateRepository.create(),

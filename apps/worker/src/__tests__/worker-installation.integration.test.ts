@@ -178,6 +178,7 @@ describe("the worker process installation", () => {
       ).toBe(true);
       expect(pipelines).toContain("ingestion_pull_processing");
       expect(pipelines).toContain("ingestion_pull_reconcile");
+      expect(pipelines).toContain("governance_activity_monitor");
       expect(pipelines).toContain("blob_maintenance");
       expect(pipelines).toContain("process_manager_maintenance");
       // Every process that is not producing resolves trace commands from this registration.
@@ -188,6 +189,7 @@ describe("the worker process installation", () => {
         ),
       );
       expect(schedules).not.toEqual([]);
+      expect(schedules).toContain("spendSpikeEvaluation");
     } finally {
       await runtime.stop();
     }

@@ -64,7 +64,6 @@ export {
   createGovernanceServices,
   createIngestionPullSources,
   createPulledUsageEventing,
-  createSpendSpikeAnomalyEvaluator,
   findAgentsListings,
 } from "./governance.server.ts";
 export type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
@@ -75,12 +74,6 @@ export type {
 } from "@langwatch/enterprise-governance-contract";
 export type { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
 export type { IngestionPullWorkerService } from "./services/ingestion-pull-worker.service.ts";
-export { GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS } from "./eventing/governance-ocsf.subscriber.ts";
-export {
-  GOVERNANCE_KPIS_SYNC_WINDOW_MS,
-  GovernanceKpisSubscriber,
-} from "./eventing/governance-kpis.subscriber.ts";
-export { GovernanceOcsfSubscriber } from "./eventing/governance-ocsf.subscriber.ts";
 
 // The thirteen tRPC transports this feature owns are not exported: they still
 // name the deleted legacy builder, so nothing may reach them until each is

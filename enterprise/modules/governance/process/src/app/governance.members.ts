@@ -22,14 +22,13 @@ import type {
   SpendOverTimeGroupBy,
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
-import { type TriggerContext } from "@langwatch/eventing";
 import type {
   InternalProject,
   InternalProjectQuery,
   ProjectWithTeam,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
-import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 export type AnomalyAlertHttpResponse = {
   status: number;
@@ -397,24 +396,17 @@ export interface GovernanceProjectDirectory {
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
 }
 
-export type GovernanceTraceSummary = {
-  traceId: string;
-  occurredAt: number;
-  totalCost: number | null;
-  totalPromptTokenCount: number | null;
-  totalCompletionTokenCount: number | null;
-  models: string[];
-  attributes: Record<string, string>;
-};
-
-/**
- * The event these subscribers actually receive. They mount on the trace
- * pipeline only, so `Event<unknown>` understated it — the guard discriminates
- * on `type`, which `unknown` would let silently compile without narrowing.
- */
-export type GovernanceTraceEvent = TraceProcessingEvent;
-
-export type GovernanceTraceContext = TriggerContext<GovernanceTraceSummary>;
+/** The trace summary fields a governance-origin trace's KPI and OCSF rows are built from. */
+export type GovernanceTraceSummary = Pick<
+  TraceSummaryData,
+  | "traceId"
+  | "occurredAt"
+  | "totalCost"
+  | "totalPromptTokenCount"
+  | "totalCompletionTokenCount"
+  | "models"
+  | "attributes"
+>;
 
 export type GovernanceKpiContribution = {
   tenantId: string;
@@ -454,11 +446,6 @@ export interface GovernanceKpiContributionWriter {
 export interface GovernanceOcsfEventWriter {
   /** Upsert/replacing identity is (tenant, eventId). */
   insertEvent(row: GovernanceOcsfEvent): Promise<void>;
-}
-
-export interface GovernanceSubscriberDiagnosticsSink {
-  warn(input: { code: string; tenantId: string; traceId: string }): void;
-  capture(error: unknown): void;
 }
 
 export interface ActivityMonitorRepository {
