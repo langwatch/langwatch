@@ -37,31 +37,33 @@ migrations X1-X4. Paths abbreviate `modules/<m>/process/src/` as `<m>:`.
 ## 1. Decisions per writer
 
 The rule for choosing:
+
 - **(a) Call an OrganizationApi command** when the column is an organization setting that several modules read.
 - **(b) Move the column to the writer's own table** when only the writer reads it.
 
 Every change goes over an existing peer edge, or towards authz (a leaf), so none adds an edge or a cycle.
 
-| # | Writer | Rows / columns | Decision |
-|---|---|---|---|
-| W1 | organization, membership repository | OrganizationUser, TeamUser | Owner. `deleteMember` deletes membership first, then re-drives durably (M1). |
-| W2 | auth, better-auth-hooks :120 | OrganizationUser insert | (a) `createMembership` in main's sso-arrival mode. Delete the repository method. |
-| W3 | identity, join-membership | OrganizationUser | Dead code: delete. |
-| W4 | scim, repository :379-390 plus the provisioning and deprovision services | OrganizationUser insert/delete | (a) `createMembership` with the asserted role (restores finding 4). Remove through `offboardMember`. |
-| W5 | authz, eventing.authz-grant :400-470 | deletes OrganizationUser, GroupMembership, TeamUser, OrganizationInvite | Split. Organization deletes its own rows in `offboardMember`. authz keeps Grant and RoleBinding (`revokeMemberAccess`). |
-| W6 | authz, admission :103,142 | OrganizationUser.pendingSsoGrantId | (b) New `AuthzPendingAdmission` table. |
-| W7 | billing, subscription :212 | Organization.pricingModel | (a) `setPricingModel` |
-| W8 | billing, webhook-organization :38,49 | currency; trial licence | currency: (a) `setBillingCurrency`. Licence: `LicensingApi.removeLicense`. |
-| W9 | billing, tiered-free-to-seat task :42 | pricingModel updateMany | (a) `setPricingModel({ onlyIfCurrently: "TIERED" })`, and register the task. |
-| W10 | licensing, organization-license :57,68 | license, expiry, last validated | (a) `storeLicense` / `clearLicense` |
-| W11 | licensing, connect-organization :57,72 | connect* columns | (b) New `LicensingConnectState` table. |
-| W12 | auth, sign-in-security-settings :94 | four lockout and session columns | (b) New `SignInSecurityPolicy` table. A missing row means the defaults 0/30/1440/0. |
-| W13 | identity, two-step-verification :113 | mfaRequired | (a) `setMfaRequired` |
-| W14 | identity, join-setting :45 | domainJoin, joinDomains | Dead code: delete. |
+| #   | Writer                                                                   | Rows / columns                                                          | Decision                                                                                                                |
+| --- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| W1  | organization, membership repository                                      | OrganizationUser, TeamUser                                              | Owner. `deleteMember` deletes membership first, then re-drives durably (M1).                                            |
+| W2  | auth, better-auth-hooks :120                                             | OrganizationUser insert                                                 | (a) `createMembership` in main's sso-arrival mode. Delete the repository method.                                        |
+| W3  | identity, join-membership                                                | OrganizationUser                                                        | Dead code: delete.                                                                                                      |
+| W4  | scim, repository :379-390 plus the provisioning and deprovision services | OrganizationUser insert/delete                                          | (a) `createMembership` with the asserted role (restores finding 4). Remove through `offboardMember`.                    |
+| W5  | authz, eventing.authz-grant :400-470                                     | deletes OrganizationUser, GroupMembership, TeamUser, OrganizationInvite | Split. Organization deletes its own rows in `offboardMember`. authz keeps Grant and RoleBinding (`revokeMemberAccess`). |
+| W6  | authz, admission :103,142                                                | OrganizationUser.pendingSsoGrantId                                      | (b) New `AuthzPendingAdmission` table.                                                                                  |
+| W7  | billing, subscription :212                                               | Organization.pricingModel                                               | (a) `setPricingModel`                                                                                                   |
+| W8  | billing, webhook-organization :38,49                                     | currency; trial licence                                                 | currency: (a) `setBillingCurrency`. Licence: `LicensingApi.removeLicense`.                                              |
+| W9  | billing, tiered-free-to-seat task :42                                    | pricingModel updateMany                                                 | (a) `setPricingModel({ onlyIfCurrently: "TIERED" })`, and register the task.                                            |
+| W10 | licensing, organization-license :57,68                                   | license, expiry, last validated                                         | (a) `storeLicense` / `clearLicense`                                                                                     |
+| W11 | licensing, connect-organization :57,72                                   | connect* columns                                                        | (b) New `LicensingConnectState` table.                                                                                  |
+| W12 | auth, sign-in-security-settings :94                                      | four lockout and session columns                                        | (b) New `SignInSecurityPolicy` table. A missing row means the defaults 0/30/1440/0.                                     |
+| W13 | identity, two-step-verification :113                                     | mfaRequired                                                             | (a) `setMfaRequired`                                                                                                    |
+| W14 | identity, join-setting :45                                               | domainJoin, joinDomains                                                 | Dead code: delete.                                                                                                      |
 
 ## 2. New and amended operations (each needs approval)
 
 **OrganizationApi**
+
 - **O1** `createMembership({ organizationId, userId, role? = MEMBER, admission })`
   - `admission` is one of `pending-sso`, `admitted { actor, commandId, source }` or `directory`.
   - Returns `"created" | "already-present"`. It adds no seat refusal.
@@ -76,6 +78,7 @@ Every change goes over an existing peer edge, or towards authz (a leaf), so none
 - **O8** `planMemberErasure({ userId })`: answers with main's saas queries and blocker texts exactly.
 
 **Other modules**
+
 - **A1** `AuthzApi.revokeMemberAccess`, which replaces `offboard`.
 - **A2** `AuthzApi.recordPendingAdmission`
 - **P1** `ProjectApi.findIdsByTeams`
@@ -85,12 +88,12 @@ Every change goes over an existing peer edge, or towards authz (a leaf), so none
 Each migration backfills with `INSERT ... SELECT`. During the transition the code dual-writes, and a re-runnable copy
 task converges the tables.
 
-| Id | Expand | Contract |
-|---|---|---|
-| X1 | `AuthzPendingAdmission(organizationId, userId, grantId, createdAt)`, backfilled from `pendingSsoGrantId` | drop `OrganizationUser.pendingSsoGrantId` |
-| X2 | `SignInSecurityPolicy(organizationId PK, four columns, updatedAt)`, backfilled for every organization | drop the four Organization columns and remove them from the wire |
-| X3 | `LicensingConnectState(organizationId PK, servicesDisabled, lastSyncAt, lastSyncError)`, backfilled | drop the three `connect*` columns and remove them from the wire |
-| X4 | `MemberRemoval(id, organizationId, userId, removedAt, accessRevokedAt, attempts, lastError)` | none |
+| Id  | Expand                                                                                                   | Contract                                                         |
+| --- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| X1  | `AuthzPendingAdmission(organizationId, userId, grantId, createdAt)`, backfilled from `pendingSsoGrantId` | drop `OrganizationUser.pendingSsoGrantId`                        |
+| X2  | `SignInSecurityPolicy(organizationId PK, four columns, updatedAt)`, backfilled for every organization    | drop the four Organization columns and remove them from the wire |
+| X3  | `LicensingConnectState(organizationId PK, servicesDisabled, lastSyncAt, lastSyncError)`, backfilled      | drop the three `connect*` columns and remove them from the wire  |
+| X4  | `MemberRemoval(id, organizationId, userId, removedAt, accessRevokedAt, attempts, lastError)`             | none                                                             |
 
 ## 4. Owner-side erase and purge (§9.1)
 
@@ -103,7 +106,7 @@ task converges the tables.
   - It lives in `process/src/eventing/<m>.erasure.ts`, a new filename kind in feature-layout-policy.
   - It is installed through `.withEventing` and calls no peer.
 - **Plan.** A frozen set of root ids: `{ kind: user-erase | organization-purge, userId?, organizationIds, teamIds,
-  projectIds }`.
+projectIds }`.
 - **Run.**
   - A keyed process manager, `erasureRun`, on the member-built `data_erasure` pipeline.
   - Its surface is `eventing.erasures.request`, `status` and `redrive`.
@@ -129,6 +132,7 @@ task converges the tables.
 ### 4.6 Model-to-owner actions
 
 Actions:
+
 - **D**: delete.
 - **N**: set to null or anonymise.
 - **B**: block (refused in CHECK).
@@ -138,33 +142,33 @@ Actions:
 Root keys: **U** the user; **p** deleted projects; **t** deleted teams; **o** organizations deleted by a user erase;
 **O** the purged organization.
 
-| Owner | Models: actions |
-|---|---|
-| user | User U:D (last) |
-| organization | OrganizationUser U:D o:D O:D; TeamUser U:D t:D O:D; Team t:D O:D; Organization o:D O:D; GroupMembership U:D[E]; Group O:D[E]; OrganizationInvite O:B[E] U:N[E] |
-| auth | Account U:D; Session U:D; TwoFactor U:D[E]; Passkey U:D[E] |
-| identity | AccountCredential U:D[E] |
-| authz | RoleBinding U:D[E] O:D; Grant O:D; GrantUsage O:D; Role O:D; Grant U:R |
-| api-key | ApiKey U:B O:D o:B |
-| ops | SystemMigrationTenantState O:D; SystemMigrationEnrollment O:D |
-| prompt | LlmPromptConfigVersion U:N p:D; LlmPromptConfig p:D; PromptTag O:D U:N[E]; PromptTagAssignment U:N[E] |
-| workflow | Workflow U:N p:D; WorkflowVersion U:D p:D |
-| annotation | Annotation U:N p:D; AnnotationQueueItem U:N p:D; AnnotationQueueMembers U:D p:D; AnnotationQueueScores p:D; AnnotationQueue p:D; AnnotationScore p:B[E] |
-| share | ShareLink U:N p:D |
-| audit-log | AuditLog U:N ("[deleted]", ip/userAgent null) |
-| dataset | BatchEvaluation p:D; Dataset p:D; DatasetRecord p:D |
-| monitor / experiment | Monitor p:D; Experiment p:D |
-| dashboard | CustomGraph p:D; Dashboard p:D; SavedView p:B[E] U:N[E] |
-| automation | Trigger p:D; TriggerSent p:B[E]; EmailSuppression p:B[E] |
-| topic / evaluation / model-provider | Topic p:D; Cost p:D; ModelProviderScope p:D |
-| project | Project p:D U:N[E] |
-| secret / data-retention / trace / analytics | ProjectSecret U:B p:B; PinnedTrace U:N[E] p:B[E]; TraceEditOverlay U:N[E] p:B[E]; Analytics p:B[E] |
-| agent / evaluator / scenario / suite | Agent, Evaluator, SimulationSuite p:B[E]; Scenario p:B[E] U:N[E] |
-| notification / webhook | Notification p:D[E] O:D[E]; WebhookEndpoint O:D[E]; WebhookEndpointDelivery p:D[E] |
-| gateway | GatewayGuardrail p:D[E] U:N[E]; GatewayChangeEvent O:D[E] p:N[E]; VirtualKey U:N[E]; GatewayBudget U:B |
-| enterprise-gateway / governance | RoutingPolicy O:D[E] U:N[E]; IngestionSource O:D[E] t:N[E] U:N[E]; AnomalyRule O:D[E] U:N[E]; AnomalyAlert, AiToolEntry, IngestionTemplate O:D[E]; AiToolEntryTeam t:D[E] |
-| scim / github | ScimExternalId, ScimUserResource U:D[E]; ScimToken, ScimRequestLog O:D[E]; GithubInstallation, GithubPullRequest, GithubBranchPullRequestCheck O:D[E] |
-| licensing / billing / role | IssuedLicense O:B; ConnectedBillingAccount, Subscription O:B; CustomRole O:B[E] |
+| Owner                                       | Models: actions                                                                                                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| user                                        | User U:D (last)                                                                                                                                                           |
+| organization                                | OrganizationUser U:D o:D O:D; TeamUser U:D t:D O:D; Team t:D O:D; Organization o:D O:D; GroupMembership U:D[E]; Group O:D[E]; OrganizationInvite O:B[E] U:N[E]            |
+| auth                                        | Account U:D; Session U:D; TwoFactor U:D[E]; Passkey U:D[E]                                                                                                                |
+| identity                                    | AccountCredential U:D[E]                                                                                                                                                  |
+| authz                                       | RoleBinding U:D[E] O:D; Grant O:D; GrantUsage O:D; Role O:D; Grant U:R                                                                                                    |
+| api-key                                     | ApiKey U:B O:D o:B                                                                                                                                                        |
+| ops                                         | SystemMigrationTenantState O:D; SystemMigrationEnrollment O:D                                                                                                             |
+| prompt                                      | LlmPromptConfigVersion U:N p:D; LlmPromptConfig p:D; PromptTag O:D U:N[E]; PromptTagAssignment U:N[E]                                                                     |
+| workflow                                    | Workflow U:N p:D; WorkflowVersion U:D p:D                                                                                                                                 |
+| annotation                                  | Annotation U:N p:D; AnnotationQueueItem U:N p:D; AnnotationQueueMembers U:D p:D; AnnotationQueueScores p:D; AnnotationQueue p:D; AnnotationScore p:B[E]                   |
+| share                                       | ShareLink U:N p:D                                                                                                                                                         |
+| audit-log                                   | AuditLog U:N ("[deleted]", ip/userAgent null)                                                                                                                             |
+| dataset                                     | BatchEvaluation p:D; Dataset p:D; DatasetRecord p:D                                                                                                                       |
+| monitor / experiment                        | Monitor p:D; Experiment p:D                                                                                                                                               |
+| dashboard                                   | CustomGraph p:D; Dashboard p:D; SavedView p:B[E] U:N[E]                                                                                                                   |
+| automation                                  | Trigger p:D; TriggerSent p:B[E]; EmailSuppression p:B[E]                                                                                                                  |
+| topic / evaluation / model-provider         | Topic p:D; Cost p:D; ModelProviderScope p:D                                                                                                                               |
+| project                                     | Project p:D U:N[E]                                                                                                                                                        |
+| secret / data-retention / trace / analytics | ProjectSecret U:B p:B; PinnedTrace U:N[E] p:B[E]; TraceEditOverlay U:N[E] p:B[E]; Analytics p:B[E]                                                                        |
+| agent / evaluator / scenario / suite        | Agent, Evaluator, SimulationSuite p:B[E]; Scenario p:B[E] U:N[E]                                                                                                          |
+| notification / webhook                      | Notification p:D[E] O:D[E]; WebhookEndpoint O:D[E]; WebhookEndpointDelivery p:D[E]                                                                                        |
+| gateway                                     | GatewayGuardrail p:D[E] U:N[E]; GatewayChangeEvent O:D[E] p:N[E]; VirtualKey U:N[E]; GatewayBudget U:B                                                                    |
+| enterprise-gateway / governance             | RoutingPolicy O:D[E] U:N[E]; IngestionSource O:D[E] t:N[E] U:N[E]; AnomalyRule O:D[E] U:N[E]; AnomalyAlert, AiToolEntry, IngestionTemplate O:D[E]; AiToolEntryTeam t:D[E] |
+| scim / github                               | ScimExternalId, ScimUserResource U:D[E]; ScimToken, ScimRequestLog O:D[E]; GithubInstallation, GithubPullRequest, GithubBranchPullRequestCheck O:D[E]                     |
+| licensing / billing / role                  | IssuedLicense O:B; ConnectedBillingAccount, Subscription O:B; CustomRole O:B[E]                                                                                           |
 
 ### 4.7 Enforcer
 
@@ -188,25 +192,26 @@ Root keys: **U** the user; **p** deleted projects; **t** deleted teams; **o** or
 ## 5. Packets
 
 **Order:**
+
 - Membership track: M1 then M2. M3 and M4 are independent. M5 comes a release later.
 - Erase track: P0, then P1, then P3a, P3b and P4, then P5.
 - P2 lands after P1 and before P5.
 - P5 lands after M1.
 
-| Packet | Scope |
-|---|---|
-| M1 | Membership commands in organization and authz (O1, O2, A1, A2); migrations X1 and X4; a MemberRemoval re-drive process manager |
-| M2 | Callers go through organization: auth hooks and SCIM (restoring the asserted role); delete the dead identity repositories |
-| M3 | Organization-row writes from billing and licensing (O3-O6); register the tiered task; migration X3 |
-| M4 | Organization-row writes from auth and identity (O7); migration X2 |
-| M5 | Contract migrations; remove the dual-writes and the wire fields |
-| P0 | Characterisation against real Postgres of today's erase and purge, recording which rows are deleted, nulled or refused; restore main's two purge deletes; resolve every [E] |
-| P1 | The eventing erasure primitive and its specs |
-| P2 | The erasure-coverage enforcer and baseline |
-| P3a | Participants scoped to projects |
-| P3b | Block and null participants |
-| P4 | Participants for identity and enterprise modules |
-| P5 | Root participants and the initiators; delete the old repositories |
+| Packet | Scope                                                                                                                                                                       |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M1     | Membership commands in organization and authz (O1, O2, A1, A2); migrations X1 and X4; a MemberRemoval re-drive process manager                                              |
+| M2     | Callers go through organization: auth hooks and SCIM (restoring the asserted role); delete the dead identity repositories                                                   |
+| M3     | Organization-row writes from billing and licensing (O3-O6); register the tiered task; migration X3                                                                          |
+| M4     | Organization-row writes from auth and identity (O7); migration X2                                                                                                           |
+| M5     | Contract migrations; remove the dual-writes and the wire fields                                                                                                             |
+| P0     | Characterisation against real Postgres of today's erase and purge, recording which rows are deleted, nulled or refused; restore main's two purge deletes; resolve every [E] |
+| P1     | The eventing erasure primitive and its specs                                                                                                                                |
+| P2     | The erasure-coverage enforcer and baseline                                                                                                                                  |
+| P3a    | Participants scoped to projects                                                                                                                                             |
+| P3b    | Block and null participants                                                                                                                                                 |
+| P4     | Participants for identity and enterprise modules                                                                                                                            |
+| P5     | Root participants and the initiators; delete the old repositories                                                                                                           |
 
 ## 6. Risks
 

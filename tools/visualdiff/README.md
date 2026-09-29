@@ -219,20 +219,20 @@ One classifier (`classify.go`) decides every screen, for the report,
 that applies wins, and every row keeps both screenshots so a person can
 overrule it. The finding classes fail the run (exit 1):
 
-| Class               | Rule                                                                            |
-| ------------------- | ------------------------------------------------------------------------------- |
-| `missing-candidate` | the base captured the screen and the candidate never did                        |
-| `missing-base`      | the candidate captured the screen and the base never did - nothing compared     |
-| `capture-failed`    | a side's own modules did not load, even taken again alone - the tool's failure  |
-| `broken-both`       | the route or flow step fails on both refs                                       |
-| `regression`        | the candidate fails, or logs a console error, where the base does not           |
-| `not-found`         | the candidate shows its not-found page where the base renders the screen        |
-| `blank`             | the candidate page has no text at all, on any route or step                     |
-| `redirect`          | the candidate ends on a different path (ids masked) than the base               |
-| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make             |
+| Class               | Rule                                                                                         |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `missing-candidate` | the base captured the screen and the candidate never did                                     |
+| `missing-base`      | the candidate captured the screen and the base never did - nothing compared                  |
+| `capture-failed`    | a side's own modules did not load, even taken again alone - the tool's failure               |
+| `broken-both`       | the route or flow step fails on both refs                                                    |
+| `regression`        | the candidate fails, or logs a console error, where the base does not                        |
+| `not-found`         | the candidate shows its not-found page where the base renders the screen                     |
+| `blank`             | the candidate page has no text at all, on any route or step                                  |
+| `redirect`          | the candidate ends on a different path (ids masked) than the base                            |
+| `api-error`         | a 4xx, 5xx or failed `/api/` or tRPC request the base does not make                          |
 | `layout`            | the page changed size, 5% or more of its covered area moved, or pixels differ by 10% or more |
-| `controls`          | a button, link, heading, tab or form field one side has and the other lacks     |
-| `uncovered`         | a route either ref declares that `visualdiff.yaml` neither renders nor excludes |
+| `controls`          | a button, link, heading, tab or form field one side has and the other lacks                  |
+| `uncovered`         | a route either ref declares that `visualdiff.yaml` neither renders nor excludes              |
 
 The informational classes are reported and never fail it:
 
