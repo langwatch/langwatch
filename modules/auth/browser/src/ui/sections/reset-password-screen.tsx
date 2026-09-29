@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Link } from "@langwatch/browser-host/link";
 import { FormErrorDisplay } from "@langwatch/design-system/form-error-display";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { useState } from "react";
@@ -22,7 +23,6 @@ import { authClient } from "../../behavior/auth-client.tsx";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
-import Link from "../../ui/elements/router-link.tsx";
 
 const INVALID_LINK_MESSAGE =
   "This password reset link is invalid or has expired. Request a new one to continue.";

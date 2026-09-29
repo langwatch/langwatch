@@ -1,4 +1,5 @@
-import { Box, Button, HStack, Link, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Check, Copy, ExternalLink, LogOut, RefreshCw } from "lucide-react";
 import { useState } from "react";
 

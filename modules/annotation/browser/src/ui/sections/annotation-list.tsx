@@ -5,6 +5,7 @@ import {
   annotationQueueItemStatusSchema,
   type AnnotationQueueItemStatus,
 } from "@langwatch/annotation-contract";
+import { Link } from "@langwatch/browser-host/link";
 import { downloadCsv } from "@langwatch/csv/download";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -49,7 +50,6 @@ import { annotationViewCopy, viewReadsMemberQueues } from "../../model/annotatio
 import type { AnnotationView } from "../../model/annotation-view.ts";
 import { AnnotationTable, AnnotationTableSkeleton } from "../blocks/annotation-table.tsx";
 import { PersonalFeatureGateDialog } from "../blocks/personal-feature-gate-dialog.tsx";
-import { Link } from "../elements/annotation-link.tsx";
 import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 import { PeriodPicker } from "../elements/period-picker.tsx";
 import { RedactedField } from "../elements/redacted-field.tsx";

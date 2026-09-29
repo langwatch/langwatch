@@ -13,6 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { ArrowLeft } from "lucide-react";
@@ -21,7 +22,6 @@ import { useMemo } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { formatDuration, readableDate } from "../../../../model/ops-formatters.ts";
-import { Link } from "../../../../ui/elements/ops-link.tsx";
 import { useReplayStatus } from "../../behavior/use-replay-status.ts";
 import { parseActiveProjections } from "../../model/replay-presentation.ts";
 import { CowboyAnimation } from "../elements/cowboy-animation.tsx";

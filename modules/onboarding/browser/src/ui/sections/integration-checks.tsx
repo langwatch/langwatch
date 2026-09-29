@@ -1,5 +1,5 @@
 import { List, Text, VStack } from "@chakra-ui/react";
-import { Link } from "@langwatch/onboarding-browser-kit";
+import { Link } from "@langwatch/browser-host/link";
 import type React from "react";
 import { CheckCircle, Circle } from "react-feather";
 

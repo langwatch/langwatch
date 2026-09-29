@@ -3,6 +3,7 @@
  * validates as out (ADR-060 §3).
  */
 import { Box, Grid, Table, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 import type {
   LangyCardHint,
@@ -343,9 +344,9 @@ function bindHints({
 
 function DefaultExploreLink({ href, children }: LangyExploreLinkProps) {
   return (
-    <a href={href}>
+    <Link unstyled href={href}>
       {children}
       <ArrowUpRight size={12} />
-    </a>
+    </Link>
   );
 }

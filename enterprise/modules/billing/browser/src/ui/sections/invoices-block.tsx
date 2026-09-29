@@ -3,6 +3,7 @@
  * status badge, and PDF download link.
  */
 import { Badge, Card, Flex, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Download, ExternalLink } from "lucide-react";
 
 import { billingApi } from "../../behavior/billing-api.ts";
@@ -11,7 +12,6 @@ import {
   formatInvoiceDate,
   getInvoiceStatusColor,
 } from "../../model/invoice-utils.ts";
-import { Link } from "../../ui/elements/link.tsx";
 
 export function InvoicesBlock({
   organizationId,

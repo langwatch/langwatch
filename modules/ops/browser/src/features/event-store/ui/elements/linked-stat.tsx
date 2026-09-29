@@ -1,4 +1,5 @@
-import { OpsNextLink as NextLink } from "../../../../ui/elements/ops-link.tsx";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
+
 import { LinkedStat as OpsLinkedStat } from "./dashboard-linked-stat.tsx";
 import type { LinkedStatProps } from "./dashboard-linked-stat.tsx";
 
@@ -8,9 +9,9 @@ export function LinkedStat(props: LinkedStatProps) {
     <OpsLinkedStat
       {...props}
       link={(content, href) => (
-        <NextLink href={href} style={{ textDecoration: "none" }}>
+        <RoutedLink href={href} style={{ textDecoration: "none" }}>
           {content}
-        </NextLink>
+        </RoutedLink>
       )}
     />
   );

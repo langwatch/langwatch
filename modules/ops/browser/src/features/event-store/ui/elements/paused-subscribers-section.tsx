@@ -1,4 +1,5 @@
 import { Box, HStack, Table, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { ReactNode } from "react";
 
 export const PAUSED_SUBSCRIBERS_HREF = "/ops/event-sourcing/subscribers";
@@ -26,7 +27,9 @@ export function PausedSubscribersSection({
         {renderSubscribersLink ? (
           renderSubscribersLink(PAUSED_SUBSCRIBERS_HREF)
         ) : (
-          <a href={PAUSED_SUBSCRIBERS_HREF}>Subscribers</a>
+          <Link unstyled href={PAUSED_SUBSCRIBERS_HREF}>
+            Subscribers
+          </Link>
         )}
       </HStack>
       <Table.ScrollArea>

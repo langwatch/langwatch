@@ -3,7 +3,8 @@
  * mutations own the answers, the row is told.
  */
 
-import { Badge, Box, Button, HStack, Link, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { GithubInstallationSummary } from "@langwatch/github-contract";
 
 export type GithubInstallationRowProps = {

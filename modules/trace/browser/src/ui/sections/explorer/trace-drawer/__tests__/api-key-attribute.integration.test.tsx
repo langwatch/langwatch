@@ -12,12 +12,6 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../elements/next-link.tsx", () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
-  ),
-}));
-
 const mockNameById = vi.fn();
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({

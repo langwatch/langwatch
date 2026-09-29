@@ -1,4 +1,5 @@
-import { Box, chakra, HStack, Icon, Link, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Icon, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";

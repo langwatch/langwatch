@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import {
   PopoverAnchor,
   PopoverArrow,
@@ -10,8 +11,6 @@ import {
 import { Zap } from "lucide-react";
 import type React from "react";
 import { useCallback, useState } from "react";
-
-import NextLink from "../../../elements/next-link.tsx";
 
 /** What the popover says, per surface that needs a model. */
 export interface ProviderPrimerCopy {
@@ -70,7 +69,7 @@ const ProviderPrimerBody: React.FC<{ copy: ProviderPrimerCopy }> = ({ copy }) =>
         <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
           {copy.body}
         </Text>
-        <NextLink
+        <RoutedLink
           href="/settings/model-providers"
           target="_blank"
           rel="noopener noreferrer"
@@ -85,7 +84,7 @@ const ProviderPrimerBody: React.FC<{ copy: ProviderPrimerCopy }> = ({ copy }) =>
           >
             Add a provider
           </Button>
-        </NextLink>
+        </RoutedLink>
       </VStack>
     </PopoverBody>
   </PopoverContent>

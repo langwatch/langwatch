@@ -26,6 +26,7 @@ import {
   defaultsForSourceKind,
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
+import { Link } from "@langwatch/browser-host/link";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { nowInstant } from "@langwatch/time";
@@ -40,7 +41,6 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../../../../model/provider-types.ts";
-import { Link } from "../../../../ui/elements/automation-link.tsx";
 import {
   SLACK_BLOCK_KIT_JSON_SCHEMA,
   VariableInfoIcon,

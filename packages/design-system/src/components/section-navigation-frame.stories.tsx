@@ -24,6 +24,7 @@ const meta = {
       },
     ],
     activeHref: "/settings/authentication",
+    onNavigate: () => {},
     children: <Text>The page this entry opens.</Text>,
   },
 } satisfies Meta<typeof SectionNavigationFrame>;

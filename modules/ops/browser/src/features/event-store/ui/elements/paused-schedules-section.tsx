@@ -1,4 +1,5 @@
 import { Box, HStack, Table, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { ReactNode } from "react";
 
 import type { PausedSchedule } from "../../model/paused-schedule.ts";
@@ -38,7 +39,9 @@ export function PausedSchedulesSection({
         {renderSchedulesLink ? (
           renderSchedulesLink(PAUSED_SCHEDULES_HREF)
         ) : (
-          <a href={PAUSED_SCHEDULES_HREF}>Schedules</a>
+          <Link unstyled href={PAUSED_SCHEDULES_HREF}>
+            Schedules
+          </Link>
         )}
       </HStack>
       <Table.ScrollArea>

@@ -84,7 +84,8 @@ export function GovernanceHero({
   /** Holds `ingestionSources:manage`; without it the pill is not offered. */
   canManageSources: boolean;
 }) {
-  const canAsk = useGovernanceHost().hasPermission("langy:create");
+  const host = useGovernanceHost();
+  const canAsk = host.hasPermission("langy:create");
 
   return (
     <VStack align="center" gap={{ base: 5, md: 6 }} width="full">
@@ -106,7 +107,13 @@ export function GovernanceHero({
           {canManageSources ? <AddSourcePill /> : null}
           <HStack gap={2} flexWrap="wrap" justify="center">
             {LEAD_CHIPS.map((chip) => (
-              <AskChip key={chip.key} icon={chip.icon} label={chip.label} href={chip.href} />
+              <AskChip
+                key={chip.key}
+                icon={chip.icon}
+                label={chip.label}
+                href={chip.href}
+                onNavigate={(href) => host.navigate(href)}
+              />
             ))}
           </HStack>
         </VStack>

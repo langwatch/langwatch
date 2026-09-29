@@ -1,4 +1,5 @@
-import { Field, HStack, Input, Link, Text } from "@chakra-ui/react";
+import { Field, HStack, Input, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 
 /** The credentials line: the key lives on the ElevenLabs provider row, never on the agent. */
 function CredentialsLine({

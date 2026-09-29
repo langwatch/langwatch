@@ -1,8 +1,8 @@
 import { Alert } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 
 import { describeError } from "../../../../model/describe-error.ts";
-import { Link } from "../../../../ui/elements/prompt-link.tsx";
 
 interface ErrorMessageProps {
   error: ParsedLLMError;

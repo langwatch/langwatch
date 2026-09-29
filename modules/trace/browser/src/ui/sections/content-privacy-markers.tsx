@@ -1,11 +1,11 @@
 import { Alert, HStack, Icon, Link, Text, VStack } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CategoryPrivacy, ContentPrivacy } from "@langwatch/trace-contract";
 import type React from "react";
 import { Eye, Lock, Slash } from "react-feather";
 
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import NextLink from "../elements/next-link.tsx";
 
 /**
  * Generic, per-category read-time privacy markers for a span's content. Every content
@@ -84,9 +84,9 @@ const PrivacyMarker: React.FC<MarkerCopy> = ({ icon, label, tooltip }) => {
           <Text>{tooltip}</Text>
           {canOpenSettings && (
             <Link asChild color="inherit" textDecoration="underline">
-              <NextLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
+              <RoutedLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
                 Open privacy settings
-              </NextLink>
+              </RoutedLink>
             </Link>
           )}
         </VStack>

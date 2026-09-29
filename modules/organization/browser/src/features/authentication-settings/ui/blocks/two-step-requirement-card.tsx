@@ -3,7 +3,8 @@
  * switch stays available for turning it off after an Enterprise plan lapses.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { Alert, Badge, Box, HStack, Link, Text } from "@chakra-ui/react";
+import { Alert, Badge, Box, HStack, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";

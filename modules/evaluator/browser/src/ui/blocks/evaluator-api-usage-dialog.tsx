@@ -1,10 +1,11 @@
-import { Box, HStack, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 /**
  * The snippets that call this evaluator from a customer's own code. A
  * narrowed family-local copy of the old `EvaluatorApiUsageDialog`, which
  * `EvaluatorListDrawer` still renders — deletes-only forbids repointing it.
  */
 import type { WireOf } from "@langwatch/api/web";
+import { Link } from "@langwatch/browser-host/link";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
   AVAILABLE_EVALUATORS,

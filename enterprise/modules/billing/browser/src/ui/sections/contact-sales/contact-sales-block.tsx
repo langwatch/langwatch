@@ -1,7 +1,8 @@
 /**
  * Contact Sales Block - CTA for enterprise or higher-tier needs
  */
-import { Button, Card, Flex, HStack, Link, SimpleGrid, Text } from "@chakra-ui/react";
+import { Button, Card, Flex, HStack, SimpleGrid, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { Check } from "lucide-react";
 

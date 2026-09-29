@@ -1,4 +1,5 @@
 import { HStack, Stat, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -62,8 +63,8 @@ export function LinkedStat({
   return link ? (
     link(content, href)
   ) : (
-    <a href={href} style={{ textDecoration: "none" }}>
+    <Link unstyled href={href} style={{ textDecoration: "none" }}>
       {content}
-    </a>
+    </Link>
   );
 }

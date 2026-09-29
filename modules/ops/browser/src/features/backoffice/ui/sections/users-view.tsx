@@ -12,6 +12,7 @@ import {
   VStack,
   Wrap,
 } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
@@ -24,7 +25,6 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
 import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
-import { OpsNextLink as NextLink } from "../../../../ui/elements/ops-link.tsx";
 import { impersonateUser } from "../../behavior/admin-client.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { EmptyCell, formatDate, formatDateTime } from "../elements/backoffice-cells.tsx";
@@ -498,7 +498,7 @@ function RefChipList({
           color="fg"
           _hover={{ textDecoration: "underline" }}
         >
-          <NextLink href={`/ops/backoffice/${resource}?q=${ref.id}`}>
+          <RoutedLink href={`/ops/backoffice/${resource}?q=${ref.id}`}>
             <Box
               as="span"
               paddingX={2}
@@ -510,7 +510,7 @@ function RefChipList({
             >
               {ref.name}
             </Box>
-          </NextLink>
+          </RoutedLink>
         </ChakraLink>
       ))}
     </Wrap>

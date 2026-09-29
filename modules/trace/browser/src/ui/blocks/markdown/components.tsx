@@ -1,4 +1,5 @@
-import { Box, Heading, Link, Table, Text } from "@chakra-ui/react";
+import { Box, Heading, Table, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type React from "react";
 
 import { ShikiCodeBlock } from "../../elements/markdown/shiki-highlight.tsx";

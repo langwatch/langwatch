@@ -1,10 +1,10 @@
 import { Box, Button, Card, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Skull } from "lucide-react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { Link } from "../../../../ui/elements/ops-link.tsx";
 import { hasFleetTrouble } from "../../model/process-presentation.ts";
 import { ProcessFleetStrip } from "../blocks/process-fleet-strip.tsx";
 import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";

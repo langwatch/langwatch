@@ -1,10 +1,10 @@
 import { Badge, Box, Button, Card, HStack, Input, Spacer, Table, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
-import { Link } from "../../../../ui/elements/ops-link.tsx";
 import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
 import { type PendingDlqAction, useDlqActions } from "../../behavior/use-dlq-actions.ts";
 
