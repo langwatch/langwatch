@@ -177,6 +177,18 @@ server.log
 # their own --outfile; this is the default so a stray build can never be
 # committed the way a 9.8 MB `apidiff` once was.
 /.bin/
+# A bare `go build ./cmd/<name>` drops its binary at the root; these are those names.
+/apidiff
+/ciguard
+/docscheck
+/haven
+/herrgen
+/importext
+/linkcheck
+/migrationorder
+/openapidiff
+/service
+/visualdiff
 
 # apidiff scratch: worktrees, instance logs, generated compose overrides
 .apidiff/
