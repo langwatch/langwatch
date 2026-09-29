@@ -83,7 +83,7 @@ Parallel tracks; staff in any order capacity allows.
 | # | Needs | What ships | Impact when it lands |
 |---|---|---|---|
 | D09 | D05, D08 | The per-customer migration wizard with both-connections grace and the legacy callback shim (R9) | Each enterprise moves at its own pace with rollback built in; nobody reconfigures their IdP under pressure |
-| D10 | D09 program exit: zero ACTIVE legacy connections | Deletion: provider config, password service, webhook, shim, secrets, QA login | Auth0 spend and code hit zero. This is the program's DONE signal — customer-paced, not a scheduled milestone |
+| D10 | D09 program exit: zero ACTIVE legacy connections (provider config, webhook, shim, secrets, QA login); ADR-143's own gate for the password service specifically (decoupled — see ADR-143) | Deletion: provider config, password service, webhook, shim, secrets, QA login | Auth0 spend and code hit zero. This is the program's DONE signal — customer-paced, not a scheduled milestone |
 
 # Sequencing rationale
 
@@ -105,7 +105,7 @@ Parallel tracks; staff in any order capacity allows.
 | D07 | SHIPPED, flag removed | Register / sign-in / no-email sign-in / delete round-trips, platform + cross-platform authenticators | None — mounted everywhere | Low |
 | D08 | `SCIM_V2_GRANTS` | Push/group/deactivate round-trip; token scoping enforced; offboard postcondition asserted in integration test | Legacy write path behind flag | Medium |
 | D09 | per-customer | Per customer: all active users linked, quiet grace, shim hits at zero, teardown event. Program: zero ACTIVE legacy connections | Both-connections-active grace IS the rollback | Customer-facing |
-| D10 (program exit criterion — customer-paced) | — | Repository-wide `grep -ri auth0` → allowlist only (changelog, tombstoned history, retained `dev/docs/` planning documents); secrets blob + deployment config verified Auth0-free; deploy pipeline green; agents-box QA green | Tagged restore point + secret escrow, retired only after the observation window (see D10) | Low |
+| D10 (program exit criterion — customer-paced) | — | Repository-wide `grep -ri auth0` → allowlist only (changelog, tombstoned history, retained `dev/docs/` planning documents); secrets blob + deployment config verified Auth0-free; deploy pipeline green; agents-box QA green. Password-service deletion specifically may land earlier, on ADR-143's own gate | Tagged restore point + secret escrow, retired only after the observation window (see D10) | Low |
 | D11 | invite changes additive | Round-trips: invite → wrong-method → accepted; expiry → resend → accepted; Slack invite cases replay green | Additive; old flow flag-restorable during bake | Low |
 | D12 | `JOIN_REQUESTS` | request → approve → member round-trip; domain auto-join round-trip (org opt-in, never public email domains); reminder/expiry wakes verified; matching/privacy specs green; orphaned-org creation rate visibly down | `JOIN_REQUESTS` off | Low |
 | D13 | SHIPPED, flag removed | Every unauthenticated journey round-trips in the new UI: sign-in per method, sign-up per method, reset, verification, deny/guidance states; zero Auth0-hosted pages or assets; sign-up completion ≥ baseline | None — the legacy screens are deleted | Medium (rode the D03 flip) |

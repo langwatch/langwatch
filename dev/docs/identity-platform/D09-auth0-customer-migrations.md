@@ -24,7 +24,7 @@ forced to reconfigure their IdP mid-migration.
 | OIDC broker for enterprise SSO (genericOAuth `auth0`/`okta` providers) | Direct per-org `SsoConnection` (OIDC/SAML), one customer at a time | this deliverable, per tenant |
 | Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set | D13 — shipped; the flag and the legacy screens are removed |
 | `Organization.ssoDomain`/`ssoProvider` string routing | Connection-based routing | D04 (`SSOCONN_ROUTING`) |
-| `src/server/auth0/passwordService.ts` (Management API password ops) | Identifier-model password change (`change-password-auth0.feature` rewrite) | D10 |
+| `src/server/auth0/passwordService.ts` (Management API password ops) — **narrowed by ADR-143**: this row named both cohorts sharing the Auth0 tenant; the `auth0\|...` database-connection cohort is not federated in the sense this deliverable's SSO broker is, and does not need to wait on it | Identifier-model password change (`change-password-auth0.feature` rewrite) for the SSO broker's own residual surface, if any (ADR-143 §5 found none). The `auth0\|...` cohort itself is covered by ADR-143, gated on its own import-coverage + zero-live-calls metric | D10, gated by ADR-143's metric rather than by this deliverable's program exit |
 | Federated logout | Direct-connection logout semantics | this deliverable per tenant; code deleted D10 |
 | SCIM log-stream webhook | Per-connection SCIM tokens; customers repoint during Step 6 | D08 machinery; per tenant here; webhook deleted D10 |
 | Customer-pinned `/api/auth/callback/auth0\|okta` redirect URIs | The legacy callback shim (R9) through grace; zero-hit metric | shim deleted D10 |
@@ -102,6 +102,7 @@ do not prove upstream provider configuration or qualified domain ownership.
 # Out of Scope
 
 - Auth0 code/config deletion (D10). Non-SSO Auth0 remnants (already migrated off with better-auth).
+- The `auth0|...` database-connection (email+password) cohort's own migration off Auth0 — see [ADR-143](../adr/143-auth0-password-export-moves-passwords-home.md). It shares an Auth0 tenant with this deliverable's SSO broker but not a user population, a migration mechanism, or a pace; it proceeds independently and does not gate, or get gated by, this deliverable's per-tenant progress.
 
 # Research
 
