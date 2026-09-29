@@ -452,6 +452,9 @@ The bundle is explicit, including an explicit opt-out for deployments
 without one. Both processes use `withPipelines`: the API's callback offers
 `produce()`, the worker's offers `consume()`. Pipelines are never exposed as
 HTTP surfaces. Consumption includes command production for follow-up work.
+The API also registers every pipeline's consume-side definitions descriptively, so ops
+introspection lists projections, subscribers and process managers: described, never started, and
+a module's `build` must describe itself without the worker's dependencies (Alex, 2026-09-29).
 Each process entry point and its surface declaration stay within 50 lines;
 framework implementations retain the code needed to preserve behaviour.
 
@@ -1016,6 +1019,10 @@ the meta tag.
 process boots; the mail member answers every send by skipping it with one log line naming what was
 not sent, and the browser learns it from public config's `capabilities.email`, so a self-hosted
 install shows that email is not configured instead of silently dropping it.
+Email is a capability the process answers from its mail member (secrets included), never a config
+leaf guess: a SendGrid-only install has it. Where it is off, password reset by email is disabled
+without saying why; the screen tells the user to contact support (SaaS) or their admin (self-hosted)
+(Alex, 2026-09-29).
 
 ## 7. Stores, the tier, and migrations
 
