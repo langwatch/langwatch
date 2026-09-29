@@ -51,6 +51,7 @@ type bootWatch struct {
 	tail      string
 	lastMove  time.Time
 	lastPhase string
+	lastCPU   float64
 	wasLive   bool
 }
 
@@ -95,6 +96,11 @@ func (watch *bootWatch) check(now time.Time, raw []byte) error {
 	}
 	watch.wasLive = watch.wasLive || stack.Live
 	if watch.stall > 0 && now.Sub(watch.lastMove) > watch.stall {
+		// A silent migration or seed still burns CPU; only a tree that also sat idle is stalled.
+		if cpu := treeCPUSeconds(stack.LauncherPid); cpu > watch.lastCPU+0.5 {
+			watch.lastCPU, watch.lastMove = cpu, now
+			return nil
+		}
 		return fmt.Errorf("stack-broken: %s: no log line and no lane change for %s (logs %s)\nlast lines:\n%s\nprocess tree:\n%s",
 			watch.slug, watch.stall, havenrun.StackLogFile(watch.slug), watch.tail, processTree(stack.LauncherPid))
 	}
@@ -124,17 +130,41 @@ func stackEntry(raw []byte, slug string) (watchedStack, bool) {
 	return watchedStack{}, false
 }
 
-// processTree lists pid and every descendant, found by `pgrep -P`, with ps.
-func processTree(pid int) string {
-	if pid <= 0 {
-		return "(haven reported no launcher pid)"
-	}
+// treePids is pid and every descendant, found by `pgrep -P`.
+func treePids(pid int) []string {
 	pids := []string{strconv.Itoa(pid)}
 	for index := 0; index < len(pids) && len(pids) < 200; index++ {
 		out, _ := exec.CommandContext(context.Background(), "pgrep", "-P", pids[index]).Output()
 		pids = append(pids, strings.Fields(string(out))...)
 	}
-	out, err := exec.CommandContext(context.Background(), "ps", "-o", "pid,ppid,%cpu,etime,command", "-p", strings.Join(pids, ",")).CombinedOutput()
+	return pids
+}
+
+// treeCPUSeconds is the CPU time the launcher's live tree has used, from ps's
+// `time` column ([[h:]m:]s.ss); 0 when there is no launcher.
+func treeCPUSeconds(pid int) float64 {
+	if pid <= 0 {
+		return 0
+	}
+	out, _ := exec.CommandContext(context.Background(), "ps", "-o", "time=", "-p", strings.Join(treePids(pid), ",")).Output()
+	total := 0.0
+	for _, field := range strings.Fields(string(out)) {
+		seconds := 0.0
+		for _, part := range strings.Split(field, ":") {
+			value, _ := strconv.ParseFloat(part, 64)
+			seconds = seconds*60 + value
+		}
+		total += seconds
+	}
+	return total
+}
+
+// processTree lists pid and every descendant with ps.
+func processTree(pid int) string {
+	if pid <= 0 {
+		return "(haven reported no launcher pid)"
+	}
+	out, err := exec.CommandContext(context.Background(), "ps", "-o", "pid,ppid,%cpu,etime,command", "-p", strings.Join(treePids(pid), ",")).CombinedOutput()
 	if err != nil {
 		return fmt.Sprintf("(ps failed: %v)", err)
 	}
