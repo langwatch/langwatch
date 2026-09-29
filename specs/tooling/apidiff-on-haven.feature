@@ -275,3 +275,49 @@ Feature: apidiff boots its instances through haven
       When it tears down
       Then it drops only its own databases and leaves the stack up
       And the next run finds the stack on the same ports, or starts it on fresh ones if those fail
+
+  Rule: A run proves effects, not only shapes
+
+    @unit
+    Scenario: A round trip that works on both sides is recorded ok per step
+      Given a curated resource that serves create, read by id, list, update and delete on both sides
+      When the round trip runs before the main pass's first delete
+      Then each side creates its own entity under the round trip's own name, from its own prerequisites
+      And create, read, list, update, delete and gone are each recorded "effect: ok" per side
+      And no finding is filed
+
+    @unit
+    Scenario: A round trip's read-back differs on the branch
+      Given the branch stores a created entity without a field it was sent
+      When the round trip reads the entity back, ids, times and urls masked
+      Then the read step is "broken" on the candidate with the first differing field named
+      And an effect_broken finding fails the run, attributed to the read operation
+
+    @unit
+    Scenario: An update the branch answers but never applies is broken
+      Given the branch answers an update 200 and changes nothing
+      When the round trip re-reads the entity until the settle deadline
+      Then the update step is "broken" on the candidate and "ok" on the base
+      And the finding names the update operation
+
+    @unit
+    Scenario: A delete that leaves the entity readable is broken on both sides alike
+      Given both sides answer the delete and still read the entity back
+      When the round trip reads after the delete until the settle deadline
+      Then the gone step is "broken" on both sides and the round trip's verdict is broken-both
+      And no finding is filed, because main does the same
+
+    @unit
+    Scenario: verdict.md opens with one line per round trip
+      Given a run with round-trip effects
+      When the run writes its files
+      Then verdict.md holds works, broken, broken-both, fixed or not-run per resource
+      And each line that is not works carries its first failure: step, operation, and each side's effect and detail
+      And it closes with the failing-finding count and the count of new log signatures
+
+    @unit
+    Scenario: signatures.md lists new-on-candidate log signatures first
+      Given the run's branch and main logs hold pino and plain warnings and errors
+      When the run writes its files
+      Then signatures.md groups the masked messages as new on candidate, also on base, and base only
+      And each line carries the candidate/base counts and the first file:line

@@ -37,6 +37,8 @@ type Report struct {
 	// A reader must be able to tell a difference that was FIXED from one that
 	// disappeared because the probe went blind; this is that evidence.
 	CredentialChecks []CredentialCheck `json:"credentialChecks"`
+	// Effects says per round-trip step whether it did its job on each side.
+	Effects []Effect `json:"effects"`
 }
 
 // MapSpecChanges maps openapidiff changes to report entries.
@@ -65,6 +67,7 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 		OperationsProbed: result.Probed,
 		Suppressed:       result.Suppressed,
 		CredentialChecks: result.CredentialChecks,
+		Effects:          result.Effects,
 	}
 	report.Differences = len(changes)
 	for _, finding := range result.Findings {
@@ -85,6 +88,9 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 	if report.CredentialChecks == nil {
 		report.CredentialChecks = []CredentialCheck{}
 	}
+	if report.Effects == nil {
+		report.Effects = []Effect{}
+	}
 	return report
 }
 
@@ -99,6 +105,7 @@ var findingKindOrder = []string{
 	FindingPermissionLeak,
 	FindingPermissionDiff,
 	FindingMutationNotVisible,
+	FindingEffectBroken,
 	FindingProbeFailed,
 	FindingSkipped,
 	FindingUnverifiedShape,

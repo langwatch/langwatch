@@ -619,6 +619,7 @@ func emitReport(verdict runVerdict, out streams) int {
 // writeFiles persists the machine report and the ledger beside it.
 func (verdict runVerdict) writeFiles(out streams) error {
 	verdict.probe.writeModulePackets(verdict, out)
+	verdict.probe.writeRunNotes(verdict, out)
 	if path := verdict.probe.reportFile; path != "" {
 		if err := writeJSONFile(path, func(file *os.File) error { return WriteJSONReport(file, verdict.report) }); err != nil {
 			return err

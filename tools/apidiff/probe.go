@@ -124,6 +124,8 @@ type ProbeResult struct {
 	// CredentialChecks is the run's own integrity reading: every credential
 	// read before the first probe and again after the last. See credentials.go.
 	CredentialChecks []CredentialCheck
+	// Effects is each round trip's per-step outcome (roundtrip.go).
+	Effects []Effect
 }
 
 // ProbeAll probes every selected operation in lockstep: each case runs on A
@@ -158,6 +160,7 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	// Post passes, after every mutation has had its chance to land.
 	if !collectionsVerified {
 		findings = append(findings, engine.verifyCollections(selected)...)
+		findings = append(findings, engine.roundTripPass(selected)...)
 	}
 	findings = append(findings, engine.permissionProbes(selected)...)
 	engine.progress("timing: collection and permission passes done after %s\n", time.Since(started).Round(time.Second))
@@ -179,6 +182,7 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 		Probed:           probed,
 		Suppressed:       engine.suppressed,
 		CredentialChecks: checks,
+		Effects:          engine.effects,
 	}
 }
 
@@ -195,6 +199,7 @@ func (engine *probeEngine) mainPass(selected []Operation) ([]Finding, int, bool)
 		// read for the created entities before the first delete, not after.
 		if !collectionsVerified && operation.Method == http.MethodDelete {
 			findings = append(findings, engine.verifyCollections(selected)...)
+			findings = append(findings, engine.roundTripPass(selected)...)
 			collectionsVerified = true
 		}
 		if skip := notProbed(operation, engine.options.ExcludePrefixes); skip != "" {
@@ -352,6 +357,7 @@ type probeEngine struct {
 	ownerIDs    map[string]*sideIDs // per operation, IDs the owner key saw
 	statusDiffs map[string]bool     // operations already reported as differing
 	transcripts []Transcript
+	effects     []Effect // round-trip outcomes, roundtrip.go
 	// gatedOps are the operations the main pass saw the Enterprise gate
 	// refuse on either side, keyed by operationKeyOf. See entitlement.go.
 	gatedOps map[string]Operation
