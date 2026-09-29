@@ -1742,6 +1742,7 @@ describe("aggregation-builder", () => {
       );
     });
 
+    /** @scenario The feedbacks stored_spans source keeps only spans carrying the vote event */
     it("pushes the event-name predicate into the stored_spans subquery", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
@@ -1760,6 +1761,7 @@ describe("aggregation-builder", () => {
       expect(predicate).toBeLessThan(subqueryEnd);
     });
 
+    /** @scenario The feedbacks stored_spans source keeps only spans carrying the vote event */
     it("names the same event in the subquery predicate and the outer filter", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
