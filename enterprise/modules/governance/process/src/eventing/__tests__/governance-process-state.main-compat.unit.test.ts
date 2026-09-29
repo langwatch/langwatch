@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { costRollupWatchStateSchema } from "../cost-rollup-watch.process.ts";
-import { gatewayDebitsStateSchema } from "../gateway-debit.process.ts";
 import { ingestionPullProcessStateSchema } from "../ingestion-pull.process.ts";
 import { pulledUsageLedgerStateSchema } from "../pulled-usage-ledger.process.ts";
 
@@ -14,27 +13,6 @@ describe("process state stored by the main release", () => {
         marks: 2,
       }),
     ).toEqual({ pendingDays: ["2026-09-01"], armedAt: 1_760_000_000_000, marks: 2 });
-  });
-  it("parses a gateway debits state as main stored it", () => {
-    expect(
-      gatewayDebitsStateSchema.parse({
-        endUserId: "",
-        virtualKeyId: "vk_1",
-        organizationId: "org_1",
-        teamId: "team_1",
-        principalUserId: "user_1",
-        admitted: true,
-        pendingOutcome: null,
-      }),
-    ).toEqual({
-      endUserId: "",
-      virtualKeyId: "vk_1",
-      organizationId: "org_1",
-      teamId: "team_1",
-      principalUserId: "user_1",
-      admitted: true,
-      pendingOutcome: null,
-    });
   });
   it("parses a pulled usage ledger state as main stored it", () => {
     expect(

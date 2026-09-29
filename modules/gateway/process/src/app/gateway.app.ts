@@ -146,6 +146,10 @@ import {
 import type { z } from "zod";
 
 import { elevenLabsConversationChannels } from "../channels/elevenlabs-conversation-channels.registry.ts";
+import {
+  GATEWAY_DEBITS_PROCESS_NAME,
+  GatewayDebitProcess,
+} from "../eventing/gateway-debit.process.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
 import {
@@ -167,6 +171,7 @@ import {
   type GatewayAgentCacheEntryStore,
   RedisGatewayAgentCacheEntryRepository,
 } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import { RedisGatewayBudgetChangeDedupeRepository } from "../repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
 import { RedisGatewaySpendFoldCacheRepository } from "../repositories/redis/redis.gateway-spend-fold-cache.repository.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
@@ -174,6 +179,7 @@ import {
   GatewayAgentCacheService,
   type GatewayAgentCacheEncryption,
 } from "../services/gateway-agent-cache.service.ts";
+import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-change-dedupe.service.ts";
 import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
@@ -205,6 +211,7 @@ import {
 } from "../services/gateway-realtime-session-reconciliation.service.ts";
 import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
 import type { GatewayRealtimeSessionCollaborators } from "../services/gateway-realtime-session.service.ts";
+import { GatewaySpendDebitService } from "../services/gateway-spend-debit.service.ts";
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import {
   GatewaySpendReconciliationService,
@@ -671,6 +678,8 @@ type GatewaySpendPipelineParts = Readonly<{
   openAdmissions: GatewayOpenAdmissionsRepository;
   settlementGraceMs: number;
   foldCache: GatewaySpendFoldCacheRepository;
+  /** Absent without the ClickHouse budget ledger, the only store a debit lands in. */
+  debits: GatewaySpendDebitService | undefined;
 }>;
 
 type GatewaySpendDefinition = StaticPipelineDefinition<
@@ -915,6 +924,16 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
         openAdmissions: controlPlane.openAdmissions,
         settlementGraceMs: graceMs,
         foldCache: RedisGatewaySpendFoldCacheRepository.create(setup.members.redis),
+        debits: controlPlane.budgetSpend
+          ? GatewaySpendDebitService.create({
+              budgets: controlPlane.budgetDecisions,
+              spend: controlPlane.budgetSpend,
+              dedupe: GatewayBudgetChangeDedupeService.create(
+                RedisGatewayBudgetChangeDedupeRepository.create(setup.members.redis),
+              ),
+              changes: controlPlane.changeEvents,
+            })
+          : void 0,
       },
       spend: {
         prisma: setup.members.prisma,
@@ -1016,11 +1035,17 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     }
     const parts = this.#spendPipeline;
     if (!parts) throw this.spendStoreUnavailable();
-    const { openAdmissions, foldCache } = parts;
+    const { openAdmissions, foldCache, debits } = parts;
     this.#spendProcessing = EventingGatewaySpendAdapter.create({
       spendEvents: parts.ledger,
       cacheStore: (inner) => foldCache.cached(inner),
       webhookSpendDelivery: parts.webhooks,
+      gatewayDebits: debits
+        ? {
+            name: GATEWAY_DEBITS_PROCESS_NAME,
+            applier: GatewayDebitProcess.create({ debits }).processManager(),
+          }
+        : void 0,
       settlement: {
         findOpenAdmissions: (query) => openAdmissions.findOpenAdmissions(query),
         graceMs: parts.settlementGraceMs,

@@ -10,6 +10,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
+import { GATEWAY_DEBITS_PROCESS_NAME } from "../../eventing/gateway-debit.process.ts";
 import { gatewayRealtimeSessionEventing } from "../../eventing/gateway-realtime-session.pipeline.ts";
 import { SPEND_SETTLEMENT_PROCESS_NAME } from "../../eventing/gateway-spend-settlement.process.ts";
 import { gatewaySpendEventing } from "../../eventing/gateway-spend.pipeline.ts";
@@ -311,6 +312,33 @@ describe("gateway app installation", () => {
           consumed.processManagers.get(SPEND_SETTLEMENT_PROCESS_NAME)?.config.schedule,
         ).toEqual({ everyMs: 5 * 60 * 1000 });
         expect(produced.processManagers.size).toBe(0);
+      } finally {
+        await resources.close();
+      }
+    });
+
+    /** @scenario "The worker's spend pipeline hosts the gateway's budget debits" */
+    it("hosts gatewayDebits, transient, on the worker's build only", async () => {
+      const { state, resources } = await installGateway();
+
+      try {
+        const app = state.provided;
+        if (!(app instanceof GatewayApp)) {
+          throw new Error("Gateway installation did not provide GatewayApp");
+        }
+        const setup = {
+          repositories: undefined,
+          app,
+          processStore: createApiFixture<ProcessStore>(),
+        };
+
+        const produced = gatewaySpendEventing.build({ ...setup, participation: "produce" });
+        const consumed = gatewaySpendEventing.build({ ...setup, participation: "consume" });
+
+        const debits = consumed.processManagers.get(GATEWAY_DEBITS_PROCESS_NAME)?.config;
+        expect(debits?.transient).toBe(true);
+        expect(Object.keys(debits?.intents ?? {})).toEqual(["writeDebits"]);
+        expect(produced.processManagers.has(GATEWAY_DEBITS_PROCESS_NAME)).toBe(false);
       } finally {
         await resources.close();
       }

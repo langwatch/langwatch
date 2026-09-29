@@ -274,6 +274,20 @@ describe("the worker process installation", () => {
     }
   });
 
+  /** @scenario "The worker hosts the gateway's budget debits on the spend pipeline" */
+  it("hosts gatewayDebits on the gateway spend pipeline, under the name its rows are keyed by", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const spend = eventing.definitions.find(
+        (definition) => definition.metadata.name === "gateway_spend_processing",
+      );
+      expect(spend?.processManagers.get("gatewayDebits")?.config.transient).toBe(true);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   /** @scenario "A SaaS worker registers the billable-events meter" */
   it("declares the billable-events meter on the roll-up pipeline of a SaaS worker", async () => {
     const { runtime, eventing } = await bootWorker({ saas: true });

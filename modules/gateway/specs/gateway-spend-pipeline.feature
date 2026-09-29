@@ -44,3 +44,32 @@ Feature: The gateway registers its own spend pipeline
     When the fold reads one request's spend state
     Then Redis is asked first, under the gateway_spend keyspace every role shares
     And a cache miss falls through to the spend ledger
+
+  @unit
+  Scenario: The worker's spend pipeline hosts the gateway's budget debits
+    Given the gateway module installed with its members
+    When its eventing is built for the api and for the worker
+    Then the worker's build hosts gatewayDebits, the name its stored rows are keyed by
+    And the api's build does not
+
+  @unit
+  Scenario: Spend debits every budget the request applies to
+    Given a confirmed request whose target resolves an every-provider budget and two provider budgets
+    When its debits are written
+    Then one ledger row lands for the every-provider budget and one for the request's own provider
+    And the budget scoped to another provider is not debited
+    And one budget-updated signal names the debited budgets
+
+  @unit
+  Scenario: A debit that fails to land is retried rather than dropped
+    Given the budget ledger refuses the insert
+    When a request's debits are written
+    Then the write fails, so the outbox retries it
+    And no budget-updated signal is appended for rows that never landed
+
+  @unit
+  Scenario: An admission without an outcome debits nothing
+    Given an admitted request whose outcome has not arrived
+    When the debits process consumes the admission
+    Then no debit intent is committed and the request's attribution is remembered
+    And an outcome that moved no money and no quantity commits no debit either
