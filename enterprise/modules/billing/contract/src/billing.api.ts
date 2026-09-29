@@ -34,6 +34,14 @@ export type ScenarioCreatedSignal = Readonly<{
   scenarioCount: number;
 }>;
 
+/** A workflow somebody created, and how many the project holds now. */
+export type WorkflowCreatedSignal = Readonly<{
+  userId: string;
+  projectId: string;
+  workflowId: string;
+  workflowCount: number;
+}>;
+
 /**
  * What the billing module answers other modules: invoice billing for a
  * connected self-hosted customer (ADR-156 section 7). Every operation refuses
@@ -83,6 +91,8 @@ export interface BillingApi {
    * organization went through, and the nurturing count behind it.
    */
   recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void>;
+  /** Nurturing learns the project's workflow count and the `workflow_created` event. */
+  recordWorkflowCreated(input: WorkflowCreatedSignal): Promise<void>;
   /**
    * The plan an organization's active subscription grants on LangWatch Cloud, with the
    * subscription's own limit overrides; the free plan where none is active or off Cloud.

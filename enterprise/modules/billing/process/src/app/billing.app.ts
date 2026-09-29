@@ -28,6 +28,7 @@ import {
   type RenewalCompletion,
   type ReportUsageForMonthCommandData,
   type ScenarioCreatedSignal,
+  type WorkflowCreatedSignal,
   type SeatChangeBillingOutcome,
   type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
@@ -61,7 +62,10 @@ import {
   BillingReportingPipeline,
 } from "../eventing/billing-reporting.pipeline.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
-import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service.rules.ts";
+import {
+  fireScenarioCreated,
+  fireWorkflowCreated,
+} from "../rules/nurturing-feature-adoption-service.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { resourceLimitCooldown } from "../services/billing-alert-cooldown.service.ts";
@@ -834,6 +838,12 @@ export class BillingApp
 
   recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void> {
     return this.#scenarioSignals.record(input);
+  }
+
+  /** Main's workflow router fired this nurturing unawaited; its failures only log. */
+  recordWorkflowCreated(input: WorkflowCreatedSignal): Promise<void> {
+    fireWorkflowCreated(input);
+    return Promise.resolve();
   }
 
   /** Main's composite recomputed `overrideAddingLimitations` from the impersonator. */
