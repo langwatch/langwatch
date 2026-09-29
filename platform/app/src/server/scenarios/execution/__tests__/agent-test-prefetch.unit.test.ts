@@ -130,6 +130,20 @@ describe("prefetchScenarioData", () => {
     });
   });
 
+  describe("given the agent test scenario id and a voice target", () => {
+    /** @scenario "A voice agent is refused by the agent-test path" */
+    it("refuses: voice agents are tested by talking to them or by running a scenario", async () => {
+      const result = await prefetchScenarioData({
+        context,
+        target: { type: "voice", referenceId: "agent_voice" },
+        deps: deps(),
+      });
+      expect(result).toMatchObject({ success: false });
+      if (result.success) return;
+      expect(result.error).toMatch(/talking to them or by running a scenario/i);
+    });
+  });
+
   describe("given the agent test scenario id and an agent that is gone", () => {
     /** @scenario "An agent the run cannot be prepared from is refused" */
     it("fails with the agent named", async () => {

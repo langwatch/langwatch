@@ -305,6 +305,12 @@ describe("the result of a file call", () => {
       "src:\napp/\nmain.py",
       "2 entries",
     ],
+    [
+      "the credentials write",
+      { ...envelope, tool: "local_langwatch_env", params: {} },
+      "Set LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in .env for project Acme.",
+      "Set 2 variables",
+    ],
   ];
 
   for (const [what, call, text, expected] of cases) {
@@ -321,6 +327,15 @@ describe("the result of a file call", () => {
       expect(
         editCounts([{ oldText: "one\ntwo", newText: "one\nmiddle\ntwo" }]),
       ).toEqual({ added: 1, removed: 0 });
+    });
+  });
+
+  describe("when an edit appends lines", () => {
+    it("counts the appended lines as added", () => {
+      expect(editCounts([{ append: "one\ntwo\n" }])).toEqual({
+        added: 2,
+        removed: 0,
+      });
     });
   });
 });

@@ -849,6 +849,35 @@ describe("aggregation-builder", () => {
       });
     });
 
+    describe("when the query leaves out trace origins", () => {
+      /** @scenario Leaving out an origin keeps the rest of the count intact */
+      it("adds a NOT IN on the origin attribute", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          excludeOrigins: ["langy"],
+        });
+
+        expect(result.sql).toContain(
+          "ifNull(ts.Attributes['langwatch.origin'], '') NOT IN ({excludeOrigins:Array(String)})",
+        );
+        expect(result.params.excludeOrigins).toEqual(["langy"]);
+      });
+
+      it("keeps the exclusion outside a negated filter selection", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          filters: { "topics.topics": ["topic-1"] },
+          negateFilters: true,
+          excludeOrigins: ["langy"],
+        });
+
+        expect(result.sql).toMatch(/AND NOT \(.*ts\.TopicId IN/s);
+        expect(result.sql).not.toMatch(
+          /NOT \([^)]*\{excludeOrigins:Array\(String\)\}/,
+        );
+      });
+    });
+
     describe("when timeScale is full with groupBy", () => {
       // @regression issue #2644: Summary charts with groupBy render blank because
       // buildSubqueryTimeseriesQuery never includes group_key in SELECT, GROUP BY,

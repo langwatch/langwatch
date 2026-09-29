@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerContext } from "../../../../pipeline/processManagerDefinition";
+import { TOPIC_ASSIGNED_EVENT_TYPE } from "../../schemas/constants";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createDeferredOriginHandler,
@@ -162,6 +163,26 @@ describe("originGate subscriber", () => {
     });
   });
 
+  describe("when a topic re-assignment lands on a trace with no origin", () => {
+    // A scheduled clustering pass re-emits topic_assigned, stamped with the
+    // current time, for every trace in its backlog. A trace older than the
+    // fold's read window folds that event from an empty state, so the origin
+    // looks unresolved even though its spans settled it long ago. Only a span
+    // arriving can mean "this trace is live and still needs an origin".
+    it("does not schedule deferred resolution", async () => {
+      const deps = createDeps();
+      const handler = createOriginGateHandler(deps);
+      const state = createFoldState({ attributes: {} });
+
+      await handler(
+        createEvent({ type: TOPIC_ASSIGNED_EVENT_TYPE }),
+        createContext({ state }),
+      );
+
+      expect(deps.scheduleDeferred).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the trace aggregate has an empty id", () => {
     it("skips without scheduling", async () => {
       const deps = createDeps();
@@ -224,6 +245,17 @@ describe("originGate subscriber", () => {
 
         expect(
           needsOriginResolution({ event: oldEvent, foldState: state }),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the event is not a span arrival", () => {
+      it("returns false even with no origin on the fold state", () => {
+        const state = createFoldState({ attributes: {} });
+        const topicEvent = createEvent({ type: TOPIC_ASSIGNED_EVENT_TYPE });
+
+        expect(
+          needsOriginResolution({ event: topicEvent, foldState: state }),
         ).toBe(false);
       });
     });

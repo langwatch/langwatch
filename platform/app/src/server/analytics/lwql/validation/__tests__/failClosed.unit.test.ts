@@ -28,8 +28,12 @@ const POLICY = {
   defaultDatabase: "analytics",
 };
 
+// Each branch names its own LIMIT: a UNION whose branches run and return
+// independently is refused (LIMIT_REQUIRED_PER_BRANCH) unless every branch
+// bounds itself, so the control must be an accepted statement for the mutations
+// below to be the only difference under test.
 const BASE_SQL =
-  "SELECT TraceId FROM traces WHERE Cost > 1 UNION ALL SELECT TraceId FROM traces";
+  "SELECT TraceId FROM traces WHERE Cost > 1 LIMIT 100 UNION ALL SELECT TraceId FROM traces LIMIT 100";
 
 /** A parser that hands back a tree someone else built. */
 function parserOf(statements: readonly SqlAstNode[]): LangWatchQLParser {

@@ -58,71 +58,16 @@ Feature: License Settings Page Styling
     And form fields use Field.Root with Field.Label components
     And the card uses platform border styling
 
-  # Drawer structure compliance
-  @integration @unimplemented
-  Scenario: License generator drawer uses standard close behavior
-    When I open the license generator drawer
-    Then the drawer does not use Drawer.Backdrop component
-    And the drawer uses closeOnInteractOutside true
-    And the drawer uses modal false
-    And clicking outside the drawer closes it
-
-  @integration @unimplemented
-  Scenario: License generator drawer header follows platform pattern
-    When I open the license generator drawer
-    Then the drawer header uses Heading component without explicit size override
-    And the drawer header does not have explicit borderBottomWidth prop
-    And the Drawer.CloseTrigger is a direct child of Drawer.Content
-
-  @integration @unimplemented
-  Scenario: License generator drawer body uses standard layout pattern
-    When I open the license generator drawer
-    Then the drawer body has padding 0
-    And the drawer body has display flex with flexDirection column
-    And internal content uses VStack with paddingX 6 and paddingY 4
-    And internal content has overflowY auto for scrollable content
-
-  @integration @unimplemented
-  Scenario: License generator drawer footer follows platform pattern
-    When I open the license generator drawer
-    Then the drawer footer has borderTopWidth 1px
-    And the drawer footer has borderColor border
-    And the footer buttons use HStack with gap 3 for alignment
-
-  @integration @unimplemented
-  Scenario: License generator drawer uses correct size
-    When I open the license generator drawer
-    Then the drawer uses size "lg" for adequate form space
-
-  # Form field styling compliance
-  @integration @unimplemented
-  Scenario: Form fields use Field.Root component pattern
-    Given I open the license generator drawer
-    Then each form field is wrapped in Field.Root
-    And each field label uses Field.Label with fontWeight medium
-    And helper text uses Field.HelperText or Text with fg.muted color
-    And error messages use Field.ErrorText component
-
-  @integration @unimplemented
-  Scenario: Form inputs use consistent sizing
-    Given I open the license generator drawer
-    Then text inputs do not specify explicit size (use default)
-    And textarea inputs use appropriate row count
-    And select fields use NativeSelect.Root pattern
-
   # Button styling compliance
   @integration @unimplemented
   Scenario: Primary buttons use colorPalette instead of colorScheme
     Given I view license components
-    Then the "Generate License" button uses colorPalette "blue"
-    And the "Activate License" button uses colorPalette "blue"
-    And the "Copy to Clipboard" button uses colorPalette "blue"
+    Then the "Activate License" button uses colorPalette "blue"
 
   @integration @unimplemented
   Scenario: Secondary buttons use outline variant
     Given I view license components
-    Then the "Generate Another" button uses variant "outline"
-    And the "Remove License" button uses variant "outline"
+    Then the "Remove License" button uses variant "outline"
 
   @integration @unimplemented
   Scenario: Danger buttons use red colorPalette with outline variant
@@ -172,10 +117,3 @@ Feature: License Settings Page Styling
 
   # License activation error messages - user-friendly
 
-  @unit @unimplemented
-  Scenario: LicenseGeneratorForm uses correct layout structure
-    Given the LicenseGeneratorForm component
-    Then the root VStack has paddingX 6
-    And the root VStack has paddingY 4
-    And the VStack has flex 1 for proper sizing
-    And the VStack has overflowY auto for long content

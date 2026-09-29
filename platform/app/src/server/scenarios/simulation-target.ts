@@ -9,7 +9,7 @@
 import { z } from "zod";
 
 export const simulationTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   referenceId: z.string(),
 });
 

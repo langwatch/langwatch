@@ -9,6 +9,8 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { RegisterConnection } from "@ee/sso/components/settings/singleSignOn/RegisterConnection";
+import type { SelfServeMigrationView } from "@ee/sso/sso-self-serve.types";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -117,6 +119,15 @@ const METHOD_LABEL: Record<string, string> = {
   "legacy-configuration": "Earlier configuration",
 };
 
+/** The three answers in the words the customer's own screen uses, so an
+ *  operator reading a connection and the administrator who set it up are
+ *  looking at the same sentence. */
+const ARRIVAL_LABELS = {
+  admit: "Joins the organization",
+  request: "Asks to join, and waits for an administrator",
+  refuse: "Is turned away",
+} as const;
+
 interface ConnectionRow {
   connectionId: string;
   organizationId: string;
@@ -135,7 +146,7 @@ interface ConnectionRow {
   issuer: string | null;
   type: string;
   source: string;
-  allowsJit: boolean;
+  arrivalPolicy: "admit" | "request" | "refuse";
   testLoginAccountId: string | null;
   rejection: { domain: string; note: string } | null;
   pendingVerificationDomain: string | null;
@@ -302,7 +313,22 @@ function rowActionsFor({
     approved && {
       value: "attest",
       label: `Vouch for ${approved}`,
-      run: () => commands.attestDomain.mutate({ ...target, domain: approved }),
+      run: () => {
+        const evidenceRef = window.prompt(
+          "Evidence reference (ticket, contract, or verification record)",
+        );
+        if (!evidenceRef?.trim()) return;
+        const note = window.prompt(
+          "Why does this evidence prove domain control?",
+        );
+        if (!note?.trim()) return;
+        commands.attestDomain.mutate({
+          ...target,
+          domain: approved,
+          evidenceRef: evidenceRef.trim(),
+          note: note.trim(),
+        });
+      },
     },
     connection.state === "VERIFIED" && {
       value: "activate",
@@ -547,6 +573,10 @@ function ConnectionDrawer({
     { connectionId: connectionId ?? "" },
     { enabled: !!connectionId, retry: false },
   );
+  const migration = api.ssoConnections.getMigrationProgress.useQuery(
+    { connectionId: connectionId ?? "", cursor: null, limit: 50 },
+    { enabled: !!connectionId, retry: false },
+  );
   const held = connection.data;
 
   return (
@@ -569,14 +599,71 @@ function ConnectionDrawer({
             <VStack align="stretch" gap={6}>
               <ConnectionFacts connection={held} />
               <ConnectionDomains connection={held} />
+              {held.source === "legacy-grandfathered" && (
+                <MigrationInventory
+                  connection={held}
+                  migration={migration.data ?? null}
+                />
+              )}
               {held.state === "VERIFIED" && (
                 <ActivationPanel connection={held} />
               )}
+              <ConnectionHistory connectionId={held.connectionId} />
             </VStack>
           )}
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function MigrationInventory({
+  connection,
+  migration,
+}: {
+  connection: ConnectionRow;
+  migration: SelfServeMigrationView | null;
+}) {
+  return (
+    <Box>
+      <Text fontWeight="semibold" marginBottom={2}>
+        Migration inventory
+      </Text>
+      <VStack align="stretch" gap={2}>
+        {migration ? (
+          <>
+            <Text fontSize="sm">
+              Replacement is in {migration.phase.toLowerCase()} with{" "}
+              {migration.members.linkedCount} of {migration.members.activeCount}{" "}
+              active members linked.
+            </Text>
+            <Text fontSize="sm" color="fg.muted">
+              Route: {migration.selectedRoute}; SCIM: {migration.scim.status}.
+            </Text>
+            {migration.blockers.length > 0 && (
+              <Text fontSize="sm" color="fg.muted">
+                Waiting on:{" "}
+                {migration.blockers
+                  .map((blocker) => blocker.message)
+                  .join("; ")}
+              </Text>
+            )}
+          </>
+        ) : (
+          <>
+            <Text fontSize="sm" color="fg.muted">
+              No replacement is registered. Import the customer's supplied OIDC
+              or SAML configuration to begin the guarded migration.
+            </Text>
+            <RegisterConnection
+              organizationId={connection.organizationId}
+              replacesConnectionId={connection.connectionId}
+              mode="operator"
+            />
+          </>
+        )}
+      </VStack>
+    </Box>
   );
 }
 
@@ -594,8 +681,8 @@ function ConnectionFacts({ connection }: { connection: ConnectionRow }) {
           ? "Carried over from an earlier configuration"
           : "In the back office"}
       </Fact>
-      <Fact label="New people provisioned on first sign-in">
-        {connection.allowsJit ? "Yes" : "No"}
+      <Fact label="Somebody signing in who is not a member yet">
+        {ARRIVAL_LABELS[connection.arrivalPolicy]}
       </Fact>
     </SimpleGrid>
   );
@@ -633,7 +720,7 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
       </VStack>
       {connection.claimedDomains.length > 0 && (
         <Text fontSize="sm" color="fg.muted" marginTop={2}>
-          Waiting for a decision: {connection.claimedDomains.join(", ")}
+          Claimed, not yet proved: {connection.claimedDomains.join(", ")}
         </Text>
       )}
       {connection.approvedDomains.length > 0 && (
@@ -647,6 +734,48 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
           {connection.rejection.note}
         </Text>
       )}
+    </Box>
+  );
+}
+
+/**
+ * What happened to this connection, newest first (ADR-117 SS5, D04) — the
+ * same read and the same words the organization's own identity provider
+ * page renders, over the back office's own gate (`ssoConnections.getHistory`)
+ * rather than the organization's `sso:manage`.
+ */
+function ConnectionHistory({ connectionId }: { connectionId: string }) {
+  const history = api.ssoConnections.getHistory.useQuery({ connectionId });
+  const rows = history.data ?? [];
+
+  return (
+    <Box>
+      <Text fontWeight="semibold" marginBottom={2}>
+        History
+      </Text>
+      {history.isLoading && (
+        <Text color="fg.muted" fontSize="sm">
+          Loading…
+        </Text>
+      )}
+      {!history.isLoading && rows.length === 0 && (
+        <Text color="fg.muted" fontSize="sm">
+          Nothing has happened to this connection yet.
+        </Text>
+      )}
+      <VStack align="stretch" gap={1}>
+        {rows.map((entry) => (
+          <HStack key={entry.eventId} gap={3} fontSize="sm">
+            <Text color="fg.muted" minWidth="18ch" flexShrink={0}>
+              {formatDateTime(new Date(entry.occurredAtMs))}
+            </Text>
+            <Text>{entry.summary}</Text>
+            {entry.carriedOver && (
+              <Badge colorPalette="gray">carried over</Badge>
+            )}
+          </HStack>
+        ))}
+      </VStack>
     </Box>
   );
 }

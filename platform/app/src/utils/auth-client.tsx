@@ -1,6 +1,9 @@
 "use client";
 
 import { passkeyClient } from "@better-auth/passkey/client";
+import { ssoClient } from "@better-auth/sso/client";
+import { looksLikeSsoConnectionId } from "@langwatch/identity";
+import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import {
   type ReactElement,
@@ -9,6 +12,9 @@ import {
   useEffect,
   useState,
 } from "react";
+import { promotePendingMethod } from "~/features/auth/logic/lastUsedMethod";
+import { readHandledError } from "~/features/errors/logic/readHandledError";
+import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
 
 /**
  * Client-side auth wrapper exposing a NextAuth-compatible API surface over
@@ -21,12 +27,27 @@ import {
 /**
  * The passkey plugin is declared unconditionally, and the METHOD SET decides
  * whether anyone is offered one: the server registers its half only when
- * `PASSKEYS_ENABLED` is on, and the sign-in router never names a passkey
+ * the passkey plugin is mounted, and the sign-in router never names a passkey
  * unless the same env says so. Gating the client half too would mean a second
  * place for the two to disagree, and the failure would be a button that
  * exists calling an endpoint that does not.
+ *
+ * The two-factor half is declared the same way and for the same reason: the
+ * server registers it only when `MFA_ENROLLMENT_OPEN` is on, and every screen
+ * that offers a setup reads the derived `MFA_ENROLLMENT_OPEN` off the public
+ * env first. One place decides, so a button that exists calling an endpoint
+ * that does not cannot happen here either.
+ *
+ * The single sign-on half is unconditional because its server half is: the
+ * plugin answers for providers in a table, and with no rows it answers "no
+ * such provider". What it buys is `signIn.sso({ providerId })`, which is how
+ * an administrator proves the connection they just registered carries a real
+ * sign-in — naming the connection outright rather than waiting for the
+ * per-organization routing flag that decides where everybody ELSE is sent.
  */
-const client = createAuthClient({ plugins: [passkeyClient()] });
+const client = createAuthClient({
+  plugins: [passkeyClient(), twoFactorClient(), ssoClient()],
+});
 
 export const authClient = client;
 
@@ -89,8 +110,8 @@ interface UseSessionOptions {
  * BetterAuth's built-in `client.useSession()` calls `/api/auth/get-session`
  * which returns the raw admin session — no impersonation rewrite. Our
  * `/api/auth/session` endpoint runs through `getServerAuthSession` which
- * reads the `Session.impersonating` JSON column and rewrites `session.user`
- * to the impersonated identity. This mirrors how NextAuth's `useSession`
+ * reads the session's `{actor, subject}` claims and rewrites `session.user`
+ * to the subject's identity (D06). This mirrors how NextAuth's `useSession`
  * worked — both server and client saw the same impersonation-aware session.
  */
 // Module-level session cache — survives component unmount/remount so
@@ -115,6 +136,18 @@ async function _fetchSessionShared(): Promise<CompatSession | null> {
       const json = await res.json();
       const session = adaptSession(json);
       _cachedSession = session;
+      // A session is the only proof a federated hand-off actually worked, and
+      // this is the one place every landing passes through.
+      //
+      // It cannot live on the sign-in screen. A federated dial hands better-auth
+      // `callbackURL ?? "/"`, so the provider's callback returns the browser to
+      // the app root — that screen is never mounted again, its effect never
+      // runs, and the parked method never became the badge. Password and
+      // passkey were unaffected because they record themselves directly, which
+      // is why this only ever looked broken for the social providers.
+      //
+      // A no-op when nothing is parked, so it costs a landing nothing.
+      if (session) promotePendingMethod();
       return session;
     } catch {
       return _cachedSession;
@@ -189,29 +222,45 @@ export const useSession = (
   };
 };
 
+/**
+ * Whether a sign-in answered with a two-factor challenge instead of a session.
+ *
+ * Read off the body rather than inferred from an absent cookie: the flag is
+ * the two-factor plugin's own contract for this state, and a cookie the
+ * browser will not show us cannot tell a challenge apart from a sign-in that
+ * quietly failed to set one.
+ */
+function isTwoStepChallenge(data: unknown): boolean {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (data as { twoFactorRedirect?: unknown }).twoFactorRedirect === true
+  );
+}
+
+type SignInOptions = {
+  email?: string;
+  password?: string;
+  callbackUrl?: string;
+  redirect?: boolean;
+  loginHint?: string;
+};
+
+type SignInResult = {
+  error?: string;
+  code?: string;
+  status?: number;
+  ok?: boolean;
+  /** The remaining rate-limit window, when supplied by the server. */
+  retryAfterSeconds?: number;
+  /** A correct password still needs a second factor; no session exists yet. */
+  twoStepRequired?: boolean;
+};
+
 export const signIn = async (
   provider: string,
-  options?: {
-    email?: string;
-    password?: string;
-    callbackUrl?: string;
-    redirect?: boolean;
-  },
-): Promise<
-  | {
-      error?: string;
-      code?: string;
-      status?: number;
-      ok?: boolean;
-      /**
-       * Seconds to wait, when the refusal was a rate limit that said so. The
-       * header carries the real remaining window, and a screen that has it can
-       * say how long instead of guessing "a minute".
-       */
-      retryAfterSeconds?: number;
-    }
-  | undefined
-> => {
+  options?: SignInOptions,
+): Promise<SignInResult | undefined> => {
   // Same-origin guard on the post-login redirect target.
   const callbackURL = options?.callbackUrl
     ? safeRedirectTarget(options.callbackUrl)
@@ -219,61 +268,53 @@ export const signIn = async (
   const shouldRedirect = options?.redirect !== false;
 
   if (provider === "credentials" || provider === "email") {
-    // The rate limiter's remaining window rides a response header, which the
-    // result object does not carry. Read on the way past rather than inferred
-    // from the status, so a screen either knows the real wait or knows it does
-    // not know.
-    let retryAfterSeconds: number | undefined;
-    const result = await client.signIn.email({
-      email: options?.email ?? "",
-      password: options?.password ?? "",
-      callbackURL,
-      fetchOptions: {
-        onError: (context: { response?: { headers?: Headers } }) => {
-          const header = context.response?.headers?.get("X-Retry-After");
-          const seconds = header === null ? Number.NaN : Number(header);
-          if (Number.isFinite(seconds) && seconds > 0) {
-            retryAfterSeconds = seconds;
-          }
-        },
-      },
+    return signInWithCredentials(options, callbackURL, shouldRedirect);
+  }
+
+  // Organization connections are registered with the SSO plugin.
+  if (looksLikeSsoConnectionId(provider)) {
+    const result = await client.signIn.sso({
+      providerId: provider,
+      callbackURL: callbackURL ?? "/",
     });
     if (result.error) {
-      // `code` is what the screens map to wording; `error` stays the message
-      // for callers that only ever read it.
       return {
-        error: result.error.message ?? "CredentialsSignin",
+        error: result.error.message ?? "OAuthSignin",
         code: result.error.code,
         status: result.error.status,
-        retryAfterSeconds,
         ok: false,
       };
     }
-    // NextAuth compat: the caller expects signIn to navigate on success.
-    // BetterAuth's signIn.email returns a JSON result and does NOT auto-
-    // redirect the browser — the caller has to do it.
-    if (shouldRedirect) {
-      navigate(callbackURL ?? "/");
+    if (
+      shouldRedirect &&
+      result.data &&
+      typeof result.data === "object" &&
+      "url" in result.data
+    ) {
+      const url = (result.data as { url?: string }).url;
+      if (url) {
+        navigate(url);
+      }
     }
     return { ok: true };
   }
 
-  // Every provider goes through signIn.social, social (google, github,
-  // gitlab, microsoft) and generic-OAuth (see `PLAIN_OIDC_PROVIDERS` and the
-  // named entries beside it in `ee/sso/providers.ts`) alike: the social plugin
-  // and the generic-oauth plugin both honor the same providerId. BetterAuth
-  // handles the redirect to the provider URL itself when `disableRedirect`
-  // is unset.
-  //
-  // Normalize `azure-ad` to `microsoft` (BetterAuth's internal provider id)
-  // to match `linkAccount()` which does the same mapping. Also honor
-  // `redirect: false` by passing `disableRedirect: true` so the caller can
-  // handle navigation itself.
-  const mappedProvider = provider === "azure-ad" ? "microsoft" : provider;
+  // Auth0 bridge buttons choose a connection; Azure uses BetterAuth's provider id.
+  const bridgeConnection = auth0BridgeConnectionOf(provider);
+  const mappedProvider =
+    bridgeConnection !== null
+      ? "auth0"
+      : provider === "azure-ad"
+        ? "microsoft"
+        : provider;
   const result = await client.signIn.social({
     provider: mappedProvider as "google",
     callbackURL,
     disableRedirect: !shouldRedirect,
+    ...(options?.loginHint ? { loginHint: options.loginHint } : {}),
+    ...(bridgeConnection !== null
+      ? { additionalParams: { connection: bridgeConnection } }
+      : {}),
   });
   if (result.error) {
     return {
@@ -298,6 +339,47 @@ export const signIn = async (
   }
   return { ok: true };
 };
+
+async function signInWithCredentials(
+  options: SignInOptions | undefined,
+  callbackURL: string | undefined,
+  shouldRedirect: boolean,
+): Promise<SignInResult> {
+  // Retry timing is carried by the response header, not the auth result.
+  let retryAfterSeconds: number | undefined;
+  const result = await client.signIn.email({
+    email: options?.email ?? "",
+    password: options?.password ?? "",
+    callbackURL,
+    fetchOptions: {
+      onError: (context: { response?: { headers?: Headers } }) => {
+        const header = context.response?.headers?.get("X-Retry-After");
+        const seconds = header === null ? Number.NaN : Number(header);
+        if (Number.isFinite(seconds) && seconds > 0) {
+          retryAfterSeconds = seconds;
+        }
+      },
+    },
+  });
+  if (result.error) {
+    // Application refusals carry their code in the handled-error payload.
+    const handled = readHandledError(result.error);
+    return {
+      error: result.error.message ?? "CredentialsSignin",
+      code: handled?.code ?? result.error.code,
+      status: result.error.status,
+      retryAfterSeconds,
+      ok: false,
+    };
+  }
+  if (isTwoStepChallenge(result.data)) {
+    return { ok: false, twoStepRequired: true };
+  }
+  if (shouldRedirect) {
+    navigate(callbackURL ?? "/");
+  }
+  return { ok: true };
+}
 
 /**
  * Browser navigation. Exported as its own export so tests can spy on it
@@ -368,13 +450,7 @@ export const signOut = async (opts?: {
     if (!res.ok) throw new Error("Logout failed");
     return;
   }
-  // Navigate directly to the logout endpoint as a full page navigation.
-  // This guarantees the Set-Cookie headers are applied by the browser
-  // (no fetch/AJAX race conditions). The endpoint clears cookies and
-  // redirects to /auth/signin. We always go to /auth/signin (not /)
-  // because / renders client-side and in Auth0 mode the signin page
-  // auto-fires signIn("auth0") which silently re-authenticates via
-  // Google SSO before the user even sees the page.
+  // Full navigation applies the cleared cookies before reaching the signed-out page.
   navigate("/api/auth/logout");
 };
 

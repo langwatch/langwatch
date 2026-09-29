@@ -9,10 +9,10 @@
  * service is: it holds no state, and a module-scope instance would resolve
  * the event stack before the App exists.
  */
-import { ScimSyncGuards } from "@langwatch/identity-server";
+import { ScimSyncGuards } from "@ee/scim/scim-sync-guards";
+import { ScimSyncLedgerWriter } from "@ee/scim/scim-sync-ledger";
+import { PrismaScimSyncProjectionRepository } from "@ee/scim/scim-sync-projection.prisma.repository";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { PrismaScimSyncProjectionRepository } from "~/server/app-layer/identity/repositories/scim-sync-projection.prisma.repository";
-import { ScimSyncLedgerWriter } from "~/server/app-layer/identity/scim-sync-ledger";
 import { ScimSyncLifecycle } from "./scim-sync.service";
 
 export function scimSyncLifecycle(prisma: PrismaClient): ScimSyncLifecycle {

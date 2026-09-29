@@ -23,7 +23,11 @@ function mapRow(options: SpanOptions = {}): TraceAnalyticsRollupRow {
   const projection = new TraceAnalyticsRollupMapProjection({
     store: { append: async () => {}, appendBatch: async () => {} } as never,
   });
-  return projection.mapTraceSpanReceived(createSpanReceivedEvent(options));
+  const row = projection.mapTraceSpanReceived(createSpanReceivedEvent(options));
+  // Every span in this file carries storable times; a null here means the
+  // storable-time gate rejected one, which is the test's problem, not a row.
+  if (row === null) throw new Error("expected the span to map to a row");
+  return row;
 }
 
 describe("TraceAnalyticsRollupMapProjection.mapTraceSpanReceived", () => {

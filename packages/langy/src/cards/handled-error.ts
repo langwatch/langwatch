@@ -479,6 +479,109 @@ const TERMINAL_STATUSES = new Set([401, 402, 403, 404, 410]);
 export const isTerminalFailure = (error: CliHandledError): boolean =>
   error.isHandled && TERMINAL_STATUSES.has(error.httpStatus);
 
+/**
+ * The error constructors JavaScript raises for a fault in the PROGRAM, never
+ * for a network that did not answer.
+ *
+ * `codeForStatus` calls anything with no HTTP status `network_error`, which is
+ * right for a socket that never connected and wrong for a TypeError thrown
+ * while rendering a response that had already arrived. `langwatch chart
+ * schema` did exactly that against a payload shape it did not expect, and the
+ * user was told "Cannot read properties of undefined (reading 'length')" under
+ * the code `network_error` with the advice to check their connection: a fix
+ * they cannot make, for a failure that was not theirs, and a crash filed as
+ * something transient that a retry would clear.
+ *
+ * `SyntaxError` is deliberately absent. With no HTTP status it is almost
+ * always `response.json()` over a body that was not JSON — a proxy's HTML
+ * error page, a truncated answer — which `parseHandledError` already treats as
+ * infrastructure, and which a retry genuinely can clear.
+ */
+const PROGRAM_FAULT_NAMES = new Set([
+  "TypeError",
+  "RangeError",
+  "ReferenceError",
+]);
+
+/**
+ * The codes a transport failure arrives with, as libuv and OpenSSL spell them.
+ *
+ * A named set rather than a SCREAMING_SNAKE shape, because Node writes its own
+ * PROGRAM-fault codes in that same style: `new URL("/api/x", endpoint)` with a
+ * scheme-less endpoint throws `TypeError [ERR_INVALID_URL]`, and a shape match
+ * would file that bug as a dead socket with "check your connection" as the way
+ * out.
+ */
+const TRANSPORT_CODES = new Set([
+  // libuv, the codes a socket, a DNS lookup or a connection carries.
+  "EADDRNOTAVAIL",
+  "EAI_AGAIN",
+  "ECANCELED",
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTDOWN",
+  "EHOSTUNREACH",
+  "ENETDOWN",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EPIPE",
+  "EPROTO",
+  "ETIMEDOUT",
+  // OpenSSL, verifying the certificate the other end presented.
+  "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+]);
+
+/**
+ * True for a code the transport put there. `UND_ERR_` is undici's own prefix
+ * (`UND_ERR_SOCKET`, `UND_ERR_CONNECT_TIMEOUT`), and every code under it names
+ * something that happened to the request rather than to our code.
+ */
+const isTransportCode = (code: unknown): boolean =>
+  typeof code === "string" &&
+  (TRANSPORT_CODES.has(code) || code.startsWith("UND_ERR_"));
+
+/**
+ * Evidence that the throw came from the TRANSPORT rather than from our code.
+ *
+ * `fetch` reports a dead socket as `TypeError("fetch failed")` whose `cause` is
+ * the libuv system error, so the constructor alone cannot tell a refused
+ * connection from a bug: both are a TypeError with no HTTP status. The cause is
+ * what distinguishes them — it carries `syscall`/`errno` for a socket, and a
+ * code of its own for a TLS failure, which has neither. The message is not
+ * evidence: `TypeError("fetch failed")` is also what a program fault in a
+ * dependency reads like, and a substring match would file it as something a
+ * retry clears.
+ *
+ * `originalError` is scanned beside `cause` because the SDK's HTTP layer wraps
+ * a throw under that name, and `handledErrorFromThrown` reads it as the body:
+ * an expired certificate arriving there carries `CERT_HAS_EXPIRED` and no
+ * `errno`, so without this it would be read as a code the platform had chosen.
+ */
+const hasTransportEvidence = (error: unknown): boolean => {
+  const outer = asRecord(error);
+  const original = asRecord(outer?.originalError);
+  return [outer, asRecord(outer?.cause), original, asRecord(original?.cause)].some(
+    (candidate) =>
+      typeof candidate?.syscall === "string" ||
+      typeof candidate?.errno === "number" ||
+      isTransportCode(candidate?.code),
+  );
+};
+
+/** True when the throw is a fault in our own code rather than a failed request. */
+const isProgramFault = (error: unknown): boolean =>
+  error instanceof Error &&
+  PROGRAM_FAULT_NAMES.has(error.name) &&
+  !hasTransportEvidence(error);
+
 /** A stable code for a failure the platform did not name itself. */
 const codeForStatus = (status: number): string => {
   if (status === 401 || status === 403) return "unauthorized";
@@ -732,11 +835,44 @@ export const handledErrorFromThrown = (error: unknown): CliHandledError => {
   const status = statusOf(cause) || statusOf(outer);
   const parsed = parseHandledError({ status, body: cause });
 
+  const message =
+    error instanceof Error && error.message ? error.message : parsed.message;
+
+  // A transport failure is infrastructure whatever its system error happens to
+  // carry. `isSystemError` disqualifies the record by `errno`/`syscall`, which
+  // catches the socket cases but not a TLS failure: that one carries neither,
+  // so its `code` (CERT_HAS_EXPIRED, UNABLE_TO_VERIFY_LEAF_SIGNATURE) was read
+  // as a discriminant the platform had chosen and rendered as the user's
+  // fault. The throw fetch makes is the tell, and it is enough on its own.
+  if (status === 0 && hasTransportEvidence(error)) {
+    return {
+      code: "network_error",
+      kind: "network_error",
+      message,
+      httpStatus: 0,
+      meta: {},
+      isHandled: false,
+    };
+  }
+
+  // No status and a program fault: the request is not what failed, so do not
+  // send the reader to their network. Read BEFORE the envelope, because the
+  // runtime hangs codes of its own on these throws — `new URL(path, endpoint)`
+  // with a scheme-less endpoint raises `TypeError [ERR_INVALID_URL]` — and a
+  // code Node chose is not a discriminant the platform chose. Still
+  // `isHandled: false`, and with no meta, because both are ours.
+  if (status === 0 && isProgramFault(error)) {
+    return {
+      ...parsed,
+      code: "internal_error",
+      kind: "internal_error",
+      message,
+      meta: {},
+      isHandled: false,
+    };
+  }
+
   if (parsed.isHandled) return parsed;
 
-  return {
-    ...parsed,
-    message:
-      error instanceof Error && error.message ? error.message : parsed.message,
-  };
+  return { ...parsed, message };
 };

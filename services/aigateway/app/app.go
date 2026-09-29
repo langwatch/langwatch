@@ -27,6 +27,7 @@ type App struct {
 	traces     AITraceEmitter
 	spend      pipeline.SpendEmitter
 	realtime   RealtimeSessionRegistry
+	hosted     HostedServices
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
 	logger     *zap.Logger

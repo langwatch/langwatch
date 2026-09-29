@@ -270,6 +270,40 @@ vi.mock("~/utils/api", () => ({
     user: {
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
       isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
+      // The dashboard shell mounts the secure-account nudge and the
+      // organization's second-factor gate on every page, so a mock that
+      // names neither takes the whole shell down.
+      secureAccountNudge: { useQuery: () => ({ data: undefined }) },
+      dismissSecureAccountNudge: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    twoStepVerification: {
+      standing: { useQuery: () => ({ data: undefined }) },
+    },
+    // The shell also mounts the join-your-team notice.
+    joinRequests: {
+      offer: { useQuery: () => ({ data: undefined }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      request: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      dismissOffer: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    useUtils: () => ({
+      user: { secureAccountNudge: { invalidate: vi.fn() } },
+      joinRequests: {
+        mine: { invalidate: vi.fn() },
+        offer: { invalidate: vi.fn() },
+      },
+    }),
+    auth: {
+      myAddressConfirmation: { useQuery: () => ({ data: undefined }) },
+      sendMyAddressConfirmation: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     governance: {
       recordWorkspaceView: {
@@ -710,14 +744,42 @@ describe("the product-switcher top bar", () => {
 
   describe("when on a Gateway page", () => {
     /** @scenario Gateway and Governance carry no scope control */
-    it("shows no project chip and no personal badge", () => {
+    it("shows no project chip", () => {
+      // The ambient team from the outer beforeEach holds projects and renders
+      // the chip on `/[project]`, so the only thing withholding it here is the
+      // page. Without a team that has projects this would assert the absence
+      // of something nothing was going to draw.
       mockPathname = "/gateway/virtual-keys";
       renderShell();
 
       expect(
         screen.queryByRole("button", { name: "Switch project" }),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario Gateway and Governance carry no scope control */
+    it("shows no personal badge even when the scope resolved is a personal workspace", () => {
+      // Both drivers of the badge are switched ON deliberately: the personal
+      // workspace is the ambient scope and `personalScope` is set. Rendered
+      // without them — as this case used to be — the badge could not appear
+      // whatever the code did, and deleting the suppression left it green.
+      // The control below is what proves these inputs draw a badge at all.
+      mockPathname = "/gateway/virtual-keys";
+      mockAmbientTeam = personalTeam;
+      renderShell();
+
       expect(screen.queryByText("Personal")).not.toBeInTheDocument();
+    });
+
+    it("draws that badge on a page that does carry a scope control, on the same inputs", () => {
+      // The positive control for the case above, and the only reason its
+      // `not.toBeInTheDocument()` means anything. If this one ever goes red,
+      // the guard beside it has stopped guarding rather than started passing.
+      mockPathname = "/[project]";
+      mockAmbientTeam = personalTeam;
+      renderShell();
+
+      expect(screen.getByText("Personal")).toBeInTheDocument();
     });
   });
 

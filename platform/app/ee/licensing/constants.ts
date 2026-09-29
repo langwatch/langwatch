@@ -117,7 +117,7 @@ export const FREE_PLAN: PlanInfo = {
  */
 // gitleaks:allow — public keys
 
-const PLACEHOLDER_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+export const PLACEHOLDER_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvyNNiu5B0lretFaxowsu
 fM907tHWnBITXVDfnpPAwUgzrODdjfTt73XW1S+EDd8AM0FzOpx0YolXipS4+SNK
 axSXwNO0S0XjJGLW7wz9Nv8/PP9V23LtiLQQOj8eGol/texr5pIZy2CRjVeEYcBZ

@@ -20,6 +20,7 @@
  * dispatch, and the progress decision are all real code.
  *
  * Spec: specs/ai-governance/puller-framework/s3-polling.feature
+ * Spec: specs/governance/pulled-usage-cost-reporting.feature
  */
 import { Readable } from "node:stream";
 
@@ -30,6 +31,7 @@ import type { PullResult } from "../pullerAdapter";
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();
 const ocsfInsert = vi.fn();
+const ocsfInsertRows = vi.fn();
 const fetchStub = vi.fn();
 const ensureGovProject = vi.fn();
 
@@ -45,6 +47,7 @@ beforeEach(() => {
   sourceFindUnique.mockReset();
   sourceUpdate.mockReset();
   ocsfInsert.mockReset();
+  ocsfInsertRows.mockReset();
   fetchStub.mockReset();
   ensureGovProject.mockReset();
   ensureGovProject.mockResolvedValue({ id: "gov-proj-1" });
@@ -62,7 +65,10 @@ beforeEach(() => {
   vi.doMock("~/server/app-layer/app", () => ({
     getApp: () => ({
       governance: {
-        ocsfEvents: { insertEvent: async (row: unknown) => ocsfInsert(row) },
+        ocsfEvents: {
+          insertEvent: async (row: unknown) => ocsfInsert(row),
+          insertEvents: async (rows: unknown[]) => ocsfInsertRows(rows),
+        },
       },
     }),
   }));
@@ -126,6 +132,12 @@ afterEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
 });
+
+/** Every audit row the worker handed the OCSF sink, whichever way it did. */
+const insertedRows = (): unknown[] => [
+  ...ocsfInsert.mock.calls.map(([row]) => row),
+  ...ocsfInsertRows.mock.calls.flatMap(([rows]) => rows as unknown[]),
+];
 
 const PREFIX = "anthropic/compliance/";
 
@@ -221,7 +233,7 @@ describe("a pull run that reported errors", () => {
         const { runIngestionPull } = await import("../pullerWorker");
         const outcome = await runIngestionPull({ sourceId, cursor: null });
 
-        expect(ocsfInsert).toHaveBeenCalledTimes(3);
+        expect(insertedRows()).toHaveLength(3);
         expect(outcome.eventCount).toBe(3);
       });
 
@@ -252,9 +264,8 @@ describe("a pull run that reported errors", () => {
        * hold on a single run while the source still never moves, because what
        * stalled it was the NEXT run re-reading the same object. So the next run
        * is what is asserted: it must start after the bad file, not at it.
-       *
-       * @scenario "Malformed file skipped, run continues"
        */
+      /** @scenario "Malformed file skipped, run continues" */
       it("does not re-read the same file on the next run, so the source is not stalled", async () => {
         const sourceId = "src-partial-4";
         sourceFindUnique.mockResolvedValueOnce(s3Source(sourceId, null));
@@ -311,7 +322,7 @@ describe("a pull run that reported errors", () => {
           runIngestionPull({ sourceId, cursor: "page-7" }),
         ).rejects.toThrow();
 
-        expect(ocsfInsert).not.toHaveBeenCalled();
+        expect(insertedRows()).toHaveLength(0);
       });
     });
   });
@@ -384,6 +395,77 @@ describe("a pull run that reported errors", () => {
         expect(outcome.nextCursor).toBe("cursor-B");
         expect(outcome.errorCount).toBe(1);
       });
+    });
+  });
+});
+
+/**
+ * #8064: a pull wrote one INSERT per audit row, so a 460-row page was 460
+ * statements against a ClickHouse whose whole budget is 32 concurrent
+ * queries. The page is one insert; what the run collected is still all there.
+ */
+describe("given a page of several events", () => {
+  beforeEach(() => {
+    stubObjects = [
+      {
+        key: `${PREFIX}a.ndjson`,
+        body: [record("evt-1"), record("evt-2"), record("evt-3")].join("\n"),
+      },
+    ];
+  });
+
+  describe("when the worker writes the page's audit rows", () => {
+    it("inserts the whole page in one statement rather than one per row", async () => {
+      const sourceId = "src-batch-1";
+      sourceFindUnique.mockResolvedValueOnce(s3Source(sourceId, null));
+
+      const { runIngestionPull } = await import("../pullerWorker");
+      const outcome = await runIngestionPull({ sourceId, cursor: null });
+
+      expect(outcome.eventCount).toBe(3);
+      expect(ocsfInsertRows).toHaveBeenCalledTimes(1);
+      expect(ocsfInsertRows.mock.calls[0]![0]).toHaveLength(3);
+      expect(ocsfInsert).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a period that needs more pages than one run may read", () => {
+  beforeEach(() => {
+    // One more object than the per-run file cap, so the run ends with money
+    // gathered and the period unfinished — no error anywhere in sight.
+    stubObjects = Array.from({ length: 101 }, (_, at) => ({
+      key: `${PREFIX}${String(at).padStart(4, "0")}.ndjson`,
+      body: record(`evt-${at}`),
+    }));
+  });
+
+  describe("when the read stops early after some of them", () => {
+    /** @scenario "A read that stops before the end keeps the money it already gathered" */
+    it("records the amounts it read and does not call the period finished", async () => {
+      const sourceId = "src-truncated-1";
+      sourceFindUnique.mockResolvedValueOnce(s3Source(sourceId, null));
+
+      const { runIngestionPull } = await import("../pullerWorker");
+      const outcome = await runIngestionPull({ sourceId, cursor: null });
+
+      // The money already gathered survives the early stop: every record
+      // read is written, and the run is not failed for stopping.
+      expect(outcome.eventCount).toBeGreaterThan(0);
+      expect(insertedRows()).toHaveLength(outcome.eventCount);
+      expect(outcome.errorCount).toBe(0);
+
+      // Not yet implemented: the run outcome's `completeness` and
+      // `readThroughAt`. Field not yet on the port (held by PR #8043 work),
+      // so the outcome is read through a widened view here.
+      const reported = outcome as typeof outcome & {
+        completeness?: "complete" | "truncated";
+        readThroughAt?: Date | null;
+      };
+      expect(reported.completeness).toBe("truncated");
+      // And the point it reached is stated, so nothing above it has to
+      // reason from the instant the run happened to finish.
+      expect(reported.readThroughAt).toBeInstanceOf(Date);
     });
   });
 });

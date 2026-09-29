@@ -18,6 +18,7 @@ import {
   crossTableRange,
   range,
 } from "./generic-translators";
+import { INSTANT_EVAL_FIELD_DEFS } from "./instant-eval-field";
 import { META_FIELD_DEFS } from "./meta-handlers";
 
 // ---------------------------------------------------------------------------
@@ -208,6 +209,9 @@ export type KnownField =
   | "has"
   | "none"
   | "eval"
+  | "eval.trace"
+  | "eval.conversation"
+  | "eval.llm"
   | "event"
   | "trace"
   | "traceId"
@@ -278,7 +282,12 @@ export const FIELD_DEFS = {
   spanStatus: crossCategoricalFacet("spanStatus", "spans", spanStatusRead),
   has: META_FIELD_DEFS.has,
   none: META_FIELD_DEFS.none,
-  eval: META_FIELD_DEFS.eval,
+  // An Instant Eval run's verdicts, or the evaluator-name lookup the bare
+  // field was before, when no run is registered for the chip.
+  eval: INSTANT_EVAL_FIELD_DEFS.eval,
+  "eval.trace": INSTANT_EVAL_FIELD_DEFS["eval.trace"],
+  "eval.conversation": INSTANT_EVAL_FIELD_DEFS["eval.conversation"],
+  "eval.llm": INSTANT_EVAL_FIELD_DEFS["eval.llm"],
   event: META_FIELD_DEFS.event,
   trace: META_FIELD_DEFS.trace,
   traceId: META_FIELD_DEFS.traceId,

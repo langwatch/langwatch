@@ -5,6 +5,8 @@ import {
   type ExpectedIdentifier,
   orphanedIdentifierRows,
 } from "../backfill";
+import { derivedAccountId } from "../auth0-upstream";
+
 
 function row(overrides: Partial<BackfillIdentifierRow>): BackfillIdentifierRow {
   return {
@@ -124,5 +126,36 @@ describe("orphaned identifier rows", () => {
         liveAccountIds: new Set(["acc_live"]),
       }).map((orphan) => orphan.id),
     ).toEqual(["idf_google"]);
+  });
+
+  /** @scenario "An Auth0-brokered social account is adopted under its own provider too" */
+  it("follows a derived identifier's liveness to its source row", () => {
+    const rows = [
+      row({
+        id: "idf_derived_live",
+        provider: "google",
+        accountId: derivedAccountId({
+          sourceAccountId: "acc_live",
+          providerId: "google",
+        }),
+      }),
+      row({
+        id: "idf_derived_gone",
+        provider: "google",
+        accountId: derivedAccountId({
+          sourceAccountId: "acc_gone",
+          providerId: "google",
+        }),
+      }),
+    ];
+    // No `Account` row of a derived identifier's own will ever exist, so a
+    // liveness read on its literal accountId would detach it every pass;
+    // what it must follow is the broker row its subject was unfolded from.
+    expect(
+      orphanedIdentifierRows({
+        rows,
+        liveAccountIds: new Set(["acc_live"]),
+      }).map((orphan) => orphan.id),
+    ).toEqual(["idf_derived_gone"]);
   });
 });

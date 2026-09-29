@@ -637,7 +637,7 @@ const cases: Case[] = [
   },
   {
     name: "over-complex query (exceeds the node cap) fails closed",
-    // 11 tags → 21 AST nodes, over MAX_NODE_COUNT (20); each would match, so a
+    // 11 tags → 21 AST nodes, over MAX_FILTER_NODE_COUNT (20); each would match, so a
     // `false` result proves the cap forced fail-closed rather than a miss.
     query: Array.from({ length: 11 }, () => "origin:app").join(" AND "),
     trace: makeTrace({ attributes: { "langwatch.origin": "app" } }),

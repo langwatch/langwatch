@@ -63,10 +63,20 @@ export interface LangyToolFrame {
   digest?: CliResultDigest;
   /** Validated polymorphic payload for a successful LangWatch CLI call. */
   result?: CliToolResult;
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. Absent means the sandbox.
+   */
+  local?: boolean;
 }
 
-/** The worker's shell tools — any of these may be carrying a `langwatch` call. */
-const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute"]);
+/**
+ * The tools a `langwatch` call can arrive through: the worker's own shells,
+ * and the shell that runs in the folder the developer shared from their
+ * machine (ADR-129). A call is the CLI's whichever shell ran it, so it is
+ * re-typed, its link remembered and its navigate intercepted the same way.
+ */
+const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
 
 /** Keys a shell tool may pass its command under. The bash tool uses `command`. */
 const COMMAND_KEYS = ["command", "cmd", "script"];

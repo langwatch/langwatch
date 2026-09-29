@@ -122,6 +122,16 @@ def sync_detailed(
     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue
     was detected. It is not proof that the answer is the one you meant.
 
+    A projection may call the app functions the schema endpoint lists (`conversation`,
+    `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the
+    query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE,
+    GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies
+    both of its branches even where each reads as a top-level projection. A projection may also call the
+    eval functions, which judge a text with a model and are charged for; their key is the text itself. A
+    run that would need more distinct conversations, traces, spans or texts than the published cap
+    answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
+    budget answers 422 before anything is sent.
+
     The project is taken from the credential — no project id appears anywhere in the path or the body,
     and none can be sent to select another one.
 
@@ -172,6 +182,16 @@ def sync(
     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue
     was detected. It is not proof that the answer is the one you meant.
 
+    A projection may call the app functions the schema endpoint lists (`conversation`,
+    `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the
+    query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE,
+    GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies
+    both of its branches even where each reads as a top-level projection. A projection may also call the
+    eval functions, which judge a text with a model and are charged for; their key is the text itself. A
+    run that would need more distinct conversations, traces, spans or texts than the published cap
+    answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
+    budget answers 422 before anything is sent.
+
     The project is taken from the credential — no project id appears anywhere in the path or the body,
     and none can be sent to select another one.
 
@@ -215,6 +235,16 @@ async def asyncio_detailed(
 
     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue
     was detected. It is not proof that the answer is the one you meant.
+
+    A projection may call the app functions the schema endpoint lists (`conversation`,
+    `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the
+    query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE,
+    GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies
+    both of its branches even where each reads as a top-level projection. A projection may also call the
+    eval functions, which judge a text with a model and are charged for; their key is the text itself. A
+    run that would need more distinct conversations, traces, spans or texts than the published cap
+    answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
+    budget answers 422 before anything is sent.
 
     The project is taken from the credential — no project id appears anywhere in the path or the body,
     and none can be sent to select another one.
@@ -263,6 +293,16 @@ async def asyncio(
 
     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue
     was detected. It is not proof that the answer is the one you meant.
+
+    A projection may call the app functions the schema endpoint lists (`conversation`,
+    `llm_readable_trace`, `llm_messages`, and so on). Those are computed by the application after the
+    query, so they are allowed only as aliased entries in the top-level SELECT list; a call in WHERE,
+    GROUP BY, ORDER BY, a join, a subquery or a nested expression is refused, and a UNION disqualifies
+    both of its branches even where each reads as a top-level projection. A projection may also call the
+    eval functions, which judge a text with a model and are charged for; their key is the text itself. A
+    run that would need more distinct conversations, traces, spans or texts than the published cap
+    answers 422 rather than a partial result, and a run whose texts would exceed the per-query token
+    budget answers 422 before anything is sent.
 
     The project is taken from the credential — no project id appears anywhere in the path or the body,
     and none can be sent to select another one.

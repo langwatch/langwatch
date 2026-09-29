@@ -4,7 +4,9 @@
  * Sends one real user turn ("Hi Langy.") through the same in-process turn
  * service the browser and the key-authed API use, holds until the turn settles
  * on the durable fold, and says what broke: healthy, or one of exactly three
- * named reasons — `timeout`, `turn_failed`, `empty_reply`.
+ * named reasons — `timeout`, `turn_failed`, `empty_reply`. A turn that
+ * answers with a question card is healthy: the wait settles on the card
+ * instead of holding until someone answers it.
  *
  * The moving parts are separated so the interesting logic is testable with no
  * worker and no real waiting:
@@ -31,6 +33,8 @@
  * turn outlives the answer, the caller's single-flight slot is held for one
  * further budget rather than released with the response, so a monitor that
  * retries faster than the documented interval cannot stack turns on top of it.
+ * A turn waiting on the user is also left alone, but its slot is released at
+ * once: the check is healthy, and the wait ends on its own expiry.
  *
  * @see specs/langy/langy-health-canary.feature
  */
@@ -40,6 +44,7 @@ import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import {
+  type AwaitingUserSettlement,
   awaitTurnSettlement,
   type TurnSettlement,
 } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
@@ -91,7 +96,7 @@ export interface LangyCanaryDeps {
    */
   awaitSettlement: (
     options: StartedTurn & { signal: AbortSignal },
-  ) => Promise<TurnSettlement | null>;
+  ) => Promise<TurnSettlement | AwaitingUserSettlement | null>;
   /** The clock, `Date.now` in production. */
   now: () => number;
   /** Overrides {@link LANGY_CANARY_BUDGET_MS}; a test seam. */
@@ -105,12 +110,15 @@ export interface LangyCanaryDeps {
  * that did not succeed, or succeeded as `stopped` (nobody stops a canary turn,
  * so a stop is the worker giving up), is `turn_failed`. A completed turn whose
  * text is empty or whitespace is `empty_reply` — an empty answer is the one
- * failure a status code alone would hide.
+ * failure a status code alone would hide. A turn waiting on the user
+ * (`awaiting_user`) is healthy: Langy started, reasoned and answered with a
+ * card.
  */
 export function classifyLangyCanaryOutcome(
-  settlement: TurnSettlement | null,
+  settlement: TurnSettlement | AwaitingUserSettlement | null,
 ): LangyCanaryVerdict {
   if (!settlement) return { healthy: false, reason: "timeout" };
+  if (settlement.outcome === "awaiting_user") return { healthy: true };
   if (!settlement.succeeded || settlement.outcome !== "completed") {
     return { healthy: false, reason: "turn_failed" };
   }
@@ -176,10 +184,16 @@ export async function runLangyCanary(
       deps.awaitSettlement({ ...started, signal: budget.signal }),
       aborted,
     ]);
+    const settled =
+      settlement !== null && "aborted" in settlement ? null : settlement;
+    if (settled?.outcome === "awaiting_user") {
+      logger.info(
+        { ...started, question: settled.text },
+        "Langy canary turn is waiting on the user",
+      );
+    }
     return {
-      ...classifyLangyCanaryOutcome(
-        settlement !== null && "aborted" in settlement ? null : settlement,
-      ),
+      ...classifyLangyCanaryOutcome(settled),
       ...started,
       durationMs: deps.now() - startedAt,
     };
@@ -214,8 +228,9 @@ export async function runLangyCanary(
  * running. Holding it bounds that to one turn per two budgets per caller.
  * At the documented poll interval the reservation has always lapsed, so a
  * correctly configured monitor never meets it, and a `429` fails its check
- * either way. Every other outcome releases at once — the turn is over, so
- * there is nothing left to protect.
+ * either way. Every other outcome releases at once. For most the turn is over;
+ * a healthy turn left waiting on the user is not, but a healthy check has no
+ * reason to be retried early.
  */
 export function createSingleFlightLangyCanary(
   run: (deps: LangyCanaryDeps) => Promise<LangyCanaryOutcome>,
@@ -287,6 +302,7 @@ export function buildProductionLangyCanaryDeps({
         turnId,
         userId: session.user.id,
         signal,
+        shouldSettleOnUserWait: true,
       }),
     now: () => Date.now(),
   };

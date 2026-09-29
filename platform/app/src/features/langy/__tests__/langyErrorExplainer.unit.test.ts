@@ -146,7 +146,40 @@ describe("explainLangyError", () => {
 
         expect(presentation.kind).toBe("llm_upstream_error");
         expect(presentation.description).toBe(
-          "The model provider is rate-limiting these calls. Wait a moment and try again.",
+          "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+
+      /** @scenario A rate limit filed under the provider's own code reads the same way */
+      it("reads the proxy's own upstream code with the provider's rate limit discriminant beneath it", () => {
+        // The chain the proxy records for a provider-native 429 body: its own
+        // code with the provider's discriminant as the one reason, and no
+        // upstream status reason at all.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: {
+                  http_status: 429,
+                  provider: "azure",
+                  body_kind: "json",
+                },
+                reasons: [{ kind: "rate_limit_exceeded" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("The model provider rejected that");
+        expect(presentation.description).toBe(
+          "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.",
         );
         expect(presentation.action).toEqual({
           label: "Try again",

@@ -29,6 +29,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 
 import { app, approveDeviceCode } from "../auth-cli";
 
@@ -92,6 +93,13 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
     await prisma.teamUser.create({
       data: { userId: USER_ID, teamId: TEAM_ID, role: "ADMIN" },
     });
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: "ADMIN",
+      scopeType: "TEAM",
+      scopeId: TEAM_ID,
+    });
     await prisma.project.create({
       data: {
         id: PROJECT_ID,
@@ -107,6 +115,8 @@ describe("CLI credential_type discriminator — no-paste convergence", () => {
 
   afterAll(async () => {
     await resetApp();
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.project
       .deleteMany({ where: { id: PROJECT_ID } })
       .catch(() => {});

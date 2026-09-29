@@ -27,10 +27,11 @@ import {
   usePresenceStore,
 } from "~/features/presence/stores/presenceStore";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { formatDuration } from "~/shared/format/time";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { formatDuration, SPAN_TYPE_COLORS } from "../../utils/formatters";
+import { SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { OverflowMenu } from "../shared/OverflowMenu";
 
 /**

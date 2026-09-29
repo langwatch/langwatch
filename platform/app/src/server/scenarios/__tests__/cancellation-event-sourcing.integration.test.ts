@@ -422,6 +422,9 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         agentInstanceRecorder: {
           recordAgentInstance: async () => undefined,
         },
+        cutAtLimitRecorder: {
+          recordCutAtLimit: vi.fn(async () => {}),
+        },
       };
 
       // Use the REAL startScenarioProcessor with the test Redis, which the

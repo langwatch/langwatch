@@ -100,5 +100,17 @@ export const hasEmailProvider = (): boolean => {
   }
 };
 
+/**
+ * Whether the installation has no email configuration at all. A named but
+ * unusable provider is a misconfiguration, not an installation without email.
+ */
+export const isEmailUnconfigured = (): boolean => {
+  try {
+    return resolveEmailProvider() === null;
+  } catch {
+    return false;
+  }
+};
+
 export type { EmailProviderName, EmailProviderPort };
 export { EmailProviderConfigurationError };

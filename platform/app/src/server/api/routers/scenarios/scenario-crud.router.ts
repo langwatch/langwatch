@@ -4,11 +4,14 @@ import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
+import { onboardingExperimentProperties } from "~/server/onboarding/guided-onboarding.experiment";
+import { readOnboardingVariantForProject } from "~/server/onboarding/onboarding-variant";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { scenarioFieldValuesSchema } from "~/server/scenarios/suite-fields";
+import { callerVoiceConfigSchema } from "~/server/scenarios/voice/caller-voice.config";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { projectSchema } from "./schemas";
 
@@ -30,6 +33,10 @@ const createScenarioSchema = projectSchema.extend({
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
   fields: scenarioFieldValuesSchema.optional(),
+  // The simulated caller's voice for a voice target. Absent leaves it unset;
+  // send the default config to clear (both parse to defaults). Not nullable at
+  // the column level — a plain null is not a valid Prisma JSON write.
+  callerVoice: callerVoiceConfigSchema.optional(),
   // The test suite this scenario is filed in; absent or null files it into Default.
   testSuiteId: z.string().nullish(),
 });
@@ -47,6 +54,8 @@ const updateScenarioSchema = projectSchema.extend({
   minTurns: z.number().int().min(0).max(100).nullish(),
   // Sent, this replaces the whole record; an empty record clears every value.
   fields: scenarioFieldValuesSchema.optional(),
+  // Absent = keep the current caller voice; send the default config to clear.
+  callerVoice: callerVoiceConfigSchema.optional(),
   // Absent = keep the current test suite; null = unfile; a test suite id = move.
   testSuiteId: z.string().nullish(),
   // The version the editor loaded. When sent, a save against any other
@@ -74,10 +83,20 @@ export const scenarioCrudRouter = createTRPCRouter({
         { actor: { userId: ctx.session.user.id, label: "user" } },
       );
 
+      const onboardingVariant = await readOnboardingVariantForProject({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+      });
       trackServerEvent({
         userId: ctx.session.user.id,
         event: "scenario_created",
         projectId: input.projectId,
+        properties: onboardingVariant
+          ? {
+              onboarding_variant: onboardingVariant,
+              ...onboardingExperimentProperties(onboardingVariant),
+            }
+          : undefined,
       });
 
       void ctx.prisma.scenario

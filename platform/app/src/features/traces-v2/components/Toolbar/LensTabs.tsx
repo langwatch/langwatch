@@ -12,13 +12,13 @@ import {
 } from "../../../../components/ui/menu";
 import { useErrorCount } from "../../hooks/useErrorCount";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useUIStore } from "../../stores/uiStore";
 import {
   COST_LENS_IDS,
   type LensConfig,
   PERFORMANCE_LENS_IDS,
-  useViewStore,
-} from "../../stores/viewStore";
+} from "../../stores/viewSlice";
 import { OverflowMenu } from "../shared/OverflowMenu";
 import { CreateLensButton } from "./CreateLensButton";
 import { LensNameDialog } from "./LensNameDialog";
@@ -42,12 +42,12 @@ const isGroupedLens = (id: string): boolean => GROUPED_LENS_IDS.has(id);
 const LENS_OVERFLOW_RESERVE_PX = 56;
 
 export const LensTabs: React.FC = () => {
-  const activeLensId = useViewStore((s) => s.activeLensId);
-  const allLenses = useViewStore((s) => s.allLenses);
-  const selectLens = useViewStore((s) => s.selectLens);
-  const createLens = useViewStore((s) => s.createLens);
-  const revertLens = useViewStore((s) => s.revertLens);
-  const isDraft = useViewStore((s) => s.isDraft);
+  const activeLensId = useExplorerStore((s) => s.activeLensId);
+  const allLenses = useExplorerStore((s) => s.allLenses);
+  const selectLens = useExplorerStore((s) => s.selectLens);
+  const createLens = useExplorerStore((s) => s.createLens);
+  const revertLens = useExplorerStore((s) => s.revertLens);
+  const isDraft = useExplorerStore((s) => s.isDraft);
   const errorCount = useErrorCount();
 
   const [pendingLensId, setPendingLensId] = useState<string | null>(null);

@@ -20,16 +20,26 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Play, X } from "lucide-react";
-import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
+import { CallerVoiceModelSelect } from "~/components/scenarios/CallerVoiceModelSelect";
+import {
+  EFFECT_LABELS,
+  UNFILED_OPTION_LABEL,
+} from "~/components/scenarios/ScenarioForm";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { SimpleSlider } from "~/components/ui/slider";
 import { Switch } from "~/components/ui/switch";
 import { TagList } from "~/components/ui/TagList";
 import type {
   ScenarioFieldValue,
   SuiteFieldDefinition,
 } from "~/server/scenarios/suite-fields";
+import {
+  CALLER_VOICE_EFFECTS,
+  type CallerVoiceConfig,
+  DEFAULT_CALLER_VOICE,
+} from "~/server/scenarios/voice/caller-voice.config";
 import { ParameterLineField } from "../run/ParameterLineField";
 import { parameterPlaceholder } from "../run/parameter-suggestions";
 import { useAgentDeclaredParameters } from "../run/useAgentDeclaredParameters";
@@ -634,9 +644,89 @@ function ModelsBlock({
 }
 
 /**
+ * The simulated caller's voice for a voice target: which voice speaks, how
+ * often it interrupts the agent, and what audio effects it speaks through.
+ * Matches the "Caller voice" group of `ScenarioForm` (AC17) so the same
+ * scenario reads the same way from either editor.
+ */
+function CallerVoiceBlock({
+  draft,
+  setDraft,
+  onRemove,
+}: {
+  draft: CaseDraft;
+  setDraft: (update: Partial<CaseDraft>) => void;
+  onRemove: () => void;
+}) {
+  const callerVoice = draft.callerVoice ?? DEFAULT_CALLER_VOICE;
+  const percent = Math.round(callerVoice.interruptProbability * 100);
+
+  const update = (change: Partial<CallerVoiceConfig>) =>
+    setDraft({ callerVoice: { ...callerVoice, ...change } });
+
+  return (
+    <VStack align="stretch" gap={3} data-testid="case-caller-voice-block">
+      <Text fontSize="11px" color={FG_MUTED}>
+        Used when this scenario runs against a voice agent.
+      </Text>
+      <Box>
+        <FieldLabel>Voice</FieldLabel>
+        <CallerVoiceModelSelect
+          value={callerVoice.voiceModel}
+          onChange={(voiceModel) => update({ voiceModel })}
+          size="sm"
+        />
+      </Box>
+      <Box>
+        <FieldLabel>Interrupts: {percent}%</FieldLabel>
+        <SimpleSlider
+          value={[percent]}
+          onValueChange={({ value }) =>
+            update({ interruptProbability: (value[0] ?? 0) / 100 })
+          }
+          min={0}
+          max={100}
+          step={5}
+          aria-label={["Interrupts"]}
+          size="sm"
+        />
+      </Box>
+      <Box>
+        <FieldLabel>
+          Effects
+          <RemoveBlockButton
+            label="Remove the caller voice"
+            onClick={onRemove}
+          />
+        </FieldLabel>
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            {...DIALOG_FIELD_STYLE}
+            aria-label="Effects"
+            value={callerVoice.effects}
+            onChange={(event) =>
+              update({
+                effects: event.target.value as CallerVoiceConfig["effects"],
+              })
+            }
+          >
+            {CALLER_VOICE_EFFECTS.map((effect) => (
+              <option key={effect} value={effect}>
+                {EFFECT_LABELS[effect]}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Box>
+    </VStack>
+  );
+}
+
+/**
  * What the scenario can carry beyond the four questions: the parameters, the
- * turn limits and the model overrides, each behind a chip until it is asked
- * for.
+ * turn limits, the model overrides and the caller voice, each behind a chip
+ * until it is asked for.
  *
  * The blocks read in the order their chips sit in, and they read as part of the
  * scenario rather than as part of the chip row: a scenario with one block open
@@ -648,7 +738,8 @@ function CustomizeBlocks({ editor }: { editor: CaseEditorState }) {
   if (
     !customize.showParameters &&
     !customize.showTurns &&
-    !customize.showModels
+    !customize.showModels &&
+    !customize.showCallerVoice
   ) {
     return null;
   }
@@ -674,6 +765,13 @@ function CustomizeBlocks({ editor }: { editor: CaseEditorState }) {
           draft={draft}
           setDraft={setDraft}
           onRemove={customize.removeModels}
+        />
+      )}
+      {customize.showCallerVoice && (
+        <CallerVoiceBlock
+          draft={draft}
+          setDraft={setDraft}
+          onRemove={customize.removeCallerVoice}
         />
       )}
     </VStack>

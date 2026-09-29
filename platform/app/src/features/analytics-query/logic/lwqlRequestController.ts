@@ -12,7 +12,7 @@
  * the backend owns parsing and policy, and a second opinion in the browser
  * could only disagree with it.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";

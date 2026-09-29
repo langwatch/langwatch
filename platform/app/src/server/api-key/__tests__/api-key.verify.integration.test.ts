@@ -8,9 +8,14 @@ import {
 } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
+
 import { ApiKeyService } from "../api-key.service";
+
+wireDefaultTestApp();
 
 /**
  * Authentication-time rejection of keys that should no longer work.
@@ -30,15 +35,13 @@ describe("Feature: API key verification", () => {
 
   /** The minting ceiling reads role bindings, not OrganizationUser rows. */
   const grantOrgAdmin = async (id: string) => {
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId,
-        userId: id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId,
+      userId: id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
   };
 
@@ -84,6 +87,7 @@ describe("Feature: API key verification", () => {
   afterAll(async () => {
     await cleanupTestRows(prisma, [
       ["roleBinding", { organizationId }],
+      ["grant", { organizationId }],
       ["apiKey", { organizationId }],
       ["organizationUser", { organizationId }],
     ]);
