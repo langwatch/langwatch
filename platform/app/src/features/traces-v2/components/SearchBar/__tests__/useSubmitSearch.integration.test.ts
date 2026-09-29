@@ -397,7 +397,7 @@ describe("given the text is an eval chip typed by hand", () => {
   });
 
   describe("given the Instant Evals flag is off for the project", () => {
-    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
     it("hands the question to the Instant Eval handler and leaves the typed query unsearched", () => {
       const { result } = renderSubmit({ isInstantEvalAvailable: false });
       act(() => result.current.submitSearch('eval:"the user is annoyed"'));
@@ -412,7 +412,7 @@ describe("given the text is an eval chip typed by hand", () => {
       expect(useExplorerStore.getState().queryText).toBe("");
     });
 
-    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
     it("refuses a chip typed alongside a bare word the same way, before any request", () => {
       const { result } = renderSubmit({ isInstantEvalAvailable: false });
       act(() =>
