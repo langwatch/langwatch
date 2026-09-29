@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import {
   CodeBlock,
   DetailTable,
@@ -151,7 +151,7 @@ function sanitizeFilenamePrefix(name: string): string {
 export const sendLicenseEmail = async ({
   mailer,
   ...props
-}: LicenseEmailProps & { mailer: EmailDelivery }) => {
+}: LicenseEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(licenseEmailTemplate, props);
   await sendEmail({
     mailer,

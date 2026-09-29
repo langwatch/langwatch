@@ -96,13 +96,11 @@ describe("given a mailer configuration naming a provider whose credentials are a
 
 describe("given a mailer configuration with no provider settings at all", () => {
   describe("when the delivery capability is composed", () => {
-    /** @scenario "A deployment with no provider composes and fails only at send time" */
-    it("composes, and fails only at send time", async () => {
+    /** @scenario "A deployment with no provider composes and skips each send" */
+    it("composes, and skips the send rather than failing it", async () => {
       const delivery = compose(configuration());
       expect(delivery.defaultFrom()).toBe("LangWatch <contact@langwatch.ai>");
-      await expect(delivery.send(message())).rejects.toThrow(
-        "No email sending method available. Skipping email sending.",
-      );
+      await expect(delivery.send(message())).resolves.toBeUndefined();
     });
   });
 });

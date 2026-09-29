@@ -10,7 +10,6 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -73,7 +72,6 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       secrets,
       publicBaseUrl: void 0,
       identityEmails: void 0,
-      mail: createApiFixture<EmailDelivery>(),
       invites: null,
       isSaas: false,
       nodeEnvironment: undefined,

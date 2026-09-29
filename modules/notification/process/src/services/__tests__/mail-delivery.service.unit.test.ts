@@ -5,6 +5,8 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  type EmailContent,
+  EmailDelivery,
   EmailProviderConfigurationError,
   type MailGatewaySettings,
 } from "../../channels/email-delivery.channel.ts";
@@ -28,11 +30,51 @@ const config: NotificationServerConfig = {
   smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
 };
 
-function serviceOver(settings: MailGatewaySettings) {
-  return MailDeliveryService.create({ settings: () => Promise.resolve(settings) });
+/** The gateway-facing message each send is handed, recorded rather than delivered. */
+class RecordingDelivery extends EmailDelivery {
+  readonly sent: EmailContent[] = [];
+
+  defaultFrom(): string {
+    return "LangWatch <contact@langwatch.test>";
+  }
+
+  async send(content: EmailContent): Promise<void> {
+    this.sent.push(content);
+  }
+}
+
+function serviceOver(settings: MailGatewaySettings, delivery = new RecordingDelivery()) {
+  return MailDeliveryService.create({ settings: () => Promise.resolve(settings), delivery });
 }
 
 describe("MailDeliveryService", () => {
+  describe("when a module sends to undisclosed recipients with an unsubscribe link", () => {
+    it("hands the gateway blind copies and RFC 8058's one-click pair, as main wrote them", async () => {
+      const delivery = new RecordingDelivery();
+
+      await serviceOver(settingsWith(), delivery).sendEmail({
+        to: "LangWatch Triggers <no-reply+tag@langwatch.ai>",
+        undisclosedRecipients: ["ada@example.com"],
+        subject: "Errors above threshold",
+        html: "<p>hi</p>",
+        unsubscribe: { url: "https://app.langwatch.test/api/unsubscribe?token=t" },
+      });
+
+      expect(delivery.sent).toEqual([
+        {
+          to: "LangWatch Triggers <no-reply+tag@langwatch.ai>",
+          bcc: ["ada@example.com"],
+          subject: "Errors above threshold",
+          html: "<p>hi</p>",
+          headers: {
+            "List-Unsubscribe": "<https://app.langwatch.test/api/unsubscribe?token=t>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        },
+      ]);
+    });
+  });
+
   describe("when the public config asks it, with EMAIL_PROVIDER unset and only a SendGrid credential", () => {
     it("projects email on from the member's own answer", async () => {
       const member = serviceOver(settingsWith({ sendgrid: { apiKey: "SG.test" } }));

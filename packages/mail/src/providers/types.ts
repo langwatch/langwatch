@@ -72,6 +72,9 @@ export abstract class EmailDelivery {
   abstract send(content: EmailContent): Promise<unknown>;
 }
 
+/** All a template needs to hand over what it rendered; NotificationApi's sender answers it. */
+export type MailSender = Pick<EmailDelivery, "send">;
+
 /**
  * Raised when a gateway is selected but cannot be used: an unknown name, or a
  * known one whose credentials are absent. Thrown at send time rather than at

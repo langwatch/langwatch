@@ -26,6 +26,14 @@ export interface SesAwsClientConfiguration {
   build(input: { region?: string; targetHost: string; endpoint?: string }): SESClientConfig;
 }
 
+/** The SES client over the default AWS credential chain, as the process runs it. */
+export const directSesClientConfiguration: SesAwsClientConfiguration = {
+  build: ({ region, endpoint }) => ({
+    ...(region === undefined ? {} : { region }),
+    ...(endpoint === undefined ? {} : { endpoint }),
+  }),
+};
+
 /** Public regional SES endpoint, used to decide proxy applicability. */
 const defaultSesHost = (region: string) =>
   `email.${region}.amazonaws.com${region.startsWith("cn-") ? ".cn" : ""}`;

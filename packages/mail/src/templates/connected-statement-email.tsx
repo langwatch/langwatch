@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import { DetailTable, EmailLayout, Muted, Paragraph } from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
@@ -147,7 +147,7 @@ export const sendConnectedStatementEmail = async ({
   mailer,
   to,
   ...props
-}: ConnectedStatementEmailProps & { mailer: EmailDelivery; to: string }): Promise<void> => {
+}: ConnectedStatementEmailProps & { mailer: MailSender; to: string }): Promise<void> => {
   const { subject, html } = await renderMailTemplate(connectedStatementEmailTemplate, props);
   await sendEmail({ mailer, content: { to, subject, html } });
 };

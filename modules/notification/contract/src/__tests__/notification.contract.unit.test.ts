@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 
-import { createNotificationCommandSchema, notificationSchema } from "../index.ts";
+import {
+  createNotificationCommandSchema,
+  notificationSchema,
+  sendEmailCommandSchema,
+} from "../index.ts";
 
 describe("Notification contract", () => {
   it("accepts the persisted notification shape", () => {
@@ -27,6 +31,17 @@ describe("Notification contract", () => {
         metadata: {},
         sentAt: new Date(),
         unexpected: true,
+      }),
+    ).toThrow(ZodError);
+  });
+
+  it("refuses raw headers on a send: the envelope is notification's to write", () => {
+    expect(() =>
+      sendEmailCommandSchema.parse({
+        to: "ada@example.com",
+        subject: "hi",
+        html: "<p>hi</p>",
+        headers: { "List-Unsubscribe": "<https://evil.test>" },
       }),
     ).toThrow(ZodError);
   });

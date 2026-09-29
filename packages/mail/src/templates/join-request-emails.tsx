@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import {
   DataTable,
   EmailLayout,
@@ -107,7 +107,7 @@ export const joinRequestArrivedTemplate = defineTemplate({
 export const sendJoinRequestArrivedEmail = async ({
   mailer,
   ...props
-}: JoinRequestArrivedProps & { mailer: EmailDelivery }) => {
+}: JoinRequestArrivedProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(joinRequestArrivedTemplate, props);
   await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
 };
@@ -177,7 +177,7 @@ export const sendJoinRequestReminderEmail = async ({
   mailer,
   adminEmail,
   ...props
-}: JoinRequestReminderProps & { mailer: EmailDelivery; adminEmail: string }) => {
+}: JoinRequestReminderProps & { mailer: MailSender; adminEmail: string }) => {
   const { subject, html } = await renderMailTemplate(joinRequestReminderTemplate, props);
   await sendEmail({ mailer, content: { to: adminEmail, subject, html } });
 };
@@ -266,7 +266,7 @@ export const joinRequestApprovedTemplate = defineTemplate({
 export const sendJoinRequestApprovedEmail = async ({
   mailer,
   ...props
-}: JoinRequestApprovedProps & { mailer: EmailDelivery }) => {
+}: JoinRequestApprovedProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(joinRequestApprovedTemplate, props);
   await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html } });
 };
@@ -314,7 +314,7 @@ export const joinRequestRejectedTemplate = defineTemplate({
 export const sendJoinRequestRejectedEmail = async ({
   mailer,
   ...props
-}: JoinRequestRejectedProps & { mailer: EmailDelivery }) => {
+}: JoinRequestRejectedProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(joinRequestRejectedTemplate, props);
   await sendEmail({ mailer, content: { to: props.requesterEmail, subject, html } });
 };
@@ -385,7 +385,7 @@ export const sendJoinRequestExpiredEmail = async ({
   mailer,
   requesterEmail,
   ...props
-}: JoinRequestExpiredProps & { mailer: EmailDelivery; requesterEmail: string }) => {
+}: JoinRequestExpiredProps & { mailer: MailSender; requesterEmail: string }) => {
   const { subject, html } = await renderMailTemplate(joinRequestExpiredTemplate, props);
   await sendEmail({ mailer, content: { to: requesterEmail, subject, html } });
 };
@@ -489,7 +489,7 @@ export const domainAutoJoinedTemplate = defineTemplate({
 export const sendDomainAutoJoinedEmail = async ({
   mailer,
   ...props
-}: DomainAutoJoinedProps & { mailer: EmailDelivery }) => {
+}: DomainAutoJoinedProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(domainAutoJoinedTemplate, props);
   await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
 };

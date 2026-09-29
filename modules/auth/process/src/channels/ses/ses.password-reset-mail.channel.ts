@@ -1,4 +1,4 @@
-import { sendResetPasswordEmail, type EmailDelivery } from "@langwatch/mail";
+import { sendResetPasswordEmail, type MailSender } from "@langwatch/mail";
 
 import {
   type PasswordResetLink,
@@ -7,11 +7,11 @@ import {
 
 /** Main's password-reset email over the process's mail member; mail off skips it. */
 export class SesPasswordResetMailChannel extends PasswordResetMailChannel {
-  static create(input: { mailer: EmailDelivery }): SesPasswordResetMailChannel {
+  static create(input: { mailer: MailSender }): SesPasswordResetMailChannel {
     return new SesPasswordResetMailChannel(input.mailer);
   }
 
-  private constructor(private readonly mailer: EmailDelivery) {
+  private constructor(private readonly mailer: MailSender) {
     super();
   }
 

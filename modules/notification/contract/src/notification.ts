@@ -60,3 +60,27 @@ export const mailDeliveryViewSchema = z
   .strict();
 
 export type MailDeliveryView = z.infer<typeof mailDeliveryViewSchema>;
+
+/** A file carried with a message, such as a licence key. */
+export const emailAttachmentSchema = z
+  .object({ filename: z.string().min(1), content: z.string(), contentType: z.string().min(1) })
+  .strict();
+
+/**
+ * One transactional message, already rendered. Notification writes the envelope: `to` is the
+ * visible recipient, `undisclosedRecipients` are delivered without appearing in any header,
+ * and `unsubscribe` becomes the RFC 8058 one-click pair.
+ */
+export const sendEmailCommandSchema = z
+  .object({
+    to: z.union([z.string().min(1), z.array(z.string().min(1))]),
+    subject: z.string(),
+    html: z.string(),
+    from: z.string().optional(),
+    undisclosedRecipients: z.array(z.string().min(1)).optional(),
+    unsubscribe: z.object({ url: z.string().url() }).strict().optional(),
+    attachments: z.array(emailAttachmentSchema).optional(),
+  })
+  .strict();
+
+export type SendEmailCommand = z.infer<typeof sendEmailCommandSchema>;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import { DetailTable, EmailLayout, Muted, Paragraph, PrimaryButton } from "./email-layout.tsx";
 import { readableDate } from "./readable-date.ts";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
@@ -110,7 +110,7 @@ export const ssoDomainProofWaveringTemplate = defineTemplate({
 export const sendSsoDomainProofWaveringEmail = async ({
   mailer,
   ...props
-}: SsoDomainProofWaveringProps & { mailer: EmailDelivery }) => {
+}: SsoDomainProofWaveringProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(ssoDomainProofWaveringTemplate, props);
   await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
 };
@@ -177,7 +177,7 @@ export const ssoDomainProofLapsedTemplate = defineTemplate({
 export const sendSsoDomainProofLapsedEmail = async ({
   mailer,
   ...props
-}: SsoDomainProofLapsedProps & { mailer: EmailDelivery }) => {
+}: SsoDomainProofLapsedProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(ssoDomainProofLapsedTemplate, props);
   await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
 };

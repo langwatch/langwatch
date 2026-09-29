@@ -1,6 +1,8 @@
-import type { MailDeliveryView } from "@langwatch/notification-contract";
+import type { MailDeliveryView, SendEmailCommand } from "@langwatch/notification-contract";
 
 import {
+  type EmailContent,
+  type EmailDelivery,
   EmailProviderConfigurationError,
   type EmailProviderName,
   type MailGatewaySettings,
@@ -9,19 +11,27 @@ import { emailGatewayChannels } from "../channels/email-gateway-channels.registr
 import { EmailProviderService } from "./email-provider.service.ts";
 
 /**
- * How mail leaves this install, for the checkup: the gateway named, and
- * whether the SMTP relay answers. Settings resolve on first ask, since the
- * credentials among them come through the secrets chain.
+ * How mail leaves this install: the one sender every module's mail goes through,
+ * the gateway the checkup reports, and whether the SMTP relay answers.
  */
 export class MailDeliveryService {
-  private constructor(private readonly settings: () => Promise<MailGatewaySettings>) {}
+  private constructor(
+    private readonly settings: () => Promise<MailGatewaySettings>,
+    private readonly delivery: EmailDelivery,
+  ) {}
 
   static create({
     settings,
+    delivery,
   }: {
     settings: () => Promise<MailGatewaySettings>;
+    delivery: EmailDelivery;
   }): MailDeliveryService {
-    return new MailDeliveryService(settings);
+    return new MailDeliveryService(settings, delivery);
+  }
+
+  async sendEmail(command: SendEmailCommand): Promise<void> {
+    await this.delivery.send(envelopeOf(command));
   }
 
   async getView(): Promise<MailDeliveryView> {
@@ -60,4 +70,21 @@ function readProviderChoice(settings: MailGatewaySettings): {
     }
     throw error;
   }
+}
+
+/** The message as a gateway sends it; the one-click pair is RFC 8058's, as main wrote it. */
+function envelopeOf(command: SendEmailCommand): EmailContent {
+  const { undisclosedRecipients, unsubscribe, ...message } = command;
+  return {
+    ...message,
+    ...(undisclosedRecipients === undefined ? {} : { bcc: undisclosedRecipients }),
+    ...(unsubscribe === undefined
+      ? {}
+      : {
+          headers: {
+            "List-Unsubscribe": `<${unsubscribe.url}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        }),
+  };
 }

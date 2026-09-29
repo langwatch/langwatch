@@ -63,7 +63,7 @@ import {
   SignInMethodPolicyService,
 } from "@langwatch/identity-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
+import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -176,7 +176,7 @@ const AUTH_CLOSED_READS = reads(
 
 /**
  * Process-supplied infrastructure. Declared members required at boot;
- * front-door features need identity, organization, and mail peers.
+ * front-door features need identity, organization, and notification peers.
  */
 export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
   Readonly<{
@@ -189,8 +189,6 @@ export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
      * service — the session read then falls back to the stored user's own
      * address, which is the documented chain, not a degraded one. */
     identityEmails: IdentityEmailService | undefined;
-    /** The process mail member the sign-up link goes out through; mail off skips each send. */
-    mail: EmailDelivery;
     /** The invitation reads, or nothing where this process composed none. */
     invites: AuthInviteDirectory | null;
     /** Whether this is the hosted product: the process's own fact, supplied
@@ -257,7 +255,6 @@ export class AuthApp implements AuthApiContract {
     "publicBaseUrl",
     "isSaas",
     "nodeEnvironment",
-    "mail",
   ] as const;
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
@@ -420,6 +417,8 @@ export class AuthApp implements AuthApiContract {
 
   static async create(setup: AuthSetup): Promise<AuthApp> {
     const { members, repositories, dependencies, config } = setup;
+    /** Every mail auth sends goes out through notification, which owns the gateway. */
+    const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
     const now = members.now ?? nowInstant;
     const accountRows = PrismaBetterAuthHooksRepository.create(members.prisma);
 
@@ -459,6 +458,7 @@ export class AuthApp implements AuthApiContract {
       },
       signUp: buildSignUpVerification({
         members,
+        mailer,
         repositories,
         now,
         users: dependencies.users,
@@ -616,7 +616,7 @@ export class AuthApp implements AuthApiContract {
             grants: dependencies.authz,
             organizations: dependencies.organizations,
             sendResetPassword: passwordResetSender({
-              mail: passwordResetMailChannels.ses.create({ mailer: members.mail }),
+              mail: passwordResetMailChannels.ses.create({ mailer }),
               publicBaseUrl: members.publicBaseUrl,
               processName: members.processName,
             }),
@@ -1100,6 +1100,7 @@ export class AuthApp implements AuthApiContract {
 /** The ceremony this process can run, or nothing where it has no public base URL to link to. */
 function buildSignUpVerification({
   members,
+  mailer,
   repositories,
   now,
   users,
@@ -1108,6 +1109,7 @@ function buildSignUpVerification({
   isEmailUnconfigured,
 }: {
   members: AuthInfrastructure;
+  mailer: MailSender;
   repositories: AuthRepositories;
   now: () => Instant;
   users: UserApi;
@@ -1120,7 +1122,7 @@ function buildSignUpVerification({
 
   return SignUpVerificationService.create({
     tokens: repositories.signUpTokens,
-    mailer: signUpVerificationMailChannels.ses.create({ mailer: members.mail }),
+    mailer: signUpVerificationMailChannels.ses.create({ mailer }),
     users,
     route,
     isWithinBudget,

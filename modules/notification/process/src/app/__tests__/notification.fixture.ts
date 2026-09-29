@@ -17,6 +17,7 @@ export function createNotificationTestApp(
   return NotificationApp.create({
     repositories: input.repositories ?? MemoryNotificationRepositories.create(),
     dependencies: {},
+    members: { publicBaseUrl: undefined },
     config: {
       defaultFrom: undefined,
       provider: undefined,

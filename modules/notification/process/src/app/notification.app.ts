@@ -9,17 +9,28 @@ import {
   type Notification,
   type NotificationRecentQuery,
   type NotificationServerConfig,
+  type SendEmailCommand,
+  sendEmailCommandSchema,
 } from "@langwatch/notification-contract";
 import { Secret } from "@langwatch/secrets";
 
-import type { MailGatewaySettings } from "../channels/email-delivery.channel.ts";
+import {
+  type MailGatewaySettings,
+  resolveDefaultFrom,
+} from "../channels/email-delivery.channel.ts";
+import { emailGatewayOpener } from "../channels/email-gateway-channels.registry.ts";
+import { directSesClientConfiguration } from "../channels/ses/ses.email-gateway.channel.ts";
 import type { NotificationRepositories } from "../repositories/notification.repositories.ts";
+import { EmailDeliveryService } from "../services/email-delivery.service.ts";
 import { MailDeliveryService } from "../services/mail-delivery.service.ts";
 import { NotificationService } from "../services/notification.service.ts";
 
+/** The public base URL is the process's own; the sender address is derived from it when unnamed. */
+type NotificationMembers = Readonly<{ publicBaseUrl: string | undefined }>;
+
 type NotificationSetup = FeatureSetup<
   typeof NotificationApp.dependencies,
-  never,
+  NotificationMembers,
   NotificationServerConfig,
   NotificationRepositories
 >;
@@ -27,6 +38,7 @@ type NotificationSetup = FeatureSetup<
 export class NotificationApp implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
+  static readonly reads = ["publicBaseUrl"] as const;
   static readonly config = notificationConfig;
   static readonly publicConfig = notificationBrowserConfig.project;
   /** Resolved while the module constructs, before boot seals them. */
@@ -49,9 +61,27 @@ export class NotificationApp implements NotificationApiContract {
     repositories,
     config,
     secrets,
+    members,
+    resources,
   }: NotificationSetup): Promise<NotificationApp> {
     const settings = await mailGatewaySettings({ config, secrets });
-    const mailDelivery = MailDeliveryService.create({ settings: async () => settings });
+    const configuration = {
+      ...settings,
+      defaultFrom: resolveDefaultFrom({
+        ...(config.defaultFrom === undefined ? {} : { emailDefaultFrom: config.defaultFrom }),
+        baseHost: members.publicBaseUrl ?? "",
+      }),
+    };
+    const delivery = EmailDeliveryService.create({
+      configuration,
+      openGateway: emailGatewayOpener({
+        configuration,
+        aws: directSesClientConfiguration,
+        outboundProxy: {},
+      }),
+    });
+    resources.own("Notification mail gateway", () => delivery.close());
+    const mailDelivery = MailDeliveryService.create({ settings: async () => settings, delivery });
     return new NotificationApp(repositories, mailDelivery);
   }
 
@@ -69,6 +99,10 @@ export class NotificationApp implements NotificationApiContract {
 
   verifySmtp(): Promise<void> {
     return this.#mailDelivery.verifySmtp();
+  }
+
+  sendEmail(input: SendEmailCommand): Promise<void> {
+    return this.#mailDelivery.sendEmail(sendEmailCommandSchema.parse(input));
   }
 }
 

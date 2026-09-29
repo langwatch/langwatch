@@ -2,7 +2,7 @@ import { Section, Text } from "@react-email/components";
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import {
   ActionRow,
   EmailLayout,
@@ -353,7 +353,7 @@ export const sendUsageLimitEmail = async ({
   mailer,
   to,
   ...props
-}: UsageLimitEmailProps & { to: string; mailer: EmailDelivery }) => {
+}: UsageLimitEmailProps & { to: string; mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(usageLimitEmailTemplate, props);
   await sendEmail({ mailer, content: { to, subject, html } });
 };

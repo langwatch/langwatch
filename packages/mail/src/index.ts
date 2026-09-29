@@ -13,6 +13,7 @@ export {
   type EmailProviderName,
   type EmailProvider,
   type MailerConfiguration,
+  type MailSender,
 } from "./providers/types.ts";
 export { hasEmailProvider, resolveEmailProviderName } from "./providers/index.ts";
 export {

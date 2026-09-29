@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
@@ -63,7 +63,7 @@ export const addressConfirmationEmailTemplate = defineTemplate({
 export const sendAddressConfirmationEmail = async ({
   mailer,
   ...props
-}: AddressConfirmationEmailProps & { mailer: EmailDelivery }) => {
+}: AddressConfirmationEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(addressConfirmationEmailTemplate, props);
   await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };

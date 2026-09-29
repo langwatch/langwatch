@@ -109,7 +109,6 @@ describe("given a Resend deployment with no API key", () => {
 
 describe("given the vendor rejects a send", () => {
   describe("when the response is not ok", () => {
-    /** @scenario "A deployment with no provider composes and fails only at send time" */
     it("raises the status without reading a body that echoes recipients", async () => {
       const cancel = vi.fn().mockResolvedValue(undefined);
       const json = vi.fn();

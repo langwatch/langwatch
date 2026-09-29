@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import { DataTable, EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
@@ -106,7 +106,7 @@ export const inviteReRequestEmailTemplate = defineTemplate({
 export const sendInviteReRequestEmail = async ({
   mailer,
   ...props
-}: InviteReRequestEmailProps & { mailer: EmailDelivery }) => {
+}: InviteReRequestEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(inviteReRequestEmailTemplate, props);
   await sendEmail({ mailer, content: { to: props.adminEmail, subject, html } });
 };

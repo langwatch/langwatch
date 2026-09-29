@@ -14,8 +14,8 @@ Feature: Composing outbound mail delivery
 
   A deployment with no email provider configured is an ordinary self-hosted
   install, not an error. Such a graph still composes, still mounts every
-  pipeline, and fails at the moment of a send — which the notification fan-outs
-  survive, because the durable fact is the request and never the courtesy.
+  pipeline, and skips each send with one warning naming the subject it did not
+  send (ARCHITECTURE.md §6: mail off is a state).
 
   @unit
   Scenario: The gateway named by the deployment is the one that sends
@@ -32,11 +32,11 @@ Feature: Composing outbound mail delivery
     And no other configured gateway is used in its place
 
   @unit
-  Scenario: A deployment with no provider composes and fails only at send time
+  Scenario: A deployment with no provider composes and skips each send
     Given a mailer configuration with no provider settings at all
     When the delivery capability is composed
     Then composition succeeds
-    And a send fails without naming any internal detail
+    And a send is skipped rather than failed
 
   @unit
   Scenario: Blind recipients never reach the rendered headers

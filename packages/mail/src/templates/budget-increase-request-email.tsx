@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import {
   DataTable,
   DetailTable,
@@ -162,7 +162,7 @@ export const sendBudgetIncreaseRequestEmail = async ({
   mailer,
   to,
   ...props
-}: SendBudgetIncreaseRequestEmailInput & { mailer: EmailDelivery }): Promise<void> => {
+}: SendBudgetIncreaseRequestEmailInput & { mailer: MailSender }): Promise<void> => {
   const { subject, html } = await renderMailTemplate(budgetIncreaseRequestEmailTemplate, props);
   await sendEmail({ mailer, content: { to, subject, html } });
 };

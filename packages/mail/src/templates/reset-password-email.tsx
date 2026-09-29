@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
@@ -46,7 +46,7 @@ export const resetPasswordEmailTemplate = defineTemplate({
 export const sendResetPasswordEmail = async ({
   mailer,
   ...props
-}: ResetPasswordEmailProps & { mailer: EmailDelivery }) => {
+}: ResetPasswordEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(resetPasswordEmailTemplate, props);
   await sendEmail({ mailer, content: { to: props.email, subject, html } });
 };

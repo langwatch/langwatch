@@ -1,4 +1,4 @@
-import { sendSignUpVerificationEmail, type EmailDelivery } from "@langwatch/mail";
+import { sendSignUpVerificationEmail, type MailSender } from "@langwatch/mail";
 
 import {
   type SignUpVerificationLink,
@@ -7,11 +7,11 @@ import {
 
 /** Main's sign-up verification email over the process's mail member; mail off skips it. */
 export class SesSignUpVerificationMailChannel extends SignUpVerificationMailChannel {
-  static create(input: { mailer: EmailDelivery }): SesSignUpVerificationMailChannel {
+  static create(input: { mailer: MailSender }): SesSignUpVerificationMailChannel {
     return new SesSignUpVerificationMailChannel(input.mailer);
   }
 
-  private constructor(private readonly mailer: EmailDelivery) {
+  private constructor(private readonly mailer: MailSender) {
     super();
   }
 

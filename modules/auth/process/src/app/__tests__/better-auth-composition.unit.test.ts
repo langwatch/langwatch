@@ -14,7 +14,6 @@ import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-con
  */
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
-import type { EmailDelivery } from "@langwatch/mail";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -109,7 +108,6 @@ async function appFor(
       },
       publicBaseUrl: undefined,
       identityEmails: undefined as never,
-      mail: createApiFixture<EmailDelivery>(),
       invites: null,
       isSaas: false,
       nodeEnvironment: undefined,

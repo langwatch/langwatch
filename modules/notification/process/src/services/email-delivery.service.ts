@@ -12,8 +12,8 @@ import { EmailProviderService } from "./email-provider.service.ts";
 const logger = createLogger("langwatch:mailer:runtime");
 
 /**
- * Per-executable mail delivery; gateway resolved on first send (not construction)
- * to allow deployments without email provider. Send failures must be survived.
+ * Per-executable mail delivery; gateway resolved on first send (not construction).
+ * Mail off is a state (ARCHITECTURE.md §6): each send is skipped with one warning.
  */
 export class EmailDeliveryService extends EmailDelivery {
   static create(input: {
@@ -42,8 +42,11 @@ export class EmailDeliveryService extends EmailDelivery {
     this.ensureOpen();
     const gateway = this.resolveGateway();
     if (!gateway) {
-      logger.error("No email sending method available. Skipping email sending.");
-      throw new Error("No email sending method available. Skipping email sending.");
+      logger.warn(
+        { subject: content.subject },
+        `Email is not configured on this install, so "${content.subject}" was not sent`,
+      );
+      return undefined;
     }
     return gateway.send({ content, defaultFrom: this.configuration.defaultFrom });
   }

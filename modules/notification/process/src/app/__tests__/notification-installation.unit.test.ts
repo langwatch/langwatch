@@ -12,6 +12,7 @@ function process(
 ) {
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(notificationServer)])
+    .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withConfig({
       notification: {
         defaultFrom: undefined,

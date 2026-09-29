@@ -1,4 +1,4 @@
-import type { EmailContent, EmailDelivery } from "./providers/types.ts";
+import type { EmailContent, EmailDelivery, MailSender } from "./providers/types.ts";
 
 export const computeDefaultFrom = (mailer: EmailDelivery): string => mailer.defaultFrom();
 
@@ -6,7 +6,7 @@ export const sendEmail = async ({
   mailer,
   content,
 }: {
-  mailer: EmailDelivery;
+  mailer: MailSender;
   content: EmailContent;
 }) => {
   return mailer.send(content);

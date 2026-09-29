@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { sendEmail } from "../email-sender.ts";
-import type { EmailDelivery } from "../providers/types.ts";
+import type { MailSender } from "../providers/types.ts";
 import { EmailLayout, Muted, Paragraph } from "./email-layout.tsx";
 import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
@@ -76,7 +76,7 @@ export const organizationMfaRequirementEmailTemplate = defineTemplate({
 export const sendOrganizationMfaRequirementEmail = async ({
   mailer,
   ...props
-}: OrganizationMfaRequirementEmailProps & { mailer: EmailDelivery }) => {
+}: OrganizationMfaRequirementEmailProps & { mailer: MailSender }) => {
   const { subject, html } = await renderMailTemplate(
     organizationMfaRequirementEmailTemplate,
     props,
