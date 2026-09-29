@@ -70,17 +70,21 @@ orchestrator and lanes run on Opus 5.5 (`claude-opus-5-5`), with effort pinned
 by the agent type you spawn, so the spawn is the enforcement. Sonnet and
 Haiku remain for really simple work, to save usage:
 
-| Agent type         | Effort | Use for                                                                                                 |
-| ------------------ | ------ | ------------------------------------------------------------------------------------------------------- |
-| `lane-opus`        | high   | Architecture decisions, cross-module integration, security-bearing ports, difficult debugging, review.  |
-| `lane-opus-medium` | medium | Scoped module ports onto an established exemplar, pattern-following UI, transport declarations, sweeps. |
-| `lane-opus-low`    | low    | Renames, one-line wiring, inventories, formatting-only and other mechanical checks.                     |
-| `lane` + `sonnet`  | -      | Really simple work, to save usage: a mechanical port with no judgement left, a straightforward test.    |
-| `lane` + `haiku`   | -      | The simplest: file inventories, narrow validation, formatting, repetitive checks.                       |
+| Agent type           | Effort | Use for                                                                                                 |
+| -------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| `lane-opus`          | high   | Architecture decisions, cross-module integration, security-bearing ports, difficult debugging, review.  |
+| `lane-opus-medium`   | medium | Scoped module ports onto an established exemplar, pattern-following UI, transport declarations, sweeps. |
+| `lane-opus-low`      | low    | Renames, one-line wiring, inventories, formatting-only and other mechanical checks.                     |
+| `lane-sonnet`        | high   | Sonnet 5.5: big implementation lanes, scoped fixes, flow and test-id work.                              |
+| `lane-sonnet-medium` | medium | Sonnet 5.5: pattern-following UI, test-id sweeps, probe cases.                                          |
+| `lane-sonnet-low`    | low    | Sonnet 5.5: renames, one-line wiring, formatting-only work.                                             |
+| `lane` + `haiku`     | -      | The simplest: file inventories, narrow validation, formatting, repetitive checks.                       |
 
 Opus 5.5 is the default; reach for Sonnet or Haiku only when the task has no
 judgement left in it. A manifest's `Model:` line names one of these. Opus 5.5 needs
 Claude Code 2.1.280 or newer; an older CLI refuses the model at the API.
+Spawn the `lane-sonnet*` agents with no model parameter: `model: "sonnet"` overrides
+the pinned Sonnet 5.5 down to Sonnet 5 (Alex, 2026-09-29).
 
 **How to spawn one.** Write the manifest, then add the lane's row to
 `.claude/coordinator/LANES.md` **before** the Agent call - a lane spawned and
