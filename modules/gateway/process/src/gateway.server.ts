@@ -55,7 +55,7 @@ export const gatewayServer = defineServerModule("gateway")
     return [
       // The gateway control plane is signed rather than bearer-authenticated.
       // It owns the same declared secret as the data-plane client.
-      bindRestCredential("internalSecret", () => app.internalDoor),
+      bindRestCredential("internalSecret", () => app.internalDoor()),
       // The callback arrives publicly and the application verifies the raw bytes
       // against the provider row's own stored secret, so the header is all the
       // transport carries.

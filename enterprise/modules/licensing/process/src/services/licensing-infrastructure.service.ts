@@ -1,4 +1,3 @@
-import type { RestIdentity } from "@langwatch/api/rest";
 import type { SeatChangeBillingOutcome } from "@langwatch/enterprise-licensing-contract";
 
 import type { LicensingInfrastructure } from "../app/licensing.app.ts";
@@ -131,7 +130,7 @@ export class LicensingInfrastructureService {
   }
 
   /** Every hosted collaborator refuses rather than reading as "entitled to nothing". */
-  unavailableHostedServices(): HostedServicesInfrastructure & { door: RestIdentity } {
+  unavailableHostedServices(): HostedServicesInfrastructure {
     const unavailable = () =>
       new Error(`${this.processName} does not compose the hosted Connect services`);
     const refuse = () => Promise.reject(unavailable());
@@ -145,7 +144,6 @@ export class LicensingInfrastructureService {
         },
       },
       spend: { recordSpend: refuse },
-      door: this.unavailableHostedDoor(),
     };
   }
 
@@ -168,13 +166,5 @@ export class LicensingInfrastructureService {
       organizations: { findById: refuse },
       optionalReportKeys: new Set(),
     };
-  }
-
-  /** A call reaching the path is refused by name, not by a missing credential binding. */
-  private unavailableHostedDoor(): RestIdentity {
-    const refuse = (): never => {
-      throw new Error(`${this.processName} does not compose the hosted Connect door`);
-    };
-    return { authenticate: refuse, identify: refuse, identifyOptional: refuse, authorize: refuse };
   }
 }

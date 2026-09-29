@@ -3,6 +3,7 @@
  * call, plus the one budget-resolution read the spend graph makes. Replaces
  * the abstract `GatewayService` — an interface plus its token, not a class.
  */
+import type { RestIdentity } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 import type { z } from "zod";
@@ -468,6 +469,11 @@ export interface GatewaySpendDay {
 }
 
 export interface GatewayApi extends GatewayInternalProtocol {
+  /**
+   * The door that verifies the Go data plane's signed calls. A peer family the
+   * data plane also calls (the hosted Connect routes) binds it, not a copy.
+   */
+  internalDoor(): RestIdentity;
   getAgentCacheEntry(input: {
     projectId: string;
     name: string;

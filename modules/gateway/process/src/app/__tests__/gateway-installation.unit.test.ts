@@ -143,7 +143,7 @@ describe("gateway app installation", () => {
 
         expect(GatewayApp.contract).toBe(GatewayApi);
         expect(spendFamilyIsWhole).toBe(true);
-        expect(credential.resolveIdentity()).toBe(app.internalDoor);
+        expect(credential.resolveIdentity()).toBe(app.internalDoor());
 
         const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
         const runtime = RestHost.create({

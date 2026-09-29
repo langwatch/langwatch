@@ -185,6 +185,23 @@ Feature: Enterprise licensing lifecycle
       When a connected install reads its hosted usage
       Then each budget's spend is unknown rather than zero
 
+  Rule: The hosted Connect routes answer behind the gateway's own signed-call door
+
+    Main mounted the hosted routes behind the gateway's signature check. The gateway hands its
+    door out through its Api, so the hosted family verifies the same signature, never a copy.
+
+    @unit
+    Scenario: A hosted call with a bad signature is refused before any route runs
+      Given the Go data plane's call is not signed with the gateway's secret
+      When it reaches a hosted Connect route
+      Then it is refused as unauthenticated and no licence is read
+
+    @unit
+    Scenario: A signed hosted call from a key without a licence is refused by its code
+      Given a correctly signed hosted call from a key no licence carries
+      When it asks for a hosted judgement
+      Then it passes the gateway's door and is refused as connect_service_not_entitled
+
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

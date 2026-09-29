@@ -1,5 +1,4 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type { RestIdentity } from "@langwatch/api/rest";
 /**
  * The licensing feature's application: what both of its doors call. It holds every service and
  * port the feature's api files reach, and it is the one typed thing a transport is given.
@@ -161,8 +160,8 @@ export type LicensingInfrastructure = Readonly<{
    */
   registry?: LicenseRegistryInfrastructure;
   /**
-   * The hosted end of Connect (ADR-156, section 5). Only LangWatch Cloud
-   * composes one; everywhere else the hosted operations refuse by name.
+   * The hosted end of Connect (ADR-156, section 5), composed from its owners on
+   * every deployment; each licence's entitlements still gate its services.
    */
   hosted?: HostedServicesInfrastructure;
   /** The registry of self-hosted installs (ADR-156, section 10); else derived from the stores. */
@@ -245,7 +244,6 @@ export class LicensingApp implements LicensingApiContract {
   readonly #activation: ActivationCodeService;
   readonly #hosted: HostedServicesService;
   readonly #hostedSpend: ConnectSpendBufferService;
-  readonly #hostedDoor: RestIdentity | undefined;
   readonly #instances: SelfHostedInstanceService;
   readonly #install: ConnectInstallService;
   readonly #identity: InstanceIdentityService;
@@ -285,7 +283,6 @@ export class LicensingApp implements LicensingApiContract {
     this.#activation = registry.activation;
     this.#hosted = registry.hosted;
     this.#hostedSpend = registry.spend;
-    this.#hostedDoor = registry.door;
     this.#instances = registry.instances;
     this.#install = install.install;
     this.#identity = install.identity;
@@ -766,16 +763,6 @@ export class LicensingApp implements LicensingApiContract {
   flushHostedSpend(): Promise<void> {
     return this.#hostedSpend.flush();
   }
-
-  /** The signed door the hosted Connect family answers behind. */
-  get hostedDoor(): RestIdentity {
-    return (
-      this.#hostedDoor ??
-      LicensingInfrastructureService.create({
-        processName: "this process",
-      }).unavailableHostedServices().door
-    );
-  }
 }
 
 /** What the registry and the hosted routes resolve to together. */
@@ -787,7 +774,6 @@ type LicenseRegistryParts = Readonly<{
   activation: ActivationCodeService;
   hosted: HostedServicesService;
   spend: ConnectSpendBufferService;
-  door: RestIdentity | undefined;
   instances: SelfHostedInstanceService;
 }>;
 
@@ -840,7 +826,6 @@ function licenseRegistryParts({
     contractBudgets,
     registry,
     spend,
-    door: hosted.door,
     instances: SelfHostedInstanceService.create({
       repository: instances.repository,
       licenses: instances.licenses,
@@ -957,7 +942,7 @@ function licenseRegistryOverPrisma({
 /**
  * The hosted end of Connect composed from its owners, as main composed it on every deployment:
  * instant-eval judges, prices and records the spend, and the gateway keeps the budgets. The door
- * is not composed here, so the family still refuses by name until the gateway's is shared.
+ * the family answers behind is the gateway's own, bound in licensing.server.ts.
  */
 function hostedServicesOverPeers({
   gateway,

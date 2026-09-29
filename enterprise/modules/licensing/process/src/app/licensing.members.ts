@@ -1,4 +1,3 @@
-import type { RestIdentity } from "@langwatch/api/rest";
 import type {
   ConnectService,
   HostedCaller,
@@ -169,20 +168,15 @@ export interface HostedSpendRecorder {
 }
 
 /**
- * The hosted end of Connect (ADR-156, section 5): only LangWatch Cloud
- * composes one. An install has no hosted routes, and its operations refuse by
- * name rather than answering an empty entitlement.
+ * The hosted end of Connect (ADR-156, section 5), composed on every deployment.
+ * A process composing none refuses its operations by name rather than
+ * answering an empty entitlement.
  */
 export type HostedServicesInfrastructure = Readonly<{
   budgets: ContractBudgetStore;
   usage: HostedUsageReader;
   judge: HostedJudge;
   spend: HostedSpendRecorder;
-  /**
-   * The door the Go data plane's signed calls arrive at. The signing scheme is
-   * the gateway's own, so the identity is supplied rather than rebuilt here.
-   */
-  door?: RestIdentity;
 }>;
 
 /**

@@ -1026,7 +1026,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     }
   }
 
-  get internalDoor(): RestIdentity {
+  internalDoor(): RestIdentity {
     return this.#internalDoor;
   }
 

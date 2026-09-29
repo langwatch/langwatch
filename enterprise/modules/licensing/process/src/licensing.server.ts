@@ -13,13 +13,9 @@ export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.
 export const licensingServer = defineServerModule("licensing")
   .withApp(LicensingApp)
   .withTransports(licenseTrpcTransport, connectTrpcTransport, connectHostedRest, connectHostRest)
-  .withTransportFacts(({ app }) => {
-    if (!(app instanceof LicensingApp)) {
-      throw new TypeError("The hosted Connect family requires its constructed application");
-    }
-
-    // The signing scheme is the gateway's own, so the door travels in rather
-    // than being rebuilt here; a process composing none refuses by name.
-    return [bindRestCredential("internalSecret", () => app.hostedDoor)];
-  })
+  // The Go data plane signs hosted calls with the gateway's own secret, so the
+  // family answers behind the gateway's door rather than a rebuilt one.
+  .withTransportFacts(({ dependencies }) => [
+    bindRestCredential("internalSecret", () => dependencies.gateway.internalDoor()),
+  ])
   .withEventing(licenseSyncEventing);
