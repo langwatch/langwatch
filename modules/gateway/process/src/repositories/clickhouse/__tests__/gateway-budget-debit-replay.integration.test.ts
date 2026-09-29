@@ -126,7 +126,7 @@ describe.skipIf(!chUrl)("given a debit whose crossing could not be recorded", ()
       const client = createTestClickHouseClient(chUrl!);
       const result = await client.query({
         query:
-          "SELECT count() AS rows FROM gateway_budget_ledger_events WHERE TenantId = {tenant:String} AND GatewayRequestId = {request:String}",
+          "SELECT toString(count()) AS rows FROM gateway_budget_ledger_events WHERE TenantId = {tenant:String} AND GatewayRequestId = {request:String}",
         query_params: { tenant: TENANT_ID, request: REQUEST_ID },
         format: "JSONEachRow",
       });

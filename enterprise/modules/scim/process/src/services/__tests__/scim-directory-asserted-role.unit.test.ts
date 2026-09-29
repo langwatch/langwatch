@@ -93,8 +93,8 @@ async function push(service: ScimService): Promise<void> {
 }
 
 describe("the membership role a SCIM push writes", () => {
-  /** @scenario Membership is no longer a fixed role written beside the grant */
   describe("given SCIM v2 grants and a SCIM group mapped ADMIN at organization scope", () => {
+    /** @scenario Membership is no longer a fixed role written beside the grant */
     it("creates an ADMIN member", async () => {
       const repository = scimRepositoryFixture({
         findDirectoryAssertedRoles: vi.fn(async () => ["MEMBER", "ADMIN"]),
