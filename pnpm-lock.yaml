@@ -3250,6 +3250,9 @@ importers:
 
   enterprise/modules/licensing/process:
     dependencies:
+      '@langwatch/actor':
+        specifier: workspace:*
+        version: link:../../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
@@ -3271,6 +3274,9 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../../../modules/instant-eval/contract
+      '@langwatch/internal-slack':
+        specifier: workspace:*
+        version: link:../../../../packages/internal-slack
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
@@ -3292,12 +3298,18 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/project/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/user/contract
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2)
