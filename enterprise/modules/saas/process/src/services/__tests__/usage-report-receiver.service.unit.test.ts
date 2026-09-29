@@ -84,6 +84,29 @@ describe("UsageReportReceiverService", () => {
       ]);
     });
 
+    it("keeps a schema version 4 report's ops health as a known field", async () => {
+      recorded.length = 0;
+      const opsHealth = {
+        snapshot_at: "2026-09-29T11:59:00.000Z",
+        failed_jobs_total: 4,
+        queues: { "event-sourcing": { pending_jobs: 7, dead_letters: 2 } },
+        pipelines: null,
+        migrations: {},
+      };
+      const { receiver, analytics } = setup();
+
+      await receiver.receive(report({ report_schema_version: 4, ops_health: opsHealth }));
+
+      expect(recorded[0]).toMatchObject({
+        properties: { report_schema_version: 4, ops_health: opsHealth },
+        unknownFields: 0,
+      });
+      expect(analytics.captured[0]?.properties).toMatchObject({
+        ops_health: opsHealth,
+        unknown_fields: 0,
+      });
+    });
+
     /** @scenario "A report the registry cannot store is still accepted" */
     /** @scenario "Storage failing never refuses the report" */
     it("answers the report and logs when the registry fails", async () => {

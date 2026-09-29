@@ -291,3 +291,51 @@ describe("given an install with two organizations", () => {
     });
   });
 });
+
+describe("given a process that composes ops health", () => {
+  const OPS_HEALTH = {
+    snapshot_at: "2026-09-21T11:59:00.000Z",
+    failed_jobs_total: 4,
+    queues: { "event-sourcing": { pending_jobs: 7, dead_letters: 2 } },
+    pipelines: {},
+    migrations: {},
+  };
+  const withOpsHealth = (switches: UsageReportCollectInput["switches"]) =>
+    UsageReportCollectionService.create({
+      peers: state.peers(),
+      deployment: () => ({
+        version: "3.17.0",
+        installMethod: "helm",
+        chartVersion: undefined,
+        environment: "production",
+        hostname: "langwatch.acme.test",
+      }),
+      opsHealth: { read: async () => OPS_HEALTH },
+    }).collect({
+      organizationIds: ["org-1"],
+      instanceId: INSTANCE_ID,
+      firstSeenAt: undefined,
+      connected: false,
+      now: NOW,
+      switches,
+    });
+
+  describe("when the report is taken with the optional category on", () => {
+    /** @scenario "The report carries the install's ops health as counts" */
+    it("carries it under ops_health", async () => {
+      const payload = await withOpsHealth({ optional: true, hostname: true });
+
+      expect(payload.ops_health).toEqual(OPS_HEALTH);
+    });
+  });
+
+  describe("when the customer switched the optional category off", () => {
+    /** @scenario "Ops health is part of the optional category" */
+    it("leaves ops health out with the rest of the category", async () => {
+      const payload = await withOpsHealth({ optional: false, hostname: true });
+
+      expect(payload.ops_health).toBeUndefined();
+      expect(payload.version).toBe("3.17.0");
+    });
+  });
+});

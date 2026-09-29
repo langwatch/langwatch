@@ -168,6 +168,51 @@ Feature: The checkup page of a self-hosted install
     When the usage report preview is taken
     Then the preview carries no optional field
 
+  # Ops health: counts the ops dashboard, the process explorer and the
+  # migrations page already read, so LangWatch can see an install struggling.
+
+  @unit
+  Scenario: The report carries the install's ops health as counts
+    Given the ops pages read a queue backlog, dead letters, a blocked group, a stalled process and a parked migration
+    When the usage report is taken with the optional category on
+    Then the report carries ops_health
+    And it counts pending jobs and dead letters per queue, by our own queue name
+    And it counts pending jobs, blocked groups, pending messages, dead letters and stalled processes per pipeline, by our own pipeline name
+    And it counts parked and rolled back organizations per in-place migration, by the migration's name
+    And it carries the failed job counter and when the dashboard last measured
+    And a queue, pipeline or migration with nothing wrong is left out
+
+  @unit
+  Scenario: Ops health carries no ids, payloads, error messages or tenant names
+    Given the ops pages read an error message, a group id and a parked tenant naming a project
+    When ops health is read for the report
+    Then it carries none of them, and no writer name either
+
+  @unit
+  Scenario: An unreadable ops health section is reported as unknown, not as healthy
+    Given the dashboard has no reading yet and the migrations cannot be read
+    When ops health is read for the report
+    Then those sections are null rather than empty
+    And the rest of the report still goes
+
+  @unit
+  Scenario: Ops health is part of the optional category
+    Given an administrator switches the optional category off
+    When the usage report is taken
+    Then the report carries no ops_health
+
+  @unit
+  Scenario: DISABLE_USAGE_STATS sends no ops health either
+    Given DISABLE_USAGE_STATS is set
+    When the daily report runs
+    Then ops health is not read
+    And nothing is posted
+
+  @unit
+  Scenario: The preview shows ops health like every other field
+    When the usage report preview is taken
+    Then the payload shows ops_health exactly as it would be posted
+
   @integration
   Scenario: The checkup page lists every row with its verdict
     When an administrator opens Settings, Checkup

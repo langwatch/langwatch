@@ -41,6 +41,7 @@ import {
   type ControlPlaneProbe,
   type ProviderTestOutcome,
 } from "./checkup.service.ts";
+import type { OpsHealthService } from "./ops-health.service.ts";
 import {
   UsageReportCollectionService,
   type UsageReportPeers,
@@ -86,6 +87,8 @@ export interface OpsCheckupDependencies {
     readonly redis: RedisHealthRepository;
   };
   readonly channels: { usageReport: UsageReportChannel; probes: CheckupProbeChannel };
+  /** The ops health the usage report carries; left out where the process composes none. */
+  readonly opsHealth?: Pick<OpsHealthService, "read">;
 }
 
 /** Who asks: an install admin reads every detail, anyone else their organization's verdicts. */
@@ -137,9 +140,11 @@ export class OpsCheckupService {
     peers,
     repositories,
     channels,
+    opsHealth,
   }: OpsCheckupDependencies): OpsCheckupService {
     const collection = UsageReportCollectionService.create({
       peers,
+      opsHealth,
       deployment: () => ({
         version: members.serviceVersion,
         installMethod: config.usageStats.installMethod ?? "self-hosted",

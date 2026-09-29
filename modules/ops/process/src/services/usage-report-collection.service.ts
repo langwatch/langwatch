@@ -30,6 +30,8 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { OpsHealthService } from "./ops-health.service.ts";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The report's word for each destination, as the field has always named it. */
@@ -79,6 +81,8 @@ export interface UsageReportPeers {
 export interface UsageReportCollectionServiceDependencies {
   readonly peers: UsageReportPeers;
   readonly deployment: () => UsageReportDeployment;
+  /** Left out of the report until the process composes it, like `gatewayConfigured`. */
+  readonly opsHealth?: Pick<OpsHealthService, "read">;
 }
 
 export interface UsageReportCollectInput {
@@ -253,7 +257,7 @@ export class UsageReportCollectionService {
     now: Instant;
   }): Promise<Record<string, unknown>> {
     const { peers } = this.deps;
-    const [stored, signedIn, domains, providers, ingested, mail, [storageBackend]] =
+    const [stored, signedIn, domains, providers, ingested, mail, [storageBackend], opsHealth] =
       await Promise.all([
         scope.projectIds.length > 0 ? this.stored(scope) : Promise.resolve({}),
         // An unexpired session is a recent sign-in; one person on four devices is one.
@@ -265,6 +269,7 @@ export class UsageReportCollectionService {
         this.ingested(scope),
         peers.mail.getMailDelivery(),
         this.findStorageBackends(scope),
+        this.deps.opsHealth?.read(),
       ]);
     const deployment = this.deps.deployment();
 
@@ -281,6 +286,7 @@ export class UsageReportCollectionService {
       ...(deployment.gatewayConfigured === undefined
         ? {}
         : { gateway_configured: deployment.gatewayConfigured }),
+      ...(opsHealth === undefined ? {} : { ops_health: opsHealth }),
     };
   }
 

@@ -12,6 +12,7 @@ import {
   type UsageField,
   type UsageFieldCategory,
   type UsageWindow,
+  usageReportOpsHealthSchema,
 } from "./usage-report.ts";
 
 export const USAGE_REPORT_DICTIONARY_DOC_PATH = "docs/self-hosting/usage-report-dictionary.mdx";
@@ -76,6 +77,22 @@ function categorySection(category: UsageFieldCategory): string[] {
   return lines;
 }
 
+/** What `ops_health` holds, one row per key, from the schema the report is built against. */
+function opsHealthSection(): string[] {
+  return [
+    "### Inside `ops_health`",
+    "",
+    "Optional, like the rest of this category. Counts only, keyed by LangWatch's own queue, pipeline and migration names: never an id, a payload, an error message, or a tenant or project name. A queue, pipeline or migration with nothing wrong is left out, and a section that could not be read is `null` rather than empty.",
+    "",
+    "| Key | What it counts |",
+    "|---|---|",
+    ...Object.entries(usageReportOpsHealthSchema.shape).map(
+      ([key, schema]) => `| \`${key}\` | ${escapeTableCell(schema.description ?? "")} |`,
+    ),
+    "",
+  ];
+}
+
 /** The whole page, frontmatter included. */
 export function renderUsageReportDictionaryPage(): string {
   const lines: string[] = [
@@ -102,6 +119,7 @@ export function renderUsageReportDictionaryPage(): string {
   for (const category of USAGE_FIELD_CATEGORIES) {
     lines.push(...categorySection(category));
   }
+  lines.push(...opsHealthSection());
 
   lines.push(
     "## Never collected",

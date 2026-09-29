@@ -44,7 +44,7 @@ export interface UsageField {
 }
 
 /** The version of this dictionary. */
-export const USAGE_REPORT_SCHEMA_VERSION = 3;
+export const USAGE_REPORT_SCHEMA_VERSION = 4;
 
 /** Every field, in the order the docs page lists them. */
 export const USAGE_FIELDS: readonly UsageField[] = [
@@ -459,6 +459,14 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     why: "Whether the AI gateway is set up, which decides whether model traffic is routed or only observed.",
     source: "LW_GATEWAY_BASE_URL",
   },
+  {
+    key: "ops_health",
+    category: "optional",
+    window: "point_in_time",
+    why: "Whether the install is struggling: waiting and dead jobs, blocked pipelines and parked migrations, counted under LangWatch's own names, so a problem is seen before its users report it.",
+    source:
+      "OpsHealthService over the ops dashboard snapshot, the process fleet and the migrations overview",
+  },
 ];
 
 /** A count in all three stretches of time. */
@@ -523,6 +531,49 @@ export const USAGE_NEVER_COLLECTED: readonly string[] = [
   "IP addresses",
   "API keys, model provider keys, or any other credential",
 ];
+
+const count = z.number().int().nonnegative();
+
+/** Named by our own queue, pipeline and migration names; never a tenant, an id or a message. */
+const byOwnName = <T extends z.ZodType>(entry: T) =>
+  z.record(z.string().max(200), entry).nullable();
+
+/**
+ * The install's ops health: counts the ops dashboard, the process explorer and the
+ * migrations page already read. Optional category; a null section is "could not read".
+ */
+export const usageReportOpsHealthSchema = z.object({
+  snapshot_at: z
+    .string()
+    .max(40)
+    .nullable()
+    .describe(
+      "When the ops dashboard last measured the queues, so a stale reading is not read as a fresh one. Null where no reading exists yet.",
+    ),
+  failed_jobs_total: count
+    .nullable()
+    .describe(
+      "Jobs that failed since the install's queue counters began. Two reports apart, the difference is the failures in between.",
+    ),
+  queues: byOwnName(z.object({ pending_jobs: count, dead_letters: count })).describe(
+    "Per queue with anything waiting or dead: jobs waiting, and jobs moved to its dead-letter queue.",
+  ),
+  pipelines: byOwnName(
+    z.object({
+      pending_jobs: count,
+      blocked_groups: count,
+      pending_messages: count,
+      dead_letters: count,
+      stalled: count,
+    }),
+  ).describe(
+    "Per pipeline with anything waiting, failing or stuck: jobs waiting, groups blocked on a failing projection or subscriber, process messages waiting and dead, and processes whose wake is overdue or whose lease lapsed.",
+  ),
+  migrations: byOwnName(z.object({ parked: count, rolled_back: count })).describe(
+    "Per in-place data migration with a problem: organizations parked on an error, and organizations rolled back.",
+  ),
+});
+export type UsageReportOpsHealth = z.infer<typeof usageReportOpsHealthSchema>;
 
 /** A rung of the onboarding ladder: the day first reached, or null on one never reached. */
 const ladderDate = z.string().max(40).nullable().optional();
@@ -649,6 +700,9 @@ export const usageReportBodySchema = z.object({
   storage_backend: z.string().max(50).optional(),
   email_configured: z.boolean().optional(),
   gateway_configured: z.boolean().optional(),
+
+  // How the install's own machinery is doing: counts under our own names.
+  ops_health: usageReportOpsHealthSchema.optional(),
 });
 
 export type UsageReportBody = z.infer<typeof usageReportBodySchema>;

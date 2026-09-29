@@ -71,11 +71,26 @@ const NOW = Temporal.Instant.from("2026-09-21T10:00:00.000Z");
 let state: UsageReportWorld;
 let channel: MemoryUsageReportChannel;
 let install: InstallStandIn;
+let opsHealthReads: number;
+
+const OPS_HEALTH = {
+  snapshot_at: "2026-09-21T09:59:00.000Z",
+  failed_jobs_total: 0,
+  queues: {},
+  pipelines: {},
+  migrations: { tenant_split_v2: { parked: 1, rolled_back: 0 } },
+};
 
 function service({ disabled = false, isSaas = false } = {}) {
   return UsageReportService.create({
     collection: UsageReportCollectionService.create({
       peers: state.peers(),
+      opsHealth: {
+        read: async () => {
+          opsHealthReads++;
+          return OPS_HEALTH;
+        },
+      },
       deployment: () => ({
         version: "3.17.0",
         installMethod: "self-hosted",
@@ -100,6 +115,7 @@ beforeEach(() => {
   state.projectsByOrganization.set("org_2", ["project_2"]);
   channel = MemoryUsageReportChannel.create();
   install = new InstallStandIn();
+  opsHealthReads = 0;
 });
 
 describe("given an install whose license names a hosted service", () => {
@@ -122,6 +138,14 @@ describe("given an install whose license names a hosted service", () => {
     /** @scenario "Product statistics stay optional and separate" */
     it("sends no statistics", async () => {
       expect(await service({ disabled: true }).send()).toBe("switched_off");
+      expect(channel.posts).toEqual([]);
+    });
+
+    /** @scenario "DISABLE_USAGE_STATS sends no ops health either" */
+    it("does not even read ops health", async () => {
+      await service({ disabled: true }).send();
+
+      expect(opsHealthReads).toBe(0);
       expect(channel.posts).toEqual([]);
     });
   });
@@ -203,6 +227,17 @@ describe("the usage report preview", () => {
     });
   });
 
+  describe("given a process that composes ops health", () => {
+    /** @scenario "The preview shows ops health like every other field" */
+    it("shows ops_health in the payload it would post", async () => {
+      await install.getInstanceId();
+
+      const preview = await service().preview();
+
+      expect(preview.payload.ops_health).toEqual(OPS_HEALTH);
+    });
+  });
+
   describe("when an administrator switched the optional category off", () => {
     /** @scenario "The two switches change the preview" */
     it("carries no optional field", async () => {
@@ -213,6 +248,7 @@ describe("the usage report preview", () => {
       expect(preview.switches).toEqual({ optional: false, hostname: true });
       expect(preview.payload.user_email_domains).toBeUndefined();
       expect(preview.payload.totalTraces).toBeUndefined();
+      expect(preview.payload.ops_health).toBeUndefined();
     });
   });
 
