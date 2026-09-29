@@ -235,3 +235,7 @@ dev/docs/plans/handover-*.md
 
 
 .nx/migrate-runs
+# coordinator scratch: lane handoffs, manifests and archives stay local
+.claude/handoffs/
+.claude/manifests/
+.claude/archives/
