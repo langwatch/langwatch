@@ -23,8 +23,12 @@ export function parseTraceQuerySyntax(query: string): LiqeQuery {
   return parseWithApostrophes(query);
 }
 
-/** Stands in for an in-word apostrophe while liqe parses, which would read it as a quote. */
-const APOSTROPHE_STAND_IN = "\uE000";
+/** A private-use character absent from `query`, standing in for an in-word apostrophe. */
+function standInFor(query: string): string {
+  let code = 0xe000;
+  while (query.includes(String.fromCharCode(code))) code += 1;
+  return String.fromCharCode(code);
+}
 const WORD_CHAR = /[\p{L}\p{N}]/u;
 
 /**
@@ -47,7 +51,7 @@ export function isWordApostrophe({
   return before && WORD_CHAR.test(text.charAt(index + 1));
 }
 
-function maskWordApostrophes(text: string): string {
+function maskWordApostrophes({ text, standIn }: { text: string; standIn: string }): string {
   let out = "";
   let quoteChar = "";
   for (let i = 0; i < text.length; i++) {
@@ -58,7 +62,7 @@ function maskWordApostrophes(text: string): string {
       continue;
     }
     if (isWordApostrophe({ text, index: i, inSingleQuotes: quoteChar === "'" })) {
-      out += quoteChar === '"' ? ch : APOSTROPHE_STAND_IN;
+      out += quoteChar === '"' ? ch : standIn;
       continue;
     }
     quoteChar = nextQuoteChar({ ch, quoteChar });
@@ -67,30 +71,31 @@ function maskWordApostrophes(text: string): string {
   return out;
 }
 
-/** The open quote after `ch`: opened, closed, or unchanged. */
 function nextQuoteChar({ ch, quoteChar }: { ch: string; quoteChar: string }): string {
   if (ch !== '"' && ch !== "'") return quoteChar;
   if (!quoteChar) return ch;
   return ch === quoteChar ? "" : quoteChar;
 }
 
-function restoreApostrophes<T>(node: T): T {
-  if (typeof node === "string") {
-    return node.replaceAll(APOSTROPHE_STAND_IN, "'") as T;
-  }
-  if (Array.isArray(node)) return node.map(restoreApostrophes) as T;
+function restoreApostrophes<T>({ node, standIn }: { node: T; standIn: string }): T {
+  if (typeof node === "string") return node.replaceAll(standIn, "'") as T;
+  if (Array.isArray(node))
+    return node.map((item) => restoreApostrophes({ node: item, standIn })) as T;
   if (node && typeof node === "object") {
     const record = node as Record<string, unknown>;
-    for (const key of Object.keys(record)) record[key] = restoreApostrophes(record[key]);
+    for (const key of Object.keys(record)) {
+      record[key] = restoreApostrophes({ node: record[key], standIn });
+    }
   }
   return node;
 }
 
 /** liqe, reading an in-word apostrophe as a letter. @see specs/traces-v2/search.feature */
 function parseWithApostrophes(query: string): LiqeQuery {
-  const masked = maskWordApostrophes(query);
+  const standIn = standInFor(query);
+  const masked = maskWordApostrophes({ text: query, standIn });
   const ast = liqeParse(masked);
-  return masked === query ? ast : restoreApostrophes(ast);
+  return masked === query ? ast : restoreApostrophes({ node: ast, standIn });
 }
 
 /**

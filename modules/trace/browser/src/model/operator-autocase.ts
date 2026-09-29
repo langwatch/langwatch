@@ -5,6 +5,7 @@
 const OPERATOR_TRIGGER = /(?:^|[\s(])(and|or|not)$/;
 const SEPARATOR_REGEX = /[\s()]/;
 const OPERATOR_WORDS: ReadonlySet<string> = new Set(["AND", "OR", "NOT"]);
+const FIELD_TERM = /^[-@]?[\p{L}_][\p{L}\p{N}_.@-]*:\S/u;
 
 function isInsideQuoted(text: string, pos: number): boolean {
   let count = 0;
@@ -26,7 +27,7 @@ function isInsideBrackets(text: string, pos: number): boolean {
 /** Whether the text ends in a term written as filter syntax rather than a word of a sentence. */
 function endsWithExplicitTerm(trimmed: string): boolean {
   const token = trimmed.split(/\s+/).at(-1) ?? "";
-  if (token.includes(":")) return true;
+  if (FIELD_TERM.test(token)) return true;
   if (/["\])]$/.test(token)) return true;
   // A closing single quote, told apart from a trailing possessive (members').
   if (/(?:^|[\s:(])'[^']*'$/.test(trimmed)) return true;

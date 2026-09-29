@@ -108,6 +108,12 @@ describe("splitBareWords", () => {
       });
     });
 
+    it("keeps a literal private-use character the query already holds", () => {
+      const sentence = "why doesn't  work";
+
+      expect(splitBareWords(sentence)).toEqual({ sentence, explicitQuery: "" });
+    });
+
     it("still reads a value in single quotes as a quoted value", () => {
       const ast = parse("model:'gpt 5' refund");
 
