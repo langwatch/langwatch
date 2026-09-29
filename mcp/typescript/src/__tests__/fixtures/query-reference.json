@@ -9822,7 +9822,8 @@
           "grain": "one row per DashboardId",
           "joinKeys": [
             "TenantId",
-            "DashboardId"
+            "DashboardId",
+            "CreatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -9855,6 +9856,32 @@
               "name": "Order",
               "type": "Int32",
               "description": "Order",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Description",
+              "type": "Nullable(String)",
+              "description": "Free text under the board's name; null until a member writes one.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "Visibility",
+              "type": "String",
+              "description": "Who may see the board: \"only_me\", \"team\" or \"organisation\" (the default, which is what every board created before the column existed keeps).",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "The member who created it; null for boards that predate the column.",
               "unit": null,
               "gates": [],
               "available": true

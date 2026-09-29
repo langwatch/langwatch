@@ -26,6 +26,32 @@ export class DashboardNotFoundError extends HandledError {
   }
 }
 
+/** A visibility change or delete by someone neither the board's creator nor an admin. */
+export class DashboardOwnerOnlyError extends HandledError {
+  declare readonly code: "dashboard_owner_only";
+
+  constructor(dashboardId: string) {
+    super(
+      "dashboard_owner_only",
+      "Only the dashboard's creator or an admin can change its visibility or delete it",
+      { httpStatus: 403, meta: { dashboardId } },
+    );
+    this.name = "DashboardOwnerOnlyError";
+  }
+}
+
+/** A Dashboards-area procedure called while `release_dashboards` is off for the project. */
+export class DashboardsNotEnabledError extends HandledError {
+  declare readonly code: "dashboards_not_enabled";
+
+  constructor() {
+    super("dashboards_not_enabled", "Dashboards are not enabled for this project", {
+      httpStatus: 403,
+    });
+    this.name = "DashboardsNotEnabledError";
+  }
+}
+
 /** A graph the project does not have. */
 export class GraphNotFoundError extends HandledError {
   declare readonly code: "graph_not_found";

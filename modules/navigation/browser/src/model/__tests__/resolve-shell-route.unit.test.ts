@@ -47,6 +47,25 @@ describe("resolveShellRoute", () => {
     });
   });
 
+  describe("given a project's Dashboards area", () => {
+    it("names Dashboards, a project product", () => {
+      expect(resolve("/acme-app/dashboards/agent-flight-deck")).toEqual({
+        isSettingsRoute: false,
+        isPersonalScopeRoute: false,
+        isOrgScopeRoute: false,
+        isResolverRoute: false,
+        activeProductId: "dashboards",
+      });
+    });
+
+    it("keeps Dashboards on the reader's own personal project", () => {
+      expect(
+        resolve("/personal-mia-abc123/dashboards", { isOnOwnPersonalProject: true })
+          .activeProductId,
+      ).toBe("dashboards");
+    });
+  });
+
   describe("given the settings detour", () => {
     /**
      * Two specs name the same detour from different angles — the ops feature

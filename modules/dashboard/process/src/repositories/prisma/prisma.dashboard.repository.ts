@@ -1,5 +1,6 @@
 import {
   dashboardSchema,
+  DEFAULT_DASHBOARD_VISIBILITY,
   graphFiltersSchema,
   graphPayloadSchema,
   graphSchema,
@@ -7,6 +8,7 @@ import {
   savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartNotFoundError,
+  type DashboardVisibility,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
   type DashboardUsageCount,
@@ -19,6 +21,7 @@ import type {
   DashboardRecord,
   DashboardRepository,
   DashboardSummaryRecord,
+  DashboardUpdate,
   GraphRecord,
   SavedWorkbenchChartRecord,
 } from "../dashboard.repository.ts";
@@ -31,6 +34,9 @@ const dashboardRow = (row: {
   projectId: string;
   name: string;
   order: number;
+  description: string | null;
+  visibility: string;
+  createdById: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): DashboardRecord =>
@@ -39,6 +45,9 @@ const dashboardRow = (row: {
     projectId: row.projectId,
     name: row.name,
     order: row.order,
+    description: row.description,
+    visibility: row.visibility,
+    createdById: row.createdById,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -180,14 +189,24 @@ export class PrismaDashboardRepository
     projectId: string;
     name: string;
     order: number;
+    createdById?: string | null;
+    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord> {
-    return dashboardRow(await this.prisma.dashboard.create({ data: input }));
+    return dashboardRow(
+      await this.prisma.dashboard.create({
+        data: {
+          ...input,
+          createdById: input.createdById ?? null,
+          visibility: input.visibility ?? DEFAULT_DASHBOARD_VISIBILITY,
+        },
+      }),
+    );
   }
 
   async updateDashboard(input: {
     projectId: string;
     dashboardId: string;
-    data: { name: string };
+    data: DashboardUpdate;
   }): Promise<DashboardRecord> {
     return dashboardRow(
       await this.prisma.dashboard.update({

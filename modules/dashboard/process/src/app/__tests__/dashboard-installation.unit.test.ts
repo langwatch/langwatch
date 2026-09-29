@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { dashboardServer } from "../../dashboard.server.ts";
 import {
   createDashboardTestAnalytics,
+  createDashboardTestAuthz,
   createDashboardTestAutomation,
   createDashboardTestProjects,
 } from "./dashboard.fixture.ts";
@@ -17,6 +18,7 @@ function process(role: "api" | "worker") {
       analytics: createDashboardTestAnalytics(),
       automation: createDashboardTestAutomation(),
       project: createDashboardTestProjects(),
+      authz: createDashboardTestAuthz(),
     });
 }
 

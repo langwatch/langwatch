@@ -10,7 +10,7 @@ import type { MouseEvent, PropsWithChildren, ReactNode } from "react";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 
 /** A click the browser handles itself: a new tab, a download, a modified click. */
-function opensElsewhere(event: MouseEvent<HTMLAnchorElement>): boolean {
+export function opensElsewhere(event: MouseEvent<HTMLAnchorElement>): boolean {
   return (
     event.defaultPrevented ||
     event.button !== 0 ||

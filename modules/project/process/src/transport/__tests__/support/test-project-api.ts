@@ -58,6 +58,9 @@ export class TestProjectApi implements ProjectApi {
   isPresenceEnabled: ProjectApi["isPresenceEnabled"] = (input) =>
     this.overrides.isPresenceEnabled?.(input) ?? Promise.resolve(false);
 
+  isTeamMember: ProjectApi["isTeamMember"] = (input) =>
+    this.overrides.isTeamMember?.(input) ?? this.unimplemented("isTeamMember");
+
   findSummaryById: ProjectApi["findSummaryById"] = (projectId) =>
     this.overrides.findSummaryById?.(projectId) ?? Promise.resolve(null);
 

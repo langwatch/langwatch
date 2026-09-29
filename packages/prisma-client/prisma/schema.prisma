@@ -2131,6 +2131,13 @@ model Dashboard {
   project   Project       @relation(fields: [projectId], references: [id])
   name      String
   order     Int           @default(0)
+  /// Free text under the board's name; null until a member writes one.
+  description String?
+  /// Who may see the board: "only_me", "team" or "organisation" (the default,
+  /// which is what every board created before the column existed keeps).
+  visibility  String  @default("organisation")
+  /// The member who created it; null for boards that predate the column.
+  createdById String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @default(now()) @updatedAt
   graphs    CustomGraph[]

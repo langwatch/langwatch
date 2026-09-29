@@ -6,11 +6,14 @@
 
 import {
   useUiCapabilities,
+  useUiDeclarations,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
   type UiRoute,
+  type UiSession,
 } from "@langwatch/browser-host/capabilities";
+import type { UiDeclarations } from "@langwatch/browser-host/declarations";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -19,6 +22,7 @@ import {
   type AnalyticsAlertAuthoring,
   type AnalyticsFailureNotice,
   type AnalyticsHostProject,
+  type AnalyticsLangyAskRequest,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
 } from "../model/analytics-host.ts";
@@ -28,33 +32,37 @@ import { analyticsApi } from "./analytics-api.ts";
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly project_: AnalyticsHostProject | undefined;
   private readonly organizationId_: string | undefined;
-  private readonly hasPermissionOf: (permission: string) => boolean;
+  private readonly session: UiSession;
   private readonly routeCapability: UiRoute;
   private readonly navigationCapability: UiNavigation;
   private readonly feedback: UiFeedback;
+  private readonly declarations: UiDeclarations;
 
   constructor({
     project_,
     organizationId_,
-    hasPermissionOf,
+    session,
     routeCapability,
     navigationCapability,
     feedback,
+    declarations,
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
-    hasPermissionOf: (permission: string) => boolean;
+    session: UiSession;
     routeCapability: UiRoute;
     navigationCapability: UiNavigation;
     feedback: UiFeedback;
+    declarations: UiDeclarations;
   }) {
     super();
     this.project_ = project_;
     this.organizationId_ = organizationId_;
-    this.hasPermissionOf = hasPermissionOf;
+    this.session = session;
     this.routeCapability = routeCapability;
     this.navigationCapability = navigationCapability;
     this.feedback = feedback;
+    this.declarations = declarations;
   }
 
   project(): AnalyticsHostProject | undefined {
@@ -65,8 +73,20 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     return this.organizationId_;
   }
 
+  userId(): string | undefined {
+    return this.session.currentUser()?.id;
+  }
+
   hasPermission(permission: string): boolean {
-    return this.hasPermissionOf(permission);
+    return this.session.hasPermission(permission);
+  }
+
+  isSettled(): boolean {
+    return this.session.isSettled();
+  }
+
+  featureFlag(flag: string): boolean | undefined {
+    return this.session.featureFlag(flag);
   }
 
   route(): AnalyticsRouteReading {
@@ -81,8 +101,9 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.routeCapability.setQuery(next, options);
   }
 
-  navigate(to: string): void {
-    this.navigationCapability.navigate(to);
+  navigate(to: string, options?: { replace?: boolean }): void {
+    if (options?.replace) this.navigationCapability.replace(to);
+    else this.navigationCapability.navigate(to);
   }
 
   openAutomationDrawer(request: AnalyticsAlertAuthoring): void {
@@ -97,6 +118,13 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   failed(failure: AnalyticsFailureNotice): void {
     this.feedback.failed(failure);
   }
+
+  /** Through what Langy lends by name; with Langy not installed nothing is declared. */
+  askLangy(request: AnalyticsLangyAskRequest): void {
+    const lent = this.declarations.declared("langyAsk")[0]?.capability;
+    if (!lent) return;
+    void lent.load().then(({ default: langy }) => langy.ask(request));
+  }
 }
 
 /**
@@ -106,6 +134,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
  */
 export default function AnalyticsHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
+  const declarations = useUiDeclarations();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeProject = session.snapshot().scope.project;
   const scopeProjectId = scopeProject?.id;
@@ -134,10 +163,11 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
               }
             : void 0,
         organizationId_: organizationId ?? void 0,
-        hasPermissionOf: (permission) => session.hasPermission(permission),
+        session,
         routeCapability: route,
         navigationCapability: navigation,
         feedback,
+        declarations,
       }),
     [
       scopeProjectId,
@@ -150,6 +180,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       route,
       navigation,
       feedback,
+      declarations,
     ],
   );
   return <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>;

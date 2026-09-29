@@ -1,9 +1,11 @@
 import {
+  DEFAULT_DASHBOARD_VISIBILITY,
   dashboardSchema,
   graphSchema,
   savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartNotFoundError,
+  type DashboardVisibility,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
   type DashboardUsageCount,
@@ -15,6 +17,7 @@ import type {
   DashboardRecord,
   DashboardRepository,
   DashboardSummaryRecord,
+  DashboardUpdate,
   GraphRecord,
   SavedWorkbenchChartRecord,
 } from "../dashboard.repository.ts";
@@ -120,9 +123,14 @@ export class MemoryDashboardRepository implements DashboardRepository {
     projectId: string;
     name: string;
     order: number;
+    createdById?: string | null;
+    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord> {
     const dashboard = dashboardSchema.parse({
       ...input,
+      description: null,
+      visibility: input.visibility ?? DEFAULT_DASHBOARD_VISIBILITY,
+      createdById: input.createdById ?? null,
       createdAt: this.#now(),
       updatedAt: this.#now(),
     });
@@ -133,10 +141,14 @@ export class MemoryDashboardRepository implements DashboardRepository {
   async updateDashboard(input: {
     projectId: string;
     dashboardId: string;
-    data: { name: string };
+    data: DashboardUpdate;
   }): Promise<DashboardRecord> {
     const dashboard = this.#requireDashboard(input);
-    const updated = { ...dashboard, name: input.data.name, updatedAt: this.#now() };
+    const updated = dashboardSchema.parse({
+      ...dashboard,
+      ...Object.fromEntries(Object.entries(input.data).filter(([, value]) => value !== undefined)),
+      updatedAt: this.#now(),
+    });
     this.#dashboards = this.#dashboards.map((row) => (row.id === dashboard.id ? updated : row));
     return updated;
   }

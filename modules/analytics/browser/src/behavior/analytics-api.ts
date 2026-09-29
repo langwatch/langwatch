@@ -11,6 +11,8 @@ import type {
 } from "@langwatch/analytics-contract";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import type {
+  DashboardSourcePresence,
+  DashboardVisibility,
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
   graphDetailSchema,
@@ -192,6 +194,25 @@ type BorrowedProcedures = {
     };
     getOrCreateFirst: {
       query: { input: ProjectScope; output: DashboardRow };
+    };
+    updateDetails: {
+      mutation: {
+        input: ProjectScope & {
+          dashboardId: string;
+          name?: string;
+          description?: string | null;
+        };
+        output: DashboardRow;
+      };
+    };
+    setVisibility: {
+      mutation: {
+        input: ProjectScope & { dashboardId: string; visibility: DashboardVisibility };
+        output: DashboardRow;
+      };
+    };
+    sourcePresence: {
+      query: { input: ProjectScope; output: DashboardSourcePresence };
     };
   };
   graphs: {

@@ -78,7 +78,14 @@ interface LwQueryError extends Error {
 type LwLogSource = "console" | "error" | "unhandledrejection" | "lw.error";
 
 /** Route keys \`LW.navigate\` accepts — an allowlist the host resolves to a real URL. */
-type LwNavigableTarget = "traces" | "trace";
+type LwNavigableTarget =
+  | "traces"
+  | "trace"
+  | "scenarios"
+  | "onlineEvaluations"
+  | "annotations"
+  | "gatewayVirtualKeys"
+  | "codingSessions";
 
 /** Return shape of \`LW.useChartQuery\`, matching TanStack Query's \`useQuery\` naming. */
 interface LwChartQueryState {

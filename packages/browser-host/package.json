@@ -78,6 +78,10 @@
       "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
     },
+    "./testing-transport": {
+      "types": "./dist/testing-transport.d.ts",
+      "default": "./src/testing-transport.ts"
+    },
     "./link": {
       "types": "./dist/link.d.ts",
       "default": "./src/link.tsx"

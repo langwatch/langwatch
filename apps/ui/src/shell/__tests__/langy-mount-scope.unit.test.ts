@@ -63,16 +63,20 @@ describe("given a page a signed-out reader can open", () => {
   });
 });
 
-describe("given the Langy layout route the table nests product pages under", () => {
-  describe("when the installed modules are asked who serves it", () => {
+describe("given the installed web modules", () => {
+  describe("when the Langy layout route's page key is resolved", () => {
     /**
-     * A bare outlet served this key once, so every project page rendered with
-     * no LangyProvider and the workbench threw from `useLangy`.
-     * @scenario A product page renders inside the Langy layout
+     * A placeholder here drew the page with no panel above it, so an ask from
+     * a dashboard board changed state that nothing rendered.
+     *
+     * @scenario The Langy layout route is served by the Langy module
      */
-    it("is langy's declared layout, never an unframed placeholder", () => {
-      expect(installedModuleScreens(webModules).loaders[LANGY_LAYOUT]).toBeDefined();
+    it("is declared by the langy module, not held by a placeholder", () => {
+      const screens = installedModuleScreens(webModules).loaders;
+
+      expect(screens[LANGY_LAYOUT]).toBeTypeOf("function");
       expect(uiUnservedPageLoaders[LANGY_LAYOUT]).toBeUndefined();
+      expect(langyLayoutAncestors("/:project/dashboards/:dashboardId")).toBe(1);
     });
   });
 });

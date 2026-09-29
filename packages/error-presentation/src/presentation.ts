@@ -475,6 +475,15 @@ const presentations = {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  dashboard_owner_only: {
+    title: "Only the creator or an admin can do that",
+    describe: () =>
+      "Ask the person who created this dashboard, or a project admin, to change its visibility or delete it.",
+  },
+  dashboards_not_enabled: {
+    title: "Dashboards aren't switched on here",
+    describe: () => "This project doesn't have Dashboards enabled yet.",
+  },
   dashboard_reorder_unknown_ids: {
     title: "Some of those dashboards are gone",
     describe: () =>

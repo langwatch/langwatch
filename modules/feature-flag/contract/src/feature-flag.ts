@@ -298,6 +298,13 @@ export const FEATURE_FLAGS = [
       "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
   },
   {
+    key: "release_dashboards",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, as a product in the product switcher and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
+  },
+  {
     key: "release_ui_comparison_leaderboard_enabled",
     scope: "PRODUCT",
     defaultValue: false,

@@ -4,11 +4,13 @@
  */
 import {
   DashboardNotFoundError,
+  DashboardOwnerOnlyError,
   DashboardReorderUnknownIdsError,
   GraphNotFoundError,
 } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
+import { FixedDashboardAudience } from "../../app/__tests__/dashboard.fixture.ts";
 import type { WorkbenchAccess } from "../../app/dashboard.members.ts";
 import { MemoryDashboardRepository } from "../../repositories/memory/memory.dashboard.repository.ts";
 import { DashboardService } from "../dashboard.service.ts";
@@ -29,6 +31,7 @@ function serviceWith(workbenchEnabled = true) {
     service: DashboardService.create({
       repository,
       workbenchAccess: new FixedWorkbenchAccess(workbenchEnabled),
+      audience: new FixedDashboardAudience(),
     }),
   };
 }
@@ -127,6 +130,45 @@ describe("DashboardService", () => {
     });
   });
 
+  describe("given a member creates a new dashboard", () => {
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("stays organisation-wide when visibility is not given", async () => {
+      const { service } = serviceWith();
+
+      const created = await service.create({
+        projectId: PROJECT,
+        name: "Reports",
+        createdById: "member-1",
+      });
+
+      expect(created.visibility).toBe("organisation");
+    });
+
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("stores an only_me board under its creator", async () => {
+      const { service } = serviceWith();
+
+      const created = await service.create({
+        projectId: PROJECT,
+        name: "Reports",
+        createdById: "member-1",
+        visibility: "only_me",
+      });
+
+      expect(created.visibility).toBe("only_me");
+      expect(created.createdById).toBe("member-1");
+    });
+
+    /** @scenario "AC10 Blank board matches the reference" */
+    it("refuses only_me from a caller with no creator", async () => {
+      const { service } = serviceWith();
+
+      await expect(
+        service.create({ projectId: PROJECT, name: "Reports", visibility: "only_me" }),
+      ).rejects.toBeInstanceOf(DashboardOwnerOnlyError);
+    });
+  });
+
   describe("given a dashboard belonging to another project", () => {
     /** @scenario "A dashboard from another project cannot be renamed" */
     it("refuses the rename as one this project does not have", async () => {
@@ -157,6 +199,29 @@ describe("DashboardService", () => {
       await expect(
         service.getAll({ projectId: PROJECT, graphCountScope: "builder" }),
       ).resolves.toMatchObject([{ order: 0 }]);
+    });
+  });
+
+  describe("given a board with no recorded creator and a project credential", () => {
+    it("refuses only me and team, having nobody to record, and allows organisation", async () => {
+      const { service, repository } = serviceWith();
+      const board = await repository.createDashboard({
+        id: "creatorless",
+        projectId: PROJECT,
+        name: "Reports",
+        order: 0,
+      });
+      const ref = { projectId: PROJECT, dashboardId: board.id };
+
+      await expect(service.setVisibility({ ...ref, visibility: "only_me" })).rejects.toMatchObject({
+        code: "dashboard_owner_only",
+      });
+      await expect(service.setVisibility({ ...ref, visibility: "team" })).rejects.toMatchObject({
+        code: "dashboard_owner_only",
+      });
+      await expect(
+        service.setVisibility({ ...ref, visibility: "organisation" }),
+      ).resolves.toMatchObject({ visibility: "organisation", createdById: null });
     });
   });
 

@@ -9,6 +9,7 @@ export type ProjectNavItem = {
 export const projectNavItems = {
   home: { path: "/[project]", title: "Home" },
   analytics: { path: "/[project]/analytics", title: "Analytics" },
+  dashboards: { path: "/[project]/dashboards", title: "Dashboards" },
   traces_v2: { path: "/[project]/traces", title: "Trace Explorer" },
   online_evaluations: {
     path: "/[project]/online-evaluations",
@@ -39,6 +40,18 @@ export type ProjectNavKey = keyof typeof projectNavItems;
 /** Destination name for document title; exact address match, not closest guess */
 export function projectNavItemAt(pathname: string): ProjectNavItem | undefined {
   return Object.values(projectNavItems).find((item) => item.path === pathname);
+}
+
+/**
+ * Where a route pattern stands in the Dashboards area: `undefined` outside it,
+ * otherwise the board it opens (`dashboardId` absent on the area's own address).
+ */
+export function dashboardsAreaAt(pattern: string): { dashboardId: string | undefined } | undefined {
+  const area = projectNavItems.dashboards.path;
+  if (pattern === area) return { dashboardId: void 0 };
+  if (!pattern.startsWith(`${area}/`)) return void 0;
+  const [dashboardId] = pattern.slice(area.length + 1).split("/");
+  return { dashboardId: dashboardId || void 0 };
 }
 
 /** Address to route pattern; normalize for pattern-based tests vs address-based host */

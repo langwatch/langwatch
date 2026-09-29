@@ -81,7 +81,7 @@ import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-sto
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
-import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
@@ -835,6 +835,15 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean> {
     return lwqlEnabled({
+      featureFlags: this.#dependencies.featureFlags,
+      projectId: input.projectId,
+      projects: this.#dependencies.projects,
+    });
+  }
+
+  /** Whether this project's rollout admits it to the Dashboards area at all. */
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean> {
+    return dashboardsEnabled({
       featureFlags: this.#dependencies.featureFlags,
       projectId: input.projectId,
       projects: this.#dependencies.projects,

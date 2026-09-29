@@ -1,6 +1,7 @@
 import type {
   Dashboard,
   DashboardSummary,
+  DashboardVisibility,
   Graph,
   GraphLayout,
   SavedWorkbenchChart,
@@ -12,6 +13,14 @@ import type {
 export type DashboardGraphKind = "builder" | "workbench_sql";
 
 export type DashboardRecord = Dashboard;
+
+/** The editable fields of a stored board; an absent key is left as it is. */
+export type DashboardUpdate = Readonly<{
+  name?: string;
+  description?: string | null;
+  visibility?: DashboardVisibility;
+  createdById?: string;
+}>;
 export type DashboardSummaryRecord = DashboardSummary;
 export type GraphRecord = Graph;
 
@@ -37,16 +46,19 @@ export interface DashboardRepository {
   findFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined>;
   findLastDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined>;
   findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]>;
+  /** No description; `createdById` null and `visibility` organisation-wide when absent. */
   createDashboard(input: {
     id: string;
     projectId: string;
     name: string;
     order: number;
+    createdById?: string | null;
+    visibility?: DashboardVisibility;
   }): Promise<DashboardRecord>;
   updateDashboard(input: {
     projectId: string;
     dashboardId: string;
-    data: { name: string };
+    data: DashboardUpdate;
   }): Promise<DashboardRecord>;
   deleteDashboard(input: { projectId: string; dashboardId: string }): Promise<DashboardRecord>;
   updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void>;

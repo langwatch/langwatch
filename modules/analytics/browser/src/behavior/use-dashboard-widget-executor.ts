@@ -4,7 +4,10 @@
  * button) share one validation gate, so a query runs identically either way.
  */
 
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLAcceptedGranularityStep,
+  LangWatchQLGranularityStep,
+} from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
   ChartQueryError,
@@ -49,7 +52,7 @@ export interface DashboardWidgetExecutorOverrides {
   /** Replaces the "last 24 hours from mount" default — the dashboard's own period. */
   readonly timeWindow?: { start: number; end: number };
   /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
-  readonly granularitySeconds?: LangWatchQLGranularityStep;
+  readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splits would scatter closured state.
@@ -67,7 +70,8 @@ export function useDashboardWidgetExecutor(
     return { start: end - 24 * 60 * 60 * 1000, end };
   });
   const pageWindow = overrides?.timeWindow ?? mountWindow;
-  const granularitySeconds = overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  const granularitySeconds: LangWatchQLAcceptedGranularityStep =
+    overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({

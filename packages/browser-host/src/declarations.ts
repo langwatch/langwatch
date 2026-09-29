@@ -461,6 +461,9 @@ export type UiStudioPromptEditorProps = {
 /** What a screen hands analytics' filter sidebar; it reads the filters from the URL itself. */
 export type UiFilterSidebarProps = { defaultShowFilters?: boolean; hideTopics?: boolean };
 
+/** What navigation hands analytics' saved-dashboards list: the board open now, if any. */
+export type UiSavedDashboardsProps = { activeDashboardId: string | undefined };
+
 /** What a check form hands trace's mapping editor, which reads its own sample traces. */
 export type UiEvaluatorTracesMappingProps = {
   targetFields: string[];
@@ -574,6 +577,21 @@ export type UiSignInMethodLinking = {
   link(input: { provider: string }): Promise<UiLinkSignInMethodOutcome>;
 };
 
+/** One reference riding with a question to Langy: `kind` is one of Langy's resource kinds. */
+export type UiLangyAskContext = { kind: string; ref: string; label: string };
+
+/** A question to ask Langy outright, or a sentence for the reader to finish, with its context. */
+export type UiLangyAskRequest = {
+  question?: string;
+  draft?: string;
+  context?: readonly UiLangyAskContext[];
+};
+
+/** What Langy lends for asking it about another module's screen; its store stays its own. */
+export type UiLangyAsk = {
+  ask(request: UiLangyAskRequest): void;
+};
+
 /** A usage-against-limit row licensing lends: a limit type it names, or a caller's label. */
 export type UiResourceLimitRowProps = { current: number; max?: number } & (
   | { label: string; limitType?: never }
@@ -615,6 +633,7 @@ export type UiDeclaredCapabilities = {
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
+  langyAsk: UiDeclaredOperations<UiLangyAsk>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   comparisonConfigForm: UiDeclaredComponent<UiComparisonConfigFormProps>;
   codingAgentPullRequestsTable: UiDeclaredComponent<UiCodingAgentPullRequestsTableProps>;
@@ -637,6 +656,7 @@ export type UiDeclaredCapabilities = {
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   runExperimentViaApiDialog: UiDeclaredComponent<UiRunExperimentViaApiDialogProps>;
+  savedDashboards: UiDeclaredComponent<UiSavedDashboardsProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
   suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;

@@ -38,17 +38,26 @@ export function useProductFlagsByOrganization({
     queryOptions,
   );
 
+  const dashboardsByOrg = navigationApi.featureFlag.isEnabledForEachOrganization.useQuery(
+    { flag: "release_dashboards", organizationIds },
+    queryOptions,
+  );
+
   return {
     reachableProductsIn: (organizationId: string) => {
       const products: ProductId[] = ["llm-ops"];
       if (governanceByOrg.data?.enabledByOrganizationId?.[organizationId]) {
         products.push("me", "governance");
       }
+      if (dashboardsByOrg.data?.enabledByOrganizationId?.[organizationId]) {
+        products.push("dashboards");
+      }
       if (gatewayByOrg.data?.enabledByOrganizationId?.[organizationId]) {
         products.push("gateway");
       }
       return products;
     },
-    isLoading: enabled && (governanceByOrg.isLoading || gatewayByOrg.isLoading),
+    isLoading:
+      enabled && (governanceByOrg.isLoading || gatewayByOrg.isLoading || dashboardsByOrg.isLoading),
   };
 }

@@ -55,6 +55,13 @@ export const analyticsWeb = defineWebModule("analytics")
     "pages/[project]/analytics/custom/[id]": {
       load: customGraph("edit"),
     },
+    // Dashboards v1, behind `release_dashboards`; each screen gates itself.
+    "pages/[project]/dashboards/index": {
+      load: () => import("./features/dashboards/ui/sections/dashboards-index.screen.tsx"),
+    },
+    "pages/[project]/dashboards/[dashboardId]": {
+      load: () => import("./features/dashboards/ui/sections/dashboard-board.screen.tsx"),
+    },
   })
   .withDrawers({
     dashboardName: {
@@ -79,6 +86,13 @@ export const analyticsWeb = defineWebModule("analytics")
     filterSidebar: {
       load: async () => ({
         default: (await import("./ui/sections/filters/filter-sidebar.tsx")).FilterSidebar,
+      }),
+    },
+    /** The saved-dashboards list, lent to navigation's sidebar on dashboards pages. */
+    savedDashboards: {
+      load: async () => ({
+        default: (await import("./features/dashboards/ui/sections/saved-dashboards-section.tsx"))
+          .SavedDashboardsSection,
       }),
     },
   });

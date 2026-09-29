@@ -1,3 +1,4 @@
+import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -21,6 +22,7 @@ export function useWidgetPreview({
   projectId,
   projectSlug,
   timeWindow,
+  granularitySeconds,
   widgetId,
   dashboardId,
   widgetName,
@@ -30,6 +32,8 @@ export function useWidgetPreview({
   projectId: string;
   projectSlug: string;
   timeWindow?: { start: number; end: number };
+  /** The step the reserved parameters carry; the executor's hourly default when absent. */
+  granularitySeconds?: LangWatchQLAcceptedGranularityStep;
   widgetId?: string;
   dashboardId?: string;
   widgetName?: string;
@@ -62,7 +66,7 @@ export function useWidgetPreview({
   } = useDashboardWidgetExecutor(
     projectId,
     previewQueries,
-    timeWindow ? { timeWindow } : undefined,
+    timeWindow ? { timeWindow, ...(granularitySeconds ? { granularitySeconds } : {}) } : undefined,
   );
 
   const paramsSnapshot = useMemo(() => declaredParamDefaults(previewQueries), [previewQueries]);

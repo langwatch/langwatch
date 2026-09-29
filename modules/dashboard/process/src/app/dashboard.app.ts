@@ -14,6 +14,7 @@ import {
   type LangWatchQLQueryResult,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
+import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import {
   AutomationApi,
   type AutomationApi as AutomationApiContract,
@@ -21,9 +22,15 @@ import {
 } from "@langwatch/automation-contract";
 import {
   DashboardApi,
+  DashboardsNotEnabledError,
+  SavedWorkbenchChartDashboardNotFoundError,
+  SavedWorkbenchChartNotFoundError,
   type Dashboard,
   type DashboardGraphCountScope,
+  type DashboardSourcePresence,
   type DashboardSummary,
+  type DashboardViewer,
+  type DashboardVisibility,
   type Graph,
   type GraphLayout,
   type SavedView,
@@ -43,12 +50,19 @@ import { DashboardService } from "../services/dashboard.service.ts";
 import { SavedViewService } from "../services/saved-view.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../services/saved-workbench-chart.service.ts";
-import type { WorkbenchAccess, WorkbenchCaller } from "./dashboard.members.ts";
+import { SourcePresenceService } from "../services/source-presence.service.ts";
+import type {
+  DashboardAudience,
+  DashboardsRollout,
+  WorkbenchAccess,
+  WorkbenchCaller,
+} from "./dashboard.members.ts";
 
 type DashboardDependencies = Readonly<{
   analytics: typeof AnalyticsApi;
   automation: typeof AutomationApi;
   projects: typeof ProjectApi;
+  authz: typeof AuthzApi;
 }>;
 
 /**
@@ -95,12 +109,47 @@ class AnalyticsWorkbenchCaller implements WorkbenchCaller {
   }
 }
 
+/** Team membership from the project peer, which owns the team, and admin rights from authz. */
+class PeerDashboardAudience implements DashboardAudience {
+  constructor(
+    private readonly peers: Readonly<{
+      projects: ProjectApiContract;
+      authz: AuthzApiContract;
+    }>,
+  ) {}
+
+  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean> {
+    return this.peers.projects.isTeamMember(input);
+  }
+
+  isAdmin(input: { projectId: string; userId: string }): Promise<boolean> {
+    return this.peers.authz.hasPermission({
+      userId: input.userId,
+      permission: "project:manage",
+      projectId: input.projectId,
+    });
+  }
+}
+
+/**
+ * `release_dashboards`, answered by Analytics, which owns the reporting area's
+ * rollout flags — the same peer the Workbench gate is composed from.
+ */
+class AnalyticsDashboardsRollout implements DashboardsRollout {
+  constructor(private readonly analytics: AnalyticsApiContract) {}
+
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean> {
+    return this.analytics.isDashboardsEnabled(input);
+  }
+}
+
 export class DashboardApp implements DashboardApi {
   static readonly contract = DashboardApi;
   static readonly dependencies = {
     analytics: AnalyticsApi,
     automation: AutomationApi,
     projects: ProjectApi,
+    authz: AuthzApi,
   };
   static readonly reads = ["publicBaseUrl"] as const;
 
@@ -108,6 +157,8 @@ export class DashboardApp implements DashboardApi {
   #charts: SavedWorkbenchChartService;
   #savedViews: SavedViewService;
   #widgets: DashboardWidgetService;
+  #sourcePresence: SourcePresenceService;
+  #rollout: DashboardsRollout;
   #analytics: AnalyticsApiContract;
   #automation: AutomationApiContract;
   #projects: ProjectApiContract;
@@ -119,6 +170,7 @@ export class DashboardApp implements DashboardApi {
     services,
     peers,
     workbench,
+    rollout,
     publicBaseUrl,
   }: Readonly<{
     services: Readonly<{
@@ -126,6 +178,7 @@ export class DashboardApp implements DashboardApi {
       charts: SavedWorkbenchChartService;
       savedViews: SavedViewService;
       widgets: DashboardWidgetService;
+      sourcePresence: SourcePresenceService;
     }>;
     peers: Readonly<{
       analytics: AnalyticsApiContract;
@@ -133,12 +186,15 @@ export class DashboardApp implements DashboardApi {
       projects: ProjectApiContract;
     }>;
     workbench: Readonly<{ access: WorkbenchAccess; caller: WorkbenchCaller }>;
+    rollout: DashboardsRollout;
     publicBaseUrl: string | undefined;
   }>) {
     this.#dashboards = services.dashboards;
     this.#charts = services.charts;
     this.#savedViews = services.savedViews;
     this.#widgets = services.widgets;
+    this.#sourcePresence = services.sourcePresence;
+    this.#rollout = rollout;
     this.#analytics = peers.analytics;
     this.#automation = peers.automation;
     this.#projects = peers.projects;
@@ -151,13 +207,16 @@ export class DashboardApp implements DashboardApi {
     const analytics: AnalyticsApiContract = setup.dependencies.analytics;
     const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
+    const { projects, authz } = setup.dependencies;
+    const dashboards = DashboardService.create({
+      repository: setup.repositories.dashboards,
+      workbenchAccess,
+      audience: new PeerDashboardAudience({ projects, authz }),
+    });
 
     return new DashboardApp({
       services: {
-        dashboards: DashboardService.create({
-          repository: setup.repositories.dashboards,
-          workbenchAccess,
-        }),
+        dashboards,
         charts: SavedWorkbenchChartService.create({
           repository: setup.repositories.dashboards,
           policy: SavedWorkbenchChartPolicyService.create({ analytics }),
@@ -167,7 +226,9 @@ export class DashboardApp implements DashboardApi {
         widgets: DashboardWidgetService.create({
           repository: setup.repositories.dashboardWidgets,
           analytics,
+          boards: dashboards,
         }),
+        sourcePresence: SourcePresenceService.create({ analytics }),
       },
       peers: {
         analytics,
@@ -175,6 +236,7 @@ export class DashboardApp implements DashboardApi {
         projects: setup.dependencies.projects,
       },
       workbench: { access: workbenchAccess, caller: workbenchCaller },
+      rollout: new AnalyticsDashboardsRollout(analytics),
       publicBaseUrl: setup.members.publicBaseUrl,
     });
   }
@@ -186,9 +248,11 @@ export class DashboardApp implements DashboardApi {
     return this.#dashboards.countUsage(input);
   }
 
+  /** The boards the viewer may see, each with the number of cards its grid renders. */
   getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;
+    viewer?: DashboardViewer;
   }): Promise<DashboardSummary[]> {
     return this.#dashboards.getAll(input);
   }
@@ -197,32 +261,51 @@ export class DashboardApp implements DashboardApi {
   getById(input: {
     projectId: string;
     dashboardId: string;
+    viewer?: DashboardViewer;
   }): Promise<Dashboard & { graphs: Graph[] }> {
     return this.#dashboards.getById(input);
   }
 
-  /** A new dashboard, appended after the current last. */
-  create(input: { projectId: string; name: string }): Promise<Dashboard> {
+  /** A new dashboard, appended after the current last; organisation-wide by default. */
+  create(input: {
+    projectId: string;
+    name: string;
+    createdById?: string;
+    visibility?: DashboardVisibility;
+  }): Promise<Dashboard> {
     return this.#dashboards.create(input);
   }
 
   /** A dashboard's name. */
-  rename(input: { projectId: string; dashboardId: string; name: string }): Promise<Dashboard> {
+  rename(input: {
+    projectId: string;
+    dashboardId: string;
+    name: string;
+    viewer?: DashboardViewer;
+  }): Promise<Dashboard> {
     return this.#dashboards.rename(input);
   }
 
   /** Removes a dashboard, cascading to its graphs. */
-  delete(input: { projectId: string; dashboardId: string }): Promise<Dashboard> {
+  delete(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer?: DashboardViewer;
+  }): Promise<Dashboard> {
     return this.#dashboards.delete(input);
   }
 
   /** The order the navigation lists them in. */
-  reorder(input: { projectId: string; dashboardIds: string[] }): Promise<{ success: true }> {
+  reorder(input: {
+    projectId: string;
+    dashboardIds: string[];
+    viewer?: DashboardViewer;
+  }): Promise<{ success: true }> {
     return this.#dashboards.reorder(input);
   }
 
-  /** The project's first dashboard, created on demand. */
-  getOrCreateFirst(input: { projectId: string }): Promise<Dashboard> {
+  /** The viewer's first dashboard, created on demand. */
+  getOrCreateFirst(input: { projectId: string; viewer?: DashboardViewer }): Promise<Dashboard> {
     return this.#dashboards.getOrCreateFirst(input);
   }
 
@@ -246,15 +329,66 @@ export class DashboardApp implements DashboardApi {
     );
   }
 
+  // -- the Dashboards area (`release_dashboards`) -----------------------------
+
+  /** A board's inline name and description. */
+  async updateDashboardDetails(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+    name?: string;
+    description?: string | null;
+  }): Promise<Dashboard> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    return this.#dashboards.updateDetails(input);
+  }
+
+  /** Who may see a board. */
+  async setDashboardVisibility(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+    visibility: DashboardVisibility;
+  }): Promise<Dashboard> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    return this.#dashboards.setVisibility(input);
+  }
+
+  /** Whether each Flight Deck source ever recorded a row, as this member reads the project. */
+  async getSourcePresence(input: {
+    projectId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardSourcePresence> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    return this.#sourcePresence.getPresence({
+      projectId: input.projectId,
+      userId: input.viewer.userId,
+    });
+  }
+
+  async #requireDashboardsEnabled(projectId: string): Promise<void> {
+    if (!(await this.#rollout.isDashboardsEnabled({ projectId }))) {
+      throw new DashboardsNotEnabledError();
+    }
+  }
+
   // -- graphs ----------------------------------------------------------------
 
-  /** The project's chart-builder graphs, optionally on one dashboard. */
-  listGraphs(input: { projectId: string; dashboardId?: string }): Promise<Graph[]> {
+  /** The project's chart-builder graphs the viewer may see, optionally on one dashboard. */
+  listGraphs(input: {
+    projectId: string;
+    dashboardId?: string;
+    viewer?: DashboardViewer;
+  }): Promise<Graph[]> {
     return this.#dashboards.listGraphs(input);
   }
 
   /** One graph. */
-  getGraph(input: { projectId: string; graphId: string }): Promise<Graph> {
+  getGraph(input: {
+    projectId: string;
+    graphId: string;
+    viewer?: DashboardViewer;
+  }): Promise<Graph> {
     return this.#dashboards.getGraph(input);
   }
 
@@ -266,6 +400,7 @@ export class DashboardApp implements DashboardApi {
     filters?: Record<string, unknown>;
     dashboardId?: string;
     layout?: Partial<GraphLayout>;
+    viewer?: DashboardViewer;
   }): Promise<Graph> {
     return this.#dashboards.createGraph(input);
   }
@@ -277,12 +412,17 @@ export class DashboardApp implements DashboardApi {
     name?: string;
     graph?: Record<string, unknown>;
     filters?: Record<string, unknown>;
+    viewer?: DashboardViewer;
   }): Promise<Graph> {
     return this.#dashboards.updateGraph(input);
   }
 
   /** Removes one chart. */
-  deleteGraph(input: { projectId: string; graphId: string }): Promise<Graph> {
+  deleteGraph(input: {
+    projectId: string;
+    graphId: string;
+    viewer?: DashboardViewer;
+  }): Promise<Graph> {
     return this.#dashboards.deleteGraph(input);
   }
 
@@ -291,6 +431,7 @@ export class DashboardApp implements DashboardApi {
     projectId: string;
     graphId: string;
     layout: GraphLayout;
+    viewer?: DashboardViewer;
   }): Promise<Graph> {
     return this.#dashboards.updateGraphLayout(input);
   }
@@ -299,6 +440,7 @@ export class DashboardApp implements DashboardApi {
   batchUpdateGraphLayouts(input: {
     projectId: string;
     layouts: { graphId: string; layout: GraphLayout }[];
+    viewer?: DashboardViewer;
   }): Promise<{ success: true }> {
     return this.#dashboards.batchUpdateGraphLayouts(input);
   }
@@ -313,28 +455,37 @@ export class DashboardApp implements DashboardApi {
     return this.#analytics.assertCustomChartPlaygroundEnabled(input);
   }
 
-  /** Every custom chart widget in the project. */
-  listDashboardWidgets(input: { projectId: string }): Promise<DashboardWidget[]> {
+  /** The project's custom chart widgets, less those on boards outside the viewer's audience. */
+  listDashboardWidgets(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<DashboardWidget[]> {
     return this.#widgets.getAll(input);
   }
 
   /** One custom chart widget. */
-  getDashboardWidget(input: { projectId: string; id: string }): Promise<DashboardWidget> {
+  getDashboardWidget(input: {
+    projectId: string;
+    id: string;
+    viewer?: DashboardViewer;
+  }): Promise<DashboardWidget> {
     return this.#widgets.getById(input);
   }
 
   /** A new widget, on the dashboard named or on the unplaced authoring grid. */
-  createDashboardWidget(
+  async createDashboardWidget(
     input: {
       projectId: string;
       dashboardId?: string;
       name: string;
+      viewer?: DashboardViewer;
     } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget> {
     return this.#widgets.createWidget({
       projectId: input.projectId,
       ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
       input: { name: input.name, code: input.code, queries: input.queries },
+      viewer: input.viewer,
     });
   }
 
@@ -344,11 +495,13 @@ export class DashboardApp implements DashboardApi {
       projectId: string;
       id: string;
       name?: string;
+      viewer?: DashboardViewer;
     } & Partial<DashboardWidgetDefinitionInput>,
   ): Promise<DashboardWidget> {
     return this.#widgets.updateWidget({
       projectId: input.projectId,
       id: input.id,
+      viewer: input.viewer,
       input: {
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.code === undefined ? {} : { code: input.code }),
@@ -358,16 +511,21 @@ export class DashboardApp implements DashboardApi {
   }
 
   /** Puts one widget on a dashboard, below whatever it would collide with. */
-  assignDashboardWidgetToDashboard(input: {
+  async assignDashboardWidgetToDashboard(input: {
     projectId: string;
     id: string;
     dashboardId: string;
+    viewer?: DashboardViewer;
   }): Promise<DashboardWidget> {
     return this.#widgets.assignToDashboard(input);
   }
 
   /** Removes one widget. */
-  deleteDashboardWidget(input: { projectId: string; id: string }): Promise<void> {
+  deleteDashboardWidget(input: {
+    projectId: string;
+    id: string;
+    viewer?: DashboardViewer;
+  }): Promise<void> {
     return this.#widgets.deleteWidget(input);
   }
 
@@ -376,10 +534,12 @@ export class DashboardApp implements DashboardApi {
     projectId: string;
     graphId: string;
     layout: GraphLayout;
+    viewer?: DashboardViewer;
   }): Promise<{ success: true }> {
     await this.#widgets.updateLayouts({
       projectId: input.projectId,
       layouts: [{ graphId: input.graphId, layout: input.layout }],
+      viewer: input.viewer,
     });
     return { success: true };
   }
@@ -388,6 +548,7 @@ export class DashboardApp implements DashboardApi {
   async batchUpdateDashboardWidgetLayouts(input: {
     projectId: string;
     layouts: { graphId: string; layout: GraphLayout }[];
+    viewer?: DashboardViewer;
   }): Promise<{ success: true }> {
     await this.#widgets.updateLayouts(input);
     return { success: true };
@@ -435,17 +596,26 @@ export class DashboardApp implements DashboardApi {
     return this.#workbenchAccess.isWorkbenchEnabled(input);
   }
 
-  /** Every saved chart in the project. */
-  listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
-    return this.#charts.getAll(input);
+  /** The project's saved charts, less those on boards outside the viewer's audience. */
+  async listSavedWorkbenchCharts(input: {
+    projectId: string;
+    viewer?: DashboardViewer;
+  }): Promise<SavedWorkbenchChart[]> {
+    const [charts, visibleIds] = await Promise.all([
+      this.#charts.getAll({ projectId: input.projectId }),
+      this.#dashboards.findVisibleDashboardIds(input),
+    ]);
+    const visible = new Set(visibleIds);
+    return charts.filter((chart) => chart.dashboardId === null || visible.has(chart.dashboardId));
   }
 
   /** One saved chart, with its query, parameters and specification. */
   getSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    return this.#charts.getById(input);
+    return this.#getVisibleChart(input);
   }
 
   /** A new saved chart, for a credential that resolved its own protections. */
@@ -460,13 +630,16 @@ export class DashboardApp implements DashboardApi {
   }
 
   /** A saved chart's name, its definition, or both. */
-  updateSavedWorkbenchChart(input: {
+  async updateSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
     name?: string;
     definitionUpdate?: SavedWorkbenchChartDefinitionUpdate;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    return this.#charts.update(input);
+    const { viewer: _viewer, ...update } = input;
+    await this.#getVisibleChart(input);
+    return this.#charts.update(update);
   }
 
   /**
@@ -506,8 +679,10 @@ export class DashboardApp implements DashboardApi {
     chartId: string;
     name?: string;
     definition?: unknown;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
     await this.#requireWorkbench(input.projectId);
+    await this.#getVisibleChart(input);
 
     const definitionUpdate =
       input.definition === undefined
@@ -529,8 +704,13 @@ export class DashboardApp implements DashboardApi {
   }
 
   /** Removes one saved chart. */
-  deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void> {
-    return this.#charts.delete(input);
+  async deleteSavedWorkbenchChart(input: {
+    projectId: string;
+    chartId: string;
+    viewer?: DashboardViewer;
+  }): Promise<void> {
+    await this.#getVisibleChart(input);
+    return this.#charts.delete({ projectId: input.projectId, chartId: input.chartId });
   }
 
   /**
@@ -538,7 +718,7 @@ export class DashboardApp implements DashboardApi {
    * names one. Placement is a property of the chart rather than of the
    * dashboard's own card list.
    */
-  placeSavedWorkbenchChart(input: {
+  async placeSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
     dashboardId: string;
@@ -546,19 +726,48 @@ export class DashboardApp implements DashboardApi {
     gridRow?: number;
     colSpan?: number;
     rowSpan?: number;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    return this.#charts.place(input);
+    const { viewer, ...placement } = input;
+    const { projectId, chartId, dashboardId } = placement;
+    if (!(await this.#dashboards.isVisibleTo({ projectId, dashboardId, viewer }))) {
+      throw new SavedWorkbenchChartDashboardNotFoundError();
+    }
+    await this.#getVisibleChart({ projectId, chartId, viewer });
+    return this.#charts.place(placement);
   }
 
   /**
    * Takes one saved chart off whatever dashboard it is on, clearing its grid
    * box with it. The chart itself is untouched.
    */
-  unplaceSavedWorkbenchChart(input: {
+  async unplaceSavedWorkbenchChart(input: {
     projectId: string;
     chartId: string;
+    viewer?: DashboardViewer;
   }): Promise<SavedWorkbenchChart> {
-    return this.#charts.unplace(input);
+    await this.#getVisibleChart(input);
+    return this.#charts.unplace({ projectId: input.projectId, chartId: input.chartId });
+  }
+
+  /** A chart on a board outside the viewer's audience reads as a chart that is not there. */
+  async #getVisibleChart(input: {
+    projectId: string;
+    chartId: string;
+    viewer?: DashboardViewer;
+  }): Promise<SavedWorkbenchChart> {
+    const chart = await this.#charts.getById({
+      projectId: input.projectId,
+      chartId: input.chartId,
+    });
+    if (chart.dashboardId === null) return chart;
+    const visible = await this.#dashboards.isVisibleTo({
+      projectId: input.projectId,
+      dashboardId: chart.dashboardId,
+      viewer: input.viewer,
+    });
+    if (!visible) throw new SavedWorkbenchChartNotFoundError();
+    return chart;
   }
 
   /** Runs one saved chart for a member, over the period the surface asks for. */
@@ -569,8 +778,10 @@ export class DashboardApp implements DashboardApi {
     timeWindow?: LangWatchQLTimeWindow;
     granularitySeconds?: number;
     onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+    viewer?: DashboardViewer;
   }): Promise<LangWatchQLQueryResult> {
     await this.#requireWorkbench(input.projectId);
+    await this.#getVisibleChart(input);
 
     const { project, protections } = await this.#workbenchCaller.resolveRunCaller({
       actorId: input.actorId,

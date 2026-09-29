@@ -140,6 +140,8 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "    route /:project/analytics/query -> pages/[project]/analytics/query",
   "    route /:project/analytics/custom -> pages/[project]/analytics/custom/index",
   "    route /:project/analytics/custom/:id -> pages/[project]/analytics/custom/[id]",
+  "    route /:project/dashboards -> pages/[project]/dashboards/index",
+  "    route /:project/dashboards/:dashboardId -> pages/[project]/dashboards/[dashboardId]",
   "    route /:project/experiments -> pages/[project]/experiments/index",
   "    route /:project/experiments/workbench -> pages/[project]/experiments/workbench/index",
   "    route /:project/experiments/workbench/:slug -> pages/[project]/experiments/workbench/[slug]",
