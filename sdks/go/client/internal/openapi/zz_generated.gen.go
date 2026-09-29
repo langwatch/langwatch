@@ -21,7 +21,6 @@ import (
 const (
 	Admin_api_keyScopes      adminApiKeyContextKey      = "admin_api_key.Scopes"
 	Instance_admin_keyScopes instanceAdminKeyContextKey = "instance_admin_key.Scopes"
-	Internal_secretScopes    internalSecretContextKey   = "internal_secret.Scopes"
 	Project_api_keyScopes    projectApiKeyContextKey    = "project_api_key.Scopes"
 	Scim_bearerScopes        scimBearerContextKey       = "scim_bearer.Scopes"
 )
@@ -73025,12 +73024,6 @@ type ClientInterface interface {
 	// GetApiCodingAgentPullRequestUsage request
 	GetApiCodingAgentPullRequestUsage(ctx context.Context, params *GetApiCodingAgentPullRequestUsageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ReadOldLambdasCleanup request
-	ReadOldLambdasCleanup(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// RunOldLambdasCleanup request
-	RunOldLambdasCleanup(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// ReceiveElevenLabsWebhookWithBody request with any body
 	ReceiveElevenLabsWebhookWithBody(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -74392,30 +74385,6 @@ func (c *Client) PostApiCheckupRun(ctx context.Context, body PostApiCheckupRunJS
 
 func (c *Client) GetApiCodingAgentPullRequestUsage(ctx context.Context, params *GetApiCodingAgentPullRequestUsageParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetApiCodingAgentPullRequestUsageRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ReadOldLambdasCleanup(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReadOldLambdasCleanupRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) RunOldLambdasCleanup(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRunOldLambdasCleanupRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -80316,60 +80285,6 @@ func NewGetApiCodingAgentPullRequestUsageRequest(server string, params *GetApiCo
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewReadOldLambdasCleanupRequest generates requests for ReadOldLambdasCleanup
-func NewReadOldLambdasCleanupRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/cron/old_lambdas_cleanup")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewRunOldLambdasCleanupRequest generates requests for RunOldLambdasCleanup
-func NewRunOldLambdasCleanupRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/cron/old_lambdas_cleanup")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -95474,12 +95389,6 @@ type ClientWithResponsesInterface interface {
 	// GetApiCodingAgentPullRequestUsageWithResponse request
 	GetApiCodingAgentPullRequestUsageWithResponse(ctx context.Context, params *GetApiCodingAgentPullRequestUsageParams, reqEditors ...RequestEditorFn) (*GetApiCodingAgentPullRequestUsageResponse, error)
 
-	// ReadOldLambdasCleanupWithResponse request
-	ReadOldLambdasCleanupWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ReadOldLambdasCleanupResponse, error)
-
-	// RunOldLambdasCleanupWithResponse request
-	RunOldLambdasCleanupWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RunOldLambdasCleanupResponse, error)
-
 	// ReceiveElevenLabsWebhookWithBodyWithResponse request with any body
 	ReceiveElevenLabsWebhookWithBodyWithResponse(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error)
 
@@ -97062,78 +96971,6 @@ func (r GetApiCodingAgentPullRequestUsageResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetApiCodingAgentPullRequestUsageResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type ReadOldLambdasCleanupResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		Message string `json:"message"`
-	}
-	JSON500 *struct {
-		Error   string `json:"error"`
-		Message string `json:"message"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r ReadOldLambdasCleanupResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ReadOldLambdasCleanupResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ReadOldLambdasCleanupResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type RunOldLambdasCleanupResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		Message string `json:"message"`
-	}
-	JSON500 *struct {
-		Error   string `json:"error"`
-		Message string `json:"message"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r RunOldLambdasCleanupResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r RunOldLambdasCleanupResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r RunOldLambdasCleanupResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -116709,24 +116546,6 @@ func (c *ClientWithResponses) GetApiCodingAgentPullRequestUsageWithResponse(ctx 
 	return ParseGetApiCodingAgentPullRequestUsageResponse(rsp)
 }
 
-// ReadOldLambdasCleanupWithResponse request returning *ReadOldLambdasCleanupResponse
-func (c *ClientWithResponses) ReadOldLambdasCleanupWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ReadOldLambdasCleanupResponse, error) {
-	rsp, err := c.ReadOldLambdasCleanup(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseReadOldLambdasCleanupResponse(rsp)
-}
-
-// RunOldLambdasCleanupWithResponse request returning *RunOldLambdasCleanupResponse
-func (c *ClientWithResponses) RunOldLambdasCleanupWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RunOldLambdasCleanupResponse, error) {
-	rsp, err := c.RunOldLambdasCleanup(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRunOldLambdasCleanupResponse(rsp)
-}
-
 // ReceiveElevenLabsWebhookWithBodyWithResponse request with arbitrary body returning *ReceiveElevenLabsWebhookResponse
 func (c *ClientWithResponses) ReceiveElevenLabsWebhookWithBodyWithResponse(ctx context.Context, modelProviderId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReceiveElevenLabsWebhookResponse, error) {
 	rsp, err := c.ReceiveElevenLabsWebhookWithBody(ctx, modelProviderId, contentType, body, reqEditors...)
@@ -121089,82 +120908,6 @@ func ParseGetApiCodingAgentPullRequestUsageResponse(rsp *http.Response) (*GetApi
 		var dest struct {
 			Error   string  `json:"error"`
 			Message *string `json:"message,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseReadOldLambdasCleanupResponse parses an HTTP response from a ReadOldLambdasCleanupWithResponse call
-func ParseReadOldLambdasCleanupResponse(rsp *http.Response) (*ReadOldLambdasCleanupResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ReadOldLambdasCleanupResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Message string `json:"message"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			Error   string `json:"error"`
-			Message string `json:"message"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseRunOldLambdasCleanupResponse parses an HTTP response from a RunOldLambdasCleanupWithResponse call
-func ParseRunOldLambdasCleanupResponse(rsp *http.Response) (*RunOldLambdasCleanupResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &RunOldLambdasCleanupResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Message string `json:"message"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			Error   string `json:"error"`
-			Message string `json:"message"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

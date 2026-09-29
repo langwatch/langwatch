@@ -1926,9 +1926,9 @@ function respondDeclared({
 }
 
 /**
- * The version namespace: any real date the caller pins dispatches to the
- * latest registration on or before it, and anything else that is not a
- * servable version answers 404 rather than falling through to a dynamic route.
+ * The version namespace: any real date the caller pins dispatches to the latest
+ * registration on or before it. A version no mounted family serves answers 404
+ * rather than falling through to a dynamic route.
  */
 function mountVersionGuards<Api>({
   app,
@@ -1947,7 +1947,8 @@ function mountVersionGuards<Api>({
 }): void {
   const namespace = "/:apiVersion{latest|preview|20\\d{2}-\\d{2}-\\d{2}}";
   const fallback = dateFallback({ basePath, declaration, ports, options, facts });
-  const notFound: MiddlewareHandler = async (context) => context.notFound();
+  const notFound: MiddlewareHandler = async (context, next) =>
+    anotherFamilyServesTheVersion(context) ? next() : context.notFound();
 
   for (const guard of [namespace, `${namespace}/*`]) {
     const handlers: [MiddlewareHandler, ...MiddlewareHandler[]] = [fallback, notFound];
@@ -2005,35 +2006,105 @@ function dateFallback<Api>({
     }),
   }));
 
-  return async (context, next) => {
-    const requested = context.req.param("apiVersion") ?? "";
+  const pick = (context: Context, routePath: string) => {
+    const requested = versionAsked(context, routePath);
 
-    if (!isDateVersion(requested) || requested < declaration.version) return next();
+    if (!isDateVersion(requested) || requested < declaration.version) return undefined;
 
     // The guard is mounted under both prefixes, so the base to strip comes
     // from the route that matched rather than from the family's bare path.
-    const marker = context.req.routePath.indexOf("/:apiVersion");
-    const mountBase = marker >= 0 ? context.req.routePath.slice(0, marker) : basePath;
+    const marker = routePath.indexOf("/:apiVersion");
+    const mountBase = marker >= 0 ? routePath.slice(0, marker) : basePath;
     const rest = context.req.path.slice(mountBase.length + requested.length + 1) || "/";
     const method = context.req.method.toLowerCase() as HttpMethod;
+    const found = candidateFor({ candidates, method, rest });
 
-    for (const candidate of candidates) {
-      if (!serves(candidate, method)) continue;
-
-      const params = matchPath(candidate.pattern, rest);
-
-      if (!params) continue;
-
-      context.set(ROUTE_PARAMS, params);
-      context.set(VERSION_REQUEST, requested);
-
-      const response = await runStack(candidate.stack, context);
-
-      return response ?? next();
-    }
-
-    return next();
+    return found ? { requested, ...found } : undefined;
   };
+
+  const fallback: MiddlewareHandler = async (context, next) => {
+    const picked = pick(context, context.req.routePath);
+
+    if (!picked) return next();
+
+    context.set(ROUTE_PARAMS, picked.params);
+    context.set(VERSION_REQUEST, picked.requested);
+
+    const response = await runStack(picked.stack, context);
+
+    return response ?? next();
+  };
+
+  datedFallbacks.set(fallback, (context, routePath) => pick(context, routePath) !== undefined);
+
+  return fallback;
+}
+
+/** Each family's date fallback, asked whether it would serve a request without running it. */
+const datedFallbacks = new WeakMap<object, (context: Context, routePath: string) => boolean>();
+
+/**
+ * Whether a family mounted after this guard serves the versioned address: a route
+ * declared at that very version, or another family's date fallback.
+ */
+function anotherFamilyServesTheVersion(context: Context): boolean {
+  const position = versionPosition(context.req.routePath);
+  const requested = versionAsked(context, context.req.routePath);
+  const later = matchedRoutes(context).slice(context.req.routeIndex + 1);
+
+  return later.some(
+    (route) => servesAtVersion({ route, position, requested }) || fallbackServes(context, route),
+  );
+}
+
+/** A route declared at the very version asked for, not a dynamic segment standing in for it. */
+function servesAtVersion({
+  route,
+  position,
+  requested,
+}: {
+  route: RouterRoute;
+  position: number;
+  requested: string;
+}): boolean {
+  if (!servesTheRequest(route)) return false;
+
+  return route.path.split("/")[position] === requested;
+}
+
+function fallbackServes(context: Context, route: RouterRoute): boolean {
+  return datedFallbacks.get(handlerOf(route))?.(context, route.path) === true;
+}
+
+/** The version segment of the request, read at the place a guard's path declares it. */
+function versionAsked(context: Context, routePath: string): string {
+  return context.req.path.split("/")[versionPosition(routePath)] ?? "";
+}
+
+function versionPosition(routePath: string): number {
+  return routePath.split("/").findIndex((segment) => segment.startsWith(":apiVersion"));
+}
+
+/** The first candidate serving the method at the path, with the params it read. */
+function candidateFor<Candidate extends Readonly<{ pattern: string; stack: MiddlewareHandler[] }>>({
+  candidates,
+  method,
+  rest,
+}: {
+  candidates: readonly (Candidate &
+    Readonly<{ methods: readonly HttpMethod[]; anyMethod: boolean }>)[];
+  method: HttpMethod;
+  rest: string;
+}): { params: Record<string, string>; stack: MiddlewareHandler[] } | undefined {
+  for (const candidate of candidates) {
+    if (!serves(candidate, method)) continue;
+
+    const params = matchPath(candidate.pattern, rest);
+
+    if (params) return { params, stack: candidate.stack };
+  }
+
+  return undefined;
 }
 
 /** Whether a candidate of the date fallback answers the method that arrived. */
@@ -2242,8 +2313,11 @@ function mountMethodGuards({
   for (const [path, methods] of served) {
     const guard: MiddlewareHandler = async (context, next) => {
       const routes = matchedRoutes(context);
+      const answered = routes.some(
+        (route) => servesTheRequest(route) || fallbackServes(context, route),
+      );
 
-      if (routes.some(servesTheRequest)) return next();
+      if (answered) return next();
 
       context.header("Allow", allowHeaderOf(new Set(routes.flatMap(guardedMethods))));
 

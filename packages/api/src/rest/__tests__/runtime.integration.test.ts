@@ -1752,6 +1752,7 @@ describe("a path the family serves with another method", () => {
 interface RunApi {
   bySlug(input: { slug: string }): Promise<{ slug: string }>;
   execute(input: { name: string }): Promise<{ started: string }>;
+  abort(input: { slug: string }): Promise<{ aborted: string }>;
 }
 
 const RunApi = moduleApi<RunApi>()("experiment");
@@ -1774,11 +1775,24 @@ const runRunner = defineRestRouter(RunApi)
   .withPermission("experiments:manage")
   .withOutput(z.object({ started: z.string() }))
   .handle(async ({ app, input }) => app.execute({ name: input.name }))
+
+  .post("/:slug/abort", "abortRun")
+  .withParams(z.object({ slug: z.string() }))
+  .withPermission("experiments:manage")
+  .withOutput(z.object({ aborted: z.string() }))
+  .handle(async ({ app, input }) => app.abort({ slug: input.slug }))
   .build();
+
+const abortedRuns: string[] = [];
 
 const runApplication: RunApi = {
   bySlug: async ({ slug }) => ({ slug }),
   execute: async ({ name }) => ({ started: name }),
+  abort: async ({ slug }) => {
+    abortedRuns.push(slug);
+
+    return { aborted: slug };
+  },
 };
 
 /** Both families on one host, in the order a module lists its transports. */
@@ -1836,6 +1850,39 @@ describe("a path two families serve with different methods", () => {
 
     expect(readerOnly.status).toBe(405);
     expect(readerOnly.headers.get("allow")).toBe("GET, HEAD");
+  });
+
+  /** @scenario "A later family's versioned address is answered, not refused by an earlier family's version guard" */
+  it("reaches the later family at latest, at its dated version and at a later real date", async () => {
+    const host = runsHost();
+
+    for (const address of [
+      "/api/runs/latest/execute",
+      `/api/runs/${VERSION}/execute`,
+      "/api/runs/2026-12-01/execute",
+      "/api/v1/runs/latest/execute",
+    ]) {
+      const executed = await post(host, address, "workbench");
+
+      expect({ address, status: executed.status }).toEqual({ address, status: 200 });
+      expect(await executed.json()).toEqual({ started: "workbench" });
+    }
+  });
+
+  /** @scenario "A version no mounted family serves still answers 404 rather than reaching a dynamic route" */
+  it("answers 404 for a date before every registration, and the dynamic route never runs", async () => {
+    abortedRuns.length = 0;
+
+    const host = runsHost();
+    const unknown = await host.request("/api/runs/2026-01-01/abort", { method: "POST" });
+
+    expect(unknown.status).toBe(404);
+    expect(abortedRuns).toEqual([]);
+
+    const served = await host.request("/api/runs/run-1/abort", { method: "POST" });
+
+    expect(served.status).toBe(200);
+    expect(abortedRuns).toEqual(["run-1"]);
   });
 
   /** @scenario "A method no mounted family serves on a path answers 405 naming every family's methods" */
