@@ -33,6 +33,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
+    "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

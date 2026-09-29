@@ -9937,6 +9937,9 @@ importers:
       '@langwatch/egress':
         specifier: workspace:*
         version: link:../../../packages/egress
+      '@langwatch/enterprise-managed-provider-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/managed-provider/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
