@@ -28,6 +28,10 @@ type Options struct {
 	DryRun       bool
 	Keep         bool
 	BootTimeout  time.Duration
+	// Stall fails a boot whose logs and lanes do not move for this long;
+	// SmokeTimeout bounds each entrypoint's import smoke (watchdog.go, smoke.go).
+	Stall        time.Duration
+	SmokeTimeout time.Duration
 	Identity     SeedIdentity
 	TraceCount   int
 	// UseHaven boots each stack as a haven stack under its own run-scoped
@@ -112,6 +116,9 @@ type Deps struct {
 	// Conditions reads the machine a run refuses to start on (conditions.go).
 	// Only the real runner gets it by default, so a test never reads the load.
 	Conditions func(ctx context.Context, options Options) Conditions
+	// ImportSmoke loads a worktree's app entrypoints before haven up (smoke.go).
+	// Only the real runner gets it by default, so a test never runs node.
+	ImportSmoke func(ctx context.Context, dir string, timeout time.Duration) error
 }
 
 // Request is everything Execute needs: what to run, what to render, and what
@@ -214,6 +221,9 @@ func (deps *Deps) fillPreflight() {
 		}
 		if deps.Conditions == nil {
 			deps.Conditions = ReadConditions
+		}
+		if deps.ImportSmoke == nil {
+			deps.ImportSmoke = ImportSmoke
 		}
 	}
 }
@@ -460,6 +470,8 @@ type session struct {
 	// logOffsets are each started stack's log size at its `haven up`, so a
 	// fatal line an earlier up of the same slug wrote is never read as this one's.
 	logOffsets map[string]int64
+	// watches follow each started stack's boot (watchdog.go).
+	watches map[string]*bootWatch
 	// stagger lets the candidate capture while the base still boots; the
 	// base arrives on baseArrival, ready and seeded, once it can (haven.go).
 	stagger     bool

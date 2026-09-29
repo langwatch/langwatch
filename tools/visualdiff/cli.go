@@ -208,7 +208,9 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	routeList := flags.String("routes", "", "comma-separated routes to run, as configured; naming any route or flow runs only those")
 	basePort := flags.Int("base-port", DefaultBasePort, "first port of the base stack")
 	runDir := flags.String("run-dir", "", "directory for worktrees, logs, screenshots and the report")
-	bootTimeout := flags.Duration("boot-timeout", 20*time.Minute, "how long a stack gets to answer")
+	bootTimeout := flags.Duration("boot-timeout", 20*time.Minute, "how long a stack gets to answer (last resort)")
+	stall := flags.Duration("stall", 90*time.Second, "fail a booting stack whose logs and lanes do not move for this long; 0 disables")
+	smokeTimeout := flags.Duration("smoke-timeout", 30*time.Second, "how long each app entrypoint gets to load its import graph before haven up; 0 skips the smoke")
 	dryRun := flags.Bool("dry-run", false, "print the plan and start nothing")
 	keep := flags.Bool("keep", false, "leave both stacks and both worktrees up after the run")
 	agent := flags.Bool("agent", false, "plain, token-free output for an agent")
@@ -250,8 +252,8 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		Root: absoluteRoot, BaseRef: *baseRef, CandidateRef: *candidateRef, RunDir: *runDir,
 		BasePort: *basePort, Viewport: parsedViewport, RoutesOnly: *routesOnly,
 		Agent: *agent, DryRun: *dryRun, Keep: *keep,
-		BootTimeout: *bootTimeout,
-		UseHaven:    havenSelected(havenOnPath(), *noHaven),
+		BootTimeout: *bootTimeout, Stall: *stall, SmokeTimeout: *smokeTimeout,
+		UseHaven: havenSelected(havenOnPath(), *noHaven),
 		Identity: SeedIdentity{
 			ProjectKey: *projectKey, Slug: *slug, Email: *email, Password: *password,
 		},

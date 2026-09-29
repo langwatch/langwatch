@@ -79,6 +79,9 @@ func (run *session) bringUpHaven(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		if err := run.importSmoke(ctx, *stack, running); err != nil {
+			return err
+		}
 		if err := run.startHaven(ctx, *stack, running); err != nil {
 			return err
 		}
@@ -164,6 +167,23 @@ func (run *session) prepareStack(ctx context.Context, stack *Stack) (bool, error
 		}
 	}
 	return live, nil
+}
+
+// importSmoke fails the run in seconds when a stack about to boot cannot even
+// load its entrypoints, instead of letting haven hang on it until the boot timeout.
+func (run *session) importSmoke(ctx context.Context, stack Stack, running bool) error {
+	timeout := run.request.Options.SmokeTimeout
+	if running || timeout <= 0 || run.request.Deps.ImportSmoke == nil {
+		return nil
+	}
+	started := time.Now()
+	err := run.request.Deps.ImportSmoke(ctx, stack.Dir, timeout)
+	run.phases.since(stack.Name+" import smoke", started)
+	fmt.Fprintf(run.streams.Err, "%s: import smoke exit=%s\n", stack.Name, exitStatus(err))
+	if err != nil {
+		return fmt.Errorf("%s: %w", stack.Name, err)
+	}
+	return nil
 }
 
 // startHaven boots a stack unless haven already runs it, recording it for
@@ -401,6 +421,10 @@ func (run *session) havenUp(ctx context.Context, stack Stack) error {
 		run.logOffsets = map[string]int64{}
 	}
 	run.logOffsets[stack.HavenSlug] = logSize(stack.HavenSlug)
+	if run.watches == nil {
+		run.watches = map[string]*bootWatch{}
+	}
+	run.watches[stack.HavenSlug] = newBootWatch(stack.HavenSlug, run.request.Options.Stall)
 	if run.upAt == nil {
 		run.upAt = map[string]time.Time{}
 	}
@@ -420,9 +444,13 @@ func (run *session) havenUp(ctx context.Context, stack Stack) error {
 func (run *session) havenWaitReady(ctx context.Context, stack *Stack) error {
 	timeout := run.request.Options.BootTimeout
 	deadline := time.Now().Add(timeout)
-	fmt.Fprintf(run.streams.Err, "%s: waiting for the ui and backend lanes of %q (up to %s)\n", stack.Name, stack.HavenSlug, timeout)
+	fmt.Fprintf(run.streams.Err, "%s: waiting for the ui and backend lanes of %q (up to %s, stall %s)\n", stack.Name, stack.HavenSlug, timeout, run.request.Options.Stall)
+	watch := run.watches[stack.HavenSlug]
+	if watch == nil {
+		watch = newBootWatch(stack.HavenSlug, run.request.Options.Stall)
+	}
 	for {
-		if ready, err := run.havenPoll(ctx, stack); ready || err != nil {
+		if ready, err := run.havenPoll(ctx, stack, watch); ready || err != nil {
 			return err
 		}
 		if time.Now().After(deadline) {
@@ -439,11 +467,11 @@ func (run *session) havenWaitReady(ctx context.Context, stack *Stack) error {
 
 // havenPoll asks haven once: ready adopts the stack's URL, and a stack haven
 // has already given up on is an error now rather than at the timeout.
-func (run *session) havenPoll(ctx context.Context, stack *Stack) (bool, error) {
-	status, statusErr := run.havenStatus(ctx, *stack)
+func (run *session) havenPoll(ctx context.Context, stack *Stack, watch *bootWatch) (bool, error) {
+	raw, status, statusErr := run.havenStatusRaw(ctx, *stack)
 	if statusErr != nil {
-		// A status call that fails mid-boot is retried; the boot timeout bounds it.
-		return false, nil //nolint:nilerr // retried by the caller's poll loop.
+		// A status call that fails mid-boot is retried; the watch and the boot timeout bound it.
+		return false, watch.check(time.Now(), nil)
 	}
 	if url, ready := havenStackURL(status, stack.HavenSlug); ready {
 		stack.HavenURL = url
@@ -452,6 +480,9 @@ func (run *session) havenPoll(ctx context.Context, stack *Stack) (bool, error) {
 	}
 	if fatal, tail := havenGaveUp(status, stack.HavenSlug, run.logOffsets[stack.HavenSlug]); fatal != "" {
 		return false, fmt.Errorf("%s: haven gave up on stack %q: %s\n%s", stack.Name, stack.HavenSlug, fatal, tail)
+	}
+	if err := watch.check(time.Now(), raw); err != nil {
+		return false, fmt.Errorf("%s: %w", stack.Name, err)
 	}
 	return false, nil
 }
@@ -529,12 +560,19 @@ func havenStackURL(status havenrun.Status, slug string) (string, bool) {
 
 // havenStatus runs one `haven status --json` and decodes it.
 func (run *session) havenStatus(ctx context.Context, stack Stack) (havenrun.Status, error) {
+	_, status, err := run.havenStatusRaw(ctx, stack)
+	return status, err
+}
+
+// havenStatusRaw is havenStatus with the raw report, which the boot watch reads too.
+func (run *session) havenStatusRaw(ctx context.Context, stack Stack) ([]byte, havenrun.Status, error) {
 	var out bytes.Buffer
 	spec := commandSpec{name: havenrun.Command, args: havenrun.StatusArgs(), dir: stack.Dir, env: havenEnv(run.request.Deps.Environ(), stack.HavenSlug)}
 	if err := run.request.Deps.Run(ctx, spec, &out); err != nil {
-		return havenrun.Status{}, err
+		return nil, havenrun.Status{}, err
 	}
-	return havenrun.ParseStatus(out.Bytes())
+	status, err := havenrun.ParseStatus(out.Bytes())
+	return out.Bytes(), status, err
 }
 
 // havenBackendLog is the tail of a stack's Node lane log, for the failure
