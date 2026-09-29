@@ -3462,6 +3462,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/user/contract
       posthog-node:
         specifier: 'catalog:'
         version: 5.48.1(rxjs@7.8.2)
@@ -3469,6 +3472,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/api-fixture':
+        specifier: workspace:*
+        version: link:../../../../packages/api-fixture
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -5374,6 +5380,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
+      '@langwatch/enterprise-nurturing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/sso/contract
