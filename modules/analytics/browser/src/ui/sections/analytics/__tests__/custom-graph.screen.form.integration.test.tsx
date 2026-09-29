@@ -44,6 +44,9 @@ vi.mock("../../custom-graph.tsx", async (importOriginal) => ({
   CustomGraph: () => null,
 }));
 vi.mock("../../filter-sidebar.tsx", () => ({ FilterSidebar: () => null }));
+vi.mock("../../saved-views-scope.tsx", () => ({
+  SavedViewsScope: ({ children }: { children: React.ReactNode }) => children,
+}));
 vi.mock("../../analytics-period-picker.tsx", () => ({ AnalyticsPeriodPicker: () => null }));
 
 import CustomGraphScreen from "../custom-graph.screen.tsx";

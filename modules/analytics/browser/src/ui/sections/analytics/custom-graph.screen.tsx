@@ -95,6 +95,7 @@ import {
 import { FilterIconWithBadge } from "../../../ui/sections/filter-icon-with-badge.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-toggle.tsx";
+import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
 
 /** Which of the builder's two addresses this render is. */
@@ -355,7 +356,7 @@ function AnalyticsCustomGraphContent({
   }, [formData, filterParams, setDebouncedCustomAPIInput, setDebouncedCustomGraphInput]);
 
   return (
-    <>
+    <SavedViewsScope>
       <PageLayout.Header>
         <PageLayout.Heading>Custom Graph</PageLayout.Heading>
         <Spacer />
@@ -474,7 +475,7 @@ EOF`}
           </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
-    </>
+    </SavedViewsScope>
   );
 }
 

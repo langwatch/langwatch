@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   createSavedWorkbenchChartSchema,
+  customGraphInputSchema,
   dashboardCreateInputSchema,
   graphLayoutSchema,
   savedWorkbenchChartDefinitionSchema,
@@ -210,5 +211,16 @@ describe("dashboard contract", () => {
     expect(z.toJSONSchema(createSavedWorkbenchChartSchema, { io: "input" }).required).toEqual([
       "name",
     ]);
+  });
+
+  it("opens a REST-created graph that carries no graphId", () => {
+    const parsed = customGraphInputSchema.safeParse({
+      graphType: "line",
+      series: [],
+      includePrevious: false,
+      timeScale: "full",
+    });
+
+    expect(parsed.success && parsed.data.graphId).toBe("custom");
   });
 });

@@ -57,7 +57,8 @@ export const customGraphFiltersSchema = z.partialRecord(
 export const customGraphInputSchema = z.object({
   startDate: z.optional(z.number()),
   endDate: z.optional(z.number()),
-  graphId: z.string(),
+  /** REST-created graphs carry none; "custom" is the builder's own id for an unnamed graph. */
+  graphId: z.string().default("custom"),
   filters: z.optional(customGraphFiltersSchema),
   /** Trace origins the graph leaves out, whatever filters the page carries. */
   excludeOrigins: z.optional(z.array(z.string())),

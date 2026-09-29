@@ -14,6 +14,7 @@ import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { AnalyticsHeader, type AnalyticsHeaderProps } from "./analytics-header.tsx";
 import { CustomDashboardsSection } from "./custom-dashboards-section.tsx";
 import { CustomQueryMenuLink } from "./custom-query-menu-link.tsx";
+import { SavedViewsScope } from "./saved-views-scope.tsx";
 
 /** Which rail entry the page being rendered is. */
 export type AnalyticsRailEntry =
@@ -43,7 +44,7 @@ export default function AnalyticsLayout({
   const { showFilters } = useFilterToggle();
 
   return (
-    <>
+    <SavedViewsScope>
       <AnalyticsHeader
         title={title}
         {...analyticsHeaderProps}
@@ -113,6 +114,6 @@ export default function AnalyticsLayout({
           {children}
         </Container>
       </HStack>
-    </>
+    </SavedViewsScope>
   );
 }

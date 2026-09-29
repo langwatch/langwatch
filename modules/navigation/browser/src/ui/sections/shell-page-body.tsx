@@ -1,6 +1,6 @@
 /**
  * Shell page body: content card interior. Moved from platform/app.
- * Drawer/announcements/analytics/SavedViews moved or removed.
+ * Drawer/announcements/analytics moved or removed; the saved-views strip is analytics' own.
  */
 
 import {
