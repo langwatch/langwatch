@@ -1,4 +1,4 @@
-import type { RunPlanRunResult, RunPlanScope } from "../langwatch-api-run-plans.js";
+import type { RunPlanRunResult, RunPlanScope } from "../langwatch-api-run-plans.ts";
 
 /**
  * The digest every run of a plan returns, whichever tool started it.

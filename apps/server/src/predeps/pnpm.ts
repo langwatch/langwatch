@@ -9,7 +9,7 @@ import type { Predep, DetectionResult, InstallContext } from "./types.ts";
 // Pinned pnpm version. Keep in lockstep with the root package.json's
 // `packageManager` field — both control which pnpm we expect dev tooling
 // + npx-server to use.
-const PNPM_VERSION = "10.24.0";
+const PNPM_VERSION = "10.34.5";
 
 // Standalone-binary URL pattern published by pnpm/pnpm releases.
 // linux-x64 / linux-arm64 are glibc; linuxstatic-* are fully static and
@@ -60,8 +60,8 @@ export const pnpmPredep: Predep = {
     }
     // Fall through to user's system pnpm if it's a 10.x — pnpm 10's
     // `manage-package-manager-versions: true` default handles the `packageManager:
-    // pnpm@10.24.0` lockfile pin transparently across patch versions (pnpm 10.30.x reads the
-    // field, self-fetches 10.24.0 into its own cache when needed, runs scripts with the right
+    // pnpm@10.34.5` lockfile pin transparently across patch versions (pnpm 10.30.x reads the
+    // field, self-fetches 10.34.5 into its own cache when needed, runs scripts with the right
     // version). This is the same pattern uv.ts uses for the host's uv.
     const sysVersion = await resolveVersion("pnpm");
     if (sysVersion && sysVersion.startsWith("10.")) {

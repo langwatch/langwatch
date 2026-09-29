@@ -1,5 +1,5 @@
-import type { DatasetMutationResponse } from "../langwatch-api-datasets.js";
-import { escapeMarkdown } from "../utils/escape-markdown.js";
+import type { DatasetMutationResponse } from "../langwatch-api-datasets.ts";
+import { escapeMarkdown } from "../utils/escape-markdown.ts";
 
 /**
  * Formats the common detail lines (name, slug, id, column types) for a

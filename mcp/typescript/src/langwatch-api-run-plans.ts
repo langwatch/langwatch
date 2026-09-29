@@ -1,13 +1,13 @@
 import type { z } from "zod";
 
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 import type {
   runParametersSchema,
   runPlanScopeSchema,
   runPlanTargetSchema,
   RunPlanTargetWire,
-} from "./schemas/run-plan.js";
-import type { EvaluatorAttachmentWire } from "./schemas/suite-fields.js";
+} from "./schemas/run-plan.ts";
+import type { EvaluatorAttachmentWire } from "./schemas/suite-fields.ts";
 
 // Client for /api/v1/run-plans. A run plan is identified by name; re-using the
 // name replaces its config while parameters/notes belong to one run only.

@@ -1,4 +1,4 @@
-import { archiveRunPlan as apiArchiveRunPlan } from "../langwatch-api-run-plans.js";
+import { archiveRunPlan as apiArchiveRunPlan } from "../langwatch-api-run-plans.ts";
 
 /**
  * Handles the platform_archive_run_plan MCP tool invocation.

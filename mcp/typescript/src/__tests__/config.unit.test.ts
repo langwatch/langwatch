@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { initConfig, getConfig, requireApiKey, runWithConfig, tryGetConfig } from "../config.js";
+import { initConfig, getConfig, requireApiKey, runWithConfig, tryGetConfig } from "../config.ts";
 
 describe("config", () => {
   let originalApiKey: string | undefined;
@@ -119,7 +119,7 @@ describe("config", () => {
       delete (globalThis as Record<string, unknown>).__langwatch_mcp_config;
       delete (globalThis as Record<string, unknown>).__langwatch_mcp_config_storage;
       vi.resetModules();
-      const freshConfig = await import("../config.js");
+      const freshConfig = await import("../config.ts");
       expect(() => freshConfig.getConfig()).toThrow("Config not initialized");
     });
   });

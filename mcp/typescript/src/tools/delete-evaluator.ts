@@ -1,4 +1,4 @@
-import { deleteEvaluator as apiDeleteEvaluator } from "../langwatch-api-evaluators.js";
+import { deleteEvaluator as apiDeleteEvaluator } from "../langwatch-api-evaluators.ts";
 
 /**
  * Handles the platform_delete_evaluator MCP tool invocation.

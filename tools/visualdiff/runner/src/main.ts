@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 
-import { openSideBrowser, type Side, type SideBrowser } from "./capture";
-import { DiffPool } from "./diff-pool";
-import { Pairing, readReplay } from "./pairing";
-import { awaitSide } from "./pending-side";
-import { emit, note, type Plan, type PlanSide } from "./protocol";
-import { orderFlows, runPool, width } from "./schedule";
-import { captureFlow, captureRoutes, type Collect } from "./screens";
-import { signInSide } from "./sign-in";
+import { openSideBrowser, type Side, type SideBrowser } from "./capture.ts";
+import { DiffPool } from "./diff-pool.ts";
+import { Pairing, readReplay } from "./pairing.ts";
+import { awaitSide } from "./pending-side.ts";
+import { emit, note, type Plan, type PlanSide } from "./protocol.ts";
+import { orderFlows, runPool, width } from "./schedule.ts";
+import { captureFlow, captureRoutes, type Collect } from "./screens.ts";
+import { signInSide } from "./sign-in.ts";
 
 const out = process.stdout;
 

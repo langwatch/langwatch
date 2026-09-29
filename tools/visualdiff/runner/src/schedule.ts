@@ -1,4 +1,4 @@
-import type { PlanFlow } from "./protocol";
+import type { PlanFlow } from "./protocol.ts";
 
 /**
  * runPool works through items on `width` lanes, each lane taking the next

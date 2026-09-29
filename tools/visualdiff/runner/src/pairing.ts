@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { DiffFiles, PixelDiff } from "./diff";
-import type { CaptureMessage, DiffMessage, Plan } from "./protocol";
+import type { DiffFiles, PixelDiff } from "./diff.ts";
+import type { CaptureMessage, DiffMessage, Plan } from "./protocol.ts";
 
 /** SIGN_IN_FLOW is the flow key of the one capture sign-in takes: the passkey offer. */
 export const SIGN_IN_FLOW = "sign-in";

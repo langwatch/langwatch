@@ -1,6 +1,6 @@
-import type { Action } from "./context";
-import { argument } from "./context";
-import { readField } from "./expect";
+import type { Action } from "./context.ts";
+import { argument } from "./context.ts";
+import { readField } from "./expect.ts";
 
 /** MAIL_TIMEOUT_MILLIS bounds the wait for a message to reach the sink. */
 const MAIL_TIMEOUT_MILLIS = 20_000;

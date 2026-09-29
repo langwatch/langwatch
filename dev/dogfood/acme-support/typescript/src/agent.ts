@@ -6,7 +6,7 @@ import { openai } from "@ai-sdk/openai";
 import { generateText, stepCountIs, tool, type ModelMessage } from "ai";
 import { z } from "zod";
 
-import { lookupOrder, refundOrder, REFUND_LIMIT_FREE } from "./accounts.js";
+import { lookupOrder, refundOrder, REFUND_LIMIT_FREE } from "./accounts.ts";
 
 /** The account the support agent works on. Every conversation uses this one. */
 export const ACCOUNT_ID = "acme-pro";

@@ -1,4 +1,4 @@
-import type { CaptureMessage } from "./protocol";
+import type { CaptureMessage } from "./protocol.ts";
 
 /** Vite serves the app's own modules on these paths; their failure is the dev server's. */
 const VITE_MODULE_PATTERN = /\/@fs\/|\/@id\/|\/@vite\/|\/@react-refresh|\/node_modules\/\.vite\//;

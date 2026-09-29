@@ -5,7 +5,7 @@
  */
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 
-import { createClaudeCodeAgent } from "./claude-code-adapter.js";
+import { createClaudeCodeAgent } from "./claude-code-adapter.ts";
 
 const workingDirectory = process.argv[2];
 if (!workingDirectory) {

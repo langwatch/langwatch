@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { createSkillTestWorkDir, removeSkillTestWorkDir } from "./helpers/claude-code-adapter";
+import { createSkillTestWorkDir, removeSkillTestWorkDir } from "./helpers/claude-code-adapter.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");

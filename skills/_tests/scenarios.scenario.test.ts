@@ -15,12 +15,12 @@ import {
   installSkillToWorkDir,
   removeSkillTestWorkDir,
   SKILL_TESTS_SET_ID,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 import {
   type RunningConnectedAgent,
   startConnectedAgentFixture,
-} from "./helpers/connected-agent-fixture";
-import { archiveTestSuite } from "./helpers/test-suite-cleanup";
+} from "./helpers/connected-agent-fixture.ts";
+import { archiveTestSuite } from "./helpers/test-suite-cleanup.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

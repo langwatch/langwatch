@@ -40,7 +40,7 @@
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "catalog:",
     "lodash-es": "catalog:",
     "pg": "^8.22.0",

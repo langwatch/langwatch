@@ -1,6 +1,6 @@
 import type { Locator, Page } from "playwright";
 
-import { asRegExp } from "./context";
+import { asRegExp } from "./context.ts";
 
 const TARGET_KEYS = ["testId", "testIdPrefix", "label"] as const;
 

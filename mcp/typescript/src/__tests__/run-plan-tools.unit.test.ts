@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../langwatch-api-run-plans.js", () => ({
+vi.mock("../langwatch-api-run-plans.ts", () => ({
   listRunPlans: vi.fn(),
   getRunPlan: vi.fn(),
   runRunPlan: vi.fn(),
@@ -21,12 +21,12 @@ import {
   runRunPlan,
   type RunPlan,
   type RunPlanRunResult,
-} from "../langwatch-api-run-plans.js";
-import { handleArchiveRunPlan } from "../tools/archive-run-plan.js";
-import { handleGetRunPlan } from "../tools/get-run-plan.js";
-import { handleListRunPlans } from "../tools/list-run-plans.js";
-import { handleRerunRunPlan } from "../tools/rerun-run-plan.js";
-import { handleRunPlan } from "../tools/run-plan.js";
+} from "../langwatch-api-run-plans.ts";
+import { handleArchiveRunPlan } from "../tools/archive-run-plan.ts";
+import { handleGetRunPlan } from "../tools/get-run-plan.ts";
+import { handleListRunPlans } from "../tools/list-run-plans.ts";
+import { handleRerunRunPlan } from "../tools/rerun-run-plan.ts";
+import { handleRunPlan } from "../tools/run-plan.ts";
 
 const mockListRunPlans = vi.mocked(listRunPlans);
 const mockGetRunPlan = vi.mocked(getRunPlan);

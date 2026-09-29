@@ -8,7 +8,7 @@ import {
   createSkillTestWorkDir,
   installSkillToWorkDir,
   removeSkillTestWorkDir,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 
 describe("Claude Code skill discovery", () => {
   it("points an existing CLAUDE.md at each installed skill once", () => {

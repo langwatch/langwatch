@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { asRegExp, fillPath, sideFixtures } from "../flows/context";
+import { asRegExp, fillPath, sideFixtures } from "../flows/context.ts";
 
 describe("fillPath", () => {
   describe("given a route with the project slug and a seeded fixture placeholder", () => {

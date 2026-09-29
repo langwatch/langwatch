@@ -2,7 +2,7 @@ import {
   getAgent as apiGetAgent,
   type AgentInstance,
   type AgentParameterSpec,
-} from "../langwatch-api-agents.js";
+} from "../langwatch-api-agents.ts";
 
 export const describeParameter = ({
   name,

@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
+import { initConfig } from "../config.ts";
 import {
   countingVerifier,
   MCP_POST_HEADERS,
@@ -18,7 +18,7 @@ import {
   VALID_KEY,
   initializeBody,
   type Harness,
-} from "./support/http-server-harness.js";
+} from "./support/http-server-harness.ts";
 
 beforeEach(() => {
   initConfig({ endpoint: "https://app.langwatch.ai" });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api.js", async (importOriginal) => {
+vi.mock("../langwatch-api.ts", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -8,9 +8,9 @@ vi.mock("../langwatch-api.js", async (importOriginal) => {
   };
 });
 
-import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
-import { deriveRunStatus, isTerminalStatus } from "../tools/experiment-run-status.js";
-import { handleExperimentStatus } from "../tools/run-experiment.js";
+import { LangWatchApiError, makeRequest } from "../langwatch-api.ts";
+import { deriveRunStatus, isTerminalStatus } from "../tools/experiment-run-status.ts";
+import { handleExperimentStatus } from "../tools/run-experiment.ts";
 
 const mockMakeRequest = vi.mocked(makeRequest);
 

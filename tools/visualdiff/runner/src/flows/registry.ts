@@ -1,9 +1,9 @@
-import * as actions from "./actions";
-import type { Action } from "./context";
-import { expectOutcome } from "./expect";
-import { capture, drag, upload } from "./interactions";
-import { mail } from "./mail";
-import { click, dismissTour, fill, go, select, type, wait } from "./primitives";
+import * as actions from "./actions.ts";
+import type { Action } from "./context.ts";
+import { expectOutcome } from "./expect.ts";
+import { capture, drag, upload } from "./interactions.ts";
+import { mail } from "./mail.ts";
+import { click, dismissTour, fill, go, select, type, wait } from "./primitives.ts";
 
 /** Keep names aligned with `RunnerActions` in tools/visualdiff/config.go; tests enforce parity. */
 export const REGISTRY: Record<string, Action> = {

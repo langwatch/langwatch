@@ -1,7 +1,7 @@
 import {
   updateEvaluator as apiUpdateEvaluator,
   getEvaluatorType,
-} from "../langwatch-api-evaluators.js";
+} from "../langwatch-api-evaluators.ts";
 
 /**
  * Handles the platform_update_evaluator MCP tool: updates an evaluator

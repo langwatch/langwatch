@@ -1,4 +1,4 @@
-import type { SettleConfig } from "./protocol";
+import type { SettleConfig } from "./protocol.ts";
 
 /**
  * Event-driven settling avoids half-rendered captures without adding a fixed delay to

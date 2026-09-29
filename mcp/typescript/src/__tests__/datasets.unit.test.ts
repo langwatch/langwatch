@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api-datasets.js", () => ({
+vi.mock("../langwatch-api-datasets.ts", () => ({
   listDatasets: vi.fn(),
   getDataset: vi.fn(),
 }));
 
-import { listDatasets, getDataset } from "../langwatch-api-datasets.js";
-import { createDatasetSchema } from "../schemas/create-dataset.js";
-import { handleGetDataset, formatDatasetResponse } from "../tools/get-dataset.js";
-import { handleListDatasets } from "../tools/list-datasets.js";
+import { listDatasets, getDataset } from "../langwatch-api-datasets.ts";
+import { createDatasetSchema } from "../schemas/create-dataset.ts";
+import { handleGetDataset, formatDatasetResponse } from "../tools/get-dataset.ts";
+import { handleListDatasets } from "../tools/list-datasets.ts";
 
 const mockListDatasets = vi.mocked(listDatasets);
 const mockGetDataset = vi.mocked(getDataset);
@@ -199,7 +199,7 @@ describe("MCP server dataset tool registration", () => {
   describe("when the MCP server is created", () => {
     /** @scenario "All dataset tools are registered in the MCP server" */
     it("registers all 8 dataset tools", async () => {
-      const { createMcpServer } = await import("../create-mcp-server.js");
+      const { createMcpServer } = await import("../create-mcp-server.ts");
       const server = createMcpServer();
       // Access registered tools via the internal _registeredTools object
       const registeredTools = (server as unknown as { _registeredTools: Record<string, unknown> })
@@ -228,7 +228,7 @@ describe("dataset tools API key requirement", () => {
       delete process.env.LANGWATCH_API_KEY;
 
       try {
-        const { initConfig, requireApiKey } = await import("../config.js");
+        const { initConfig, requireApiKey } = await import("../config.ts");
         initConfig({ apiKey: "", endpoint: "http://localhost:0" });
 
         expect(() => requireApiKey()).toThrow("LANGWATCH_API_KEY is required");

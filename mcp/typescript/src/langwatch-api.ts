@@ -1,7 +1,7 @@
 import type { HandledErrorFault, SerializedReason } from "@langwatch/handled-error";
 
-import { getConfig, requireApiKey } from "./config.js";
-import type { EvaluationSummary } from "./utils/format-evaluations.js";
+import { getConfig, requireApiKey } from "./config.ts";
+import type { EvaluationSummary } from "./utils/format-evaluations.ts";
 
 // --- Response types ---
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { admitOAuthToken, createSessionStore } from "../http-security.js";
+import { admitOAuthToken, createSessionStore } from "../http-security.ts";
 
 describe("createSessionStore", () => {
   function makeStore(maxAgeMs = 60_000) {

@@ -1,4 +1,4 @@
-import type { CaptureMessage } from "./protocol";
+import type { CaptureMessage } from "./protocol.ts";
 
 /** SHELL_PROBE is how many of the candidate's first routes decide whether its shell renders. */
 export const SHELL_PROBE = 3;

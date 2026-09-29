@@ -1,7 +1,7 @@
-import type { RunParameters, RunPlanRunResult } from "./langwatch-api-run-plans.js";
-import { makeRequest } from "./langwatch-api.js";
-import type { RunPlanTargetWire } from "./schemas/run-plan.js";
-import type { EvaluatorAttachmentWire, SuiteField } from "./schemas/suite-fields.js";
+import type { RunParameters, RunPlanRunResult } from "./langwatch-api-run-plans.ts";
+import { makeRequest } from "./langwatch-api.ts";
+import type { RunPlanTargetWire } from "./schemas/run-plan.ts";
+import type { EvaluatorAttachmentWire, SuiteField } from "./schemas/suite-fields.ts";
 
 /**
  * Client for `/api/v1/test-suites`. A test suite groups scenarios by

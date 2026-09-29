@@ -1,5 +1,5 @@
-import { listDatasets as apiListDatasets, type DatasetSummary } from "../langwatch-api-datasets.js";
-import { escapeMarkdown } from "../utils/escape-markdown.js";
+import { listDatasets as apiListDatasets, type DatasetSummary } from "../langwatch-api-datasets.ts";
+import { escapeMarkdown } from "../utils/escape-markdown.ts";
 
 /**
  * Fetches all datasets by paginating until every page is retrieved.

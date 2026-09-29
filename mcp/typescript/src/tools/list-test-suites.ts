@@ -1,4 +1,4 @@
-import { listTestSuites as apiListTestSuites } from "../langwatch-api-test-suites.js";
+import { listTestSuites as apiListTestSuites } from "../langwatch-api-test-suites.ts";
 
 /**
  * Handles the platform_list_test_suites MCP tool invocation.

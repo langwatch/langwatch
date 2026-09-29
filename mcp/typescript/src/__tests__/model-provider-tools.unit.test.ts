@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api-model-providers.js", () => ({
+vi.mock("../langwatch-api-model-providers.ts", () => ({
   listModelProviders: vi.fn(),
   setModelProvider: vi.fn(),
 }));
 
-import { listModelProviders, setModelProvider } from "../langwatch-api-model-providers.js";
-import { handleListModelProviders } from "../tools/list-model-providers.js";
-import { handleSetModelProvider } from "../tools/set-model-provider.js";
+import { listModelProviders, setModelProvider } from "../langwatch-api-model-providers.ts";
+import { handleListModelProviders } from "../tools/list-model-providers.ts";
+import { handleSetModelProvider } from "../tools/set-model-provider.ts";
 
 const mockListModelProviders = vi.mocked(listModelProviders);
 const mockSetModelProvider = vi.mocked(setModelProvider);

@@ -8,8 +8,8 @@ import { join, resolve } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { initConfig } from "../config.js";
-import { listDashboards } from "../langwatch-api-dashboards.js";
+import { initConfig } from "../config.ts";
+import { listDashboards } from "../langwatch-api-dashboards.ts";
 
 const SERVER_SRC = resolve(__dirname, "..");
 

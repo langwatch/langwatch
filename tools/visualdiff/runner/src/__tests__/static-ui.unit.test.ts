@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { bounded, requestTiming } from "../capture";
-import { stepError } from "../screens";
-import { builtShell, insideDir } from "../static-ui";
+import { bounded, requestTiming } from "../capture.ts";
+import { stepError } from "../screens.ts";
+import { builtShell, insideDir } from "../static-ui.ts";
 
 const built = `<html><head><script type="module" crossorigin src="/assets/index-a.js"></script><link rel="stylesheet" href="/assets/index-b.css"><link rel="icon" href="/favicon.ico" /></head><body></body></html>`;
 

@@ -4,8 +4,8 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
-import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.js";
-import { FEATURE_SKILLS, NATIVE_ONLY_SKILLS } from "../_lib/feature-skills.js";
+import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.ts";
+import { FEATURE_SKILLS, NATIVE_ONLY_SKILLS } from "../_lib/feature-skills.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");

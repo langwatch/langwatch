@@ -6,7 +6,7 @@ import {
   truncateJsonlToByteBudget,
 } from "@langwatch/redaction";
 
-import { getConfig } from "../config.js";
+import { getConfig } from "../config.ts";
 
 /** Transcripts are capped after redaction; oldest lines are dropped first. */
 const MAX_SESSION_BYTES = 8 * 1024 * 1024;

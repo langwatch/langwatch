@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 
-import { note, type PlanSide } from "./protocol";
+import { note, type PlanSide } from "./protocol.ts";
 
 const POLL_MILLIS = 500;
 

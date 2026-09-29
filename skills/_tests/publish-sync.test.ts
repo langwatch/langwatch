@@ -4,7 +4,7 @@ import path from "path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { sync } from "../_publish/sync.js";
+import { sync } from "../_publish/sync.ts";
 
 const EXTERNAL_LINK = /^(https?:|mailto:|#|\{\{)/;
 

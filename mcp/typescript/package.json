@@ -34,7 +34,7 @@
     }
   },
   "scripts": {
-    "start": "tsx src/index.ts",
+    "start": "node --experimental-transform-types src/index.ts",
     "build": "tsup && node build.js",
     "prepublish": "pnpm run build",
     "test": "vitest run",
@@ -67,7 +67,6 @@
     "express": "^5.2.1",
     "node-pty": "catalog:",
     "tsup": "catalog:",
-    "tsx": "catalog:",
     "typescript": "catalog:sdk-toolchain",
     "typescript-eslint": "catalog:",
     "vitest": "catalog:",

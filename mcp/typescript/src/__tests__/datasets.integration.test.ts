@@ -2,7 +2,7 @@ import { createServer, type Server } from "http";
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
+import { initConfig } from "../config.ts";
 
 // --- Canned responses for dataset API endpoints ---
 
@@ -290,7 +290,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the project has datasets", () => {
       /** @scenario "List datasets returns a formatted summary of all datasets" */
       it("returns a formatted list showing both datasets with their names, slugs, and record counts", async () => {
-        const { handleListDatasets } = await import("../tools/list-datasets.js");
+        const { handleListDatasets } = await import("../tools/list-datasets.ts");
         const result = await handleListDatasets();
         expect(result).toContain("User Feedback");
         expect(result).toContain("Training Data");
@@ -306,7 +306,7 @@ describe("MCP dataset tools integration", () => {
 
       beforeEach(async () => {
         emptyListMode = true;
-        const { handleListDatasets } = await import("../tools/list-datasets.js");
+        const { handleListDatasets } = await import("../tools/list-datasets.ts");
         result = await handleListDatasets();
       });
 
@@ -322,7 +322,7 @@ describe("MCP dataset tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON containing all datasets and total", async () => {
-        const { handleListDatasets } = await import("../tools/list-datasets.js");
+        const { handleListDatasets } = await import("../tools/list-datasets.ts");
         const result = await handleListDatasets({ format: "json" });
         const parsed = JSON.parse(result);
         expect(parsed.data).toEqual(CANNED_DATASETS_LIST.data);
@@ -337,7 +337,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Get dataset by slug returns metadata and a preview of records" */
       it("returns the dataset name, slug, and column definitions", async () => {
-        const { handleGetDataset } = await import("../tools/get-dataset.js");
+        const { handleGetDataset } = await import("../tools/get-dataset.ts");
         const result = await handleGetDataset({ slugOrId: "my-dataset" });
         expect(result).toContain("My Dataset");
         expect(result).toContain("my-dataset");
@@ -346,7 +346,7 @@ describe("MCP dataset tools integration", () => {
       });
 
       it("returns a preview of records", async () => {
-        const { handleGetDataset } = await import("../tools/get-dataset.js");
+        const { handleGetDataset } = await import("../tools/get-dataset.ts");
         const result = await handleGetDataset({ slugOrId: "my-dataset" });
         expect(result).toContain("hello");
         expect(result).toContain("world");
@@ -355,7 +355,7 @@ describe("MCP dataset tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON matching the API response", async () => {
-        const { handleGetDataset } = await import("../tools/get-dataset.js");
+        const { handleGetDataset } = await import("../tools/get-dataset.ts");
         const result = await handleGetDataset({ slugOrId: "my-dataset", format: "json" });
         expect(JSON.parse(result)).toEqual(CANNED_DATASET_DETAIL);
       });
@@ -364,7 +364,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Get dataset with non-existent slug returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleGetDataset } = await import("../tools/get-dataset.js");
+        const { handleGetDataset } = await import("../tools/get-dataset.ts");
         await expect(handleGetDataset({ slugOrId: "does-not-exist" })).rejects.toThrow("404");
       });
     });
@@ -376,7 +376,7 @@ describe("MCP dataset tools integration", () => {
     describe("when creating with name and columns", () => {
       /** @scenario "Create a dataset with name and columns" */
       it("returns confirmation including the generated slug", async () => {
-        const { handleCreateDataset } = await import("../tools/create-dataset.js");
+        const { handleCreateDataset } = await import("../tools/create-dataset.ts");
         const result = await handleCreateDataset({
           name: "Test Data",
           columnTypes: [
@@ -392,7 +392,7 @@ describe("MCP dataset tools integration", () => {
     describe("when creating with only a name", () => {
       /** @scenario "Create a dataset with only a name and no columns" */
       it("returns confirmation including the slug", async () => {
-        const { handleCreateDataset } = await import("../tools/create-dataset.js");
+        const { handleCreateDataset } = await import("../tools/create-dataset.ts");
         const result = await handleCreateDataset({
           name: "Empty Schema",
         });
@@ -408,7 +408,7 @@ describe("MCP dataset tools integration", () => {
     describe("when updating the dataset name", () => {
       /** @scenario "Update a dataset name" */
       it("returns confirmation reflecting the new name", async () => {
-        const { handleUpdateDataset } = await import("../tools/update-dataset.js");
+        const { handleUpdateDataset } = await import("../tools/update-dataset.ts");
         const result = await handleUpdateDataset({
           slugOrId: "old-name",
           name: "New Name",
@@ -421,7 +421,7 @@ describe("MCP dataset tools integration", () => {
     describe("when updating dataset column types", () => {
       /** @scenario "Update a dataset column types" */
       it("returns confirmation reflecting the new columns", async () => {
-        const { handleUpdateDataset } = await import("../tools/update-dataset.js");
+        const { handleUpdateDataset } = await import("../tools/update-dataset.ts");
         const result = await handleUpdateDataset({
           slugOrId: "my-dataset",
           columnTypes: [{ name: "question", type: "string" }],
@@ -434,7 +434,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Update a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleUpdateDataset } = await import("../tools/update-dataset.js");
+        const { handleUpdateDataset } = await import("../tools/update-dataset.ts");
         await expect(handleUpdateDataset({ slugOrId: "ghost", name: "Whatever" })).rejects.toThrow(
           "404",
         );
@@ -448,7 +448,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Delete a dataset archives it" */
       it("returns confirmation that the dataset was deleted", async () => {
-        const { handleDeleteDataset } = await import("../tools/delete-dataset.js");
+        const { handleDeleteDataset } = await import("../tools/delete-dataset.ts");
         const result = await handleDeleteDataset({ slugOrId: "to-delete" });
         expect(result).toContain("deleted");
       });
@@ -457,7 +457,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Delete a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleDeleteDataset } = await import("../tools/delete-dataset.js");
+        const { handleDeleteDataset } = await import("../tools/delete-dataset.ts");
         await expect(handleDeleteDataset({ slugOrId: "ghost" })).rejects.toThrow("404");
       });
     });
@@ -469,7 +469,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Add records to a dataset" */
       it("returns confirmation with the count of records created", async () => {
-        const { handleCreateDatasetRecords } = await import("../tools/create-dataset-records.js");
+        const { handleCreateDatasetRecords } = await import("../tools/create-dataset-records.ts");
         const result = await handleCreateDatasetRecords({
           slugOrId: "my-dataset",
           entries: [
@@ -485,7 +485,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Add records to a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleCreateDatasetRecords } = await import("../tools/create-dataset-records.js");
+        const { handleCreateDatasetRecords } = await import("../tools/create-dataset-records.ts");
         await expect(
           handleCreateDatasetRecords({
             slugOrId: "ghost",
@@ -502,7 +502,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the record exists", () => {
       /** @scenario "Update a single record entry" */
       it("returns confirmation that the record was updated", async () => {
-        const { handleUpdateDatasetRecord } = await import("../tools/update-dataset-record.js");
+        const { handleUpdateDatasetRecord } = await import("../tools/update-dataset-record.ts");
         const result = await handleUpdateDatasetRecord({
           slugOrId: "my-dataset",
           recordId: "rec-123",
@@ -515,7 +515,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Update a record in a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleUpdateDatasetRecord } = await import("../tools/update-dataset-record.js");
+        const { handleUpdateDatasetRecord } = await import("../tools/update-dataset-record.ts");
         await expect(
           handleUpdateDatasetRecord({
             slugOrId: "ghost",
@@ -533,7 +533,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset exists", () => {
       /** @scenario "Delete records by IDs" */
       it("returns confirmation with the count of records deleted", async () => {
-        const { handleDeleteDatasetRecords } = await import("../tools/delete-dataset-records.js");
+        const { handleDeleteDatasetRecords } = await import("../tools/delete-dataset-records.ts");
         const result = await handleDeleteDatasetRecords({
           slugOrId: "my-dataset",
           recordIds: ["rec-1", "rec-2"],
@@ -546,7 +546,7 @@ describe("MCP dataset tools integration", () => {
     describe("when the dataset does not exist", () => {
       /** @scenario "Delete records from a non-existent dataset returns an error" */
       it("propagates the 404 error", async () => {
-        const { handleDeleteDatasetRecords } = await import("../tools/delete-dataset-records.js");
+        const { handleDeleteDatasetRecords } = await import("../tools/delete-dataset-records.ts");
         await expect(
           handleDeleteDatasetRecords({
             slugOrId: "ghost",

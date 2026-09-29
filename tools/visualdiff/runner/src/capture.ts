@@ -4,18 +4,18 @@ import { dirname } from "node:path";
 import type { Browser, BrowserContext, Page, Request, Response } from "playwright";
 import { chromium } from "playwright";
 
-import { isModuleConsoleError, isModuleRequest } from "./module-load";
-import { isExpectedThrottle, isThrottleConsoleError } from "./noise";
+import { isModuleConsoleError, isModuleRequest } from "./module-load.ts";
+import { isExpectedThrottle, isThrottleConsoleError } from "./noise.ts";
 import {
   note,
   type CaptureMessage,
   type PlanSide,
   type SettleConfig,
   type Viewport,
-} from "./protocol";
-import { StepRecorder, type Drained } from "./recorder";
-import { InFlightTracker, shouldIgnoreRequest } from "./settle";
-import { serveBuiltUi } from "./static-ui";
+} from "./protocol.ts";
+import { StepRecorder, type Drained } from "./recorder.ts";
+import { InFlightTracker, shouldIgnoreRequest } from "./settle.ts";
+import { serveBuiltUi } from "./static-ui.ts";
 
 /** Animations and carets are the largest source of pixel noise between two identical screens. */
 const FREEZE_CSS =

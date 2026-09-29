@@ -1,4 +1,4 @@
-import { listScenarios as apiListScenarios } from "../langwatch-api-scenarios.js";
+import { listScenarios as apiListScenarios } from "../langwatch-api-scenarios.ts";
 
 /**
  * Handles the platform_list_scenarios MCP tool: lists scenarios in the

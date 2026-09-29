@@ -1,4 +1,4 @@
-import { listApiKeys as apiListApiKeys } from "../langwatch-api-api-keys.js";
+import { listApiKeys as apiListApiKeys } from "../langwatch-api-api-keys.ts";
 
 export async function handleListApiKeys(): Promise<string> {
   const result = await apiListApiKeys();

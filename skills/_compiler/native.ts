@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env node
 /**
  * Native skill generator: emits opencode-discoverable SKILL.md files,
  * verbatim, for the langyagent image (in-product nuances live in AGENTS.md).
@@ -12,8 +12,8 @@ import {
   listNativeSkills,
   listPublishedSkills,
   type PublishedSkill,
-} from "../_lib/feature-skills.js";
-import { inlineMdx } from "../_lib/mdx-inline.js";
+} from "../_lib/feature-skills.ts";
+import { inlineMdx } from "../_lib/mdx-inline.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

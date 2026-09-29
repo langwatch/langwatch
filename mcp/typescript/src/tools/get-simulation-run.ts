@@ -1,8 +1,8 @@
 import {
   getSimulationRun as apiGetSimulationRun,
   type SimulationRunSummary,
-} from "../langwatch-api-simulation-runs.js";
-import { formatEvaluations, pendingEvaluationNote } from "./format-suite-details.js";
+} from "../langwatch-api-simulation-runs.ts";
+import { formatEvaluations, pendingEvaluationNote } from "./format-suite-details.ts";
 
 function resultLines(results: NonNullable<SimulationRunSummary["results"]>): string[] {
   const lines = ["\n## Results"];

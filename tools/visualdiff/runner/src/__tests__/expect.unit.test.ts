@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { describeExpect, judgeBody, judgeCount, pollExpect, readField } from "../flows/expect";
+import { describeExpect, judgeBody, judgeCount, pollExpect, readField } from "../flows/expect.ts";
 
 describe("Feature: visualdiff flows assert outcomes", () => {
   describe("given an api expect on a list body", () => {

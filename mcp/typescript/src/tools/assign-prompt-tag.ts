@@ -1,4 +1,4 @@
-import { assignPromptTag as apiAssignPromptTag } from "../langwatch-api.js";
+import { assignPromptTag as apiAssignPromptTag } from "../langwatch-api.ts";
 
 export async function handleAssignPromptTag(params: {
   idOrHandle: string;

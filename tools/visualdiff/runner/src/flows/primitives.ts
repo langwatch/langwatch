@@ -1,8 +1,8 @@
 import type { Locator, Page } from "playwright";
 
-import type { Action, ActionContext } from "./context";
-import { argument, asRegExp, escapeRegExp, fillPath, scope } from "./context";
-import { isTargeted, targetOf } from "./target";
+import type { Action, ActionContext } from "./context.ts";
+import { argument, asRegExp, escapeRegExp, fillPath, scope } from "./context.ts";
+import { isTargeted, targetOf } from "./target.ts";
 
 const CLICKABLE =
   "button, a, [role=button], [role=menuitem], [role=tab], [role=option], [role=radio]";

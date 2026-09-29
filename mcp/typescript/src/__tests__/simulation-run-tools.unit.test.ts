@@ -6,13 +6,13 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../langwatch-api-simulation-runs.js", () => ({
+vi.mock("../langwatch-api-simulation-runs.ts", () => ({
   getSimulationRun: vi.fn(),
   listSimulationRuns: vi.fn(),
 }));
 
-import { getSimulationRun, type SimulationRunSummary } from "../langwatch-api-simulation-runs.js";
-import { handleGetSimulationRun } from "../tools/get-simulation-run.js";
+import { getSimulationRun, type SimulationRunSummary } from "../langwatch-api-simulation-runs.ts";
+import { handleGetSimulationRun } from "../tools/get-simulation-run.ts";
 
 const mockGetSimulationRun = vi.mocked(getSimulationRun);
 

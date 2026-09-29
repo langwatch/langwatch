@@ -1,4 +1,4 @@
-import { revokeApiKey as apiRevokeApiKey } from "../langwatch-api-api-keys.js";
+import { revokeApiKey as apiRevokeApiKey } from "../langwatch-api-api-keys.ts";
 
 export async function handleRevokeApiKey(params: { id: string }): Promise<string> {
   await apiRevokeApiKey(params.id);

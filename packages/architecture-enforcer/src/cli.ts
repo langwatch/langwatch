@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env -S node --experimental-transform-types
 import { relative, resolve } from "node:path";
 
 import {

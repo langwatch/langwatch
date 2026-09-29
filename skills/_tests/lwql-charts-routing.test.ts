@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
-import { listNativeSkills, renderSkill } from "../_compiler/native.js";
+import { listNativeSkills, renderSkill } from "../_compiler/native.ts";
 
 // Backs specs/lwql/langy-authoring.feature: the chart family's
 // discoverability for Langy — the CLI command listing (built from

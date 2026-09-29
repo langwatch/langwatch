@@ -1,7 +1,7 @@
 import {
   createEvaluator as apiCreateEvaluator,
   getEvaluatorType,
-} from "../langwatch-api-evaluators.js";
+} from "../langwatch-api-evaluators.ts";
 
 /**
  * Handles the platform_create_evaluator MCP tool: creates an evaluator

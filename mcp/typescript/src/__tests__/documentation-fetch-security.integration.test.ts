@@ -2,9 +2,9 @@ import { createServer, type Server } from "node:http";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
-import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.js";
-import { countingVerifier } from "./support/http-server-harness.js";
+import { initConfig } from "../config.ts";
+import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.ts";
+import { countingVerifier } from "./support/http-server-harness.ts";
 
 const TEST_API_KEY = "security-regression-test";
 
@@ -112,7 +112,7 @@ describe("MCP documentation fetch security", () => {
       targetPort = typeof targetAddress === "object" && targetAddress ? targetAddress.port : 0;
 
       initConfig({ endpoint: "https://app.langwatch.ai" });
-      const { startHttpServer } = await import("../http-server.js");
+      const { startHttpServer } = await import("../http-server.ts");
       // These cases are about SSRF in the documentation tools, so the key check
       // is stubbed to keep the test on its own subject.
       const { verifier } = countingVerifier([TEST_API_KEY]);

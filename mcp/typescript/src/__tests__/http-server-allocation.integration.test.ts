@@ -8,8 +8,8 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
-import { createApiKeyVerifier } from "../http-security.js";
+import { initConfig } from "../config.ts";
+import { createApiKeyVerifier } from "../http-security.ts";
 import {
   countingVerifier,
   initializeBody,
@@ -18,7 +18,7 @@ import {
   requestUntilThrottled,
   startHarness,
   VALID_KEY,
-} from "./support/http-server-harness.js";
+} from "./support/http-server-harness.ts";
 
 /** Mirrors MAX_SESSIONS_PER_KEY in http-server.ts. */
 const MAX_SESSIONS_PER_KEY = 20;

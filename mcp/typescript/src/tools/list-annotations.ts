@@ -1,7 +1,7 @@
 import {
   listAnnotations as apiListAnnotations,
   getAnnotationsByTrace as apiGetByTrace,
-} from "../langwatch-api-annotations.js";
+} from "../langwatch-api-annotations.ts";
 
 export async function handleListAnnotations(params: { traceId?: string }): Promise<string> {
   const annotations = params.traceId

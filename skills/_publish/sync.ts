@@ -1,16 +1,16 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env node
 /**
  * Sync SKILL.mdx files into a checkout of langwatch/skills, inlining MDX
  * partials so the published .md files are self-contained.
- * Usage: tsx skills/_publish/sync.ts <path-to-skills-repo>
+ * Usage: node skills/_publish/sync.ts <path-to-skills-repo>
  */
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { listPublishedSkills } from "../_lib/feature-skills.js";
-import { inlineMdx } from "../_lib/mdx-inline.js";
+import { listPublishedSkills } from "../_lib/feature-skills.ts";
+import { inlineMdx } from "../_lib/mdx-inline.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

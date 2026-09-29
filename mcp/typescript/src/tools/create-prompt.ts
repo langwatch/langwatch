@@ -1,4 +1,4 @@
-import { createPrompt as apiCreatePrompt } from "../langwatch-api.js";
+import { createPrompt as apiCreatePrompt } from "../langwatch-api.ts";
 
 const HANDLE_PATTERN = /^[a-z0-9_-]+(?:\/[a-z0-9_-]+)?$/;
 

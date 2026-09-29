@@ -1,4 +1,4 @@
-import { createApiKey as apiCreateApiKey } from "../langwatch-api-api-keys.js";
+import { createApiKey as apiCreateApiKey } from "../langwatch-api-api-keys.ts";
 
 export async function handleCreateApiKey(params: {
   keyType: "personal" | "service";

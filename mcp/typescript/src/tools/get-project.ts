@@ -1,4 +1,4 @@
-import { getProject as apiGetProject } from "../langwatch-api-projects.js";
+import { getProject as apiGetProject } from "../langwatch-api-projects.ts";
 
 export async function handleGetProject(params: { id: string }): Promise<string> {
   const project = await apiGetProject(params.id);

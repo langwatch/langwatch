@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { makeRequest } from "./langwatch-api.js";
-import { requestPublicJson } from "./public-http-request.js";
+import { makeRequest } from "./langwatch-api.ts";
+import { requestPublicJson } from "./public-http-request.ts";
 
 /**
  * The run parameters a call carries: a flat record of scalars. The platform
@@ -276,7 +276,7 @@ export async function runAgent({
     );
   }
 
-  const { runWorkflow } = await import("./langwatch-api-workflows.js");
+  const { runWorkflow } = await import("./langwatch-api-workflows.ts");
   const result = await runWorkflow(workflowId, input);
   return { agentType: agent.type, result };
 }

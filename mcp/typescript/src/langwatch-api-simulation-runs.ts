@@ -1,5 +1,5 @@
-import { makeRequest } from "./langwatch-api.js";
-import type { SimulationRunEvaluation } from "./tools/format-suite-details.js";
+import { makeRequest } from "./langwatch-api.ts";
+import type { SimulationRunEvaluation } from "./tools/format-suite-details.ts";
 
 export interface SimulationRunSummary {
   scenarioRunId: string;

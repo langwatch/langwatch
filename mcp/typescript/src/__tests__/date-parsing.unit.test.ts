@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-import { parseRelativeDate } from "../utils/date-parsing.js";
+import { parseRelativeDate } from "../utils/date-parsing.ts";
 
 describe("parseRelativeDate()", () => {
   afterEach(() => {

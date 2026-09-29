@@ -4,7 +4,7 @@ import {
   updatePrompt as apiUpdatePrompt,
   type PromptDetailResponse,
   type PromptTag,
-} from "../langwatch-api.js";
+} from "../langwatch-api.ts";
 
 // Updates a prompt via PUT, creating a new version. Re-fetches the full prompt
 // to get tags since the mutation response doesn't include them.

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { runAgent as apiRunAgent, type AgentCallParams } from "../langwatch-api-agents.js";
+import { runAgent as apiRunAgent, type AgentCallParams } from "../langwatch-api-agents.ts";
 
 /**
  * A scalar and an array both parse as JSON, and either one reaches the agent

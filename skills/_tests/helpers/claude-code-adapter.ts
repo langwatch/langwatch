@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import { type AgentAdapter, claudeCodeAgent, pointClaudeMdAtSkills } from "@langwatch/scenario";
 import chalk from "chalk";
 
-import { inlineMdx } from "../../_lib/mdx-inline.js";
+import { inlineMdx } from "../../_lib/mdx-inline.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

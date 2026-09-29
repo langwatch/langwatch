@@ -5,7 +5,7 @@ import {
   isLoopbackHost,
   isOriginAllowed,
   parseAllowedOrigins,
-} from "../http-security.js";
+} from "../http-security.ts";
 
 describe("bind host", () => {
   it("defaults to loopback", () => {

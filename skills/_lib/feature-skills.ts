@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-import { splitFrontmatter } from "./frontmatter.js";
+import { splitFrontmatter } from "./frontmatter.ts";
 
 // The curated, top-level skill set — the skills shown on the public directory
 // (https://langwatch.ai/docs/skills/directory). Adding one here is the one-line

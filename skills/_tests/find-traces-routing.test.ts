@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 
 import { describe, expect, it } from "vitest";
 
-import { listNativeSkills, renderSkill } from "../_compiler/native.js";
+import { listNativeSkills, renderSkill } from "../_compiler/native.ts";
 
 // Backs specs/langy/langy-trace-explorer-actions.feature ("The skill decides
 // between driving the Explorer and answering with cards"): what the

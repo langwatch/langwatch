@@ -1,4 +1,4 @@
-import { getPrompt as apiGetPrompt, type PromptDetailResponse } from "../langwatch-api.js";
+import { getPrompt as apiGetPrompt, type PromptDetailResponse } from "../langwatch-api.ts";
 
 interface DeploymentTag {
   name: string;

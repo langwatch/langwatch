@@ -1,8 +1,8 @@
 import {
   getDataset as apiGetDataset,
   type DatasetDetailResponse,
-} from "../langwatch-api-datasets.js";
-import { escapeMarkdown } from "../utils/escape-markdown.js";
+} from "../langwatch-api-datasets.ts";
+import { escapeMarkdown } from "../utils/escape-markdown.ts";
 
 /**
  * Formats a dataset detail response into AI-readable markdown.

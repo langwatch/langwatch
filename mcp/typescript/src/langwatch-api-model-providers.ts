@@ -1,4 +1,4 @@
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 
 // --- Model Provider types ---
 

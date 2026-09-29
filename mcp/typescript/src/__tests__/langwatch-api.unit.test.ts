@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { initConfig } from "../config.js";
+import { initConfig } from "../config.ts";
 
 const TEST_ENDPOINT = "https://test.langwatch.ai";
 const TEST_API_KEY = "test-key";
@@ -48,7 +48,7 @@ describe("langwatch-api", () => {
 
   describe("searchTraces()", () => {
     it("sends POST to /api/v1/traces/search with format digest by default", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       const responseData = { traces: [] };
       mockJsonResponse(responseData);
 
@@ -75,7 +75,7 @@ describe("langwatch-api", () => {
     });
 
     it("sends format json when specified", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockJsonResponse({ traces: [] });
 
       await searchTraces({
@@ -90,7 +90,7 @@ describe("langwatch-api", () => {
 
     describe("when response is not OK", () => {
       it("throws a descriptive error with status code and body", async () => {
-        const { searchTraces } = await import("../langwatch-api.js");
+        const { searchTraces } = await import("../langwatch-api.ts");
         mockErrorResponse(401, "Unauthorized");
 
         await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow("401");
@@ -100,7 +100,7 @@ describe("langwatch-api", () => {
 
   describe("getTraceById()", () => {
     it("sends GET to /api/v1/traces/{id}?format=digest by default", async () => {
-      const { getTraceById } = await import("../langwatch-api.js");
+      const { getTraceById } = await import("../langwatch-api.ts");
       const responseData = { trace: { id: "abc" } };
       mockJsonResponse(responseData);
 
@@ -119,7 +119,7 @@ describe("langwatch-api", () => {
     });
 
     it("sends format=json when specified", async () => {
-      const { getTraceById } = await import("../langwatch-api.js");
+      const { getTraceById } = await import("../langwatch-api.ts");
       mockJsonResponse({});
 
       await getTraceById("abc", "json");
@@ -131,7 +131,7 @@ describe("langwatch-api", () => {
     });
 
     it("does not include Content-Type for GET requests", async () => {
-      const { getTraceById } = await import("../langwatch-api.js");
+      const { getTraceById } = await import("../langwatch-api.ts");
       mockJsonResponse({});
 
       await getTraceById("abc");
@@ -143,7 +143,7 @@ describe("langwatch-api", () => {
 
   describe("getAnalyticsTimeseries()", () => {
     it("sends POST to /api/v1/analytics/timeseries", async () => {
-      const { getAnalyticsTimeseries } = await import("../langwatch-api.js");
+      const { getAnalyticsTimeseries } = await import("../langwatch-api.ts");
       const params = {
         series: [{ metric: "performance.completion_time", aggregation: "avg" }],
         startDate: 1000,
@@ -171,7 +171,7 @@ describe("langwatch-api", () => {
 
   describe("listPrompts()", () => {
     it("sends GET to /api/v1/prompts", async () => {
-      const { listPrompts } = await import("../langwatch-api.js");
+      const { listPrompts } = await import("../langwatch-api.ts");
       const responseData = [{ id: "1", name: "test" }];
       mockJsonResponse(responseData);
 
@@ -192,7 +192,7 @@ describe("langwatch-api", () => {
 
   describe("getPrompt()", () => {
     it("sends GET to /api/v1/prompts/{id} with encoded ID", async () => {
-      const { getPrompt } = await import("../langwatch-api.js");
+      const { getPrompt } = await import("../langwatch-api.ts");
       const responseData = { id: "1", name: "test" };
       mockJsonResponse(responseData);
 
@@ -213,7 +213,7 @@ describe("langwatch-api", () => {
 
   describe("createPrompt()", () => {
     it("sends POST to /api/v1/prompts with body", async () => {
-      const { createPrompt } = await import("../langwatch-api.js");
+      const { createPrompt } = await import("../langwatch-api.ts");
       const data = {
         handle: "test-prompt",
         messages: [{ role: "system", content: "You are helpful." }],
@@ -241,7 +241,7 @@ describe("langwatch-api", () => {
 
   describe("updatePrompt()", () => {
     it("sends PUT to /api/v1/prompts/{id} with body", async () => {
-      const { updatePrompt } = await import("../langwatch-api.js");
+      const { updatePrompt } = await import("../langwatch-api.ts");
       const data = {
         messages: [{ role: "system", content: "Updated" }],
         commitMessage: "update system prompt",
@@ -269,7 +269,7 @@ describe("langwatch-api", () => {
   describe("when getPrompt is called with tag options", () => {
     describe("when called with tag option", () => {
       it("appends tag query parameter", async () => {
-        const { getPrompt } = await import("../langwatch-api.js");
+        const { getPrompt } = await import("../langwatch-api.ts");
         mockJsonResponse({ id: "1" });
 
         await getPrompt("pizza-prompt", { tag: "production" });
@@ -283,7 +283,7 @@ describe("langwatch-api", () => {
 
     describe("when called with version option", () => {
       it("appends version query parameter", async () => {
-        const { getPrompt } = await import("../langwatch-api.js");
+        const { getPrompt } = await import("../langwatch-api.ts");
         mockJsonResponse({ id: "1" });
 
         await getPrompt("pizza-prompt", { version: 2 });
@@ -297,7 +297,7 @@ describe("langwatch-api", () => {
 
     describe("when called with no options", () => {
       it("sends no query string", async () => {
-        const { getPrompt } = await import("../langwatch-api.js");
+        const { getPrompt } = await import("../langwatch-api.ts");
         mockJsonResponse({ id: "1" });
 
         await getPrompt("pizza-prompt");
@@ -313,7 +313,7 @@ describe("langwatch-api", () => {
   describe("when createPrompt is called with tags", () => {
     describe("when called with tags", () => {
       it("includes tags in the request body", async () => {
-        const { createPrompt } = await import("../langwatch-api.js");
+        const { createPrompt } = await import("../langwatch-api.ts");
         const data = {
           handle: "test",
           messages: [{ role: "system", content: "hi" }],
@@ -333,7 +333,7 @@ describe("langwatch-api", () => {
   describe("when updatePrompt is called with tags", () => {
     describe("when called with tags", () => {
       it("includes tags in the request body", async () => {
-        const { updatePrompt } = await import("../langwatch-api.js");
+        const { updatePrompt } = await import("../langwatch-api.ts");
         mockJsonResponse({ id: "p1" });
 
         await updatePrompt("p1", {
@@ -349,7 +349,7 @@ describe("langwatch-api", () => {
 
   describe("assignPromptTag()", () => {
     it("sends PUT to /api/v1/prompts/{id}/tags/{tag} with versionId", async () => {
-      const { assignPromptTag } = await import("../langwatch-api.js");
+      const { assignPromptTag } = await import("../langwatch-api.ts");
       mockJsonResponse({ success: true });
 
       await assignPromptTag({
@@ -367,7 +367,7 @@ describe("langwatch-api", () => {
 
   describe("listPromptTags()", () => {
     it("sends GET to /api/v1/prompts/tags", async () => {
-      const { listPromptTags } = await import("../langwatch-api.js");
+      const { listPromptTags } = await import("../langwatch-api.ts");
       const tags = [{ id: "1", name: "production" }];
       mockJsonResponse(tags);
 
@@ -383,7 +383,7 @@ describe("langwatch-api", () => {
 
   describe("createPromptTag()", () => {
     it("sends POST to /api/v1/prompts/tags with name", async () => {
-      const { createPromptTag } = await import("../langwatch-api.js");
+      const { createPromptTag } = await import("../langwatch-api.ts");
       mockJsonResponse({ id: "t1", name: "canary" });
 
       await createPromptTag("canary");
@@ -397,7 +397,7 @@ describe("langwatch-api", () => {
 
   describe("renamePromptTag()", () => {
     it("sends PUT to /api/v1/prompts/tags/{tag} with new name", async () => {
-      const { renamePromptTag } = await import("../langwatch-api.js");
+      const { renamePromptTag } = await import("../langwatch-api.ts");
       mockJsonResponse({ id: "t1", name: "preview" });
 
       await renamePromptTag({ tag: "canary", name: "preview" });
@@ -411,7 +411,7 @@ describe("langwatch-api", () => {
 
   describe("deletePromptTag()", () => {
     it("sends DELETE to /api/v1/prompts/tags/{tag}", async () => {
-      const { deletePromptTag } = await import("../langwatch-api.js");
+      const { deletePromptTag } = await import("../langwatch-api.ts");
       mock204Response();
 
       const result = await deletePromptTag("canary");
@@ -426,7 +426,7 @@ describe("langwatch-api", () => {
   describe("makeRequest()", () => {
     describe("when response is 204 No Content", () => {
       it("returns null without calling json()", async () => {
-        const { listPromptTags } = await import("../langwatch-api.js");
+        const { listPromptTags } = await import("../langwatch-api.ts");
         mock204Response();
 
         const result = await listPromptTags();
@@ -437,14 +437,14 @@ describe("langwatch-api", () => {
 
   describe("when the API returns an error", () => {
     it("includes the status code in the error message", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockErrorResponse(500, "Internal Server Error");
 
       await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow("500");
     });
 
     it("includes the response body in the error message", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockErrorResponse(403, "Forbidden: invalid API key");
 
       await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow(
@@ -463,7 +463,7 @@ describe("langwatch-api", () => {
     };
 
     it("parses code, tips, docsUrl and fault into LangWatchApiError fields", async () => {
-      const { searchTraces, LangWatchApiError } = await import("../langwatch-api.js");
+      const { searchTraces, LangWatchApiError } = await import("../langwatch-api.ts");
       mockErrorResponse(400, JSON.stringify(handledErrorBody));
 
       const error = await searchTraces({
@@ -481,7 +481,7 @@ describe("langwatch-api", () => {
     });
 
     it("formats the message with the server message, Tips section and Docs link", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockErrorResponse(400, JSON.stringify(handledErrorBody));
 
       const error = await searchTraces({
@@ -522,7 +522,7 @@ describe("langwatch-api", () => {
       };
 
       beforeEach(async () => {
-        const { createEvaluator } = await import("../langwatch-api-evaluators.js");
+        const { createEvaluator } = await import("../langwatch-api-evaluators.ts");
         mockErrorResponse(422, JSON.stringify(rejectedTypeBody));
 
         error = await createEvaluator({
@@ -550,7 +550,7 @@ describe("langwatch-api", () => {
     });
 
     it("parses the tRPC shape using `code` instead of `error`", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       const body = {
         code: "dataset_not_found",
         message: "Dataset 'abc' not found",
@@ -576,7 +576,7 @@ describe("langwatch-api", () => {
     });
 
     it("omits the Tips and Docs sections when absent", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockErrorResponse(401, JSON.stringify({ error: "unauthorized", message: "Invalid API key" }));
 
       const error = await searchTraces({
@@ -592,7 +592,7 @@ describe("langwatch-api", () => {
     });
 
     it("ignores an invalid fault value", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockErrorResponse(500, JSON.stringify({ error: "boom", message: "Boom", fault: "nobody" }));
 
       const error = await searchTraces({
@@ -606,7 +606,7 @@ describe("langwatch-api", () => {
 
   describe("when the error body is not a handled-error envelope", () => {
     it("keeps the raw text as the message and sets no extra fields", async () => {
-      const { searchTraces, LangWatchApiError } = await import("../langwatch-api.js");
+      const { searchTraces, LangWatchApiError } = await import("../langwatch-api.ts");
       mockErrorResponse(502, "<html>Bad Gateway</html>");
 
       const error = await searchTraces({
@@ -625,7 +625,7 @@ describe("langwatch-api", () => {
     });
 
     it("treats JSON without error/code/message fields as raw text", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       const body = JSON.stringify({ unexpected: true });
       mockErrorResponse(500, body);
 

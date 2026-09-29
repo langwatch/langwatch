@@ -2,7 +2,7 @@ import type {
   EvaluatorAttachmentWire,
   ScenarioMapping,
   SuiteField,
-} from "../schemas/suite-fields.js";
+} from "../schemas/suite-fields.ts";
 
 /**
  * The digest lines for a suite's fields, the evaluators attached to a suite

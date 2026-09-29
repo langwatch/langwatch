@@ -215,9 +215,8 @@ type predictionRequest struct {
 // This is a PREDICTION, not an instruction, because nothing here rewrites the
 // command any more. It agrees with the enforcement for every heavy command
 // the gate classifies: the compiler, linter, formatter and vitest bin shims
-// all take a slot through `haven slot run` on their own (dev/scripts/
-// install-check-shims.mjs), and `make go-lint` does the same for
-// golangci-lint - the gap this comment used to flag is closed.
+// all take a slot through `haven slot run` on their own, and `make go-lint`
+// does the same for golangci-lint - the gap this comment used to flag is closed.
 func predictiveMessage(r predictionRequest) string {
 	switch r.decision {
 	case domain.Narrow:

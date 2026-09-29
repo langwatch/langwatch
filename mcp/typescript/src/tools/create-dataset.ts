@@ -1,6 +1,6 @@
-import { createDataset as apiCreateDataset } from "../langwatch-api-datasets.js";
-import type { DatasetColumnType } from "../langwatch-api-datasets.js";
-import { formatDatasetMutationDetails } from "./format-dataset-mutation.js";
+import { createDataset as apiCreateDataset } from "../langwatch-api-datasets.ts";
+import type { DatasetColumnType } from "../langwatch-api-datasets.ts";
+import { formatDatasetMutationDetails } from "./format-dataset-mutation.ts";
 
 /**
  * Handles the platform_create_dataset MCP tool: creates a dataset and

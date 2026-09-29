@@ -3,7 +3,7 @@
  * escaped: one pipe in a cell would split the row for every reader.
  */
 
-import { escapeMarkdown } from "./escape-markdown.js";
+import { escapeMarkdown } from "./escape-markdown.ts";
 
 /** Longest a single cell is rendered before it is cut. */
 const MAX_CELL_LENGTH = 200;

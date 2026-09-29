@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../langwatch-api-test-suites.js", () => ({
+vi.mock("../langwatch-api-test-suites.ts", () => ({
   listTestSuites: vi.fn(),
   createTestSuite: vi.fn(),
   getTestSuite: vi.fn(),
@@ -15,19 +15,19 @@ vi.mock("../langwatch-api-test-suites.js", () => ({
   runTestSuite: vi.fn(),
 }));
 
-vi.mock("../langwatch-api-scenarios.js", () => ({
+vi.mock("../langwatch-api-scenarios.ts", () => ({
   listScenarios: vi.fn(),
   createScenario: vi.fn(),
   updateScenario: vi.fn(),
 }));
 
-import type { RunPlanRunResult } from "../langwatch-api-run-plans.js";
+import type { RunPlanRunResult } from "../langwatch-api-run-plans.ts";
 import {
   createScenario,
   listScenarios,
   updateScenario,
   type ScenarioSummary,
-} from "../langwatch-api-scenarios.js";
+} from "../langwatch-api-scenarios.ts";
 import {
   archiveTestSuite,
   createTestSuite,
@@ -37,17 +37,17 @@ import {
   runTestSuite,
   updateTestSuite,
   type TestSuite,
-} from "../langwatch-api-test-suites.js";
-import { handleArchiveTestSuite } from "../tools/archive-test-suite.js";
-import { handleCreateScenario } from "../tools/create-scenario.js";
-import { handleCreateTestSuite } from "../tools/create-test-suite.js";
-import { handleGetTestSuite } from "../tools/get-test-suite.js";
-import { handleListScenarios } from "../tools/list-scenarios.js";
-import { handleListTestSuites } from "../tools/list-test-suites.js";
-import { handleRenameTestSuite } from "../tools/rename-test-suite.js";
-import { handleRunTestSuite } from "../tools/run-test-suite.js";
-import { handleUpdateScenario } from "../tools/update-scenario.js";
-import { handleUpdateTestSuite } from "../tools/update-test-suite.js";
+} from "../langwatch-api-test-suites.ts";
+import { handleArchiveTestSuite } from "../tools/archive-test-suite.ts";
+import { handleCreateScenario } from "../tools/create-scenario.ts";
+import { handleCreateTestSuite } from "../tools/create-test-suite.ts";
+import { handleGetTestSuite } from "../tools/get-test-suite.ts";
+import { handleListScenarios } from "../tools/list-scenarios.ts";
+import { handleListTestSuites } from "../tools/list-test-suites.ts";
+import { handleRenameTestSuite } from "../tools/rename-test-suite.ts";
+import { handleRunTestSuite } from "../tools/run-test-suite.ts";
+import { handleUpdateScenario } from "../tools/update-scenario.ts";
+import { handleUpdateTestSuite } from "../tools/update-test-suite.ts";
 
 const mockListTestSuites = vi.mocked(listTestSuites);
 const mockCreateTestSuite = vi.mocked(createTestSuite);

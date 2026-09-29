@@ -12,7 +12,7 @@ import { Hono } from "hono";
 import { connectAgent, type AgentMessage } from "langwatch/agent";
 import { z } from "zod";
 
-import { ACCOUNT_ID, answerTurn } from "./agent.js";
+import { ACCOUNT_ID, answerTurn } from "./agent.ts";
 
 export const acmeSupport = connectAgent(
   {

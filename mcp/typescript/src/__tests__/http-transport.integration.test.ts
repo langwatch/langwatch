@@ -2,8 +2,8 @@ import type { Server } from "http";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
-import type { ApiKeyVerifier } from "../http-security.js";
+import { initConfig } from "../config.ts";
+import type { ApiKeyVerifier } from "../http-security.ts";
 
 /** Standard headers required by the MCP Streamable HTTP protocol for POST requests */
 const MCP_POST_HEADERS = {
@@ -61,7 +61,7 @@ describe("HTTP transport", () => {
       endpoint: "https://app.langwatch.ai",
     });
 
-    const { startHttpServer } = await import("../http-server.js");
+    const { startHttpServer } = await import("../http-server.ts");
     const result = await startHttpServer({
       port: 0,
       apiKeyVerifier: stubVerifier([BEARER_TOKEN, "my-langwatch-api-key"]),

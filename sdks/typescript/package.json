@@ -118,7 +118,7 @@
     "@types/ws": "catalog:",
     "@typescript-eslint/parser": "^8.58.1",
     "@vercel/otel": "^1.13.0",
-    "@vitest/coverage-v8": "^5.0.0",
+    "@vitest/coverage-v8": "^5.0.1",
     "dotenv-cli": "^11.0.0",
     "esbuild": "catalog:",
     "eslint": "^9.32.0",

@@ -1,10 +1,10 @@
-import { createTestSuite as apiCreateTestSuite } from "../langwatch-api-test-suites.js";
+import { createTestSuite as apiCreateTestSuite } from "../langwatch-api-test-suites.ts";
 import {
   type EvaluatorAttachmentInput,
   type SuiteField,
   toWireAttachments,
-} from "../schemas/suite-fields.js";
-import { formatEvaluatorAttachments, formatSuiteFields } from "./format-suite-details.js";
+} from "../schemas/suite-fields.ts";
+import { formatEvaluatorAttachments, formatSuiteFields } from "./format-suite-details.ts";
 
 /**
  * Handles the platform_create_test_suite MCP tool invocation.

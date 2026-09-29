@@ -1,6 +1,6 @@
 import { parentPort } from "node:worker_threads";
 
-import { diffScreenshots, type DiffFiles } from "./diff";
+import { diffScreenshots, type DiffFiles } from "./diff.ts";
 
 /** One pixel diff per message, off the capture's event loop (diff-pool.ts). */
 parentPort?.on("message", (files: DiffFiles) => {

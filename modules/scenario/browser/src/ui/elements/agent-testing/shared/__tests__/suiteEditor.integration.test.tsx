@@ -210,24 +210,24 @@ function stubVerticalLayout(): () => void {
   // the native method as a bare value to store it is itself an unbound-method
   // reference, and the native implementation is receiver-dependent so it
   // cannot safely be rebound with .bind() to sidestep that.
-  const spy = vi
-    .spyOn(Element.prototype, "getBoundingClientRect")
-    .mockImplementation(function (this: Element): DOMRect {
-      const siblings = this.parentElement?.children;
-      const index = siblings ? Array.prototype.indexOf.call(siblings, this) : 0;
-      const top = index * 60;
-      return {
-        x: 0,
-        y: top,
-        top,
-        bottom: top + 50,
-        left: 0,
-        right: 400,
-        width: 400,
-        height: 50,
-        toJSON: () => ({}),
-      } as DOMRect;
-    });
+  const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+    this: Element,
+  ): DOMRect {
+    const siblings = this.parentElement?.children;
+    const index = siblings ? Array.prototype.indexOf.call(siblings, this) : 0;
+    const top = index * 60;
+    return {
+      x: 0,
+      y: top,
+      top,
+      bottom: top + 50,
+      left: 0,
+      right: 400,
+      width: 400,
+      height: 50,
+      toJSON: () => ({}),
+    } as DOMRect;
+  });
   return () => {
     spy.mockRestore();
   };

@@ -10,7 +10,6 @@
   },
   "type": "module",
   "scripts": {
-    "postinstall": "node dev/scripts/install-check-shims.mjs --remove",
     "dev": "node dev/scripts/dev-supervisor.mjs bash dev/scripts/dev-stack.sh",
     "dev:app": "pnpm --parallel --filter @langwatch/ui --filter @langwatch/platform-api dev",
     "dev:ui": "node dev/scripts/dev-supervisor.mjs pnpm --filter @langwatch/ui dev",
@@ -74,7 +73,7 @@
     "concurrently": "catalog:",
     "knip": "catalog:",
     "nx": "23.2.1",
-    "oxfmt": "0.63.0",
+    "oxfmt": "0.70.0",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "typescript": "catalog:",
@@ -85,5 +84,5 @@
     "node": ">=24.0.0",
     "pnpm": ">=10"
   },
-  "packageManager": "pnpm@10.24.0"
+  "packageManager": "pnpm@10.34.5"
 }

@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env -S node --experimental-transform-types
 /**
  * Feature-parity check: every `@integration` / `@unit` scenario in every
  * `.feature` file under a configured specification root must be bound to at

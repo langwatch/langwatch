@@ -7,8 +7,8 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import express from "express";
 import type { Request, RequestHandler, Response, NextFunction } from "express";
 
-import { getConfig, runWithConfig } from "./config.js";
-import { createMcpServer } from "./create-mcp-server.js";
+import { getConfig, runWithConfig } from "./config.ts";
+import { createMcpServer } from "./create-mcp-server.ts";
 import {
   admitOAuthToken,
   apiKeysMatch,
@@ -22,7 +22,7 @@ import {
   type OAuthTokenEntry,
   type RateLimiter,
   type SessionStore,
-} from "./http-security.js";
+} from "./http-security.ts";
 
 /** Idle time after which a session is closed and forgotten. */
 const SESSION_MAX_AGE_MS = 30 * 60 * 1000;

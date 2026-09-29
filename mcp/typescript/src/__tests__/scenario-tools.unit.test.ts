@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api-scenarios.js", () => ({
+vi.mock("../langwatch-api-scenarios.ts", () => ({
   listScenarios: vi.fn(),
   getScenario: vi.fn(),
 }));
 
-import { listScenarios, getScenario } from "../langwatch-api-scenarios.js";
-import { formatScenarioSchema } from "../tools/discover-scenario-schema.js";
-import { handleGetScenario } from "../tools/get-scenario.js";
-import { handleListScenarios } from "../tools/list-scenarios.js";
+import { listScenarios, getScenario } from "../langwatch-api-scenarios.ts";
+import { formatScenarioSchema } from "../tools/discover-scenario-schema.ts";
+import { handleGetScenario } from "../tools/get-scenario.ts";
+import { handleListScenarios } from "../tools/list-scenarios.ts";
 
 const mockListScenarios = vi.mocked(listScenarios);
 const mockGetScenario = vi.mocked(getScenario);

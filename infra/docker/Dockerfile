@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # ── Stage 1: build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
-RUN npm install -g pnpm@10.24.0
+RUN npm install -g pnpm@10.34.5
 
 # Install Goose migration tool (copied to runtime stage later)
 ARG GOOSE_SHA256_ARM64=dfafe0254b0058cabf016234a500df5ada1623ed034e9473cee9fe4ed07ca090
@@ -60,8 +60,6 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 # Every package tsconfig extends the root ones, and build:types builds tsconfig.build.json.
 COPY tsconfig.base.json tsconfig.shared.json tsconfig.build.json tsconfig.emit.json ./
 COPY vendor ./vendor
-# The root postinstall runs this script.
-COPY dev/scripts/install-check-shims.mjs ./dev/scripts/install-check-shims.mjs
 # Every workspace member's manifest must be present or `--frozen-lockfile`
 # has nothing to check the lockfile against. This one carries no source into
 # the image — only the manifest the workspace needs to stay coherent.
@@ -192,7 +190,7 @@ RUN CI=true pnpm prune --prod
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
 RUN apk --no-cache add curl openssl bash
-RUN npm install -g pnpm@10.24.0
+RUN npm install -g pnpm@10.34.5
 
 COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 # The scenario SDK opens a voice worker's quick tunnel with a bare `cloudflared` spawn, so the

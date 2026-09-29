@@ -1,4 +1,4 @@
-import { listModelProviders as apiListModelProviders } from "../langwatch-api-model-providers.js";
+import { listModelProviders as apiListModelProviders } from "../langwatch-api-model-providers.ts";
 
 /**
  * Handles the platform_list_model_providers MCP tool: lists providers

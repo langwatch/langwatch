@@ -2,7 +2,7 @@ import { createServer, type Server } from "http";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { initConfig } from "../config.js";
+import { initConfig } from "../config.ts";
 
 // --- Canned responses for each API endpoint ---
 
@@ -162,7 +162,7 @@ describe("MCP tools integration", () => {
 
   describe("search_traces()", () => {
     it("returns formatted trace digests from mock server", async () => {
-      const { handleSearchTraces } = await import("../tools/search-traces.js");
+      const { handleSearchTraces } = await import("../tools/search-traces.ts");
       const result = await handleSearchTraces({
         startDate: "24h",
         endDate: "now",
@@ -175,7 +175,7 @@ describe("MCP tools integration", () => {
 
   describe("get_trace()", () => {
     it("returns formatted trace digest from mock server", async () => {
-      const { handleGetTrace } = await import("../tools/get-trace.js");
+      const { handleGetTrace } = await import("../tools/get-trace.ts");
       const result = await handleGetTrace({ traceId: "trace-001" });
       expect(result).toContain("trace-001");
       expect(result).toContain("LLM Call [llm] 500ms");
@@ -186,7 +186,7 @@ describe("MCP tools integration", () => {
 
   describe("get_analytics()", () => {
     it("returns formatted analytics data from mock server", async () => {
-      const { handleGetAnalytics } = await import("../tools/get-analytics.js");
+      const { handleGetAnalytics } = await import("../tools/get-analytics.ts");
       const result = await handleGetAnalytics({
         metric: "metadata.trace_id",
         aggregation: "cardinality",
@@ -199,7 +199,7 @@ describe("MCP tools integration", () => {
 
   describe("platform_list_prompts()", () => {
     it("returns formatted prompt list from mock server", async () => {
-      const { handleListPrompts } = await import("../tools/list-prompts.js");
+      const { handleListPrompts } = await import("../tools/list-prompts.ts");
       const result = await handleListPrompts();
       expect(result).toContain("greeting-bot");
       expect(result).toContain("Greeting Bot");
@@ -209,7 +209,7 @@ describe("MCP tools integration", () => {
 
   describe("platform_get_prompt()", () => {
     it("returns formatted prompt details from mock server", async () => {
-      const { handleGetPrompt } = await import("../tools/get-prompt.js");
+      const { handleGetPrompt } = await import("../tools/get-prompt.ts");
       const result = await handleGetPrompt({ idOrHandle: "greeting-bot" });
       expect(result).toContain("Greeting Bot");
       expect(result).toContain("gpt-5-mini");
@@ -220,7 +220,7 @@ describe("MCP tools integration", () => {
 
   describe("platform_create_prompt()", () => {
     it("returns success message from mock server", async () => {
-      const { handleCreatePrompt } = await import("../tools/create-prompt.js");
+      const { handleCreatePrompt } = await import("../tools/create-prompt.ts");
       const result = await handleCreatePrompt({
         name: "New Prompt",
         messages: [{ role: "system", content: "You are helpful." }],
@@ -233,7 +233,7 @@ describe("MCP tools integration", () => {
 
   describe("platform_update_prompt()", () => {
     it("returns success message from mock server", async () => {
-      const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
+      const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
       const result = await handleUpdatePrompt({
         idOrHandle: "greeting-bot",
         model: "openai/gpt-5-mini",
@@ -258,7 +258,7 @@ describe("MCP tools integration", () => {
         endpoint: `http://localhost:${port}`,
       });
 
-      const { handleSearchTraces } = await import("../tools/search-traces.js");
+      const { handleSearchTraces } = await import("../tools/search-traces.ts");
       await expect(handleSearchTraces({ startDate: "24h" })).rejects.toThrow("401");
     });
   });

@@ -2,9 +2,9 @@ import { createServer, type Server } from "http";
 
 import { afterAll, beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
 
-import { initConfig } from "../config.js";
-import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.js";
-import { deleteAgent, getAgent, updateAgent } from "../langwatch-api-agents.js";
+import { initConfig } from "../config.ts";
+import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.ts";
+import { deleteAgent, getAgent, updateAgent } from "../langwatch-api-agents.ts";
 import QUERY_REFERENCE_FIXTURE from "./fixtures/query-reference.json" with { type: "json" };
 
 // --- Canned responses for every API endpoint ---
@@ -1124,7 +1124,7 @@ describe("All MCP tools integration", () => {
     describe("when category is filters", () => {
       /** @scenario Agent discovers available filter fields */
       it("returns the platform's own filter fields", async () => {
-        const { formatSchema } = await import("../tools/discover-schema.js");
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("filters");
 
         expect(result).toContain("## Trace Filter Fields");
@@ -1138,7 +1138,7 @@ describe("All MCP tools integration", () => {
     describe("when category is lwql", () => {
       /** @scenario Agent discovers the analytics SQL schema */
       it("returns the datasets with their time columns and example statements", async () => {
-        const { formatSchema } = await import("../tools/discover-schema.js");
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("lwql");
 
         expect(result).toContain("## Analytics SQL");
@@ -1151,7 +1151,7 @@ describe("All MCP tools integration", () => {
     describe("when category is metrics", () => {
       /** @scenario Agent discovers available metrics with allowed aggregations */
       it("returns metric documentation", async () => {
-        const { formatSchema } = await import("../tools/discover-schema.js");
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("metrics");
 
         expect(result).toContain("## Available Metrics");
@@ -1160,7 +1160,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is aggregations", () => {
       it("returns aggregation types", async () => {
-        const { formatSchema } = await import("../tools/discover-schema.js");
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("aggregations");
 
         expect(result).toContain("## Available Aggregation Types");
@@ -1173,7 +1173,7 @@ describe("All MCP tools integration", () => {
     describe("when category is groups", () => {
       /** @scenario Agent discovers available group-by options */
       it("returns group-by options", async () => {
-        const { formatSchema } = await import("../tools/discover-schema.js");
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("groups");
 
         expect(result).toContain("## Available Group-By Options");
@@ -1182,7 +1182,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is scenarios", () => {
       it("returns scenario schema documentation", async () => {
-        const { formatScenarioSchema } = await import("../tools/discover-scenario-schema.js");
+        const { formatScenarioSchema } = await import("../tools/discover-scenario-schema.ts");
         const result = formatScenarioSchema();
 
         expect(result).toContain("# Scenario Schema");
@@ -1193,7 +1193,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is evaluators", () => {
       it("returns evaluator type overview", async () => {
-        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.js");
+        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.ts");
         const result = formatEvaluatorSchema();
 
         expect(result).toContain("# Available Evaluator Types");
@@ -1202,7 +1202,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is evaluators with specific type", () => {
       it("returns detailed evaluator schema", async () => {
-        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.js");
+        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.ts");
         const result = formatEvaluatorSchema("langevals/llm_boolean");
 
         expect(result).toContain("langevals/llm_boolean");
@@ -1212,7 +1212,7 @@ describe("All MCP tools integration", () => {
 
     describe("when evaluator type is unknown", () => {
       it("returns an error message", async () => {
-        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.js");
+        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.ts");
         const result = formatEvaluatorSchema("nonexistent/type");
 
         expect(result).toContain("Unknown evaluator type");
@@ -1222,7 +1222,7 @@ describe("All MCP tools integration", () => {
     describe("when category is all", () => {
       /** @scenario Agent discovers all schema information at once */
       it("returns all schema categories", async () => {
-        const { formatSchema } = await import("../tools/discover-schema.js");
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("all");
 
         expect(result).toContain("## Trace Filter Fields");
@@ -1235,7 +1235,7 @@ describe("All MCP tools integration", () => {
 
     describe("when the reference is fetched", () => {
       it("sends the credential", async () => {
-        const { formatSchema } = await import("../tools/discover-schema.js");
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         await formatSchema("filters");
         expect(lastRequests["GET /api/v1/query/reference"]?.method).toBe("GET");
       });
@@ -1246,7 +1246,7 @@ describe("All MCP tools integration", () => {
     describe("when the statement returns rows", () => {
       /** @scenario Agent runs an analytics SQL statement and reads a table */
       it("sends the statement unchanged and renders a markdown table", async () => {
-        const { handleRunQuery } = await import("../tools/run-query.js");
+        const { handleRunQuery } = await import("../tools/run-query.ts");
         const sql =
           "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day";
         const result = await handleRunQuery({ sql });
@@ -1259,7 +1259,7 @@ describe("All MCP tools integration", () => {
       });
 
       it("passes the declared parameters through", async () => {
-        const { handleRunQuery } = await import("../tools/run-query.js");
+        const { handleRunQuery } = await import("../tools/run-query.ts");
         await handleRunQuery({
           sql: "SELECT {days:UInt32}",
           parameters: { days: 7 },
@@ -1273,8 +1273,8 @@ describe("All MCP tools integration", () => {
     describe("when the statement returns more rows than the tool prints", () => {
       /** @scenario A long result is capped and says so */
       it("prints the cap and reports the real count", async () => {
-        const { handleRunQuery } = await import("../tools/run-query.js");
-        const { RUN_QUERY_ROW_CAP } = await import("../tools/run-query.js");
+        const { handleRunQuery } = await import("../tools/run-query.ts");
+        const { RUN_QUERY_ROW_CAP } = await import("../tools/run-query.ts");
         const result = await handleRunQuery({ sql: "__many__" });
 
         const dataRows = result
@@ -1295,7 +1295,7 @@ describe("All MCP tools integration", () => {
     describe("when traces are found", () => {
       /** @scenario Agent searches traces with a text query */
       it("returns formatted trace digests", async () => {
-        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           startDate: "24h",
           endDate: "now",
@@ -1309,7 +1309,7 @@ describe("All MCP tools integration", () => {
 
     describe("when no traces match", () => {
       it("returns a no-results message", async () => {
-        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           query: "__empty__",
         });
@@ -1321,7 +1321,7 @@ describe("All MCP tools integration", () => {
     describe("when pagination token is present", () => {
       /** @scenario Agent paginates through trace results */
       it("includes scroll ID for next page", async () => {
-        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           pageSize: 5,
         });
@@ -1332,7 +1332,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON", async () => {
-        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           format: "json",
         });
@@ -1347,7 +1347,7 @@ describe("All MCP tools integration", () => {
     describe("when filters are applied", () => {
       /** @scenario Agent searches traces filtered by user_id */
       it("passes filters to the API", async () => {
-        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         await handleSearchTraces({
           filters: { "metadata.user_id": ["user-42"] },
         });
@@ -1364,7 +1364,7 @@ describe("All MCP tools integration", () => {
     describe("when a trace filter string is given", () => {
       /** @scenario Agent filters a trace search with the trace filter language */
       it("sends it as the filter, not as the text query", async () => {
-        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         await handleSearchTraces({
           filter: "status:error AND model:gpt-*",
           query: "refund",
@@ -1379,7 +1379,7 @@ describe("All MCP tools integration", () => {
       });
 
       it("sends no filter key when none was given", async () => {
-        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         await handleSearchTraces({ query: "refund" });
 
         const parsed = JSON.parse(lastRequests["POST /api/v1/traces/search"]!.body) as {
@@ -1392,7 +1392,7 @@ describe("All MCP tools integration", () => {
     describe("given a trace has evaluation results", () => {
       /** @scenario Agent searches traces and sees evaluation results without a follow-up call */
       it("includes evaluation status in the digest without a follow-up call", async () => {
-        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           startDate: "24h",
           endDate: "now",
@@ -1410,7 +1410,7 @@ describe("All MCP tools integration", () => {
     describe("when trace exists", () => {
       /** @scenario Agent gets a single trace by ID in AI-readable format */
       it("returns formatted trace with metadata and evaluations", async () => {
-        const { handleGetTrace } = await import("../tools/get-trace.js");
+        const { handleGetTrace } = await import("../tools/get-trace.ts");
         const result = await handleGetTrace({ traceId: "trace-001" });
 
         expect(result).toContain("# Trace: trace-001");
@@ -1426,7 +1426,7 @@ describe("All MCP tools integration", () => {
     describe("when trace does not exist", () => {
       /** @scenario Agent gets a trace that does not exist */
       it("propagates the 404 error", async () => {
-        const { handleGetTrace } = await import("../tools/get-trace.js");
+        const { handleGetTrace } = await import("../tools/get-trace.ts");
 
         await expect(handleGetTrace({ traceId: "trace-nonexistent" })).rejects.toThrow("404");
       });
@@ -1434,7 +1434,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON with full trace data", async () => {
-        const { handleGetTrace } = await import("../tools/get-trace.js");
+        const { handleGetTrace } = await import("../tools/get-trace.ts");
         const result = await handleGetTrace({
           traceId: "trace-001",
           format: "json",
@@ -1454,7 +1454,7 @@ describe("All MCP tools integration", () => {
   describe("get_analytics()", () => {
     describe("when data is available", () => {
       it("returns formatted analytics with markdown table", async () => {
-        const { handleGetAnalytics } = await import("../tools/get-analytics.js");
+        const { handleGetAnalytics } = await import("../tools/get-analytics.ts");
         const result = await handleGetAnalytics({
           metric: "metadata.trace_id",
           aggregation: "cardinality",
@@ -1469,7 +1469,7 @@ describe("All MCP tools integration", () => {
 
     describe("when metric and aggregation are specified", () => {
       it("passes them through to the API", async () => {
-        const { handleGetAnalytics } = await import("../tools/get-analytics.js");
+        const { handleGetAnalytics } = await import("../tools/get-analytics.ts");
         await handleGetAnalytics({
           metric: "performance.total_cost",
           aggregation: "sum",
@@ -1490,7 +1490,7 @@ describe("All MCP tools integration", () => {
   describe("platform_create_prompt()", () => {
     describe("when valid data is provided", () => {
       it("returns success confirmation with prompt details", async () => {
-        const { handleCreatePrompt } = await import("../tools/create-prompt.js");
+        const { handleCreatePrompt } = await import("../tools/create-prompt.ts");
         const result = await handleCreatePrompt({
           name: "New Prompt",
           messages: [{ role: "system", content: "You are helpful." }],
@@ -1511,7 +1511,7 @@ describe("All MCP tools integration", () => {
   describe("platform_list_prompts()", () => {
     describe("when prompts exist", () => {
       it("returns formatted prompt list", async () => {
-        const { handleListPrompts } = await import("../tools/list-prompts.js");
+        const { handleListPrompts } = await import("../tools/list-prompts.ts");
         const result = await handleListPrompts();
 
         expect(result).toContain("greeting-bot");
@@ -1529,7 +1529,7 @@ describe("All MCP tools integration", () => {
   describe("platform_get_prompt()", () => {
     describe("when prompt exists", () => {
       it("returns formatted prompt details with messages and deployments", async () => {
-        const { handleGetPrompt } = await import("../tools/get-prompt.js");
+        const { handleGetPrompt } = await import("../tools/get-prompt.ts");
         const result = await handleGetPrompt({
           idOrHandle: "greeting-bot",
         });
@@ -1550,7 +1550,7 @@ describe("All MCP tools integration", () => {
   describe("platform_update_prompt()", () => {
     describe("when updating a prompt", () => {
       it("returns success message", async () => {
-        const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
         const result = await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
           model: "openai/gpt-5-mini",
@@ -1567,7 +1567,7 @@ describe("All MCP tools integration", () => {
     describe("when an update supplies only messages and a commit message", () => {
       /** @scenario Carrying forward prior fields when an update supplies only messages and a commit message */
       it("does not send fields that would wipe prior prompt configuration", async () => {
-        const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
         await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
           messages: [{ role: "system", content: "You are a helpful bot." }],
@@ -1588,7 +1588,7 @@ describe("All MCP tools integration", () => {
     describe("when an update omits tags", () => {
       /** @scenario Tag-to-version mapping stays unchanged when an update omits tags */
       it("does not send a tags field in the update request", async () => {
-        const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
         await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
           model: "openai/gpt-5-mini",
@@ -1605,7 +1605,7 @@ describe("All MCP tools integration", () => {
     describe("when an update passes tags explicitly", () => {
       /** @scenario Passing tags explicitly moves the tag to the new version */
       it("sends the requested tags in the update request", async () => {
-        const { handleUpdatePrompt } = await import("../tools/update-prompt.js");
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
         await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
           model: "openai/gpt-5-mini",
@@ -1627,7 +1627,7 @@ describe("All MCP tools integration", () => {
   describe("platform_create_scenario()", () => {
     describe("when valid data is provided", () => {
       it("returns confirmation with new scenario ID", async () => {
-        const { handleCreateScenario } = await import("../tools/create-scenario.js");
+        const { handleCreateScenario } = await import("../tools/create-scenario.ts");
         const result = await handleCreateScenario({
           name: "New Scenario",
           situation: "User does something",
@@ -1647,7 +1647,7 @@ describe("All MCP tools integration", () => {
   describe("platform_list_scenarios()", () => {
     describe("when scenarios exist", () => {
       it("returns formatted scenario list", async () => {
-        const { handleListScenarios } = await import("../tools/list-scenarios.js");
+        const { handleListScenarios } = await import("../tools/list-scenarios.ts");
         const result = await handleListScenarios({});
 
         expect(result).toContain("# Scenarios (2 total)");
@@ -1658,7 +1658,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON matching API response", async () => {
-        const { handleListScenarios } = await import("../tools/list-scenarios.js");
+        const { handleListScenarios } = await import("../tools/list-scenarios.ts");
         const result = await handleListScenarios({ format: "json" });
 
         expect(JSON.parse(result)).toEqual(CANNED_SCENARIOS_LIST);
@@ -1672,7 +1672,7 @@ describe("All MCP tools integration", () => {
   describe("platform_get_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns formatted scenario details", async () => {
-        const { handleGetScenario } = await import("../tools/get-scenario.js");
+        const { handleGetScenario } = await import("../tools/get-scenario.ts");
         const result = await handleGetScenario({
           scenarioId: "scen_abc123",
         });
@@ -1685,7 +1685,7 @@ describe("All MCP tools integration", () => {
 
     describe("when the scenario does not exist", () => {
       it("propagates the 404 error", async () => {
-        const { handleGetScenario } = await import("../tools/get-scenario.js");
+        const { handleGetScenario } = await import("../tools/get-scenario.ts");
 
         await expect(handleGetScenario({ scenarioId: "scen_nonexistent" })).rejects.toThrow("404");
       });
@@ -1693,7 +1693,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON", async () => {
-        const { handleGetScenario } = await import("../tools/get-scenario.js");
+        const { handleGetScenario } = await import("../tools/get-scenario.ts");
         const result = await handleGetScenario({
           scenarioId: "scen_abc123",
           format: "json",
@@ -1710,7 +1710,7 @@ describe("All MCP tools integration", () => {
   describe("platform_update_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns update confirmation with updated details", async () => {
-        const { handleUpdateScenario } = await import("../tools/update-scenario.js");
+        const { handleUpdateScenario } = await import("../tools/update-scenario.ts");
         const result = await handleUpdateScenario({
           scenarioId: "scen_abc123",
           name: "Login Flow - Updated",
@@ -1728,7 +1728,7 @@ describe("All MCP tools integration", () => {
   describe("platform_archive_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns confirmation that scenario was archived", async () => {
-        const { handleArchiveScenario } = await import("../tools/archive-scenario.js");
+        const { handleArchiveScenario } = await import("../tools/archive-scenario.ts");
         const result = await handleArchiveScenario({
           scenarioId: "scen_abc123",
         });
@@ -1746,7 +1746,7 @@ describe("All MCP tools integration", () => {
   describe("platform_create_evaluator()", () => {
     describe("when valid data is provided", () => {
       it("returns success confirmation with evaluator details", async () => {
-        const { handleCreateEvaluator } = await import("../tools/create-evaluator.js");
+        const { handleCreateEvaluator } = await import("../tools/create-evaluator.ts");
         const result = await handleCreateEvaluator({
           name: "My LLM Judge",
           config: { evaluatorType: "langevals/llm_boolean" },
@@ -1766,7 +1766,7 @@ describe("All MCP tools integration", () => {
   describe("platform_list_evaluators()", () => {
     describe("when evaluators exist", () => {
       it("returns formatted evaluator list", async () => {
-        const { handleListEvaluators } = await import("../tools/list-evaluators.js");
+        const { handleListEvaluators } = await import("../tools/list-evaluators.ts");
         const result = await handleListEvaluators();
 
         expect(result).toContain("# Evaluators (2 total)");
@@ -1785,7 +1785,7 @@ describe("All MCP tools integration", () => {
   describe("platform_get_evaluator()", () => {
     describe("when the evaluator exists", () => {
       it("returns formatted evaluator details with config and fields", async () => {
-        const { handleGetEvaluator } = await import("../tools/get-evaluator.js");
+        const { handleGetEvaluator } = await import("../tools/get-evaluator.ts");
         const result = await handleGetEvaluator({
           idOrSlug: "evaluator_abc123",
         });
@@ -1803,7 +1803,7 @@ describe("All MCP tools integration", () => {
 
     describe("when the evaluator does not exist", () => {
       it("propagates the 404 error", async () => {
-        const { handleGetEvaluator } = await import("../tools/get-evaluator.js");
+        const { handleGetEvaluator } = await import("../tools/get-evaluator.ts");
 
         await expect(handleGetEvaluator({ idOrSlug: "evaluator_nonexistent" })).rejects.toThrow(
           "404",
@@ -1818,7 +1818,7 @@ describe("All MCP tools integration", () => {
   describe("platform_update_evaluator()", () => {
     describe("when the evaluator exists", () => {
       it("returns update confirmation", async () => {
-        const { handleUpdateEvaluator } = await import("../tools/update-evaluator.js");
+        const { handleUpdateEvaluator } = await import("../tools/update-evaluator.ts");
         const result = await handleUpdateEvaluator({
           evaluatorId: "evaluator_abc123",
           name: "Updated Toxicity",
@@ -1837,7 +1837,7 @@ describe("All MCP tools integration", () => {
   describe("platform_set_model_provider()", () => {
     describe("when setting a provider with API key", () => {
       it("returns success confirmation with provider details", async () => {
-        const { handleSetModelProvider } = await import("../tools/set-model-provider.js");
+        const { handleSetModelProvider } = await import("../tools/set-model-provider.ts");
         const result = await handleSetModelProvider({
           provider: "openai",
           enabled: true,
@@ -1853,7 +1853,7 @@ describe("All MCP tools integration", () => {
 
     describe("when setting a default model", () => {
       it("shows the normalized model name with provider prefix", async () => {
-        const { handleSetModelProvider } = await import("../tools/set-model-provider.js");
+        const { handleSetModelProvider } = await import("../tools/set-model-provider.ts");
         const result = await handleSetModelProvider({
           provider: "openai",
           enabled: true,
@@ -1871,7 +1871,7 @@ describe("All MCP tools integration", () => {
   describe("platform_list_model_providers()", () => {
     describe("when providers exist", () => {
       it("returns formatted provider list with status and key info", async () => {
-        const { handleListModelProviders } = await import("../tools/list-model-providers.js");
+        const { handleListModelProviders } = await import("../tools/list-model-providers.ts");
         const result = await handleListModelProviders();
 
         expect(result).toContain("# Model Providers (2 total)");
@@ -1904,7 +1904,7 @@ describe("All MCP tools integration", () => {
         projectId: "proj_123",
       });
 
-      const { handleSearchTraces } = await import("../tools/search-traces.js");
+      const { handleSearchTraces } = await import("../tools/search-traces.ts");
       await expect(handleSearchTraces({ startDate: "24h" })).rejects.toThrow("401");
     });
 
@@ -1915,7 +1915,7 @@ describe("All MCP tools integration", () => {
         projectId: "proj_123",
       });
 
-      const { handleListEvaluators } = await import("../tools/list-evaluators.js");
+      const { handleListEvaluators } = await import("../tools/list-evaluators.ts");
       await expect(handleListEvaluators()).rejects.toThrow("401");
     });
 
@@ -1926,7 +1926,7 @@ describe("All MCP tools integration", () => {
         projectId: "proj_123",
       });
 
-      const { handleListModelProviders } = await import("../tools/list-model-providers.js");
+      const { handleListModelProviders } = await import("../tools/list-model-providers.ts");
       await expect(handleListModelProviders()).rejects.toThrow("401");
     });
   });
@@ -1936,7 +1936,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_run_plan()", () => {
     it("runs a configuration and reports the plan it created", async () => {
-      const { handleRunPlan } = await import("../tools/run-plan.js");
+      const { handleRunPlan } = await import("../tools/run-plan.ts");
       const result = await handleRunPlan({
         name: "Regression Plan",
         scope: { mode: "labels", labels: ["auth"] },
@@ -1954,7 +1954,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_list_run_plans()", () => {
     it("returns formatted run plan list", async () => {
-      const { handleListRunPlans } = await import("../tools/list-run-plans.js");
+      const { handleListRunPlans } = await import("../tools/list-run-plans.ts");
       const result = await handleListRunPlans({});
 
       expect(result).toContain("Run Plans (1 total)");
@@ -1964,7 +1964,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_get_run_plan()", () => {
     it("returns the plan configuration", async () => {
-      const { handleGetRunPlan } = await import("../tools/get-run-plan.js");
+      const { handleGetRunPlan } = await import("../tools/get-run-plan.ts");
       const result = await handleGetRunPlan({ id: "plan_abc" });
 
       expect(result).toContain("Regression Plan");
@@ -1975,7 +1975,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_rerun_run_plan()", () => {
     it("runs the stored configuration again and reports it joined the plan", async () => {
-      const { handleRerunRunPlan } = await import("../tools/rerun-run-plan.js");
+      const { handleRerunRunPlan } = await import("../tools/rerun-run-plan.ts");
       const result = await handleRerunRunPlan({ id: "plan_abc" });
 
       expect(result).toContain("Regression Plan");
@@ -1986,7 +1986,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_archive_run_plan()", () => {
     it("archives the run plan", async () => {
-      const { handleArchiveRunPlan } = await import("../tools/archive-run-plan.js");
+      const { handleArchiveRunPlan } = await import("../tools/archive-run-plan.ts");
       const result = await handleArchiveRunPlan({ id: "plan_abc" });
 
       expect(result).toContain("archived");
@@ -1999,7 +1999,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_list_test_suites()", () => {
     it("returns formatted test suite list", async () => {
-      const { handleListTestSuites } = await import("../tools/list-test-suites.js");
+      const { handleListTestSuites } = await import("../tools/list-test-suites.ts");
       const result = await handleListTestSuites({});
 
       expect(result).toContain("Test Suites (1 total)");
@@ -2009,7 +2009,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_create_test_suite()", () => {
     it("creates a test suite and returns confirmation", async () => {
-      const { handleCreateTestSuite } = await import("../tools/create-test-suite.js");
+      const { handleCreateTestSuite } = await import("../tools/create-test-suite.ts");
       const result = await handleCreateTestSuite({ name: "New Suite" });
 
       expect(result).toContain("created");
@@ -2020,7 +2020,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_get_test_suite()", () => {
     it("returns the suite with the scenarios filed in it", async () => {
-      const { handleGetTestSuite } = await import("../tools/get-test-suite.js");
+      const { handleGetTestSuite } = await import("../tools/get-test-suite.ts");
       const result = await handleGetTestSuite({ id: "suite_abc" });
 
       expect(result).toContain("Checkout");
@@ -2030,7 +2030,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_rename_test_suite()", () => {
     it("renames the test suite", async () => {
-      const { handleRenameTestSuite } = await import("../tools/rename-test-suite.js");
+      const { handleRenameTestSuite } = await import("../tools/rename-test-suite.ts");
       const result = await handleRenameTestSuite({
         id: "suite_abc",
         name: "Checkout v2",
@@ -2042,7 +2042,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_archive_test_suite()", () => {
     it("archives the suite and says the filed scenarios went with it", async () => {
-      const { handleArchiveTestSuite } = await import("../tools/archive-test-suite.js");
+      const { handleArchiveTestSuite } = await import("../tools/archive-test-suite.ts");
       const result = await handleArchiveTestSuite({ id: "suite_abc" });
 
       expect(result).toContain("archived");
@@ -2052,7 +2052,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_run_test_suite()", () => {
     it("runs the suite against a target and reports the derived plan", async () => {
-      const { handleRunTestSuite } = await import("../tools/run-test-suite.js");
+      const { handleRunTestSuite } = await import("../tools/run-test-suite.ts");
       const result = await handleRunTestSuite({
         id: "suite_abc",
         targets: [{ type: "http", referenceId: "agent_abc" }],
@@ -2068,7 +2068,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_list_simulation_runs()", () => {
     it("returns formatted run list", async () => {
-      const { handleListSimulationRuns } = await import("../tools/list-simulation-runs.js");
+      const { handleListSimulationRuns } = await import("../tools/list-simulation-runs.ts");
       const result = await handleListSimulationRuns({});
 
       expect(result).toContain("Simulation Runs");
@@ -2078,7 +2078,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_get_simulation_run()", () => {
     it("returns run details with conversation", async () => {
-      const { handleGetSimulationRun } = await import("../tools/get-simulation-run.js");
+      const { handleGetSimulationRun } = await import("../tools/get-simulation-run.ts");
       const result = await handleGetSimulationRun({ scenarioRunId: "run_abc" });
 
       expect(result).toContain("Login Flow");
@@ -2092,7 +2092,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_list_monitors()", () => {
     it("returns formatted monitor list", async () => {
-      const { listMonitors } = await import("../langwatch-api-monitors.js");
+      const { listMonitors } = await import("../langwatch-api-monitors.ts");
       const monitors = await listMonitors();
       expect(monitors).toHaveLength(1);
       expect(monitors[0]!.name).toBe("Toxicity Check");
@@ -2102,7 +2102,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_get_monitor()", () => {
     it("returns monitor details", async () => {
-      const { getMonitor } = await import("../langwatch-api-monitors.js");
+      const { getMonitor } = await import("../langwatch-api-monitors.ts");
       const monitor = await getMonitor("mon_abc");
       expect(monitor.id).toBe("mon_abc");
       expect(monitor.name).toBe("Toxicity Check");
@@ -2112,7 +2112,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_create_monitor()", () => {
     it("creates a monitor and returns metadata", async () => {
-      const { createMonitor } = await import("../langwatch-api-monitors.js");
+      const { createMonitor } = await import("../langwatch-api-monitors.ts");
       const monitor = await createMonitor({ name: "New Monitor", checkType: "ragas/toxicity" });
       expect(monitor.id).toBe("mon_new");
       expect(monitor.name).toBe("New Monitor");
@@ -2121,7 +2121,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_update_monitor()", () => {
     it("updates a monitor", async () => {
-      const { updateMonitor } = await import("../langwatch-api-monitors.js");
+      const { updateMonitor } = await import("../langwatch-api-monitors.ts");
       const monitor = await updateMonitor({ id: "mon_abc", enabled: false });
       expect(monitor.id).toBe("mon_abc");
       expect(monitor.enabled).toBe(false);
@@ -2130,7 +2130,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_delete_monitor()", () => {
     it("deletes a monitor", async () => {
-      const { deleteMonitor } = await import("../langwatch-api-monitors.js");
+      const { deleteMonitor } = await import("../langwatch-api-monitors.ts");
       const result = await deleteMonitor("mon_abc");
       expect(result.id).toBe("mon_abc");
       expect(result.deleted).toBe(true);
@@ -2142,7 +2142,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_list_secrets()", () => {
     it("returns formatted secret list", async () => {
-      const { listSecrets } = await import("../langwatch-api-secrets.js");
+      const { listSecrets } = await import("../langwatch-api-secrets.ts");
       const secrets = await listSecrets();
       expect(secrets).toHaveLength(2);
       expect(secrets[0]!.name).toBe("MY_API_KEY");
@@ -2151,7 +2151,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_create_secret()", () => {
     it("creates a secret and returns metadata", async () => {
-      const { createSecret } = await import("../langwatch-api-secrets.js");
+      const { createSecret } = await import("../langwatch-api-secrets.ts");
       const secret = await createSecret({ name: "NEW_SECRET", value: "sk-123" });
       expect(secret.id).toBe("secret_new");
       expect(secret.name).toBe("NEW_SECRET");
@@ -2160,7 +2160,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_update_secret()", () => {
     it("updates a secret value", async () => {
-      const { updateSecret } = await import("../langwatch-api-secrets.js");
+      const { updateSecret } = await import("../langwatch-api-secrets.ts");
       const secret = await updateSecret({ id: "secret_abc", value: "new-val" });
       expect(secret.id).toBe("secret_abc");
       expect(secret.name).toBe("MY_API_KEY");
@@ -2169,7 +2169,7 @@ describe("All MCP tools integration", () => {
 
   describe("platform_delete_secret()", () => {
     it("deletes a secret", async () => {
-      const { deleteSecret } = await import("../langwatch-api-secrets.js");
+      const { deleteSecret } = await import("../langwatch-api-secrets.ts");
       const result = await deleteSecret("secret_abc");
       expect(result.id).toBe("secret_abc");
       expect(result.deleted).toBe(true);
@@ -2206,7 +2206,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_run_workflow()", () => {
     it("executes a workflow and returns result", async () => {
-      const { handleRunWorkflow } = await import("../tools/run-workflow.js");
+      const { handleRunWorkflow } = await import("../tools/run-workflow.ts");
       const result = await handleRunWorkflow({ id: "wf_abc" });
 
       expect(result).toContain("executed successfully");

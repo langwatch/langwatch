@@ -196,15 +196,14 @@ export const TracesPage: React.FC = () => {
             {/* Hide the sidebar during the integrate pane (no data →
                 no facets to show) and during the legacy journey except
                 for the facets/outro beats. */}
-            {!showIntegratePane &&
-              (!showEmptyState || sidebarVisibleDuringEmpty) && (
-                // `height="full"` + `overflow="hidden"` on this wrapper is load-bearing: without
-                // it the inner aside expands to its intrinsic height and facets become invisible
-                // and unscrollable on shorter viewports.
-                <Box flexShrink={0} data-tour-target="sidebar" height="full" overflow="hidden">
-                  <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
-                </Box>
-              )}
+            {!showIntegratePane && (!showEmptyState || sidebarVisibleDuringEmpty) && (
+              // `height="full"` + `overflow="hidden"` on this wrapper is load-bearing: without
+              // it the inner aside expands to its intrinsic height and facets become invisible
+              // and unscrollable on shorter viewports.
+              <Box flexShrink={0} data-tour-target="sidebar" height="full" overflow="hidden">
+                <FilterAside dimmed={dimChrome && !sidebarVisibleDuringEmpty} />
+              </Box>
+            )}
             {/* `mode="wait"` lets the IntegratePane finish its exit before ResultsPane mounts and
                 fades in, hiding the heavy mount behind the fade instead of a janky pop-in. */}
             <AnimatePresence mode="wait" initial={false}>

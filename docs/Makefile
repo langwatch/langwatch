@@ -16,7 +16,7 @@ sync-api-spec:
 .PHONY: generate-openapi-evals
 generate-openapi-evals:
 	@echo "Generating OpenAPI spec for evaluators from langevals..."
-	@npx tsx scripts/generate-openapi-evals.ts
+	@node scripts/generate-openapi-evals.ts
 	@echo "✅ Evaluators OpenAPI spec generated successfully"
 
 .PHONY: generate-api-reference

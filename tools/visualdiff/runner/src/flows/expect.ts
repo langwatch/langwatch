@@ -1,6 +1,6 @@
-import type { Action, ActionContext } from "./context";
-import { asRegExp, fillPath } from "./context";
-import { hasTarget, targetOf } from "./target";
+import type { Action, ActionContext } from "./context.ts";
+import { asRegExp, fillPath } from "./context.ts";
+import { hasTarget, targetOf } from "./target.ts";
 
 /** EXPECT_TIMEOUT_MILLIS bounds how long an expect polls before it fails. */
 export const EXPECT_TIMEOUT_MILLIS = 10_000;
