@@ -1,24 +1,27 @@
+import type { WorkflowCreatedSignal } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { WorkflowSignals } from "../app/workflow.app.ts";
 
 const logger = createLogger("langwatch:workflows:signals");
 
-/** Where a created workflow and a failure nothing waits on are recorded: the log. */
-export class LoggedWorkflowSignalsService implements WorkflowSignals {
-  static create(): LoggedWorkflowSignalsService {
-    return new LoggedWorkflowSignalsService();
+/**
+ * A created workflow is announced to billing for nurturing; an announcement or
+ * any other side effect nothing waits on only logs when it fails.
+ */
+export class WorkflowSignalsService implements WorkflowSignals {
+  static create(deps: {
+    announce: (input: WorkflowCreatedSignal) => Promise<void>;
+  }): WorkflowSignalsService {
+    return new WorkflowSignalsService(deps.announce);
   }
 
-  private constructor() {}
+  private constructor(private readonly announce: (input: WorkflowCreatedSignal) => Promise<void>) {}
 
-  workflowCreated(input: {
-    userId: string;
-    workflowCount: number;
-    workflowId: string;
-    projectId: string;
-  }): void {
-    logger.info(input, "workflow created");
+  workflowCreated(input: WorkflowCreatedSignal): void {
+    void this.announce(input).catch((error: unknown) => {
+      this.failed(error, { projectId: input.projectId });
+    });
   }
 
   failed(error: unknown, context: Readonly<{ projectId?: string }>): void {

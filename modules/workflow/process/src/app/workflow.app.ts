@@ -11,6 +11,7 @@ import {
  * operation serves a browser session, an API key and a background job alike.
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
@@ -109,7 +110,7 @@ import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.
 import { WorkflowPermissionService } from "../services/workflow-permission.service.ts";
 import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
 import { WorkflowPublicationService } from "../services/workflow-publication.service.ts";
-import { LoggedWorkflowSignalsService } from "../services/workflow-signals.service.ts";
+import { WorkflowSignalsService } from "../services/workflow-signals.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
 import { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
@@ -473,6 +474,8 @@ export class WorkflowApp implements WorkflowApi {
     experiments: ExperimentApi,
     /** The monitors an archived workflow's evaluators back, deleted with it. */
     monitors: MonitorApi,
+    /** Where a created workflow is announced, for nurturing. */
+    billing: BillingApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -558,7 +561,9 @@ export class WorkflowApp implements WorkflowApi {
         }),
       }),
       publications: publicationsOf(setup.repositories.lineage),
-      signals: LoggedWorkflowSignalsService.create(),
+      signals: WorkflowSignalsService.create({
+        announce: (input) => setup.dependencies.billing.recordWorkflowCreated(input),
+      }),
     });
   }
 
