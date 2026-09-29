@@ -4,17 +4,14 @@ import { useMemo, useState } from "react";
 
 import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
 import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
+import { useTargetProject } from "../../behavior/use-target-project.ts";
 
 export function ConnectionSettings({ compact = false }: { compact?: boolean }) {
-  const { currentProject, projects: allProjects } = useFoundryTransport();
+  const { projects: allProjects } = useFoundryTransport();
   const [isOpen, setIsOpen] = useState(false);
 
-  const { selectedProjectId, setSelectedProject } = useFoundryProjectStore();
-
-  // Default to current project if nothing selected
-  const selectedProject = selectedProjectId
-    ? allProjects.find((p) => p.id === selectedProjectId)
-    : (allProjects.find((p) => p.id === currentProject?.id) ?? allProjects[0]);
+  const setSelectedProject = useFoundryProjectStore((s) => s.setSelectedProject);
+  const selectedProject = useTargetProject();
 
   return (
     <Box p={3}>

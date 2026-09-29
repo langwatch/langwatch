@@ -2,10 +2,10 @@ import { Badge, Box, Button, Flex, Text } from "@chakra-ui/react";
 import { ChevronDown, Shuffle } from "lucide-react";
 import { useState } from "react";
 
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
 import { usePresetStore } from "../../behavior/preset.store.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { useFoundryPrompts } from "../../behavior/use-foundry-prompts.ts";
+import { useTargetProject } from "../../behavior/use-target-project.ts";
 import type { SpanConfig, TraceConfig } from "../../model/foundry-types.ts";
 import { shortId } from "../../model/foundry-types.ts";
 
@@ -67,7 +67,7 @@ export function PresetPicker() {
   const setTrace = useTraceStore((s) => s.setTrace);
   const { builtIn, userPresets } = usePresetStore();
   const allPresets = [...builtIn, ...userPresets];
-  const selectedProjectId = useFoundryProjectStore((s) => s.selectedProjectId);
+  const selectedProjectId = useTargetProject()?.id ?? null;
   const prompts = useFoundryPrompts({
     enabled: !!selectedProjectId,
     projectId: selectedProjectId,

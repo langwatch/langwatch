@@ -10,9 +10,8 @@ import { MessagesSquare } from "lucide-react";
 import { useState } from "react";
 
 import { useExecutionStore } from "../../behavior/execution.store.ts";
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
-import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
 import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
+import { useTargetProject } from "../../behavior/use-target-project.ts";
 import { generateConversation } from "../../model/generate-conversation.ts";
 
 const TURN_PRESETS = [10, 25, 50, 100] as const;
@@ -23,9 +22,8 @@ export function GenerateConversationDialog() {
   const [staggerMs, setStaggerMs] = useState(150);
   const [isSending, setIsSending] = useState(false);
 
-  const { currentProject: project } = useFoundryTransport();
-  const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
-  const apiKey = selectedApiKey ?? project?.apiKey;
+  const project = useTargetProject();
+  const apiKey = project?.apiKey;
   const { addLogEntry, updateLogEntry } = useExecutionStore();
 
   async function handleSend() {

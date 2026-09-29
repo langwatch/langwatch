@@ -4,10 +4,9 @@ import { Play } from "lucide-react";
 import { useState } from "react";
 
 import { useExecutionStore } from "../../behavior/execution.store.ts";
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
-import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
 import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
+import { useTargetProject } from "../../behavior/use-target-project.ts";
 
 /** The mark each run outcome shows in the log; anything else reads as failed. */
 const LOG_STATUS_ICONS: Record<string, string> = {
@@ -27,9 +26,8 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
     updateLogEntry,
   } = useExecutionStore();
   const trace = useTraceStore((s) => s.trace);
-  const { currentProject: project } = useFoundryTransport();
-  const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
-  const apiKey = selectedApiKey ?? project?.apiKey;
+  const project = useTargetProject();
+  const apiKey = project?.apiKey;
 
   async function handleSend() {
     if (running || !apiKey) return;

@@ -10,9 +10,9 @@ import { Switch } from "@langwatch/design-system/switch";
 import { Sparkles } from "lucide-react";
 import { useState } from "react";
 
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { useFoundryPrompts } from "../../behavior/use-foundry-prompts.ts";
+import { useTargetProject } from "../../behavior/use-target-project.ts";
 import type { GeneratorOptions, PromptRef } from "../../model/trace-generator.ts";
 import { generateTrace } from "../../model/trace-generator.ts";
 
@@ -44,7 +44,7 @@ function describeRealPrompts({
 export function GenerateTraceDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const setTrace = useTraceStore((s) => s.setTrace);
-  const selectedProjectId = useFoundryProjectStore((s) => s.selectedProjectId);
+  const selectedProjectId = useTargetProject()?.id ?? null;
 
   const [targetSpanCount, setTargetSpanCount] = useState(1500);
   const [depthPreset, setDepthPreset] = useState<number>(1); // index into DEPTH_PRESETS

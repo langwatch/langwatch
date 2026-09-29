@@ -6,17 +6,15 @@ import { Play, RotateCcw } from "lucide-react";
 import { type RefObject, useEffect, useRef, useState } from "react";
 
 import { useExecutionStore } from "../../behavior/execution.store.ts";
-import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
-import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
 import { usePresetStore } from "../../behavior/preset.store.ts";
 import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
+import { useTargetProject } from "../../behavior/use-target-project.ts";
 import { type Preset, SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types.ts";
 
 export function FoundryDrawer({ onClose }: UiFoundryDrawerProps) {
-  const { currentProject: project } = useFoundryTransport();
-  const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
-  const apiKey = selectedApiKey ?? project?.apiKey;
+  const project = useTargetProject();
+  const apiKey = project?.apiKey;
   const trace = useTraceStore((s) => s.trace);
   const setTrace = useTraceStore((s) => s.setTrace);
   const resetTrace = useTraceStore((s) => s.resetTrace);
