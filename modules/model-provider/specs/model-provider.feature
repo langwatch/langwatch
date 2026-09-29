@@ -56,3 +56,41 @@ Feature: Model Provider service
     When the platform provider chain is read
     Then vertex_ai is in the chain under GOOGLE_APPLICATION_CREDENTIALS
     And the credential is borrowed on the read, never while the module is constructing
+
+  # Managed providers come from the managed-provider peer, as main's managed Bedrock config did.
+  @unit
+  Scenario: Bedrock reads as managed for an organization the managed-provider peer manages
+    Given the managed-provider peer manages Bedrock for an organization
+    When model provider asks whether Bedrock is managed for that organization
+    Then it answers managed
+    And any other provider or organization answers not managed
+
+  @unit
+  Scenario: A managed call runs with the parameters the managed-provider peer builds
+    Given the managed-provider peer builds Bedrock parameters for a project
+    When model provider prepares a Bedrock call for that project
+    Then the call runs with the peer's parameters
+
+  @unit
+  Scenario: A managed call whose credentials cannot be assumed fails the call
+    Given the managed-provider peer cannot assume the customer's role
+    When model provider prepares a Bedrock call for that project
+    Then preparing the call fails with the peer's error
+
+  @unit
+  Scenario: A managed-Bedrock organization lists Bedrock as an enabled system provider
+    Given an organization with a project whose Bedrock is managed and not saved
+    When the organization's providers are listed
+    Then Bedrock is listed once as an enabled system provider
+
+  @unit
+  Scenario: A saved Bedrock row is not listed twice for a managed organization
+    Given a managed-Bedrock organization that saved its own Bedrock row
+    When the organization's providers are listed
+    Then Bedrock is listed once, as the saved row
+
+  @unit
+  Scenario: An unmanaged organization lists no Bedrock system row
+    Given an organization whose Bedrock is not managed and not configured
+    When the organization's providers are listed
+    Then Bedrock is not listed

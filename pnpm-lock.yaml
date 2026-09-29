@@ -3403,9 +3403,6 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
-      '@langwatch/project-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/project/contract
     devDependencies:
       '@langwatch/secrets':
         specifier: workspace:*

@@ -77,13 +77,42 @@ export class ModelProviderQueryService {
         }),
     ]);
     const savedProviders = new Set(saved.map((provider) => provider.provider));
+    const systemRows = system.filter(
+      (provider) => provider.enabled && !savedProviders.has(provider.provider),
+    );
 
     return [
       ...saved
         .filter((provider) => this.shouldKeep(provider, system))
         .map((provider) => this.toSummary({ provider, system })),
-      ...system.filter((provider) => provider.enabled && !savedProviders.has(provider.provider)),
+      ...systemRows,
+      ...this.managedBedrockRows({
+        organizationId: parsed.organizationId,
+        shown: [...savedProviders, ...systemRows.map((provider) => provider.provider)],
+        system,
+      }),
     ].map((provider) => modelProviderSummarySchema.parse(provider));
+  }
+
+  /**
+   * A managed-Bedrock organization sees Bedrock as an enabled system row, so the table shows
+   * where it comes from, unless a saved row or an enabled system row already shows it.
+   */
+  private managedBedrockRows(input: {
+    organizationId: string;
+    shown: readonly string[];
+    system: ModelProviderSummary[];
+  }): ModelProviderSummary[] {
+    if (input.shown.includes("bedrock")) return [];
+    const isManaged = this.options.catalog.isManagedProvider({
+      organizationId: input.organizationId,
+      provider: "bedrock",
+    });
+    if (!isManaged) return [];
+
+    return input.system
+      .filter((provider) => provider.provider === "bedrock")
+      .map((provider) => ({ ...provider, enabled: true, disabledByDefault: false }));
   }
 
   async getForProject(input: {

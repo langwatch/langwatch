@@ -2,26 +2,21 @@ import {
   type BuildManagedProviderParametersInput,
   type ManagedProviderApi,
 } from "@langwatch/enterprise-managed-provider-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { ManagedProviderCredentialVendor } from "../channels/managed-provider-credentials.channel.ts";
 import type { ManagedProviderConfiguration } from "./managed-provider-configuration.service.ts";
 
 export class ManagedProviderService implements ManagedProviderApi {
-  private readonly projectOrganizations = new Map<string, string>();
-
   private constructor(
     private readonly configuration: ManagedProviderConfiguration,
-    private readonly projects: ProjectApi,
     private readonly credentials: ManagedProviderCredentialVendor,
   ) {}
 
   static create(options: {
     configuration: ManagedProviderConfiguration;
-    projects: ProjectApi;
     credentials: ManagedProviderCredentialVendor;
   }): ManagedProviderService {
-    return new ManagedProviderService(options.configuration, options.projects, options.credentials);
+    return new ManagedProviderService(options.configuration, options.credentials);
   }
 
   isManagedProvider({
@@ -44,13 +39,7 @@ export class ManagedProviderService implements ManagedProviderApi {
       return input.params;
     }
 
-    const organizationId = await this.tryOrganizationForProject(input.projectId);
-
-    if (!organizationId) {
-      return input.params;
-    }
-
-    const deployment = this.configuration.getBedrockDeployment(organizationId);
+    const deployment = this.configuration.getBedrockDeployment(input.organizationId);
 
     if (deployment.kind === "unmanaged") {
       return input.params;
@@ -71,25 +60,5 @@ export class ManagedProviderService implements ManagedProviderApi {
     delete input.params.api_key;
 
     return input.params;
-  }
-
-  clearProjectOrganizationCache(): void {
-    this.projectOrganizations.clear();
-  }
-
-  private async tryOrganizationForProject(projectId: string): Promise<string | undefined> {
-    const cached = this.projectOrganizations.get(projectId);
-
-    if (cached) {
-      return cached;
-    }
-
-    const organizationId = await this.projects.findOrganizationId(projectId);
-
-    if (organizationId) {
-      this.projectOrganizations.set(projectId, organizationId);
-    }
-
-    return organizationId;
   }
 }

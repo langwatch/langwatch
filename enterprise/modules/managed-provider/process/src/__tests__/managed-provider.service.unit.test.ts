@@ -7,17 +7,6 @@ import {
   ManagedProviderService,
   type ManagedProviderCredentials,
 } from "../index.ts";
-import { TestProjectApi } from "./test-project-api.ts";
-
-class Projects extends TestProjectApi {
-  override async findOrganizationId(): Promise<string> {
-    return "org_1";
-  }
-
-  override async listPaths(): Promise<never[]> {
-    return [];
-  }
-}
 
 class CredentialVendorTestDouble extends ManagedProviderCredentialVendor {
   configs: ManagedBedrockConfig[] = [];
@@ -53,7 +42,6 @@ describe("ManagedProviderService", () => {
       it("reports bedrock as managed and every other provider as unmanaged", () => {
         const service = ManagedProviderService.create({
           configuration: configurationForConfiguredOrganization(),
-          projects: new Projects(),
           credentials: new CredentialVendorTestDouble(),
         });
 
@@ -77,7 +65,6 @@ describe("ManagedProviderService", () => {
         const credentials = new CredentialVendorTestDouble();
         const service = ManagedProviderService.create({
           configuration: configurationForConfiguredOrganization(),
-          projects: new Projects(),
           credentials,
         });
         const params = { api_key: "caller-key", model: "gpt-5-mini" };
@@ -85,6 +72,7 @@ describe("ManagedProviderService", () => {
         const result = await service.buildLitellmParameters({
           params,
           projectId: "project-1",
+          organizationId: "org_1",
           model: "gpt-5-mini",
           modelProvider: { provider: "openai" },
         });
@@ -101,12 +89,12 @@ describe("ManagedProviderService", () => {
     const configuration = configurationForConfiguredOrganization();
     const service = ManagedProviderService.create({
       configuration,
-      projects: new Projects(),
       credentials: new CredentialVendorTestDouble(),
     });
     const result = await service.buildLitellmParameters({
       params: { api_key: "old" },
       projectId: "project-1",
+      organizationId: "org_1",
       model: "model",
       modelProvider: { provider: "bedrock" },
     });
@@ -116,5 +104,28 @@ describe("ManagedProviderService", () => {
       aws_bedrock_runtime_endpoint: "http://private.internal",
     });
     expect(result).not.toHaveProperty("api_key");
+  });
+
+  describe("given a Bedrock call for an organization with no managed deployment", () => {
+    /** @scenario "The caller's organization decides the managed deployment" */
+    it("returns the caller's parameters untouched and assumes no role", async () => {
+      const credentials = new CredentialVendorTestDouble();
+      const service = ManagedProviderService.create({
+        configuration: configurationForConfiguredOrganization(),
+        credentials,
+      });
+      const params = { api_key: "customer-key" };
+
+      const result = await service.buildLitellmParameters({
+        params,
+        projectId: "project-1",
+        organizationId: "org_2",
+        model: "model",
+        modelProvider: { provider: "bedrock" },
+      });
+
+      expect(result).toEqual({ api_key: "customer-key" });
+      expect(credentials.configs).toEqual([]);
+    });
   });
 });

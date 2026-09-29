@@ -236,6 +236,9 @@ The legacy `filters` grammar (a filter field to a parameterised ClickHouse condi
 
 Enterprise-licensed code stays in enterprise modules: auth (open) obtains the SSO provider configs better-auth needs from
 `SsoApi`, building better-auth lazily so no peer is called during construction (Alex, 2026-09-25).
+Model provider asks the enterprise `ManagedProviderApi` whether LangWatch supplies a provider's credentials and
+for a managed call's parameters, naming the project's organization itself so managed-provider holds no project
+peer and closes no cycle (Alex, 2026-09-29).
 
 ### 3.4 The browser half and the kit
 
