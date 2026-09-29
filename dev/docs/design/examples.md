@@ -169,7 +169,7 @@ import { Menu } from "@langwatch/design-system/menu";
 Pattern for multi-step flows (e.g., type → list → editor). See `dev/docs/best_practices/drawers.md` ("Going to another drawer and back") for the canonical walkthrough.
 
 ```tsx
-import { Button, Heading, HStack } from "@chakra-ui/react";
+import { Button, HStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/browser-host/drawer";
@@ -236,7 +236,7 @@ export function ItemDrawer() {
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Select Item</Heading>
+            <Drawer.Title>Select Item</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>{/* Item list */}</Drawer.Body>
