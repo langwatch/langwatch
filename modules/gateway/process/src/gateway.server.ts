@@ -2,6 +2,8 @@ import {
   bindRestCredential,
   bindRestMiddleware,
   ForbiddenError,
+  keyCredentialOfRequest,
+  organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
@@ -9,6 +11,7 @@ import { defineServerModule } from "@langwatch/kernel";
 import type { RedisConnection } from "@langwatch/redis-client";
 
 import { GatewayApp } from "./app/gateway.app.ts";
+import { gatewayGovernanceEventsEventing } from "./eventing/gateway-governance-events.pipeline.ts";
 import { gatewayRealtimeSessionEventing } from "./eventing/gateway-realtime-session.pipeline.ts";
 import { gatewaySpendEventing } from "./eventing/gateway-spend.pipeline.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
@@ -22,13 +25,26 @@ import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
-import { gatewayPlatformRest, gatewayRestCredential } from "./transport/gateway-platform.rest.ts";
+import {
+  gatewayKeyCaller,
+  gatewayPlatformRest,
+  gatewayRestCredential,
+} from "./transport/gateway-platform.rest.ts";
 import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
 export type { GatewayInfrastructure } from "./app/gateway.app.ts";
+
+/**
+ * The organization a spend-plan check reads (ADR-072): off the raw request
+ * the credential door recorded it against, never a context variable no door
+ * here ever sets.
+ */
+export function gatewaySpendPlanOrganizationId(context: { req: { raw: Request } }): string {
+  return organizationCredentialOfRequest(context.req.raw).organizationId;
+}
 
 export const gatewayServer = defineServerModule("gateway")
   .withApp(GatewayApp)
@@ -45,6 +61,7 @@ export const gatewayServer = defineServerModule("gateway")
     gatewayUsageTrpcTransport,
     virtualKeyTrpcTransport,
   )
+  .withEventing(gatewayGovernanceEventsEventing)
   .withEventing(gatewaySpendEventing)
   .withEventing(gatewayRealtimeSessionEventing)
   .withTransportFacts(({ app, dependencies }) => {
@@ -56,6 +73,9 @@ export const gatewayServer = defineServerModule("gateway")
       // The gateway control plane is signed rather than bearer-authenticated.
       // It owns the same declared secret as the data-plane client.
       bindRestCredential("internalSecret", () => app.internalDoor()),
+      // Organization-owned rows take any API key; the application asks the
+      // permission at the reach the operation needs.
+      bindRestMiddleware(gatewayKeyCaller, (context) => keyCredentialOfRequest(context.req.raw)),
       // The callback arrives publicly and the application verifies the raw bytes
       // against the provider row's own stored secret, so the header is all the
       // transport carries.
@@ -79,9 +99,8 @@ export const gatewayServer = defineServerModule("gateway")
        * Fail-closed: a rejected lookup refuses; no plan store refuses at boot.
        */
       bindRestMiddleware(gatewaySpendBillingPlanGate, async (context) => {
-        const organization = context.get("organization") as { id: string };
         const plan = await dependencies.entitlement.getActivePlan({
-          organizationId: organization.id,
+          organizationId: gatewaySpendPlanOrganizationId(context),
         });
         if (plan.webhookEndpointsEnabled !== true) {
           throw new ForbiddenError(

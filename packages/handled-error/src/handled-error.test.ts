@@ -187,10 +187,14 @@ describe("handledErrorFromHerr", () => {
 
 describe("NotFoundError", () => {
   it("accepts remediation options", () => {
-    const err = new NotFoundError("trace_not_found", "Trace", "abc", {
-      tips: ["Check the trace id"],
-      docsUrl: "https://docs.langwatch.ai/traces",
-    });
+    const err = new NotFoundError(
+      "trace_not_found",
+      { resource: "Trace", id: "abc" },
+      {
+        tips: ["Check the trace id"],
+        docsUrl: "https://docs.langwatch.ai/traces",
+      },
+    );
 
     expect(err.httpStatus).toBe(404);
     expect(err.meta).toMatchObject({ id: "abc" });

@@ -11,20 +11,22 @@ import type { GatewayBudgetSpend, GatewayChangeEvents } from "../app/gateway.mem
 import type { WriteGatewayDebitsPayload } from "../eventing/gateway-debit.intent.ts";
 import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
 import type { BudgetChangeEventDedupeService } from "./gateway-budget-change-dedupe.service.ts";
+import type { GatewayBudgetCrossingService } from "./gateway-budget-crossing.service.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
 const logger = createLogger("langwatch:gateway:spend-debits");
 
 /**
  * The sole writer of gateway budget debits: one ledger row per budget a
- * request's outcome applies to, then a BUDGET_UPDATED so the data plane stops
- * enforcing against the spend its cached bundle was built with.
+ * request's outcome applies to, then its crossings, then a BUDGET_UPDATED so
+ * the data plane stops enforcing against the spend its cached bundle was built with.
  */
 type GatewaySpendDebitCollaborators = Readonly<{
   budgets: Pick<GatewayService, "resolveApplicableBudgets">;
   spend: Pick<GatewayBudgetSpend, "insertDebitsForBudgets">;
   dedupe: BudgetChangeEventDedupeService;
   changes: Pick<GatewayChangeEvents, "append">;
+  crossings: Pick<GatewayBudgetCrossingService, "detect">;
 }>;
 
 export class GatewaySpendDebitService {
@@ -59,6 +61,14 @@ export class GatewaySpendDebitService {
       // Rethrown for the outbox retry: a lost debit under-enforces the cap.
       throw error;
     }
+
+    // Throws for the outbox retry too: the insert skips a budget the request
+    // already debited, so a re-drive writes nothing twice.
+    await this.collaborators.crossings.detect({
+      tenantId: payload.project_id,
+      organizationId: payload.organization_id,
+      budgets,
+    });
 
     await this.announce(payload, budgets);
   }

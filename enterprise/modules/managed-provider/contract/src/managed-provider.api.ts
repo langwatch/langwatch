@@ -23,6 +23,8 @@ export type ManagedModelProvider = z.infer<typeof managedModelProviderSchema>;
 export type BuildManagedProviderParametersInput = {
   params: Record<string, string>;
   projectId: string;
+  /** The project's organization, named by the caller, whose managed deployment applies. */
+  organizationId: string;
   model: string;
   modelProvider: ManagedModelProvider;
 };

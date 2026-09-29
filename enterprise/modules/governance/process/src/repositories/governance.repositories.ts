@@ -63,6 +63,8 @@ export interface GovernanceRepositories {
   readonly ingestionTemplates: IngestionTemplateRepository;
   readonly costRollup: GovernanceCostRollupRepository;
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
+  /** The `governance_kpis` rows the spend-spike evaluator reads and the trace pull writes. */
+  readonly anomalySpend: GovernanceClickHouseRepositories["anomalySpend"];
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly rollupErasure: RollupErasureRepository;
   readonly setupState: GovernanceSetupStateRepository;

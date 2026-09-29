@@ -56,6 +56,7 @@ import {
   passkeySignUpRegistration,
   type SignUpVerification,
 } from "./http.passkey-sign-up.channel.ts";
+import { PasswordResetSessionChannel } from "./http.password-reset-session.channel.ts";
 import { resilientGenericOAuth } from "./http.resilient-generic-oauth.channel.ts";
 import {
   runSignInRouterShadow,
@@ -352,6 +353,7 @@ export const createAuthOptions = ({
   credentialGuard,
   signInLockout,
   addressRoutesToConnection,
+  passwordResetSession,
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
@@ -364,6 +366,8 @@ export const createAuthOptions = ({
   credentialGuard: CredentialSessionGuard;
   signInLockout: SignInAttemptCounter;
   addressRoutesToConnection: AddressRoutesToConnection;
+  /** Opens the session a completed password reset earned. */
+  passwordResetSession?: PasswordResetSessionChannel;
 }): BetterAuthOptions & {
   // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
   // always states it, and `enabled` inside it is REQUIRED. Saying so keeps the
@@ -672,6 +676,7 @@ export const createAuthOptions = ({
      *  bare async resolving undefined fails EVERY auth request after its
      *  endpoint has already answered. */
     after: createAuthMiddleware(async (ctx) => {
+      await passwordResetSession?.signInAfterPasswordReset(ctx);
       await countSignInAttempt({ ctx, signInLockout });
       answerAuthRefusalByRegisteredCode(ctx);
     }),
@@ -842,6 +847,7 @@ const transportOptions = ({
   storage,
   users,
 }: BetterAuthTransportOptions) => {
+  const passwordResetSession = PasswordResetSessionChannel.create();
   const authOptions = createAuthOptions({
     repo: database,
     deployment,
@@ -853,6 +859,7 @@ const transportOptions = ({
     credentialGuard,
     signInLockout,
     addressRoutesToConnection,
+    passwordResetSession,
     hooks: {
       federation,
       invites,
@@ -892,8 +899,9 @@ const transportOptions = ({
       sendResetPassword: async ({ user, token }) => {
         await sendResetPassword({ email: user.email, token });
       },
-      onPasswordReset: async ({ user }) => {
+      onPasswordReset: async ({ user }, request) => {
         await auth.revokeAllBrowserSessions({ userId: user.id });
+        passwordResetSession.recordPasswordReset({ userId: user.id, request });
       },
     },
   } satisfies BetterAuthOptions;

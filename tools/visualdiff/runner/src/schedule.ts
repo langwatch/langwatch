@@ -43,12 +43,15 @@ export const runPoolWithRecapture = async <Item, Result>({
   take,
   spoiled,
   keep,
+  onRecaptured,
 }: {
   items: readonly Item[];
   width: number;
   take: (job: { item: Item; lane: number }) => Promise<Result>;
   spoiled: (result: Result) => boolean;
   keep: (result: Result) => void;
+  /** onRecaptured hears how long the retakes alone took. */
+  onRecaptured?: (millis: number) => void;
 }): Promise<Item[]> => {
   const heldBack: Item[] = [];
   await runPool({
@@ -60,7 +63,9 @@ export const runPoolWithRecapture = async <Item, Result>({
       else keep(result);
     },
   });
+  const startedAt = Date.now();
   for (const item of heldBack) keep(await take({ item, lane: 0 }));
+  onRecaptured?.(Date.now() - startedAt);
   return heldBack;
 };
 

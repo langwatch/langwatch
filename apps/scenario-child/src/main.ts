@@ -112,6 +112,8 @@ function readRuntime(): ScenarioChildRuntime {
     logger,
     nlpTimeouts: HttpNlpFetchChannel.timeoutsFromEnvironment(source),
     voiceAgents: (data) => createSerializedVoiceAgentAdapter({ data, registry: voiceTransports }),
+    endVoiceCall: ({ data, adapter }) =>
+      voiceTransports[data.voiceTarget.transport].endCall(adapter),
   };
 }
 

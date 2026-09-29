@@ -297,7 +297,10 @@ describe("a mounted contract procedure", () => {
 
       const declaration = reviewRouter({
         getById: (async () => {
-          throw new NotFoundError("annotation_not_found", "Annotation", "annotation-1");
+          throw new NotFoundError("annotation_not_found", {
+            resource: "Annotation",
+            id: "annotation-1",
+          });
         }) as never,
         archive: (async () => {
           throw new Error("the database refused the write");
@@ -438,7 +441,9 @@ describe("the tRPC error formatter", () => {
 
     /** @scenario "A known failure is serialised as a handled error over tRPC" */
     it("carries a not-found error's code, its id and its 404", () => {
-      const formatted = format(new NotFoundError("evaluation_not_found", "Evaluation", "eval-1"));
+      const formatted = format(
+        new NotFoundError("evaluation_not_found", { resource: "Evaluation", id: "eval-1" }),
+      );
 
       expect(formatted.data.error).toMatchObject({
         code: "evaluation_not_found",

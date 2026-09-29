@@ -55,3 +55,17 @@ Feature: A package's integration suite runs in CI when it declares one
       When the package suites job runs
       Then neither script is run
 
+
+  Rule: The suites are split across runners without losing one
+
+    @unit
+    Scenario: Every package lands on exactly one shard
+      Given the package suites job is split into several shards
+      When every shard takes its share of the discovered packages
+      Then each package is run by exactly one shard
+
+    @unit
+    Scenario: A malformed shard value is refused
+      Given PACKAGE_SUITES_SHARD is not "<index>/<total>"
+      When the package suites job starts
+      Then it fails instead of running every package on every shard

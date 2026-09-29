@@ -64,6 +64,12 @@ import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
 import { NullLangevalsChannel } from "../channels/null.langevals.channel.ts";
 import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
+import {
+  EvaluationProcessingPipelineAdapter,
+  type EvaluationAutomationReactions,
+  type EvaluationProcessingPipeline,
+} from "../eventing/evaluation-processing-definition.pipeline.ts";
+import { EvaluationProcessingStoresAdapter } from "../eventing/evaluation-processing-stores.pipeline.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
@@ -75,7 +81,6 @@ import {
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationCostService } from "../services/evaluation-cost.service.ts";
 import { EvaluationDatasetLookupService } from "../services/evaluation-dataset-lookup.service.ts";
-import { EvaluationEventingService } from "../services/evaluation-eventing.service.ts";
 import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import { EvaluationExecutionMetricsService } from "../services/evaluation-execution-metrics.service.ts";
 import { EvaluationExecutionReceiptService } from "../services/evaluation-execution-receipt.service.ts";
@@ -92,11 +97,6 @@ import {
 import { EvaluationModelCascadeService } from "../services/evaluation-model-cascade.service.ts";
 import { EvaluationMonitorLookupService } from "../services/evaluation-monitor-lookup.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
-import {
-  EvaluationProcessingService,
-  type EvaluationAutomationReactions,
-  type EvaluationProcessingPipeline,
-} from "../services/evaluation-processing.service.ts";
 import { EvaluationRetentionDaysService } from "../services/evaluation-retention-days.service.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
 import { EvaluationSavedEvaluatorService } from "../services/evaluation-saved-evaluator.service.ts";
@@ -297,7 +297,7 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #clustering: LangevalsClusteringService;
   readonly #piiDetection: LangevalsPiiDetectionService;
   readonly #executionIntent: EvaluationExecutionIntent;
-  readonly #eventing: EvaluationEventingService;
+  readonly #eventing: EvaluationProcessingStoresAdapter;
   readonly #automations: EvaluationAutomationReactions;
 
   private constructor({
@@ -317,7 +317,7 @@ export class EvaluationApp implements EvaluationApiContract {
     clustering: LangevalsClusteringService;
     piiDetection: LangevalsPiiDetectionService;
     executionIntent: EvaluationExecutionIntent;
-    eventing: EvaluationEventingService;
+    eventing: EvaluationProcessingStoresAdapter;
   }) {
     this.#service = service;
     this.#clustering = clustering;
@@ -466,7 +466,7 @@ export class EvaluationApp implements EvaluationApiContract {
           costs,
         }),
       }),
-      eventing: EvaluationEventingService.create({
+      eventing: EvaluationProcessingStoresAdapter.create({
         runs: EvaluationRunProjectionService.create({
           repository: repositories.runs,
           retention: EvaluationRetentionDaysService.create(dependencies.retention),
@@ -490,7 +490,7 @@ export class EvaluationApp implements EvaluationApiContract {
     clustering: LangevalsClusteringService;
     piiDetection: LangevalsPiiDetectionService;
     executionIntent: EvaluationExecutionIntent;
-    eventing: EvaluationEventingService;
+    eventing: EvaluationProcessingStoresAdapter;
   }): EvaluationApp {
     const {
       infrastructure: members,
@@ -524,7 +524,7 @@ export class EvaluationApp implements EvaluationApiContract {
 
   /** evaluation_processing: run and analytics folds, execute intent, automation reactions. */
   eventingPipeline(): EvaluationProcessingPipeline {
-    return EvaluationProcessingService.createPipeline({
+    return EvaluationProcessingPipelineAdapter.createPipeline({
       ...this.#eventing.buildStores(),
       executeEvaluationCommand: ExecuteEvaluationCommand.create(this.#executionIntent),
       automations: this.#automations,

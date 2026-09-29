@@ -164,6 +164,8 @@ beforeAll(() => {
         skipLibCheck: true,
         strict: true,
         target: "ES2022",
+        typeRoots: [resolve(root, "node_modules/@types")],
+        types: ["node"],
       },
       files: [file],
     }),

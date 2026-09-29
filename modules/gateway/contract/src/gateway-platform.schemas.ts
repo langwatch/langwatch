@@ -350,3 +350,46 @@ export const gatewayRequestCredentialSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("legacyProjectKey") }),
 ]);
+
+/**
+ * Any API key as the key door resolved it. A legacy project key is its project;
+ * any other key reaches its organization and names the project it resolved to,
+ * if any, so an organization key manages organization-owned rows.
+ */
+export const gatewayKeyCallerSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("project"), projectId: z.string().min(1) }).readonly(),
+  z
+    .object({
+      kind: z.literal("apiKey"),
+      apiKeyId: z.string().min(1),
+      userId: z.string().min(1).nullable(),
+      organizationId: z.string().min(1),
+      resolvedProject: z
+        .object({ id: z.string().min(1), teamId: z.string().min(1) })
+        .readonly()
+        .optional(),
+    })
+    .readonly(),
+]);
+
+export type GatewayKeyCaller = z.infer<typeof gatewayKeyCallerSchema>;
+
+/**
+ * Where a key caller's permission is asked. `caller` is the key's own reach:
+ * its project when it resolved one, else its organization. `organization` is
+ * the whole organization, for a write to an organization-owned row.
+ */
+export const gatewayKeyCallerReachSchema = z.enum(["caller", "organization"]);
+
+export type GatewayKeyCallerReach = z.infer<typeof gatewayKeyCallerReachSchema>;
+
+/** A key caller the application authorized: its organization and who a write is recorded as. */
+export const gatewayAuthorizedKeyCallerSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    actor: z.unknown(),
+    actorUserId: z.string().min(1),
+  })
+  .readonly();
+
+export type GatewayAuthorizedKeyCaller = z.infer<typeof gatewayAuthorizedKeyCallerSchema>;

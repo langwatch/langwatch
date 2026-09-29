@@ -98,6 +98,10 @@ export const simulationRecordAgentInstanceSchema = z.object({
 });
 export type SimulationRecordAgentInstance = z.infer<typeof simulationRecordAgentInstanceSchema>;
 
+/** A voice run LangWatch ended at the maximum call duration, reported by the child. */
+export const simulationRecordCutAtLimitSchema = simulationRunIdentitySchema;
+export type SimulationRecordCutAtLimit = z.infer<typeof simulationRecordCutAtLimitSchema>;
+
 export const simulationComputeRunMetricsSchema = z.object({
   ...simulationRunIdentitySchema.shape,
   traceId: z.string(),

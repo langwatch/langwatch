@@ -5,7 +5,6 @@ import {
   parseManagedBedrockDirectory,
 } from "@langwatch/enterprise-managed-provider-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { ProjectApi } from "@langwatch/project-contract";
 
 import { HttpManagedProviderCredentialsChannel } from "../channels/http/http.managed-provider-credentials.channel.ts";
 import { ManagedProviderConfigurationService } from "../services/managed-provider-configuration.service.ts";
@@ -16,7 +15,7 @@ type ManagedProviderSetup = FeatureSetup<typeof ManagedProviderApp.dependencies,
 
 export class ManagedProviderApp implements ManagedProviderApiContract {
   static readonly contract = ManagedProviderApi;
-  static readonly dependencies = { projects: ProjectApi };
+  static readonly dependencies = {};
   static readonly secrets = managedProviderSecrets;
 
   readonly #service: ManagedProviderService;
@@ -25,10 +24,7 @@ export class ManagedProviderApp implements ManagedProviderApiContract {
     this.#service = service;
   }
 
-  static async create({
-    secrets,
-    dependencies,
-  }: ManagedProviderSetup): Promise<ManagedProviderApp> {
+  static async create({ secrets }: ManagedProviderSetup): Promise<ManagedProviderApp> {
     const bedrock = await secrets.into(
       managedProviderSecrets.bedrock,
       parseManagedBedrockDirectory,
@@ -37,7 +33,6 @@ export class ManagedProviderApp implements ManagedProviderApiContract {
       ManagedProviderService.create({
         configuration: ManagedProviderConfigurationService.create({ bedrock }),
         credentials: HttpManagedProviderCredentialsChannel.create(),
-        projects: dependencies.projects,
       }),
     );
   }

@@ -28,6 +28,7 @@
     "skills/_compiled/**",
     "services/langyagent/internal/assets/skills/**",
     "plugins/langwatch/scripts/session-context.mjs",
+    "plugins/langwatch/scripts/session-guidance.mjs",
     "specs/webhooks/signature-vectors.json",
     "**/*.min.*",
     "**/testdata/**",

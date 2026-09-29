@@ -34,3 +34,8 @@ export function creditRemainingUsdCents({
 }): number {
   return Math.max(0, commitUsdCents - drawnDownUsdCents);
 }
+
+/** The month as the statement names it, such as "August 2026", read in UTC. */
+export function statementMonthLabel(month: Instant): string {
+  return month.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+}

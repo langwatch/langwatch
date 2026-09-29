@@ -1,20 +1,20 @@
+import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 /**
- * Builds ModelProviderInfrastructure (previously hand-composed) from redis
- * and config. Two intentional branches: managed is always Unmanaged (core
- * may not import Enterprise); spans is always undefined (no untyped peer).
+ * Builds ModelProviderInfrastructure from redis, config and peers. Managed status comes from
+ * the managed-provider peer; spans is always undefined (no untyped peer).
  */
 
 import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
 import { CodexAccountService } from "../services/codex-account.service.ts";
 import { CodexOAuthModelProviderTokenRefresherService } from "../services/codex-oauth-model-provider-token-refresher.service.ts";
 import { HttpModelProviderCredentialProbeService } from "../services/http-model-provider-credential-probe.service.ts";
+import { ManagedModelProviderGatewayService } from "../services/managed-model-provider-gateway.service.ts";
 import { PrefixedModelProviderIdService } from "../services/prefixed-model-provider-id.service.ts";
 import { RegistryModelProviderCatalogService } from "../services/registry-model-provider-catalog.service.ts";
 import { SsrfModelProviderEgressService } from "../services/ssrf-model-provider-egress.service.ts";
-import { UnmanagedModelProviderGatewayService } from "../services/unmanaged-model-provider-gateway.service.ts";
 import { VercelAiModelTranslationService } from "../services/vercel-ai-model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterService } from "../services/windowed-model-provider-connection-rate-limiter.service.ts";
 import type {
@@ -59,7 +59,7 @@ class RedisModelProviderRateLimit extends ModelProviderRateLimit {
 export function buildModelProviderInfrastructure(input: {
   members: Readonly<{ redis: RedisConnection }>;
   config: ModelProviderBuildConfig;
-  dependencies: Readonly<{ projects: ProjectApi }>;
+  dependencies: Readonly<{ projects: ProjectApi; managed: ManagedProviderApi }>;
 }): ModelProviderInfrastructure {
   const { members, config, dependencies } = input;
   const egress = SsrfModelProviderEgressService.create({ policy: config.egress });
@@ -74,7 +74,10 @@ export function buildModelProviderInfrastructure(input: {
 
   return {
     catalog: RegistryModelProviderCatalogService.create({
-      managed: UnmanagedModelProviderGatewayService.create(),
+      managed: ManagedModelProviderGatewayService.create({
+        managed: dependencies.managed,
+        projects: dependencies.projects,
+      }),
       probe,
       systemProviderEnvironment: config.environment,
       isSaas: config.isSaas,

@@ -83,6 +83,10 @@ class TestScenarioExecutionService extends ScenarioExecutionService {
   recordAgentInstance(): Promise<void> {
     throw new Error("recordAgentInstance unexpectedly called in simulation intent tests");
   }
+
+  recordCutAtLimit(): Promise<void> {
+    throw new Error("recordCutAtLimit unexpectedly called in simulation intent tests");
+  }
 }
 
 function executionService(submit: (job: ScenarioExecutionJob) => void): ScenarioExecutionService {

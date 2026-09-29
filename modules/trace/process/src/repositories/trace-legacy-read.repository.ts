@@ -10,6 +10,9 @@ import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
 } from "@langwatch/trace-contract";
 
 import type { ResolvedTraceSpans } from "../services/trace-offload-resolution.service.ts";
@@ -55,6 +58,11 @@ export abstract class TraceLegacyReadRepository {
     protections: Protections,
     options?: GetAllTracesForProjectOptions,
   ): Promise<TracesForProjectResult>;
+
+  abstract findTraceSummaries(
+    query: TraceSummaryListQuery,
+    options?: TraceSummaryListOptions,
+  ): Promise<TraceSummaryPage>;
 
   abstract findCustomersAndLabels(
     input: AggregationFiltersInput,

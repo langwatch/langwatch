@@ -282,7 +282,11 @@ export class NotFoundError extends HandledError {
    * `code` is a bare `string` on purpose, and that is NOT the same as saying any string is
    * acceptable.
    */
-  constructor(code: string, resource: string, id: string, options: HandledErrorOptions = {}) {
+  constructor(
+    code: string,
+    { resource, id }: { resource: string; id: string },
+    options: HandledErrorOptions = {},
+  ) {
     super(code, `${resource} not found: ${id}`, {
       ...options,
       meta: { id, ...options.meta },

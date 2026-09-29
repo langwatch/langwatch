@@ -147,11 +147,10 @@ export class EventingLangyConversationAdapter {
           aggregateId: conversationId,
         });
         if (read.kind === "empty") {
-          throw new NotFoundError(
-            "langy_conversation_not_found",
-            "Langy conversation",
-            conversationId,
-          );
+          throw new NotFoundError("langy_conversation_not_found", {
+            resource: "Langy conversation",
+            id: conversationId,
+          });
         }
         const { projection } = read;
         return {

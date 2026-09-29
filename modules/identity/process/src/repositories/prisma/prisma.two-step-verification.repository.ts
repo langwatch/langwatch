@@ -19,7 +19,7 @@ export type PrismaTwoStepVerificationDatabase = Pick<
 
 /**
  * Row-truth reads over the two-factor plugin's own column, passkeys and seats (D06). The
- * requirement is an Organization column written here, as prisma.join-setting.repository.ts does.
+ * requirement is an Organization column written here.
  */
 export class PrismaTwoStepVerificationRepository implements TwoStepVerificationRepository {
   static create(database: PrismaTwoStepVerificationDatabase): PrismaTwoStepVerificationRepository {

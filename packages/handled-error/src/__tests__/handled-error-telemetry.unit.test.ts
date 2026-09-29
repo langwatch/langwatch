@@ -20,7 +20,10 @@ describe("given a handled error constructed inside an active span", () => {
       trace.wrapSpanContext({ traceId: TRACE_ID, spanId: SPAN_ID, traceFlags: TraceFlags.SAMPLED }),
     );
 
-    const error = new NotFoundError("evaluation_not_found", "Evaluation", "eval-1");
+    const error = new NotFoundError("evaluation_not_found", {
+      resource: "Evaluation",
+      id: "eval-1",
+    });
 
     expect(error.traceId).toBe(TRACE_ID);
     expect(error.spanId).toBe(SPAN_ID);
@@ -31,7 +34,10 @@ describe("given a handled error constructed inside an active span", () => {
   it("carries no ids when no span is active", () => {
     vi.spyOn(trace, "getActiveSpan").mockReturnValue(undefined);
 
-    const error = new NotFoundError("evaluation_not_found", "Evaluation", "eval-1");
+    const error = new NotFoundError("evaluation_not_found", {
+      resource: "Evaluation",
+      id: "eval-1",
+    });
 
     expect(error.traceId).toBeUndefined();
     expect(error.spanId).toBeUndefined();

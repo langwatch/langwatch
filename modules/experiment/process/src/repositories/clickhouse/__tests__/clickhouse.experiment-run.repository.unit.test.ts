@@ -72,9 +72,11 @@ describe("ClickHouseExperimentRunRepository", () => {
       experimentIds: ["experiment_1"],
     });
 
-    expect(queries[0]).toMatch(/FROM \(\s*SELECT/s);
-    expect(queries[0].match(/WHERE TenantId/g)).toHaveLength(1);
-    expect(queries[0]).toMatch(/GROUP BY ExperimentId, RunId\s*\)\s*GROUP BY ExperimentId/s);
+    const [query] = queries;
+    expect(query).toBeDefined();
+    expect(query).toMatch(/FROM \(\s*SELECT/s);
+    expect(query?.match(/WHERE TenantId/g)).toHaveLength(1);
+    expect(query).toMatch(/GROUP BY ExperimentId, RunId\s*\)\s*GROUP BY ExperimentId/s);
   });
 
   it("uses the injected tuple wrapper for exact experiment/run pairs", async () => {

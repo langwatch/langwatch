@@ -45,6 +45,9 @@ func Publish(ctx context.Context, request PublishRequest) (string, error) {
 		fmt.Fprintf(request.Stderr, "publish: skipped, %s\n", skip)
 		return "", nil
 	}
+	if err := gh.publishStatus(ctx, request, pr); err != nil {
+		fmt.Fprintln(request.Stderr, err)
+	}
 	picks := SelectScreens(request.Rows, request.Config)
 	if len(picks) == 0 {
 		fmt.Fprintln(request.Stderr, "publish: skipped, no screen passed the selection and the secret guard")

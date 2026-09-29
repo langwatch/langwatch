@@ -73,3 +73,29 @@ Feature: The gateway registers its own spend pipeline
     When the debits process consumes the admission
     Then no debit intent is committed and the request's attribution is remembered
     And an outcome that moved no money and no quantity commits no debit either
+
+  @unit
+  Scenario: A crossing is detected after the debit lands
+    Given a confirmed request whose debits were written
+    When the debit writer finishes the insert
+    Then crossing detection runs over the budgets it debited, reading the rows it just wrote
+
+  @unit
+  Scenario: A failed crossing read re-drives the debit
+    Given the debit landed and the crossing read or its record then fails
+    When the debit writer runs
+    Then the write fails, so the outbox re-drives it
+    And no budget-updated signal is appended on that attempt
+
+  @integration
+  Scenario: A re-driven debit writes nothing new
+    Given a debit whose rows landed before its crossing could be recorded
+    When the outbox re-drives it
+    Then the ledger still holds one row for the request and budget
+
+  @integration
+  Scenario: The calendar-window total counts a re-driven request once
+    Given a month-window budget debited by a request that was re-driven
+    When the month's spend is read from the rollup
+    Then the request's cost is counted once
+    And the crossing it recorded carries that figure

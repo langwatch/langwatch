@@ -31,6 +31,8 @@ class RecordingExecution extends SimulationExecutionRepository {
   async recordEvaluations(_input: RecordEvaluationsCommandData): Promise<void> {}
 
   async recordAgentInstance(): Promise<void> {}
+
+  async recordCutAtLimit(): Promise<void> {}
 }
 
 describe("SimulationService", () => {

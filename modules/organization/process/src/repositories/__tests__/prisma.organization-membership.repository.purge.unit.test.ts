@@ -1,4 +1,7 @@
-/** Tenant purge must clean all rows keyed to it, including non-cascading authorization tables. */
+/**
+ * Tenant purge must clean all rows keyed to it, including non-cascading authorization tables.
+ * @see specs/organizations/organizations-provisioning-rest-api.feature
+ */
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
@@ -9,8 +12,9 @@ import { PrismaOrganizationMembershipRepository } from "../prisma/prisma.organiz
 
 const ORGANIZATION_ID = "org_acme";
 
-const expectedPurgeWhere = (model: string): Record<string, string> => {
+const expectedPurgeWhere = (model: string): Record<string, unknown> => {
   if (model === "organization") return { id: ORGANIZATION_ID };
+  if (model === "teamUser") return { team: { organizationId: ORGANIZATION_ID } };
   if (model === "systemMigrationTenantState") return { tenantId: ORGANIZATION_ID };
   return { organizationId: ORGANIZATION_ID };
 };
@@ -33,6 +37,8 @@ function purgingPrisma() {
     systemMigrationEnrollment: deleting("systemMigrationEnrollment"),
     apiKey: deleting("apiKey"),
     promptTag: deleting("promptTag"),
+    teamUser: deleting("teamUser"),
+    organizationUser: deleting("organizationUser"),
     team: deleting("team"),
     organization: deleting("organization"),
     $transaction: transaction,
@@ -42,6 +48,7 @@ function purgingPrisma() {
 
 describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization", () => {
   describe("when a provisioned organization is purged", () => {
+    /** @scenario Rolling back a provisioned organization removes its memberships */
     it("deletes the grants ledger's projections along with the legacy rows", async () => {
       const { prisma, deletions } = purgingPrisma();
       const repository = PrismaOrganizationMembershipRepository.create({
@@ -64,6 +71,9 @@ describe("PrismaOrganizationMembershipRepository.deleteProvisionedOrganization",
         "systemMigrationEnrollment",
         "apiKey",
         "promptTag",
+        // Memberships do not cascade from their team or organization.
+        "teamUser",
+        "organizationUser",
         "team",
         "organization",
       ]);

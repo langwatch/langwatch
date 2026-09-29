@@ -56,6 +56,109 @@ function expectedRoot(id: string, classification: FeatureClassification): string
   return classification === "enterprise" ? `enterprise/modules/${id}` : `modules/${id}`;
 }
 
+interface SeenCatalogue {
+  ids: Set<string>;
+  roots: Set<string>;
+  subjectOwners: Map<string, string>;
+}
+
+function parseCatalogueEntry({
+  path,
+  index,
+  raw,
+  violations,
+}: {
+  path: string;
+  index: number;
+  raw: unknown;
+  violations: ArchitectureViolation[];
+}): FeatureCatalogueEntry | undefined {
+  if (!jsonObjectSchema.validate(raw)) {
+    violations.push(issue(path, `Feature catalogue entry ${index} must be an object.`));
+    return undefined;
+  }
+
+  if (!featureCatalogueEntryKeysSchema.validate(raw)) {
+    violations.push(
+      issue(
+        path,
+        `Feature catalogue entry ${index} must contain only id, root, classification, and subjects.`,
+      ),
+    );
+
+    return undefined;
+  }
+
+  const entryResult = featureCatalogueEntrySchema.safeParse(raw);
+
+  if (!entryResult.success) {
+    violations.push(
+      issue(
+        path,
+        `Feature catalogue entry ${index} is malformed.`,
+        "Use a singular lower-case kebab-case id, its derived root, a core or enterprise classification, and a sorted duplicate-free subjects array.",
+      ),
+    );
+
+    return undefined;
+  }
+
+  const { classification, id, root, subjects } = entryResult.data;
+  return { id, root, classification, subjects };
+}
+
+function checkCatalogueEntry({
+  path,
+  entry,
+  seen,
+  violations,
+}: {
+  path: string;
+  entry: FeatureCatalogueEntry;
+  seen: SeenCatalogue;
+  violations: ArchitectureViolation[];
+}): void {
+  const { classification, id, root, subjects } = entry;
+  const expected = expectedRoot(id, classification);
+
+  if (root !== expected) {
+    violations.push(
+      issue(
+        path,
+        `Feature ${JSON.stringify(id)} must use root ${JSON.stringify(expected)}, found ${JSON.stringify(root)}.`,
+      ),
+    );
+  }
+
+  if (seen.ids.has(id)) {
+    violations.push(issue(path, `Feature id ${JSON.stringify(id)} is declared more than once.`));
+  }
+
+  if (seen.roots.has(root)) {
+    violations.push(
+      issue(path, `Feature root ${JSON.stringify(root)} is declared more than once.`),
+    );
+  }
+
+  seen.ids.add(id);
+  seen.roots.add(root);
+
+  for (const subject of subjects) {
+    const owner = seen.subjectOwners.get(subject);
+
+    if (owner && owner !== id) {
+      violations.push(
+        issue(
+          path,
+          `Subject ${JSON.stringify(subject)} is owned by both ${JSON.stringify(owner)} and ${JSON.stringify(id)}.`,
+        ),
+      );
+    } else {
+      seen.subjectOwners.set(subject, id);
+    }
+  }
+}
+
 export function readFeatureCatalogue(
   workspaceRoot: string,
   violations: ArchitectureViolation[],
@@ -98,87 +201,18 @@ export function readFeatureCatalogue(
   }
 
   const entries: FeatureCatalogueEntry[] = [];
-  const ids = new Set<string>();
-  const roots = new Set<string>();
-  const subjectOwners = new Map<string, string>();
+
+  const seen: SeenCatalogue = {
+    ids: new Set<string>(),
+    roots: new Set<string>(),
+    subjectOwners: new Map<string, string>(),
+  };
 
   for (const [index, raw] of catalogueResult.data.features.entries()) {
-    if (!jsonObjectSchema.validate(raw)) {
-      violations.push(issue(path, `Feature catalogue entry ${index} must be an object.`));
-      continue;
-    }
-
-    if (!featureCatalogueEntryKeysSchema.validate(raw)) {
-      violations.push(
-        issue(
-          path,
-          `Feature catalogue entry ${index} must contain only id, root, classification, and subjects.`,
-        ),
-      );
-
-      continue;
-    }
-
-    const entryResult = featureCatalogueEntrySchema.safeParse(raw);
-
-    if (!entryResult.success) {
-      violations.push(
-        issue(
-          path,
-          `Feature catalogue entry ${index} is malformed.`,
-          "Use a singular lower-case kebab-case id, its derived root, a core or enterprise classification, and a sorted duplicate-free subjects array.",
-        ),
-      );
-
-      continue;
-    }
-
-    const { classification, id, root, subjects } = entryResult.data;
-    const expected = expectedRoot(id, classification);
-
-    if (root !== expected) {
-      violations.push(
-        issue(
-          path,
-          `Feature ${JSON.stringify(id)} must use root ${JSON.stringify(expected)}, found ${JSON.stringify(root)}.`,
-        ),
-      );
-    }
-
-    if (ids.has(id)) {
-      violations.push(issue(path, `Feature id ${JSON.stringify(id)} is declared more than once.`));
-    }
-
-    if (roots.has(root)) {
-      violations.push(
-        issue(path, `Feature root ${JSON.stringify(root)} is declared more than once.`),
-      );
-    }
-
-    ids.add(id);
-    roots.add(root);
-
-    for (const subject of subjects) {
-      const owner = subjectOwners.get(subject);
-
-      if (owner && owner !== id) {
-        violations.push(
-          issue(
-            path,
-            `Subject ${JSON.stringify(subject)} is owned by both ${JSON.stringify(owner)} and ${JSON.stringify(id)}.`,
-          ),
-        );
-      } else {
-        subjectOwners.set(subject, id);
-      }
-    }
-
-    entries.push({
-      id,
-      root,
-      classification,
-      subjects,
-    });
+    const entry = parseCatalogueEntry({ path, index, raw, violations });
+    if (!entry) continue;
+    checkCatalogueEntry({ path, entry, seen, violations });
+    entries.push(entry);
   }
 
   const sorted = [...entries].toSorted((left, right) => {

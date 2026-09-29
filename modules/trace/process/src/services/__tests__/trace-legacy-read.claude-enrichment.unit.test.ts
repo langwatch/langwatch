@@ -155,6 +155,7 @@ function makeService(
       findTracesByThreadId: mockGetTracesByThreadId,
       findTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
       listAllTracesForProject: mockGetAllTracesForProject,
+      findTraceSummaries: vi.fn(),
       resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
       findCustomersAndLabels: vi.fn(),
       findDistinctFieldNames: vi.fn(),

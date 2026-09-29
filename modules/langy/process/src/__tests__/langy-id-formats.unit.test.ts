@@ -39,7 +39,7 @@ describe("langy ids", () => {
       ["legacy", LEGACY.call],
       ["ksuid", minted("call")],
     ])("accepts a %s call id in the poll path and the cancel frame", (_, callId) => {
-      expect(langyLocalCallIdParamsSchema.parse({ id: callId }).id).toBe(callId);
+      expect(langyLocalCallIdParamsSchema.parse({ callId }).callId).toBe(callId);
       expect(cancelFrameSchema.shape.callId.parse(callId)).toBe(callId);
     });
 

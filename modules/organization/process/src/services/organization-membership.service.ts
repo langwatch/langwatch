@@ -383,7 +383,8 @@ export class OrganizationMembershipService {
   /** One organization's provisioning summary; an unknown id answers the door's `not_found`. */
   async getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary> {
     const summary = await this.findProvisioningSummary(organizationId);
-    if (!summary) throw new NotFoundError("not_found", "Organization", organizationId);
+    if (!summary)
+      throw new NotFoundError("not_found", { resource: "Organization", id: organizationId });
     return summary;
   }
 

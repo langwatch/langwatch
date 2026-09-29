@@ -13,6 +13,7 @@ import {
   LangyApi,
   LangyApiRequestInvalidError,
   langyLocalCallIdParamsSchema,
+  langyLocalWaitIdParamsSchema,
   langyLocalCreateRequestBodySchema,
   langyLocalStartCallRequestSchema,
   langyLocalStartWaitRequestSchema,
@@ -106,7 +107,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     }),
   )
 
-  .get("/api/langy/local/calls/:id", "langyLocalReadCall")
+  .get("/api/langy/local/calls/:callId", "langyLocalReadCall")
   .withPermission(LOCAL_PERMISSION)
   .withParams(langyLocalCallIdParamsSchema)
   .withOutput(pollCallResponseSchema)
@@ -115,12 +116,12 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     app.getLocalCallAnswer({
       actor,
       projectId: scope.id,
-      callId: input.id,
+      callId: input.callId,
       ...(signal ? { signal } : {}),
     }),
   )
 
-  .post("/api/langy/local/calls/:id/cancel", "langyLocalCancelCall")
+  .post("/api/langy/local/calls/:callId/cancel", "langyLocalCancelCall")
   .withPermission(LOCAL_PERMISSION)
   .withParams(langyLocalCallIdParamsSchema)
   .withInput(controlActionBodySchema)
@@ -130,7 +131,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     app.cancelLocalCall({
       actor,
       projectId: scope.id,
-      callId: input.id,
+      callId: input.callId,
     }),
   )
 
@@ -151,16 +152,16 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     }),
   )
 
-  .get("/api/langy/waits/:id", "langyLocalReadWait")
+  .get("/api/langy/waits/:waitId", "langyLocalReadWait")
   .withPermission(LOCAL_PERMISSION)
-  .withParams(langyLocalCallIdParamsSchema)
+  .withParams(langyLocalWaitIdParamsSchema)
   .withOutput(pollWaitResponseSchema)
   .withDocs({ description: "The answered question, or not found while it is still waiting." })
   .handle(({ app, input, actor, scope, signal }) =>
     app.getLocalWaitAnswer({
       actor,
       projectId: scope.id,
-      waitId: input.id,
+      waitId: input.waitId,
       ...(signal ? { signal } : {}),
     }),
   )

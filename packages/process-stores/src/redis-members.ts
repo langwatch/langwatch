@@ -18,7 +18,7 @@ export function redisCache(redis: RedisConnection): Cache {
       const stored = await redis.getBuffer(`${CACHE_PREFIX}${key}`);
       return stored === null ? void 0 : new Uint8Array(stored);
     },
-    async set(key, tag, body, ttlSeconds) {
+    async set({ key, tag, body, ttlSeconds }) {
       const entry = `${CACHE_PREFIX}${key}`;
       await redis.set(entry, Buffer.from(body), "EX", ttlSeconds);
       await redis.sadd(`${TAG_PREFIX}${tag}`, entry);

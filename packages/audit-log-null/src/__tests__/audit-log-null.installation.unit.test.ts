@@ -18,7 +18,7 @@ describe("given a process that installed no Enterprise audit log", () => {
           expect(runtime.module(auditLogNullServer).provided).toBe(app);
           await expect(
             app.record({ userId: "user-1", action: "agents.create", args: { id: "agent-1" } }),
-          ).resolves.toBeUndefined();
+          ).resolves.toEqual({ id: "", occurredAt: 0 });
           await expect(
             app.listEntityHistory({
               projectId: "project-1",

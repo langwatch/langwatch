@@ -22,7 +22,12 @@ import type {
   UpdateGatewayGuardrailInput,
 } from "./gateway-guardrail.ts";
 import type { GatewayInternalSpendCommandRecord } from "./gateway-internal.schemas.ts";
-import type { gatewayRequestCredentialSchema } from "./gateway-platform.schemas.ts";
+import type {
+  GatewayAuthorizedKeyCaller,
+  GatewayKeyCaller,
+  GatewayKeyCallerReach,
+  gatewayRequestCredentialSchema,
+} from "./gateway-platform.schemas.ts";
 import type {
   GatewayPrincipalDailySpend,
   GatewayPrincipalModelSpend,
@@ -508,6 +513,16 @@ export interface GatewayApi extends GatewayInternalProtocol {
     actor: GatewayCaller;
     actorUserId: string;
   };
+  /**
+   * Authorizes any API key for one permission, at the key's own reach or at
+   * the whole organization. Refuses with `permission_denied` naming the
+   * permission, never with a credential error: the key itself was valid.
+   */
+  authorizeKeyCaller(input: {
+    caller: GatewayKeyCaller;
+    permission: string;
+    reach: GatewayKeyCallerReach;
+  }): Promise<GatewayAuthorizedKeyCaller>;
   /** Tenant-wide write by project credential, checked at the organization. */
   authorizeOrganizationWideOperation(input: {
     actor: GatewayCaller;

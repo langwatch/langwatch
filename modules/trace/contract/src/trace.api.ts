@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { ConversationView } from "./conversation/conversation-steps.ts";
 import type { ExportProgressEvent } from "./export-progress.trpc.ts";
 import type { TraceOtlpIngestApi } from "./otlp-ingest.rest.ts";
 import type {
@@ -61,7 +62,13 @@ import type {
   TraceQueryClassificationInput,
   TraceQueryFieldCatalogueInput,
 } from "./trace-query.contract.ts";
-import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
+import type {
+  TraceLegacyListInput,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
+  TracesForProjectResult,
+} from "./trace-read.contract.ts";
 import type { TraceRecord } from "./trace-record.ts";
 import type {
   TraceFacetsAnswer,
@@ -154,13 +161,14 @@ export interface TraceApi extends TraceOtlpIngestApi {
    */
   renderReadableTrace(input: { trace: Trace; maxTokens: number }): Promise<string>;
   /**
-   * A thread as one markdown transcript, the traces already ordered and cut by
-   * the caller. Under `maxTokens` the preamble and both ends survive and a
-   * marker names what was dropped, so a cut never reads as a short thread.
+   * A thread as one markdown transcript, traces already ordered and cut:
+   * `conversation` reads like the chat view, `steps` lists each turn's tool
+   * calls and results. Under `maxTokens` turns shorten before any drops.
    */
   renderThreadTranscript(input: {
     threadKey: string;
     traces: readonly Trace[];
+    view: ConversationView;
     maxTokens?: number;
   }): Promise<string>;
   /**
@@ -208,6 +216,14 @@ export interface TraceApi extends TraceOtlpIngestApi {
       filterWhere?: { sql: string; params: Record<string, unknown> };
     };
   }): Promise<TracesForProjectResult>;
+  /**
+   * The project's latest trace summaries on the `dateField` axis, paged by `scrollId`:
+   * no content, spans, evaluations or protections, for a system reader.
+   */
+  listTraceSummaries(input: {
+    query: TraceSummaryListQuery;
+    options?: TraceSummaryListOptions;
+  }): Promise<TraceSummaryPage>;
   findTrace(input: {
     projectId: string;
     traceId: string;

@@ -10,7 +10,8 @@ import type {
 } from "@langwatch/onboarding-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
+import { reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 /**
  * One campaign trigger per path. Marketing runs one campaign off each of
@@ -76,19 +77,20 @@ export function guidedOnboardingOrgTraits({
  * picked path, so a path picked once never re-triggers. Fire-and-forget.
  */
 export function fireGuidedOnboardingPaths({
+  nurturing,
   userId,
   organizationId,
   event,
   previousPaths,
   paths,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   organizationId: string;
   event: "paths_selected" | "path_begun";
   previousPaths: GuidedPath[];
   paths: GuidedPath[];
 }): void {
-  const nurturing = findSink();
   if (!nurturing) return;
 
   const primaryPath = paths[0];
@@ -126,19 +128,20 @@ export function fireGuidedOnboardingPaths({
 
 /** Fires the provider connected, the tour outcome and each path completed. Fire-and-forget. */
 export function fireGuidedOnboardingProgress({
+  nurturing,
   userId,
   organizationId,
   event,
   payload,
   state,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   organizationId: string;
   event: "provider_connected" | "tour_completed" | "tour_skipped" | "path_completed";
   payload: Record<string, string | string[] | number | undefined>;
   state: GuidedOnboardingState;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) return;
 
   switch (event) {

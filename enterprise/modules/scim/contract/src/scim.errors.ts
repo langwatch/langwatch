@@ -32,9 +32,13 @@ export class ScimTokenNotFoundError extends NotFoundError {
   declare readonly code: "scim_token_not_found";
 
   constructor(tokenId: string) {
-    super("scim_token_not_found", "SCIM token", tokenId, {
-      meta: { tokenId },
-    });
+    super(
+      "scim_token_not_found",
+      { resource: "SCIM token", id: tokenId },
+      {
+        meta: { tokenId },
+      },
+    );
     this.name = "ScimTokenNotFoundError";
   }
 }
@@ -84,9 +88,13 @@ export class ScimConnectionNotFoundError extends NotFoundError {
   declare readonly code: "scim_connection_not_found";
 
   constructor(connectionId: string) {
-    super("scim_connection_not_found", "Single sign-on connection", connectionId, {
-      meta: { connectionId },
-    });
+    super(
+      "scim_connection_not_found",
+      { resource: "Single sign-on connection", id: connectionId },
+      {
+        meta: { connectionId },
+      },
+    );
     this.name = "ScimConnectionNotFoundError";
   }
 }
@@ -141,7 +149,11 @@ export class ScimSyncNotFoundError extends NotFoundError {
   declare readonly code: "scim_sync_not_found";
 
   constructor(scimSyncId: string) {
-    super("scim_sync_not_found", "SCIM sync", scimSyncId, { meta: { scimSyncId } });
+    super(
+      "scim_sync_not_found",
+      { resource: "SCIM sync", id: scimSyncId },
+      { meta: { scimSyncId } },
+    );
     this.name = "ScimSyncNotFoundError";
   }
 }

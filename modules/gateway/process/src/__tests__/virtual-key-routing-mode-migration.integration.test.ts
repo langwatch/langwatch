@@ -26,7 +26,7 @@ const USER_ID = `usr-rmm-${suffix}`;
 const POLICY_ID = `policy-rmm-${suffix}`;
 const MP_OPENAI_ID = `mp-rmm-openai-${suffix}`;
 
-const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 const MIGRATION_FILE = join(
   repositoryRoot,
   "packages/prisma-client/prisma/migrations/20260728120001_budgets_provider_filter_group_scope_routing_mode/migration.sql",

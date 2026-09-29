@@ -149,6 +149,7 @@ export const COMMANDS_WITHOUT_PROJECT: Record<string, string> = {
   "projects delete": "names projects rather than running inside one",
   "projects get": "names projects rather than running inside one",
   "projects list": "names projects rather than running inside one",
+  "projects move": "names projects rather than running inside one",
   "projects update": "names projects rather than running inside one",
 };
 

@@ -4,8 +4,8 @@
  * hash stays stored only until that window closes.
  */
 
+import { VirtualKeyRevokedError } from "@langwatch/gateway-contract";
 import { nowInstant } from "@langwatch/time";
-import { TRPCError } from "@trpc/server";
 
 import {
   type GatewayAudit,
@@ -80,10 +80,7 @@ export class VirtualKeyRotationService {
   async rotate(input: RotateVirtualKeyInput): Promise<CreatedVirtualKey> {
     const existing = await this.validation.ownedForMutation(input.id, input.organizationId);
     if (existing.status === "REVOKED") {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Cannot rotate a revoked virtual key",
-      });
+      throw new VirtualKeyRevokedError("Cannot rotate a revoked virtual key");
     }
 
     const before = VirtualKeyValidationService.serialiseForAudit(existing);

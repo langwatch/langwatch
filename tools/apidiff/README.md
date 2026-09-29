@@ -177,8 +177,7 @@ deterministic summary, or the machine report with `-json` (optionally to
   `-exact-status` restores exact-code and error-body comparison. The summary
   ends with a `suppressed: N same-class status differences, M error-body
 comparisons` line.
-- `/api/gateway` operations are excluded by default (they egress to real LLM
-  providers); repeat `-exclude-prefix` to add more.
+- Nothing is excluded by default; repeat `-exclude-prefix` to skip a family.
 - Idempotent probes (GET/HEAD/OPTIONS) retry up to 2 times on 5xx with
   backoff (500ms, 1s), so a momentary database restart or recovery window
   degrades into a slow probe instead of false findings. Mutations are never
@@ -518,6 +517,25 @@ in `<work-root>/probe/<module>.md` (`run`), or in `probe/` beside `-report`
 per case, the finding kind, every differing pointer with both values, both
 sides' request path, status and a short body excerpt, and the request body,
 so a lane can act without opening the multi-megabyte report.
+
+## Round trips, verdict.md and signatures.md
+
+An equal wire shape does not prove a feature works. Before the main pass's first
+delete, each resource in `roundTrips` (roundtrip.go, beside `curatedCreates`) is
+walked on each side on its own: create (the curated body, under a name of its
+own) -> read back holds what was sent (ids, times and urls masked) -> appears
+in the list -> update is visible -> delete -> read misses (404/410). Reads poll
+up to `-settle-timeout`. Each step is recorded per side as `effect: ok|broken|not-run`
+in the report's `effects`. A step broken on the candidate and ok on the base is
+an `effect_broken` finding and fails the run; broken on both is recorded, not a
+finding.
+
+Beside the probe packets (or the report file) the run writes `verdict.md`, the
+file to read first: one line per round trip (`works`, `broken`, `broken-both`,
+`fixed`, `not-run`) with its first failure, the failing-finding count and the
+new log signature count. When the run kept `logs/`, `signatures.md` lists the
+warn-and-worse log messages, masked, as new on candidate, also on base and base
+only, with counts and the first file:line.
 
 ## Findings stream
 

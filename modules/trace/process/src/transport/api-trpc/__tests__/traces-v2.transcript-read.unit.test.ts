@@ -64,7 +64,7 @@ describe("readCodingAgentTranscript", () => {
       ]);
 
       const transcript = await traceTranscriptReadService.readCodingAgentTranscript({
-        app,
+        reads: app,
         ports,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
@@ -96,7 +96,7 @@ describe("readCodingAgentTranscript", () => {
       ]);
 
       const transcript = await traceTranscriptReadService.readCodingAgentTranscript({
-        app,
+        reads: app,
         ports,
         projectId: PROJECT_ID,
         traceId: TRACE_ID,

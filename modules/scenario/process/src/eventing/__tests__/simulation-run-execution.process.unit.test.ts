@@ -58,6 +58,10 @@ class UnusedScenarioExecutionService extends ScenarioExecutionService {
   recordAgentInstance(): Promise<void> {
     throw new Error("recordAgentInstance unexpectedly called in evolve tests");
   }
+
+  recordCutAtLimit(): Promise<void> {
+    throw new Error("recordCutAtLimit unexpectedly called in evolve tests");
+  }
 }
 
 /**

@@ -339,13 +339,31 @@ export class ScimProvisioningService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
+    const role = await this.directoryAssertedOrganizationRole({ userId, organizationId });
     try {
-      await this.prisma.addMembership({ userId, organizationId, role: "MEMBER" });
+      await this.prisma.addMembership({ userId, organizationId, role });
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
     }
 
     await this.reconcileOrganizationMembership({ userId, organizationId });
+  }
+
+  /**
+   * The membership row's role, from what the directory asserts: ADMIN when a SCIM group mapped
+   * ADMIN at organization scope holds them under SCIM_V2_GRANTS, else MEMBER. A provisioned
+   * person is a member whatever else was or was not mapped; without the flag, always MEMBER.
+   */
+  private async directoryAssertedOrganizationRole({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<"ADMIN" | "MEMBER"> {
+    if (!this.provenOffboarding) return "MEMBER";
+    const roles = await this.prisma.findDirectoryAssertedRoles({ userId, organizationId });
+    return roles.includes("ADMIN") ? "ADMIN" : "MEMBER";
   }
 
   async getUser({ id, organizationId }: { id: string; organizationId: string }): Promise<ScimUser> {

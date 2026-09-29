@@ -1,5 +1,6 @@
 import * as actions from "./actions";
 import type { Action } from "./context";
+import { expectOutcome } from "./expect";
 import { click, dismissTour, fill, go, select, type, wait } from "./primitives";
 
 /** Keep names aligned with `RunnerActions` in tools/visualdiff/config.go; tests enforce parity. */
@@ -11,6 +12,7 @@ export const REGISTRY: Record<string, Action> = {
   type,
   wait,
   dismissTour,
+  expect: expectOutcome,
   signIn: actions.signIn,
   createAutomation: actions.createAutomation,
   createEvaluation: actions.createEvaluation,

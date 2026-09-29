@@ -85,6 +85,19 @@ function inviteResentToast({ emailSent }: { emailSent: boolean }) {
   };
 }
 
+/** One invite row as the procedure takes it; a team with no custom role sends none. */
+function toInviteInput(invite: MembersForm["invites"][number]) {
+  return {
+    email: invite.email.toLowerCase(),
+    role: invite.orgRole,
+    teams: invite.teams.map((team) => ({
+      teamId: team.teamId,
+      role: team.role,
+      ...(team.customRoleId ? { customRoleId: team.customRoleId } : {}),
+    })),
+  };
+}
+
 /**
  * Invite mutation handlers: create, resend, revoke. All pricing models go
  * through enforcement first — SEAT_EVENT with an active subscription opens
@@ -138,15 +151,7 @@ export function useInviteActions({
     createInvitesMutation.mutate(
       {
         organizationId,
-        invites: data.invites.map((invite) => ({
-          email: invite.email.toLowerCase(),
-          role: invite.orgRole,
-          teams: invite.teams.map((team) => ({
-            teamId: team.teamId,
-            role: team.role,
-            customRoleId: team.customRoleId ?? null,
-          })),
-        })),
+        invites: data.invites.map(toInviteInput),
       },
       {
         onSuccess: (data) => {

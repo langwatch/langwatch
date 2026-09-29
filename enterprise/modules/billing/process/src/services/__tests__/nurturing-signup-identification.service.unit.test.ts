@@ -8,6 +8,7 @@ import { fireSignup } from "../../rules/nurturing-signup-identification-service.
 import {
   registerNoNurturingSink,
   registerNurturingSink,
+  wiring,
   settle,
 } from "./support/nurturing-harness.ts";
 
@@ -34,6 +35,7 @@ describe("fireSignup", () => {
         const sink = registerNurturingSink();
 
         fireSignup({
+          ...wiring(),
           ...SIGNUP,
           signUpData: { yourRole: "engineer", companySize: "11-50" },
         });
@@ -56,10 +58,7 @@ describe("fireSignup", () => {
       it("associates them with their organization by name", async () => {
         const sink = registerNurturingSink();
 
-        fireSignup({
-          ...SIGNUP,
-          signUpData: { companySize: "11-50" },
-        });
+        fireSignup({ ...wiring(), ...SIGNUP, signUpData: { companySize: "11-50" } });
         await settle();
 
         expect(sink.sentTo("/group")[0]).toMatchObject({
@@ -74,6 +73,7 @@ describe("fireSignup", () => {
         const sink = registerNurturingSink();
 
         fireSignup({
+          ...wiring(),
           ...SIGNUP,
           signUpData: { yourRole: "engineer", companySize: "11-50" },
         });
@@ -90,7 +90,7 @@ describe("fireSignup", () => {
       it("sends every milestone trait as not yet reached", async () => {
         const sink = registerNurturingSink();
 
-        fireSignup(SIGNUP);
+        fireSignup({ ...wiring(), ...SIGNUP });
         await settle();
 
         expect(sink.sentTo("/identify")[0]).toMatchObject({
@@ -112,6 +112,7 @@ describe("fireSignup", () => {
         const sink = registerNurturingSink();
 
         fireSignup({
+          ...wiring(),
           ...SIGNUP,
           signUpData: { utmCampaign: "launch-week", howDidYouHearAboutUs: "twitter" },
         });
@@ -130,10 +131,7 @@ describe("fireSignup", () => {
       it("sends lead_source as a trait and leadSource as an event property", async () => {
         const sink = registerNurturingSink();
 
-        fireSignup({
-          ...SIGNUP,
-          signUpData: { leadSource: "website" },
-        });
+        fireSignup({ ...wiring(), ...SIGNUP, signUpData: { leadSource: "website" } });
         await settle();
 
         expect(sink.sentTo("/identify")[0]).toMatchObject({
@@ -150,6 +148,7 @@ describe("fireSignup", () => {
         const sink = registerNurturingSink();
 
         fireSignup({
+          ...wiring(),
           ...SIGNUP,
           signUpData: {
             utmSource: "google",
@@ -180,7 +179,7 @@ describe("fireSignup", () => {
       it("omits the attribution keys rather than sending them empty", async () => {
         const sink = registerNurturingSink();
 
-        fireSignup(SIGNUP);
+        fireSignup({ ...wiring(), ...SIGNUP });
         await settle();
 
         const { traits } = sink.sentTo("/identify")[0] as { traits: Record<string, unknown> };
@@ -205,7 +204,7 @@ describe("fireSignup", () => {
       it("returns normally and reports the failure for observability", async () => {
         const sink = registerNurturingSink({ failing: true });
 
-        expect(() => fireSignup(SIGNUP)).not.toThrow();
+        expect(() => fireSignup({ ...wiring(), ...SIGNUP })).not.toThrow();
         await settle();
 
         expect(sink.errorReporter.capture).toHaveBeenCalled();
@@ -220,7 +219,7 @@ describe("fireSignup", () => {
         const sink = registerNurturingSink();
         registerNoNurturingSink();
 
-        expect(() => fireSignup(SIGNUP)).not.toThrow();
+        expect(() => fireSignup({ ...wiring(), ...SIGNUP })).not.toThrow();
         await settle();
 
         expect(sink.fetchFn).not.toHaveBeenCalled();

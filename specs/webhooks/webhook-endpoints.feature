@@ -571,7 +571,7 @@ Feature: Webhook endpoints, signed outbound event delivery
       When post-debit detection runs
       Then only the above-threshold bucket appends a threshold crossing
       And only the past-limit bucket appends a breach
-      And a detection failure never fails the debit that triggered it
+      And a detection failure re-drives the debit, which writes no row twice
 
     @unit
     Scenario: Governance events only reach endpoints subscribed to their types

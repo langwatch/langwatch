@@ -148,9 +148,13 @@ export class RoleBindingNotFoundError extends NotFoundError {
   declare readonly code: "role_binding_not_found";
 
   constructor(bindingId: string) {
-    super("role_binding_not_found", "Role binding", bindingId, {
-      meta: { bindingId },
-    });
+    super(
+      "role_binding_not_found",
+      { resource: "Role binding", id: bindingId },
+      {
+        meta: { bindingId },
+      },
+    );
     this.name = "RoleBindingNotFoundError";
   }
 }
@@ -160,11 +164,10 @@ export class AuthzScopeNotFoundError extends NotFoundError {
   declare readonly code: "authz_scope_not_found";
 
   constructor(ids: { projectId?: string; teamId?: string; organizationId?: string }) {
-    super(
-      "authz_scope_not_found",
-      "Scope",
-      ids.projectId ?? ids.teamId ?? ids.organizationId ?? "",
-    );
+    super("authz_scope_not_found", {
+      resource: "Scope",
+      id: ids.projectId ?? ids.teamId ?? ids.organizationId ?? "",
+    });
     this.name = "AuthzScopeNotFoundError";
   }
 }

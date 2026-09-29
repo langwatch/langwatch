@@ -16,11 +16,8 @@ const INJECTED_DEFAULT_RETENTION_DAYS = 49;
 
 /**
  * @see specs/data-retention/ingestion-stamping.feature
- *
- * event_log is the source of truth for trace-pipeline events. If the retention
- * resolver returns N days for the tenant, every event_log row in the batch
- * must carry _retention_days = N. Without it, derived projections expire while
- * the raw events survive — re-projection then resurrects deleted data.
+ * Every event_log row carries the tenant's _retention_days; without it projections
+ * expire while raw events survive, and re-projection resurrects deleted data.
  */
 describe("EventStoreClickHouse retention stamping", () => {
   const tenantId = createTenantId("project_abc");

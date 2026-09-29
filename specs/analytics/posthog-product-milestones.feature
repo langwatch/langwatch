@@ -136,3 +136,18 @@ Feature: PostHog product milestones
     Given a project whose active day is already tracked today
     When another signal arrives the same day
     Then nothing is tracked
+
+  # Billing sends its server-side milestones (scenario_created today) through ops' product-analytics
+  # target, as main's trackServerEvent did through POSTHOG_KEY.
+  @unit
+  Scenario: Billing's milestones send nothing where the deployment named no PostHog key
+    Given a deployment whose ops config names no product-analytics target
+    When billing tracks a milestone
+    Then no PostHog client is built and nothing is sent
+    And closing the channel succeeds
+
+  @unit
+  Scenario: Billing reads ops' PostHog target on its first milestone, not at boot
+    Given billing composed its PostHog channel
+    When two milestones are tracked
+    Then ops' targets were read once, on the first

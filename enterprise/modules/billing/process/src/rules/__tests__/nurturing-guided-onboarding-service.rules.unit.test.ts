@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
+  wiring,
   settle,
 } from "../../services/__tests__/support/nurturing-harness.ts";
 import {
@@ -30,6 +31,7 @@ describe("fireGuidedOnboardingPaths()", () => {
   describe("when the user selects gateway then llmops", () => {
     const select = (sink: ReturnType<typeof registerNurturingSink>) => {
       fireGuidedOnboardingPaths({
+        ...wiring(),
         userId: "user-1",
         organizationId: "org-1",
         event: "paths_selected",
@@ -89,6 +91,7 @@ describe("fireGuidedOnboardingPaths()", () => {
       const sink = registerNurturingSink();
 
       fireGuidedOnboardingPaths({
+        ...wiring(),
         userId: "user-1",
         organizationId: "org-1",
         event: "paths_selected",
@@ -111,6 +114,7 @@ describe("fireGuidedOnboardingPaths()", () => {
       const sink = registerNurturingSink();
 
       fireGuidedOnboardingPaths({
+        ...wiring(),
         userId: "user-1",
         organizationId: "org-1",
         event: "path_begun",
@@ -138,6 +142,7 @@ describe("fireGuidedOnboardingPaths()", () => {
       const sink = registerNurturingSink();
 
       fireGuidedOnboardingPaths({
+        ...wiring(),
         userId: "user-1",
         organizationId: "org-1",
         event: "path_begun",
@@ -157,6 +162,7 @@ describe("fireGuidedOnboardingPaths()", () => {
 
       expect(() =>
         fireGuidedOnboardingPaths({
+          ...wiring(),
           userId: "user-1",
           organizationId: "org-1",
           event: "paths_selected",
@@ -166,6 +172,7 @@ describe("fireGuidedOnboardingPaths()", () => {
       ).not.toThrow();
       expect(() =>
         fireGuidedOnboardingProgress({
+          ...wiring(),
           userId: "user-1",
           organizationId: "org-1",
           event: "path_completed",
@@ -184,6 +191,7 @@ describe("fireGuidedOnboardingProgress()", () => {
       const sink = registerNurturingSink();
 
       fireGuidedOnboardingProgress({
+        ...wiring(),
         userId: "user-1",
         organizationId: "org-1",
         event: "provider_connected",
@@ -206,6 +214,7 @@ describe("fireGuidedOnboardingProgress()", () => {
       const sink = registerNurturingSink();
 
       fireGuidedOnboardingProgress({
+        ...wiring(),
         userId: "user-1",
         organizationId: "org-1",
         event: "tour_completed",
@@ -226,6 +235,7 @@ describe("fireGuidedOnboardingProgress()", () => {
       const sink = registerNurturingSink();
 
       fireGuidedOnboardingProgress({
+        ...wiring(),
         userId: "user-1",
         organizationId: "org-1",
         event: "tour_skipped",
@@ -246,6 +256,7 @@ describe("fireGuidedOnboardingProgress()", () => {
       const sink = registerNurturingSink();
 
       fireGuidedOnboardingProgress({
+        ...wiring(),
         userId: "user-1",
         organizationId: "org-1",
         event: "path_completed",

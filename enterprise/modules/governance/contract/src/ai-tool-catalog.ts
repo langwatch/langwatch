@@ -318,7 +318,7 @@ export type AiToolStarterTileChoice = z.infer<typeof aiToolStarterTileChoiceSche
 /** Main answered NOT_FOUND on `get` and a plain error on update and remove; each refuses here. */
 export class AiToolEntryNotFoundError extends NotFoundError {
   constructor(entryId: string) {
-    super("not_found", "AI tool entry", entryId);
+    super("not_found", { resource: "AI tool entry", id: entryId });
     this.name = "AiToolEntryNotFoundError";
   }
 }

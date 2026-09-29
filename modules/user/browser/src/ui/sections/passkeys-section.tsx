@@ -321,76 +321,108 @@ export function PasskeysSection() {
   };
 
   return (
-    <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <Fingerprint size={18} />
-          <Text fontWeight={600}>Passkeys</Text>
-        </HStack>
-        <Text color="fg.muted" fontSize="sm">
-          Passkeys can be created and saved on your devices, like your phone or laptop, or on
-          security keys. With passkeys on your devices, you don&apos;t need to remember complex
-          passwords.
-        </Text>
-      </VStack>
+    <VStack
+      width="full"
+      align="start"
+      gap={4}
+      data-testid="passkeys-settings-section"
+      id="passkeys"
+    >
+      <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
+        <VStack align="start" gap={1}>
+          <HStack gap={2}>
+            <Fingerprint size={18} />
+            <Text fontWeight={600}>Passkeys</Text>
+          </HStack>
+          <Text color="fg.muted" fontSize="sm">
+            Passkeys can be created and saved on your devices, like your phone or laptop, or on
+            security keys. With passkeys on your devices, you don&apos;t need to remember complex
+            passwords.
+          </Text>
+        </VStack>
 
-      {isPending ? <Spinner size="sm" /> : null}
+        {isPending ? <Spinner size="sm" /> : null}
 
-      {!isPending && held.length === 0 ? (
-        <Card.Root width="full" data-testid="passkeys-empty">
-          <Card.Body>
-            <VStack align="start" gap={3}>
-              {/* Said in terms of what somebody already does with their device,
+        {!isPending && held.length === 0 ? (
+          <Card.Root width="full" data-testid="passkeys-empty">
+            <Card.Body>
+              <VStack align="start" gap={3}>
+                {/* Said in terms of what somebody already does with their device,
                   because "public key credential" is not a thing anybody has ever
                   wanted. */}
-              <Text fontSize="sm">
-                Passkeys are encrypted digital keys you create using your fingerprint, face, or
-                screen lock. They are saved in your credential manager, so you can sign in on other
-                devices.
-              </Text>
+                <Text fontSize="sm">
+                  Passkeys are encrypted digital keys you create using your fingerprint, face, or
+                  screen lock. They are saved in your credential manager, so you can sign in on
+                  other devices.
+                </Text>
+                <Button
+                  colorPalette="orange"
+                  loading={isCreating}
+                  onClick={() => void create()}
+                  data-testid="create-passkey"
+                >
+                  Create a passkey
+                </Button>
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        ) : null}
+
+        {held.length > 0 ? (
+          <VStack width="full" align="stretch" gap={5}>
+            <PasskeyGroup
+              heading="Passkeys on your devices"
+              passkeys={held.filter((passkey) => !isSecurityKey(passkey))}
+              onRename={setRenaming}
+              onRemove={setRemoving}
+            />
+            <PasskeyGroup
+              heading="Passkeys on security keys"
+              passkeys={held.filter(isSecurityKey)}
+              onRename={setRenaming}
+              onRemove={setRemoving}
+            />
+            <Box>
               <Button
-                colorPalette="orange"
+                variant="outline"
+                size="sm"
                 loading={isCreating}
                 onClick={() => void create()}
                 data-testid="create-passkey"
               >
                 Create a passkey
               </Button>
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-      ) : null}
+            </Box>
+          </VStack>
+        ) : null}
 
-      {held.length > 0 ? (
-        <VStack width="full" align="stretch" gap={5}>
-          <PasskeyGroup
-            heading="Passkeys on your devices"
-            passkeys={held.filter((passkey) => !isSecurityKey(passkey))}
-            onRename={setRenaming}
-            onRemove={setRemoving}
-          />
-          <PasskeyGroup
-            heading="Passkeys on security keys"
-            passkeys={held.filter(isSecurityKey)}
-            onRename={setRenaming}
-            onRemove={setRemoving}
-          />
-          <Box>
-            <Button
-              variant="outline"
-              size="sm"
-              loading={isCreating}
-              onClick={() => void create()}
-              data-testid="create-passkey"
-            >
-              Create a passkey
-            </Button>
-          </Box>
-        </VStack>
-      ) : null}
+        {/* The waiting state sits over the list the ceremony was started from. */}
+        <Dialog.Root open={isCreating} placement="center">
+          <Dialog.Content bg="bg" data-testid="passkey-ceremony-dialog">
+            <Dialog.Header>
+              <Dialog.Title fontSize="md" fontWeight="500">
+                Create your passkey
+              </Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body paddingBottom={6}>
+              <Text fontSize="sm" color="fg.muted">
+                Follow your device&apos;s prompt to finish. Closing it keeps things as they were.
+              </Text>
+            </Dialog.Body>
+          </Dialog.Content>
+        </Dialog.Root>
 
-      <RenamePasskeyDialog passkey={renaming} onClose={() => setRenaming(null)} onRename={rename} />
-      <RemovePasskeyDialog passkey={removing} onClose={() => setRemoving(null)} onRemove={remove} />
+        <RenamePasskeyDialog
+          passkey={renaming}
+          onClose={() => setRenaming(null)}
+          onRename={rename}
+        />
+        <RemovePasskeyDialog
+          passkey={removing}
+          onClose={() => setRemoving(null)}
+          onRemove={remove}
+        />
+      </VStack>
     </VStack>
   );
 }

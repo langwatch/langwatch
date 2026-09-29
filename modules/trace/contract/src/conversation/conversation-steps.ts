@@ -87,6 +87,33 @@ function safeIndex({ text, index }: { text: string; index: number }): number {
 
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
+/**
+ * How much of a turn's work a transcript shows: `conversation` reads like the chat
+ * view (input, one line naming the tools used, output), `steps` lists every
+ * model call, tool call and result.
+ */
+export type ConversationView = "conversation" | "steps";
+
+/**
+ * The conversation view's one line of a turn's steps: the tools it used, in
+ * order, a repeat counted. Names only: on judge-lab, argument hints doubled the
+ * tokens of coding sessions for no accuracy. Empty when it used none.
+ */
+export function renderToolLine({ steps }: { steps: readonly ConversationStep[] }): string {
+  const used = steps.filter(
+    (step) => step.depth === 0 && (step.kind === "tool" || step.kind === "retrieval"),
+  );
+  const names =
+    used.length > 0
+      ? used.map((step) => step.name)
+      : steps.flatMap((step) => (step.kind === "model" ? (step.calls ?? []) : []));
+  if (names.length === 0) return "";
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  const listed = [...counts].map(([name, count]) => (count > 1 ? `${name} (${count}x)` : name));
+  return `_Used ${names.length === 1 ? "1 tool" : `${names.length} tools`}: ${listed.join(", ")}_`;
+}
+
 /** The step list of one turn as markdown, empty when nothing is worth listing. */
 export function renderConversationSteps({
   steps,

@@ -627,7 +627,10 @@ describe("GET /api/experiments/runs", () => {
       const { request } = await harness({
         experiments: {
           getRunsPageBySlug: async () => {
-            throw new NotFoundError("experiment_not_found", "Experiment", "checkout-eval");
+            throw new NotFoundError("experiment_not_found", {
+              resource: "Experiment",
+              id: "checkout-eval",
+            });
           },
         },
       });

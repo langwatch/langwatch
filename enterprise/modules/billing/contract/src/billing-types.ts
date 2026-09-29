@@ -182,11 +182,10 @@ export interface BillingUsageLimitOrganization {
   findProjectsWithName(organizationId: string): Promise<{ id: string; name: string }[]>;
 }
 
-export interface BillingUsageCounter {
-  getCountByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN>;
+/** The warning entitlement decided: the threshold crossed and the month's count per project. */
+export interface UsageWarningDecision extends UsageLimitData {
+  crossedThreshold: number;
+  projectCounts: { projectId: string; count: number }[];
 }
 
 export interface BillingPlanResolver {

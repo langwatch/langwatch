@@ -72,7 +72,7 @@ export type UpdateAnomalyRuleInput = z.infer<typeof updateAnomalyRuleInputSchema
 
 export class AnomalyRuleNotFoundError extends NotFoundError {
   constructor(ruleId: string) {
-    super("anomaly_rule_not_found", "Anomaly rule", ruleId);
+    super("anomaly_rule_not_found", { resource: "Anomaly rule", id: ruleId });
     this.name = "AnomalyRuleNotFoundError";
   }
 }

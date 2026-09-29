@@ -36,6 +36,24 @@ func TestAStepThatFailsOnBothRefsIsAFinding(t *testing.T) {
 	mustContain(t, why, "flow broken on both")
 }
 
+// @scenario "An expect failing on the candidate alone is broken"
+func TestAnExpectFailingOnTheCandidateAloneIsBroken(t *testing.T) {
+	expect := `text "VD Alert"`
+	row := pair(&Capture{Expect: expect}, &Capture{Expect: expect, Error: "expect text \"VD Alert\": not visible after 10000ms"})
+	row.Kind = "flow"
+
+	class, why := Classify(row)
+
+	if class != ClassBroken || !class.IsFinding() {
+		t.Fatalf("got %s (%s)", class, why)
+	}
+	mustContain(t, why, "not visible")
+	row.Base.Error, row.Candidate.Error = row.Candidate.Error, ""
+	if class, _ := Classify(row); class != ClassIntendedRestore {
+		t.Fatalf("an expect failing on the base alone is intended-restore, got %s", class)
+	}
+}
+
 // @scenario "A blank page is a finding on every route"
 func TestABlankPageIsAFinding(t *testing.T) {
 	for _, base := range []*Capture{{}, {Blank: true}} {

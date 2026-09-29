@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
+import { TraceDestinationProjectService } from "./support/trace-destination-project-service.ts";
 import { PostgresVirtualKeyAdapter } from "./testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
@@ -46,7 +47,10 @@ function codeOf(error: unknown): string | null {
 }
 
 describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
-  const service = createVirtualKeyServiceForTest(prisma, new TestProjectApi());
+  const service = createVirtualKeyServiceForTest(
+    prisma,
+    new TraceDestinationProjectService(prisma),
+  );
 
   beforeAll(async () => {
     await prisma.organization.create({

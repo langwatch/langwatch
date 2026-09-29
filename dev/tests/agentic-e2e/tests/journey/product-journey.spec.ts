@@ -54,6 +54,11 @@ test.describe("browser product journey", () => {
       ignoreHTTPSErrors: true,
     });
     page = await context.newPage();
+    // A password sign-in is offered a passkey once; the walk declines it wherever it opens.
+    const nudge = page.getByTestId("secure-account-nudge");
+    await page.addLocatorHandler(nudge, async () => {
+      await nudge.getByRole("button", { name: "Not now", exact: true }).click();
+    });
   });
 
   test.afterAll(async () => {
@@ -377,9 +382,12 @@ test.describe("browser product journey", () => {
  */
 async function deleteEveryAgent(): Promise<void> {
   await openProjectPage("agents", "Agents");
+  const actions = page.locator('[aria-label^="Actions for "]');
+  const noAgents = page.getByText("No agents yet", { exact: true });
   for (let removed = 0; removed < 10; removed++) {
-    const actions = page.locator('[aria-label^="Actions for "]');
-    if ((await actions.count()) === 0) return;
+    // The list paints after its read lands; counting before that finds nothing to delete.
+    await expect(actions.first().or(noAgents)).toBeVisible({ timeout: 30000 });
+    if (await noAgents.isVisible()) return;
     await actions.first().click();
     await page.getByRole("menuitem", { name: "Delete" }).first().click();
     await page.getByTestId("cascade-archive-confirm-input").fill("delete");

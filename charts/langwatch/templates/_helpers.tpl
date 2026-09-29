@@ -1015,9 +1015,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # Telemetry - Usage analytics collection
 - name: DISABLE_USAGE_STATS
   value: {{ (not (ternary .Values.app.telemetry.usage.enabled true (hasKey .Values.app.telemetry.usage "enabled"))) | quote }}
-# Telemetry - Prometheus metrics collection
+# Telemetry - Prometheus metrics collection. The processes push over OTLP
+# unless told to mount a /metrics scrape door; in production that door needs
+# its bearer, so an install with no key serves no /metrics at all.
 {{- if .Values.app.telemetry.metrics.enabled }}
-{{- include "langwatch.secretOrValue" (dict "envName" "METRICS_API_KEY" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
+- name: LANGWATCH_METRICS_MODE
+  value: "prometheus"
+{{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_METRICS_TOKEN" "fieldValues" .Values.app.telemetry.metrics.apiKey) }}
 {{- end }}
 
 # Dataplane Object Storage (shared between datasets and stored-objects;

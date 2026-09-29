@@ -389,6 +389,25 @@ export class PrismaScimRepository extends ScimRepository {
       where: { userId_organizationId: input },
     });
   };
+  async findDirectoryAssertedRoles(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
+    const bindings = await this.prisma.roleBinding.findMany({
+      where: {
+        organizationId: input.organizationId,
+        scopeType: "ORGANIZATION",
+        scopeId: input.organizationId,
+        group: {
+          organizationId: input.organizationId,
+          scimSource: { not: null },
+          members: { some: { userId: input.userId } },
+        },
+      },
+      select: { role: true },
+    });
+    return bindings.map((binding) => binding.role);
+  }
   async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     const row = await this.prisma.group.findFirst({
       where: { id: input.id, organizationId: input.organizationId },

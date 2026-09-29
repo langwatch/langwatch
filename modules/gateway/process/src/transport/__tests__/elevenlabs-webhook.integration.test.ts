@@ -22,6 +22,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { resolvedSecrets } from "@langwatch/process-stores";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -122,7 +123,12 @@ async function mountWebhook(): Promise<MountableRestApp> {
     spendRating: ModelCatalogGatewaySpendRatingService.create(),
     spendConfirmation: new RecordingSpendConfirmation(),
   };
-  const runtime = await createApp({ role: "api" })
+  // The gateway resolves its secrets through the process chain; an empty one leaves each unset.
+  const secretsChain = SecretsResolver.over(SecretsChain.start({ environment: {} }));
+  const runtime = await createApp({
+    role: "api",
+    secrets: (owner, declared) => secretsChain.scopeTo(owner, declared),
+  })
     .withModules([gatewayServer])
     .withConfig({
       gateway: {

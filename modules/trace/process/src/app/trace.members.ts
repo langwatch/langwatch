@@ -41,6 +41,9 @@ import type {
   TracesForProjectResult,
   TraceCanonicalisationService,
   TraceSummaryData,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
 } from "@langwatch/trace-contract";
 
 export type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
@@ -143,6 +146,12 @@ export interface TraceLegacyRead {
       filterWhere?: { sql: string; params: Record<string, unknown> };
     },
   ): Promise<TracesForProjectResult>;
+
+  /** The list read's keyset page as bare summaries, for a system reader. */
+  listTraceSummaries(
+    query: TraceSummaryListQuery,
+    options?: TraceSummaryListOptions,
+  ): Promise<TraceSummaryPage>;
 
   /**
    * Named traces with their spans. `occurredAt` is the partition-pruning hint:

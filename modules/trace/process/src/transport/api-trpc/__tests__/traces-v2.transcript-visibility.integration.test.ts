@@ -164,7 +164,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
   async function transcriptAsApiKeyCaller(logs: TraceLogRecordReadRow[]) {
     getLogsByTraceId.mockResolvedValue(logs);
     return traceTranscriptReadService.readCodingAgentTranscript({
-      app,
+      reads: app,
       ports,
       projectId: PROJECT_ID,
       traceId: TRACE_ID,

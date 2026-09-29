@@ -41,6 +41,9 @@ func openRunLog(options Options, streams *Streams) (func(), error) {
 	}, nil
 }
 
+// RetainedRuns is how many earlier run directories a run keeps: the previous one.
+const RetainedRuns = 1
+
 // startRun opens the run log and collects what earlier runs left behind
 // (not on a dry run), then warns about a dirty candidate. The returned
 // function closes the log.
@@ -54,7 +57,7 @@ func startRun(ctx context.Context, request Request, streams *Streams) (func(), e
 		}
 		finish = opened
 		err = CollectGarbage(ctx, GCRequest{
-			Root: options.Root, Current: options.RunDir, UseHaven: options.UseHaven,
+			Root: options.Root, Current: options.RunDir, UseHaven: options.UseHaven, KeepRuns: RetainedRuns,
 			Run: deps.Run, Environ: deps.Environ, Out: streams.Err,
 		})
 		if err != nil {

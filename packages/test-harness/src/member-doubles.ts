@@ -32,7 +32,7 @@ export function frozenAt(moment: Instant | string = "2026-01-01T00:00:00.000Z"):
 /** Response bodies, keyed and tagged, as the cache member holds them. */
 export interface Cache {
   find(key: string): Promise<Uint8Array | undefined>;
-  set(key: string, tag: string, body: Uint8Array, ttlSeconds: number): Promise<void>;
+  set(entry: { key: string; tag: string; body: Uint8Array; ttlSeconds: number }): Promise<void>;
   invalidateTag(tag: string): Promise<void>;
 }
 
@@ -42,7 +42,7 @@ export function memoryCache(): Cache {
   const tagged = new Map<string, Set<string>>();
   return {
     find: (key) => Promise.resolve(entries.get(key)),
-    set(key, tag, body) {
+    set({ key, tag, body }) {
       entries.set(key, body);
       const keys = tagged.get(tag) ?? new Set<string>();
       keys.add(key);

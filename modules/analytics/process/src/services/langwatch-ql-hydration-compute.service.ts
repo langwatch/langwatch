@@ -45,6 +45,8 @@ export interface LangWatchQLTraceRenderer {
   renderThreadTranscript(input: {
     threadKey: string;
     traces: readonly Trace[];
+    /** `conversation` for the chat-like transcript, `steps` for `llm_readable_thread`. */
+    view: "conversation" | "steps";
     /** Absent for the unbounded `conversation`. */
     maxTokens?: number;
   }): Promise<string>;
@@ -217,14 +219,17 @@ export class LangWatchQLHydrationComputeService {
       };
     }
 
-    const isBounded = name === "conversation_bounded";
+    const isSteps = name === "llm_readable_thread";
+    const isBounded = name === "conversation_bounded" || isSteps;
     const ordered = threadTracesUntil({
       traces: orderThreadTraces(threadTraces),
-      untilTraceId: isBounded ? stringOption({ definition, options, at: 1 }) : "",
+      untilTraceId:
+        name === "conversation_bounded" ? stringOption({ definition, options, at: 1 }) : "",
     });
     const transcript = await this.renderer.renderThreadTranscript({
       threadKey,
       traces: ordered,
+      view: isSteps ? "steps" : "conversation",
       ...(isBounded ? { maxTokens: pickNumberOption({ definition, options, at: 0 }) } : {}),
     });
 

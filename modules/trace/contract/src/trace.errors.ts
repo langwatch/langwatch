@@ -24,11 +24,15 @@ export class TraceNotFoundError extends NotFoundError {
     readonly traceId: string,
     options: { reasons?: readonly Error[] } = {},
   ) {
-    super("trace_not_found", "Trace", traceId, {
-      meta: { traceId },
-      ...remediation("trace_not_found"),
-      ...options,
-    });
+    super(
+      "trace_not_found",
+      { resource: "Trace", id: traceId },
+      {
+        meta: { traceId },
+        ...remediation("trace_not_found"),
+        ...options,
+      },
+    );
     this.name = "TraceNotFoundError";
   }
 }
@@ -101,11 +105,15 @@ export class SpanNotFoundError extends NotFoundError {
   declare readonly code: "span_not_found";
 
   constructor(spanId: string, options: { reasons?: readonly Error[] } = {}) {
-    super("span_not_found", "Span", spanId, {
-      meta: { spanId },
-      ...remediation("span_not_found"),
-      ...options,
-    });
+    super(
+      "span_not_found",
+      { resource: "Span", id: spanId },
+      {
+        meta: { spanId },
+        ...remediation("span_not_found"),
+        ...options,
+      },
+    );
     this.name = "SpanNotFoundError";
   }
 }

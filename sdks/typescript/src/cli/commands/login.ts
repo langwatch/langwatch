@@ -33,6 +33,11 @@ function printAgentHintBanner(): void {
   );
   console.log(
     chalk.gray(
+      "  --device --management     same, plus the management access you hold (teams, organization)",
+    ),
+  );
+  console.log(
+    chalk.gray(
       "  --project [slug]           project SDK key into .env; with a slug, no browser (uses your device login)",
     ),
   );
@@ -303,6 +308,33 @@ async function chooseEndpoint(): Promise<void> {
   warnIfLocalEndpointTakesOverGlobalConfig(cfg.control_plane_url);
 }
 
+/**
+ * Management access rides on the device login key only: a project key or a
+ * pre-minted token never passes through the approval that grants it.
+ */
+function refuseManagementOutsideDeviceLogin(
+  options: {
+    management?: boolean;
+    project?: boolean | string;
+    apiKey?: string;
+    token?: string;
+  } = {},
+): void {
+  if (!options.management) return;
+  if (!options.project && !options.apiKey && !options.token) return;
+  console.error(
+    chalk.red(
+      "Error: --management applies to the device login. Run `langwatch login --device --management`.",
+    ),
+  );
+  process.exit(1);
+}
+
+/** `--management` implies `--device`: management access only rides on the device login key. */
+function asksForDeviceLogin(options: { device?: boolean; management?: boolean } = {}): boolean {
+  return options.device === true || options.management === true;
+}
+
 export const loginCommand = async (options?: {
   apiKey?: string;
   device?: boolean;
@@ -310,8 +342,11 @@ export const loginCommand = async (options?: {
   browser?: string;
   endpoint?: string;
   token?: string;
+  management?: boolean;
 }): Promise<void> => {
   try {
+    refuseManagementOutsideDeviceLogin(options);
+
     // First, so every flow below reads a config that already says how to run
     // this CLI; the Claude Code plugin's hooks look it up there.
     recordCliLocation();
@@ -335,8 +370,11 @@ export const loginCommand = async (options?: {
     // mints a personal virtual key bound to the user. This is the
     // governance-plane onboarding for enterprise users, distinct from the
     // single-user API-key flow below.
-    if (options?.device) {
-      await runDeviceFlowLogin({ browser: options.browser });
+    if (asksForDeviceLogin(options)) {
+      await runDeviceFlowLogin({
+        browser: options?.browser,
+        management: options?.management === true,
+      });
       return;
     }
 

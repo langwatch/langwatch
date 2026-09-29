@@ -25,9 +25,6 @@
       "path": "../../../../packages/observability/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/project/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/secrets/tsconfig.build.json"
     },
     {

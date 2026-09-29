@@ -68,7 +68,7 @@ func BuildUIDist(ctx context.Context, request UIBuildRequest) (UIBuild, error) {
 }
 
 // uiBuildCached reports a persistent worktree whose last finished build had
-// this tree's key, and the key to record once this build finishes; a miss
+// this code's key (reuse.go), and the key to record once this build finishes; a miss
 // forgets the old key first.
 func uiBuildCached(ctx context.Context, stack Stack, spec commandSpec) (string, bool, error) {
 	if !stack.Persistent {
@@ -76,10 +76,7 @@ func uiBuildCached(ctx context.Context, stack Stack, spec commandSpec) (string, 
 	}
 	_, relative := UIBuildCommand(stack.Layout)
 	dir := filepath.Join(stack.Dir, relative)
-	key := ""
-	if tree, err := resolveTree(ctx, gitRef{run: execRunner, root: stack.Dir, ref: "HEAD"}); err == nil && tree != "" {
-		key = PrepareKey(stack.Layout, tree, []commandSpec{spec})
-	}
+	key := keyed(stack.Layout, spec, codeKey(ctx, execRunner, stack.Dir))
 	if key != "" && builtKey(stack.Dir) == key && fileExists(filepath.Join(dir, "index.html")) {
 		return key, true, nil
 	}
@@ -121,6 +118,7 @@ func (run *session) buildUI(ctx context.Context, stack Stack) {
 		run.staticDirs = map[string]string{}
 	}
 	run.staticDirs[stack.Name] = built.Dir
+	run.phases.since(stack.Name+" ui build", started)
 	how := "built in " + time.Since(started).Round(time.Second).String()
 	if built.Cached {
 		how = "cached, this tree was built by an earlier run"

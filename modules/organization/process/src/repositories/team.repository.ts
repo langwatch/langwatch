@@ -64,11 +64,14 @@ export abstract class TeamRepository {
     activeOnly?: boolean;
   }): Promise<string[]>;
 
+  /** Runs `change` while holding the team's membership lock, so a membership
+   *  read, its last-admin check and its write cannot interleave with another. */
   abstract fenceMembershipChange(input: {
     teamId: string;
     organizationId: string;
     expectedUpdatedAt: Team["updatedAt"];
     name?: string;
     removeLegacyUserId?: string;
+    change: () => Promise<void>;
   }): Promise<OrganizationTeam>;
 }

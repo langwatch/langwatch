@@ -124,16 +124,7 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
     describe("when a valid specification renders as a chart", () => {
       /** @scenario "The chart renders under a CSP that forbids eval" */
       /** @scenario "A categorical LangWatchQL result renders as a chart in a real browser" */
-      // QUARANTINED, and the product claim it makes is currently FALSE: under a
-      // policy without `unsafe-eval` the chart does not fall back to Vega's
-      // expression interpreter — it renders `lwql-chart-failure`, reports
-      // `data-chart-status="failed"` and draws zero marks. A deployment with a
-      // strict Content-Security-Policy therefore gets no analytics chart at all.
-      //
-      // `it.fails` keeps it running rather than skipping it, so the day the
-      // embed is fixed this turns red and the quarantine comes off. It has never
-      // run in CI, which is why nobody saw it: this lane was wired to nothing.
-      it.fails("draws through Vega's expression interpreter, while the same specification with the interpreter disabled is refused", async () => {
+      it("draws through Vega's expression interpreter, while the same specification with the interpreter disabled is refused", async () => {
         // The control differs from the shipped path by exactly one option, and
         // this is the shipped value of it.
         expect(lwqlVegaEmbedOptions({ themeConfig: {}, colorMode: "light" }).ast).toBe(true);

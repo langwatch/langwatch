@@ -58,6 +58,15 @@ Feature: Organization provisioning REST API for self-hosted deployments
     And no organization or team with that slug remains
     And provisioning the same slug afterwards succeeds
 
+  # Membership rows do not cascade from the organization: a purge that skipped
+  # them would fail on the foreign key and leave the whole tenant behind.
+  @integration
+  Scenario: Rolling back a provisioned organization removes its memberships
+    Given a provisioned organization with a member of the organization and of its team
+    When the provisioned organization is purged
+    Then no organization membership or team membership of it remains
+    And the organization and its team are gone
+
   # ============================================================================
   # Read
   # ============================================================================

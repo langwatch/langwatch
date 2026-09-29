@@ -3,6 +3,7 @@ import {
   simulationCancelRunSchema,
   simulationDeleteRunSchema,
   simulationRecordAgentInstanceSchema,
+  simulationRecordCutAtLimitSchema,
   simulationFinishRunSchema,
   recordEvaluationsCommandDataSchema,
   simulationMessageSnapshotSchema,
@@ -22,6 +23,7 @@ import type {
   SimulationCancelRun,
   SimulationDeleteRun,
   SimulationRecordAgentInstance,
+  SimulationRecordCutAtLimit,
   SimulationExportFilterInput,
   SimulationExportRunsInput,
   SimulationExternalSetCountInput,
@@ -190,5 +192,9 @@ export class SimulationService extends SimulationServiceContract {
 
   recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void> {
     return this.execution.recordAgentInstance(simulationRecordAgentInstanceSchema.parse(input));
+  }
+
+  recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void> {
+    return this.execution.recordCutAtLimit(simulationRecordCutAtLimitSchema.parse(input));
   }
 }

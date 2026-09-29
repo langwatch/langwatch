@@ -45,19 +45,21 @@ Feature: Plan-limit and usage-warning notifications fire correctly
     Then the mail is graded Medium, reads 80%, and links to the usage settings
 
   @unit
-  Scenario: A usage warning below every threshold sends nothing
-    Given an organization at 10% of its monthly limit
-    When the usage-limit warning is checked
-    Then no mail goes out and nothing is recorded
+  Scenario: The usage warning lists each project's count as entitlement decided it
+    Given entitlement decided a warning with each project's count this month
+    When billing sends the usage-limit warning
+    Then the mail lists each named project with the decided count, 0 where none was counted
+    And billing counts no usage itself
+
   @unit
-  Scenario: The usage warning lists projects in the meter the caller resolved
-    Given an organization metered in events above a warning threshold
-    When the usage-limit warning is checked with the events meter
-    Then the mail lists each named project's billable events, not its traces
+  Scenario: A usage warning already sent this month is not sent again
+    Given the decided threshold was already warned about this month
+    When billing is asked to send the usage-limit warning
+    Then no mail goes out and nothing is recorded
 
   @unit
   Scenario: A usage warning for an organization that no longer exists sends nothing
     Given an organization that has been deleted
-    When the usage-limit warning is checked
-    Then nothing is sent and the check reports it was not sent
+    When billing is asked to send the usage-limit warning
+    Then nothing is sent and the send reports it was not sent
 

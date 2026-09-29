@@ -18,9 +18,14 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                  [-dry-run] [-keep] [-agent] [-no-haven]
                  [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
-                 [-no-fail-fast] [-resume RUNID] [-no-publish]
+                 [-no-fail-fast] [-resume RUNID] [-no-publish] [-include-done]
+                 [-rebase-main] [-force] [-max-load N] [-pages N]
 
+  visualdiff flow ID | route PATH [-edition E] [-candidate REF] [-force] [-dev-ui] [-dry-run] [-root DIR]
+  visualdiff down [-root DIR]
   visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E] [-root DIR]
+  visualdiff done -run RUNID (-route PATH | -flow ID) [-edition E] -note WHY [-force]
+  visualdiff done -list | -undo KEY
   visualdiff coverage [-base REF] [-candidate REF] [-config FILE] [-root DIR]
   visualdiff gc [-kept] [-no-haven] [-root DIR]
   visualdiff publish -run-dir DIR [-pr N] [-link URL] [-base REF] [-candidate REF] [-root DIR]
@@ -45,13 +50,32 @@ intended-restore and noise are reported and never fail it.
 
 Every screen is captured once per edition - enterprise (the seeded license)
 by default, and free (no license) with -editions enterprise,free - on the
-same stacks. The base's captures are cached
+same stacks. Without -base, the base is origin/main pinned at a commit kept
+in .visualdiff/baselines/main-pin.json; the pin moves once main has changed
+2000 lines since it, or on -rebase-main. The base's captures are cached
 under .visualdiff/baselines per base commit, edition and capture settings:
-a later run against the same base replays them and never boots the base.
+a later run replays them and never boots the base, and a run that adds or
+changes routes or flows renders only those on the base and adds them.
+
+A run refuses to start on battery, above -max-load, or beside another live
+or kept visualdiff stack; -force runs anyway. Each side captures on -pages
+pages, half the CPUs by default and fewer when the load leaves less free.
+A run keeps its own directory and the previous run's, and deletes older ones.
 The candidate is captured first, and a candidate whose shell does not render
 stops the run within its first three routes (-no-fail-fast to carry on).
 -resume RUNID continues a -keep run after a fix: its prepared worktrees and
 running stacks are reused, so nothing is checked out or installed again.
+A route with no finding and a flow judged works are recorded in
+.visualdiff/works.json at the candidate commit; a later run skips each while
+git diff since that commit is empty over its module (from the screens its
+web module declares), the shell packages and apps/ui, and a flow's steps are
+unchanged. -include-done, -routes and -flows walk everything named.
+
+flow ID and route PATH are the fix loop: they boot the candidate as a kept
+stack under .visualdiff/loop, or reuse it (its worktree follows the
+candidate's commit, re-preparing only what changed), run that one section
+against main's cached baseline, topping the cache up when it lacks it, and
+print its verdict. down stops the loop's stacks.
 A finished run shows its largest changes, new failures and key pages on the
 open pull request of the checked-out branch, in one comment it edits in place;
 -no-publish skips that, as does a missing PR or a gh that is not signed in.
@@ -68,9 +92,15 @@ publish shows a finished run's screens on a pull request after the fact:
 full report's address. It exits 0 when it published, 1 when it skipped and
 said why, 2 when it failed.
 
+done keeps a signed-off section's proof (screenshots, aria snapshots, console
+and request log, meta.json) under .visualdiff/done/<edition>/<key>, and every
+later run skips it; -include-done captures done sections anyway. A section
+with any class but noise, copy or intended-restore is refused without -force.
+
 coverage prints the same coverage verdict without booting anything. gc,
 which every run also does first, removes what dead runs left behind: their
-worktrees, haven stacks and databases, and every orphan visualdiff-* stack.
+worktrees, haven stacks and databases, and every orphan visualdiff-* stack;
+by hand, it removes run directories older than -older-than.
 A -keep run is left alone unless -kept is given.
 
 Exit status: 0 no findings, 1 findings, 2 the run could not be completed.
@@ -93,6 +123,12 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 		return gcCommand(ctx, args[1:], streams)
 	case "publish":
 		return publishCommand(ctx, args[1:], streams)
+	case "done":
+		return doneCommand(args[1:], streams)
+	case "flow", "route":
+		return loopCommand(ctx, args[0], args[1:], streams)
+	case "down":
+		return downCommand(ctx, args[1:], streams)
 	case "-h", "--help", "help":
 		fmt.Fprint(streams.Out, usage)
 		return ExitClean
@@ -106,17 +142,24 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 type runFlags struct {
 	options Options
 	config  *Config
+	// includeDone captures the done ledger's sections too; otherwise done
+	// is the ledger, read before the run starts.
+	includeDone bool
+	done        DoneLedger
 }
 
 func runCommand(ctx context.Context, args []string, streams Streams) int {
 	parsed, err := parseRunFlags(args, streams.Err)
+	if err == nil && !parsed.includeDone {
+		parsed.done, err = LoadDoneLedger(parsed.options.Root)
+	}
 	if err != nil {
 		if !errors.Is(err, errFlagsReported) {
 			fmt.Fprintln(streams.Err, "visualdiff:", err)
 		}
 		return ExitOperational
 	}
-	result, err := Execute(ctx, Request{Options: parsed.options, Config: parsed.config}, streams)
+	result, err := Execute(ctx, Request{Options: parsed.options, Config: parsed.config, Done: parsed.done}, streams)
 	if err != nil {
 		fmt.Fprintln(streams.Err, "visualdiff:", err)
 	}
@@ -161,7 +204,8 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	configPath := flags.String("config", "", "configuration file (default <root>/"+ConfigFile+")")
 	viewport := flags.String("viewport", "1440x900", "browser viewport, WIDTHxHEIGHT")
 	routesOnly := flags.Bool("routes-only", false, "capture the route list and skip the flows")
-	flowList := flags.String("flows", "", "comma-separated flow ids to run (default: all)")
+	flowList := flags.String("flows", "", "comma-separated flow ids to run; naming any route or flow runs only those")
+	routeList := flags.String("routes", "", "comma-separated routes to run, as configured; naming any route or flow runs only those")
 	basePort := flags.Int("base-port", DefaultBasePort, "first port of the base stack")
 	runDir := flags.String("run-dir", "", "directory for worktrees, logs, screenshots and the report")
 	bootTimeout := flags.Duration("boot-timeout", 20*time.Minute, "how long a stack gets to answer")
@@ -178,8 +222,13 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	refreshBaseline := flags.Bool("refresh-baseline", false, "render the base and replace its cached baseline")
 	noFailFast := flags.Bool("no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
 	resume := flags.String("resume", "", "continue a -keep run by id: reuse its worktrees and running stacks")
-	noPublish, devUI := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request"),
-		flags.Bool("dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI")
+	noPublish, devUI, includeDone := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request"),
+		flags.Bool("dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI"),
+		flags.Bool("include-done", false, "capture the sections the done ledger holds too")
+	rebaseMain := flags.Bool("rebase-main", false, "move the base's pin to -base as it is now, whatever it changed")
+	force := flags.Bool("force", false, "run on battery, under load or beside another visualdiff stack")
+	maxLoad := flags.Float64("max-load", DefaultMaxLoad, "refuse to start above this 1-minute load average")
+	pages := flags.Int("pages", 0, "pages each side captures on at once (default half the CPUs, fewer under load)")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
@@ -188,7 +237,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	if err != nil {
 		return nil, err
 	}
-	config, parsedViewport, err := loadRunConfig(flags, runConfigInputs{root: absoluteRoot, configPath: *configPath, flowList: *flowList, viewport: *viewport})
+	config, parsedViewport, err := loadRunConfig(flags, runConfigInputs{root: absoluteRoot, configPath: *configPath, routeList: *routeList, flowList: *flowList, viewport: *viewport})
 	if err != nil {
 		return nil, err
 	}
@@ -208,9 +257,11 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		},
 		Editions: editions, Baseline: !*noBaseline, RefreshBaseline: *refreshBaseline,
 		FailFast: !*noFailFast, NoPublish: *noPublish, DevUI: *devUI,
+		PinMain: !isFlagSet(flags, "base"), RebaseMain: *rebaseMain, Force: *force, MaxLoad: *maxLoad, Pages: *pages,
+		SkipWorks: !*includeDone && *routeList == "" && *flowList == "",
 	}
 	resumeRun(&options, *resume)
-	return &runFlags{options: options, config: config}, nil
+	return &runFlags{options: options, config: config, includeDone: *includeDone}, nil
 }
 
 // resumeRun points a run at the -keep run it continues, when one is named.
@@ -234,6 +285,7 @@ func runEditions(value string, noHaven bool) ([]Edition, error) {
 type runConfigInputs struct {
 	root       string
 	configPath string
+	routeList  string
 	flowList   string
 	viewport   string
 }
@@ -255,7 +307,7 @@ func loadRunConfig(flags *flag.FlagSet, inputs runConfigInputs) (*Config, Viewpo
 	if err != nil {
 		return nil, Viewport{}, err
 	}
-	config, err = config.SelectFlows(splitList(inputs.flowList))
+	config, err = config.Select(splitList(inputs.routeList), splitList(inputs.flowList))
 	if err != nil {
 		return nil, Viewport{}, err
 	}

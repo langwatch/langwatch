@@ -234,6 +234,14 @@ Feature: Reading a trace the way the drawer reads it
   # results, and a budget that shortens every turn before it drops one.
 
   @unit
+  Scenario: The conversation view reads like the chat view with one line naming the tools
+    Given a thread whose first turn called a tool twice and another once
+    When the thread is rendered in the conversation view
+    Then each turn holds its user message and reply
+    And the first turn carries one line naming the tools, a repeat counted
+    And no tool argument, result or model call is printed
+
+  @unit
   Scenario: A conversation turn lists its tool calls with their results
     Given a thread whose first turn called a tool that returned a price
     When the thread is rendered as a conversation
@@ -274,3 +282,11 @@ Feature: Reading a trace the way the drawer reads it
     Given a coding agent turn whose first model call is a title call on a small model
     When the thread is rendered as a conversation
     Then the turn heading names the model that wrote the most output first
+
+  @unit
+  Scenario: A Vercel AI SDK tool call is listed by its tool name with the result it recorded
+    Given a tool span that records its name and result only as ai.toolCall attributes
+    And a generateText span wrapping the model calls of the turn
+    When the turn's steps are extracted
+    Then the tool call is listed under its tool name with the recorded result
+    And the wrapping span is not listed as a model call

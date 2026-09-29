@@ -200,9 +200,10 @@ describe("Main API", () => {
       // Sort by string representation
       const sorted = [...ksuids].toSorted((a, b) => a.toString().localeCompare(b.toString()));
 
-      // Should be sorted by timestamp (KSUIDs are naturally sortable)
+      // Should be sorted by timestamp (KSUIDs are naturally sortable). Bounded
+      // by `sorted.length`, so both indices are in range by construction.
       for (let i = 1; i < sorted.length; i++) {
-        expect(sorted[i].timestamp).toBeGreaterThanOrEqual(sorted[i - 1].timestamp);
+        expect(sorted[i]!.timestamp).toBeGreaterThanOrEqual(sorted[i - 1]!.timestamp);
       }
     });
   });

@@ -27,6 +27,9 @@
       "path": "../../../packages/egress/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/managed-provider/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {

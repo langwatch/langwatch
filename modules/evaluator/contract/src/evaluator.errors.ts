@@ -3,7 +3,7 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 export class EvaluatorNotFoundError extends NotFoundError {
   declare readonly code: "evaluator_not_found";
   constructor(id: string) {
-    super("evaluator_not_found", "Evaluator", id);
+    super("evaluator_not_found", { resource: "Evaluator", id: id });
     this.name = "EvaluatorNotFoundError";
   }
 }
@@ -51,7 +51,7 @@ export class EvaluatorIsNotCopyError extends HandledError {
 export class EvaluatorSourceNotFoundError extends NotFoundError {
   declare readonly code: "evaluator_source_not_found";
   constructor(sourceEvaluatorId: string) {
-    super("evaluator_source_not_found", "Source evaluator", sourceEvaluatorId);
+    super("evaluator_source_not_found", { resource: "Source evaluator", id: sourceEvaluatorId });
     this.name = "EvaluatorSourceNotFoundError";
   }
 }

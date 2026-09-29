@@ -2675,7 +2675,7 @@ function catalogueApp(options: { allowed?: boolean; ported?: boolean } = {}): {
           },
           cache: {
             get: async (key: string) => entries.get(key)?.body ?? null,
-            set: async (key: string, tag: string, body: Uint8Array) => {
+            set: async ({ key, tag, body }: { key: string; tag: string; body: Uint8Array }) => {
               entries.set(key, { tag, body });
             },
             invalidateTag: async (tag: string) => {

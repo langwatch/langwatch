@@ -824,7 +824,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   /** Every request-supplied scope id must name something in the budget's own organization. */
-  private async assertScopeWithinOrganization(input: CreateBudgetInput): Promise<void> {
+  async assertScopeWithinOrganization(input: CreateBudgetInput): Promise<void> {
     // Cross-org guard for PRINCIPAL budgets: the named user must belong to
     // the budget's organization, or the FK to User would pass while the
     // budget silently never matched the user's traffic (PRINCIPAL spans only

@@ -482,10 +482,12 @@ jobs:
       - name: Cache TypeScript incremental build info
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
+          # One level per package: a `**` walks every node_modules symlink below
+          # it, and the save then outlives the job's timeout.
           path: |
-            packages/**/dist
-            modules/**/dist
-            enterprise/**/dist
+            packages/*/dist
+            modules/*/*/dist
+            enterprise/modules/*/*/dist
             apps/*/dist
           key: ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
@@ -501,8 +503,15 @@ jobs:
 
       # Not --no-bail: one package's failure should not hide the rest, and a
       # migration in flight tends to break several at once. The job still fails.
+      # Two passes. When a restored upstream dist is stale, tsc 7's build
+      # rebuilds that project but checks its dependants against the old
+      # declarations it already read, and reports errors a fresh run does not
+      # have. The first pass brings every dist up to date; the second is the
+      # verdict, and only re-checks the projects the first one failed.
       - name: Run typecheck (every workspace package)
-        run: pnpm run typecheck
+        run: |
+          pnpm run typecheck > /dev/null 2>&1 || echo "First pass failed; re-checking against the rebuilt declarations."
+          pnpm run typecheck
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -871,10 +880,17 @@ jobs:
       VITEST_ISOLATE_WORKER_REDIS: "1"
       CI: "true"
     runs-on: ubuntu-latest
-    # No shards: a hundred and fifty small suites, run one after another.
-    # Serial is not thrift — each suite is its own vitest with its own worker
+    # Serial within a leg: each suite is its own vitest with its own worker
     # pool, and several at once on a 4-core runner produce "[vitest-pool]:
     # Worker forks emitted error", which reads as a broken test and is not one.
+    # Parallel across legs: over two hundred package suites run one after
+    # another take well past two hours, so the list is split round-robin
+    # (PACKAGE_SUITES_SHARD) over separate runners.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    name: package-suites (${{ matrix.shard }}/8)
     #
     # It DOES have services. This job absorbed the datastore lane at the
     # deployment cutover: `test-integration` existed to shard the monolith's
@@ -949,10 +965,11 @@ jobs:
         # Node @clickhouse/client still sees ECONNREFUSED on its first
         # connect (IPv6/IPv4 dual-stack bind race under --network host).
         # Retry the whole migrate step a couple of times to absorb the
-        # cold-start window.
+        # cold-start window. BUILD_TIME is unset for this one command: the
+        # task reads it as "no datastore here" and returns without migrating.
         run: |
           for i in 1 2 3; do
-            if pnpm task clickhouse-migrate; then
+            if env -u BUILD_TIME pnpm task clickhouse-migrate; then
               exit 0
             fi
             if [ "$i" -lt 3 ]; then
@@ -977,6 +994,7 @@ jobs:
       - name: Run every workspace package suite
         env:
           REQUIRE_HELM_TESTS: "1"
+          PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
         run: node --experimental-strip-types .github/scripts/run-package-suites.ts
 
   lint:
@@ -1005,9 +1023,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # Oxlint's type-aware pass resolves every governed file's imports, so it
+      # needs every workspace project installed, not only the applications'.
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/platform-api... @langwatch/ui... @langwatch/architecture-enforcer..."
+          install: "all"
 
       # The ADR-076 workspace invariants: one lockfile, one workspace
       # definition, no member carrying overrides pnpm would ignore, the app and
@@ -1077,6 +1097,10 @@ jobs:
       #
       # `lint:oxlint` is the same binary, config and path set that `pnpm lint`
       # gives a contributor.
+      # The Prisma client, the generated SDK types and the built SDK dist are
+      # imports the type-aware rules resolve; without them they read as `any`.
+      - uses: ./.github/actions/prepare-generated-files
+
       - name: Oxlint (blocking -- config errors included)
         run: pnpm lint:oxlint
 

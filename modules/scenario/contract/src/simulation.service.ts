@@ -2,6 +2,7 @@ import type {
   SimulationCancelRun,
   SimulationDeleteRun,
   SimulationRecordAgentInstance,
+  SimulationRecordCutAtLimit,
   SimulationFinishRun,
   SimulationMessageSnapshot,
   SimulationQueueRun,
@@ -177,4 +178,5 @@ export abstract class SimulationService {
   abstract cancelRun(input: SimulationCancelRun): Promise<void>;
   abstract deleteRun(input: SimulationDeleteRun): Promise<void>;
   abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;
+  abstract recordCutAtLimit(input: SimulationRecordCutAtLimit): Promise<void>;
 }

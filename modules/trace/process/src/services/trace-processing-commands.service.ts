@@ -1,22 +1,29 @@
-import type { EventingCommands } from "@langwatch/eventing";
+import type { CommandEnvelope, EventingCommandSender } from "@langwatch/eventing";
 import {
   TraceCapabilityUnavailableError,
+  type AnnotationAddedEventData,
+  type AnnotationRemovedEventData,
   type AssignTopicCommandData,
   type LogTraceContribution,
   type RecordMetricCorrelationCommandData,
   type RecordSpanCommandData,
   type ResolveOriginCommandData,
+  type TraceNameChangedEventData,
 } from "@langwatch/trace-contract";
 
-import type {
-  TraceProcessingCommands,
-  TraceProcessingPipelineDefinition,
-} from "../app/trace.members.ts";
+import type { TraceProcessingCommands } from "../app/trace.members.ts";
 
-type TraceProcessingSenders = EventingCommands<TraceProcessingPipelineDefinition>;
-type Payload<Name extends keyof TraceProcessingSenders> = Parameters<
-  TraceProcessingSenders[Name]["send"]
->[0];
+/** The trace_processing command senders this service dispatches through, and nothing else. */
+export type TraceProcessingSenders = Readonly<{
+  recordSpan: EventingCommandSender<RecordSpanCommandData>;
+  changeTraceName: EventingCommandSender<TraceNameChangedEventData & CommandEnvelope>;
+  addAnnotation: EventingCommandSender<AnnotationAddedEventData & CommandEnvelope>;
+  removeAnnotation: EventingCommandSender<AnnotationRemovedEventData & CommandEnvelope>;
+  assignTopic: EventingCommandSender<AssignTopicCommandData>;
+  resolveOrigin: EventingCommandSender<ResolveOriginCommandData>;
+  recordLogContribution: EventingCommandSender<LogTraceContribution>;
+  recordMetricCorrelation: EventingCommandSender<RecordMetricCorrelationCommandData>;
+}>;
 
 /** trace_processing's senders, bound on connect; unbound, each refuses by name. */
 export class TraceProcessingCommandsService implements TraceProcessingCommands {
@@ -36,15 +43,15 @@ export class TraceProcessingCommandsService implements TraceProcessingCommands {
     await this.#connected("recordSpan").recordSpan.send(data);
   }
 
-  async changeTraceName(data: Payload<"changeTraceName">): Promise<void> {
+  async changeTraceName(data: TraceNameChangedEventData & CommandEnvelope): Promise<void> {
     await this.#connected("changeTraceName").changeTraceName.send(data);
   }
 
-  async addAnnotation(data: Payload<"addAnnotation">): Promise<void> {
+  async addAnnotation(data: AnnotationAddedEventData & CommandEnvelope): Promise<void> {
     await this.#connected("addAnnotation").addAnnotation.send(data);
   }
 
-  async removeAnnotation(data: Payload<"removeAnnotation">): Promise<void> {
+  async removeAnnotation(data: AnnotationRemovedEventData & CommandEnvelope): Promise<void> {
     await this.#connected("removeAnnotation").removeAnnotation.send(data);
   }
 

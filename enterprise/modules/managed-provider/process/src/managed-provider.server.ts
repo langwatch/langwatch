@@ -1,5 +1,4 @@
 import { defineServerModule } from "@langwatch/kernel";
-import type { ProjectApi } from "@langwatch/project-contract";
 
 import { ManagedProviderApp } from "./app/managed-provider.app.ts";
 import type { ManagedProviderCredentialVendor } from "./channels/managed-provider-credentials.channel.ts";
@@ -13,7 +12,6 @@ export const managedProviderServer = defineServerModule("managed-provider")
 /** The managed-provider capability, over the ports this process composed. */
 export function createManagedProviderService(options: {
   configuration: ManagedProviderConfiguration;
-  projects: ProjectApi;
   credentials: ManagedProviderCredentialVendor;
 }): ManagedProviderService {
   return ManagedProviderService.create(options);

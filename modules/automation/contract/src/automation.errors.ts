@@ -183,7 +183,11 @@ export class AutomationNotInProjectError extends NotFoundError {
   declare readonly code: "automation_not_found";
 
   constructor(triggerId: string, projectId: string) {
-    super("automation_not_found", "Automation", triggerId, { meta: { projectId } });
+    super(
+      "automation_not_found",
+      { resource: "Automation", id: triggerId },
+      { meta: { projectId } },
+    );
     this.name = "AutomationNotInProjectError";
   }
 }
@@ -193,7 +197,7 @@ export class GraphNotInProjectError extends NotFoundError {
   declare readonly code: "graph_not_found";
 
   constructor(customGraphId: string, projectId: string) {
-    super("graph_not_found", "Graph", customGraphId, { meta: { projectId } });
+    super("graph_not_found", { resource: "Graph", id: customGraphId }, { meta: { projectId } });
     this.name = "GraphNotInProjectError";
   }
 }

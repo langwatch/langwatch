@@ -3,6 +3,9 @@ import {
   type Span,
   type Trace,
   type TraceLegacyListInput,
+  type TraceSummaryListOptions,
+  type TraceSummaryListQuery,
+  type TraceSummaryPage,
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
 
@@ -28,6 +31,13 @@ export class TraceContentReadService extends TraceContentReadContract {
     };
   }): Promise<TracesForProjectResult> {
     return this.read.getAllTracesForProject(input.query, input.protections, input.options);
+  }
+
+  listTraceSummaries(input: {
+    query: TraceSummaryListQuery;
+    options?: TraceSummaryListOptions;
+  }): Promise<TraceSummaryPage> {
+    return this.read.listTraceSummaries(input.query, input.options);
   }
 
   findTrace(input: {

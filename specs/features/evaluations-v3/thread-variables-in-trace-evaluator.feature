@@ -111,5 +111,5 @@ Feature: Thread variables available in trace-level evaluator input mapping
   Scenario: The formatted_traces source is the thread transcript under the judge's budget
     Given a trace-level evaluator with "conversation" mapped to "thread.formatted_traces"
     When the thread's traces are resolved into the mapping
-    Then the value is one transcript of the thread in time order with each turn's tool calls
+    Then the value is the steps view of the thread in time order, each turn with its tool calls and results
     And it is rendered under the thread digest budget, so a long thread is shortened rather than skipped

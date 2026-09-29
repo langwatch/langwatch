@@ -337,9 +337,8 @@ export abstract class ModelProviderRateLimit {
 }
 
 /**
- * Whether LangWatch itself supplies a provider's credentials, and with what. The managed-provider
- * vertical is Enterprise and this package is not, so a composition root that has that service
- * must pass it — absent, every provider reads as the customer's own, wrong for one that isn't.
+ * Whether LangWatch itself supplies a provider's credentials, and with what. The app answers it
+ * from the managed-provider peer; the unmanaged stand-in serves only a runtime composed without it.
  */
 export abstract class ModelProviderManagedGateway {
   abstract isManaged(input: { organizationId: string; provider: string }): boolean;

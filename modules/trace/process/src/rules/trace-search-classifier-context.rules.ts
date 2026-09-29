@@ -49,14 +49,14 @@ export function buildRouteQuestion({
           {
             name: "instant_eval",
             description:
-              "Finding the traces needs reading each one and judging its content (a tone, a language, a promise made, a topic discussed), and no listed evaluator or event already records it.",
+              "Finding the traces needs reading each one and judging what was said or what the agent did (a tone, a language, a promise made, a topic discussed, a tool called with a wrong value, a claim no tool result backs, tests not re-run, a cache miss), and no listed evaluator or event already records it.",
           },
         ]
       : []),
     {
       name: "free_text",
       description:
-        "The sentence is a literal string to look for in the traces: an id, an error message, a product name, a quoted phrase.",
+        "The sentence is a literal string to look for in the traces: an id, an error message, a product name, a quoted phrase. A description of something that happened is not a literal string.",
     },
     ...(isLangyAvailable
       ? [

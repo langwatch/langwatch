@@ -36,6 +36,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   type GatewayBudgetRepository,
   type ArchiveBudgetInput,
+  type BucketBoundaryRow,
   type BudgetCheckInput,
   type BudgetCheckResult,
   type BudgetListWithHealth,
@@ -236,6 +237,8 @@ export class GatewayService {
     const parsed = createGatewayBudgetInputSchema.parse(input);
     assertOrganizationScopeIsOwn(parsed);
     await this.assertProjectScopesBelongToOrganization(parsed);
+    // Ownership before reach: a scope from another tenant is refused as that, never as unreachable.
+    await this.repository.assertScopeWithinOrganization(parsed);
     await this.assertScopeIsReachable(parsed);
 
     return this.repository.create(parsed);
@@ -255,6 +258,14 @@ export class GatewayService {
 
   resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]> {
     return this.repository.resolveApplicableBudgets(input);
+  }
+
+  /** When each of these budgets' buckets last rolled over, for a boundary-aware spend read. */
+  findBucketBoundaries(input: {
+    organizationId: string;
+    budgetIds: string[];
+  }): Promise<BucketBoundaryRow[]> {
+    return this.repository.findBucketBoundaries(input);
   }
 
   async resolveScopeTargets(

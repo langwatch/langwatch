@@ -283,7 +283,7 @@ describe.skipIf(!DB_URL)("given the worker records spans for a project", () => {
       where: { team: { organizationId: { in: organizationIds } } },
     });
     await prisma.team.deleteMany({ where: { organizationId: { in: organizationIds } } });
-    await prisma.organization.deleteMany({ where });
+    await prisma.organization.deleteMany({ where: { id: { in: organizationIds } } });
     await prisma.$disconnect();
   });
 

@@ -161,6 +161,7 @@ describe("the tasks process installation", () => {
         "process-manager-purge",
         "stalled-runs-backfill",
         "topic-clustering-run",
+        "user-data-erase",
       ]);
     } finally {
       await runtime.stop();

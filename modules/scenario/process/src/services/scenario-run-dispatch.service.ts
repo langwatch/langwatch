@@ -60,4 +60,10 @@ export class ScenarioRunDispatchService extends ScenarioExecutionService {
       new Error("Recording the serving agent instance is not reached through run dispatch."),
     );
   }
+
+  recordCutAtLimit(): Promise<never> {
+    return Promise.reject(
+      new Error("Recording a run cut at the call limit is not reached through run dispatch."),
+    );
+  }
 }

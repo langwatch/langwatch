@@ -13,6 +13,9 @@ import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
+  TraceSummaryListOptions,
+  TraceSummaryListQuery,
+  TraceSummaryPage,
 } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 
@@ -311,6 +314,14 @@ export class TraceLegacyReadService {
       },
     );
   };
+
+  /** The list read's keyset page as bare summaries: the store's read, no enrichment. */
+  listTraceSummaries(
+    query: TraceSummaryListQuery,
+    options?: TraceSummaryListOptions,
+  ): Promise<TraceSummaryPage> {
+    return this.clickHouseService.findTraceSummaries(query, options);
+  }
 
   async getEvaluationsMultiple(
     projectId: string,

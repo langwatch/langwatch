@@ -20,8 +20,8 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
+import type { EvaluationProcessingPipeline } from "../../eventing/evaluation-processing-definition.pipeline.ts";
 import { EvaluationCommandDispatcherService } from "../../services/evaluation-command-dispatcher.service.ts";
-import type { EvaluationProcessingPipeline } from "../../services/evaluation-processing.service.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
 async function installed() {

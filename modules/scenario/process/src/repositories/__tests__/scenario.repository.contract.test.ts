@@ -12,8 +12,9 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, toDate } from "@langwatch/time";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
 import { PrismaScenarioRepository } from "../prisma/scenario.repository.ts";
@@ -192,16 +193,42 @@ function database(): PrismaClient {
 }
 
 describe.skipIf(!databaseUrl)("given the Postgres Scenario repository", () => {
-  const written: string[] = [];
+  // A scenario row needs a real project behind it.
+  const owner = `scenario-contract-${randomUUID()}`;
 
-  function tracked(): ScenarioRepository {
-    return PrismaScenarioRepository.create(database());
-  }
+  beforeAll(async () => {
+    const organization = await database().organization.create({
+      data: { id: owner, name: owner, slug: owner },
+    });
+    const team = await database().team.create({
+      data: { id: owner, name: owner, slug: owner, organizationId: organization.id },
+    });
+    await database().project.upsert({
+      where: { id: PROJECT_ID },
+      create: {
+        id: PROJECT_ID,
+        name: owner,
+        slug: owner,
+        apiKey: owner,
+        teamId: team.id,
+        language: "typescript",
+        framework: "other",
+      },
+      update: { teamId: team.id },
+    });
+  });
 
   afterAll(async () => {
-    await database().scenario.deleteMany({ where: { id: { in: written } } });
+    await cleanupTestRows(database(), [
+      ["scenarioVersion", { projectId: PROJECT_ID }],
+      ["scenario", { projectId: PROJECT_ID }],
+      ["simulationSuite", { projectId: PROJECT_ID }],
+      ["project", { id: PROJECT_ID }],
+      ["team", { id: owner }],
+      ["organization", { id: owner }],
+    ]);
     await connection?.closeOnce();
   });
 
-  contractCases({ repository: tracked });
+  contractCases({ repository: () => PrismaScenarioRepository.create(database()) });
 });

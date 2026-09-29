@@ -1,4 +1,5 @@
-import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules.ts";
+import type { NurturingService } from "../services/nurturing.service.ts";
+import { reportFailure } from "./nurturing-sink-registry-service.rules.ts";
 
 /**
  * Fires when a project's first real trace arrives — Langy's own turns and
@@ -7,19 +8,20 @@ import { findSink, reportFailure } from "./nurturing-sink-registry-service.rules
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 export function fireFirstTraceIntegrated({
+  nurturing,
   userId,
   projectId,
   sdkLanguage,
   sdkFramework,
   traceOccurredAt,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   projectId: string;
   sdkLanguage: string;
   sdkFramework: string;
   traceOccurredAt: string;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }
@@ -51,13 +53,14 @@ export function fireFirstTraceIntegrated({
 
 /** A later trace from a project that already sent its first — updates the freshness trait only. */
 export function identifySubsequentTrace({
+  nurturing,
   userId,
   traceOccurredAt,
 }: {
+  nurturing: NurturingService | undefined;
   userId: string;
   traceOccurredAt: string;
 }): void {
-  const nurturing = findSink();
   if (!nurturing) {
     return;
   }

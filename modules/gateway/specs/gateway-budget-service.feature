@@ -41,3 +41,15 @@ Feature: Gateway budget decision service
     Given a budget whose organisation has no projects
     When its detail reads the recent ledger and its spend
     Then each read answers empty without sending a statement
+
+  @integration
+  Scenario: A budget listing carries each row's scope reach
+    Given a page of budgets, one of which no active key can reach
+    When the budget list is answered
+    Then each row carries scope_reach from the same per-row reach read the detail route uses
+
+  @integration
+  Scenario: A budget reset answers with the row it moved, carrying no reach read
+    Given a budget whose period is reset
+    When the reset answers with the row it moved
+    Then the answer carries no scope_reach field

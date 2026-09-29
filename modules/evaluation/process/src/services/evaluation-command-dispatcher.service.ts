@@ -6,7 +6,7 @@ import type { EventingCommands, QueueSendOptions } from "@langwatch/eventing";
 
 import type { EvaluationReport } from "../app/evaluation.members.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
-import type { EvaluationProcessingPipeline } from "./evaluation-processing.service.ts";
+import type { EvaluationProcessingPipeline } from "../eventing/evaluation-processing-definition.pipeline.ts";
 
 /** Main's trace-trigger dedup: outlasts trace's 5-minute deferred origin window by a minute. */
 const TRACE_EVALUATION_DEDUP_TTL_MS = 6 * 60 * 1000;

@@ -105,6 +105,19 @@ export class VirtualKeyNotFoundError extends HandledError {
   }
 }
 
+/** A revoked virtual key cannot be rotated: revocation is terminal, no secret left to roll. */
+export class VirtualKeyRevokedError extends HandledError {
+  declare readonly code: "bad_request";
+
+  constructor(message: string) {
+    super("bad_request", message, {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "VirtualKeyRevokedError";
+  }
+}
+
 /**
  * Expiration date already passed; rejected at write-time to point users at
  * the field on screen.

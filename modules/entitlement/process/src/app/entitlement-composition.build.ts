@@ -26,62 +26,92 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
+import { findCrossedUsageThreshold } from "../rules/usage-warning-thresholds.rules.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { UsageService } from "../services/usage-enforcement.service.ts";
-import { UsageWarningSweepService } from "../services/usage-warning-sweep.service.ts";
+import {
+  type CountedUsageReading,
+  UsageWarningSweepService,
+} from "../services/usage-warning-sweep.service.ts";
 import type { EntitlementInfrastructure } from "./entitlement.app.ts";
-import { InProcessUsageCache, type UsageWarning } from "./entitlement.members.ts";
+import { InProcessUsageCache, USAGE_UNKNOWN, type UsageWarning } from "./entitlement.members.ts";
 
-/** The approaching-limit mail, in the organization's own meter, sent by billing. */
+/** The approaching-limit mail: entitlement decides the threshold and counts; billing sends. */
 class BillingUsageWarning implements UsageWarning {
   static create(input: {
-    billing: Pick<BillingApi, "checkAndSendUsageWarning">;
+    billing: Pick<BillingApi, "sendUsageWarning">;
     counter: UsageService;
     plans: EntitlementService;
     peers: EntitlementUsagePeers;
     isSaas: boolean;
     logger: Logger;
   }): BillingUsageWarning {
-    return new BillingUsageWarning(input.billing, input.counter, (send) =>
-      UsageWarningSweepService.create({
-        isSaas: input.isSaas,
-        logger: input.logger,
-        organizationIds: () => input.peers.organizations.findAllIds(),
-        projectIds: (organizationId) =>
-          input.peers.projects.listIdsByOrganization({ organizationId }),
-        currentMonthCount: (organizationId) =>
-          input.counter.getCurrentMonthCount({ organizationId }),
-        activePlan: (organizationId) => input.plans.getActivePlan({ organizationId }),
-        send,
-      }),
-    );
+    const projectIds = (organizationId: string) =>
+      input.peers.projects.listIdsByOrganization({ organizationId });
+    return new BillingUsageWarning({
+      billing: input.billing,
+      counter: input.counter,
+      projectIds,
+      sweep: (send) =>
+        UsageWarningSweepService.create({
+          isSaas: input.isSaas,
+          logger: input.logger,
+          organizationIds: () => input.peers.organizations.findAllIds(),
+          projectIds,
+          countByProjects: (counted) => input.counter.getCurrentMonthCountByProjects(counted),
+          activePlan: (organizationId) => input.plans.getActivePlan({ organizationId }),
+          send,
+        }),
+    });
   }
 
   readonly #sweep: UsageWarningSweepService;
+  private readonly billing: Pick<BillingApi, "sendUsageWarning">;
+  private readonly counter: UsageService;
+  private readonly projectIds: (organizationId: string) => Promise<string[]>;
 
-  private constructor(
-    private readonly billing: Pick<BillingApi, "checkAndSendUsageWarning">,
-    private readonly counter: UsageService,
-    sweep: (send: UsageWarning["sendWarning"]) => UsageWarningSweepService,
-  ) {
-    this.#sweep = sweep((input) => this.sendWarning(input));
+  private constructor(input: {
+    billing: Pick<BillingApi, "sendUsageWarning">;
+    counter: UsageService;
+    projectIds: (organizationId: string) => Promise<string[]>;
+    sweep: (
+      send: (input: CountedUsageReading) => Promise<UsageLimitWarning>,
+    ) => UsageWarningSweepService;
+  }) {
+    this.billing = input.billing;
+    this.counter = input.counter;
+    this.projectIds = input.projectIds;
+    this.#sweep = input.sweep((reading) => this.decide(reading));
   }
 
+  /** A caller's reading: counted per project only once a threshold is crossed. */
   async sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
-    const meter = await this.counter.getResolvedUsageUnit({ organizationId: input.organizationId });
-    const { sent, notificationId, sentAt } = await this.billing.checkAndSendUsageWarning({
+    if (findCrossedUsageThreshold(input) === undefined) return { sent: false };
+    const { organizationId } = input;
+    const projectCounts = await this.counter.getCountByProjects({
+      organizationId,
+      projectIds: await this.projectIds(organizationId),
+    });
+    if (projectCounts === USAGE_UNKNOWN) return { sent: false };
+    return this.decide({ ...input, projectCounts });
+  }
+
+  sweep(): Promise<void> {
+    return this.#sweep.sweep();
+  }
+
+  private async decide(input: CountedUsageReading): Promise<UsageLimitWarning> {
+    const crossedThreshold = findCrossedUsageThreshold(input);
+    if (crossedThreshold === undefined) return { sent: false };
+    const { sent, notificationId, sentAt } = await this.billing.sendUsageWarning({
       ...input,
-      meter,
+      crossedThreshold,
     });
     return {
       sent,
       ...(notificationId === undefined ? {} : { notificationId }),
       ...(sentAt === undefined ? {} : { sentAt: toDate(sentAt) }),
     };
-  }
-
-  sweep(): Promise<void> {
-    return this.#sweep.sweep();
   }
 }
 
@@ -184,7 +214,7 @@ export type EntitlementUsagePeers = Readonly<{
   traces: Pick<TraceApi, "countTracesByProjects">;
   billing: Pick<
     BillingApi,
-    "countBillableEventsByProjects" | "getPricingModel" | "checkAndSendUsageWarning"
+    "countBillableEventsByProjects" | "getPricingModel" | "sendUsageWarning"
   >;
   organizations: Pick<OrganizationApi, "getOrganizationIdByTeamId" | "findAllIds">;
   projects: Pick<ProjectApi, "listIdsByOrganization">;

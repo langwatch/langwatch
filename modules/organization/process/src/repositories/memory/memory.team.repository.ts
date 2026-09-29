@@ -194,11 +194,33 @@ export class MemoryTeamRepository extends TeamRepository {
     return input.organizationIds.filter((organizationId) => member.has(organizationId));
   }
 
-  async fenceMembershipChange(input: {
+  private readonly membershipLocks = new Map<string, Promise<unknown>>();
+
+  fenceMembershipChange(input: {
     teamId: string;
     organizationId: string;
     expectedUpdatedAt: Instant;
     name?: string;
+    change: () => Promise<void>;
+  }): Promise<OrganizationTeam> {
+    const previous = this.membershipLocks.get(input.teamId) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(() => this.fencedChange(input));
+    this.membershipLocks.set(input.teamId, next);
+    void next
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.membershipLocks.get(input.teamId) === next)
+          this.membershipLocks.delete(input.teamId);
+      });
+    return next;
+  }
+
+  private async fencedChange(input: {
+    teamId: string;
+    organizationId: string;
+    expectedUpdatedAt: Instant;
+    name?: string;
+    change: () => Promise<void>;
   }): Promise<OrganizationTeam> {
     const row = this.memory.teams.get(input.teamId);
     if (!row || row.organizationId !== input.organizationId || row.archivedAt) {
@@ -207,8 +229,15 @@ export class MemoryTeamRepository extends TeamRepository {
     if (row.updatedAt.epochMilliseconds !== input.expectedUpdatedAt.epochMilliseconds) {
       throw new TeamMembershipChangedError(input.teamId);
     }
+    const before = { name: row.name, updatedAt: row.updatedAt };
     if (input.name !== undefined) row.name = input.name;
     row.updatedAt = nowInstant();
+    try {
+      await input.change();
+    } catch (error) {
+      Object.assign(row, before);
+      throw error;
+    }
     return toOrganizationTeam(row);
   }
 

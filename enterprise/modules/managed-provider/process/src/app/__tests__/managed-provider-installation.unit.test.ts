@@ -5,19 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import { ManagedProviderApp } from "../managed-provider.app.ts";
 
-/** A peer the boot resolves and no assertion here calls. */
-function peer(name: string): never {
-  return new Proxy(
-    {},
-    {
-      get(_target, property) {
-        if (typeof property === "symbol") return undefined;
-        throw new Error(`The ${name} peer was called for "${String(property)}".`);
-      },
-    },
-  ) as never;
-}
-
 const DEPLOYMENT = {
   proxyRoleArn: "proxy",
   bedrockRoleArn: "customer",
@@ -41,7 +28,7 @@ function install(environment: Record<string, string | undefined>) {
     config: void 0,
     resources: new ResourceScope(),
     secrets: secretsFrom(environment),
-    dependencies: { projects: peer("project") },
+    dependencies: {},
   });
 }
 

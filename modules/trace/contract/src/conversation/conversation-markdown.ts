@@ -3,8 +3,10 @@ import { extractSystemText } from "../transcript/transcript-text-extraction.ts";
 import {
   clipKeepingEnds,
   type ConversationDetail,
+  type ConversationView,
   FULL_CONVERSATION_DETAIL,
   renderConversationSteps,
+  renderToolLine,
 } from "./conversation-steps.ts";
 import type { ConversationTurnSource, ParsedTurn } from "./parsed-turns.ts";
 
@@ -30,11 +32,13 @@ export function buildConversationMarkdownChunks({
   conversationId,
   turns,
   detail = FULL_CONVERSATION_DETAIL,
+  view = "conversation",
 }: {
   conversationId: string;
   turns: ParsedTurn<ConversationTurnSource>[];
   /** How much of each turn's text and steps to keep; a budgeted render lowers it. */
   detail?: ConversationDetail;
+  view?: ConversationView;
 }): ConversationMarkdownChunk[] {
   const chunks: ConversationMarkdownChunk[] = [
     { id: "header", markdown: conversationHeader({ conversationId, turns }) },
@@ -57,7 +61,7 @@ export function buildConversationMarkdownChunks({
   }
 
   for (let i = 0; i < turns.length; i++) {
-    chunks.push(...turnChunks({ parsed: turns[i]!, turnNumber: i + 1, detail }));
+    chunks.push(...turnChunks({ parsed: turns[i]!, turnNumber: i + 1, detail, view }));
   }
 
   return chunks;
@@ -98,10 +102,12 @@ function turnChunks({
   parsed,
   turnNumber,
   detail,
+  view,
 }: {
   parsed: ParsedTurn<ConversationTurnSource>;
   turnNumber: number;
   detail: ConversationDetail;
+  view: ConversationView;
 }): ConversationMarkdownChunk[] {
   const { turn } = parsed;
   const model = turn.models[0] ? turn.models[0] : "—";
@@ -118,7 +124,10 @@ function turnChunks({
   if (user) {
     chunks.push({ id: `turn-${turnNumber}-user`, turnNumber, markdown: user });
   }
-  const steps = renderConversationSteps({ steps: turn.steps ?? [], detail });
+  const steps =
+    view === "steps"
+      ? renderConversationSteps({ steps: turn.steps ?? [], detail })
+      : renderToolLine({ steps: turn.steps ?? [] });
   if (steps) {
     chunks.push({ id: `turn-${turnNumber}-steps`, turnNumber, markdown: steps });
   }

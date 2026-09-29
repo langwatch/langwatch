@@ -20,6 +20,7 @@ import type {
 import { writeGatewayDebitsSchema } from "../../eventing/gateway-debit.intent.ts";
 import { GatewayBudgetChangeDedupeRepository } from "../../repositories/gateway-budget-change-dedupe.repository.ts";
 import { GatewayBudgetChangeDedupeService } from "../gateway-budget-change-dedupe.service.ts";
+import type { GatewayBudgetCrossingService } from "../gateway-budget-crossing.service.ts";
 import { GatewaySpendDebitService } from "../gateway-spend-debit.service.ts";
 import type { GatewayService } from "../gateway.service.ts";
 
@@ -93,6 +94,29 @@ class RecordingLedger implements Pick<GatewayBudgetSpend, "insertDebitsForBudget
   }
 }
 
+/** Records each detection after the ledger's rows, so the order is observable. */
+class RecordingCrossings implements Pick<GatewayBudgetCrossingService, "detect"> {
+  readonly detected: { tenantId: string; budgetIds: string[] }[] = [];
+
+  constructor(
+    private readonly ledger: RecordingLedger,
+    private readonly refusal?: Error,
+  ) {}
+
+  async detect(input: {
+    tenantId: string;
+    organizationId: string;
+    budgets: GatewayResolvedBudget[];
+  }): Promise<void> {
+    if (this.ledger.batches.length === 0) throw new Error("detected before the debit landed");
+    if (this.refusal) throw this.refusal;
+    this.detected.push({
+      tenantId: input.tenantId,
+      budgetIds: input.budgets.map(({ budget }) => budget.id),
+    });
+  }
+}
+
 class RecordingChanges implements Pick<GatewayChangeEvents, "append"> {
   readonly appended: AppendGatewayChangeEventInput[] = [];
 
@@ -143,21 +167,25 @@ function harness({
   budgets,
   windows = new MemoryDedupeWindows(),
   refusal,
+  detectionRefusal,
 }: {
   budgets: GatewayResolvedBudget[];
   windows?: GatewayBudgetChangeDedupeRepository | null;
   refusal?: Error;
+  detectionRefusal?: Error;
 }) {
   const resolver = new StaticBudgets(budgets);
   const ledger = new RecordingLedger(refusal);
   const changes = new RecordingChanges();
+  const crossings = new RecordingCrossings(ledger, detectionRefusal);
   const debits = GatewaySpendDebitService.create({
     budgets: resolver,
     spend: ledger,
     dedupe: GatewayBudgetChangeDedupeService.create(windows),
     changes,
+    crossings,
   });
-  return { debits, resolver, ledger, changes };
+  return { debits, resolver, ledger, changes, crossings };
 }
 
 describe("GatewaySpendDebitService", () => {
@@ -268,6 +296,37 @@ describe("GatewaySpendDebitService", () => {
       const { debits, changes } = harness({ budgets: [resolved({ id: "b" })], refusal });
 
       await expect(debits.write(payload())).rejects.toBe(refusal);
+      expect(changes.appended).toEqual([]);
+    });
+  });
+
+  describe("given the debit landed", () => {
+    /** @scenario "A crossing is detected after the debit lands" */
+    it("runs crossing detection over the debited budgets once the rows are written", async () => {
+      const { debits, crossings } = harness({
+        budgets: [
+          resolved({ id: "any" }),
+          resolved({ id: "anthropic-only", providerKey: "anthropic" }),
+        ],
+      });
+
+      await debits.write(payload());
+
+      expect(crossings.detected).toEqual([{ tenantId: "project-1", budgetIds: ["any"] }]);
+    });
+  });
+
+  describe("given crossing detection fails after the debit landed", () => {
+    /** @scenario "A failed crossing read re-drives the debit" */
+    it("fails the write so the outbox re-drives it, and announces nothing yet", async () => {
+      const refusal = new Error("clickhouse read timed out");
+      const { debits, ledger, changes } = harness({
+        budgets: [resolved({ id: "b" })],
+        detectionRefusal: refusal,
+      });
+
+      await expect(debits.write(payload())).rejects.toBe(refusal);
+      expect(ledger.batches).toHaveLength(1);
       expect(changes.appended).toEqual([]);
     });
   });

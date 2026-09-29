@@ -28,7 +28,7 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
   {
     name: "conversation",
     description:
-      "The whole thread as one markdown transcript, the way the trace drawer renders it: the system prompt once, then one section per turn, with a marker where content was redacted.",
+      "The whole thread as one markdown transcript that reads like the chat view: the system prompt once, then each turn's user message and reply, with one line naming the tools the turn used. For questions about what was said; `llm_readable_thread` holds what the agent did.",
     parameters: [LWQL_THREAD_KEY_PARAMETER],
     keyKind: "thread",
     returns: "Nullable(String)",
@@ -44,7 +44,7 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
   {
     name: "conversation_bounded",
     description:
-      "The same transcript under a token budget: the opening and closing turns are kept and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
+      "The same transcript under a token budget: every turn is shortened before one is dropped, and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
     parameters: [
       LWQL_THREAD_KEY_PARAMETER,
       {
@@ -70,6 +70,30 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
         database,
         call: `conversation_bounded(ConversationId, ${LWQL_DEFAULT_BUDGET_TOKENS}, '')`,
         alias: "transcript",
+      }),
+  },
+  {
+    name: "llm_readable_thread",
+    description:
+      "The thread as the thread evaluators read it: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), under a token budget. For questions about what the agent did; `conversation` holds what was said.",
+    parameters: [
+      LWQL_THREAD_KEY_PARAMETER,
+      {
+        name: "max_tokens",
+        role: "option",
+        type: "number",
+        description: "Token budget for the rendered thread, estimated as bytes over four.",
+      },
+    ],
+    keyKind: "thread",
+    returns: "Nullable(String)",
+    encoding: "text",
+    gates: ["input", "output"],
+    example: (database) =>
+      lwqlThreadExample({
+        database,
+        call: `llm_readable_thread(ConversationId, ${LWQL_DEFAULT_BUDGET_TOKENS})`,
+        alias: "text",
       }),
   },
   {

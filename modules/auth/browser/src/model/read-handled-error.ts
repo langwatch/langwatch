@@ -56,7 +56,7 @@ function safeTips(value: unknown): readonly string[] {
  */
 export function readHandledError(error: unknown): AuthHandledError | null {
   const candidate = (error as { data?: { error?: unknown } } | null)?.data?.error;
-  if (!isRecord(candidate)) return null;
+  if (!isRecord(candidate)) return fromRestBody(error);
 
   const code = errorCandidateCode(candidate);
   if (code === null) return null;
@@ -135,3 +135,24 @@ const MACHINE_PROSE = new RegExp(
     "\\b(?:invocation|constraint failed|deadlock detected)\\b",
   ].join("|"),
 );
+
+/** A handled code as the registry spells one: lower snake case, never a library's SHOUTED code. */
+const HANDLED_CODE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/;
+
+/**
+ * The flat body a REST boundary sends (`{ error: "<code>" }`), as Better Auth's client and the
+ * passkey failures hand it back. The status lives on the response, so it is read when stamped.
+ */
+function fromRestBody(error: unknown): AuthHandledError | null {
+  if (!isRecord(error)) return null;
+  const code = error.error;
+  if (typeof code !== "string" || !HANDLED_CODE.test(code)) return null;
+  const status = typeof error.httpStatus === "number" ? error.httpStatus : error.status;
+  return {
+    code,
+    httpStatus: typeof status === "number" ? status : 0,
+    meta: {},
+    tips: safeTips(error.tips),
+    traceId: undefined,
+  };
+}

@@ -12,6 +12,7 @@ import {
 import {
   registerNoNurturingSink,
   registerNurturingSink,
+  wiring,
   settle,
 } from "./support/nurturing-harness.ts";
 
@@ -49,6 +50,7 @@ describe("fireIntegrationMethod", () => {
         const sink = registerNurturingSink({ hanging: true });
 
         const answer = fireIntegrationMethod({
+          ...wiring(),
           userId: "user-1",
           integrationMethod: "platform",
         });
@@ -69,10 +71,7 @@ describe("fireIntegrationMethod", () => {
         const sink = registerNurturingSink({ failing: true });
 
         expect(() =>
-          fireIntegrationMethod({
-            userId: "user-1",
-            integrationMethod: "platform",
-          }),
+          fireIntegrationMethod({ ...wiring(), userId: "user-1", integrationMethod: "platform" }),
         ).not.toThrow();
         await settle();
 

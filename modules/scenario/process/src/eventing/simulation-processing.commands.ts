@@ -189,6 +189,7 @@ export class SimulationProcessingCommandsAdapter {
   readonly cancelRun = CancelRunCommand;
   readonly deleteRun = DeleteRunCommand;
   readonly recordAgentInstance = RecordAgentInstanceCommand;
+  readonly recordCutAtLimit = RecordCutAtLimitCommand;
   readonly archiveSet = ArchiveSetCommand;
 
   private constructor() {}
