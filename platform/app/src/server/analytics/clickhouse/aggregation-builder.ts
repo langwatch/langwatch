@@ -3248,13 +3248,15 @@ export function buildFeedbacksQuery(
   // the feedback ARRAY JOIN reads, and push the StartTime window into the
   // subquery, instead of joining the full analytics column set (#2551 / #2605).
   //
-  // The event-name predicate rides along for a different reason. It prunes no
-  // granules, because nothing indexes `Events.Name`; what it does is reach
-  // PREWHERE, so the light `Array(LowCardinality(String))` is read first and
-  // `Events.Attributes` is materialised only for the spans that carry a vote
-  // event. That map is `Array(Map(LowCardinality(String), String))` and is by
-  // far the widest column in the select list, and a span carrying a vote is a
-  // small minority of the window.
+  // The event-name predicate rides along for a different reason. Nothing
+  // indexes `Events.Name`, so it does not change which granules are selected;
+  // what it does is reach PREWHERE, so the light `Array(LowCardinality(String))`
+  // is read first and `Events.Attributes` is skipped for every granule in
+  // which no span carries a vote event. That map is
+  // `Array(Map(LowCardinality(String), String))` and by far the widest column
+  // in the select list. The saving is per granule rather than per span: a
+  // granule holding one voting span still reads every map beside it, and
+  // surviving rows are then filtered before the ARRAY JOIN copies anything.
   //
   // It cannot change the result: the outer query ARRAY JOINs these arrays and
   // then keeps only `event_name = 'thumbs_up_down'`, which a span satisfies
