@@ -195,7 +195,7 @@ func (instance *selfDestructInstance) revoke() {
 // with the decoded report.
 func probeJSONReport(t *testing.T, args ...string) (int, Report) {
 	t.Helper()
-	code, stdout, stderr := runProbeCLI(t, append([]string{"probe", "-json"}, args...)...)
+	code, stdout, stderr := runProbeCLI(t, append([]string{"probe", "-json", "-probe-concurrency", "1"}, args...)...)
 	var report Report
 	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
 		t.Fatalf("decode report: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)

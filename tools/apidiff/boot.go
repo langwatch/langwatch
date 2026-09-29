@@ -111,6 +111,7 @@ type Instance struct {
 	Name    string // "branch" or "main"
 	Dir     string
 	URL     string
+	MailURL string // the stack's mail sink (mailsim), when haven routes one
 	Port    int
 	Profile bootProfile
 }
@@ -271,7 +272,16 @@ var managedEnvKeys = []string{
 	"LANGWATCH_INSTANCE_ADMIN_API_KEY",
 	"LW_GATEWAY_INTERNAL_SECRET", "LW_GATEWAY_JWT_SECRET", "LW_VIRTUAL_KEY_PEPPER",
 	"FEATURE_FLAG_FORCE_ENABLE", "LANGWATCH_LOCAL_STORAGE_PATH",
+	"API_RATE_LIMIT_REQUESTS", "API_RATE_LIMIT_SECONDS",
 }
+
+// Both instances run with the API's request limiter raised out of reach: the
+// scenario phase sends thousands of requests a minute, and a 429 there is a
+// harness error, never a retry.
+const (
+	raisedRateLimitRequests = "1000000"
+	raisedRateLimitSeconds  = "60"
+)
 
 // instanceEnvSpec carries the per-instance values instanceEnv composes.
 type instanceEnvSpec struct {
@@ -316,6 +326,8 @@ func instanceEnv(inherit []string, spec instanceEnvSpec) []string {
 		"API_KEY_PEPPER="+throwawayCredentialsSecret,
 		"LANGWATCH_INSTANCE_ADMIN_API_KEY="+throwawayInstanceAdminKey,
 		"FEATURE_FLAG_FORCE_ENABLE="+forcedFeatureFlags,
+		"API_RATE_LIMIT_REQUESTS="+raisedRateLimitRequests,
+		"API_RATE_LIMIT_SECONDS="+raisedRateLimitSeconds,
 		"LW_GATEWAY_INTERNAL_SECRET="+throwawayGatewayInternalSecret,
 		"LW_GATEWAY_JWT_SECRET="+throwawayGatewayJWTSecret,
 		"LW_VIRTUAL_KEY_PEPPER="+throwawayVirtualKeyPepper,
@@ -1579,6 +1591,7 @@ func (state *bootState) teardown() {
 // teardownOnceOnly is teardown's body: the parity phase's cleanup and the
 // booted instances share one state, and whichever runs second finds it done.
 func (state *bootState) teardownOnceOnly() {
+	defer phaseDone(state.stderr, "teardown", time.Now())
 	if state.infraDone != nil {
 		<-state.infraDone
 	}

@@ -84,16 +84,21 @@ func (phase *parityPhase) prepare(ctx context.Context, bootsAfter bool) error {
 	if err := state.prepareLayout(); err != nil {
 		return err
 	}
+	worktrees := time.Now()
 	if err := state.setupWorktree(ctx); err != nil {
 		return err
 	}
+	phaseDone(state.stderr, "worktrees", worktrees)
 	state.timing("worktrees ready")
 	if bootsAfter && !state.cfg.UseHaven {
 		if err := state.startInfraEarly(ctx); err != nil {
 			return err
 		}
 	}
-	return state.prepareTrees(ctx)
+	install := time.Now()
+	err := state.prepareTrees(ctx)
+	phaseDone(state.stderr, "install", install)
+	return err
 }
 
 // finish waits for the background inventories and answers their error.

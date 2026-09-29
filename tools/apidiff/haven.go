@@ -88,10 +88,12 @@ func havenOnPath() bool {
 // instance-admin operations comparable rather than symmetrically unauthorized.
 func havenEnv(inherit []string, slug string) []string {
 	return havenrun.Env(inherit, slug, havenrun.EnvOptions{
-		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY", "FEATURE_FLAG_FORCE_ENABLE"},
+		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY", "FEATURE_FLAG_FORCE_ENABLE", "API_RATE_LIMIT_REQUESTS", "API_RATE_LIMIT_SECONDS"},
 		Extra: []string{
 			"LANGWATCH_INSTANCE_ADMIN_API_KEY=" + throwawayInstanceAdminKey,
 			"FEATURE_FLAG_FORCE_ENABLE=" + forcedFeatureFlags,
+			"API_RATE_LIMIT_REQUESTS=" + raisedRateLimitRequests,
+			"API_RATE_LIMIT_SECONDS=" + raisedRateLimitSeconds,
 		},
 	})
 }
@@ -145,6 +147,20 @@ func havenStackReady(report havenStatus, slug string) (string, bool) {
 		return "", false
 	}
 	return fmt.Sprintf("http://127.0.0.1:%d", stack.APIPort), true
+}
+
+// havenMailService is the routed mail sink haven runs beside the stack.
+const havenMailService = "mail"
+
+// havenMailURL is the named stack's mail sink address, or "" when it has none.
+func havenMailURL(report havenStatus, slug string) string {
+	for _, stack := range report.Stacks {
+		if stack.Slug == slug {
+			address, _ := stack.ServiceURL(havenMailService)
+			return address
+		}
+	}
+	return ""
 }
 
 // parseHavenStatus decodes a `haven status --json` report.
@@ -290,6 +306,7 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 		if err == nil {
 			if baseURL, ready := havenStackReady(report, plan.slug); ready {
 				instance.URL = baseURL
+				instance.MailURL = havenMailURL(report, plan.slug)
 				state.logf("haven %s: %s ready at %s", instance.Name, plan.slug, baseURL)
 				return nil
 			}

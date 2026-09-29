@@ -591,7 +591,7 @@ something else. Every boundary is logged as `timing +<elapsed>: <phase>`.
    4. after the collection checks and round trips, the deletes.
 
    Within a stage each owning module is one lane that keeps probe order, and
-   up to `-probe-concurrency` lanes (default 4; 1 is serial) run at once.
+   up to `-probe-concurrency` lanes (default 16; 1 is serial) run at once.
    Several lanes each resolve and capture ids against their own copy of the
    symbol tables, filed into the shared ones in probe order when the stage
    ends: a lane sees what earlier stages and its own module captured, never
@@ -608,6 +608,96 @@ something else. Every boundary is logged as `timing +<elapsed>: <phase>`.
 6. Teardown, once, whichever of the parity cleanup and the boot's teardown
    runs first. It kills the instances, drops the run's databases and hands
    the persistent worktrees back; nothing in it waits on a slow step.
+
+### Timeline, phase durations and progress
+
+Every line the tool prints, the relayed `main |` and `branch |` child lines
+included, starts with `[HH:MM:SS]`; only the `-json` report on stdout is left
+bare. Each phase ends with a `phase <name>: <duration>` line: worktrees,
+install, prepare, boot (stacks up, migrated, seeded), parity inventories, seed
+fixtures, probe main pass, round trips, permission probes, entitled pass,
+scenario shards, scenarios, teardown. Phases that overlap (both installs, the
+inventories beside boot) print their own durations, which do not add up to the
+wall time. During the probe pass and the scenario phase a line is printed
+about every 5 s, for example
+`[12:04:31] scenarios 412/1830 · 398 pass 9 fail-branch 5 err · 41.2/s · ~34s left`.
+The per-operation `probe METHOD PATH [i/N]` lines are gone; the ticker
+replaces them.
+
+## Scenarios
+
+`tools/apidiff/scenarios/*.yaml` are cases with a request, an expectation and
+verify steps, run on both stacks at once after the main pass (`apidiff run`
+skips the phase quietly when no file matches, or with `-skip-scenarios`).
+Against two stacks that are already up:
+
+```bash
+go run ./cmd/apidiff scenarios -a BRANCH_URL -b MAIN_URL -admin-key KEY \
+  -scenarios 'tools/apidiff/scenarios/*.yaml' [-scenario-id 'evaluators-*']
+```
+
+The format and the verdicts (PASS, FAIL-branch, FAIL-main, FAIL-both,
+FAIL-diff, ERROR) are in `scenarios/_example.yaml` and scenario.go; files
+whose name starts with `_` are skipped by the default glob. A scenario that
+held on both sides still fails as FAIL-diff when the two main responses differ
+after normalization. Exit code: 2 if any ERROR (the harness could not
+measure, including a 429), else 1 if anything is not PASS, else 0.
+`scenarios.jsonl` lands in the run directory (`-run-dir` in the standalone
+mode).
+
+- **One stack (PASS or FAIL):** `apidiff scenarios -a URL` with no `-b` runs
+  every scenario against that one stack; the verdicts are PASS, FAIL and
+  ERROR. Main-versus-branch comparison (`-a` and `-b`, or `run`) is for final
+  testing. Against a shared stack use the API lane's address (for example
+  `http://127.0.0.1:<apiPort>` from `haven status`) when the routed HTTPS name
+  is not registered, and `-mail-a` for its mail sink (`mail` service port).
+- **Shared seed:** shards are seeded through the public API once, under a
+  flock, and recorded in `<-seed-dir>/shared-seed.json` (default `.apidiff/`),
+  keyed by the stack's URL; a later lane reuses every recorded shard that still
+  authenticates and seeds only the missing ones. With `-admin-key` the seed
+  also provisions an `apidiff` organization of its own (own org key, project
+  and team) and the shared shard and all isolated projects live in it, never in
+  `local-dev-organization`; without it the seeded organization is used and
+  `org` shards are ERROR. `shard: serial` scenarios take a flock on
+  `.visualdiff/check/instance.lock` for the serial pass.
+- **Pool:** `-scenario-concurrency` (default 48) scenarios in flight per side,
+  both sides of one scenario at once, over pooled keep-alive connections.
+- **Shards:** `shard: shared` (default) uses the seeded fixtures;
+  `project` and `org` run in one of `-scenario-shards` (default 8) isolated
+  projects or organizations; `serial` runs alone after the pool drains.
+  **A `shard: project` scenario gets its own project keys and ids** (its
+  `{projectId}` and `{projectKey}`, and `auth: project` sends that key), so a
+  `countDelta` on a project-level list such as `GET /api/evaluators` counts
+  only what scenarios in the same project do; eight shards means about a
+  scenario in eight shares a project, so keep the request's own name unique
+  with `{uid}`. Prefer it to `serial`. A `countDelta` on a shared list races.
+- **Placeholders:** `{uid}` (fixed width, so one never prefixes another),
+  `{UID}` (upper case, for names like `^[A-Z][A-Z0-9_]*$`), `{uidHex16}`,
+  `{uidHex32}`, `{nowMs}` and `{nowMs-3600000}` / `{nowMs+60000}` (read when
+  the request is built), `{side}`, `{adminEmail}`, `{userId}` (the seeded admin
+  user), `{projectId}`, `{orgId}`, `{projectKey}`, `{orgKey}`, `{teamId}` and
+  every capture.
+- **Expect:** `body: { key: "<any>" }` is present and not null;
+  `body: { key: "<absent>" }` is not in the body at all. Methods: GET, HEAD,
+  POST, PUT, PATCH, DELETE (no multipart bodies yet).
+- **Auth kinds:** project, project-b, project-c, org, admin, scim, none,
+  restricted (a read-only key minted per shard), session, cli.
+- **Mail:** `-mail-a` / `-mail-b` are each side's mailsim base URL; `run`
+  takes them from haven. On the shared check stack an organization invite
+  returned 201 but no message reached the sink, so the `_example.yaml` mail
+  scenario fails there until mail is confirmed to be delivered on that stack.
+  **Rate limit:** `run` boots the stacks with `API_RATE_LIMIT_REQUESTS`
+  raised; a stack booted otherwise answers 429 as an ERROR naming the limiter.
+- **Sign-off:** `apidiff done -run RUN -scenario ID -note TEXT` copies a
+  passing scenario's proof from `.apidiff/<RUN>/scenarios.jsonl` into
+  `.apidiff/done/<ID>/meta.json`; `-list` prints the ledger, `-undo ID`
+  removes an entry, `-force` signs off a scenario that did not pass. Signed-off
+  scenarios are skipped by later runs unless `-final`.
+- **`-dry-run`** (standalone mode) loads and validates the files, prints how
+  many are valid and how many would run, and exits without a stack.
+- **`-repeat N`** repeats every selected scenario N times under suffixed ids,
+  to measure throughput. YAML: quote any flow-mapping value that contains a
+  `{placeholder}`.
 
 ## Persistent worktrees and caches
 

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -25,6 +26,10 @@ const (
 	exitDifferences
 	exitError
 )
+
+// defaultProbeConcurrency lets every module lane run beside the others: they
+// are independent, so the longest lane bounds the pass.
+const defaultProbeConcurrency = 16
 
 // streams pairs the command's output writers: stdout carries only the
 // deterministic report, stderr carries progress and errors.
@@ -84,6 +89,10 @@ type probeFlags struct {
 	// behavioral phase completes with REST once both sides serve.
 	parityOnly bool
 	parity     *parityPhase
+	// scenarios are the scenario phase's flags; runDir is where run mode
+	// files scenarios.jsonl.
+	scenarios scenarioFlags
+	runDir    string
 }
 
 func (probe *probeFlags) filter() OpFilter {
@@ -105,7 +114,7 @@ func registerProbeFlags(flags *flag.FlagSet, probe *probeFlags) {
 	flags.StringVar(&probe.method, "method", "", "only probe this HTTP method")
 	flags.Var(&probe.excludePrefixes, "exclude-prefix", "path prefix to skip (repeatable)")
 	flags.IntVar(&probe.maxOps, "max-ops", 0, "cap the number of probed operations (0 = all)")
-	flags.IntVar(&probe.concurrency, "probe-concurrency", 4, "how many modules the main pass probes at once; each module stays in its own order (1 = serial)")
+	flags.IntVar(&probe.concurrency, "probe-concurrency", defaultProbeConcurrency, "how many modules the main pass probes at once; each module stays in its own order (1 = serial)")
 	flags.BoolVar(&probe.exactStatus, "exact-status", false, "compare exact status codes and error bodies (default: classes only, error bodies skipped)")
 	flags.BoolVar(&probe.jsonOutput, "json", false, "write the machine report to stdout instead of the summary")
 	flags.StringVar(&probe.reportFile, "report", "", "also write the machine report (JSON) to this file")
@@ -126,6 +135,11 @@ usage:
                 [-exclude-prefix P]... [-max-ops N] [-probe-concurrency N]
                 [-json] [-report FILE] [-ledger FILE] [-ledger-baseline FILE]
                 [-module NAME]...
+  apidiff scenarios -a URL -b URL [probe key flags] [-mail-a URL -mail-b URL]
+                [-scenarios GLOB] [-scenario-id PATTERN]... [-scenario-concurrency N]
+                [-scenario-shards N] [-repeat N] [-run-dir DIR] [-seed-dir DIR] [-final]
+                (without -b: run the scenarios against the one stack; PASS or FAIL)
+  apidiff done  -run RUN -scenario ID -note TEXT [-force] | -list | -undo ID
 
 Each run instance is a haven stack under its own run-scoped slug wherever
 haven is installed, so a run never reaches the datastores your own stack uses.
@@ -139,7 +153,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if stdout == nil || stderr == nil {
 		return exitError
 	}
-	out := streams{stdout: stdout, stderr: stderr}
+	stampedErr := &stampWriter{out: stderr}
+	defer stampedErr.flush()
+	out := streams{stdout: stdout, stderr: stampedErr}
+	if !slices.Contains(args, "-json") && !slices.Contains(args, "--json") {
+		stampedOut := &stampWriter{out: stdout}
+		defer stampedOut.flush()
+		out.stdout = stampedOut
+	}
 	if len(args) == 0 {
 		fmt.Fprint(out.stderr, usage)
 		return exitError
@@ -152,6 +173,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return runProbeSubcommand(ctx, args[1:], out)
 	case "run":
 		return runBootSubcommand(ctx, args[1:], out)
+	case "scenarios":
+		return runScenariosSubcommand(ctx, args[1:], out)
+	case "done":
+		return doneScenariosSubcommand(args[1:], out)
 	default:
 		fmt.Fprintf(out.stderr, "unknown subcommand %q\n%s", args[0], usage)
 		return exitError
@@ -161,7 +186,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 func runProbeSubcommand(ctx context.Context, args []string, out streams) int {
 	flags := flag.NewFlagSet("apidiff probe", flag.ContinueOnError)
 	flags.SetOutput(out.stderr)
-	probe := &probeFlags{}
+	probe := &probeFlags{scenarios: scenarioFlags{skip: true}}
 	registerProbeFlags(flags, probe)
 	if err := flags.Parse(args); err != nil {
 		return exitError
@@ -179,12 +204,14 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 		return code
 	}
 	boot.ParityOnly = probe.parityOnly
+	prepared := time.Now()
 	parity, err := runParityPhase(ctx, boot, out.stderr)
 	if err != nil {
 		fmt.Fprintln(out.stderr, "parity:", err)
 		return exitError
 	}
 	defer parity.cleanup()
+	phaseDone(out.stderr, "prepare (worktrees and install)", prepared)
 	if probe.parityOnly {
 		if err := parity.finish(); err != nil {
 			fmt.Fprintln(out.stderr, "parity:", err)
@@ -197,16 +224,20 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	// The child processes inherit this context; canceling it kills them.
 	bootCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	booting := time.Now()
 	booted, err := parity.boot(bootCtx)
 	if err != nil {
 		fmt.Fprintln(out.stderr, "boot:", err)
 		return exitError
 	}
 	defer booted.Teardown()
+	phaseDone(out.stderr, "boot (stacks up, migrated, seeded)", booting)
+	inventories := time.Now()
 	if err := parity.finish(); err != nil {
 		fmt.Fprintln(out.stderr, "parity:", err)
 		return exitError
 	}
+	phaseDone(out.stderr, "parity inventories (wait beyond boot)", inventories)
 
 	// One JSON line per operation, appended as its comparison completes, so a
 	// reader can tail .apidiff/<runID>/findings.jsonl during the run rather
@@ -220,6 +251,8 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 
 	probe.a = booted.A.URL
 	probe.b = booted.B.URL
+	probe.runDir = booted.WorkRoot
+	probe.scenarios.mailA, probe.scenarios.mailB = booted.A.MailURL, booted.B.MailURL
 	probe.activateEntitlement = booted.ActivateEntitlement
 	if boot.UseHaven {
 		// The SCIM token and the permission-probe projects are inserted with
@@ -302,6 +335,8 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	envFile := ""
 	flags.StringVar(&envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed); not usable with the haven path")
 	registerProbeFlags(flags, probe)
+	registerScenarioFlags(flags, &probe.scenarios)
+	flags.BoolVar(&probe.scenarios.skip, "skip-scenarios", false, "skip the scenario phase after the main pass")
 	flags.BoolVar(&probe.parityOnly, "parity-only", false, "stop after the parity phase: both worktrees prepared, tRPC inventoried, parity.json and per-module packets written, no stack booted")
 	if err := flags.Parse(args); err != nil {
 		return boot, probe, exitError, true
@@ -402,7 +437,7 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 	if code := emitReport(verdict, out); code != exitEqual {
 		return code
 	}
-	return verdict.exitCode(out)
+	return max(verdict.exitCode(out), probe.runScenarioAfterMainPass(ctx, out))
 }
 
 // runVerdict is one completed comparison: what was found, how it groups, and

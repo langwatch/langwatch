@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -158,20 +159,31 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	credentialsBefore := engine.readCanaries(canaries)
 	started := time.Now()
 	engine.seedFixtures()
+	engine.phaseDone("seed fixtures", started)
 	defer engine.fixtureTraceSettled()
 
+	mainStart := time.Now()
+	stopTicker := startTicker(options.Progress, "probe", len(selected), engine.probeSnapshot)
 	findings, probed, collectionsVerified := engine.mainPass(selected)
+	stopTicker()
+	engine.phaseDone("probe main pass", mainStart)
 	engine.progress("timing: main pass done after %s\n", time.Since(started).Round(time.Second))
 
 	// Post passes, after every mutation has had its chance to land.
 	if !collectionsVerified {
+		roundTrips := time.Now()
 		findings = append(findings, engine.verifyCollections(selected)...)
 		findings = append(findings, engine.roundTripPass(selected)...)
+		engine.phaseDone("round trips", roundTrips)
 	}
+	permissions := time.Now()
 	findings = append(findings, engine.permissionProbes(selected)...)
+	engine.phaseDone("permission probes", permissions)
 	engine.progress("timing: collection and permission passes done after %s\n", time.Since(started).Round(time.Second))
 	findings = append(findings, engine.markUnverifiedLists(selected)...)
+	entitled := time.Now()
 	findings = append(findings, engine.entitledPass()...)
+	engine.phaseDone("entitled pass", entitled)
 
 	// The closing assertion: every credential still authenticates. A run that
 	// destroyed one produced agreement, not evidence.
@@ -348,6 +360,10 @@ type probeEngine struct {
 	// stage of several, each operation's lane's own tables (probe-waves.go).
 	mu    sync.Mutex
 	lanes map[string][2]*SymbolTable
+	// probed and differing are what the progress ticker reads while the main
+	// pass runs.
+	probed    atomic.Int64
+	differing atomic.Int64
 }
 
 // sideIDs holds one operation's owner-visible IDs, per side.
@@ -363,6 +379,17 @@ func newSideIDs() *sideIDs {
 // operationKeyOf names an operation in the engine's per-operation maps.
 func operationKeyOf(operation Operation) string {
 	return operation.Method + " " + operation.Path
+}
+
+func (engine *probeEngine) phaseDone(name string, started time.Time) {
+	engine.progress("phase %s: %s\n", name, time.Since(started).Round(100*time.Millisecond))
+}
+
+// probeSnapshot is the main pass's progress: operations answered, and how
+// many of them already differ.
+func (engine *probeEngine) probeSnapshot() (int, string) {
+	done, differing := int(engine.probed.Load()), int(engine.differing.Load())
+	return done, fmt.Sprintf("%d agree %d differ", done-differing, differing)
 }
 
 func (engine *probeEngine) progress(format string, args ...any) {

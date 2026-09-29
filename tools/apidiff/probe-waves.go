@@ -3,6 +3,7 @@ package apidiff
 import (
 	"net/http"
 	"slices"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -39,8 +40,10 @@ func (engine *probeEngine) mainPass(selected []Operation) ([]Finding, int, bool)
 	}
 	// Deletes remove what the creates made, so the lists are read for the
 	// created entities before the first delete, not after.
+	roundTrips := time.Now()
 	findings = append(findings, engine.verifyCollections(selected)...)
 	findings = append(findings, engine.roundTripPass(selected)...)
+	engine.phaseDone("round trips", roundTrips)
 	engine.runStage(selected, stages[stageDeletes], results)
 	deleted, probedDeletes := engine.fileResults(selected, results, stages[stageDeletes])
 	return append(findings, deleted...), probed + probedDeletes, true
@@ -145,9 +148,12 @@ func (engine *probeEngine) probeAt(selected []Operation, index int) opResult {
 		return opResult{}
 	}
 	engine.awaitFixtureTraceFor(operation)
-	engine.progress("probe %s %s [%d/%d]\n", operation.Method, operation.Path, index+1, len(selected))
 	result := engine.probeOperation(operation)
 	result.probed = true
+	engine.probed.Add(1)
+	if len(result.findings) > 0 {
+		engine.differing.Add(1)
+	}
 	if engine.options.OnOperationDone != nil {
 		engine.mu.Lock()
 		defer engine.mu.Unlock()
