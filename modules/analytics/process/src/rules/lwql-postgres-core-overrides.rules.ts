@@ -82,4 +82,9 @@ export const CORE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = 
       UpdatedAt: "When the batch evaluation was last changed.",
     },
   },
+
+  Dashboard: {
+    // Visibility is a fixed label ("only_me", "team" or "organisation"), not content.
+    columnGates: { Visibility: [] },
+  },
 };
