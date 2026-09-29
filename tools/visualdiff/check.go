@@ -25,7 +25,7 @@ type checkFlags struct {
 	root, url, only, skip string
 	pages                 int
 	all, mark, down       bool
-	devUI                 bool
+	devUI, shared         bool
 }
 
 // checkCommand is `visualdiff check`: every flow not yet done (less -skip) against ONE
@@ -112,6 +112,7 @@ func parseCheckFlags(args []string, stderr io.Writer) (checkFlags, error) {
 	flags.BoolVar(&parsed.mark, "mark", false, "mark every flow that passes as done, so later checks skip it")
 	flags.BoolVar(&parsed.down, "down", false, "destroy check's own stack and forget its seed")
 	flags.BoolVar(&parsed.devUI, "dev-ui", false, "serve pages from the stack's Vite dev server instead of a production build")
+	flags.BoolVar(&parsed.shared, "shared", false, "lanes share the stack: boot and seed under a lock, never restart it, pages from the dev server")
 	if err := flags.Parse(args); err != nil {
 		return parsed, err
 	}
@@ -158,7 +159,7 @@ func checkConfig(parsed checkFlags) (*Config, []string, error) {
 // checkSide is the app under check: check's own stack, or -url as given, unseeded.
 func checkSide(ctx context.Context, parsed checkFlags, times *checkTimes, stderr io.Writer) (RunnerSide, error) {
 	if parsed.url == "" {
-		return checkStack(ctx, checkStackRequest{root: parsed.root, devUI: parsed.devUI, stderr: stderr}, times)
+		return checkStack(ctx, checkStackRequest{root: parsed.root, devUI: parsed.devUI || parsed.shared, shared: parsed.shared, stderr: stderr}, times)
 	}
 	app := Stack{HavenURL: parsed.url}
 	return RunnerSide{Name: "candidate", BaseURL: app.URL(), MailURL: app.MailURL(), Fixtures: map[string]string{}}, nil

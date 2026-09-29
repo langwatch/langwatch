@@ -1,8 +1,10 @@
 package visualdiff
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -120,5 +122,32 @@ func TestCheckRefusesACheckoutWhoseInstallOrGeneratedFilesAreStale(t *testing.T)
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("refusal %q lacks %q", err, want)
 		}
+	}
+}
+
+func TestSharedStackLockMakesASecondLaneWait(t *testing.T) {
+	dir := t.TempDir()
+	unlock, err := lockCheckStack(dir, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var waited bytes.Buffer
+	acquired := make(chan func())
+	go func() {
+		second, err := lockCheckStack(dir, &waited)
+		if err != nil {
+			t.Error(err)
+		}
+		acquired <- second
+	}()
+	select {
+	case <-acquired:
+		t.Fatal("the second lane took the lock while the first held it")
+	case <-time.After(200 * time.Millisecond):
+	}
+	unlock()
+	(<-acquired)()
+	if !strings.Contains(waited.String(), "waiting") {
+		t.Fatalf("the waiting lane said nothing: %q", waited.String())
 	}
 }

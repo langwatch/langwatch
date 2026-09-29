@@ -626,6 +626,11 @@ pinned, cached baseline when it holds that flow with the same steps ("looks like
 main", "differs from main (n%)", or "no baseline"); main is never booted for it.
 The answer is written to `.visualdiff/check/check-report.md` too.
 
+`-shared` is for several lanes checking against the one stack at once: boot and
+seed happen under a lock (`.visualdiff/check/stack.lock`), the backend is never
+restarted under another lane's flows, and pages come from the Vite dev server,
+so test-id edits show without a build.
+
 ## Adding a route
 
 Add the path to `routes:` in `tools/visualdiff/visualdiff.yaml`. `{slug}` is substituted with

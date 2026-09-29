@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/havenrun"
@@ -28,6 +29,7 @@ func CheckDir(root string) string { return filepath.Join(root, ".visualdiff", "c
 type checkStackRequest struct {
 	root   string
 	devUI  bool
+	shared bool
 	stderr io.Writer
 }
 
@@ -57,16 +59,25 @@ func checkStack(ctx context.Context, request checkStackRequest, times *checkTime
 		return RunnerSide{}, err
 	}
 	stack := Stack{Name: "check", Dir: request.root, HavenSlug: CheckSlug, Layout: layout}
+	if request.shared {
+		unlock, err := lockCheckStack(dir, request.stderr)
+		if err != nil {
+			return RunnerSide{}, err
+		}
+		defer unlock()
+	}
 	started := time.Now()
 	code := workingTreeKey(ctx, request.root)
 	booted, err := run.upCheckStack(ctx, &stack)
-	if err == nil && !booted {
+	if err == nil && !booted && !request.shared {
 		err = run.restartChangedBackend(ctx, &stack, code)
 	}
 	if err != nil {
 		return RunnerSide{}, err
 	}
-	recordKey(filepath.Join(dir, "backend"), code)
+	if !request.shared {
+		recordKey(filepath.Join(dir, "backend"), code)
+	}
 	times.boot = time.Since(started)
 	fmt.Fprintf(request.stderr, "check: phase boot %s\n", times.boot.Round(time.Second))
 	started = time.Now()
@@ -266,4 +277,24 @@ func downCheckStack(ctx context.Context, root string, stderr io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// lockCheckStack holds check's stack for one lane's boot and seed, so lanes sharing the
+// stack never boot or seed it twice at once. The lock goes when the process does.
+func lockCheckStack(dir string, stderr io.Writer) (func(), error) {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return nil, err
+	}
+	file, err := os.OpenFile(filepath.Join(dir, "stack.lock"), os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- the tool's own run directory.
+	if err != nil {
+		return nil, err
+	}
+	if syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+		fmt.Fprintln(stderr, "check: another lane is booting or seeding the shared stack; waiting")
+		if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); err != nil {
+			_ = file.Close()
+			return nil, err
+		}
+	}
+	return func() { _ = file.Close() }, nil
 }
