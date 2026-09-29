@@ -29,6 +29,20 @@ export const fillArgs = ({
     Object.entries(args).map(([name, text]) => [name, fillValues({ text, values })]),
   );
 
+/** flowValues are what a flow's API setup captured, which the seed files as `<flow id>/<name>`. */
+export const flowValues = ({
+  fixtures,
+  flowId,
+}: {
+  fixtures: Record<string, string>;
+  flowId: string;
+}): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(fixtures)
+      .filter(([name]) => name.startsWith(`${flowId}/`))
+      .map(([name, value]) => [name.slice(flowId.length + 1), value]),
+  );
+
 /** ISOLATED_SLUG and ISOLATED_KEY are the fixtures the seed's second project fills. */
 export const ISOLATED_SLUG = "isolatedSlug";
 export const ISOLATED_KEY = "isolatedProjectKey";

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 // Seeded fixture names: the {name} placeholders a stack's seed fills with the
@@ -93,31 +95,76 @@ type entityRequest struct {
 	seeds  []entitySeed
 }
 
-// seedEntities posts each entity and keeps its id. One that fails, or whose
-// prerequisite failed, is a warning and no fixture: its route then renders
-// that side's not-found state, which the report shows, instead of the whole run dying.
-func seedEntities(ctx context.Context, request entityRequest) (fixtures map[string]string, warnings []string) {
-	fixtures = map[string]string{}
-	for _, seed := range request.seeds {
-		if missing := firstMissing(fixtures, seed.needs); missing != "" {
-			warnings = append(warnings, fmt.Sprintf("%s not seeded: needs %s, which was not", seed.fixture, missing))
-			continue
+// seedEntities posts each entity and keeps its id, in waves: every entity whose
+// prerequisites are settled posts at once. One that fails, or whose prerequisite
+// failed, is a warning and no fixture: its route then renders that side's
+// not-found state, which the report shows, instead of the whole run dying.
+func seedEntities(ctx context.Context, request entityRequest) (map[string]string, []string) {
+	fixtures := map[string]string{}
+	var warnings []string
+	var mutex sync.Mutex
+	settled := map[string]bool{}
+	for pending := request.seeds; len(pending) > 0; {
+		var wave, later []entitySeed
+		for _, seed := range pending {
+			if waitsOn(seed, settled) {
+				later = append(later, seed)
+				continue
+			}
+			wave = append(wave, seed)
 		}
-		spec := postSpec{url: request.apiURL + seed.path, key: request.key, body: seed.body(fixtures)}
-		answer, err := postReading(ctx, request.client, spec)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("%s not seeded: %v", seed.fixture, err))
-			continue
+		if len(wave) == 0 {
+			wave, later = later, nil // a prerequisite no seed makes: each reports it missing
 		}
-		id, err := StringAt(answer, seed.idPath)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("%s not seeded: %s answered without %s: %v", seed.fixture, seed.path, seed.idPath, err))
-			continue
+		var group sync.WaitGroup
+		earlier := maps.Clone(fixtures)
+		for _, seed := range wave {
+			group.Go(func() {
+				id, warning := seedEntity(ctx, request, seed, earlier)
+				mutex.Lock()
+				defer mutex.Unlock()
+				if warning != "" {
+					warnings = append(warnings, warning)
+				} else {
+					fixtures[seed.fixture] = id
+				}
+			})
 		}
-		fixtures[seed.fixture] = id
+		group.Wait()
+		for _, seed := range wave {
+			settled[seed.fixture] = true
+		}
+		pending = later
 	}
 	delete(fixtures, evaluatorKey)
 	return fixtures, warnings
+}
+
+// waitsOn reports an entity with a prerequisite not yet settled either way.
+func waitsOn(seed entitySeed, settled map[string]bool) bool {
+	for _, need := range seed.needs {
+		if !settled[need] {
+			return true
+		}
+	}
+	return false
+}
+
+// seedEntity posts one entity once its wave starts, when its prerequisites were seeded.
+func seedEntity(ctx context.Context, request entityRequest, seed entitySeed, fixtures map[string]string) (string, string) {
+	if missing := firstMissing(fixtures, seed.needs); missing != "" {
+		return "", fmt.Sprintf("%s not seeded: needs %s, which was not", seed.fixture, missing)
+	}
+	spec := postSpec{url: request.apiURL + seed.path, key: request.key, body: seed.body(fixtures)}
+	answer, err := postReading(ctx, request.client, spec)
+	if err != nil {
+		return "", fmt.Sprintf("%s not seeded: %v", seed.fixture, err)
+	}
+	id, err := StringAt(answer, seed.idPath)
+	if err != nil {
+		return "", fmt.Sprintf("%s not seeded: %s answered without %s: %v", seed.fixture, seed.path, seed.idPath, err)
+	}
+	return id, ""
 }
 
 func firstMissing(fixtures map[string]string, needs []string) string {

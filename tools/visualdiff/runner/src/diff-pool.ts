@@ -23,17 +23,31 @@ export class DiffPool {
   private readonly all: Worker[] = [];
   private readonly queue: DiffJob[] = [];
   private readonly running = new Map<Worker, DiffJob>();
+  private closing = false;
 
   constructor(size: number) {
-    for (let index = 0; index < size; index++) {
-      const worker = new Worker(new URL("./diff-worker.ts", import.meta.url));
-      worker.on("message", (reply: DiffReply) => this.answered({ worker, reply }));
-      worker.on("error", (error: Error) =>
-        this.answered({ worker, reply: { error: error.message } }),
-      );
-      this.all.push(worker);
-      this.idle.push(worker);
-    }
+    for (let index = 0; index < size; index++) this.idle.push(this.spawn());
+  }
+
+  /** spawn starts a worker; one that dies fails its job and is replaced, never reused. */
+  private spawn(): Worker {
+    const worker = new Worker(new URL("./diff-worker.ts", import.meta.url));
+    worker.on("message", (reply: DiffReply) => this.answered({ worker, reply }));
+    worker.on("error", (error: Error) => this.died({ worker, why: error.message }));
+    worker.on("exit", (code) => this.died({ worker, why: `diff worker exited ${code}` }));
+    this.all.push(worker);
+    return worker;
+  }
+
+  private died({ worker, why }: { worker: Worker; why: string }): void {
+    if (!this.all.includes(worker) || this.closing) return;
+    this.all.splice(this.all.indexOf(worker), 1);
+    const idleAt = this.idle.indexOf(worker);
+    if (idleAt >= 0) this.idle.splice(idleAt, 1);
+    this.running.get(worker)?.reject(new Error(why));
+    this.running.delete(worker);
+    this.idle.push(this.spawn());
+    this.next();
   }
 
   diff(files: DiffFiles): Promise<PixelDiff | null> {
@@ -44,6 +58,7 @@ export class DiffPool {
   }
 
   async close(): Promise<void> {
+    this.closing = true;
     await Promise.all(this.all.map((worker) => worker.terminate()));
   }
 

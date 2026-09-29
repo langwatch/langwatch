@@ -98,7 +98,8 @@ func isRunName(name string) bool {
 
 // SelectGarbage decides a gc pass from the run directories found. A run is
 // stale when no live process drives it and it is not a kept run (unless
-// IncludeKept). A registered visualdiff slug no run directory names is an orphan.
+// IncludeKept). A registered visualdiff slug no run directory names is an
+// orphan, except check's own stack (CheckSlug), which `check -down` destroys.
 func SelectGarbage(states []RunState, selection GCSelection) GCPlan {
 	sorted := append([]RunState(nil), states...)
 	sort.Slice(sorted, func(a, b int) bool { return sorted[a].Name > sorted[b].Name })
@@ -117,7 +118,7 @@ func SelectGarbage(states []RunState, selection GCSelection) GCPlan {
 		}
 	}
 	for _, slug := range selection.Registered {
-		if strings.HasPrefix(slug, havenSlugPrefix+"-") && !owned[slug] {
+		if strings.HasPrefix(slug, havenSlugPrefix+"-") && !owned[slug] && slug != CheckSlug {
 			plan.OrphanSlugs = append(plan.OrphanSlugs, slug)
 		}
 	}

@@ -66,6 +66,8 @@ type Flow struct {
 	Isolated bool   `json:"isolated,omitempty" yaml:"isolated,omitempty"`
 	Serial   bool   `json:"serial,omitempty"   yaml:"serial,omitempty"`
 	Steps    []Step `json:"steps"              yaml:"steps"`
+	// Setup are API calls made before the flow runs (setup.go); the runner never sees them.
+	Setup []SetupStep `json:"-" yaml:"setup,omitempty"`
 }
 
 // FlowsDir is where the per-area flow files live, beside ConfigFile. Each

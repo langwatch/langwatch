@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -248,7 +249,10 @@ func TestSeedPostsTracesAndADatasetThroughTheCandidateAPI(t *testing.T) {
 		key  string
 	}
 	var calls []received
+	var mutex sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mutex.Lock()
+		defer mutex.Unlock()
 		calls = append(calls, received{r.URL.Path, r.Header.Get("X-Auth-Token")})
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -265,12 +269,16 @@ func TestSeedPostsTracesAndADatasetThroughTheCandidateAPI(t *testing.T) {
 	if len(result.TraceIDs) != 2 || !result.DatasetOK {
 		t.Fatalf("result: %+v", result)
 	}
-	if len(calls) < 3 || calls[0].path != "/api/collector" || calls[2].path != "/api/dataset" {
+	paths := map[string]int{}
+	for _, call := range calls {
+		paths[call.path]++
+	}
+	if paths["/api/collector"] < 2 || paths["/api/dataset"] != 1 {
 		t.Fatalf("calls: %+v", calls)
 	}
 	for _, call := range calls {
-		if call.path == "/api/bug-reports" {
-			continue // the bug-report intake is unauthenticated on purpose
+		if call.path == "/api/bug-reports" || call.path == "/api/projects" {
+			continue // bug-report intake is unauthenticated; a project is created with the organization token
 		}
 		if call.key != DefaultProjectKey {
 			t.Fatalf("every fixture is posted with the project key: %+v", call)

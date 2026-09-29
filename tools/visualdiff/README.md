@@ -198,13 +198,13 @@ stack:
    both refs: the script name is identical in both layouts' root
    `package.json`, and each ref's own version resolves to what that ref
    actually needs.
-4. Modular layout only: `node dev/scripts/ensure-built.mjs`, building the
+4. Modular layout only: `pnpm run ensure:built`, building the
    workspace packages the api and worker import a built `dist` from
    (`langwatch`, `@langwatch/mcp-server`, `@langwatch/mail` - see that
    script and the three applications' `predev`/`pretest` hooks). The
    monolith layout's own `start:prepare:files` (`platform/app`'s, on
    `origin/main`) already builds the SDK and the MCP server inline, and
-   `ensure-built.mjs` does not exist there at all.
+   the `ensure:built` script does not exist there at all.
 
 On a persistent worktree a step whose inputs are unchanged since it last
 finished there is skipped (reuse.go): the install when the lockfile, the
@@ -213,7 +213,7 @@ workspace file, `.npmrc`, `.pnpmfile.cjs` and `patches` are unchanged and
 inputs are unchanged (every top-level entry but Go, docs, specs, tools and
 infrastructure, plus `services/langevals/ts-integration` and
 `services/langyworker`). Inputs are git object ids, never mtimes.
-`ensure-built.mjs` checks itself and runs every time, after the run removes
+`ensure:built` checks itself and runs every time, after the run removes
 any `.ensure-built.lock` a killed prepare left: that script waits 180s on a
 stale lock, which cost runs 20260929-161501 and -164614 over three minutes each.
 
@@ -602,6 +602,29 @@ rebuilds the UI; the backend lanes' watchers restart on the new files. The loop
 renders commits, not uncommitted edits. While the loop is up, a full `run`
 refuses to start beside it; `down` destroys its stacks and removes the
 directory.
+
+## Checking every flow
+
+```bash
+go run ./cmd/visualdiff check                     # every flow not yet done, 6 at a time
+go run ./cmd/visualdiff check -only a,b -mark     # marks the flows that pass as done
+go run ./cmd/visualdiff check -all                # the final pass: done flows too
+go run ./cmd/visualdiff check -down               # destroys check's own stack
+```
+
+`check` answers pass, fail or unproven per flow against one app, with no base
+stack and no agent. By default that app is check's own haven stack
+(`visualdiff-check`), booted with `haven up` straight from the working tree, so
+uncommitted edits count; a later call reuses it. It builds the UI for production
+once per change to the code (`-dev-ui` keeps the Vite dev server), seeds the
+fixtures once per boot, including the second project `isolated` flows work in,
+and keeps its marker and output in `.visualdiff/check`. `-url` checks a running
+app instead. Flows the done ledger holds print as `DONE` and are skipped until
+`-all`; `-mark` adds each passing flow to it, so the loop is check, fix,
+check -mark, on what remains. Each flow's screens are also diffed against main's
+pinned, cached baseline when it holds that flow with the same steps ("looks like
+main", "differs from main (n%)", or "no baseline"); main is never booted for it.
+The answer is written to `.visualdiff/check/check-report.md` too.
 
 ## Adding a route
 

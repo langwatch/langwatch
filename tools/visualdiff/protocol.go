@@ -39,19 +39,19 @@ type RunnerPhase struct {
 // error rather than a skip: a capture silently dropped reads exactly like a
 // screen that matched.
 func ParseRunnerStream(reader io.Reader) (RunnerStream, error) {
-	return ParseRunnerStreamLive(reader, nil, nil)
+	return ParseRunnerStreamLive(reader, CaptureOptions{})
 }
 
 // ParseRunnerStreamLive reads the runner's JSON lines exactly like
-// ParseRunnerStream, but also calls onCapture and onDiff (either may be nil)
-// the instant each message is parsed - not once the whole stream has been
+// ParseRunnerStream, but also calls the options' OnCapture, OnDiff and OnPhase
+// (any may be nil) the instant each message is parsed - not once the whole stream has been
 // read. Reading reader as the subprocess writes it (a live pipe, not a
 // buffer read after the process exits) is what makes that a real streaming
 // callback rather than one that just fires the moment the process happens to
 // finish.
-func ParseRunnerStreamLive(reader io.Reader, onCapture func(Capture), onDiff func(Diff)) (RunnerStream, error) {
+func ParseRunnerStreamLive(reader io.Reader, options CaptureOptions) (RunnerStream, error) {
 	stream := RunnerStream{}
-	hooks := runnerStreamHooks{onCapture: onCapture, onDiff: onDiff}
+	hooks := runnerStreamHooks{onCapture: options.OnCapture, onDiff: options.OnDiff, onPhase: options.OnPhase}
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	line := 0
@@ -78,6 +78,7 @@ func ParseRunnerStreamLive(reader io.Reader, onCapture func(Capture), onDiff fun
 type runnerStreamHooks struct {
 	onCapture func(Capture)
 	onDiff    func(Diff)
+	onPhase   func(RunnerPhase)
 }
 
 // runnerLine is one not-yet-parsed line of the runner's output, carrying its
@@ -117,7 +118,11 @@ func (line runnerLine) applyTo(stream *RunnerStream, hooks runnerStreamHooks) er
 	case "error":
 		return errors.New("runner: " + message.Message)
 	case "phase":
-		stream.Phases = append(stream.Phases, RunnerPhase{Side: message.Side, Name: message.Name, Millis: message.Millis})
+		phase := RunnerPhase{Side: message.Side, Name: message.Name, Millis: message.Millis}
+		stream.Phases = append(stream.Phases, phase)
+		if hooks.onPhase != nil {
+			hooks.onPhase(phase)
+		}
 	case "done", "ready", "log":
 	default:
 		return fmt.Errorf("runner output line %d: unknown message type %q", line.line, message.Type)
@@ -150,6 +155,8 @@ type RunnerPlan struct {
 	// edition on the same stacks before it renders again.
 	Edition Edition        `json:"edition,omitempty"`
 	Stacks  []EditionStack `json:"stacks,omitempty"`
+	// Check photographs a flow only at its expects and its failure, and times each flow.
+	Check bool `json:"check,omitempty"`
 }
 
 // RunnerSide is one stack the runner drives. Replay names a cached

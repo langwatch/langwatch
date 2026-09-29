@@ -8,7 +8,11 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // DefaultProjectKey is the deterministic project key the repository's Prisma
@@ -64,42 +68,118 @@ type SeedRequest struct {
 	APIURL     string
 	Identity   SeedIdentity
 	TraceCount int
+	// Flows are the run's flows, whose `setup:` the seed posts too (setup.go).
+	Flows []Flow
 }
 
 // SeedResult reports what the seeding step created. Fixtures are the ids
 // this stack generated for the dynamic routes' entities; Warnings name the
-// entities it could not create.
+// entities it could not create; Timings are how long each part took.
 type SeedResult struct {
 	TraceIDs  []string
 	DatasetOK bool
 	Fixtures  map[string]string
 	Warnings  []string
+	Timings   []SeedTiming
+}
+
+// SeedTiming is how long one part of a seed took.
+type SeedTiming struct {
+	Part string
+	Took time.Duration
 }
 
 // SeedTraceIDPrefix names the traces a run creates, so a flow can open one by
 // name and a person can tell a fixture from real data at a glance.
 const SeedTraceIDPrefix = "trace_visualdiff_"
 
-// Seed posts the run's fixtures through one stack's API: traces on
-// /api/collector, one dataset on /api/dataset, then the entities the dynamic
-// routes open (seed_entities.go). The ids the stack generates come back as
-// Fixtures, since each stack that owns a database generates its own.
+// seedConcurrency bounds how many fixture posts one part of a seed has in flight.
+const seedConcurrency = 8
+
+// seedClient is one keep-alive client every post of a seed shares.
+func seedClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConnsPerHost = seedConcurrency * 2
+	return &http.Client{Timeout: 30 * time.Second, Transport: transport}
+}
+
+// Seed posts the run's fixtures through one stack's API: traces on /api/collector,
+// the dataset and its rows, the entities the dynamic routes open (seed_entities.go)
+// and the flow suite's fixtures, all at once, then each flow's setup (setup.go).
+// The ids the stack generates come back as Fixtures, since each stack that owns a
+// database generates its own. A failed trace or dataset fails the seed.
 func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 	client := request.Client
 	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second}
+		client = seedClient()
 	}
-	result := SeedResult{}
+	result := SeedResult{Fixtures: map[string]string{}}
+	var mutex sync.Mutex
+	keep := func(part string, started time.Time, fixtures map[string]string, warnings []string) {
+		mutex.Lock()
+		defer mutex.Unlock()
+		maps.Copy(result.Fixtures, fixtures)
+		result.Warnings = append(result.Warnings, warnings...)
+		result.Timings = append(result.Timings, SeedTiming{Part: part, Took: time.Since(started)})
+	}
 	now := time.Now().UnixMilli()
-	for index := range request.TraceCount {
-		traceID := fmt.Sprintf("%s%d", SeedTraceIDPrefix, index)
-		body := seedTrace(traceID, index, now)
-		fixture := postSpec{url: request.APIURL + "/api/collector", key: request.Identity.ProjectKey, body: body}
-		if err := post(ctx, client, fixture); err != nil {
-			return result, fmt.Errorf("seed trace %s: %w", traceID, err)
-		}
-		result.TraceIDs = append(result.TraceIDs, traceID)
+	key := request.Identity.ProjectKey
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.Go(func() error {
+		started := time.Now()
+		ids, err := seedTraces(groupCtx, client, request, now)
+		result.TraceIDs = ids
+		keep("traces", started, nil, nil)
+		return err
+	})
+	group.Go(func() error {
+		started := time.Now()
+		fixtures, warnings, err := seedDataset(groupCtx, client, request.APIURL, key)
+		result.DatasetOK = err == nil
+		keep("dataset", started, fixtures, warnings)
+		return err
+	})
+	group.Go(func() error {
+		started := time.Now()
+		fixtures, warnings := seedEntities(groupCtx, entityRequest{client: client, apiURL: request.APIURL, key: key, seeds: entitySeeds})
+		keep("entities", started, fixtures, warnings)
+		return nil
+	})
+	group.Go(func() error {
+		started := time.Now()
+		fixtures, warnings := seedForFlows(groupCtx, flowSeedRequest{client: client, apiURL: request.APIURL, key: key, now: now})
+		keep("flow fixtures", started, fixtures, warnings)
+		return nil
+	})
+	if err := group.Wait(); err != nil {
+		return result, err
 	}
+	started := time.Now()
+	setups, warnings := runFlowSetups(ctx, setupRequest{client: client, apiURL: request.APIURL, key: key, fixtures: result.Fixtures, flows: request.Flows})
+	keep("setups", started, setups, warnings)
+	return result, nil
+}
+
+// seedTraces posts TraceCount deterministic traces at once, and returns their ids in order.
+func seedTraces(ctx context.Context, client *http.Client, request SeedRequest, now int64) ([]string, error) {
+	ids := make([]string, request.TraceCount)
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(seedConcurrency)
+	for index := range request.TraceCount {
+		ids[index] = fmt.Sprintf("%s%d", SeedTraceIDPrefix, index)
+		group.Go(func() error {
+			fixture := postSpec{url: request.APIURL + "/api/collector", key: request.Identity.ProjectKey, body: seedTrace(ids[index], index, now)}
+			if err := post(groupCtx, client, fixture); err != nil {
+				return fmt.Errorf("seed trace %s: %w", ids[index], err)
+			}
+			return nil
+		})
+	}
+	return ids, group.Wait()
+}
+
+// seedDataset posts the dataset, then its rows, and names it as a fixture.
+func seedDataset(ctx context.Context, client *http.Client, apiURL, key string) (map[string]string, []string, error) {
 	dataset := map[string]any{
 		"name": "Visual Diff QA",
 		"columnTypes": []map[string]string{
@@ -107,23 +187,26 @@ func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 			{"name": "expected_output", "type": "string"},
 		},
 	}
-	answer, err := postReading(ctx, client, postSpec{url: request.APIURL + "/api/dataset", key: request.Identity.ProjectKey, body: dataset})
+	answer, err := postReading(ctx, client, postSpec{url: apiURL + "/api/dataset", key: key, body: dataset})
+	var warnings []string
+	switch {
+	case err != nil && strings.Contains(err.Error(), "answered 409"):
+		// An earlier seed of this database made it, rows and all.
+		answer, err = postReading(ctx, client, postSpec{url: apiURL + "/api/dataset/" + SeedDatasetSlug, key: key, method: http.MethodGet})
+	case err == nil:
+		rows := postSpec{url: apiURL + "/api/dataset/" + SeedDatasetSlug + "/records", key: key, body: map[string]any{"entries": seedDatasetRows()}}
+		if err := post(ctx, client, rows); err != nil {
+			warnings = append(warnings, fmt.Sprintf("dataset rows not seeded: %v", err))
+		}
+	}
 	if err != nil {
-		return result, fmt.Errorf("seed dataset: %w", err)
+		return nil, nil, fmt.Errorf("seed dataset: %w", err)
 	}
-	result.DatasetOK = true
-	result.Fixtures, result.Warnings = seedEntities(ctx, entityRequest{
-		client: client, apiURL: request.APIURL, key: request.Identity.ProjectKey, seeds: entitySeeds,
-	})
-	extra, extraWarnings := seedForFlows(ctx, flowSeedRequest{client: client, apiURL: request.APIURL, key: request.Identity.ProjectKey, now: now})
-	maps.Copy(result.Fixtures, extra)
-	result.Warnings = append(result.Warnings, extraWarnings...)
-	if id, err := StringAt(answer, "id"); err == nil {
-		result.Fixtures[FixtureDataset] = id
-	} else {
-		result.Warnings = append(result.Warnings, fmt.Sprintf("%s not seeded: /api/dataset answered without id: %v", FixtureDataset, err))
+	id, err := StringAt(answer, "id")
+	if err != nil {
+		return nil, append(warnings, fmt.Sprintf("%s not seeded: /api/dataset answered without id: %v", FixtureDataset, err)), nil
 	}
-	return result, nil
+	return map[string]string{FixtureDataset: id}, warnings, nil
 }
 
 // seedTrace is one deterministic trace: a root span, an LLM span and a
@@ -155,11 +238,12 @@ func seedTrace(traceID string, index int, now int64) map[string]any {
 	}
 }
 
-// postSpec is one fixture write.
+// postSpec is one fixture write, or a read when method is GET.
 type postSpec struct {
-	url  string
-	key  string
-	body any
+	url    string
+	key    string
+	body   any
+	method string
 }
 
 func post(ctx context.Context, client *http.Client, spec postSpec) error {
@@ -173,7 +257,11 @@ func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	outgoing, err := http.NewRequestWithContext(ctx, http.MethodPost, spec.url, bytes.NewReader(encoded))
+	method, body := http.MethodPost, io.Reader(bytes.NewReader(encoded))
+	if spec.method != "" {
+		method, body = spec.method, nil
+	}
+	outgoing, err := http.NewRequestWithContext(ctx, method, spec.url, body)
 	if err != nil {
 		return nil, err
 	}

@@ -1,8 +1,11 @@
 import { chromium } from "playwright";
 
+import { closeBrowser } from "./capture";
+
 try {
   const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
-  await browser.close();
+  await closeBrowser(browser);
+  process.exit(0);
 } catch (thrown) {
   const reason = thrown instanceof Error ? thrown.message : String(thrown);
   process.stderr.write(

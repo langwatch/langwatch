@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -24,11 +25,15 @@ func entityServer(t *testing.T, refuse string) (*httptest.Server, map[string]map
 		"/api/gateway/v1/virtual-keys": `{"virtual_key":{"id":"vk_1"},"secret":"s"}`,
 		"/api/gateway/v1/budgets":      `{"budget":{"id":"budget_1"}}`,
 		"/api/bug-reports":             `{"id":"bug_1"}`,
+		"/api/projects":                `{"slug":"isolated-1","serviceApiKey":"sk-lw-isolated"}`,
 	}
 	bodies := map[string]map[string]any{}
+	var mutex sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
+		mutex.Lock()
+		defer mutex.Unlock()
 		bodies[r.URL.Path] = body
 		if r.URL.Path == refuse {
 			w.WriteHeader(http.StatusForbidden)
@@ -53,6 +58,7 @@ func TestEachStackSeedsTheEntitiesItsDynamicRoutesOpenAndKeepsItsOwnIDs(t *testi
 		FixtureDataset: "dataset_1", FixtureExperiment: "visual-diff-experiment", FixtureMonitor: "monitor_1",
 		FixtureGraph: "graph_1", FixtureVirtualKey: "vk_1", FixtureBudget: "budget_1",
 		FixtureErrorTrace: SeedErrorTraceID, FixtureConversation: SeedConversationThread, FixtureBugReport: "bug_1",
+		FixtureIsolatedSlug: "isolated-1", FixtureIsolatedKey: "sk-lw-isolated",
 	}
 	if len(result.Warnings) != 0 || len(result.Fixtures) != len(want) {
 		t.Fatalf("fixtures %+v, warnings %v", result.Fixtures, result.Warnings)

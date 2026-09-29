@@ -14,6 +14,8 @@ type stampedWriter struct {
 	out     io.Writer
 	now     func() time.Time
 	midLine bool
+	// layout is the stamp's time layout and what follows it; empty is run.log's.
+	layout string
 }
 
 // newStampedWriter stamps every line written to out with now's clock time.
@@ -27,7 +29,11 @@ func (writer *stampedWriter) Write(chunk []byte) (int, error) {
 	var buffer bytes.Buffer
 	for rest := chunk; len(rest) > 0; {
 		if !writer.midLine {
-			buffer.WriteString(writer.now().Format("15:04:05.000") + " ")
+			layout := writer.layout
+			if layout == "" {
+				layout = "15:04:05.000 "
+			}
+			buffer.WriteString(writer.now().Format(layout))
 		}
 		end := bytes.IndexByte(rest, '\n')
 		if end < 0 {

@@ -392,9 +392,25 @@ export class SideBrowser {
   }
 
   async close(): Promise<void> {
-    await this.browser.close().catch(() => undefined);
+    await closeBrowser(this.browser);
   }
 }
+
+/** BROWSER_CLOSE_MILLIS bounds a close: Chromium here can take 30s to exit on its own. */
+const BROWSER_CLOSE_MILLIS = 3_000;
+
+/**
+ * closeBrowser asks Chromium to close and stops waiting after BROWSER_CLOSE_MILLIS;
+ * Playwright kills what it launched when this process exits.
+ */
+export const closeBrowser = async (browser: Browser): Promise<void> => {
+  let timer: NodeJS.Timeout | undefined;
+  const bounded = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, BROWSER_CLOSE_MILLIS);
+  });
+  await Promise.race([browser.close().catch(() => undefined), bounded]);
+  clearTimeout(timer);
+};
 
 export const openSideBrowser = async ({
   side,

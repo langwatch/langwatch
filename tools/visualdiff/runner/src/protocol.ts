@@ -71,6 +71,8 @@ export interface Plan {
   fixtures?: Record<string, string>;
   /** concurrency is how many pages each side captures routes and flows on at once. */
   concurrency?: Concurrency;
+  /** check photographs a flow only at its expects and its failure, and times each flow. */
+  check?: boolean;
 }
 
 export interface Concurrency {
@@ -114,7 +116,8 @@ export interface DiffMessage {
 export interface PhaseMessage {
   type: "phase";
   side: string;
-  name: "capture" | "recapture" | "flows";
+  /** A `flow <id>` phase is one flow's whole walk, reported in check mode only. */
+  name: "capture" | "recapture" | "flows" | "sign-in" | `flow ${string}`;
   millis: number;
 }
 

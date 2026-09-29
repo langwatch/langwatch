@@ -610,7 +610,7 @@ func (run *session) seedStacks(ctx context.Context, options Options, deps Deps) 
 	}
 	fixtures := map[string]map[string]string{}
 	for _, stack := range stacks {
-		seed := SeedRequest{APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount}
+		seed := SeedRequest{APIURL: stack.APIURL(), Identity: options.Identity, TraceCount: options.TraceCount, Flows: run.request.Config.Flows}
 		result, err := deps.Seed(ctx, seed)
 		if err != nil {
 			return nil, fmt.Errorf("seed %s: %w", stack.Name, err)
@@ -1011,7 +1011,12 @@ type CaptureOptions struct {
 	// comparison while the run is still going (see findings_stream.go).
 	OnCapture func(Capture)
 	OnDiff    func(Diff)
+	// OnPhase is called as each phase the runner times ends (check's per-flow progress).
+	OnPhase func(RunnerPhase)
 }
+
+// runnerWaitDelay is how long the runner's pipes may outlive its process.
+const runnerWaitDelay = 30 * time.Second
 
 // RunRunner writes the plan to a file, runs the Node capture package over it
 // and streams its JSON lines as they arrive. The plan goes to a file because
@@ -1036,6 +1041,8 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 	command := exec.CommandContext(ctx, "pnpm", "--silent", "--filter", RunnerPackage, "capture", "--plan", planPath)
 	command.Dir = options.Root
 	command.Stderr = options.Stderr
+	// A grandchild left holding stderr (tsx's esbuild service) must not hold Wait open.
+	command.WaitDelay = runnerWaitDelay
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		return RunnerStream{}, err
@@ -1043,7 +1050,9 @@ func RunRunner(ctx context.Context, plan RunnerPlan, options CaptureOptions) (Ru
 	if err := command.Start(); err != nil {
 		return RunnerStream{}, err
 	}
-	stream, parseErr := ParseRunnerStreamLive(stdout, options.OnCapture, options.OnDiff)
+	stream, parseErr := ParseRunnerStreamLive(stdout, options)
+	// Parsing stops at the runner's error line; unread, its last writes block it from exiting.
+	_, _ = io.Copy(io.Discard, stdout)
 	runErr := command.Wait()
 	if parseErr != nil {
 		return stream, parseErr

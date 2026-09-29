@@ -3,13 +3,20 @@ import { join } from "node:path";
 import { captureMessage, type Side } from "./capture";
 import { DeadlineAlarm } from "./deadline-alarm";
 import { fillPath, sideFixtures } from "./flows/context";
-import { fillArgs, ISOLATED_KEY, ISOLATED_SLUG, uidFor } from "./flows/values";
+import { fillArgs, flowValues, ISOLATED_KEY, ISOLATED_SLUG, uidFor } from "./flows/values";
 import { describeExpect } from "./flows/expect";
 import { declinePasskeyOffer } from "./flows/primitives";
 import { resolveAction } from "./flows/registry";
 import { needsRecapture } from "./module-load";
 import { safeName } from "./pairing";
-import { note, type CaptureMessage, type Credential, type Plan, type PlanFlow } from "./protocol";
+import {
+  emit,
+  note,
+  type CaptureMessage,
+  type Credential,
+  type Plan,
+  type PlanFlow,
+} from "./protocol";
 import { runPoolWithRecapture } from "./schedule";
 import { SHELL_PROBE, shellBroken, type ShellProbe } from "./shell";
 
@@ -218,7 +225,10 @@ export const flowProject = ({
   return { slug, credential: { ...plan.credential, slug, projectKey }, missing: "" };
 };
 
-/** captureFlow runs one flow's steps on one page; each step's first action opens its own screen. */
+/**
+ * captureFlow runs one flow's steps on one page, each step's first action opening its own
+ * screen, and stops at the first step that fails. Check mode photographs only expects and the failure.
+ */
 export const captureFlow = async ({
   plan,
   flow,
@@ -231,10 +241,17 @@ export const captureFlow = async ({
   collect: Collect;
 }): Promise<void> => {
   side.drain();
+  const flowStartedAt = Date.now();
+  const everyStep = plan.check !== true;
   let failed = 0;
   const fixtures = sideFixtures({ plan, side: side.name });
   const project = flowProject({ plan, flow, fixtures });
-  const values: Record<string, string> = { ...fixtures, slug: project.slug, uid: uidFor(flow.id) };
+  const values: Record<string, string> = {
+    ...fixtures,
+    ...flowValues({ fixtures, flowId: flow.id }),
+    slug: project.slug,
+    uid: uidFor(flow.id),
+  };
   const mailUrl = plan.sides.find((candidate) => candidate.name === side.name)?.mailUrl;
   let anonymous: Side | undefined;
   for (const [stepIndex, step] of flow.steps.entries()) {
@@ -285,7 +302,7 @@ export const captureFlow = async ({
         args: fillArgs({ args: step.with ?? {}, values }),
         values,
         mailUrl,
-        snapshot: async (label: string) => shoot({ label, error: "" }),
+        snapshot: async (label: string) => (everyStep ? shoot({ label, error: "" }) : undefined),
       });
     } catch (thrown) {
       error = step.optional === true ? "" : stepError(thrown);
@@ -297,9 +314,16 @@ export const captureFlow = async ({
         err: process.stderr,
       });
     }
-    await shoot({ label: "after", error });
+    // Check mode still settles after every step: the next step's 6s starts on a loaded screen.
+    if (everyStep || error !== "" || step.action === "expect") await shoot({ label: "after", error });
+    else await active.waitUntilQuiet();
+    if (error !== "") break;
   }
   await anonymous?.dispose();
+  if (!everyStep) {
+    const millis = Date.now() - flowStartedAt;
+    emit({ message: { type: "phase", side: side.name, name: `flow ${flow.id}`, millis }, out: process.stdout });
+  }
   const outcome = failed === 0 ? "ok" : `${failed} failed`;
   note({
     text: `${side.name} ${flow.id}: ${flow.steps.length} steps, ${outcome}`,

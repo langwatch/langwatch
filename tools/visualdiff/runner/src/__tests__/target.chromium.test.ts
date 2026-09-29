@@ -4,6 +4,7 @@ import { chromium } from "playwright";
 import type { Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { closeBrowser } from "../capture";
 import { targetOf } from "../flows/target";
 
 const installed = existsSync(chromium.executablePath());
@@ -14,7 +15,7 @@ describe.skipIf(!installed)("Feature: flows name elements by test id", () => {
     browser = await chromium.launch();
   });
   afterAll(async () => {
-    await browser?.close();
+    if (browser !== undefined) await closeBrowser(browser);
   });
 
   /** @scenario Steps target elements by test id, prefix or label */

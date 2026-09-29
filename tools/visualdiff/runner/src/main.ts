@@ -14,6 +14,30 @@ const out = process.stdout;
 /** DIFF_WORKERS decode and compare screenshots beside the pages capturing them. */
 const DIFF_WORKERS = 2;
 
+/** WIND_DOWN_MILLIS bounds each step after the last capture, so a stalled one fails loud. */
+const WIND_DOWN_MILLIS = 120_000;
+
+/** windDown is `work` unless it outlasts WIND_DOWN_MILLIS, then an error naming `step`. */
+const windDown = async <T>({ step, work }: { step: string; work: Promise<T> }): Promise<T> => {
+  let timer: NodeJS.Timeout | undefined;
+  const stalled = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${step} did not finish within ${WIND_DOWN_MILLIS}ms`)),
+      WIND_DOWN_MILLIS,
+    );
+  });
+  try {
+    return await Promise.race([work, stalled]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/** exit leaves once stdout has flushed, so no stray handle keeps a finished runner alive. */
+const exit = (code: number): void => {
+  out.write("", () => process.exit(code));
+};
+
 const readPlan = (argv: string[]): Plan => {
   const index = argv.indexOf("--plan");
   if (index === -1 || argv[index + 1] === undefined) {
@@ -36,8 +60,13 @@ const openPages = async ({
 }): Promise<Side[]> => {
   const first = await browser.openPage();
   const count = Math.max(width(plan.concurrency?.routes), width(plan.concurrency?.flows));
+  const signInStartedAt = Date.now();
+  const signedIn = signInSide({ plan, side: first, collect }).then(() => {
+    const millis = Date.now() - signInStartedAt;
+    emit({ message: { type: "phase", side: first.name, name: "sign-in", millis }, out });
+  });
   const [, rest] = await Promise.all([
-    signInSide({ plan, side: first, collect }),
+    signedIn,
     Promise.all(Array.from({ length: count - 1 }, () => browser.openPage())),
   ]);
   return [first, ...rest];
@@ -125,22 +154,28 @@ const main = async (): Promise<void> => {
         try {
           await captureSide({ plan, browser, collect });
         } finally {
-          await browser.close();
+          await windDown({ step: `closing the ${definition.name} browser`, work: browser.close() });
         }
       }),
     );
-    await Promise.all(diffs);
+    await windDown({ step: "comparing the screenshots", work: Promise.all(diffs) });
   } finally {
-    await Promise.all(browsers.map((browser) => browser.close()));
-    await differ.close();
+    await windDown({
+      step: "closing the browsers",
+      work: Promise.all(browsers.map((browser) => browser.close())),
+    });
+    await windDown({ step: "stopping the diff workers", work: differ.close() });
   }
   emit({ message: { type: "done" }, out });
 };
 
-main().catch((thrown: unknown) => {
-  emit({
-    message: { type: "error", message: String(thrown instanceof Error ? thrown.message : thrown) },
-    out,
-  });
-  process.exitCode = 1;
-});
+main().then(
+  () => exit(0),
+  (thrown: unknown) => {
+    emit({
+      message: { type: "error", message: String(thrown instanceof Error ? thrown.message : thrown) },
+      out,
+    });
+    exit(1);
+  },
+);

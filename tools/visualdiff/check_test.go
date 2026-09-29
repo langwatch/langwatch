@@ -1,0 +1,124 @@
+package visualdiff
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestCheckAnswersPassOrFailAndHowEachFlowComparesWithMain(t *testing.T) {
+	results := newFlowResults()
+	results.add(Capture{Kind: "flow", Key: "same", Side: "candidate", Expect: "saved"})
+	results.add(Capture{Kind: "flow", Key: "moved", Side: "candidate", Expect: "saved"})
+	results.add(Capture{Kind: "flow", Key: "broken", Side: "candidate", Index: 2, Label: "click", Error: "timeout"})
+	results.add(Capture{Kind: "flow", Key: "broken", Side: "base", Expect: "a base capture never counts"})
+	diffs := []Diff{{Kind: "flow", Key: "same", Ratio: 0.001}, {Kind: "flow", Key: "moved", Ratio: 0.25}}
+
+	outcome := results.outcome(checkOutcomeInputs{
+		flows: []Flow{{ID: "same"}, {ID: "moved"}, {ID: "broken"}, {ID: "new"}},
+		done:  []string{"finished"}, diffs: diffs, held: map[string]bool{"same": true, "moved": true},
+	})
+
+	for _, want := range []string{
+		"DONE     finished (skipped; -all runs it)",
+		"PASS     same (1 expects) · looks like main",
+		"PASS     moved (1 expects) · differs from main (25.0%)",
+		"FAIL     broken · step 2 click: timeout · no baseline",
+		"UNPROVEN new · no expect held · no baseline",
+		"2/4 flows passed",
+	} {
+		if !strings.Contains(outcome.text, want) {
+			t.Errorf("missing %q in\n%s", want, outcome.text)
+		}
+	}
+	if outcome.failed != 2 || len(outcome.passed) != 2 {
+		t.Errorf("failed %d, passed %v", outcome.failed, outcome.passed)
+	}
+}
+
+func TestGCNeverTakesChecksOwnStackAsAnOrphan(t *testing.T) {
+	plan := SelectGarbage(nil, GCSelection{Registered: []string{CheckSlug, "visualdiff-stray"}})
+	if len(plan.OrphanSlugs) != 1 || plan.OrphanSlugs[0] != "visualdiff-stray" {
+		t.Errorf("orphans = %v", plan.OrphanSlugs)
+	}
+}
+
+func TestAFlowsSetupPostsItsPrerequisitesAndFilesWhatTheyAnswerUnderTheFlow(t *testing.T) {
+	var bodies []map[string]any
+	var keys []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		bodies, keys = append(bodies, body), append(keys, r.Header.Get("X-Auth-Token"))
+		_, _ = w.Write([]byte(`{"agent":{"id":"agent_` + r.URL.Path[len(r.URL.Path)-1:] + `"}}`))
+	}))
+	t.Cleanup(server.Close)
+	flows := []Flow{
+		{ID: "plain"},
+		{ID: "suite", Isolated: true, Setup: []SetupStep{
+			{Post: "/api/agents/1", Body: map[string]any{"name": `in "{isolatedSlug}"`}, As: map[string]string{"agentId": "agent.id"}},
+			{Post: "/api/suites/2", Body: map[string]any{"agent": "{agentId}"}},
+		}},
+	}
+
+	captured, warnings := runFlowSetups(context.Background(), setupRequest{
+		client: server.Client(), apiURL: server.URL, key: "sk-main",
+		fixtures: map[string]string{FixtureIsolatedSlug: "iso", FixtureIsolatedKey: "sk-iso"}, flows: flows,
+	})
+
+	if len(warnings) != 0 || captured["suite/agentId"] != "agent_1" || len(captured) != 1 {
+		t.Fatalf("captured %v, warnings %v", captured, warnings)
+	}
+	if bodies[0]["name"] != `in "iso"` || bodies[1]["agent"] != "agent_1" || keys[0] != "sk-iso" {
+		t.Errorf("bodies %v, keys %v", bodies, keys)
+	}
+}
+
+func TestCheckRefusesACheckoutWhoseInstallOrGeneratedFilesAreStale(t *testing.T) {
+	root := t.TempDir()
+	write := func(path string, at time.Time) {
+		full := filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(full, at, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	earlier, later := time.Now().Add(-time.Hour), time.Now()
+	prepares := []checkoutPrepare{
+		{output: "node_modules/.modules.yaml", inputs: []string{"pnpm-lock.yaml"}, command: "pnpm install"},
+		{output: "sdks/typescript/dist/index.mjs", inputs: []string{"sdks/typescript/src"}, command: "pnpm ensure:built"},
+	}
+	write("node_modules/.modules.yaml", later)
+	write("pnpm-lock.yaml", earlier)
+	write("sdks/typescript/src/index.ts", earlier)
+	write("sdks/typescript/dist/index.mjs", later)
+	if err := checkoutUnprepared(root, prepares); err != nil {
+		t.Fatalf("a prepared checkout was refused: %v", err)
+	}
+
+	write("pnpm-lock.yaml", later.Add(time.Minute))
+	if err := os.Remove(filepath.Join(root, "sdks/typescript/dist/index.mjs")); err != nil {
+		t.Fatal(err)
+	}
+	err := checkoutUnprepared(root, prepares)
+
+	if err == nil || strings.Contains(err.Error(), "\n") {
+		t.Fatalf("want one refusal line, got %v", err)
+	}
+	for _, want := range []string{"node_modules/.modules.yaml", "sdks/typescript/dist/index.mjs", "run pnpm install && pnpm ensure:built"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal %q lacks %q", err, want)
+		}
+	}
+}
