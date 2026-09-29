@@ -175,7 +175,6 @@ const FLAG_ON = { release_dashboards: true };
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const MEMBER = ["analytics:view", "cost:view", "traces:view"];
 const LANGY_MEMBER = [...MEMBER, "langy:create"];
-const WRITES = /^dashboards\.(?!getAll)|^dashboardWidgets\.(?!list)/;
 const OWN_BOARDS: Board[] = [
   {
     id: "board-1",
@@ -231,9 +230,6 @@ function openBoard({
 
 const callsTo = (server: ReturnType<typeof inMemoryServer>, path: string) =>
   server.state.calls.filter((call) => call.path === path);
-
-const writesTo = (server: ReturnType<typeof inMemoryServer>) =>
-  server.state.calls.filter(({ path }) => WRITES.test(path));
 
 /** The picker's regions, by the name each section carries. */
 async function pickerRegions() {
@@ -322,10 +318,16 @@ describe("a member's board", () => {
     });
 
     describe("when they choose a question", () => {
-      /** @scenario "AC11 Ask Langy by question" */
-      it("closes the picker and asks Langy the question's prompt, writing nothing", async () => {
+      const withExistingWidget = () =>
+        inMemoryServer({
+          boards: OWN_BOARDS,
+          widgets: [storedWidget({ id: "w-1", dashboardId: "board-1", name: "Traces" })],
+        });
+
+      /** @scenario "AC12 A picked question adds its widget and seeds Langy" */
+      it("closes the picker, adds the question's widget below the existing ones, and drafts Langy to send", async () => {
         const user = userEvent.setup();
-        const { server, host } = openPicker();
+        const { server, host } = openPicker(withExistingWidget());
         const traffic = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
           ({ id }) => id === "traffic",
         )!;
@@ -334,36 +336,72 @@ describe("a member's board", () => {
           await screen.findByRole("button", { name: new RegExp(escape(traffic.question)) }),
         );
 
-        expect(host.lastQuery).toEqual({ addBlock: void 0 });
+        await waitFor(() => expect(host.lastQuery).toEqual({ addBlock: void 0 }));
+        const created = server.state.widgets.find(({ id }) => id === "widget-new-1")!;
+        expect(created).toMatchObject({
+          dashboardId: "board-1",
+          name: traffic.question,
+          gridRow: 3,
+        });
         expect(host.langyAsks).toHaveLength(1);
         const [ask] = host.langyAsks;
-        expect(ask?.question.startsWith(traffic.prompt)).toBe(true);
-        expect(ask?.question).toContain("Dashboard period:");
+        expect(ask?.question).toBeUndefined();
+        expect(ask?.draft?.startsWith(traffic.prompt)).toBe(true);
+        expect(ask?.draft).toContain("Dashboard period:");
         expect(ask?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
         expect(ask?.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
-        expect(writesTo(server)).toEqual([]);
       });
     });
   });
 
   describe("given the picker is open and Langy is not available to the member", () => {
-    /** @scenario "AC12 Only working questions are offered" */
+    /** @scenario "AC12b Without Langy a picked question still adds its widget" */
     it.each([
       ["the release flag is off", FLAG_ON, LANGY_MEMBER],
       ["the member may not start a conversation", LANGY_ON, MEMBER],
-    ])("shows no questions and nothing to search when %s", async (_case, flags, permissions) => {
-      openBoard({
-        server: inMemoryServer({ boards: OWN_BOARDS }),
-        query: { addBlock: "open" },
-        flags,
-        permissions,
-      });
+    ])(
+      "lists every question and no Ask Langy footer when %s",
+      async (_case, flags, permissions) => {
+        openBoard({
+          server: inMemoryServer({ boards: OWN_BOARDS }),
+          query: { addBlock: "open" },
+          flags,
+          permissions,
+        });
 
-      expect(await pickerRegions()).toEqual([]);
-      expect(await screen.findByText("Nothing matches your search.")).toBeInTheDocument();
-      for (const { question } of BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions)) {
-        expect(screen.queryByRole("button", { name: new RegExp(escape(question)) })).toBeNull();
-      }
+        expect(await pickerRegions()).toEqual(BLOCK_QUESTION_SECTIONS.map(({ title }) => title));
+        for (const { question } of BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions)) {
+          expect(screen.getByRole("button", { name: new RegExp(escape(question)) })).toBeEnabled();
+        }
+        expect(screen.queryByRole("button", { name: "Ask Langy" })).toBeNull();
+      },
+    );
+
+    /** @scenario "AC12b Without Langy a picked question still adds its widget" */
+    it("adds the picked question's widget and seeds no Langy conversation", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({
+        server,
+        query: { addBlock: "open" },
+        flags: FLAG_ON,
+        permissions: MEMBER,
+      });
+      const overall = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
+        ({ id }) => id === "overall",
+      )!;
+
+      await user.click(
+        await screen.findByRole("button", { name: new RegExp(escape(overall.question)) }),
+      );
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
+      expect(callsTo(server, "dashboardWidgets.create")[0]?.input).toMatchObject({
+        dashboardId: "board-1",
+        name: overall.question,
+      });
+      expect(host.langyAsks).toEqual([]);
+      expect(host.lastQuery).toEqual({ addBlock: void 0 });
     });
   });
 

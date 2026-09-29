@@ -64,7 +64,10 @@ export type AnalyticsLangyContext = { kind: "dashboard"; ref: string; label: str
 
 /** A question for Langy and what it is asked about. */
 export type AnalyticsLangyAskRequest = {
-  question: string;
+  /** A question to send outright; absent when only a draft is handed over. */
+  question?: string;
+  /** A prompt seeded into the composer for the reader to send; never sent for them. */
+  draft?: string;
   context: readonly AnalyticsLangyContext[];
 };
 

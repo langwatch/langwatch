@@ -100,6 +100,28 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # Evidence: the docs diff
 
   # ---------------------------------------------------------------------------
+  # Question picker
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: AC12 A picked question adds its widget and seeds Langy
+    Given a board with a widget on it, Langy enabled and the member may start a conversation
+    When the member opens the picker and picks a question
+    Then the picker closes
+    And the question's widget is stored on the board below the existing widgets
+    And Langy opens with the question's prompt ready to send and not sent
+    And the open board is passed as context
+    # Evidence: screenshot of the board with the new widget and Langy's drafted prompt
+
+  @integration
+  Scenario: AC12b Without Langy a picked question still adds its widget
+    Given a board and Langy is not available to the member
+    When the member opens the picker
+    Then every question is still listed with no "Ask Langy" footer
+    And picking one stores its widget on the board and opens no Langy conversation
+    # Evidence: screenshot of the picker without Langy and the board with the new widget
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -121,3 +143,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 9: "The docs explain how to build boards from an agent" → Scenario: AC9 The docs explain how to build boards from an agent
   # AC 10: "A non-empty board still offers a way to add a widget" → Scenario: AC10 A non-empty board still offers a way to add a widget
   # AC 11: "Existing boards are unaffected" → Scenario: AC11 Existing boards are unaffected
+  # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget
