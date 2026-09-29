@@ -3,7 +3,7 @@
  * No local rail: the product sidebar carries these pages now.
  */
 
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
@@ -20,7 +20,18 @@ describe("given a governance page", () => {
 
     expect(screen.queryByTestId("section-navigation-links")).toBeNull();
     expect(screen.queryByRole("navigation")).toBeNull();
-    const content = screen.getByTestId("section-navigation-content");
+    const content = screen.getByTestId("section-navigation-layout");
     expect(content.textContent).toBe("page content");
+  });
+
+  it("writes the page title it is given as the document title", async () => {
+    renderWithGovernanceHost(
+      <GovernanceLayout pageTitle="A page · LangWatch">page content</GovernanceLayout>,
+      {
+        host: fakeGovernanceHost({ enabledFlags: [] }),
+      },
+    );
+
+    await waitFor(() => expect(document.title).toBe("A page · LangWatch"));
   });
 });

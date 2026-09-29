@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@langwatch/design-system/dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
@@ -125,65 +126,45 @@ function SourceDetailHeader({
   });
   const StatusIcon = status.icon;
   return (
-    <HStack alignItems="end">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <Link href="/governance/ingestion-sources" color="blue.600" fontSize="xs">
-            <HStack gap={1}>
-              <ArrowLeft size={12} />
-              <Text>All sources</Text>
-            </HStack>
-          </Link>
+    <PageLayout.Header>
+      <Link href="/governance/ingestion-sources" color="blue.600" fontSize="xs">
+        <HStack gap={1}>
+          <ArrowLeft size={12} />
+          <Text>All sources</Text>
         </HStack>
-        <HStack gap={2}>
-          <Heading size="md">{source.name}</Heading>
-          <Badge size="sm" variant="surface">
-            {source.sourceType}
-          </Badge>
-          <HStack gap={1}>
-            <Box color={status.color} display="flex">
-              <StatusIcon size={14} />
-            </Box>
-            <Text fontSize="sm" color="fg.muted">
-              {status.label}
-            </Text>
-          </HStack>
-        </HStack>
-        {source.description && (
-          <Text fontSize="sm" color="fg.muted">
-            {source.description}
-          </Text>
-        )}
-      </VStack>
+      </Link>
+      <PageLayout.Heading>{source.name}</PageLayout.Heading>
+      <Badge size="sm" variant="surface">
+        {source.sourceType}
+      </Badge>
+      <HStack gap={1}>
+        <Box color={status.color} display="flex">
+          <StatusIcon size={14} />
+        </Box>
+        <Text fontSize="sm" color="fg.muted">
+          {status.label}
+        </Text>
+      </HStack>
       <Spacer />
       {/* Editing, rotating a secret and archiving are all
           `ingestionSources:manage`. */}
       {canManage && (
         <>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onEdit}
-            title="Edit this source's configuration"
-          >
+          <PageLayout.HeaderButton onClick={onEdit} title="Edit this source's configuration">
             <Pencil size={14} /> Edit
-          </Button>
+          </PageLayout.HeaderButton>
           {needsIngestSecret({
             sourceType: source.sourceType as SourceType,
           }) && (
-            <Button
-              size="sm"
-              variant="outline"
+            <PageLayout.HeaderButton
               onClick={onRotate}
               loading={isRotating}
               title="Mint a new ingestSecret (24h grace on the old one)"
             >
               <RotateCw size={14} /> Rotate secret
-            </Button>
+            </PageLayout.HeaderButton>
           )}
-          <Button
-            size="sm"
-            variant="ghost"
+          <PageLayout.HeaderButton
             colorPalette="red"
             onClick={() => {
               if (!confirmArchiveSource({ name: source.name })) return;
@@ -192,10 +173,10 @@ function SourceDetailHeader({
             loading={isArchiving}
           >
             <Trash2 size={14} /> Archive
-          </Button>
+          </PageLayout.HeaderButton>
         </>
       )}
-    </HStack>
+    </PageLayout.Header>
   );
 }
 
@@ -378,10 +359,12 @@ function SourceActivityPanels({
 function SourceAccessDenied({ pageTitle }: { pageTitle: string }) {
   return (
     <GovernanceLayout pageTitle={pageTitle}>
-      <PermissionRequiredNotice
-        permission="ingestionSources:view"
-        detail="This source's configuration and health stay hidden until then."
-      />
+      <PageLayout.Container>
+        <PermissionRequiredNotice
+          permission="ingestionSources:view"
+          detail="This source's configuration and health stay hidden until then."
+        />
+      </PageLayout.Container>
     </GovernanceLayout>
   );
 }
@@ -595,10 +578,12 @@ function IngestionSourceDetailPage() {
   if (sourceQuery.error) {
     return (
       <SourceDetailShell pageTitle={pageTitle}>
-        <HandledErrorAlert
-          error={sourceQuery.error}
-          fallbackTitle="Couldn't load this ingestion source"
-        />
+        <PageLayout.Container>
+          <HandledErrorAlert
+            error={sourceQuery.error}
+            fallbackTitle="Couldn't load this ingestion source"
+          />
+        </PageLayout.Container>
       </SourceDetailShell>
     );
   }
@@ -606,7 +591,9 @@ function IngestionSourceDetailPage() {
   if (!source) {
     return (
       <SourceDetailShell pageTitle={pageTitle}>
-        <Spinner size="sm" />
+        <PageLayout.Container>
+          <Spinner size="sm" />
+        </PageLayout.Container>
       </SourceDetailShell>
     );
   }
@@ -675,35 +662,43 @@ function LoadedSourceDetail({
 >) {
   return (
     <SourceDetailShell pageTitle={pageTitle}>
-      <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <SourceDetailHeader
-          source={source}
-          canManage={canManage}
-          isRotating={rotateMutation.isPending}
-          isArchiving={archiveMutation.isPending}
-          onRotate={() => rotateMutation.mutate({ organizationId: orgId, id: source.id })}
-          onArchive={() => archiveMutation.mutate({ organizationId: orgId, id: source.id })}
-          onEdit={() => setIsEditing(true)}
-        />
+      <SourceDetailHeader
+        source={source}
+        canManage={canManage}
+        isRotating={rotateMutation.isPending}
+        isArchiving={archiveMutation.isPending}
+        onRotate={() => rotateMutation.mutate({ organizationId: orgId, id: source.id })}
+        onArchive={() => archiveMutation.mutate({ organizationId: orgId, id: source.id })}
+        onEdit={() => setIsEditing(true)}
+      />
 
-        {/* The same drawer the source list opens, so the two surfaces cannot
+      <PageLayout.Container>
+        <VStack align="stretch" gap={6} width="full">
+          {source.description && (
+            <Text fontSize="sm" color="fg.muted">
+              {source.description}
+            </Text>
+          )}
+
+          {/* The same drawer the source list opens, so the two surfaces cannot
             drift into offering different edits of the same row. */}
-        <SourceEditDrawer
-          organizationId={orgId}
-          destinationCtx={destinationCtx}
-          source={isEditing ? source : null}
-          onClose={() => setIsEditing(false)}
-          onSubmit={(input) => updateMutation.mutate(input)}
-          isPending={updateMutation.isPending}
-        />
+          <SourceEditDrawer
+            organizationId={orgId}
+            destinationCtx={destinationCtx}
+            source={isEditing ? source : null}
+            onClose={() => setIsEditing(false)}
+            onSubmit={(input) => updateMutation.mutate(input)}
+            isPending={updateMutation.isPending}
+          />
 
-        <SourceActivityPanels
-          source={source}
-          canReadActivity={canReadActivity}
-          healthQuery={healthQuery}
-          eventsPager={eventsPager}
-        />
-      </VStack>
+          <SourceActivityPanels
+            source={source}
+            canReadActivity={canReadActivity}
+            healthQuery={healthQuery}
+            eventsPager={eventsPager}
+          />
+        </VStack>
+      </PageLayout.Container>
 
       <SecretRevealModal
         details={secretReveal}

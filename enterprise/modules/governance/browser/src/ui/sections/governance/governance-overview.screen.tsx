@@ -1,4 +1,5 @@
-import { Badge, Box, Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Badge, Box, Spacer, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { GovernanceHeroGround } from "../../../features/overview/ui/sections/governance-hero-ground.tsx";
@@ -37,32 +38,30 @@ function GovernanceOverviewPage() {
 
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
-      <VStack align="stretch" gap={8} width="full" maxW={HOME_MEASURE} marginX="auto">
-        {/* The only place this page still says its own name; the sample
-            toggle sits at its right like every other governance page. */}
-        <VStack align="stretch" gap={6}>
-          {/* Stacked above the ground: the hero's light bleeds past its own
-              box, and would otherwise sit under the row's words. */}
-          <HStack gap={2} align="center" position="relative" zIndex={1}>
-            <Heading size="sm">AI Governance</Heading>
-            <Badge colorPalette="purple" variant="subtle">
-              Preview
-            </Badge>
-            <Spacer />
-            <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
-          </HStack>
+      <PageLayout.Header>
+        <PageLayout.Heading>AI Governance</PageLayout.Heading>
+        <Badge colorPalette="purple" variant="subtle">
+          Preview
+        </Badge>
+        <Spacer />
+        <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
+      </PageLayout.Header>
 
-          {orgId && !sample.active && <QuarantineFillAlert organizationId={orgId} />}
+      <PageLayout.Container>
+        <VStack align="stretch" gap={8} width="full" maxW={HOME_MEASURE} marginX="auto">
+          <VStack align="stretch" gap={6}>
+            {orgId && !sample.active && <QuarantineFillAlert organizationId={orgId} />}
 
-          <GovernanceHeroGround>
-            <Box paddingTop={{ base: 2, md: 4 }}>
-              <GovernanceHero canManageSources={canManageSources} />
-            </Box>
-          </GovernanceHeroGround>
+            <GovernanceHeroGround>
+              <Box paddingTop={{ base: 2, md: 4 }}>
+                <GovernanceHero canManageSources={canManageSources} />
+              </Box>
+            </GovernanceHeroGround>
+          </VStack>
+
+          <GovernanceHomeSections canSetUpInsights={canSetUpInsights} sample={sample.active} />
         </VStack>
-
-        <GovernanceHomeSections canSetUpInsights={canSetUpInsights} sample={sample.active} />
-      </VStack>
+      </PageLayout.Container>
     </GovernanceLayout>
   );
 }

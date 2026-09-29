@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   Card,
-  EmptyState,
   HStack,
   Spacer,
   Spinner,
@@ -16,6 +15,7 @@ import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd, type VirtualKeySpendThisMonth } from "@langwatch/gateway-contract";
@@ -218,18 +218,16 @@ function VirtualKeysPage() {
           <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
           <Spacer />
           {canCreate && (
-            <Button
-              variant="outline"
-              size="sm"
+            <PageLayout.HeaderButton
               data-testid="gateway-virtual-key-new"
               onClick={() => setCreateOpen(true)}
             >
               <Plus size={14} /> New virtual key
-            </Button>
+            </PageLayout.HeaderButton>
           )}
         </PageLayout.Header>
 
-        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
+        <PageLayout.Container>
           {listView === "loading" && <Spinner />}
           {listView === "error" && (
             <GatewayErrorPanel
@@ -334,7 +332,7 @@ function VirtualKeysPage() {
               )}
             </VStack>
           )}
-        </Box>
+        </PageLayout.Container>
       </>
 
       {orgId && (
@@ -670,23 +668,17 @@ function VirtualKeysEmptyState({
 }) {
   return (
     <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
-      <EmptyState.Root>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <KeyRound size={32} />
-          </EmptyState.Indicator>
-          <EmptyState.Title>No virtual keys yet</EmptyState.Title>
-          <EmptyState.Description>
-            Mint your first virtual key to route requests through the LangWatch AI Gateway with
-            budgets, guardrails, and per-tenant tracing attached.
-          </EmptyState.Description>
-          {canCreate && (
-            <Button colorPalette="orange" onClick={onCreate} mt={2}>
-              <Plus size={14} /> New virtual key
-            </Button>
-          )}
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <NoDataInfoBlock
+        title="No virtual keys yet"
+        description="Mint your first virtual key to route requests through the LangWatch AI Gateway with budgets, guardrails, and per-tenant tracing attached."
+        icon={<KeyRound size={32} />}
+      >
+        {canCreate && (
+          <PageLayout.HeaderButton onClick={onCreate} marginTop={4}>
+            <Plus size={14} /> New virtual key
+          </PageLayout.HeaderButton>
+        )}
+      </NoDataInfoBlock>
       <GatewayCapabilityPreview />
     </VStack>
   );

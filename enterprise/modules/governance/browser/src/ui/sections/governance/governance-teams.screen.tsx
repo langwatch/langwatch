@@ -1,4 +1,5 @@
-import { Box, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
 import numeral from "numeral";
@@ -109,32 +110,33 @@ function GovernanceTeamsListPage() {
 
   return (
     <GovernanceLayout pageTitle="Teams · AI Governance · LangWatch">
-      <VStack align="stretch" gap={4} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <VStack align="start" gap={1}>
-            <Text fontSize="xs" color="fg.muted">
-              <Link href="/governance" color="blue.600">
-                ← AI Governance
-              </Link>{" "}
-              · All teams
-            </Text>
-            <Heading size="md">All teams by {SORT_LABEL[sortBy]}</Heading>
-            <Text color="fg.muted" fontSize="sm">
-              Every team that reported activity in the last 30 days. Click a row to drill into a
-              single team.
-            </Text>
-          </VStack>
-        </HStack>
+      <PageLayout.Header>
+        <Text fontSize="xs" color="fg.muted">
+          <Link href="/governance" color="blue.600">
+            ← AI Governance
+          </Link>{" "}
+          · All teams
+        </Text>
+        <PageLayout.Heading>All teams by {SORT_LABEL[sortBy]}</PageLayout.Heading>
+      </PageLayout.Header>
 
-        {canReadActivity ? (
-          <TeamSpendPanel orgId={orgId} sortBy={sortBy} onSortChange={setSortBy} />
-        ) : (
-          <PermissionRequiredNotice
-            permission="activityMonitor:view"
-            detail="Team spend and activity stay hidden until then."
-          />
-        )}
-      </VStack>
+      <PageLayout.Container>
+        <VStack align="stretch" gap={4} width="full">
+          <Text color="fg.muted" fontSize="sm">
+            Every team that reported activity in the last 30 days. Click a row to drill into a
+            single team.
+          </Text>
+
+          {canReadActivity ? (
+            <TeamSpendPanel orgId={orgId} sortBy={sortBy} onSortChange={setSortBy} />
+          ) : (
+            <PermissionRequiredNotice
+              permission="activityMonitor:view"
+              detail="Team spend and activity stay hidden until then."
+            />
+          )}
+        </VStack>
+      </PageLayout.Container>
     </GovernanceLayout>
   );
 }

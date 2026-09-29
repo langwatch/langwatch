@@ -1,9 +1,8 @@
-import { Tabs, VStack } from "@chakra-ui/react";
+import { Skeleton, Tabs, VStack } from "@chakra-ui/react";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { useState } from "react";
 
 import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
-import { LoadingScreen } from "../../../../ui/elements/loading-screen.tsx";
 import { PermissionRequiredNotice } from "../../../../ui/elements/permission-required-notice.tsx";
 import { AiToolEntryDrawer } from "./ai-tool-entry-drawer.tsx";
 import { IngestionTemplatesEditor } from "./ingestion-templates-editor.tsx";
@@ -68,7 +67,7 @@ export function ToolCatalogPanel() {
   >(null);
 
   if (!organization) {
-    return <LoadingScreen />;
+    return <Skeleton height="240px" />;
   }
 
   if (!canManageCatalog) {

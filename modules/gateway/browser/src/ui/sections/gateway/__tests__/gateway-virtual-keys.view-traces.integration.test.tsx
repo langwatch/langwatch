@@ -115,7 +115,7 @@ function keyRow(overrides: Partial<VirtualKeyRow> = {}): VirtualKeyRow {
 
 async function openRowActions() {
   renderWithGatewayHost(<VirtualKeysPage />, { host });
-  await userEvent.click(screen.getByRole("button", { name: "Actions" }));
+  await userEvent.click(screen.getByRole("button", { name: /^Actions for / }));
   await screen.findByText("Details");
 }
 

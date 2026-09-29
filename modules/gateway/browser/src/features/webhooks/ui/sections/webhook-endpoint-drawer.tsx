@@ -1,14 +1,4 @@
-import {
-  Badge,
-  Button,
-  Code,
-  Heading,
-  HStack,
-  Input,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Button, Code, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
@@ -670,7 +660,7 @@ export function WebhookEndpointDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">{endpoint ? "Edit webhook endpoint" : "New webhook endpoint"}</Heading>
+          <Drawer.Title>{endpoint ? "Edit webhook endpoint" : "New webhook endpoint"}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

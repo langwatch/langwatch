@@ -1,19 +1,8 @@
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  EmptyState,
-  Heading,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Badge, Box, Button, Spacer, Spinner, Table, Text, VStack } from "@chakra-ui/react";
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   History,
@@ -167,38 +156,39 @@ type EndpointActionProps = EndpointListActions & { endpoint: EndpointView };
 
 function WebhooksUpsell() {
   return (
-    <VStack gap={6} width="full" align="start" paddingY={6} paddingX={4}>
-      <Heading size="lg">Webhooks</Heading>
-      <Alert.Root status="info">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Enterprise Feature</Alert.Title>
-          <Alert.Description>
-            Webhook endpoints stream signed events (gateway billing, budgets, key lifecycle) to your
-            systems with durable retries and delivery history. Available on Enterprise plans.
-          </Alert.Description>
-        </Alert.Content>
-      </Alert.Root>
-      <Box width="full">
-        <UiSlot name="contactSales" props={{}} />
-      </Box>
-    </VStack>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Webhooks</PageLayout.Heading>
+      </PageLayout.Header>
+      <PageLayout.Container>
+        <VStack gap={6} width="full" align="start">
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Enterprise Feature</Alert.Title>
+              <Alert.Description>
+                Webhook endpoints stream signed events (gateway billing, budgets, key lifecycle) to
+                your systems with durable retries and delivery history. Available on Enterprise
+                plans.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <Box width="full">
+            <UiSlot name="contactSales" props={{}} />
+          </Box>
+        </VStack>
+      </PageLayout.Container>
+    </>
   );
 }
 
 function NoWebhookEndpointsState() {
   return (
-    <EmptyState.Root>
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <Webhook />
-        </EmptyState.Indicator>
-        <EmptyState.Title>No webhook endpoints</EmptyState.Title>
-        <EmptyState.Description>
-          Create an endpoint to receive signed event batches.
-        </EmptyState.Description>
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <NoDataInfoBlock
+      title="No webhook endpoints"
+      description="Create an endpoint to receive signed event batches."
+      icon={<Webhook />}
+    />
   );
 }
 
@@ -318,24 +308,29 @@ function WebhookEndpointsPanel({
   isLoading: boolean;
 }) {
   return (
-    <VStack gap={6} width="full" align="start" paddingY={6} paddingX={4}>
-      <HStack width="full" justify="space-between">
-        <Heading size="lg">Webhooks</Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Webhooks</PageLayout.Heading>
+        <Spacer />
         {actions.canManage && (
           <PageLayout.HeaderButton onClick={actions.dialogs.openCreate} data-testid="webhook-new">
             <Plus size={14} /> New endpoint
           </PageLayout.HeaderButton>
         )}
-      </HStack>
+      </PageLayout.Header>
 
-      {isLoading && <Spinner size="sm" />}
+      <PageLayout.Container>
+        <VStack gap={6} width="full" align="start">
+          {isLoading && <Spinner size="sm" />}
 
-      {endpoints && endpoints.length === 0 && <NoWebhookEndpointsState />}
+          {endpoints && endpoints.length === 0 && <NoWebhookEndpointsState />}
 
-      {endpoints && endpoints.length > 0 && (
-        <WebhookEndpointsTable endpoints={endpoints} {...actions} />
-      )}
-    </VStack>
+          {endpoints && endpoints.length > 0 && (
+            <WebhookEndpointsTable endpoints={endpoints} {...actions} />
+          )}
+        </VStack>
+      </PageLayout.Container>
+    </>
   );
 }
 

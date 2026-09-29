@@ -1,6 +1,7 @@
-import { Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { docsUrl } from "@langwatch/error-presentation/docs-url";
 import { Lightbulb, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -61,47 +62,53 @@ export function RoutingPoliciesPage() {
 
   return (
     <AiGatewayLayout pageTitle="Routing Policies · AI Gateway · LangWatch">
-      <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <PageHeading />
+      <PageLayout.Header>
+        <PageLayout.Heading>Routing policies</PageLayout.Heading>
+      </PageLayout.Header>
 
-        {policiesQuery.isLoading && <Spinner size="sm" />}
+      <PageLayout.Container>
+        <VStack align="stretch" gap={6} width="full">
+          <PageDescription />
 
-        <HandledErrorAlert
-          error={policiesQuery.error}
-          fallbackTitle="Couldn't load routing policies"
-        />
+          {policiesQuery.isLoading && <Spinner size="sm" />}
 
-        {/* "Publish a default policy" is an instruction, so it is only shown
+          <HandledErrorAlert
+            error={policiesQuery.error}
+            fallbackTitle="Couldn't load routing policies"
+          />
+
+          {/* "Publish a default policy" is an instruction, so it is only shown
             to whoever can carry it out. */}
-        {canManage && !policiesQuery.isLoading && !hasAnyDefault && (
-          <NoDefaultNotice
-            hasPolicies={policies.length > 0}
-            onAddOrganizationPolicy={() => openNew("organization", true)}
-          />
-        )}
+          {canManage && !policiesQuery.isLoading && !hasAnyDefault && (
+            <NoDefaultNotice
+              hasPolicies={policies.length > 0}
+              onAddOrganizationPolicy={() => openNew("organization", true)}
+            />
+          )}
 
-        <RoutingPoliciesTable
-          policies={policies}
-          resolveScopeNames={resolveScopeNames}
-          onNew={(level) => openNew(level)}
-          onEdit={(policy) =>
-            host.openDrawer({
-              drawer: ROUTING_POLICY_DRAWER,
-              params: { policyId: policy.id },
-            })
-          }
-          onSetDefault={(policy) => setDefault.mutate({ organizationId, id: policy.id })}
-          onDelete={setPolicyToDelete}
-          canManage={canManage}
-        />
-
-        {!canManage && (
-          <PermissionRequiredNotice
-            permission="routingPolicies:manage"
-            detail="You can read the policies and the tiers they publish. Creating, editing, and deleting need this grant."
+          <RoutingPoliciesTable
+            policies={policies}
+            resolveScopeNames={resolveScopeNames}
+            onNew={(level) => openNew(level)}
+            onEdit={(policy) =>
+              host.openDrawer({
+                drawer: ROUTING_POLICY_DRAWER,
+                params: { policyId: policy.id },
+              })
+            }
+            onSetDefault={(policy) => setDefault.mutate({ organizationId, id: policy.id })}
+            onDelete={setPolicyToDelete}
+            canManage={canManage}
           />
-        )}
-      </VStack>
+
+          {!canManage && (
+            <PermissionRequiredNotice
+              permission="routingPolicies:manage"
+              detail="You can read the policies and the tiers they publish. Creating, editing, and deleting need this grant."
+            />
+          )}
+        </VStack>
+      </PageLayout.Container>
 
       <DeletePolicyDialog
         policy={policyToDelete}
@@ -154,17 +161,12 @@ function DeletePolicyDialog({
   );
 }
 
-function PageHeading() {
+function PageDescription() {
   return (
-    <VStack align="start" gap={0}>
-      <Heading as="h2" size="lg">
-        Routing policies
-      </Heading>
-      <Text color="fg.muted" fontSize="sm">
-        Decide which providers and models your keys reach, and what the model tiers mean here. A
-        project policy wins over a team policy, which wins over the organization policy.
-      </Text>
-    </VStack>
+    <Text color="fg.muted" fontSize="sm">
+      Decide which providers and models your keys reach, and what the model tiers mean here. A
+      project policy wins over a team policy, which wins over the organization policy.
+    </Text>
   );
 }
 
@@ -223,9 +225,9 @@ function NoDefaultNotice({
   return (
     <Box
       borderWidth="1px"
-      borderColor="orange.300"
+      borderColor="orange.muted"
       borderRadius="md"
-      backgroundColor="orange.50"
+      backgroundColor="orange.subtle"
       padding={4}
     >
       <HStack alignItems="start" gap={3}>

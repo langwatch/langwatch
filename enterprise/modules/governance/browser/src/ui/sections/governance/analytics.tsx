@@ -4,12 +4,13 @@ import {
   Button,
   createListCollection,
   Field,
-  Heading,
   HStack,
+  Spacer,
   Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo, useState } from "react";
@@ -47,64 +48,64 @@ function AnalyticsPage() {
 
   return (
     <GovernanceLayout pageTitle="Analytics · AI Governance · LangWatch">
-      <VStack align="stretch" gap={5} width="full">
-        <HStack justify="space-between" align="start" gap={6}>
-          <VStack align="start" gap={1}>
-            <HStack gap={2}>
-              <Heading size="md">Analytics</Heading>
-              <Badge colorPalette="purple" size="sm" variant="surface">
-                Preview
-              </Badge>
-            </HStack>
-            <Text color="fg.muted">
-              A preview of how you will explore activity in {orgName}. The controls below shape a
-              query; running it is coming.
-            </Text>
-          </VStack>
-          <SegmentedControl
-            size="sm"
-            value={timeWindow}
-            onValueChange={({ value }) => {
-              if (value) setTimeWindow(value as ExploreWindow);
-            }}
-            items={[...EXPLORE_WINDOWS]}
-            flexShrink={0}
-          />
-        </HStack>
+      <PageLayout.Header>
+        <PageLayout.Heading>Analytics</PageLayout.Heading>
+        <Badge colorPalette="purple" size="sm" variant="surface">
+          Preview
+        </Badge>
+        <Spacer />
+        <SegmentedControl
+          size="sm"
+          value={timeWindow}
+          onValueChange={({ value }) => {
+            if (value) setTimeWindow(value as ExploreWindow);
+          }}
+          items={[...EXPLORE_WINDOWS]}
+          flexShrink={0}
+        />
+      </PageLayout.Header>
 
-        <Tabs.Root defaultValue="explore" variant="line" lazyMount unmountOnExit>
-          <Tabs.List>
-            <Tabs.Trigger
-              value="explore"
-              color="fg.muted"
-              _selected={{ color: "fg", fontWeight: "semibold" }}
-            >
-              Explore
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="dashboards"
-              color="fg.muted"
-              _selected={{ color: "fg", fontWeight: "semibold" }}
-            >
-              Dashboards
-              <Badge size="xs" variant="subtle" colorPalette="gray">
-                0
-              </Badge>
-            </Tabs.Trigger>
-          </Tabs.List>
-          <Tabs.Content value="explore" paddingTop={4}>
-            <ExploreTab
-              orgName={orgName}
-              timeWindow={timeWindow}
-              selection={selection}
-              onSelectionChange={setSelection}
-            />
-          </Tabs.Content>
-          <Tabs.Content value="dashboards" paddingTop={4}>
-            <Text color="fg.muted">Dashboards are not available yet.</Text>
-          </Tabs.Content>
-        </Tabs.Root>
-      </VStack>
+      <PageLayout.Container>
+        <VStack align="stretch" gap={5} width="full">
+          <Text color="fg.muted">
+            A preview of how you will explore activity in {orgName}. The controls below shape a
+            query; running it is coming.
+          </Text>
+
+          <Tabs.Root defaultValue="explore" variant="line" lazyMount unmountOnExit>
+            <Tabs.List>
+              <Tabs.Trigger
+                value="explore"
+                color="fg.muted"
+                _selected={{ color: "fg", fontWeight: "semibold" }}
+              >
+                Explore
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                value="dashboards"
+                color="fg.muted"
+                _selected={{ color: "fg", fontWeight: "semibold" }}
+              >
+                Dashboards
+                <Badge size="xs" variant="subtle" colorPalette="gray">
+                  0
+                </Badge>
+              </Tabs.Trigger>
+            </Tabs.List>
+            <Tabs.Content value="explore" paddingTop={4}>
+              <ExploreTab
+                orgName={orgName}
+                timeWindow={timeWindow}
+                selection={selection}
+                onSelectionChange={setSelection}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="dashboards" paddingTop={4}>
+              <Text color="fg.muted">Dashboards are not available yet.</Text>
+            </Tabs.Content>
+          </Tabs.Root>
+        </VStack>
+      </PageLayout.Container>
     </GovernanceLayout>
   );
 }

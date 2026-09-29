@@ -2,7 +2,6 @@ import {
   Alert,
   Box,
   Button,
-  Heading,
   HStack,
   Image,
   Input,
@@ -494,7 +493,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
               personal portal; what the reader is adding is a tool the
               organization runs, and the Inventory catalog that now opens this
               same drawer calls it that. */}
-          <Heading size="md">{isEdit ? "Edit tool" : "Add tool"}</Heading>
+          <Drawer.Title>{isEdit ? "Edit tool" : "Add tool"}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -605,7 +604,7 @@ function RadioCard({
     <Box
       borderWidth="1px"
       borderColor={checked ? "blue.500" : "border.muted"}
-      backgroundColor={checked ? "blue.50" : "transparent"}
+      backgroundColor={checked ? "blue.subtle" : "transparent"}
       borderRadius="sm"
       paddingX={3}
       paddingY={2}
@@ -1009,7 +1008,7 @@ function ExternalToolFields({
                   variant="outline"
                   onClick={() => onIconAssetChange(value)}
                   borderColor={selected ? "blue.500" : "border.muted"}
-                  backgroundColor={selected ? "blue.50" : "transparent"}
+                  backgroundColor={selected ? "blue.subtle" : "transparent"}
                   borderRadius="sm"
                   paddingX={3}
                   paddingY={2}

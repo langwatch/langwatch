@@ -6,7 +6,6 @@ import {
   Button,
   Code,
   Collapsible,
-  Heading,
   HStack,
   Input,
   Spacer,
@@ -273,12 +272,12 @@ function resolvePullConfig(
 
 function InventoryHeader() {
   return (
-    <HStack gap={2}>
-      <Heading size="md">Inventory</Heading>
+    <>
+      <PageLayout.Heading>Inventory</PageLayout.Heading>
       <Badge colorPalette="purple" size="sm" variant="surface">
         Preview
       </Badge>
-    </HStack>
+    </>
   );
 }
 
@@ -1178,70 +1177,75 @@ function InventoryPage() {
 
   return (
     <GovernanceLayout pageTitle="Inventory · Governance · LangWatch">
-      <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <HStack justify="space-between" align="center" gap={4} width="full">
-          <InventoryHeader />
-          <InventoryHeaderActions page={page} inventoryTab={inventoryTab} />
-        </HStack>
+      <PageLayout.Header>
+        <InventoryHeader />
+        <Spacer />
+        <InventoryHeaderActions page={page} inventoryTab={inventoryTab} />
+      </PageLayout.Header>
 
-        {page.sample.active && (
-          <SampleDataBanner>
-            These tools, figures and environments are an illustration of what the inventory holds
-            once your tools report. Nothing here is real.
-          </SampleDataBanner>
-        )}
+      <PageLayout.Container>
+        <VStack align="stretch" gap={6} width="full">
+          {page.sample.active && (
+            <SampleDataBanner>
+              These tools, figures and environments are an illustration of what the inventory holds
+              once your tools report. Nothing here is real.
+            </SampleDataBanner>
+          )}
 
-        <SourceComposerDrawer
-          isOpen={page.composing}
-          organizationId={orgId}
-          destinationCtx={destinationCtx}
-          composer={page.composer}
-          setComposer={page.setComposer}
-          invalidFieldKeys={page.invalidFieldKeys}
-          isPending={mutations.create.isPending}
-          onSubmit={page.onSubmit}
-          onClose={page.closeComposer}
-        />
+          <SourceComposerDrawer
+            isOpen={page.composing}
+            organizationId={orgId}
+            destinationCtx={destinationCtx}
+            composer={page.composer}
+            setComposer={page.setComposer}
+            invalidFieldKeys={page.invalidFieldKeys}
+            isPending={mutations.create.isPending}
+            onSubmit={page.onSubmit}
+            onClose={page.closeComposer}
+          />
 
-        <InventorySummaryStrip
-          page={page}
-          cards={cards}
-          environments={environments}
-          sources={sources}
-        />
+          <InventorySummaryStrip
+            page={page}
+            cards={cards}
+            environments={environments}
+            sources={sources}
+          />
 
-        <InventoryTabs
-          inventoryTab={inventoryTab}
-          selectInventoryTab={selectInventoryTab}
-          catalogCount={cards?.length}
-          // Derived from the source list, so it goes uncounted on the same
-          // silence that leaves the Sources tab uncounted beside it.
-          environmentCount={sources === undefined ? undefined : environments.length}
-          sourceCount={sources?.length}
-          catalog={
-            <InventoryCatalogPane
-              catalog={page.catalog}
-              canManage={page.canManageTools}
-              sampleActive={page.sample.active}
-              layout={page.catalogLayout}
-              onEdit={(entry) => page.setToolDrawer({ mode: "edit", entry })}
-            />
-          }
-          environments={
-            <EnvironmentsTab
-              canRead={page.canRead}
-              sources={sourcesQuery.data}
-              sampleActive={page.sample.active}
-              added={page.addedEnvironments}
-              // The header's own control, rendered a second time. Same
-              // component, so one label and one flow — the empty state never
-              // invents a second doorway with different words.
-              createAction={<AddEnvironmentControl onAdd={() => page.setAddingEnvironment(true)} />}
-            />
-          }
-          sources={<InventorySourcesPane page={page} />}
-        />
-      </VStack>
+          <InventoryTabs
+            inventoryTab={inventoryTab}
+            selectInventoryTab={selectInventoryTab}
+            catalogCount={cards?.length}
+            // Derived from the source list, so it goes uncounted on the same
+            // silence that leaves the Sources tab uncounted beside it.
+            environmentCount={sources === undefined ? undefined : environments.length}
+            sourceCount={sources?.length}
+            catalog={
+              <InventoryCatalogPane
+                catalog={page.catalog}
+                canManage={page.canManageTools}
+                sampleActive={page.sample.active}
+                layout={page.catalogLayout}
+                onEdit={(entry) => page.setToolDrawer({ mode: "edit", entry })}
+              />
+            }
+            environments={
+              <EnvironmentsTab
+                canRead={page.canRead}
+                sources={sourcesQuery.data}
+                sampleActive={page.sample.active}
+                added={page.addedEnvironments}
+                // The header's own control, rendered a second time. Same
+                // component, so one label and one flow — the empty state never
+                // invents a second doorway with different words.
+                createAction={
+                  <AddEnvironmentControl onAdd={() => page.setAddingEnvironment(true)} />
+                }
+              />
+            }
+            sources={<InventorySourcesPane page={page} />}
+          />
+        </VStack>
+      </PageLayout.Container>
 
       <InventoryOverlays page={page} />
     </GovernanceLayout>
@@ -1507,9 +1511,7 @@ export function SourceComposerDrawer({
           <Drawer.CloseTrigger />
           <HStack gap={3}>
             <SourceTypeIconGlyph sourceType={composer.sourceType} size="24px" />
-            <Heading as="h2" size="md">
-              Add {meta?.label ?? "ingestion source"}
-            </Heading>
+            <Drawer.Title>Add {meta?.label ?? "ingestion source"}</Drawer.Title>
             {/* What this source reads and what it needs granted, behind the
                 (i) rather than as a paragraph under the first input. It is
                 three or four sentences of prerequisites, and printed in the
@@ -1995,9 +1997,7 @@ export function SourceEditDrawer({
             {sourceType && (
               <SourceTypeIconGlyph sourceType={sourceType} size="24px" testId="source-type-icon" />
             )}
-            <Heading as="h2" size="md">
-              Edit {editLabel}
-            </Heading>
+            <Drawer.Title>Edit {editLabel}</Drawer.Title>
             {/* Why a setting is locked, behind the (i) rather than printed
                 above the fields it describes. Rendered only when something
                 actually is: an empty marker promises an explanation that is
@@ -4749,7 +4749,7 @@ function SecretGraceNotice() {
     <Box
       borderWidth="1px"
       borderColor="amber.300"
-      backgroundColor="amber.50"
+      backgroundColor="orange.subtle"
       padding={3}
       borderRadius="sm"
     >

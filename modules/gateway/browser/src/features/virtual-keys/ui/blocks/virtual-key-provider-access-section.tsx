@@ -183,7 +183,7 @@ export function VirtualKeyProviderAccessSection({
           borderWidth="1px"
           borderColor="orange.200"
           borderRadius="md"
-          background="orange.50"
+          background="orange.subtle"
           padding={3}
         >
           <Text fontSize="sm" fontWeight="medium">

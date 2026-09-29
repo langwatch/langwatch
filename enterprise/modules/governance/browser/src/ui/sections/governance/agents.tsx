@@ -1,4 +1,4 @@
-import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import type {
@@ -436,78 +436,82 @@ function AgentsPage() {
 
   return (
     <GovernanceLayout pageTitle="Agents · AI Governance · LangWatch">
-      <VStack align="stretch" gap={5} width="full" maxW="container.xl">
-        <HStack justify="space-between" align="center">
-          <Heading size="md">Agents</Heading>
-          <HStack gap={2}>
-            {/* Same corner and same order as the inventory's header: how the
+      <PageLayout.Header>
+        <PageLayout.Heading>Agents</PageLayout.Heading>
+        <Spacer />
+        <HStack gap={2}>
+          {/* Same corner and same order as the inventory's header: how the
                 content is drawn, then whether it is invented, then the one
                 thing this page is for adding. */}
-            {showControls && <AgentsLayoutControl layout={layout} onChange={selectLayout} />}
-            {/* Ghost, so the one outlined control in this row stays the
+          {showControls && <AgentsLayoutControl layout={layout} onChange={selectLayout} />}
+          {/* Ghost, so the one outlined control in this row stays the
                 action that creates something of the organization's own — the
                 same arrangement as `Run match pass`. Rendered for every
                 reader, not gated on the manage grant, so a reader who can't
                 press it still sees why the page won't refresh. */}
-            <GovernanceSyncButton
-              label="Sync agents"
-              state={sync.state}
-              reason={sync.reason}
-              onPress={sync.press}
-            />
-            <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
-            {/* The action that creates this page's own thing, drawn as the
+          <GovernanceSyncButton
+            label="Sync agents"
+            state={sync.state}
+            reason={sync.reason}
+            onPress={sync.press}
+          />
+          <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
+          {/* The action that creates this page's own thing, drawn as the
                 house header button — outline, small, leading plus glyph,
                 the same control /settings/model-providers uses for "Add
                 Model Provider". The brand accent marks only the sample
                 affordances, the one thing on this screen it must distinguish.
                 Rule: specs/ai-governance/dashboard/governance-ui-controls.feature */}
-            <PageLayout.HeaderButton onClick={openRegister}>
-              <Plus size={14} />
-              Register agent
-            </PageLayout.HeaderButton>
-          </HStack>
+          <PageLayout.HeaderButton onClick={openRegister}>
+            <Plus size={14} />
+            Register agent
+          </PageLayout.HeaderButton>
         </HStack>
-        {sample.active && (
-          <SampleDataBanner>
-            These agents are an illustration of what this page will hold, nothing here is real.
-          </SampleDataBanner>
-        )}
-        {/* Above the content rather than in place of it. A failed read leaves
+      </PageLayout.Header>
+
+      <PageLayout.Container>
+        <VStack align="stretch" gap={5} width="full">
+          {sample.active && (
+            <SampleDataBanner>
+              These agents are an illustration of what this page will hold, nothing here is real.
+            </SampleDataBanner>
+          )}
+          {/* Above the content rather than in place of it. A failed read leaves
             the page with no rows, and the pane below already has a sentence
             for that; what it cannot say is that the emptiness is a failure
             rather than an answer. `useAgentsScreen` has already decided this
             is null under sample mode. */}
-        <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" />
-        {/* Under the banner, above the chips. Under the banner because every
+          <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" />
+          {/* Under the banner, above the chips. Under the banner because every
             figure on it is invented while sample mode is on, and the banner is
             the page's one claim about the whole screen; above the chips
             because the strip summarizes the fleet rather than whatever the
             chips have left of it. */}
-        {summary && <AgentFleetSummaryStrip summary={summary} />}
-        {/* Out of the content and into the header. Controls that narrow what
+          {summary && <AgentFleetSummaryStrip summary={summary} />}
+          {/* Out of the content and into the header. Controls that narrow what
             is below should not live inside the thing they narrow — the api
             keys page pairs its scope filter with its create action above a
             table for the same reason. */}
-        {showControls && (
-          <AgentFilterBar
+          {showControls && (
+            <AgentFilterBar
+              filters={filters}
+              sources={sourcesPresentIn(rows)}
+              onSourceChange={(value) => setFilter("source", value)}
+              onOwnershipChange={(value) => setFilter("ownership", value)}
+              onSortChange={(value) => setFilter("sort", value)}
+            />
+          )}
+          <AgentsPane
+            rows={rows}
             filters={filters}
-            sources={sourcesPresentIn(rows)}
-            onSourceChange={(value) => setFilter("source", value)}
-            onOwnershipChange={(value) => setFilter("ownership", value)}
-            onSortChange={(value) => setFilter("sort", value)}
+            layout={layout}
+            sample={sample.active}
+            isLoading={isLoading}
+            noAgents={noAgents}
+            onClearFilters={clearFilters}
           />
-        )}
-        <AgentsPane
-          rows={rows}
-          filters={filters}
-          layout={layout}
-          sample={sample.active}
-          isLoading={isLoading}
-          noAgents={noAgents}
-          onClearFilters={clearFilters}
-        />
-      </VStack>
+        </VStack>
+      </PageLayout.Container>
       {/* No drawer is mounted here. `CurrentDrawer` at the app root owns the
           mount and the address owns which one is open, so this page only ever
           asks. */}

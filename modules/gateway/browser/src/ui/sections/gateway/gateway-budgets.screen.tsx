@@ -1,10 +1,8 @@
 import {
   Alert,
   Badge,
-  Box,
   Button,
   Card,
-  EmptyState,
   HStack,
   Progress,
   Spacer,
@@ -17,6 +15,7 @@ import { ProviderScopeChips, type ProviderScopeType } from "@langwatch/authz-bro
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
@@ -198,18 +197,16 @@ function BudgetsPage() {
           <PageLayout.Heading>Budgets</PageLayout.Heading>
           <Spacer />
           {canCreate && (
-            <Button
-              colorPalette="orange"
-              size="sm"
+            <PageLayout.HeaderButton
               data-testid="gateway-budget-new"
               onClick={() => setCreateOpen(true)}
             >
               <Plus size={14} /> New budget
-            </Button>
+            </PageLayout.HeaderButton>
           )}
         </PageLayout.Header>
 
-        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
+        <PageLayout.Container>
           {isLoading && <Spinner />}
           {showError && (
             <GatewayErrorPanel
@@ -219,24 +216,17 @@ function BudgetsPage() {
             />
           )}
           {showEmpty && (
-            <EmptyState.Root>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <Gauge size={32} />
-                </EmptyState.Indicator>
-                <EmptyState.Title>No budgets yet</EmptyState.Title>
-                <EmptyState.Description>
-                  Budgets enforce a spend ceiling on any dimension: organization, group, team,
-                  project, member, or virtual key; each optionally limited to a single provider.
-                  Create one to start governing cost.
-                </EmptyState.Description>
-                {canCreate && (
-                  <Button colorPalette="orange" onClick={() => setCreateOpen(true)} mt={2}>
-                    <Plus size={14} /> New budget
-                  </Button>
-                )}
-              </EmptyState.Content>
-            </EmptyState.Root>
+            <NoDataInfoBlock
+              title="No budgets yet"
+              description="Budgets enforce a spend ceiling on any dimension: organization, group, team, project, member, or virtual key; each optionally limited to a single provider. Create one to start governing cost."
+              icon={<Gauge size={32} />}
+            >
+              {canCreate && (
+                <PageLayout.HeaderButton onClick={() => setCreateOpen(true)} marginTop={4}>
+                  <Plus size={14} /> New budget
+                </PageLayout.HeaderButton>
+              )}
+            </NoDataInfoBlock>
           )}
           {showRows && (
             <VStack align="stretch" gap={4}>
@@ -307,7 +297,7 @@ function BudgetsPage() {
               </Card.Root>
             </VStack>
           )}
-        </Box>
+        </PageLayout.Container>
       </>
 
       {organization?.id && (

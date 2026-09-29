@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Button, HStack, Heading, Spacer, Text } from "@chakra-ui/react";
+import { Spacer, Text } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Temporal } from "@langwatch/time";
 
 import { SampleDataToggle } from "../../../../ui/elements/sample-data-controls.tsx";
@@ -30,18 +31,18 @@ export function CostsHeader({
   onToggleSample: () => void;
 }) {
   return (
-    <HStack align="center" gap={3}>
-      <Heading size="md">Costs</Heading>
+    <PageLayout.Header>
+      <PageLayout.Heading>Costs</PageLayout.Heading>
       <Spacer />
       <FiguresLastRead at={lastReadAt} />
       {/* `aria-busy` rather than a disabled control: a reader who sees nothing
           move clicks again, and a button that goes dead says nothing about
           why. */}
-      <Button size="xs" variant="outline" aria-busy={busy} onClick={onRefresh}>
+      <PageLayout.HeaderButton aria-busy={busy} onClick={onRefresh}>
         Refresh
-      </Button>
+      </PageLayout.HeaderButton>
       <SampleDataToggle active={showSample} onToggle={onToggleSample} />
-    </HStack>
+    </PageLayout.Header>
   );
 }
 

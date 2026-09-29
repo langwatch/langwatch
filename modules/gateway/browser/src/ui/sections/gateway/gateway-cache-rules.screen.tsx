@@ -1,9 +1,7 @@
 import {
   Badge,
-  Box,
   Button,
   Card,
-  EmptyState,
   HStack,
   Spacer,
   Spinner,
@@ -14,6 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
@@ -124,13 +123,13 @@ function CacheRulesPage() {
           <PageLayout.Heading>Cache Rules</PageLayout.Heading>
           <Spacer />
           {canCreate && (
-            <Button colorPalette="orange" size="sm" onClick={() => setCreateOpen(true)}>
+            <PageLayout.HeaderButton onClick={() => setCreateOpen(true)}>
               <Plus size={14} /> New rule
-            </Button>
+            </PageLayout.HeaderButton>
           )}
         </PageLayout.Header>
 
-        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
+        <PageLayout.Container>
           <Text fontSize="sm" color="fg.muted" mb={4}>
             Rules are evaluated first-match-wins by priority (highest first). A per-request{" "}
             <code>X-LangWatch-Cache</code> header always wins over matching rules, and a matched
@@ -158,7 +157,7 @@ function CacheRulesPage() {
               onArchive={setArchiving}
             />
           )}
-        </Box>
+        </PageLayout.Container>
       </>
 
       <CacheRuleCreateDrawer
@@ -202,23 +201,17 @@ function CacheRulesEmptyState({
   onCreate: () => void;
 }) {
   return (
-    <EmptyState.Root>
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <Zap size={32} />
-        </EmptyState.Indicator>
-        <EmptyState.Title>No cache rules yet</EmptyState.Title>
-        <EmptyState.Description>
-          Cache rules let operators force, disable, or override cache behaviour across virtual keys,
-          models, principals, or custom request metadata: no client code changes required.
-        </EmptyState.Description>
-        {canCreate && (
-          <Button colorPalette="orange" onClick={onCreate} mt={2}>
-            <Plus size={14} /> New rule
-          </Button>
-        )}
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <NoDataInfoBlock
+      title="No cache rules yet"
+      description="Cache rules let operators force, disable, or override cache behaviour across virtual keys, models, principals, or custom request metadata: no client code changes required."
+      icon={<Zap size={32} />}
+    >
+      {canCreate && (
+        <PageLayout.HeaderButton onClick={onCreate} marginTop={4}>
+          <Plus size={14} /> New rule
+        </PageLayout.HeaderButton>
+      )}
+    </NoDataInfoBlock>
   );
 }
 

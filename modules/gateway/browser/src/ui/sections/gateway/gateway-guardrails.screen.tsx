@@ -1,9 +1,7 @@
 import {
   Badge,
-  Box,
   Button,
   Card,
-  EmptyState,
   Field,
   HStack,
   Input,
@@ -17,6 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import type {
   GatewayGuardrailDirection,
@@ -149,20 +148,13 @@ function GuardrailsPage() {
         <PageLayout.Header>
           <PageLayout.Heading>Guardrails</PageLayout.Heading>
         </PageLayout.Header>
-        <Box paddingX={6} paddingY={4} width="full">
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <Shield size={36} />
-              </EmptyState.Indicator>
-              <EmptyState.Title>Pick a project first</EmptyState.Title>
-              <EmptyState.Description>
-                Guardrails are scoped per project. Use the project switcher in the top-left to pick
-                a project before creating one.
-              </EmptyState.Description>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </Box>
+        <PageLayout.Container>
+          <NoDataInfoBlock
+            title="Pick a project first"
+            description="Guardrails are scoped per project. Use the project switcher in the top-left to pick a project before creating one."
+            icon={<Shield size={36} />}
+          />
+        </PageLayout.Container>
       </AiGatewayLayout>
     );
   }
@@ -177,18 +169,16 @@ function GuardrailsPage() {
         <PageLayout.Heading>Guardrails</PageLayout.Heading>
         <Spacer />
         {canManage && (
-          <Button
-            colorPalette="orange"
-            size="sm"
+          <PageLayout.HeaderButton
             onClick={() => setCreateOpen(true)}
             disabled={guardrailEvaluators.length === 0}
           >
             <Plus size={14} /> New guardrail
-          </Button>
+          </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
 
-      <Box paddingX={6} paddingY={4} width="full">
+      <PageLayout.Container>
         <VStack align="stretch" gap={4}>
           <Text fontSize="sm" color="fg.muted">
             Project-scoped LangWatch evaluators that run on every gateway request bound to this
@@ -210,7 +200,7 @@ function GuardrailsPage() {
             />
           )}
         </VStack>
-      </Box>
+      </PageLayout.Container>
 
       <GuardrailDrawer
         open={createOpen || editing !== null}
@@ -243,28 +233,15 @@ function GuardrailsEmptyState({ hasGuardrailEvaluators }: { hasGuardrailEvaluato
   return (
     <Card.Root>
       <Card.Body>
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <Shield size={36} />
-            </EmptyState.Indicator>
-            <EmptyState.Title>No guardrails yet</EmptyState.Title>
-            <EmptyState.Description>
-              {!hasGuardrailEvaluators ? (
-                <>
-                  No project evaluators are marked as guardrails. Open Evaluations, edit an
-                  evaluator, and switch <strong>executionMode</strong> to <code>AS_GUARDRAIL</code>{" "}
-                  before binding it here.
-                </>
-              ) : (
-                <>
-                  Click <strong>New guardrail</strong> to bind one of your project evaluators as a
-                  pre / post / stream_chunk hook.
-                </>
-              )}
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
+        <NoDataInfoBlock
+          title="No guardrails yet"
+          description={
+            hasGuardrailEvaluators
+              ? "Click New guardrail to bind one of your project evaluators as a pre / post / stream_chunk hook."
+              : "No project evaluators are marked as guardrails. Open Evaluations, edit an evaluator, and switch its execution mode to AS_GUARDRAIL before binding it here."
+          }
+          icon={<Shield size={36} />}
+        />
       </Card.Body>
     </Card.Root>
   );

@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   chakra,
-  EmptyState,
   Heading,
   HStack,
   Spacer,
@@ -14,6 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { neutralizeRows } from "@langwatch/csv";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -312,28 +312,26 @@ function GatewayUsagePage() {
                 borderRadius="md"
                 fontSize="xs"
                 fontWeight={days === p.days ? "semibold" : "normal"}
-                background={days === p.days ? "orange.100" : "transparent"}
-                color={days === p.days ? "orange.800" : "fg.muted"}
+                background={days === p.days ? "orange.subtle" : "transparent"}
+                color={days === p.days ? "orange.fg" : "fg.muted"}
                 borderWidth="1px"
-                borderColor={days === p.days ? "orange.300" : "border.subtle"}
+                borderColor={days === p.days ? "orange.muted" : "border.subtle"}
                 onClick={() => setDays(p.days)}
               >
                 {p.label}
               </Box>
             ))}
-            <Button
-              size="xs"
-              variant="outline"
+            <PageLayout.HeaderButton
               onClick={exportCsv}
               disabled={!data || data.totalRequests === 0}
               marginLeft={2}
             >
               <Download size={12} /> Export CSV
-            </Button>
+            </PageLayout.HeaderButton>
           </HStack>
         </PageLayout.Header>
 
-        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
+        <PageLayout.Container>
           {isLoadingUsage && <Spinner />}
           {showUsageError && (
             <GatewayErrorPanel
@@ -343,23 +341,16 @@ function GatewayUsagePage() {
             />
           )}
           {showUsageEmpty && (
-            <EmptyState.Root>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <BarChart3 size={32} />
-                </EmptyState.Indicator>
-                <EmptyState.Title>No usage in this window</EmptyState.Title>
-                <EmptyState.Description>
-                  Spend shows up here once the gateway has traced its first completed request. Send
-                  a few requests against a virtual key, then check back in a couple of minutes.
-                </EmptyState.Description>
-              </EmptyState.Content>
-            </EmptyState.Root>
+            <NoDataInfoBlock
+              title="No usage in this window"
+              description="Spend shows up here once the gateway has traced its first completed request. Send a few requests against a virtual key, then check back in a couple of minutes."
+              icon={<BarChart3 size={32} />}
+            />
           )}
           {showUsage && data && (
             <UsageBreakdown data={data} showKeys={!virtualKeyId} viewTracesHref={viewTracesHref} />
           )}
-        </Box>
+        </PageLayout.Container>
       </>
     </AiGatewayLayout>
   );

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
 import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
 import { useSampleMode } from "../../../../ui/elements/governance-sample-mode.ts";
@@ -87,57 +88,59 @@ export function CostsPage() {
 
   return (
     <GovernanceLayout pageTitle="Costs · AI Governance · LangWatch">
-      <VStack align="stretch" gap={5} width="full">
-        <CostsHeader
-          lastReadAt={summary.dataUpdatedAt}
-          busy={busy}
-          onRefresh={refresh}
-          showSample={showSample}
-          onToggleSample={toggleSample}
-        />
-        {showSample && <SampleDataBanner />}
-        {/* Everything under the banner inherits what the banner said. While it
+      <CostsHeader
+        lastReadAt={summary.dataUpdatedAt}
+        busy={busy}
+        onRefresh={refresh}
+        showSample={showSample}
+        onToggleSample={toggleSample}
+      />
+      <PageLayout.Container>
+        <VStack align="stretch" gap={5} width="full">
+          {showSample && <SampleDataBanner />}
+          {/* Everything under the banner inherits what the banner said. While it
             is up, the per-panel marks stand down rather than restating it
             sixteen times; the moment it comes down they are the only thing
             telling an invented panel from a measured one, and they return.
             `sampleMark.tsx` carries the reasoning. */}
-        <SampleSaidOnce said={showSample}>
-          <CostFilterBar
-            departmentName={filters.departmentName}
-            departments={departmentOptions}
-            onDepartmentChange={(department, departmentName) =>
-              patch({ department, departmentName })
-            }
-            frame={filters.frame}
-            onFrameChange={chooseFrame}
-            interval={filters.interval}
-            onIntervalChange={(interval) => patch({ interval })}
-          />
-          <ReadCeilingNotice frame={filters.frame} showSample={showSample} />
+          <SampleSaidOnce said={showSample}>
+            <CostFilterBar
+              departmentName={filters.departmentName}
+              departments={departmentOptions}
+              onDepartmentChange={(department, departmentName) =>
+                patch({ department, departmentName })
+              }
+              frame={filters.frame}
+              onFrameChange={chooseFrame}
+              interval={filters.interval}
+              onIntervalChange={(interval) => patch({ interval })}
+            />
+            <ReadCeilingNotice frame={filters.frame} showSample={showSample} />
 
-          <CostsBody
-            isLoading={summary.isLoading && !!organizationId}
-            isError={summary.isError}
-            refused={isRefusedRead(summary.error)}
-            data={summary.data}
-            interval={filters.interval}
-            showSample={showSample}
-            samplePeriods={samplePeriods}
-          />
+            <CostsBody
+              isLoading={summary.isLoading && !!organizationId}
+              isError={summary.isError}
+              refused={isRefusedRead(summary.error)}
+              data={summary.data}
+              interval={filters.interval}
+              showSample={showSample}
+              samplePeriods={samplePeriods}
+            />
 
-          <CostBreakdowns
-            filters={filters}
-            breakdowns={breakdowns}
-            periods={samplePeriods}
-            showSample={showSample}
-            spenders={spenders}
-            sourcesConnected={holdsFigures}
-            organizationId={organizationId}
-            providerDays={providerDays.data?.rows ?? null}
-            hasProviderDaysFailure={providerDays.isError}
-          />
-        </SampleSaidOnce>
-      </VStack>
+            <CostBreakdowns
+              filters={filters}
+              breakdowns={breakdowns}
+              periods={samplePeriods}
+              showSample={showSample}
+              spenders={spenders}
+              sourcesConnected={holdsFigures}
+              organizationId={organizationId}
+              providerDays={providerDays.data?.rows ?? null}
+              hasProviderDaysFailure={providerDays.isError}
+            />
+          </SampleSaidOnce>
+        </VStack>
+      </PageLayout.Container>
     </GovernanceLayout>
   );
 }

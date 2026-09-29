@@ -275,7 +275,7 @@ function Problems({ problems }: { problems: string[] }) {
       borderWidth="1px"
       borderColor="orange.300"
       borderRadius="md"
-      backgroundColor="orange.50"
+      backgroundColor="orange.subtle"
       padding={3}
     >
       {problems.map((problem) => (
@@ -306,7 +306,7 @@ function SaveError({
       borderWidth="1px"
       borderColor="red.300"
       borderRadius="md"
-      backgroundColor="red.50"
+      backgroundColor="red.subtle"
       padding={3}
     >
       <HStack alignItems="start" gap={2}>

@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { LangyMark, useLangyStore, LangyPanelSurface, SERIF } from "@langwatch/langy-browser-kit";
 import { useState } from "react";
@@ -31,33 +31,34 @@ function InsightsPage() {
 
   return (
     <GovernanceLayout pageTitle="Insights · AI Governance · LangWatch">
-      <VStack align="stretch" gap={6} width="full">
-        <VStack align="start" gap={1}>
-          <HStack gap={2}>
-            <Heading size="md">Insights</Heading>
-            <Badge colorPalette="purple" size="sm" variant="surface">
-              Preview
-            </Badge>
-          </HStack>
+      <PageLayout.Header>
+        <PageLayout.Heading>Insights</PageLayout.Heading>
+        <Badge colorPalette="purple" size="sm" variant="surface">
+          Preview
+        </Badge>
+      </PageLayout.Header>
+
+      <PageLayout.Container>
+        <VStack align="stretch" gap={6} width="full">
           <Text color="fg.muted">
             A preview of the inbox where Langy will file the few things worth acting on. Nothing is
             filed yet.
           </Text>
-        </VStack>
 
-        <HStack align="start" gap={8} width="full">
-          <InsightsRail selected={folder} counts={EMPTY_INSIGHTS_COUNTS} onSelect={setFolder} />
-          <Box flex={1} minWidth={0}>
-            {folder === "inbox" ? (
-              <InboxEmptyBrief onSetup={() => setSetupOpen(true)} onOpenLangy={openLangy} />
-            ) : (
-              <Text color="fg.muted" paddingY={4}>
-                {EMPTY_FOLDER_LINE[folder]}
-              </Text>
-            )}
-          </Box>
-        </HStack>
-      </VStack>
+          <HStack align="start" gap={8} width="full">
+            <InsightsRail selected={folder} counts={EMPTY_INSIGHTS_COUNTS} onSelect={setFolder} />
+            <Box flex={1} minWidth={0}>
+              {folder === "inbox" ? (
+                <InboxEmptyBrief onSetup={() => setSetupOpen(true)} onOpenLangy={openLangy} />
+              ) : (
+                <Text color="fg.muted" paddingY={4}>
+                  {EMPTY_FOLDER_LINE[folder]}
+                </Text>
+              )}
+            </Box>
+          </HStack>
+        </VStack>
+      </PageLayout.Container>
 
       <InsightsSetupDrawer
         open={setupOpen}

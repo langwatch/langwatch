@@ -72,8 +72,8 @@ function EligibleProviderRow({
       paddingY={1.5}
       gap={2}
       cursor={interactive ? "pointer" : "default"}
-      background={isSelected ? "blue.50" : undefined}
-      _hover={interactive ? { background: isSelected ? "blue.50" : "bg.subtle" } : undefined}
+      background={isSelected ? "blue.subtle" : undefined}
+      _hover={interactive ? { background: isSelected ? "blue.subtle" : "bg.subtle" } : undefined}
       onClick={interactive ? () => onSelectProviderModel?.(mp.defaultModel) : undefined}
       title={interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined}
     >
@@ -216,7 +216,7 @@ export function EligibleModelProvidersPreview({
         borderWidth="1px"
         borderColor="orange.200"
         borderRadius="md"
-        background="orange.50"
+        background="orange.subtle"
         padding={3}
       >
         <Text fontSize="sm" fontWeight="medium">

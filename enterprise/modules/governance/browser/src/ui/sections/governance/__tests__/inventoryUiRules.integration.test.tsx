@@ -37,7 +37,7 @@ describe("given an admin on the Inventory page", () => {
       connectTools();
       renderScreenWithReferences();
       const heading = screen.getByRole("heading", { name: "Inventory" });
-      const headerRow = heading.closest("div")?.parentElement;
+      const headerRow = heading.closest("div");
       expect(headerRow).not.toBeNull();
       const actions = headerRow?.lastElementChild;
       const sampleToggle = screen.getByRole("button", {
@@ -117,7 +117,7 @@ describe("given an admin on the Inventory page", () => {
 
       const createControls = () => screen.queryAllByRole("button", { name: /Add (tool|source)/ });
       const heading = screen.getByRole("heading", { name: "Inventory" });
-      const headerRow = heading.closest("div")?.parentElement;
+      const headerRow = heading.closest("div");
 
       const assertOneDoor = (expectedLabel: string) => {
         const controls = createControls();

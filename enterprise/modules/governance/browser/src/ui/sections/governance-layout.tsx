@@ -1,20 +1,26 @@
 /**
- * The frame every `/governance/*` page renders inside: content only, no
- * local rail, since the product sidebar already lists every destination.
- * KNOWN GAP: the outer `NavigationShell` chrome does not wrap this yet.
+ * The frame every `/governance/*` page renders inside: no padding, no width, no
+ * rail. The shell owns the chrome and each screen sets its own Header and Container.
  */
 
-import { Box, Container } from "@chakra-ui/react";
-import type { PropsWithChildren } from "react";
+import { Box } from "@chakra-ui/react";
+import { type PropsWithChildren, useEffect } from "react";
 
-export default function GovernanceLayout({ children }: PropsWithChildren<{ pageTitle?: string }>) {
+export default function GovernanceLayout({
+  children,
+  pageTitle,
+}: PropsWithChildren<{ pageTitle?: string }>) {
+  useEffect(() => {
+    if (pageTitle === void 0) return;
+    // Queued so it lands after the shell's own title effect.
+    queueMicrotask(() => {
+      document.title = pageTitle;
+    });
+  }, [pageTitle]);
+
   return (
-    <Box width="full" padding={4} data-testid="section-navigation-layout">
-      <Container maxW="1600px" paddingX={0} data-testid="section-navigation-container">
-        <Box width="full" data-testid="section-navigation-content">
-          {children}
-        </Box>
-      </Container>
+    <Box width="full" data-testid="section-navigation-layout">
+      {children}
     </Box>
   );
 }

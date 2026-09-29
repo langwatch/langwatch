@@ -245,7 +245,7 @@ export function OttlEditor({
         <Box
           borderWidth="1px"
           borderColor="orange.300"
-          backgroundColor="orange.50"
+          backgroundColor="orange.subtle"
           borderRadius="md"
           padding={3}
         >

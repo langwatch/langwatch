@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Code,
-  EmptyState,
   Heading,
   HStack,
   Progress,
@@ -17,6 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
@@ -227,7 +227,7 @@ function BudgetDetailPage() {
           )}
         </PageLayout.Header>
 
-        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
+        <PageLayout.Container>
           {isLoadingBudget && <Spinner />}
           {budgetMissing && <Text color="fg.muted">Budget not found.</Text>}
           {!isLoadingBudget && budget && (
@@ -331,18 +331,11 @@ function BudgetDetailPage() {
 
               <Section title="Recent activity">
                 {budget.recentLedger.length === 0 ? (
-                  <EmptyState.Root size="sm">
-                    <EmptyState.Content>
-                      <EmptyState.Indicator>
-                        <Receipt size={24} />
-                      </EmptyState.Indicator>
-                      <EmptyState.Title>No usage yet</EmptyState.Title>
-                      <EmptyState.Description>
-                        Activity shows up here after the first completed request against a virtual
-                        key in this scope.
-                      </EmptyState.Description>
-                    </EmptyState.Content>
-                  </EmptyState.Root>
+                  <NoDataInfoBlock
+                    title="No usage yet"
+                    description="Activity shows up here after the first completed request against a virtual key in this scope."
+                    icon={<Receipt size={24} />}
+                  />
                 ) : (
                   <Table.Root size="sm">
                     <Table.Header>
@@ -390,7 +383,7 @@ function BudgetDetailPage() {
               </Section>
             </VStack>
           )}
-        </Box>
+        </PageLayout.Container>
       </>
 
       <BudgetEditDrawer

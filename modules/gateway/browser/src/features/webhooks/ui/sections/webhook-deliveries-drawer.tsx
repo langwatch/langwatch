@@ -1,14 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Spinner, Table, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { type TimeInput } from "@langwatch/time";
 import { useEffect, useMemo, useState } from "react";
@@ -301,7 +291,7 @@ export function WebhookDeliveriesDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">Deliveries</Heading>
+          <Drawer.Title>Deliveries</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

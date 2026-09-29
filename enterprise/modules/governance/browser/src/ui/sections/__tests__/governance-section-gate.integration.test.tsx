@@ -40,10 +40,6 @@ vi.mock("../../../behavior/governance-api.ts", () => {
   return { api, governanceApi: api };
 });
 
-vi.mock("../../elements/loading-screen.tsx", () => ({
-  LoadingScreen: () => <div>Loading governance</div>,
-}));
-
 import AgentsScreen from "../governance/agents.tsx";
 import AnalyticsScreen from "../governance/analytics.tsx";
 import BilledScreen from "../governance/governance-billed.screen.tsx";
@@ -59,7 +55,7 @@ const ALL_FLAGS = [SECTION_FLAG, BILLED_COST_FLAG];
 const VIEWER = ["organization:view", "governance:view"];
 const ORG_ADMIN = [...builtinRolePermissions("org-admin"), ...builtinRolePermissions("admin")];
 const NOT_FOUND = "This page is not here";
-const LOADING = "Loading governance";
+const LOADING_TESTID = "governance-loading";
 
 function renderGated(
   page: ReactElement,
@@ -175,7 +171,7 @@ describe("before the flags and the session have answered", () => {
     it("shows the loading screen and reads nothing", () => {
       renderGated(<AgentsScreen />, { flagsAnswered: false });
 
-      expect(screen.getByText(LOADING)).toBeInTheDocument();
+      expect(screen.getByTestId(LOADING_TESTID)).toBeInTheDocument();
       expect(screen.queryByText(NOT_FOUND)).toBeNull();
       expect(harness.requested).toEqual([]);
     });
@@ -185,7 +181,7 @@ describe("before the flags and the session have answered", () => {
     it("shows the loading screen rather than the permission notice, and reads nothing", () => {
       renderGated(<CostsScreen />, { permissions: [], sessionSettled: false });
 
-      expect(screen.getByText(LOADING)).toBeInTheDocument();
+      expect(screen.getByTestId(LOADING_TESTID)).toBeInTheDocument();
       expect(screen.queryByText(/Missing permission/)).toBeNull();
       expect(harness.requested).toEqual([]);
     });
@@ -196,7 +192,7 @@ describe("before the flags and the session have answered", () => {
       renderGated(<CostsScreen />, { flags: [SECTION_FLAG] });
 
       expect(screen.getByText(NOT_FOUND)).toBeInTheDocument();
-      expect(screen.queryByText(LOADING)).toBeNull();
+      expect(screen.queryByTestId(LOADING_TESTID)).toBeNull();
       expect(harness.requested).toEqual([]);
     });
   });
@@ -206,7 +202,7 @@ describe("before the flags and the session have answered", () => {
       renderGated(<CostsScreen />);
 
       expect(screen.getByText(/Missing permission: governanceCost:view/)).toBeInTheDocument();
-      expect(screen.queryByText(LOADING)).toBeNull();
+      expect(screen.queryByTestId(LOADING_TESTID)).toBeNull();
       expect(harness.requested).toEqual([]);
     });
   });

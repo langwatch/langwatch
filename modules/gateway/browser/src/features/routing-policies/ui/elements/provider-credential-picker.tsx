@@ -155,7 +155,7 @@ function NoProvidersToPick({
       borderWidth="1px"
       borderColor="orange.300"
       borderRadius="md"
-      backgroundColor="orange.50"
+      backgroundColor="orange.subtle"
       padding={3}
     >
       <VStack align="start" gap={1}>

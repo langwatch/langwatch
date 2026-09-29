@@ -5,8 +5,8 @@ import {
   Box,
   Button,
   Collapsible,
-  Heading,
   HStack,
+  Spacer,
   Spinner,
   Tabs,
   Text,
@@ -416,32 +416,34 @@ function PeoplePage() {
 
   return (
     <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
-      <VStack align="stretch" gap={4} width="full" maxW="container.xl">
-        <PeoplePageHeader
-          sampleActive={sample.active}
-          onToggleSample={sample.toggle}
-          canManage={canManage}
-          isRunningMatch={runMatch.isRunning}
-          onRunMatch={runMatch.run}
-          onAddDepartment={() => setCreatingDepartment(true)}
-        />
+      <PeoplePageHeader
+        sampleActive={sample.active}
+        onToggleSample={sample.toggle}
+        canManage={canManage}
+        isRunningMatch={runMatch.isRunning}
+        onRunMatch={runMatch.run}
+        onAddDepartment={() => setCreatingDepartment(true)}
+      />
 
-        <PeopleSampleBanner active={sample.active} />
+      <PageLayout.Container>
+        <VStack align="stretch" gap={4} width="full">
+          <PeopleSampleBanner active={sample.active} />
 
-        <PeopleSummaryStrip
-          rows={allRows}
-          departmentCount={departmentTab.recordCount}
-          sampleActive={sample.active}
-          reads={reads}
-        />
+          <PeopleSummaryStrip
+            rows={allRows}
+            departmentCount={departmentTab.recordCount}
+            sampleActive={sample.active}
+            reads={reads}
+          />
 
-        <PeopleTabsSection
-          tab={tab}
-          onSelectTab={selectTab}
-          screen={screen}
-          onAssignDepartment={setAssigning}
-        />
-      </VStack>
+          <PeopleTabsSection
+            tab={tab}
+            onSelectTab={selectTab}
+            screen={screen}
+            onAssignDepartment={setAssigning}
+          />
+        </VStack>
+      </PageLayout.Container>
 
       <AssignDepartmentDialog
         orgId={screen.orgId}
@@ -648,28 +650,21 @@ function PeoplePageHeader({
   onAddDepartment: () => void;
 }) {
   return (
-    <HStack
-      data-testid="people-page-header"
-      justify="space-between"
-      align="center"
-      flexWrap="wrap"
-      gap={2}
-    >
-      <Heading size="md">People</Heading>
-      <HStack gap={2}>
-        <SampleDataToggle active={sampleActive} onToggle={onToggleSample} size="sm" />
-        {canManage && (
-          <>
-            <Button size="sm" variant="ghost" loading={isRunningMatch} onClick={onRunMatch}>
-              Run match pass
-            </Button>
-            <PageLayout.HeaderButton onClick={onAddDepartment}>
-              <Plus size={14} /> Add department
-            </PageLayout.HeaderButton>
-          </>
-        )}
-      </HStack>
-    </HStack>
+    <PageLayout.Header data-testid="people-page-header">
+      <PageLayout.Heading>People</PageLayout.Heading>
+      <Spacer />
+      <SampleDataToggle active={sampleActive} onToggle={onToggleSample} size="sm" />
+      {canManage && (
+        <>
+          <PageLayout.HeaderButton loading={isRunningMatch} onClick={onRunMatch}>
+            Run match pass
+          </PageLayout.HeaderButton>
+          <PageLayout.HeaderButton onClick={onAddDepartment}>
+            <Plus size={14} /> Add department
+          </PageLayout.HeaderButton>
+        </>
+      )}
+    </PageLayout.Header>
   );
 }
 

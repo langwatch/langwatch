@@ -497,7 +497,7 @@ function VirtualKeyDetailPage() {
           )}
         </PageLayout.Header>
 
-        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
+        <PageLayout.Container>
           {detailQuery.isLoading && <Spinner />}
           {!detailQuery.isLoading && !vk && <Text color="fg.muted">Virtual key not found.</Text>}
           {!detailQuery.isLoading && vk && (
@@ -597,7 +597,7 @@ function VirtualKeyDetailPage() {
               />
             </VStack>
           )}
-        </Box>
+        </PageLayout.Container>
       </>
 
       {orgId && vk && (
