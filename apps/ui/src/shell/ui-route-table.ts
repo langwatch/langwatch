@@ -325,6 +325,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             },
           },
           {
+            // Access's switches moved to Directory and Authentication; it lands on Directory.
+            path: "/settings/access",
+            redirect: { from: "/settings/access", to: "/settings/directory" },
+          },
+          {
             path: "/settings/connect",
             page: "pages/settings/connect",
           },

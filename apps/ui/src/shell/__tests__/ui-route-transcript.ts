@@ -43,6 +43,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "    route /settings/security -> pages/settings/security",
   "    route /settings/directory -> pages/settings/directory",
   "    redirect /settings/groups -> /settings/directory (from /settings/groups) [pin tab=groups]",
+  "    redirect /settings/access -> /settings/directory (from /settings/access)",
   "    route /settings/connect -> pages/settings/connect",
   "    route /settings/checkup -> pages/settings/checkup",
   "    route /settings/license -> pages/settings/license",
