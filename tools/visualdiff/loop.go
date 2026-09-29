@@ -80,9 +80,9 @@ func loopConfig(kind string, parsed *loopFlags) (*Config, error) {
 		return nil, err
 	}
 	if kind == "flow" {
-		return config.Select(nil, []string{parsed.section})
+		return config.Select(nil, strings.Split(parsed.section, ","))
 	}
-	return config.Select([]string{parsed.section}, nil)
+	return config.Select(strings.Split(parsed.section, ","), nil)
 }
 
 // parseLoopFlags takes the section first or after the flags.
