@@ -132,6 +132,15 @@ export class EventSourcingService<
       replayMarkerChecker,
       retentionPolicyResolver,
       killSwitch,
+      aggregateHistory: async ({ tenantId, aggregateId, occurredAtMs }) => {
+        const events = await eventStore.getEvents({
+          aggregateId,
+          context: { tenantId: createTenantId(tenantId) },
+          aggregateType,
+          anchorOccurredAtMs: occurredAtMs,
+        });
+        return events.map((event) => this.prepareEventForProjection(event));
+      },
     });
 
     this.registerFoldProjections(foldProjections, aggregateType, eventStore);

@@ -327,6 +327,8 @@ export class QueueManager<EventType extends Event = Event> {
       | "projection"
       | "command"
       | "reactor"
+      | "projectionRebuild"
+      | "stateProjectionRebuild"
       | "job",
     name: string,
   ): string {
@@ -530,6 +532,7 @@ export class QueueManager<EventType extends Event = Event> {
     projections,
     onEvent,
     onEventBatch,
+    onRebuild,
     lane = { queueType: "projection", jobPath: "fold" },
   }: {
     projections: Record<
@@ -550,6 +553,12 @@ export class QueueManager<EventType extends Event = Event> {
     onEventBatch?: (
       projectionName: string,
       events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    /** Rebuilds the missed event's aggregate; its job shares the aggregate's group. */
+    onRebuild?: (
+      projectionName: string,
+      missed: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>;
     lane?: {
@@ -617,6 +626,7 @@ export class QueueManager<EventType extends Event = Event> {
 
       const facade = this.createFacade(lane.queueType, projectionName, jobLane);
       this.eventQueues.set(this.key(lane.queueType, projectionName), facade);
+      this.registerRebuildQueue({ queueType: lane.queueType, projectionName, jobLane, onRebuild });
       if (lane.queueType === "stateProjection") {
         this.stateProjectionCount++;
       } else {
@@ -625,16 +635,49 @@ export class QueueManager<EventType extends Event = Event> {
     }
   };
 
+  /** Registers the lane's rebuild job kind, keyed like the lane so it runs in aggregate order. */
+  private registerRebuildQueue({
+    queueType,
+    projectionName,
+    jobLane,
+    onRebuild,
+  }: {
+    queueType: "projection" | "stateProjection";
+    projectionName: string;
+    jobLane: JobLane<EventType>;
+    onRebuild: ProjectionQueueRequest<EventType>["onRebuild"];
+  }): void {
+    if (!onRebuild) return;
+    const rebuildType = queueType === "projection" ? "projectionRebuild" : "stateProjectionRebuild";
+    const facade = this.createFacade(rebuildType, projectionName, {
+      parse: this.parseEvent,
+      groupKeyFn: jobLane.groupKeyFn,
+      getTenantId: jobLane.getTenantId,
+      preflightGroupKey: jobLane.preflightGroupKey,
+      // Behind whatever the lane already holds: the rebuild reads the log when it runs.
+      scoreFn: () => nowInstant().epochMilliseconds,
+      process: async (missed: EventType, delivery?: JobDelivery) => {
+        await onRebuild(projectionName, missed, {
+          tenantId: missed.tenantId,
+          deliveryAttempt: delivery?.attempt,
+        });
+      },
+      spanAttributes: (missed: EventType) => ({
+        "projection.name": projectionName,
+        "projection.rebuild": true,
+        "event.id": missed.id,
+        "event.aggregate_id": String(missed.aggregateId),
+      }),
+    });
+    this.eventQueues.set(this.key(rebuildType, projectionName), facade);
+  }
+
   // An arrow instance property, for the same reason as initializeProjectionQueues above.
   initializeStateProjectionQueues = (
-    projections: ProjectionQueueRequest<EventType>["projections"],
-    onEvent: ProjectionQueueRequest<EventType>["onEvent"],
-    onEventBatch?: ProjectionQueueRequest<EventType>["onEventBatch"],
+    request: Omit<ProjectionQueueRequest<EventType>, "lane">,
   ): void => {
     this.initializeProjectionQueues({
-      projections,
-      onEvent,
-      onEventBatch,
+      ...request,
       lane: { queueType: "stateProjection", jobPath: "state" },
     });
   };
@@ -944,6 +987,18 @@ export class QueueManager<EventType extends Event = Event> {
     projectionName: string,
   ): EventSourcedQueueProcessor<EventType> | undefined {
     return this.eventQueues.get(this.key("stateProjection", projectionName));
+  }
+
+  /** The job lane that rebuilds one aggregate of a fold or state projection, in its group. */
+  getRebuildQueue({
+    kind,
+    projectionName,
+  }: {
+    kind: "fold" | "state";
+    projectionName: string;
+  }): EventSourcedQueueProcessor<EventType> | undefined {
+    const type = kind === "fold" ? "projectionRebuild" : "stateProjectionRebuild";
+    return this.eventQueues.get(this.key(type, projectionName));
   }
 
   getProjectionSubscriberQueue(

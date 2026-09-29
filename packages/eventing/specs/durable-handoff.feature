@@ -33,20 +33,35 @@ Feature: Durable hand-off from an append to its lanes
     Then the process manager has evolved on the event exactly once
 
   @unit
-  Scenario: A fold that fails to stage is recorded and never re-staged as a late event
-    Given a fold whose first store throws
-    When an event is appended
-    Then one hand-off row names the fold and the event
+  Scenario: A fold that missed an event is rebuilt and ends equal to a full replay
+    Given a fold that folded the events either side of one it missed
     When the hand-off outbox drains
-    Then the row retires dead naming the one-aggregate rebuild it needs
-    And the fold is not handed the event again
+    Then the aggregate is rebuilt from its event log
+    And the fold's state equals a full replay of the log
 
-  @unimplemented
-  Scenario: A fold or state lane that missed an event rebuilds its aggregate
-    Given a fold or state projection lane that missed an event
-    When its hand-off row is re-driven
-    Then the aggregate is rebuilt from the event log inside its own lane
-    And an accumulating fold counts the event exactly once
+  @unit
+  Scenario: A state projection that missed an event is rebuilt from the aggregate's log
+    Given a state projection that applied the events either side of one it missed
+    When the hand-off outbox drains
+    Then the row holds every event and the newest cursor
+
+  @unit
+  Scenario: The rebuild job runs in the aggregate's own ordered lane
+    Given a fold's queued lanes
+    When a rebuild is requested for one aggregate
+    Then its job shares the group of that aggregate's live fold jobs
+
+  @unit
+  Scenario: A live event arriving during the rebuild is not lost
+    Given a rebuild of a fold's aggregate
+    When a live event's job runs after it, whether or not the rebuild read the event
+    Then the fold holds that event exactly once
+
+  @unit
+  Scenario: A lane keyed across aggregates cannot rebuild from one aggregate and retires dead
+    Given a fold whose key spans aggregates
+    When its missed hand-off is re-driven
+    Then the row retires dead naming why it cannot rebuild
 
   @unit
   Scenario: A global lane missed while the registry is closed is re-driven once it routes

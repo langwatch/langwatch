@@ -55,8 +55,12 @@ import {
   sealMapProjection,
   sealStateProjection,
 } from "./sealedProjection.ts";
-import type { StateProjectionDefinition } from "./stateProjection.types.ts";
-import { StateProjectionExecutor } from "./stateProjectionExecutor.ts";
+import type { StateProjectionDefinition, StoredProjection } from "./stateProjection.types.ts";
+import {
+  applyStateEvent,
+  orderEvents,
+  StateProjectionExecutor,
+} from "./stateProjectionExecutor.ts";
 
 /**
  * Default cap on same-aggregate fold events coalesced into one cycle — a pure
@@ -98,6 +102,13 @@ function getMapHandler<T>(handlerDefs: Record<string, T>, handlerName: string): 
   }
   return handlerDef;
 }
+
+/** One aggregate's events from the event log, as live dispatch sees them. */
+export type AggregateHistory<E extends Event> = (params: {
+  tenantId: string;
+  aggregateId: string;
+  occurredAtMs: number;
+}) => Promise<readonly E[]>;
 
 /** A lane gone from this build: its recorded hand-off can never be staged, so it retires. */
 function laneNotRegistered({ kind, lane }: { kind: HandoffLaneKind; lane: string }): DispatchError {
@@ -175,6 +186,7 @@ export class ProjectionRouter<
   private readonly aggregateType: AggregateType;
   private readonly pipelineName: string;
   private readonly queueManager: QueueManager<EventType>;
+  private readonly aggregateHistory?: AggregateHistory<EventType>;
 
   constructor(options: {
     aggregateType: AggregateType;
@@ -184,7 +196,10 @@ export class ProjectionRouter<
     replayMarkerChecker?: ReplayMarkerChecker;
     retentionPolicyResolver?: RetentionPolicyResolver;
     killSwitch?: KillSwitch;
+    /** One aggregate's leaned events from the log; a state projection rebuilds from it. */
+    aggregateHistory?: AggregateHistory<EventType>;
   }) {
+    this.aggregateHistory = options.aggregateHistory;
     this.aggregateType = options.aggregateType;
     this.pipelineName = options.pipelineName;
     this.queueManager = options.queueManager;
@@ -519,9 +534,9 @@ export class ProjectionRouter<
       };
     }
 
-    this.queueManager.initializeStateProjectionQueues(
-      projectionDefs,
-      async (projectionName, event, context) => {
+    this.queueManager.initializeStateProjectionQueues({
+      projections: projectionDefs,
+      onEvent: async (projectionName, event, context) => {
         const projection = this.stateProjections.get(projectionName);
         if (!projection) {
           throw new ConfigurationError(
@@ -539,7 +554,7 @@ export class ProjectionRouter<
           }),
         );
       },
-      async (projectionName, events, context) => {
+      onEventBatch: async (projectionName, events, context) => {
         const projection = this.stateProjections.get(projectionName);
         if (!projection) {
           throw new ConfigurationError(
@@ -557,7 +572,9 @@ export class ProjectionRouter<
           }),
         );
       },
-    );
+      onRebuild: (projectionName, missed, context) =>
+        this.rebuildState({ projectionName, missed, context }),
+    });
   }
 
   /**
@@ -631,6 +648,8 @@ export class ProjectionRouter<
           }),
         );
       },
+      onRebuild: (projectionName, missed, context) =>
+        this.rebuildFold({ projectionName, missed, context }),
     });
   }
 
@@ -820,11 +839,160 @@ export class ProjectionRouter<
   }): Promise<void> {
     if (kind === "map") return this.redeliverToMap({ lane, event });
     if (kind === "subscriber") return this.redeliverToSubscriber({ lane, event });
-    // A late single event would double-count an accumulating fold and fall
-    // behind a state projection's cursor; these lanes rebuild the aggregate.
-    throw new DispatchError({
-      message: `The ${kind} lane "${lane}" missed event ${event.id} of aggregate ${String(event.aggregateId)}; it needs a one-aggregate rebuild`,
-      retryable: false,
+    return this.requestRebuild({ kind, lane, event });
+  }
+
+  /**
+   * A late single event would double-count an accumulating fold and fall behind
+   * a state projection's cursor, so the lane rebuilds the aggregate instead, as
+   * a job in the aggregate's own ordered lane that no live event can race.
+   */
+  private async requestRebuild({
+    kind,
+    lane,
+    event,
+  }: {
+    kind: "fold" | "state";
+    lane: string;
+    event: EventType;
+  }): Promise<void> {
+    const blocker =
+      kind === "fold" ? this.foldRebuildBlocker(lane) : this.stateRebuildBlocker(lane);
+    if (blocker) {
+      throw new DispatchError({
+        message: `The ${kind} lane "${lane}" cannot rebuild aggregate ${String(event.aggregateId)}: ${blocker}`,
+        retryable: false,
+      });
+    }
+    const queue = this.queueManager.getRebuildQueue({ kind, projectionName: lane });
+    if (queue) {
+      await queue.send(event);
+      return;
+    }
+    const context = { tenantId: event.tenantId };
+    if (kind === "fold") await this.rebuildFold({ projectionName: lane, missed: event, context });
+    else await this.rebuildState({ projectionName: lane, missed: event, context });
+  }
+
+  /** Why one aggregate's history cannot rebuild this fold, if it cannot. */
+  private foldRebuildBlocker(lane: string): string | undefined {
+    const fold = this.foldProjections.get(lane)?.definition;
+    if (!fold) return "the lane is not registered";
+    if (fold.key) return "it keys state across aggregates";
+    if (!fold.eventLoader) return "it has no event loader";
+    return undefined;
+  }
+
+  /** Why one aggregate's history cannot rebuild this state projection, if it cannot. */
+  private stateRebuildBlocker(lane: string): string | undefined {
+    const projection = this.stateProjections.get(lane)?.definition;
+    if (!projection) return "the lane is not registered";
+    if (projection.key) return "it keys state across aggregates";
+    if (!this.aggregateHistory) return "no event log is wired";
+    return undefined;
+  }
+
+  /** The fold rebuild job: the aggregate's whole history, folded from init. */
+  private async rebuildFold({
+    projectionName,
+    missed,
+    context,
+  }: {
+    projectionName: string;
+    missed: EventType;
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
+    await this.getFoldProjection(projectionName).open(async (fold) => {
+      if (
+        await this.laneKilled({
+          projectionName,
+          event: missed,
+          customKey: fold.options?.killSwitch?.customKey,
+        })
+      ) {
+        return;
+      }
+      const kept = await this.withoutReplaySkipped({ projectionName, events: [missed] });
+      if (kept.length === 0) return;
+      const storeContext = await this.buildStoreContext({
+        event: missed,
+        deliveryAttempt: context.deliveryAttempt,
+      });
+      const foldState = await this.foldExecutor.rebuild(fold, missed, storeContext);
+      await this.dispatchSubscribersAfterStore({ projectionName, events: [missed], foldState });
+    });
+  }
+
+  /** The state rebuild job: the aggregate's whole history, applied from init. */
+  private async rebuildState({
+    projectionName,
+    missed,
+    context,
+  }: {
+    projectionName: string;
+    missed: EventType;
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
+    const entry = this.stateProjections.get(projectionName);
+    if (!entry) throw laneNotRegistered({ kind: "state", lane: projectionName });
+    await entry.open((projection) =>
+      this.rebuildStateProjection({ projectionName, projection, missed, context }),
+    );
+  }
+
+  private async rebuildStateProjection<State>({
+    projectionName,
+    projection,
+    missed,
+    context,
+  }: {
+    projectionName: string;
+    projection: StateProjectionDefinition<State, EventType>;
+    missed: EventType;
+    context: EventStoreReadContext<EventType>;
+  }): Promise<void> {
+    if (!this.aggregateHistory) throw laneNotRegistered({ kind: "state", lane: projectionName });
+    const customKey = projection.options?.killSwitch?.customKey;
+    if (await this.laneKilled({ projectionName, event: missed, customKey })) return;
+    const kept = await this.withoutReplaySkipped({ projectionName, events: [missed] });
+    if (kept.length === 0) return;
+    const history = await this.aggregateHistory({
+      tenantId: missed.tenantId,
+      aggregateId: String(missed.aggregateId),
+      occurredAtMs: missed.occurredAt,
+    });
+    if (!history.some((event) => event.id === missed.id)) {
+      throw new Error(`The log does not yet hold missed event ${missed.id}; retrying the rebuild`);
+    }
+    let latest: StoredProjection<State> | null = null;
+    for (const event of orderEvents(history)) {
+      latest = applyStateEvent({ projection, latest, event });
+    }
+    if (!latest) return;
+    const storeContext = await this.buildStoreContext({
+      event: missed,
+      deliveryAttempt: context.deliveryAttempt,
+    });
+    await projection.store.store(latest, storeContext);
+  }
+
+  private laneKilled({
+    projectionName,
+    event,
+    customKey,
+  }: {
+    projectionName: string;
+    event: EventType;
+    customKey: string | undefined;
+  }): Promise<boolean> {
+    return isComponentKilled({
+      killSwitch: this.killSwitch,
+      aggregateType: this.aggregateType,
+      componentType: "projection",
+      componentName: projectionName,
+      tenantId: event.tenantId,
+      customKey,
+      logger: this.logger,
     });
   }
 

@@ -16,7 +16,11 @@ import {
 import { ProcessRuntime } from "../../../process-manager/processRuntime.ts";
 import { InMemoryProcessStore } from "../../../process-manager/stores/inMemoryProcessStore.ts";
 import { ProjectionRegistry } from "../../../projections/projectionRegistry.ts";
-import { sealFoldProjection } from "../../../projections/sealedProjection.ts";
+import { sealFoldProjection, sealStateProjection } from "../../../projections/sealedProjection.ts";
+import type {
+  StateProjectionDefinition,
+  StoredProjection,
+} from "../../../projections/stateProjection.types.ts";
 import type { EventSourcedQueueProcessor } from "../../../queues/index.ts";
 import { EventStoreMemory } from "../../../stores/eventStoreMemory.ts";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types.ts";
@@ -38,6 +42,34 @@ const aggregateType = TEST_CONSTANTS.AGGREGATE_TYPE;
 const aggregateId = TEST_CONSTANTS.AGGREGATE_ID;
 const pipelineName = TEST_CONSTANTS.PIPELINE_NAME;
 
+interface Count {
+  count: number;
+  seen: string[];
+  LastEventOccurredAt: number;
+}
+
+function countEvent(state: Count, event: Event): Count {
+  return {
+    count: state.count + 1,
+    seen: [...state.seen, event.id],
+    LastEventOccurredAt: Math.max(state.LastEventOccurredAt, event.occurredAt),
+  };
+}
+
+/** A fold store that keeps its one row and the applied-id set it was committed with. */
+function foldStoreInMemory() {
+  let row: { state: Count; applied: string[] } | null = null;
+  const store = createMockFoldProjectionStore<Count>();
+  store.getWithApplied = async () =>
+    row
+      ? { state: row.state, appliedEventIds: row.applied }
+      : { state: null, appliedEventIds: [], miss: "absent" };
+  vi.mocked(store.store).mockImplementation(async (state, context) => {
+    row = { state, applied: [...(context.appliedEventIds ?? [])] };
+  });
+  return { store, current: () => row };
+}
+
 function serviceWith(
   options: Partial<EventSourcingServiceOptions<Event>> & { handoffStore: InMemoryProcessStore },
 ) {
@@ -56,7 +88,7 @@ function serviceWith(
     handlers: Object.fromEntries(handoffLaneKindSchema.options.map((kind) => [kind, redeliver])),
     processNames: [HANDOFF_PROCESS_NAME],
   });
-  return { service, drain: (now: number) => dispatcher.runOnce({ now }) };
+  return { service, eventStore, drain: (now: number) => dispatcher.runOnce({ now }) };
 }
 
 function handoffRows(store: InMemoryProcessStore) {
@@ -70,6 +102,8 @@ function handoffRows(store: InMemoryProcessStore) {
 }
 
 const appended = () => createTestEvent(aggregateId, aggregateType, tenantId);
+const appendedAt = (createdAt: number) =>
+  createTestEvent(aggregateId, aggregateType, tenantId, TEST_CONSTANTS.EVENT_TYPE_1, createdAt);
 
 describe("durable hand-off", () => {
   describe("given every lane stages", () => {
@@ -168,23 +202,26 @@ describe("durable hand-off", () => {
     });
   });
 
-  describe("given a fold whose first store throws", () => {
-    /** @scenario "A fold that fails to stage is recorded and never re-staged as a late event" */
-    it("records the lane and retires it dead rather than re-staging the event", async () => {
+  describe("given a fold that missed an event between two it folded", () => {
+    /** @scenario "A fold that missed an event is rebuilt and ends equal to a full replay" */
+    it("rebuilds the aggregate to what a full replay of the log folds", async () => {
       const handoffStore = InMemoryProcessStore.createForTesting();
-      const store = createMockFoldProjectionStore<{ count: number }>();
-      vi.mocked(store.store).mockRejectedValueOnce(new Error("clickhouse refused"));
+      const { store, current } = foldStoreInMemory();
       const fold = createMockFoldProjectionDefinition("counter", {
         store,
-        init: () => ({ count: 0 }),
-        apply: (state: { count: number }) => ({ count: state.count + 1 }),
+        init: () => ({ count: 0, seen: [], LastEventOccurredAt: 0 }),
+        apply: countEvent,
       });
-      const { service, drain } = serviceWith({
+      const { service, eventStore, drain } = serviceWith({
         handoffStore,
         foldProjections: [sealFoldProjection(fold)],
       });
 
-      await service.storeEvents([appended()], { tenantId });
+      await service.storeEvents([appendedAt(1_000)], { tenantId });
+      vi.mocked(store.store).mockRejectedValueOnce(new Error("clickhouse refused"));
+      await service.storeEvents([appendedAt(2_000)], { tenantId });
+      await service.storeEvents([appendedAt(3_000)], { tenantId });
+      expect(current()?.state.count).toBe(2);
       expect(await handoffRows(handoffStore)).toEqual([
         expect.objectContaining({
           intentType: "fold",
@@ -194,8 +231,71 @@ describe("durable hand-off", () => {
 
       const report = await drain(Date.now());
 
+      const log = await eventStore.getEvents({ aggregateId, context: { tenantId }, aggregateType });
+      const fullReplay = log.reduce(countEvent, { count: 0, seen: [], LastEventOccurredAt: 0 });
+      expect(report.dispatched).toHaveLength(1);
+      expect(current()?.state).toEqual(fullReplay);
+      expect(current()?.applied).toEqual(log.map((event) => event.id));
+    });
+  });
+
+  describe("given a fold whose key spans aggregates", () => {
+    /** @scenario "A lane keyed across aggregates cannot rebuild from one aggregate and retires dead" */
+    it("retires the row dead rather than rebuilding from one aggregate", async () => {
+      const handoffStore = InMemoryProcessStore.createForTesting();
+      const { store } = foldStoreInMemory();
+      vi.mocked(store.store).mockRejectedValueOnce(new Error("clickhouse refused"));
+      const fold = createMockFoldProjectionDefinition("perOrganization", { store });
+      fold.key = () => "organization-1";
+      const { service, drain } = serviceWith({
+        handoffStore,
+        foldProjections: [sealFoldProjection(fold)],
+      });
+
+      await service.storeEvents([appended()], { tenantId });
+      const report = await drain(Date.now());
+
       expect(report.dead).toHaveLength(1);
       expect(store.store).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a state projection that missed an event between two it applied", () => {
+    /** @scenario "A state projection that missed an event is rebuilt from the aggregate's log" */
+    it("rebuilds the row with every event and the newest cursor", async () => {
+      const handoffStore = InMemoryProcessStore.createForTesting();
+      const held: { row?: StoredProjection<{ count: number }> } = {};
+      const projection: StateProjectionDefinition<{ count: number }, Event> = {
+        name: "counterRow",
+        version: "2026-09-29",
+        eventTypes: [],
+        init: () => ({ count: 0 }),
+        apply: (state) => ({ count: state.count + 1 }),
+        store: {
+          get: async () =>
+            held.row ? { kind: "folded", projection: held.row } : { kind: "empty" },
+          store: async (stored) => {
+            held.row = stored;
+          },
+        },
+      };
+      const failingOnce = vi.spyOn(projection.store, "store");
+      const { service, drain } = serviceWith({
+        handoffStore,
+        stateProjections: [sealStateProjection(projection)],
+      });
+
+      await service.storeEvents([appendedAt(1_000)], { tenantId });
+      failingOnce.mockRejectedValueOnce(new Error("postgres refused"));
+      await service.storeEvents([appendedAt(2_000)], { tenantId });
+      const last = appendedAt(3_000);
+      await service.storeEvents([last], { tenantId });
+      expect(held.row?.state.count).toBe(2);
+
+      await drain(Date.now());
+
+      expect(held.row?.state.count).toBe(3);
+      expect(held.row?.cursor.eventId).toBe(last.id);
     });
   });
 
