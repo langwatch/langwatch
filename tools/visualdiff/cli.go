@@ -123,6 +123,8 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 		return gcCommand(ctx, args[1:], streams)
 	case "publish":
 		return publishCommand(ctx, args[1:], streams)
+	case "check":
+		return checkCommand(ctx, args[1:], streams)
 	case "done":
 		return doneCommand(args[1:], streams)
 	case "flow", "route":
