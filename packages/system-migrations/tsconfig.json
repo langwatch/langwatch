@@ -4,6 +4,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "lib": ["es2023"],
+    // Node-only (a startup convergence loop): AbortSignal/AbortController and
+    // setTimeout are Node's globals here, not DOM's, and nothing else in this
+    // package's `lib` array declares them.
+    "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
