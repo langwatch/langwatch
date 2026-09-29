@@ -37,9 +37,9 @@ func (side *scenarioSide) authHeaders(shard *shardContext, kind string) (map[str
 	case authProject:
 		return tokenHeaders(kind, shard.keys.ProjectKey, func(token string) map[string]string { return map[string]string{"X-Auth-Token": token} })
 	case authProjectB:
-		return tokenHeaders(kind, shard.keys.ProjectKeyB, func(token string) map[string]string { return map[string]string{"X-Auth-Token": token} })
+		return projectBHeaders(side, shard)
 	case authProjectC:
-		return tokenHeaders(kind, shard.keys.ProjectKeyC, func(token string) map[string]string { return map[string]string{"X-Auth-Token": token} })
+		return projectCHeaders(shard)
 	case authOrg:
 		return tokenHeaders(kind, shard.keys.OrgKey, bearerHeader)
 	case authAdmin:
@@ -54,6 +54,41 @@ func (side *scenarioSide) authHeaders(shard *shardContext, kind string) (map[str
 		return tokenHeaders(kind, side.creds[credCLIToken], bearerHeader)
 	}
 	return nil, fmt.Errorf("auth %q is not a known kind", kind)
+}
+
+func projectKeyHeader(token string) map[string]string {
+	return map[string]string{"X-Auth-Token": token}
+}
+
+// projectBHeaders is a same-organization sibling of the shard's project: the
+// -project-key-b key when given, else another seeded project of the stack.
+func projectBHeaders(side *scenarioSide, shard *shardContext) (map[string]string, error) {
+	if shard.keys.ProjectKeyB != "" {
+		return projectKeyHeader(shard.keys.ProjectKeyB), nil
+	}
+	if sibling := side.sibling(shard); sibling != nil {
+		return projectKeyHeader(sibling.keys.ProjectKey), nil
+	}
+	return nil, fmt.Errorf("auth \"project-b\" needs a second project in the same organization: pass -project-key-b, or run with -scenario-shards 2 or more")
+}
+
+// projectCHeaders is a project of another organization, which only a key
+// flag or an organization the admin key can provision supplies.
+func projectCHeaders(shard *shardContext) (map[string]string, error) {
+	if shard.keys.ProjectKeyC == "" {
+		return nil, fmt.Errorf("auth \"project-c\" needs a project in another organization: pass -project-key-c, or -admin-key (LANGWATCH_INSTANCE_ADMIN_API_KEY on the stack) so one can be provisioned")
+	}
+	return projectKeyHeader(shard.keys.ProjectKeyC), nil
+}
+
+// sibling is a seeded project of the side other than the shard's own.
+func (side *scenarioSide) sibling(shard *shardContext) *shardContext {
+	for _, candidate := range side.projects {
+		if candidate.err == "" && candidate.keys.ProjectKey != "" && candidate.keys.ProjectKey != shard.keys.ProjectKey {
+			return candidate
+		}
+	}
+	return nil
 }
 
 func tokenHeaders(kind, token string, build func(string) map[string]string) (map[string]string, error) {
@@ -82,6 +117,7 @@ func sessionCredentialHeaders(side *scenarioSide) (map[string]string, error) {
 type scenarioNeeds struct {
 	projects, orgs           int
 	restricted, sessionLogin bool
+	siblings                 bool
 }
 
 func needsOf(items []scenario, shards int) scenarioNeeds {
@@ -94,8 +130,12 @@ func needsOf(items []scenario, shards int) scenarioNeeds {
 		case shardOrg:
 			needs.orgs++
 		}
+		needs.siblings = needs.siblings || usesAuth(item, authProjectB)
 		needs.restricted = needs.restricted || usesAuth(item, authRestricted)
 		needs.sessionLogin = needs.sessionLogin || usesAuth(item, authSession) || usesAuth(item, authCLI)
+	}
+	if needs.siblings {
+		needs.projects = max(needs.projects, 2)
 	}
 	needs.projects = min(needs.projects, shards)
 	needs.orgs = min(needs.orgs, shards)

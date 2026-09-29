@@ -115,8 +115,9 @@ func (stack *fakeStack) handler() http.Handler {
 		}
 		stack.mu.Lock()
 		stack.projects++
+		number := stack.projects
 		stack.mu.Unlock()
-		replyJSON(writer, http.StatusCreated, map[string]any{"id": "p1", "serviceApiKey": "k1"})
+		replyJSON(writer, http.StatusCreated, map[string]any{"id": fmt.Sprintf("p%d", number), "serviceApiKey": fmt.Sprintf("k%d", number)})
 	})
 	mux.HandleFunc("/api/organizations", func(writer http.ResponseWriter, _ *http.Request) {
 		stack.mu.Lock()

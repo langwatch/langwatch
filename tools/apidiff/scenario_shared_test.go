@@ -149,3 +149,30 @@ func TestAdminKeyProvisionsTheToolOrganizationOnce(t *testing.T) {
 		t.Errorf("record %+v lacks the apidiff organization", record)
 	}
 }
+
+const siblingScenarios = `
+- id: other-project-b
+  endpoint: GET /api/dataset
+  auth: project-b
+  request: { path: /api/dataset }
+  expect: { status: 200 }
+- id: other-project-c
+  endpoint: GET /api/dataset
+  auth: project-c
+  request: { path: /api/dataset }
+  expect: { status: 200 }
+`
+
+func TestProjectBIsASeededSiblingAndProjectCNamesTheAdminKey(t *testing.T) {
+	server := httptest.NewServer(newFake().handler())
+	t.Cleanup(server.Close)
+	options := singleOptions(t, server.URL)
+	options.Glob = writeScenarioYAML(t, siblingScenarios)
+	code, report := runSingle(options)
+	if code != exitError || !strings.Contains(report, "1 PASS, 0 FAIL, 1 ERROR") {
+		t.Fatalf("code %d:\n%s", code, report)
+	}
+	if !strings.Contains(report, "-admin-key") || !strings.Contains(report, "LANGWATCH_INSTANCE_ADMIN_API_KEY") {
+		t.Errorf("the project-c refusal does not name the unblocker:\n%s", report)
+	}
+}

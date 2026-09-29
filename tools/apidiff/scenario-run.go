@@ -276,6 +276,9 @@ func (runner *scenarioRunner) varsFor(side *scenarioSide, shard *shardContext, r
 	vars["uid"] = fmt.Sprintf("%s%05d", runner.tag, result.order)
 	vars["UID"] = strings.ToUpper(vars["uid"])
 	vars["side"] = side.name
+	if sibling := side.sibling(shard); sibling != nil {
+		vars["projectIdB"], vars["projectKeyB"] = sibling.vars["projectId"], sibling.keys.ProjectKey
+	}
 	vars["adminEmail"] = adminEmailFor(side.name)
 	if _, set := vars["userId"]; !set {
 		vars["userId"] = seededAdminUserID
