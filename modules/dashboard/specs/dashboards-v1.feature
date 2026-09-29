@@ -118,16 +118,18 @@ Feature: Dashboards v1
     And Langy is enabled for the project and the member may start a conversation
     When they open the picker and choose a question
     Then the picker closes
-    And Langy opens with that question's own prompt, the dashboard period and grain
+    And Langy opens with that question's own prompt, the dashboard period and grain, ready to send
     And the open board is passed as context, by its name and id
-    And nothing is written to any board
+    And the question's widget is added to the board
+    # (changed by langwatch/tasks#911: picking a question now adds its widget and drafts Langy, rather than sending and writing nothing; see dashboards-v2.feature AC12)
 
   @integration
   Scenario: AC12 Only working questions are offered
     Given the picker is open
     When the member browses every section
     Then every listed question carries its own prompt naming the LangWatchQL views and the dashboard period
-    And when Langy is not available to the member the picker shows no questions and nothing to choose
+    And when Langy is not available to the member the picker still lists every question, each adding its widget only
+    # (changed by langwatch/tasks#911: the picker lists every question with or without Langy; see dashboards-v2.feature AC12b)
 
   @integration
   Scenario: AC13 Period and grain update every block
@@ -373,8 +375,8 @@ Feature: Dashboards v1
   # AC 8: "The Agent Flight Deck is a template" (changed: was "The Flight Deck cannot be edited"; the read-only board and its server refusal are gone) → Scenario: AC8 Starting from the template makes a new board of editable widgets
   # AC 9: "Empty period" → Scenario: AC9 Empty period shows an empty state
   # AC 10: "Blank board matches the reference" (changed by langwatch/tasks#911: no "Add a block" area on the empty board) → Scenario: AC10 Blank board matches the reference
-  # AC 11: "Add a block by question" (changed: no read-only board to mark) → Scenario: AC11 Ask Langy by question
-  # AC 12: "Only working questions are offered" → Scenario: AC12 Only working questions are offered
+  # AC 11: "Add a block by question" (changed by langwatch/tasks#911: picking a question adds its widget and drafts Langy to send, instead of sending and writing nothing) → Scenario: AC11 Ask Langy by question
+  # AC 12: "Only working questions are offered" (changed by langwatch/tasks#911: the picker lists every question with or without Langy) → Scenario: AC12 Only working questions are offered
   # AC 13: "Period and grain" (changed: widgets, through their reserved parameters) → Scenario: AC13 Period and grain update every block; Scenario: AC13 Grain choices update every block
   # AC 14: "Rename and describe" → Scenario: AC14 Rename and describe
   # AC 15: "Widget menu" (changed: Edit, Duplicate, Delete; no move to another board) → Scenario: AC15 Widget menu actions persist after reload

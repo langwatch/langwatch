@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { boardPromptQuestion, boardSubject } from "../langy/model/board-langy.ts";
 import { BLOCK_QUESTION_SECTIONS, searchBlockQuestions } from "../model/block-questions.ts";
 import { BOARD_LWQL_VIEWS } from "../model/board-lwql-views.ts";
-import { boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
+import { addedWidgetSlots, boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
 
 const every = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions);
 
@@ -52,7 +52,7 @@ describe("the picker's questions", () => {
         period: PERIOD,
       });
 
-      expect(request.question.startsWith(first!.prompt)).toBe(true);
+      expect(request.question?.startsWith(first!.prompt)).toBe(true);
       expect(request.question).toContain(
         "Dashboard period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z",
       );
@@ -124,5 +124,32 @@ describe("widgets on a board", () => {
       colSpan: 4,
       rowSpan: 3,
     });
+  });
+
+  /** @scenario "AC12 A picked question adds its widget and seeds Langy" */
+  it("drops added widgets flush below the board's bottom row, keeping their relative layout", () => {
+    const existing = [{ graphId: "a", gridColumn: 0, gridRow: 0, colSpan: 8, rowSpan: 3 }];
+    // Two template widgets that start at row 4, side by side, then one below at row 8.
+    const widgets = [
+      { layout: { gridColumn: 0, gridRow: 4, colSpan: 4, rowSpan: 4 } },
+      { layout: { gridColumn: 4, gridRow: 4, colSpan: 4, rowSpan: 4 } },
+      { layout: { gridColumn: 0, gridRow: 8, colSpan: 4, rowSpan: 4 } },
+    ];
+
+    expect(addedWidgetSlots({ placements: existing, widgets })).toEqual([
+      { gridColumn: 0, gridRow: 3, colSpan: 4, rowSpan: 4 },
+      { gridColumn: 4, gridRow: 3, colSpan: 4, rowSpan: 4 },
+      { gridColumn: 0, gridRow: 7, colSpan: 4, rowSpan: 4 },
+    ]);
+  });
+
+  /** @scenario "AC12b Without Langy a picked question still adds its widget" */
+  it("places a single added widget at the top of an empty board", () => {
+    expect(
+      addedWidgetSlots({
+        placements: [],
+        widgets: [{ layout: { gridColumn: 0, gridRow: 3, colSpan: 8, rowSpan: 6 } }],
+      }),
+    ).toEqual([{ gridColumn: 0, gridRow: 0, colSpan: 8, rowSpan: 6 }]);
   });
 });

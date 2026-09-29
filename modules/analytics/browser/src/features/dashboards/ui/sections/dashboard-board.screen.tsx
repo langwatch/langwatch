@@ -158,7 +158,14 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         </DashboardRefreshedAtContext.Provider>
       )}
       {picker.isOpen && (
-        <BlockPickerDialog board={subject} period={period} onClose={picker.close} />
+        <BlockPickerDialog
+          board={subject}
+          period={period}
+          onAddWidgets={(question) =>
+            boardWidgets.addQuestionWidgets({ dashboardId: board.id, question })
+          }
+          onClose={picker.close}
+        />
       )}
       <CreateDashboardWidgetDrawer
         open={isAddChartOpen}
