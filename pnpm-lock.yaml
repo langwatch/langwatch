@@ -15088,6 +15088,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../packages/eventing
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract

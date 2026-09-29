@@ -1,7 +1,7 @@
 /**
  * @see specs/studio/nlp-lambda-cleanup.feature
- * The sweep of the studio's quiet per-project NLP engines, as the module's own
- * operation rather than a process's port.
+ * The sweep of the studio's quiet per-project NLP engines, run through the
+ * module's own scheduled process manager.
  */
 // @vitest-environment node
 import type { AgentApi } from "@langwatch/agent-contract";
@@ -14,9 +14,9 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { Temporal } from "@langwatch/time";
-import { NlpLambdaFleetNotComposedError } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { NLP_LAMBDA_CLEANUP_PROCESS_NAME } from "../../eventing/workflow-nlp-lambda-cleanup.process.ts";
 import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
@@ -77,17 +77,37 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
   });
 }
 
+/** Runs the sweep intent the daily wake asks for, as the worker's outbox would. */
+async function runSweep(app: WorkflowApp): Promise<void> {
+  const process = app
+    .nlpLambdaCleanupPipeline({ deleteDispatchedBefore: async () => 0 })
+    .processManagers.get(NLP_LAMBDA_CLEANUP_PROCESS_NAME);
+  if (!process) throw new Error("the app built no Lambda cleanup process manager");
+
+  await process.config.intents!.sweep!.run(
+    { scheduledFor: 0 },
+    {
+      processName: NLP_LAMBDA_CLEANUP_PROCESS_NAME,
+      projectId: "global",
+      processKey: "global",
+      tenantId: "global",
+      messageKey: "sweep:0",
+      attempt: 1,
+    },
+  );
+}
+
 describe("the studio's NLP Lambda sweep", () => {
   describe("given a deployment that composed no NLP Lambda account", () => {
-    /** @scenario "A deployment that composed no Lambda account refuses the sweep by name" */
-    it("refuses by name rather than reporting there was nothing to delete", async () => {
-      await expect(appWith().cleanupOldLambdas()).rejects.toThrow(NlpLambdaFleetNotComposedError);
+    /** @scenario "A deployment that composed no Lambda account sweeps nothing on its daily wake" */
+    it("reads nothing and succeeds", async () => {
+      await expect(runSweep(appWith())).resolves.toBeUndefined();
     });
   });
 
   describe("given a deployment whose studio engines can be swept", () => {
-    /** @scenario "A completed sweep answers the sentence the scheduler expects" */
-    it("reads the account through the fleet it was composed with", async () => {
+    /** @scenario "A sweep deletes the engines that have been quiet for a week" */
+    it("deletes an engine that has not run for a month", async () => {
       const listFunctions = vi.fn(async () => [{ name: "langwatch_nlp_project-1" }] as const);
       const deleteFunction = vi.fn(async () => {});
       const fleet: NlpLambdaFleet = {
@@ -99,7 +119,7 @@ describe("the studio's NLP Lambda sweep", () => {
         deleteLogGroup: async () => {},
       };
 
-      await appWith(fleet).cleanupOldLambdas();
+      await runSweep(appWith(fleet));
 
       expect(listFunctions).toHaveBeenCalledTimes(1);
       expect(deleteFunction).toHaveBeenCalledWith({ functionName: "langwatch_nlp_project-1" });

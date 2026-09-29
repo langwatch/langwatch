@@ -1253,6 +1253,9 @@ A process-manager handler emits intents through the typed accessor `ctx.intent(n
 registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline; the
 eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
+Periodic work is a scheduled process manager (`.schedule({ everyMs }).onWake`) on its owner's pipeline;
+there are no cron routes. A route under `/api/cron` is refused by
+`packages/architecture-enforcer/tests/no-cron-routes.unit.test.ts` (Alex, 2026-09-29).
 The system-migration re-drive and an operator's "run a pass now" are one scheduled process manager
 on ops' `ops_system_migrations` (Alex, 2026-09-28): the hourly wake asks for a pass only when the
 stored state holds a tenant a pass could still move, and the kick is a command whose event asks

@@ -396,14 +396,6 @@ export interface WorkflowApi {
   }): Promise<void>;
   listPublishedComponents(input: { projectId: string }): Promise<unknown>;
 
-  // -- the deployment's own housekeeping ------------------------------------
-
-  /**
-   * Deletes the studio's quiet per-project NLP Lambda functions and their
-   * log groups. Belongs here, not a process: the Lambdas are the studio's
-   * own engines; the deployment's cron bearer is what invokes it.
-   */
-  cleanupOldLambdas(): Promise<void>;
   /**
    * The platform's own address for one workflow resource, from the
    * project's slug and an already-resolved path. Built by the app itself

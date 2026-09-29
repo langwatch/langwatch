@@ -173,7 +173,6 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,
-  "/api/cron/old_lambdas_cleanup": UNDOCUMENTED_APP_INTERNAL,
   "/api/elevenlabs/webhook/{modelProviderId}": UNDOCUMENTED_APP_INTERNAL,
   "/api/track_event": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/admin/impersonate": UNDOCUMENTED_APP_INTERNAL,

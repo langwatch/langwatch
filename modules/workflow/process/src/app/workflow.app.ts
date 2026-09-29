@@ -13,6 +13,7 @@ import {
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
+import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -25,7 +26,6 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
-  NlpLambdaFleetNotComposedError,
   WorkflowApi,
   WorkflowExecutionFailedError,
   WorkflowNotFoundError,
@@ -86,6 +86,7 @@ import {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
 } from "../channels/http/http.workflow-studio-stream.channel.ts";
+import { buildNlpLambdaCleanupPipeline } from "../eventing/workflow-nlp-lambda-cleanup.pipeline.ts";
 import type { WorkflowLineageRepository } from "../repositories/workflow-lineage.repository.ts";
 import {
   workflowRepositories,
@@ -312,9 +313,9 @@ export interface WorkflowInfrastructure {
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
   /**
-   * The account the studio's engines are deployed into, for the cron sweep.
+   * The account the studio's engines are deployed into, for the daily sweep.
    * Absent where the deployment fronts the engine with no Lambdas at all,
-   * and the sweep then refuses by name rather than reporting a clean run.
+   * and the sweep then reads nothing.
    */
   nlpLambdaFleet?: NlpLambdaFleet;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
@@ -1240,17 +1241,25 @@ export class WorkflowApp implements WorkflowApi {
 
   // -- the deployment's own housekeeping ------------------------------------
 
-  /**
-   * Sweeps the studio's quiet per-project NLP Lambda functions and log
-   * groups. Refuses rather than reporting an empty sweep when no fleet was
-   * composed — "nothing to delete" and "nothing was looked at" read alike.
-   */
-  async cleanupOldLambdas(): Promise<void> {
+  /** The daily sweep of the studio's quiet NLP Lambda functions this module's worker hosts. */
+  nlpLambdaCleanupPipeline(deps: {
+    deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
+  }): StaticPipelineDefinition<never> {
+    return buildNlpLambdaCleanupPipeline({
+      sweep: () => this.#sweepQuietNlpLambdas(),
+      deleteDispatchedBefore: deps.deleteDispatchedBefore,
+    });
+  }
+
+  /** A deployment with no Lambda account has no engines of its own to sweep. */
+  async #sweepQuietNlpLambdas(): Promise<void> {
     const fleet = this.#members.nlpLambdaFleet;
+    if (!fleet) {
+      logger.info("no NLP Lambda fleet composed; the daily sweep has nothing to read");
+      return;
+    }
 
-    if (!fleet) throw new NlpLambdaFleetNotComposedError();
-
-    await NlpLambdaCleanupService.create({ fleet }).sweep();
+    await NlpLambdaCleanupService.create({ fleet, logger }).sweep();
   }
 
   /**
