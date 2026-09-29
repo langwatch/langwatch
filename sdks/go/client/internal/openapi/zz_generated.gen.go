@@ -1546,6 +1546,21 @@ func (e PostApiDatasetJSONBodyColumnTypesType11) Valid() bool {
 	}
 }
 
+// Defines values for PostApiDatasetJSONBodyColumnTypesType12.
+const (
+	PostApiDatasetJSONBodyColumnTypesType12File PostApiDatasetJSONBodyColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiDatasetJSONBodyColumnTypesType12 enum.
+func (e PostApiDatasetJSONBodyColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiDatasetJSONBodyColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiDatasetEvaluate200JSONResponseBody0Status.
 const (
 	PostApiDatasetEvaluate200JSONResponseBody0StatusProcessed PostApiDatasetEvaluate200JSONResponseBody0Status = "processed"
@@ -1780,6 +1795,21 @@ const (
 func (e PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11) Valid() bool {
 	switch e {
 	case PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11Image:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12.
+const (
+	PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12File PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 enum.
+func (e PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12) Valid() bool {
+	switch e {
+	case PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12File:
 		return true
 	default:
 		return false
@@ -6049,11 +6079,27 @@ func (e GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11) V
 	}
 }
 
+// Defines values for GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12File GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPrompts200JSONResponseBodyInputsType.
 const (
 	GetApiPrompts200JSONResponseBodyInputsTypeBool         GetApiPrompts200JSONResponseBodyInputsType = "bool"
 	GetApiPrompts200JSONResponseBodyInputsTypeChatMessages GetApiPrompts200JSONResponseBodyInputsType = "chat_messages"
 	GetApiPrompts200JSONResponseBodyInputsTypeDict         GetApiPrompts200JSONResponseBodyInputsType = "dict"
+	GetApiPrompts200JSONResponseBodyInputsTypeFile         GetApiPrompts200JSONResponseBodyInputsType = "file"
 	GetApiPrompts200JSONResponseBodyInputsTypeFloat        GetApiPrompts200JSONResponseBodyInputsType = "float"
 	GetApiPrompts200JSONResponseBodyInputsTypeImage        GetApiPrompts200JSONResponseBodyInputsType = "image"
 	GetApiPrompts200JSONResponseBodyInputsTypeList         GetApiPrompts200JSONResponseBodyInputsType = "list"
@@ -6072,6 +6118,8 @@ func (e GetApiPrompts200JSONResponseBodyInputsType) Valid() bool {
 	case GetApiPrompts200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case GetApiPrompts200JSONResponseBodyInputsTypeDict:
+		return true
+	case GetApiPrompts200JSONResponseBodyInputsTypeFile:
 		return true
 	case GetApiPrompts200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -6319,6 +6367,21 @@ func (e GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineCo
 	}
 }
 
+// Defines values for GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPrompts200JSONResponseBodyPromptingTechniqueType.
 const (
 	GetApiPrompts200JSONResponseBodyPromptingTechniqueTypeChainOfThought GetApiPrompts200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -6378,6 +6441,7 @@ const (
 	PostApiPromptsJSONBodyInputsTypeBool         PostApiPromptsJSONBodyInputsType = "bool"
 	PostApiPromptsJSONBodyInputsTypeChatMessages PostApiPromptsJSONBodyInputsType = "chat_messages"
 	PostApiPromptsJSONBodyInputsTypeDict         PostApiPromptsJSONBodyInputsType = "dict"
+	PostApiPromptsJSONBodyInputsTypeFile         PostApiPromptsJSONBodyInputsType = "file"
 	PostApiPromptsJSONBodyInputsTypeFloat        PostApiPromptsJSONBodyInputsType = "float"
 	PostApiPromptsJSONBodyInputsTypeImage        PostApiPromptsJSONBodyInputsType = "image"
 	PostApiPromptsJSONBodyInputsTypeList         PostApiPromptsJSONBodyInputsType = "list"
@@ -6396,6 +6460,8 @@ func (e PostApiPromptsJSONBodyInputsType) Valid() bool {
 	case PostApiPromptsJSONBodyInputsTypeChatMessages:
 		return true
 	case PostApiPromptsJSONBodyInputsTypeDict:
+		return true
+	case PostApiPromptsJSONBodyInputsTypeFile:
 		return true
 	case PostApiPromptsJSONBodyInputsTypeFloat:
 		return true
@@ -6676,11 +6742,27 @@ func (e PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11) 
 	}
 }
 
+// Defines values for PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12File PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPrompts200JSONResponseBodyInputsType.
 const (
 	PostApiPrompts200JSONResponseBodyInputsTypeBool         PostApiPrompts200JSONResponseBodyInputsType = "bool"
 	PostApiPrompts200JSONResponseBodyInputsTypeChatMessages PostApiPrompts200JSONResponseBodyInputsType = "chat_messages"
 	PostApiPrompts200JSONResponseBodyInputsTypeDict         PostApiPrompts200JSONResponseBodyInputsType = "dict"
+	PostApiPrompts200JSONResponseBodyInputsTypeFile         PostApiPrompts200JSONResponseBodyInputsType = "file"
 	PostApiPrompts200JSONResponseBodyInputsTypeFloat        PostApiPrompts200JSONResponseBodyInputsType = "float"
 	PostApiPrompts200JSONResponseBodyInputsTypeImage        PostApiPrompts200JSONResponseBodyInputsType = "image"
 	PostApiPrompts200JSONResponseBodyInputsTypeList         PostApiPrompts200JSONResponseBodyInputsType = "list"
@@ -6699,6 +6781,8 @@ func (e PostApiPrompts200JSONResponseBodyInputsType) Valid() bool {
 	case PostApiPrompts200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case PostApiPrompts200JSONResponseBodyInputsTypeDict:
+		return true
+	case PostApiPrompts200JSONResponseBodyInputsTypeFile:
 		return true
 	case PostApiPrompts200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -6946,6 +7030,21 @@ func (e PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineC
 	}
 }
 
+// Defines values for PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPrompts200JSONResponseBodyPromptingTechniqueType.
 const (
 	PostApiPrompts200JSONResponseBodyPromptingTechniqueTypeChainOfThought PostApiPrompts200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -7180,11 +7279,27 @@ func (e GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType1
 	}
 }
 
+// Defines values for GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12File GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPromptsById200JSONResponseBodyInputsType.
 const (
 	GetApiPromptsById200JSONResponseBodyInputsTypeBool         GetApiPromptsById200JSONResponseBodyInputsType = "bool"
 	GetApiPromptsById200JSONResponseBodyInputsTypeChatMessages GetApiPromptsById200JSONResponseBodyInputsType = "chat_messages"
 	GetApiPromptsById200JSONResponseBodyInputsTypeDict         GetApiPromptsById200JSONResponseBodyInputsType = "dict"
+	GetApiPromptsById200JSONResponseBodyInputsTypeFile         GetApiPromptsById200JSONResponseBodyInputsType = "file"
 	GetApiPromptsById200JSONResponseBodyInputsTypeFloat        GetApiPromptsById200JSONResponseBodyInputsType = "float"
 	GetApiPromptsById200JSONResponseBodyInputsTypeImage        GetApiPromptsById200JSONResponseBodyInputsType = "image"
 	GetApiPromptsById200JSONResponseBodyInputsTypeList         GetApiPromptsById200JSONResponseBodyInputsType = "list"
@@ -7203,6 +7318,8 @@ func (e GetApiPromptsById200JSONResponseBodyInputsType) Valid() bool {
 	case GetApiPromptsById200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case GetApiPromptsById200JSONResponseBodyInputsTypeDict:
+		return true
+	case GetApiPromptsById200JSONResponseBodyInputsTypeFile:
 		return true
 	case GetApiPromptsById200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -7450,6 +7567,21 @@ func (e GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInli
 	}
 }
 
+// Defines values for GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPromptsById200JSONResponseBodyPromptingTechniqueType.
 const (
 	GetApiPromptsById200JSONResponseBodyPromptingTechniqueTypeChainOfThought GetApiPromptsById200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -7509,6 +7641,7 @@ const (
 	PutApiPromptsByIdJSONBodyInputsTypeBool         PutApiPromptsByIdJSONBodyInputsType = "bool"
 	PutApiPromptsByIdJSONBodyInputsTypeChatMessages PutApiPromptsByIdJSONBodyInputsType = "chat_messages"
 	PutApiPromptsByIdJSONBodyInputsTypeDict         PutApiPromptsByIdJSONBodyInputsType = "dict"
+	PutApiPromptsByIdJSONBodyInputsTypeFile         PutApiPromptsByIdJSONBodyInputsType = "file"
 	PutApiPromptsByIdJSONBodyInputsTypeFloat        PutApiPromptsByIdJSONBodyInputsType = "float"
 	PutApiPromptsByIdJSONBodyInputsTypeImage        PutApiPromptsByIdJSONBodyInputsType = "image"
 	PutApiPromptsByIdJSONBodyInputsTypeList         PutApiPromptsByIdJSONBodyInputsType = "list"
@@ -7527,6 +7660,8 @@ func (e PutApiPromptsByIdJSONBodyInputsType) Valid() bool {
 	case PutApiPromptsByIdJSONBodyInputsTypeChatMessages:
 		return true
 	case PutApiPromptsByIdJSONBodyInputsTypeDict:
+		return true
+	case PutApiPromptsByIdJSONBodyInputsTypeFile:
 		return true
 	case PutApiPromptsByIdJSONBodyInputsTypeFloat:
 		return true
@@ -7807,11 +7942,27 @@ func (e PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType1
 	}
 }
 
+// Defines values for PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12File PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PutApiPromptsById200JSONResponseBodyInputsType.
 const (
 	PutApiPromptsById200JSONResponseBodyInputsTypeBool         PutApiPromptsById200JSONResponseBodyInputsType = "bool"
 	PutApiPromptsById200JSONResponseBodyInputsTypeChatMessages PutApiPromptsById200JSONResponseBodyInputsType = "chat_messages"
 	PutApiPromptsById200JSONResponseBodyInputsTypeDict         PutApiPromptsById200JSONResponseBodyInputsType = "dict"
+	PutApiPromptsById200JSONResponseBodyInputsTypeFile         PutApiPromptsById200JSONResponseBodyInputsType = "file"
 	PutApiPromptsById200JSONResponseBodyInputsTypeFloat        PutApiPromptsById200JSONResponseBodyInputsType = "float"
 	PutApiPromptsById200JSONResponseBodyInputsTypeImage        PutApiPromptsById200JSONResponseBodyInputsType = "image"
 	PutApiPromptsById200JSONResponseBodyInputsTypeList         PutApiPromptsById200JSONResponseBodyInputsType = "list"
@@ -7830,6 +7981,8 @@ func (e PutApiPromptsById200JSONResponseBodyInputsType) Valid() bool {
 	case PutApiPromptsById200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case PutApiPromptsById200JSONResponseBodyInputsTypeDict:
+		return true
+	case PutApiPromptsById200JSONResponseBodyInputsTypeFile:
 		return true
 	case PutApiPromptsById200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -8077,6 +8230,21 @@ func (e PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInli
 	}
 }
 
+// Defines values for PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PutApiPromptsById200JSONResponseBodyPromptingTechniqueType.
 const (
 	PutApiPromptsById200JSONResponseBodyPromptingTechniqueTypeChainOfThought PutApiPromptsById200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -8311,11 +8479,27 @@ func (e PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesT
 	}
 }
 
+// Defines values for PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSyncJSONBodyConfigDataInputsType.
 const (
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeBool         PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "bool"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeChatMessages PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "chat_messages"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeDict         PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "dict"
+	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeFile         PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "file"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeFloat        PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "float"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeImage        PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "image"
 	PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeList         PostApiPromptsByIdSyncJSONBodyConfigDataInputsType = "list"
@@ -8334,6 +8518,8 @@ func (e PostApiPromptsByIdSyncJSONBodyConfigDataInputsType) Valid() bool {
 	case PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeChatMessages:
 		return true
 	case PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeDict:
+		return true
+	case PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeFile:
 		return true
 	case PostApiPromptsByIdSyncJSONBodyConfigDataInputsTypeFloat:
 		return true
@@ -8581,6 +8767,21 @@ func (e PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrations
 	}
 }
 
+// Defines values for PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueType.
 const (
 	PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueTypeChainOfThought PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueType = "chain_of_thought"
@@ -8821,11 +9022,27 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDem
 	}
 }
 
+// Defines values for PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType.
 const (
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeBool         PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "bool"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeChatMessages PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "chat_messages"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeDict         PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "dict"
+	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeFile         PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "file"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeFloat        PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "float"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeImage        PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "image"
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeList         PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsType = "list"
@@ -8844,6 +9061,8 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInp
 	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeChatMessages:
 		return true
 	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeDict:
+		return true
+	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeFile:
 		return true
 	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataInputsTypeFloat:
 		return true
@@ -9091,6 +9310,21 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPro
 	}
 }
 
+// Defines values for PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueType.
 const (
 	PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueTypeChainOfThought PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueType = "chain_of_thought"
@@ -9307,11 +9541,27 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColum
 	}
 }
 
+// Defines values for PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType.
 const (
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeBool         PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "bool"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeChatMessages PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "chat_messages"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeDict         PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "dict"
+	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeFile         PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "file"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeFloat        PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "float"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeImage        PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "image"
 	PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeList         PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType = "list"
@@ -9330,6 +9580,8 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyPromptInputsType) Valid() bool 
 	case PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeChatMessages:
 		return true
 	case PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeDict:
+		return true
+	case PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeFile:
 		return true
 	case PostApiPromptsByIdSync200JSONResponseBodyPromptInputsTypeFloat:
 		return true
@@ -9577,6 +9829,21 @@ func (e PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonst
 	}
 }
 
+// Defines values for PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueType.
 const (
 	PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueTypeChainOfThought PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueType = "chain_of_thought"
@@ -9811,11 +10078,27 @@ func (e GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTy
 	}
 }
 
+// Defines values for GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12File GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPromptsByIdVersions200JSONResponseBodyInputsType.
 const (
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeBool         GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "bool"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeChatMessages GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "chat_messages"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeDict         GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "dict"
+	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeFile         GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "file"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeFloat        GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "float"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeImage        GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "image"
 	GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeList         GetApiPromptsByIdVersions200JSONResponseBodyInputsType = "list"
@@ -9834,6 +10117,8 @@ func (e GetApiPromptsByIdVersions200JSONResponseBodyInputsType) Valid() bool {
 	case GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeDict:
+		return true
+	case GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeFile:
 		return true
 	case GetApiPromptsByIdVersions200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -10081,6 +10366,21 @@ func (e GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrat
 	}
 }
 
+// Defines values for GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueType.
 const (
 	GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueTypeChainOfThought GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueType = "chain_of_thought"
@@ -10315,11 +10615,27 @@ func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstra
 	}
 }
 
+// Defines values for PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12.
+const (
+	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12File PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12File:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType.
 const (
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeBool         PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "bool"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeChatMessages PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "chat_messages"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeDict         PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "dict"
+	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeFile         PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "file"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeFloat        PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "float"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeImage        PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "image"
 	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeList         PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsType = "list"
@@ -10338,6 +10654,8 @@ func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTyp
 	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeChatMessages:
 		return true
 	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeDict:
+		return true
+	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeFile:
 		return true
 	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyInputsTypeFloat:
 		return true
@@ -10467,13 +10785,13 @@ func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPrompting
 
 // Defines values for PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4.
 const (
-	PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4List PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4 = "list"
+	List PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4 = "list"
 )
 
 // Valid indicates whether the value is a known member of the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4 enum.
 func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4) Valid() bool {
 	switch e {
-	case PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType4List:
+	case List:
 		return true
 	default:
 		return false
@@ -10579,6 +10897,21 @@ const (
 func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) Valid() bool {
 	switch e {
 	case Image:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12.
+const (
+	File PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 = "file"
+)
+
+// Valid indicates whether the value is a known member of the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 enum.
+func (e PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) Valid() bool {
+	switch e {
+	case File:
 		return true
 	default:
 		return false
@@ -19434,9 +19767,27 @@ type PostApiDatasetJSONBodyColumnTypesType10 string
 // PostApiDatasetJSONBodyColumnTypesType11 defines parameters for PostApiDataset.
 type PostApiDatasetJSONBodyColumnTypesType11 string
 
+// PostApiDatasetJSONBodyColumnTypesType12 defines parameters for PostApiDataset.
+type PostApiDatasetJSONBodyColumnTypesType12 string
+
 // PostApiDatasetJSONBody_ColumnTypes_Type defines parameters for PostApiDataset.
 type PostApiDatasetJSONBody_ColumnTypes_Type struct {
 	union json.RawMessage
+}
+
+// PostApiDatasetAttachmentsMultipartBody defines parameters for PostApiDatasetAttachments.
+type PostApiDatasetAttachmentsMultipartBody struct {
+	// DatasetId The dataset that owns the file. Omit it while the dataset is still a draft.
+	DatasetId *string `json:"datasetId,omitempty"`
+
+	// File The file to store.
+	File openapi_types.File `json:"file"`
+}
+
+// PostApiDatasetAttachmentsParams defines parameters for PostApiDatasetAttachments.
+type PostApiDatasetAttachmentsParams struct {
+	// ProjectId The project the file is stored for.
+	ProjectId string `form:"projectId" json:"projectId"`
 }
 
 // PostApiDatasetEvaluateJSONBody defines parameters for PostApiDatasetEvaluate.
@@ -19566,6 +19917,9 @@ type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType10 string
 
 // PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11 defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11 string
+
+// PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 defines parameters for PatchApiDatasetBySlugOrId.
+type PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 string
 
 // PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type defines parameters for PatchApiDatasetBySlugOrId.
 type PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type struct {
@@ -22109,6 +22463,9 @@ type GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType10 strin
 // GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
 
+// GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPrompts.
+type GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
+
 // GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22164,6 +22521,9 @@ type GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColum
 
 // GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPrompts.
+type GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPrompts.
 type GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22264,6 +22624,9 @@ type PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType10 stri
 // PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPrompts.
 type PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPrompts.
+type PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPrompts.
 type PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22319,6 +22682,9 @@ type PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColu
 
 // PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPrompts.
 type PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPrompts.
+type PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPrompts.
 type PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22389,6 +22755,9 @@ type GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType10 s
 // GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPromptsById.
 type GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
 
+// GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPromptsById.
+type GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
+
 // GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPromptsById.
 type GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22444,6 +22813,9 @@ type GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineC
 
 // GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPromptsById.
 type GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPromptsById.
+type GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPromptsById.
 type GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22544,6 +22916,9 @@ type PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType10 s
 // PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for PutApiPromptsById.
 type PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
 
+// PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for PutApiPromptsById.
+type PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
+
 // PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for PutApiPromptsById.
 type PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22599,6 +22974,9 @@ type PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineC
 
 // PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PutApiPromptsById.
 type PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PutApiPromptsById.
+type PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PutApiPromptsById.
 type PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22722,6 +23100,9 @@ type PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType
 // PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22778,6 +23159,9 @@ type PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInl
 // PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22827,6 +23211,9 @@ type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemons
 
 // PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22884,6 +23271,9 @@ type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPrompt
 // PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -22930,6 +23320,9 @@ type PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTy
 
 // PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -22987,6 +23380,9 @@ type PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrat
 // PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
 
+// PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdSync.
+type PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
+
 // PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdSync.
 type PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -23041,6 +23437,9 @@ type GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypes
 
 // GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPromptsByIdVersions.
 type GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
+
+// GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPromptsByIdVersions.
+type GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
 
 // GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPromptsByIdVersions.
 type GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -23098,6 +23497,9 @@ type GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstration
 // GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for GetApiPromptsByIdVersions.
 type GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
 
+// GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for GetApiPromptsByIdVersions.
+type GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
+
 // GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for GetApiPromptsByIdVersions.
 type GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
 	union json.RawMessage
@@ -23147,6 +23549,9 @@ type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstratio
 
 // PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
 type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
+type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
 type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -23203,6 +23608,9 @@ type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTec
 
 // PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
 type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 string
+
+// PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
+type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 string
 
 // PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type defines parameters for PostApiPromptsByIdVersionsByVersionIdRestore.
 type PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type struct {
@@ -28865,6 +29273,9 @@ type PatchApiDashboardsByIdJSONRequestBody PatchApiDashboardsByIdJSONBody
 
 // PostApiDatasetJSONRequestBody defines body for PostApiDataset for application/json ContentType.
 type PostApiDatasetJSONRequestBody PostApiDatasetJSONBody
+
+// PostApiDatasetAttachmentsMultipartRequestBody defines body for PostApiDatasetAttachments for multipart/form-data ContentType.
+type PostApiDatasetAttachmentsMultipartRequestBody PostApiDatasetAttachmentsMultipartBody
 
 // PostApiDatasetEvaluateJSONRequestBody defines body for PostApiDatasetEvaluate for application/json ContentType.
 type PostApiDatasetEvaluateJSONRequestBody PostApiDatasetEvaluateJSONBody
@@ -46405,6 +46816,32 @@ func (t *PostApiDatasetJSONBody_ColumnTypes_Type) MergePostApiDatasetJSONBodyCol
 	return err
 }
 
+// AsPostApiDatasetJSONBodyColumnTypesType12 returns the union data inside the PostApiDatasetJSONBody_ColumnTypes_Type as a PostApiDatasetJSONBodyColumnTypesType12
+func (t PostApiDatasetJSONBody_ColumnTypes_Type) AsPostApiDatasetJSONBodyColumnTypesType12() (PostApiDatasetJSONBodyColumnTypesType12, error) {
+	var body PostApiDatasetJSONBodyColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiDatasetJSONBodyColumnTypesType12 overwrites any union data inside the PostApiDatasetJSONBody_ColumnTypes_Type as the provided PostApiDatasetJSONBodyColumnTypesType12
+func (t *PostApiDatasetJSONBody_ColumnTypes_Type) FromPostApiDatasetJSONBodyColumnTypesType12(v PostApiDatasetJSONBodyColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiDatasetJSONBodyColumnTypesType12 performs a merge with any union data inside the PostApiDatasetJSONBody_ColumnTypes_Type, using the provided PostApiDatasetJSONBodyColumnTypesType12
+func (t *PostApiDatasetJSONBody_ColumnTypes_Type) MergePostApiDatasetJSONBodyColumnTypesType12(v PostApiDatasetJSONBodyColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiDatasetJSONBody_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -46805,6 +47242,32 @@ func (t *PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) FromPatchApiDataset
 
 // MergePatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11 performs a merge with any union data inside the PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type, using the provided PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11
 func (t *PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) MergePatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11(v PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 returns the union data inside the PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type as a PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12
+func (t PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) AsPatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12() (PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12, error) {
+	var body PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 overwrites any union data inside the PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type as the provided PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12
+func (t *PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) FromPatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12(v PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12 performs a merge with any union data inside the PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type, using the provided PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12
+func (t *PatchApiDatasetBySlugOrIdJSONBody_ColumnTypes_Type) MergePatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12(v PatchApiDatasetBySlugOrIdJSONBodyColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -49103,6 +49566,32 @@ func (t *GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type
 	return err
 }
 
+// AsGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t GetApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -49415,6 +49904,32 @@ func (t *GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inli
 
 // MergeGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -49747,6 +50262,32 @@ func (t *PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Typ
 	return err
 }
 
+// AsPostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PostApiPrompts200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPrompts200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -50059,6 +50600,32 @@ func (t *PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inl
 
 // MergePostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPrompts200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPrompts200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -50391,6 +50958,32 @@ func (t *GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_
 	return err
 }
 
+// AsGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t GetApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -50703,6 +51296,32 @@ func (t *GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_
 
 // MergeGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -51035,6 +51654,32 @@ func (t *PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_
 	return err
 }
 
+// AsPutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsPutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromPutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergePutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PutApiPromptsById200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PutApiPromptsById200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -51347,6 +51992,32 @@ func (t *PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_
 
 // MergePutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PutApiPromptsById200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PutApiPromptsById200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -51679,6 +52350,32 @@ func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnT
 	return err
 }
 
+// AsPostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSyncJSONBodyConfigDataDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPromptsByIdSyncJSONBody_ConfigData_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -51991,6 +52688,32 @@ func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrat
 
 // MergePostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSyncJSONBody_ConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSyncJSONBodyConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -52323,6 +53046,32 @@ func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData
 	return err
 }
 
+// AsPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -52635,6 +53384,32 @@ func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData
 
 // MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_ConflictInfo_RemoteConfigData_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -52967,6 +53742,32 @@ func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_
 	return err
 }
 
+// AsPostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyPromptDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPromptsByIdSync200JSONResponseBody_Prompt_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -53279,6 +54080,32 @@ func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Dem
 
 // MergePostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdSync200JSONResponseBody_Prompt_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdSync200JSONResponseBodyPromptPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -53611,6 +54438,32 @@ func (t *GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_Colu
 	return err
 }
 
+// AsGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v GetApiPromptsByIdVersions200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t GetApiPromptsByIdVersions200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -53923,6 +54776,32 @@ func (t *GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonst
 
 // MergeGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *GetApiPromptsByIdVersions200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergeGetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v GetApiPromptsByIdVersions200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -54255,6 +55134,32 @@ func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonst
 	return err
 }
 
+// AsPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Demonstrations_Inline_ColumnTypes_Type) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -54567,6 +55472,32 @@ func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_Prompti
 
 // MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11 performs a merge with any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11
 func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType11) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 returns the union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as a PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) AsPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12() (PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12, error) {
+	var body PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 overwrites any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type as the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) FromPostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12 performs a merge with any union data inside the PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type, using the provided PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12
+func (t *PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBody_PromptingTechnique_Demonstrations_Inline_ColumnTypes_Type) MergePostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12(v PostApiPromptsByIdVersionsByVersionIdRestore200JSONResponseBodyPromptingTechniqueDemonstrationsInlineColumnTypesType12) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -70706,6 +71637,9 @@ type ClientInterface interface {
 
 	PostApiDataset(ctx context.Context, body PostApiDatasetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostApiDatasetAttachmentsWithBody request with any body
+	PostApiDatasetAttachmentsWithBody(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiDatasetDirectUpload request
 	PostApiDatasetDirectUpload(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -72317,6 +73251,18 @@ func (c *Client) PostApiDatasetWithBody(ctx context.Context, contentType string,
 
 func (c *Client) PostApiDataset(ctx context.Context, body PostApiDatasetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiDatasetRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiDatasetAttachmentsWithBody(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiDatasetAttachmentsRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -78397,6 +79343,58 @@ func NewPostApiDatasetRequestWithBody(server string, contentType string, body io
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostApiDatasetAttachmentsRequestWithBody generates requests for PostApiDatasetAttachments with any type of body
+func NewPostApiDatasetAttachmentsRequestWithBody(server string, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/dataset/attachments")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "projectId", params.ProjectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
@@ -91424,6 +92422,9 @@ type ClientWithResponsesInterface interface {
 
 	PostApiDatasetWithResponse(ctx context.Context, body PostApiDatasetJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiDatasetResponse, error)
 
+	// PostApiDatasetAttachmentsWithBodyWithResponse request with any body
+	PostApiDatasetAttachmentsWithBodyWithResponse(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsResponse, error)
+
 	// PostApiDatasetDirectUploadWithResponse request
 	PostApiDatasetDirectUploadWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostApiDatasetDirectUploadResponse, error)
 
@@ -93959,6 +94960,76 @@ func (r PostApiDatasetResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PostApiDatasetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiDatasetAttachmentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		// MediaType The media type the file is stored under.
+		MediaType string `json:"mediaType"`
+
+		// Name The file name the reference carries.
+		Name string `json:"name"`
+
+		// SizeBytes The size of the stored file, in bytes.
+		SizeBytes float32 `json:"sizeBytes"`
+
+		// Url The value to write into the cell, and the address the file is served from.
+		Url string `json:"url"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON413 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON415 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON429 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiDatasetAttachmentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiDatasetAttachmentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiDatasetAttachmentsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -113326,6 +114397,15 @@ func (c *ClientWithResponses) PostApiDatasetWithResponse(ctx context.Context, bo
 	return ParsePostApiDatasetResponse(rsp)
 }
 
+// PostApiDatasetAttachmentsWithBodyWithResponse request with arbitrary body returning *PostApiDatasetAttachmentsResponse
+func (c *ClientWithResponses) PostApiDatasetAttachmentsWithBodyWithResponse(ctx context.Context, params *PostApiDatasetAttachmentsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiDatasetAttachmentsResponse, error) {
+	rsp, err := c.PostApiDatasetAttachmentsWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiDatasetAttachmentsResponse(rsp)
+}
+
 // PostApiDatasetDirectUploadWithResponse request returning *PostApiDatasetDirectUploadResponse
 func (c *ClientWithResponses) PostApiDatasetDirectUploadWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostApiDatasetDirectUploadResponse, error) {
 	rsp, err := c.PostApiDatasetDirectUpload(ctx, reqEditors...)
@@ -118299,6 +119379,114 @@ func ParsePostApiDatasetResponse(rsp *http.Response) (*PostApiDatasetResponse, e
 	response := &PostApiDatasetResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParsePostApiDatasetAttachmentsResponse parses an HTTP response from a PostApiDatasetAttachmentsWithResponse call
+func ParsePostApiDatasetAttachmentsResponse(rsp *http.Response) (*PostApiDatasetAttachmentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiDatasetAttachmentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			// MediaType The media type the file is stored under.
+			MediaType string `json:"mediaType"`
+
+			// Name The file name the reference carries.
+			Name string `json:"name"`
+
+			// SizeBytes The size of the stored file, in bytes.
+			SizeBytes float32 `json:"sizeBytes"`
+
+			// Url The value to write into the cell, and the address the file is served from.
+			Url string `json:"url"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil
