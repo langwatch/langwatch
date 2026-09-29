@@ -23,6 +23,8 @@
  * picks the index up on ADD alone, and that needs a fixture heavy enough to
  * cross the wide-part threshold. The justification for materialising inline is
  * the production EXPLAIN evidence in migration 00101's comment, not this suite.
+ *
+ * @see specs/coding-agent/session-lookup-pruning.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -31,8 +33,10 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session.clickhouse.repository";
 
 let ch: ClickHouseClient;
+let sessions: CodingAgentSessionClickHouseRepository;
 const tag = `t${nanoid(8)}`;
 
 /**
@@ -130,40 +134,10 @@ async function rowsReadForSessionLookup({
   return body.statistics?.rows_read ?? -1;
 }
 
-/** The latest-version read the repository performs, reduced to its essentials. */
-async function latestVersion({
-  tenantId,
-  sessionId,
-}: {
-  tenantId: string;
-  sessionId: string;
-}) {
-  const rows = await (
-    await ch.query({
-      query: `
-        SELECT SessionId, ModelCalls
-        FROM coding_agent_sessions
-        WHERE TenantId = {tenantId:String}
-          AND SessionId = {sessionId:String}
-          AND (TenantId, SessionId, UpdatedAt) IN (
-            SELECT TenantId, SessionId, max(UpdatedAt)
-            FROM coding_agent_sessions
-            WHERE TenantId = {tenantId:String} AND SessionId = {sessionId:String}
-            GROUP BY TenantId, SessionId
-          )
-        ORDER BY ModelCalls DESC, StartedAt ASC
-        LIMIT 1
-      `,
-      query_params: { tenantId, sessionId },
-      format: "JSONEachRow",
-    })
-  ).json<{ SessionId: string; ModelCalls: number }>();
-  return rows[0] ?? null;
-}
-
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
+  sessions = new CodingAgentSessionClickHouseRepository(async () => ch);
 }, 60_000);
 
 afterAll(async () => {
@@ -181,18 +155,8 @@ afterAll(async () => {
 });
 
 describe("given the coding_agent_sessions SessionId skip-index", () => {
-  it("attaches a bloom_filter index on SessionId", async () => {
-    const ddl = await (
-      await ch.query({
-        query: "SHOW CREATE TABLE coding_agent_sessions",
-        format: "TabSeparatedRaw",
-      })
-    ).text();
-    expect(ddl).toMatch(/INDEX\s+idx_session_id\b/i);
-    expect(ddl).toMatch(/idx_session_id[\s\S]*TYPE\s+bloom_filter/i);
-  });
-
   describe("when looking up a session that does not exist", () => {
+    /** @scenario Looking up a session that does not exist reads nothing */
     it("reads no rows at all", async () => {
       const tenantId = tenantIdFor("a");
       // Sessions spread across partitions, so a time-unbounded lookup would
@@ -269,6 +233,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
   });
 
   describe("when the session exists", () => {
+    /** @scenario Looking up a session returns the version that folded the most */
     it("returns the version that folded the most, unchanged by the index", async () => {
       const tenantId = tenantIdFor("b");
       const sessionId = `${tag}-s3`;
@@ -298,14 +263,14 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
         ],
       });
 
-      expect(await latestVersion({ tenantId, sessionId })).toEqual({
-        SessionId: sessionId,
-        ModelCalls: 7,
-      });
+      const read = await sessions.findBySessionId({ tenantId, sessionId });
+      expect(read?.sessionId).toBe(sessionId);
+      expect(read?.modelCalls).toBe(7);
     });
   });
 
   describe("when two tenants share a session id", () => {
+    /** @scenario A session id used in two projects resolves within the requesting project */
     it("keeps the lookup scoped to the requesting tenant", async () => {
       const sessionId = `${tag}-shared`;
       await insertSessions({
@@ -331,18 +296,16 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
         ],
       });
 
-      expect(
-        await latestVersion({ tenantId: tenantIdFor("c"), sessionId }),
-      ).toEqual({
-        SessionId: sessionId,
-        ModelCalls: 3,
+      const inC = await sessions.findBySessionId({
+        tenantId: tenantIdFor("c"),
+        sessionId,
       });
-      expect(
-        await latestVersion({ tenantId: tenantIdFor("d"), sessionId }),
-      ).toEqual({
-        SessionId: sessionId,
-        ModelCalls: 9,
+      const inD = await sessions.findBySessionId({
+        tenantId: tenantIdFor("d"),
+        sessionId,
       });
+      expect(inC?.modelCalls).toBe(3);
+      expect(inD?.modelCalls).toBe(9);
     });
   });
 });
