@@ -102,6 +102,9 @@ type Request struct {
 	Options Options
 	Config  *Config
 	Deps    Deps
+	// Done is the ledger whose sections the run skips (done.go); the CLI
+	// leaves it empty on -include-done.
+	Done DoneLedger
 }
 
 // Result is what a finished run produced.
@@ -244,7 +247,7 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 	}
 	plan := buildPlan(options, config)
 	result := Result{Plan: plan, Coverage: runCoverage(ctx, request, streams.Err)}
-	baselines, err := planBaselines(ctx, baselineInputs{options: options, config: config, deps: deps}, streams.Err)
+	baselines, err := planBaselines(ctx, baselineInputs{options: options, config: config, deps: deps, done: request.Done}, streams.Err)
 	if err != nil {
 		return result, err
 	}
@@ -253,9 +256,11 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 
 	if options.DryRun {
 		writePlan(streams.Out, plan, options.RoutesOnly)
+		request.Done.writeSkips(streams.Out, config, options.Editions)
 		writeBaselinePlan(streams.Out, options.Editions, baselines)
 		return result, nil
 	}
+	request.Done.writeSkips(streams.Err, config, options.Editions)
 	if err := prepareInfra(ctx, portInfraInputs{plan: &plan, deps: deps, stderr: streams.Err}, options); err != nil {
 		return result, err
 	}
@@ -631,7 +636,8 @@ func (run *session) cacheBaseline(baseline Baseline, stream RunnerStream) {
 // capture drives the runner over both sides for one edition: the base from
 // its baseline when one is cached, live otherwise.
 func (run *session) capture(ctx context.Context, edition Edition, baseline Baseline) (RunnerStream, error) {
-	options, config, deps := run.request.Options, run.request.Config, run.request.Deps
+	options, deps := run.request.Options, run.request.Deps
+	config, _ := run.request.Done.Scope(run.request.Config, edition)
 	plan := run.plan
 	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL(), Fixtures: run.sideFixtures[plan.Base.Name], StaticDir: run.staticDirs[plan.Base.Name]}
 	if baseline.Cached {
@@ -694,6 +700,8 @@ func (run *session) report(stream RunnerStream, edition Edition) ([]Row, error) 
 		BaseURL: plan.Base.URL(), CandidateURL: plan.Candidate.URL(),
 		Viewport: options.Viewport.String(), StartedAt: run.request.Deps.Now().Format(time.RFC3339),
 	}
+	meta.BaseCommit, _ = resolveCommit(context.Background(), gitRef{run: run.request.Deps.Run, root: options.Root, ref: options.BaseRef})
+	meta.CandidateCommit, _ = resolveCommit(context.Background(), gitRef{run: run.request.Deps.Run, root: options.Root, ref: options.CandidateRef})
 	if err := WriteReport(dir, rows, meta); err != nil {
 		return rows, fmt.Errorf("write %s report: %w", edition, err)
 	}

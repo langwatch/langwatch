@@ -216,6 +216,8 @@ type baselineInputs struct {
 	options Options
 	config  *Config
 	deps    Deps
+	// done narrows each edition's routes and flows (DoneLedger.Scope).
+	done DoneLedger
 }
 
 // resolveBaselines finds each edition's slot for the base as it is now.
@@ -231,11 +233,12 @@ func resolveBaselines(ctx context.Context, inputs baselineInputs) (map[Edition]B
 		return nil, err
 	}
 	now := inputs.deps.Now()
-	wanted := flowHashes(inputs.config.Flows)
-	if options.RoutesOnly {
-		wanted = nil
-	}
 	for _, edition := range options.Editions {
+		config, _ := inputs.done.Scope(inputs.config, edition)
+		wanted := flowHashes(config.Flows)
+		if options.RoutesOnly {
+			wanted = nil
+		}
 		key, err := BaselineKey(baselineKeyInputs{
 			commit: commit, edition: edition, config: inputs.config,
 			viewport: options.Viewport, root: options.Root, ui: uiMode(options),
@@ -247,11 +250,11 @@ func resolveBaselines(ctx context.Context, inputs baselineInputs) (map[Edition]B
 			Dir: filepath.Join(options.Root, ".visualdiff", BaselinesDir, key),
 			Meta: BaselineMeta{
 				BaseRef: options.BaseRef, BaseCommit: commit, Edition: edition, CreatedAt: now.UTC(),
-				Routes: inputs.config.Routes, Flows: wanted,
+				Routes: config.Routes, Flows: wanted,
 			},
 		}
 		baseline.Cached = !options.RefreshBaseline && baseline.Present() &&
-			readBaselineMeta(baseline.Dir).Covers(inputs.config.Routes, wanted)
+			readBaselineMeta(baseline.Dir).Covers(config.Routes, wanted)
 		baselines[edition] = baseline
 	}
 	return baselines, nil

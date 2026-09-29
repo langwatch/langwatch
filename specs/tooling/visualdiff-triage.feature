@@ -356,3 +356,20 @@ Feature: visualdiff catches regressions and reports its own coverage
       When the row is classified
       Then it is "capture-failed", a finding naming the side and the first failed module
       And a live base holding one is not cached as a baseline
+
+  Rule: A signed-off section keeps its proof and is not captured again
+
+    @unit
+    Scenario: A section marked done keeps its proof and is skipped by later runs
+      Given a finished run whose route or flow is only noise, copy or intended-restore
+      When `visualdiff done -run RUNID -route PATH -note WHY` marks it
+      Then its screenshots, aria snapshots, console and request log and a meta.json with both commits land under .visualdiff/done/<edition>/<key>
+      And every later run skips it, says how many sections it skipped and which, and never counts it as a finding or uncovered
+      And -include-done captures it again, and `done -undo KEY` removes it
+
+    @unit
+    Scenario: A section with a failing class is refused unless forced
+      Given a finished run whose section has a failing class
+      When `visualdiff done` marks it without -force
+      Then it is refused naming the class, and no entry is written
+      And with -force and a note it is marked done and recorded as forced

@@ -120,6 +120,9 @@ type ReportMeta struct {
 	CandidateURL string `json:"candidateUrl"`
 	Viewport     string `json:"viewport"`
 	StartedAt    string `json:"startedAt"`
+	// The commits the refs resolved to, which a done entry records.
+	BaseCommit      string `json:"baseCommit,omitempty"`
+	CandidateCommit string `json:"candidateCommit,omitempty"`
 }
 
 // WriteReport writes the three artifacts: the HTML page a person reads, the

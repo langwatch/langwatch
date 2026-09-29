@@ -424,6 +424,26 @@ never tears anything down - both are the `run` step's job, not
 `recapture`'s. See `specs/tooling/visualdiff-on-haven.feature`'s "A findings
 stream reports each comparison as it completes" rule for the bound scenarios.
 
+## Marking a section done
+
+A section is one route or one flow in one edition. Once it is signed off, keep
+its proof and stop capturing it:
+
+```bash
+go run ./cmd/visualdiff done -run 20260929-161501 -route /{slug}/settings -note "copy only, wording agreed"
+go run ./cmd/visualdiff done -list                                # key, candidate commit, date, note
+go run ./cmd/visualdiff done -undo enterprise/route-%2F%7Bslug%7D%2Fsettings
+```
+
+`done` copies the section's screenshots and diffs, its rows (aria snapshots,
+console errors, failed requests) and a `meta.json` (run id, both commits, date,
+note, classes) from `report/<edition>/findings.json` into
+`.visualdiff/done/<edition>/<key>/`, which is local and gitignored. It refuses a
+section with any class but `noise`, `copy` or `intended-restore` unless `-force`
+is given. Every later `run` skips done sections and prints how many and which;
+a skip is neither a finding nor `uncovered`. `-include-done` captures them
+anyway, for a periodic full pass.
+
 ## Adding a route
 
 Add the path to `routes:` in `tools/visualdiff/visualdiff.yaml`. `{slug}` is substituted with
@@ -488,6 +508,7 @@ tools/visualdiff/haven.go            the haven boot path: slugs, up, readiness, 
 tools/visualdiff/findings_stream.go  findings.jsonl: the live tracker, the file writer, run+recapture's shared capture path
 tools/visualdiff/catalogue.go        the module guess, from modules/catalogue.json
 tools/visualdiff/recapture.go        `visualdiff recapture`: replays named routes against a -keep run's own stacks
+tools/visualdiff/done.go             `visualdiff done`: the ledger of signed-off sections a run skips
 tools/havenrun/                      what visualdiff and apidiff share to boot through haven
 cmd/visualdiff/main.go               the entry point
 tools/visualdiff/runner/             @langwatch/visual-diff-runner: Playwright capture + pixel diff

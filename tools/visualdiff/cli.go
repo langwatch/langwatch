@@ -18,9 +18,11 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                  [-dry-run] [-keep] [-agent] [-no-haven]
                  [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
-                 [-no-fail-fast] [-resume RUNID] [-no-publish]
+                 [-no-fail-fast] [-resume RUNID] [-no-publish] [-include-done]
 
   visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E] [-root DIR]
+  visualdiff done -run RUNID (-route PATH | -flow ID) [-edition E] -note WHY [-force]
+  visualdiff done -list | -undo KEY
   visualdiff coverage [-base REF] [-candidate REF] [-config FILE] [-root DIR]
   visualdiff gc [-kept] [-no-haven] [-root DIR]
   visualdiff publish -run-dir DIR [-pr N] [-link URL] [-base REF] [-candidate REF] [-root DIR]
@@ -68,6 +70,11 @@ publish shows a finished run's screens on a pull request after the fact:
 full report's address. It exits 0 when it published, 1 when it skipped and
 said why, 2 when it failed.
 
+done keeps a signed-off section's proof (screenshots, aria snapshots, console
+and request log, meta.json) under .visualdiff/done/<edition>/<key>, and every
+later run skips it; -include-done captures done sections anyway. A section
+with any class but noise, copy or intended-restore is refused without -force.
+
 coverage prints the same coverage verdict without booting anything. gc,
 which every run also does first, removes what dead runs left behind: their
 worktrees, haven stacks and databases, and every orphan visualdiff-* stack.
@@ -93,6 +100,8 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 		return gcCommand(ctx, args[1:], streams)
 	case "publish":
 		return publishCommand(ctx, args[1:], streams)
+	case "done":
+		return doneCommand(args[1:], streams)
 	case "-h", "--help", "help":
 		fmt.Fprint(streams.Out, usage)
 		return ExitClean
@@ -106,17 +115,24 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 type runFlags struct {
 	options Options
 	config  *Config
+	// includeDone captures the done ledger's sections too; otherwise done
+	// is the ledger, read before the run starts.
+	includeDone bool
+	done        DoneLedger
 }
 
 func runCommand(ctx context.Context, args []string, streams Streams) int {
 	parsed, err := parseRunFlags(args, streams.Err)
+	if err == nil && !parsed.includeDone {
+		parsed.done, err = LoadDoneLedger(parsed.options.Root)
+	}
 	if err != nil {
 		if !errors.Is(err, errFlagsReported) {
 			fmt.Fprintln(streams.Err, "visualdiff:", err)
 		}
 		return ExitOperational
 	}
-	result, err := Execute(ctx, Request{Options: parsed.options, Config: parsed.config}, streams)
+	result, err := Execute(ctx, Request{Options: parsed.options, Config: parsed.config, Done: parsed.done}, streams)
 	if err != nil {
 		fmt.Fprintln(streams.Err, "visualdiff:", err)
 	}
@@ -178,8 +194,9 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	refreshBaseline := flags.Bool("refresh-baseline", false, "render the base and replace its cached baseline")
 	noFailFast := flags.Bool("no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
 	resume := flags.String("resume", "", "continue a -keep run by id: reuse its worktrees and running stacks")
-	noPublish, devUI := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request"),
-		flags.Bool("dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI")
+	noPublish, devUI, includeDone := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request"),
+		flags.Bool("dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI"),
+		flags.Bool("include-done", false, "capture the sections the done ledger holds too")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
@@ -210,7 +227,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		FailFast: !*noFailFast, NoPublish: *noPublish, DevUI: *devUI,
 	}
 	resumeRun(&options, *resume)
-	return &runFlags{options: options, config: config}, nil
+	return &runFlags{options: options, config: config, includeDone: *includeDone}, nil
 }
 
 // resumeRun points a run at the -keep run it continues, when one is named.
