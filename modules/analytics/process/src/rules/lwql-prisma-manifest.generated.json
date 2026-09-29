@@ -7703,6 +7703,33 @@
           "documentation": ""
         },
         {
+          "name": "description",
+          "columnName": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Free text under the board's name; null until a member writes one."
+        },
+        {
+          "name": "visibility",
+          "columnName": "visibility",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Who may see the board: \"only_me\", \"team\" or \"organisation\" (the default,\nwhich is what every board created before the column existed keeps)."
+        },
+        {
+          "name": "createdById",
+          "columnName": "createdById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member who created it; null for boards that predate the column."
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "DateTime",
