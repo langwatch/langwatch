@@ -172,6 +172,15 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the attempt is refused with code join_request_throttled and status 429
     And the refusal says how long is left, from the answer it got
 
+  # The offer is read on every page, so the page must not spend the lookup
+  # limit: a person who only moves around is never throttled.
+  @unit
+  Scenario: Moving between pages does not ask for the offer again
+    Given the offer to join was read less than thirty seconds ago
+    When the person moves to another page or back to the window
+    Then the offer is answered from what was already read
+    And the lookup limit is not spent on navigation
+
   @unit
   Scenario: A rejected person cannot immediately ask again
     Given "ana" rejected "sam"'s request

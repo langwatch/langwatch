@@ -113,6 +113,7 @@ const crowdedOrg = {
 const navigateMock = vi.fn();
 const replaceMock = vi.fn();
 const rememberScopeMock = vi.fn();
+const openDrawerMock = vi.fn();
 
 const BASE_READINGS: StubNavigationReadings = {
   organizations: [orgA],
@@ -142,7 +143,12 @@ function renderShell({
     <ChakraProvider value={defaultSystem}>
       <WithStubNavigationHost
         readings={{ ...BASE_READINGS, ...readings }}
-        actions={{ navigate: navigateMock, replace: replaceMock, rememberScope: rememberScopeMock }}
+        actions={{
+          navigate: navigateMock,
+          replace: replaceMock,
+          rememberScope: rememberScopeMock,
+          openDrawer: openDrawerMock,
+        }}
       >
         <NavigationShell personalScope={personalScope}>
           <div data-testid="page-body" />
@@ -243,6 +249,7 @@ beforeEach(() => {
   };
   navigateMock.mockReset();
   rememberScopeMock.mockReset();
+  openDrawerMock.mockReset();
   localStorage.clear();
 });
 
@@ -394,6 +401,31 @@ describe("the product-switcher top bar", () => {
       await waitFor(() => {
         expect(screen.getByText("Support Bot")).toBeInTheDocument();
       });
+    });
+
+    /** @scenario Creating a project stays available while the list is unfiltered */
+    it("offers New Project under a team the reader may create in, opening the create drawer", async () => {
+      renderShell({ readings: { permissions: ["project:create"] } });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await user.click(await screen.findByText("New Project"));
+
+      expect(openDrawerMock).toHaveBeenCalledWith("createProject", {
+        navigateOnCreate: "true",
+        defaultTeamId: "team_1",
+        organizationId: "org_1",
+      });
+    });
+
+    it("offers no New Project to a reader who may not create one", async () => {
+      renderShell({ readings: { permissions: [] } });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await screen.findByText("Support Bot");
+
+      expect(screen.queryByText("New Project")).not.toBeInTheDocument();
     });
   });
 

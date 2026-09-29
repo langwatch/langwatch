@@ -65,7 +65,8 @@ export function useProjectPickGroups(): ProjectPickGroup[] {
           teamId: team.id,
           orgId: organization.id,
           label: team.name,
-          canCreateProject,
+          // A personal workspace holds its owner's one project; main offered no create there.
+          canCreateProject: canCreateProject && !team.isPersonal,
         },
         projects: team.projects.map((candidate) => ({
           projectId: candidate.id,

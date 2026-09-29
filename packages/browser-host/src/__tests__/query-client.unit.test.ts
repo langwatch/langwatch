@@ -42,6 +42,16 @@ describe("createUiQueryClient", () => {
       expect(client.getDefaultOptions().queries?.retry).toBe(shouldRetryQuery);
     });
 
+    /** @scenario "Moving between pages does not ask for the offer again" */
+    it("keeps an answer fresh for thirty seconds and does not refetch on focus", () => {
+      const client = createUiQueryClient();
+
+      expect(client.getDefaultOptions().queries).toMatchObject({
+        staleTime: 30_000,
+        refetchOnWindowFocus: false,
+      });
+    });
+
     it("installs no QueryCache.onError — a query failure is never auto-reported", () => {
       const client = createUiQueryClient();
 
