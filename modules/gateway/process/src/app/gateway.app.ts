@@ -1051,15 +1051,15 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
   }: {
     participation: EventingParticipation;
   }): GatewaySpendDefinition {
-    if (participation === "produce") {
+    const parts = this.#spendPipeline;
+    if (participation === "produce" || (participation === "describe" && !parts)) {
       return GatewaySpendProducerAdapter.create().createGatewaySpendProducerPipeline({
         processName: "langwatch-api",
       });
     }
-    const parts = this.#spendPipeline;
     if (!parts) throw this.spendStoreUnavailable();
     const { openAdmissions, foldCache, debits } = parts;
-    this.#spendProcessing = EventingGatewaySpendAdapter.create({
+    const processing = EventingGatewaySpendAdapter.create({
       spendEvents: parts.ledger,
       cacheStore: (inner) => foldCache.cached(inner),
       webhookSpendDelivery: parts.webhooks,
@@ -1074,7 +1074,8 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
         graceMs: parts.settlementGraceMs,
       },
     });
-    return this.#spendProcessing.buildProcessing();
+    if (participation === "consume") this.#spendProcessing = processing;
+    return processing.buildProcessing();
   }
 
   /** governance_events_processing for this role: the worker also hands each fact to webhook. */

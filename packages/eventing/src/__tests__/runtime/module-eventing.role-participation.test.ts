@@ -219,6 +219,7 @@ describe("given one module declaration installed by an api process and a worker"
       expect(installedAs.map((installed) => installed.participation)).toEqual([
         "consume",
         "produce",
+        "describe",
       ]);
       await workerRuntime.stop();
       await apiRuntime.stop();
@@ -244,7 +245,7 @@ describe("given one module declaration installed by an api process and a worker"
         .withModules([module])
         .boot();
 
-      expect(installedAs.map((installed) => installed.processStore)).toEqual([void 0]);
+      expect(installedAs.map((installed) => installed.processStore)).toEqual([void 0, void 0]);
       expect(api.unrunProcessManagers).toEqual([PROCESS_NAME]);
       expect(() => api.processRuntime).toThrow(/producer-only/);
       await apiRuntime.stop();

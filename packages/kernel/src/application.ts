@@ -742,6 +742,19 @@ function installModuleEventing({
   });
   const registration = eventing.register(definition);
   module.connect?.({ app: state.provided, commands: commandsOf(registration) });
+  if (eventing.participation !== "produce" || !eventing.describe) return;
+  eventing.describe(
+    buildModuleEventing({
+      eventing: module,
+      setup: {
+        participation: "describe",
+        repositories: state.repositories,
+        app: state.provided,
+        processStore: eventing.processStore,
+      },
+      log: () => eventing.eventStore,
+    }),
+  );
 }
 
 /**

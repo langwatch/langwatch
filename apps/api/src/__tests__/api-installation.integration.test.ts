@@ -101,6 +101,10 @@ describe("the api process installation", () => {
       expect(eventing.definitions.map((definition) => definition.metadata.name)).toContain(
         "trace_processing",
       );
+      const trace = eventing.definitions.find(
+        ({ metadata }) => metadata.name === "trace_processing",
+      );
+      expect(trace?.open((definition) => definition.foldProjections.size)).toBeGreaterThan(0);
       expect(serverModules.flatMap((module) => module.transports ?? [])).not.toEqual([]);
     } finally {
       await runtime.stop();

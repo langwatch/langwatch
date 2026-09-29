@@ -123,6 +123,7 @@ export class EventSourcing {
   private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.runtime");
   private readonly pipelines = new Map<string, RegisteredCommandSenders>();
   private readonly _definitions: SealedPipelineDefinition[] = [];
+  private readonly _described = new Map<string, SealedPipelineDefinition>();
   private readonly projectionRegistry: ProjectionRegistry<Event>;
 
   // Infrastructure — lazily initialized
@@ -279,9 +280,23 @@ export class EventSourcing {
     return owner.open((definition): Event => definition.parseEvent(value));
   }
 
-  /** Returns the static definitions captured during register() calls. */
+  /**
+   * The registered definitions, each replaced by its described consume side when a
+   * role that sends only listed it. Read by introspection; nothing here is run.
+   */
   get definitions(): readonly SealedPipelineDefinition[] {
-    return this._definitions;
+    if (this._described.size === 0) return this._definitions;
+    const kept = this._definitions.filter(({ metadata }) => !this._described.has(metadata.name));
+    return [...kept, ...this._described.values()];
+  }
+
+  /** Lists a pipeline's consume side without starting it: no queue, consumer, timer or sender. */
+  describe<
+    EventType extends Event,
+    ProjectionTypes extends Record<string, Projection>,
+    Commands extends RegisteredCommand,
+  >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): void {
+    this._described.set(definition.metadata.name, sealPipelineDefinition(definition));
   }
 
   /**

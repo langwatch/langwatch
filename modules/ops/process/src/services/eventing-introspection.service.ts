@@ -7,9 +7,14 @@ import {
   type SealedPipelineDefinition,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import type {
+  OpsEventSubscriberRegistration,
+  OpsPipelineRegistrations,
+} from "@langwatch/ops-contract";
 
 import {
   type OpsEventingIntrospection,
+  type OpsPipelineRegistry,
   type OpsDejaViewFold,
   type OpsDejaViewProjection,
   type OpsProcessManagerMetadata,
@@ -22,7 +27,7 @@ import {
  * resolved lazily on every call because a composition registers pipelines
  * during boot and an explorer may be built before the last one lands.
  */
-export class EventingIntrospectionService implements OpsEventingIntrospection {
+export class EventingIntrospectionService implements OpsEventingIntrospection, OpsPipelineRegistry {
   private constructor(private readonly definitions: () => readonly SealedPipelineDefinition[]) {}
 
   static create(
@@ -33,6 +38,14 @@ export class EventingIntrospectionService implements OpsEventingIntrospection {
 
   projections(): OpsProjectionMetadata[] {
     return this.definitions().flatMap((sealed) => sealed.open(projectionsOf));
+  }
+
+  /** What `listProjections` answers: projections and event subscribers, as main's registry did. */
+  listRegistrations(): OpsPipelineRegistrations {
+    return {
+      projections: this.projections(),
+      eventSubscribers: this.definitions().flatMap((sealed) => sealed.open(eventSubscribersOf)),
+    };
   }
 
   killSwitches(): OpsKillSwitchDescriptor[] {
@@ -97,6 +110,22 @@ function projectionsOf<
     kind: "state" as const,
   }));
   return [...folds, ...maps, ...states];
+}
+
+function eventSubscribersOf<
+  EventType extends Event,
+  ProjectionTypes extends Record<string, Projection>,
+  Commands extends RegisteredCommand,
+>(
+  def: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>,
+): OpsEventSubscriberRegistration[] {
+  const { name: pipelineName, aggregateType } = def.metadata;
+  return Array.from(def.eventSubscribers.values()).map((definition) => ({
+    subscriberName: definition.name,
+    pipelineName,
+    aggregateType,
+    eventTypes: definition.eventTypes,
+  }));
 }
 
 function dejaViewProjectionsOf<

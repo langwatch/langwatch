@@ -90,7 +90,7 @@ export function buildEventing(options: {
     ...(queueFactory === undefined ? {} : { queueFactory }),
     processStore,
     ...(config.killSwitch === undefined ? {} : { killSwitch: config.killSwitch }),
-    ...(options.redis === undefined || config.store.kind === "producer-only"
+    ...(options.redis === undefined
       ? {}
       : { maintenance: eventingMaintenance({ redis: options.redis, processStore }) }),
   });

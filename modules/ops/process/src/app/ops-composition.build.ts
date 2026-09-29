@@ -320,10 +320,10 @@ export function buildOpsInfrastructure(input: {
       }).build();
     },
     eventingIntrospection: introspection,
-    // Four operator readings this process composes nothing for. Each answers
+    pipelines: introspection,
+    // Three operator readings this process composes nothing for. Each answers
     // its empty shape rather than refusing: the back office renders the page
     // and shows nothing registered, which is what is true here.
-    pipelines: { listRegistrations: () => ({ projections: [], eventSubscribers: [] }) },
     eventLogWindow: {
       read: () => ({ searchLookbackDays: 7, hotTierDays: null, hotTierEnvVar: null }),
     },

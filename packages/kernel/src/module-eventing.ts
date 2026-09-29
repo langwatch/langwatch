@@ -7,11 +7,11 @@ import type { ServerRole } from "./feature-installer.ts";
 import type { ResourceOwnership } from "./resource-scope.ts";
 
 /**
- * Whether this process only sends on a pipeline, or also drains it. The api
- * produces; the worker folds, maps, subscribes and runs process managers —
- * the one branch a declaration reading its own projections is allowed to take.
+ * Whether this process only sends on a pipeline, or also drains it: the api produces, the
+ * worker folds, maps, subscribes and runs process managers. "describe" builds the consume
+ * side to be listed, never run, so it reads the worker's dependencies only when a handler runs.
  */
-export type EventingParticipation = "produce" | "consume";
+export type EventingParticipation = "produce" | "consume" | "describe";
 
 /**
  * Which half the role runs. The worker is the one role that drains: it claims
@@ -173,6 +173,12 @@ class PendingPipelines {
       declaration.connect?.({ app: this.setup.app, commands: commandsOf(registration) });
     }
   }
+
+  describeEach(describe: (definition: unknown) => void): void {
+    for (const declaration of this.declarations) {
+      describe(buildModuleEventing({ eventing: declaration, setup: this.setup, log: this.#log }));
+    }
+  }
 }
 
 /** A module's eventing with one more pipeline declared after what it had. */
@@ -196,14 +202,24 @@ export interface EventingHost {
   /** Read at call time: a runtime opens its event store only once it initialises. */
   readonly eventStore?: AggregateEventLog;
   register(definition: unknown): unknown;
+  /** Lists a definition without starting it; absent on a runtime that cannot describe. */
+  describe?(definition: unknown): void;
   /** The runtime's own maintenance pipelines (blob, process-manager retention). */
   maintenancePipelines?(): readonly unknown[];
 }
 
-/** Installs the framework's maintenance pipelines once, where the role drains (WP-6b ruling 2). */
+/**
+ * Installs the framework's maintenance pipelines once, where the role drains (WP-6b ruling 2).
+ * A role that sends only describes them, so the operator console lists what the worker runs.
+ */
 export function installEventingMaintenance(eventing: EventingHost | undefined): void {
-  if (eventing === void 0 || eventing.participation !== "consume") return;
-  for (const definition of eventing.maintenancePipelines?.() ?? []) eventing.register(definition);
+  if (eventing === void 0) return;
+  const definitions = eventing.maintenancePipelines?.() ?? [];
+  if (eventing.participation === "consume") {
+    for (const definition of definitions) eventing.register(definition);
+    return;
+  }
+  for (const definition of definitions) eventing.describe?.(definition);
 }
 
 /**
@@ -226,6 +242,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
       return host.eventStore;
     },
     register: registerPipelines(host.register.bind(candidate)),
+    ...(typeof host.describe === "function"
+      ? { describe: describePipelines(host.describe.bind(candidate)) }
+      : {}),
     ...(typeof host.maintenancePipelines === "function"
       ? { maintenancePipelines: host.maintenancePipelines.bind(candidate) }
       : {}),
@@ -238,6 +257,14 @@ function registerPipelines(register: (definition: unknown) => unknown) {
     if (!(definition instanceof PendingPipelines)) return register(definition);
     definition.registerEach(register);
     return {};
+  };
+}
+
+/** Describes a module's several pipelines one by one, and a single one as it is. */
+function describePipelines(describe: (definition: unknown) => void) {
+  return (definition: unknown): void => {
+    if (!(definition instanceof PendingPipelines)) return describe(definition);
+    definition.describeEach(describe);
   };
 }
 

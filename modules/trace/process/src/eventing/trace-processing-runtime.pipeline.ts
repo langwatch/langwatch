@@ -109,7 +109,7 @@ export class TraceProcessingRuntimeAdapter {
   private constructor(private readonly input: TraceProcessingPipelineInput) {}
 
   build(setup: { participation: EventingParticipation }): TraceProcessingPipelineDefinition {
-    if (setup.participation !== "consume") {
+    if (setup.participation === "produce") {
       return createTraceProcessingProducerPipeline({
         processName: this.input.processName,
       });
