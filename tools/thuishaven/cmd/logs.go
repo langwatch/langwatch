@@ -119,7 +119,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		// home and prints whatever *.log files it finds there.
 		return fmt.Errorf("--stack %q is not a valid stack slug", slug)
 	}
-	dir := filepath.Join(havenHome(), "logs", slug)
+	dir := d.orch.LogDir(slug)
 
 	var since time.Time
 	if v := inv.value("--since"); v != "" {

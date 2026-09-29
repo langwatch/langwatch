@@ -361,10 +361,10 @@ func (s *Server) laneStatus(live bool, port int) string {
 // Lanes with none are left out; a stack with no captured logs has none.
 func (s *Server) recentErrors(slug string) []laneErrorsJSON {
 	out := []laneErrorsJSON{}
-	if s.config.LogDir == "" {
+	if s.config.LogDir == nil {
 		return out
 	}
-	root, err := openStackLogs(s.config.LogDir, slug)
+	root, err := openStackLogs(s.config.LogDir(slug))
 	if err != nil {
 		return out
 	}

@@ -255,7 +255,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	return deps{
 		orch: orch,
 		dash: dashboard.New(dashboard.Config{
-			LogDir:    filepath.Join(havenHome(), "logs"),
+			LogDir:    orch.LogDir,
 			Stacks:    store.Stacks,
 			SharedURL: sharedURL,
 			Probes: dashboard.Probes{
@@ -675,9 +675,12 @@ if [ -n "$ZSH_VERSION" ]; then
 fi
 `
 
-// stackLogPath is where a detached `haven up -d` streams its output.
-func stackLogPath(slug string) string {
-	return filepath.Join(havenHome(), "logs", slug+".log")
+// stackLogPath is where a detached `haven up -d` streams its output: this
+// worktree is known directly here, before the stack has even registered, so
+// it is built straight from domain.StackLogPaths rather than a registry lookup.
+func stackLogPath(worktreeDir, slug string) string {
+	_, combined := domain.StackLogPaths(worktreeDir, slug)
+	return combined
 }
 
 // detachedStack describes a stack startDetachedUp just backgrounded.
@@ -696,7 +699,7 @@ func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 	if err != nil {
 		return detachedStack{}, err
 	}
-	logPath := stackLogPath(slug)
+	logPath := stackLogPath(d.worktree, slug)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return detachedStack{}, err
 	}
@@ -766,7 +769,8 @@ func runUpAttached(ctx context.Context, d deps, rest []string) error {
 	if err != nil {
 		return err
 	}
-	if err := runUpViewer(ctx, st.slug, preferredGroup(rest), d.sessionActions(st.slug)); err != nil {
+	logDir, _ := domain.StackLogPaths(d.worktree, st.slug)
+	if err := runUpViewer(ctx, st.slug, preferredGroup(rest), st.logPath, logDir, d.sessionActions(st.slug)); err != nil {
 		return err
 	}
 	fmt.Printf("detached — stack %q keeps running in the background\n", st.slug)

@@ -163,6 +163,7 @@ server.log
 # thuishaven (portless local dev)
 .langwatch-slug
 .haven.json
+.haven/
 **/dev.log
 .claude/tmp/
 

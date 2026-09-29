@@ -126,10 +126,11 @@ func TestMonolithAppLaneCapturesItsOwnLog(t *testing.T) {
 			o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
 			repo := t.TempDir()
 			st := monolithStack()
+			st.WorktreeDir = repo
 			children := o.planChildren(st, PlanOptions{RepoRoot: repo}, repo, "")
 
 			app, _ := findChild(children, domain.MonolithAppLane)
-			want := filepath.Join(o.cfg.Home, "logs", st.Slug, "app.log")
+			want := filepath.Join(st.WorktreeDir, ".haven", "logs", st.Slug, "app.log")
 			if app.LogPath != want {
 				t.Errorf("app lane captures to %q, want %q, which `haven logs app` reads", app.LogPath, want)
 			}

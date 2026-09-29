@@ -588,13 +588,13 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	// the services boot. Owned here so `pnpm dev` is simply `haven up`.
 	if jobs.Codegen == "" {
 		fmt.Println("  codegen: left to the app lane, which runs it on its way up")
-	} else if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, Name: "codegen", Dir: p.WorktreeDir, Shell: jobs.Codegen, Env: env}); err != nil {
+	} else if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "codegen", Dir: p.WorktreeDir, Shell: jobs.Codegen, Env: env}); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
 	// Migrations failing on an existing database is the one prep step that must
 	// STOP the up: continuing would boot the app onto a half-migrated schema,
 	// and silently dropping the data to get past it is never haven's call.
-	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, Name: "prepare", Dir: p.WorktreeDir, Shell: jobs.Prepare, Env: env}); err != nil {
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "prepare", Dir: p.WorktreeDir, Shell: jobs.Prepare, Env: env}); err != nil {
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
 	o.runSeed(ctx, p, seedRun{Slug: st.Slug, Env: env, Shell: jobs.Seed})
@@ -664,7 +664,7 @@ func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, seed seedRun) {
 			return
 		}
 	}
-	if err := o.runOnceJob(ctx, onceJob{Slug: slug, Name: "seed", Dir: p.WorktreeDir, Shell: seedShell(seed.Shell, env), Env: env}); err != nil {
+	if err := o.runOnceJob(ctx, onceJob{Slug: slug, WorktreeDir: p.WorktreeDir, Name: "seed", Dir: p.WorktreeDir, Shell: seedShell(seed.Shell, env), Env: env}); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
 }
@@ -714,7 +714,7 @@ func (o *Orchestrator) prepareLangyContainer(ctx context.Context, st domain.Stac
 	}
 	shell := langyImageEnsureShell(image, forceRebuild, langyImagePullRef(image))
 	fmt.Printf("  langyagent: ensuring container image %s (a first build can take a few minutes)…\n", image)
-	job := onceJob{Slug: st.Slug, Name: "langy-image", Dir: repoRoot, Shell: shell, Env: []string{"DOCKER_HOST=" + dockerHost}}
+	job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langy-image", Dir: repoRoot, Shell: shell, Env: []string{"DOCKER_HOST=" + dockerHost}}
 	if err := o.runOnceJob(ctx, job); err != nil {
 		return "", fmt.Errorf("build %s: %w", image, err)
 	}

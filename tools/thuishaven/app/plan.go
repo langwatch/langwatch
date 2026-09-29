@@ -68,8 +68,9 @@ func goCombinedShell(repoRoot string, services []string, shouldWatch bool) strin
 // service its SERVER_ADDR.
 func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, langyDockerHost string) []Child {
 	base := st.OverlayEnv()
+	logDir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
 	logPath := func(name string) string {
-		return filepath.Join(o.cfg.Home, "logs", st.Slug, name+".log")
+		return filepath.Join(logDir, name+".log")
 	}
 	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
 	// the app process and the langy worker (Bun) subprocess otherwise

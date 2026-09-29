@@ -53,7 +53,7 @@ func newHomeFixture(t *testing.T) *homeFixture {
 		},
 	}
 	f.server = New(Config{
-		LogDir: f.logDir,
+		LogDir: func(slug string) string { return filepath.Join(f.logDir, slug) },
 		Stacks: func() []domain.Stack { return []domain.Stack{stack} },
 		SharedURL: func(svc string) string {
 			return naming.URL(svc, "", "https", 443)

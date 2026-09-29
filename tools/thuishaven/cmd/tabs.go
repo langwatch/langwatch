@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -60,7 +59,7 @@ func runTabCmd(name string) func(context.Context, deps, invocation) error {
 		if err != nil {
 			return err
 		}
-		m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
+		m := newViewerModel(slug, d.orch.LogPath(slug), d.orch.LogDir(slug))
 		m.enableDashboard(d.sessionActions(slug), false)
 		m.ingest()
 		tab, ok := m.tabs[name]

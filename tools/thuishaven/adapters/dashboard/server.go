@@ -42,7 +42,10 @@ type Probes struct {
 // telemetry); Extras yields the machine picture (may be nil — the page
 // degrades to registry-only).
 type Config struct {
-	LogDir    string
+	// LogDir resolves a slug's capture directory — its own worktree under
+	// domain.HavenLogsRoot, or the pre-ruling global home for a stack still
+	// running under the old layout (ruling 2026-09-29). Nil is log-capture-off.
+	LogDir    func(slug string) string
 	Stacks    func() []domain.Stack
 	SharedURL func(service string) string
 	Probes    Probes

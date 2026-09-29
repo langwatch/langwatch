@@ -20,7 +20,10 @@ func logServer(t *testing.T) (*Server, string) {
 	if err := os.Mkdir(filepath.Join(root, "project"), 0700); err != nil {
 		t.Fatal(err)
 	}
-	return New(Config{LogDir: root, Stacks: func() []domain.Stack { return []domain.Stack{{Slug: "project"}} }}), root
+	return New(Config{
+		LogDir: func(slug string) string { return filepath.Join(root, slug) },
+		Stacks: func() []domain.Stack { return []domain.Stack{{Slug: "project"}} },
+	}), root
 }
 func writeLog(t *testing.T, path, body string) {
 	t.Helper()

@@ -19,7 +19,7 @@ func TestSimulatorLanesUseTheHavenExecutable(t *testing.T) {
 		t.Fatal(err)
 	}
 	o := &Orchestrator{cfg: Config{Home: home, SimulatorArgv: []string{executable, "%s/%s", "simulator"}}, proxy: stubProxy{}}
-	st := domain.Stack{Slug: "old-branch", Services: []domain.Service{
+	st := domain.Stack{Slug: "old-branch", WorktreeDir: repo, Services: []domain.Service{
 		{Name: "idp", Port: 45570, DNSPort: 45571, URL: "https://idp.old-branch.langwatch.localhost:1355"},
 		{Name: "mail", Port: 45580, SMTPPort: 45581, URL: "https://mail.old-branch.langwatch.localhost:1355"},
 	}}
@@ -38,7 +38,7 @@ func TestSimulatorLanesUseTheHavenExecutable(t *testing.T) {
 			if err != nil || string(output) != "simulator/"+name {
 				t.Fatalf("%s child with watch=%v: %q, %v", name, watch, output, err)
 			}
-			if child.LogPath != filepath.Join(home, "logs", st.Slug, name+".log") {
+			if child.LogPath != filepath.Join(repo, ".haven", "logs", st.Slug, name+".log") {
 				t.Errorf("%s log capture is %q", name, child.LogPath)
 			}
 			if name == "mail" && valueOf(child.Env, "MAILSIM_DATA_DIR") != filepath.Join(home, "mail", st.Slug) {

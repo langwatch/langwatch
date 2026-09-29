@@ -69,7 +69,9 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 		return fmt.Errorf("refusing to destroy %q - %s is the shared database every worktree without its own falls back to", slug, db)
 	}
 	var downed []int
+	var worktreeDir string
 	if st, ok := o.stackBySlug(slug); ok {
+		worktreeDir = st.WorktreeDir
 		if st.LauncherPID != 0 {
 			downed = append(downed, st.LauncherPID)
 		}
@@ -81,6 +83,14 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	// gone before the databases they hold connections to are dropped.
 	o.waitForProcessesDead(downed)
 	o.dropWorktreeDatabases(ctx, slug)
+	// Logs are haven's own state, same as the databases above: remove this
+	// slug's share of them, not the checkout (ruling 2026-09-29). Best-effort —
+	// a slug with no registered stack has no worktree to resolve one from.
+	if worktreeDir != "" {
+		dir, combined := domain.StackLogPaths(worktreeDir, slug)
+		_ = os.RemoveAll(dir)
+		_ = os.RemoveAll(combined)
+	}
 	o.removeStackHome(slug)
 	fmt.Printf("stack %q destroyed (database %s dropped)\n", slug, db)
 	return nil

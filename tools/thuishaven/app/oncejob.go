@@ -12,13 +12,16 @@ import (
 )
 
 // onceJob is one one-shot lane to run: which stack it belongs to, what it is
-// called in the log, and the command itself.
+// called in the log, and the command itself. WorktreeDir is the stack's own
+// root (may differ from Dir, the job's working directory — the langy image
+// build runs from the repo root but still journals under the stack's logs).
 type onceJob struct {
-	Slug  string
-	Name  string
-	Dir   string
-	Shell string
-	Env   []string
+	Slug        string
+	WorktreeDir string
+	Name        string
+	Dir         string
+	Shell       string
+	Env         []string
 }
 
 // runOnceJob runs a one-shot lane and journals the run. The journal is the only
@@ -31,7 +34,7 @@ type onceJob struct {
 func (o *Orchestrator) runOnceJob(ctx context.Context, job onceJob) error {
 	started := o.sys.Now()
 	err := o.sup.RunOnce(ctx, job.Name, job.Dir, job.Shell, job.Env)
-	o.journalOnceJob(job.Slug, domain.OnceJobRun{
+	o.journalOnceJob(job.WorktreeDir, job.Slug, domain.OnceJobRun{
 		Name:       job.Name,
 		At:         started,
 		DurationMS: o.sys.Now().Sub(started).Milliseconds(),
@@ -55,12 +58,17 @@ func exitStatus(err error) int {
 	return 1
 }
 
-// journalOnceJob appends one record to the stack's job journal.
-func (o *Orchestrator) journalOnceJob(slug string, run domain.OnceJobRun) {
-	if slug == "" || o.cfg.Home == "" {
+// journalOnceJob appends one record to the stack's job journal, under its own
+// worktree (ruling 2026-09-29) — falling back to the pre-ruling global home
+// only when the caller has no worktree to hand (should not happen in practice).
+func (o *Orchestrator) journalOnceJob(worktreeDir, slug string, run domain.OnceJobRun) {
+	if slug == "" || (worktreeDir == "" && o.cfg.Home == "") {
 		return
 	}
 	dir := filepath.Join(o.cfg.Home, "logs", slug)
+	if worktreeDir != "" {
+		dir, _ = domain.StackLogPaths(worktreeDir, slug)
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return
 	}

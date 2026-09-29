@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,9 +40,11 @@ type sessionActions struct {
 
 // runUpViewer opens the viewer on a stack until quit or ctx cancel. preferred,
 // when non-empty, names the application whose log sub-tab to land on - `haven
-// up +langy` should open looking at langy.
-func runUpViewer(ctx context.Context, slug, preferred string, session sessionActions) error {
-	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
+// up +langy` should open looking at langy. logPath/logDir are the caller's
+// already-resolved paths (d.orch.LogPath/LogDir, or the known worktree for a
+// stack this process just started), so the viewer never re-resolves them.
+func runUpViewer(ctx context.Context, slug, preferred, logPath, logDir string, session sessionActions) error {
+	m := newViewerModel(slug, logPath, logDir)
 	m.preferred = preferred
 	m.enableDashboard(session, false)
 	return runViewer(ctx, m)
@@ -52,8 +53,8 @@ func runUpViewer(ctx context.Context, slug, preferred string, session sessionAct
 // runPlayViewer is the same view over a play sandbox, with the opposite quit
 // contract in its banner: quitting `haven play` destroys the sandbox, it never
 // detaches.
-func runPlayViewer(ctx context.Context, slug string, session sessionActions) error {
-	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
+func runPlayViewer(ctx context.Context, slug, logPath, logDir string, session sessionActions) error {
+	m := newViewerModel(slug, logPath, logDir)
 	m.destroyOnQuit = true
 	m.enableDashboard(session, true)
 	return runViewer(ctx, m)
