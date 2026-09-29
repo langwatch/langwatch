@@ -106,13 +106,17 @@ func (engine *probeEngine) awaitFixtureTrace(baseURLs []string) {
 // trace having landed: the trace routes and the analytics that count it.
 var traceReadingPaths = []string{"trace", "span", "analytics"}
 
-// awaitFixtureTraceFor holds the first trace-reading operation until the
-// background fixture-trace wait is over; every later one then proceeds.
+// awaitFixtureTraceFor holds every trace-reading operation until the
+// background fixture-trace wait is over; once it is, none waits or logs.
 func (engine *probeEngine) awaitFixtureTraceFor(operation Operation) {
-	if engine.fixtureTrace == nil || engine.traceAwaited || !readsTraces(operation.Path) {
+	if engine.fixtureTrace == nil || !readsTraces(operation.Path) {
 		return
 	}
-	engine.traceAwaited = true
+	select {
+	case <-engine.fixtureTrace:
+		return
+	default:
+	}
 	started := time.Now()
 	<-engine.fixtureTrace
 	engine.progress("fixture trace: %s %s waited %s for it\n", operation.Method, operation.Path, time.Since(started).Round(time.Millisecond))

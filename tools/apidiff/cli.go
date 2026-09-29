@@ -60,6 +60,7 @@ type probeFlags struct {
 	method          string
 	excludePrefixes stringSlice
 	maxOps          int
+	concurrency     int
 	exactStatus     bool
 	jsonOutput      bool
 	reportFile      string
@@ -104,6 +105,7 @@ func registerProbeFlags(flags *flag.FlagSet, probe *probeFlags) {
 	flags.StringVar(&probe.method, "method", "", "only probe this HTTP method")
 	flags.Var(&probe.excludePrefixes, "exclude-prefix", "path prefix to skip (repeatable)")
 	flags.IntVar(&probe.maxOps, "max-ops", 0, "cap the number of probed operations (0 = all)")
+	flags.IntVar(&probe.concurrency, "probe-concurrency", 4, "how many modules the main pass probes at once; each module stays in its own order (1 = serial)")
 	flags.BoolVar(&probe.exactStatus, "exact-status", false, "compare exact status codes and error bodies (default: classes only, error bodies skipped)")
 	flags.BoolVar(&probe.jsonOutput, "json", false, "write the machine report to stdout instead of the summary")
 	flags.StringVar(&probe.reportFile, "report", "", "also write the machine report (JSON) to this file")
@@ -121,8 +123,9 @@ usage:
                 [-compose-project NAME] [-parity-only] [probe flags...]
   apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
                 [-timeout DUR] [-settle-timeout DUR] [-path-prefix P] [-method M]
-                [-exclude-prefix P]... [-max-ops N] [-json] [-report FILE]
-                [-ledger FILE] [-ledger-baseline FILE] [-module NAME]...
+                [-exclude-prefix P]... [-max-ops N] [-probe-concurrency N]
+                [-json] [-report FILE] [-ledger FILE] [-ledger-baseline FILE]
+                [-module NAME]...
 
 Each run instance is a haven stack under its own run-scoped slug wherever
 haven is installed, so a run never reaches the datastores your own stack uses.
@@ -375,7 +378,7 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 	}
 
 	selected := SelectOperations(operations, probe.filter())
-	fmt.Fprintf(out.stderr, "probing %d operations (lockstep)\n", len(selected))
+	fmt.Fprintf(out.stderr, "probing %d operations (lockstep, %d modules at once)\n", len(selected), max(probe.concurrency, 1))
 	result := ProbeAll(ctx, ProbeOptions{
 		A:                   probe.a,
 		B:                   probe.b,
@@ -390,6 +393,8 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		SettleTimeout:       probe.settleTimeout,
 		OnOperationDone:     probe.onOperationDone,
 		ActivateEntitlement: probe.activateEntitlement,
+		ModuleOf:            probe.moduleOf(),
+		Concurrency:         probe.concurrency,
 	}, operations)
 
 	verdict := runVerdict{report: BuildReport(changes, result), probe: probe}

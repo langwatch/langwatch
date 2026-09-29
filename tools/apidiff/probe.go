@@ -96,6 +96,12 @@ type ProbeOptions struct {
 	// just probed.
 	OnOperationDone func(Operation, []Finding)
 
+	// ModuleOf names the module that owns an operation, and Concurrency how
+	// many modules the main pass probes at once (probe-waves.go). A nil
+	// ModuleOf is one module; a Concurrency below 1 is 1.
+	ModuleOf    func(method, path string) string
+	Concurrency int
+
 	// ActivateEntitlement, when non-nil, lets the entitled pass elevate the
 	// seeded organization to an Enterprise plan mid-run and re-probe whatever
 	// the main pass saw the Enterprise gate refuse. Only `apidiff run` can
@@ -129,9 +135,9 @@ type ProbeResult struct {
 }
 
 // ProbeAll probes every selected operation in lockstep: each case runs on A
-// and B at once, and the next starts only when both answered, keeping both
-// databases in the same state. Operations
-// run in deterministic order (sorted by path, then method).
+// and B at once, and the module's next case starts only when both answered.
+// Modules run beside each other in stages (probe-waves.go); findings and
+// transcripts are filed in probe order (path, then method) all the same.
 func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation) ProbeResult {
 	client := options.Client
 	if client == nil {
@@ -184,38 +190,6 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 		CredentialChecks: checks,
 		Effects:          engine.effects,
 	}
-}
-
-// mainPass probes every selected operation in order, verifying the lists
-// before the first delete, and answers the findings, the number probed and
-// whether the lists were verified.
-func (engine *probeEngine) mainPass(selected []Operation) ([]Finding, int, bool) {
-	findings := make([]Finding, 0)
-	probed := 0
-	collectionsVerified := false
-	for index := range selected {
-		operation := selected[index]
-		// Deletes run last and remove what the creates made, so the lists are
-		// read for the created entities before the first delete, not after.
-		if !collectionsVerified && operation.Method == http.MethodDelete {
-			findings = append(findings, engine.verifyCollections(selected)...)
-			findings = append(findings, engine.roundTripPass(selected)...)
-			collectionsVerified = true
-		}
-		if skip := notProbed(operation, engine.options.ExcludePrefixes); skip != "" {
-			engine.progress("skip %s %s (%s) [%d/%d]\n", operation.Method, operation.Path, skip, index+1, len(selected))
-			continue
-		}
-		engine.awaitFixtureTraceFor(operation)
-		engine.progress("probe %s %s [%d/%d]\n", operation.Method, operation.Path, index+1, len(selected))
-		probed++
-		operationFindings := engine.probeOperation(operation)
-		findings = append(findings, operationFindings...)
-		if engine.options.OnOperationDone != nil {
-			engine.options.OnOperationDone(operation, operationFindings)
-		}
-	}
-	return findings, probed, collectionsVerified
 }
 
 // notProbed names why an operation is left out of the run entirely, without
@@ -365,13 +339,15 @@ type probeEngine struct {
 	// (side-credentials.go).
 	credsA sideCredentials
 	credsB sideCredentials
-	// progressMu keeps lines whole when the two sides, the collection and
-	// permission pools, and the fixture-trace wait report at once.
+	// progressMu keeps lines whole when the two sides, the module lanes, the
+	// collection and permission pools, and the fixture-trace wait report at once.
 	progressMu sync.Mutex
-	// fixtureTrace closes when the background fixture-trace wait is over;
-	// traceAwaited says a trace-reading operation already waited on it.
+	// fixtureTrace closes when the background fixture-trace wait is over.
 	fixtureTrace chan struct{}
-	traceAwaited bool
+	// mu guards what module lanes probing at once share; lanes is, during a
+	// stage of several, each operation's lane's own tables (probe-waves.go).
+	mu    sync.Mutex
+	lanes map[string][2]*SymbolTable
 }
 
 // sideIDs holds one operation's owner-visible IDs, per side.
@@ -408,22 +384,22 @@ type probeCase struct {
 	curated  *curatedCreate
 }
 
-func (engine *probeEngine) probeOperation(operation Operation) []Finding {
+func (engine *probeEngine) probeOperation(operation Operation) opResult {
 	headers := userBoundHeaders(operation, authHeaders(operation, engine.options.Schemes, engine.options.Keys), engine.options.Keys)
 
 	paramsA, paramsB, unresolved := engine.resolveBothSides(operation)
 	if unresolved != nil {
-		return []Finding{*unresolved}
+		return opResult{findings: []Finding{*unresolved}}
 	}
 	engine.retargetWidgetProject(operation, &paramsA, &paramsB)
 	cases, refused := engine.casesFor(operation)
 	if refused != "" {
-		return []Finding{skippedFinding(operation, refused)}
+		return opResult{findings: []Finding{skippedFinding(operation, refused)}}
 	}
 	headersA, headersB := engine.sideHeaders(operation, headers)
 
 	if blocked, ok := engine.guardSelfDestruction(operation, paramsA, paramsB); ok {
-		return blocked
+		return opResult{findings: blocked}
 	}
 
 	// Each side is probed at the alias form its own spec documents, with the
@@ -437,29 +413,29 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 		headersA: headersA,
 		headersB: headersB,
 	}
-	findings := make([]Finding, 0)
+	result := opResult{findings: make([]Finding, 0)}
 	missingReported := false
 	for _, probeCase := range cases {
 		transcript := engine.runAndRecord(operation, probeCase, target)
+		result.transcripts = append(result.transcripts, transcript)
 		if !operation.InA || !operation.InB {
 			if reportsMissing(operation, missingReported) {
 				missingReported = true
-				findings = append(findings, missingOperationFinding(operation, probeCase.name, transcript))
+				result.findings = append(result.findings, missingOperationFinding(operation, probeCase.name, transcript))
 			}
-			findings = append(findings, oneSidedServerError(operation, probeCase.name, transcript)...)
+			result.findings = append(result.findings, oneSidedServerError(operation, probeCase.name, transcript)...)
 			continue
 		}
-		findings = append(findings, engine.compareCase(operation, probeCase, transcript)...)
+		result.findings = append(result.findings, engine.compareCase(operation, probeCase, transcript)...)
 		engine.recordGate(operation, transcript)
 	}
-	return findings
+	return result
 }
 
-// runAndRecord runs one case, waits out a settled read, and files what the
-// answers taught the engine.
+// runAndRecord runs one case, waits out a settled read, and files the ids its
+// answers carry; the rest is filed with the operation's result.
 func (engine *probeEngine) runAndRecord(operation Operation, probeCase probeCase, target probeTarget) Transcript {
 	transcript := engine.settleRead(operation, target, engine.runCase(operation, probeCase, target))
-	engine.transcripts = append(engine.transcripts, transcript)
 	engine.captureFrom(operation, probeCase, transcript)
 	engine.afterCurated(probeCase, transcript)
 	return transcript
@@ -481,21 +457,20 @@ func (engine *probeEngine) guardSelfDestruction(operation Operation, sides ...re
 	return []Finding{skippedFinding(operation, guard.Blocked)}, true
 }
 
-// captureFrom files everything one probe case taught the engine: each side's
-// IDs into its own symbol table, the owner-visible IDs, and any create.
+// captureFrom files each side's IDs from one probe case into that side's own
+// symbol table.
 func (engine *probeEngine) captureFrom(operation Operation, probeCase probeCase, transcript Transcript) {
 	capturePath := operation.Path
 	if probeCase.captures != "" {
 		capturePath = probeCase.captures
 	}
-	captureSucceeded(engine.symbolsA, capturePath, transcript.A)
-	captureSucceeded(engine.symbolsB, capturePath, transcript.B)
+	symbolsA, symbolsB := engine.symbolsFor(operation)
+	captureSucceeded(symbolsA, capturePath, transcript.A)
+	captureSucceeded(symbolsB, capturePath, transcript.B)
 	if probeCase.perSide {
-		probeCase.curated.pin(engine.symbolsA, capturePath, transcript.A)
-		probeCase.curated.pin(engine.symbolsB, capturePath, transcript.B)
+		probeCase.curated.pin(symbolsA, capturePath, transcript.A)
+		probeCase.curated.pin(symbolsB, capturePath, transcript.B)
 	}
-	engine.recordOwnerIDs(operation, probeCase, transcript)
-	engine.captureMutation(operation, probeCase, transcript)
 }
 
 // compareCase compares one case's two outcomes and remembers whether this
@@ -504,6 +479,8 @@ func (engine *probeEngine) captureFrom(operation Operation, probeCase probeCase,
 func (engine *probeEngine) compareCase(operation Operation, probeCase probeCase, transcript Transcript) []Finding {
 	cmp := Comparison{Method: operation.Method, Path: operation.Path, Case: probeCase.name, OperationID: operation.OperationID, ExactStatus: engine.options.ExactStatus}
 	outcome := CompareResults(cmp, transcript.B, transcript.A)
+	engine.mu.Lock()
+	defer engine.mu.Unlock()
 	for _, finding := range outcome.Findings {
 		if finding.Kind == FindingStatusDiff || finding.Kind == FindingProbeFailed {
 			engine.statusDiffs[operationKeyOf(operation)] = true
@@ -531,8 +508,8 @@ func unresolvedFinding(operation Operation, unresolvedA, unresolvedB string) Fin
 // recordOwnerIDs remembers the IDs each side returned to the OWNER key for
 // one operation, so the permission pass can tell owner data apart from
 // instance-global data without an allowlist.
-func (engine *probeEngine) recordOwnerIDs(operation Operation, probeCase probeCase, transcript Transcript) {
-	if !isReadMethod(operation.Method) || probeCase.name != "read" {
+func (engine *probeEngine) recordOwnerIDs(operation Operation, transcript Transcript) {
+	if !isReadMethod(operation.Method) || transcript.Case != "read" {
 		return
 	}
 	key := operationKeyOf(operation)
@@ -559,8 +536,8 @@ func collectBodyIDs(body string, into map[string]bool) {
 
 // captureMutation records a successful create so the collection verification
 // pass can check the entity is visible in each side's list.
-func (engine *probeEngine) captureMutation(operation Operation, probeCase probeCase, transcript Transcript) {
-	if probeCase.name != "mutation" {
+func (engine *probeEngine) captureMutation(operation Operation, transcript Transcript) {
+	if transcript.Case != "mutation" {
 		return
 	}
 	if transcript.A.Status < 200 || transcript.A.Status >= 300 || transcript.B.Status < 200 || transcript.B.Status >= 300 {

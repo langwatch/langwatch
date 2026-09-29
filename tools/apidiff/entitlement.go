@@ -86,6 +86,8 @@ func (engine *probeEngine) recordGate(operation Operation, transcript Transcript
 	if !gatedBy(transcript) {
 		return
 	}
+	engine.mu.Lock()
+	defer engine.mu.Unlock()
 	if engine.gatedOps == nil {
 		engine.gatedOps = map[string]Operation{}
 	}

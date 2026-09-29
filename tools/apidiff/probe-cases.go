@@ -12,8 +12,9 @@ import (
 // into a skip.
 func (engine *probeEngine) resolveBothSides(operation Operation) (paramsA, paramsB resolvedParams, unresolved *Finding) {
 	deleteOp := operation.Method == http.MethodDelete
-	paramsA, unresolvedA := resolveParams(operation, engine.symbolsA, deleteOp)
-	paramsB, unresolvedB := resolveParams(operation, engine.symbolsB, deleteOp)
+	symbolsA, symbolsB := engine.symbolsFor(operation)
+	paramsA, unresolvedA := resolveParams(operation, symbolsA, deleteOp)
+	paramsB, unresolvedB := resolveParams(operation, symbolsB, deleteOp)
 	if !operation.InA {
 		unresolvedA = ""
 	}

@@ -2,7 +2,9 @@ package apidiff
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -257,6 +259,16 @@ type SymbolTable struct {
 // NewSymbolTable returns an empty table.
 func NewSymbolTable() *SymbolTable {
 	return &SymbolTable{byParam: map[string][]string{}, pinned: map[string]string{}}
+}
+
+// clone copies the table, so a module lane can capture into its own.
+func (table *SymbolTable) clone() *SymbolTable {
+	copied := NewSymbolTable()
+	for bucket, ids := range table.byParam {
+		copied.byParam[bucket] = slices.Clone(ids)
+	}
+	maps.Copy(copied.pinned, table.pinned)
+	return copied
 }
 
 // Capture walks a decoded response body in sorted-key order (deterministic:

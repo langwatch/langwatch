@@ -20,7 +20,7 @@ apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
               [-scim-key KEY] [-project-key-b KEY] [-project-key-c KEY]
               [-timeout DUR] [-settle-timeout DUR] [-path-prefix P]
               [-method M] [-exact-status] [-exclude-prefix P]... [-max-ops N]
-              [-json] [-report FILE] [-ledger FILE] [-ledger-baseline FILE] [-module NAME]...
+              [-probe-concurrency N] [-json] [-report FILE] [-ledger FILE] [-ledger-baseline FILE] [-module NAME]...
 ```
 
 `run` boots both instances itself — a detached git worktree for `-main-ref`
@@ -580,12 +580,31 @@ something else. Every boundary is logged as `timing +<elapsed>: <phase>`.
    fixtures, LangWatchQL provisioning (main's still after the branch's, since
    both provision one server-wide ClickHouse identity), then its API and
    worker spawned together and its health waited on.
-5. Probing: each case is sent to both sides at once, and the next case starts
-   only when both answered, so each side keeps its own order. The fixture
-   trace is waited on in the background; only the first trace or analytics
-   operation waits for it, and a side that never reads it back is logged as a
-   `WARNING`. The collection checks and the permission probes run in a pool
-   of six and are filed in probe order afterwards.
+5. Probing: each case is sent to both sides at once, and the operation's
+   next case starts only when both answered, so each side keeps its own order.
+   The main pass runs in stages (probe-waves.go), each after the last:
+   1. the curated creates, as one lane in their own order (they feed each
+      other across modules);
+   2. every other operation that needs no captured id, so each producer
+      `-module` would add runs before any module that reads its ids;
+   3. the operations that read an id something captured;
+   4. after the collection checks and round trips, the deletes.
+
+   Within a stage each owning module is one lane that keeps probe order, and
+   up to `-probe-concurrency` lanes (default 4; 1 is serial) run at once.
+   Several lanes each resolve and capture ids against their own copy of the
+   symbol tables, filed into the shared ones in probe order when the stage
+   ends: a lane sees what earlier stages and its own module captured, never
+   a lane beside it, so its ids do not depend on timing. Findings, transcripts
+   and the report are filed in probe order; only progress lines interleave.
+   Lockstep now holds per module, not across modules: a read of another
+   module's data (an audit log, a spend total) can see a lane beside it on
+   one side first. `-probe-concurrency 1` rules that out when a difference
+   looks like it. Every trace or analytics operation waits for the
+   background fixture-trace wait, and one that had to wait logs it; a side
+   that never reads the trace back is logged as a `WARNING`. The collection
+   checks and the permission probes run in a pool of six and are filed in
+   probe order afterwards.
 6. Teardown, once, whichever of the parity cleanup and the boot's teardown
    runs first. It kills the instances, drops the run's databases and hands
    the persistent worktrees back; nothing in it waits on a slow step.
