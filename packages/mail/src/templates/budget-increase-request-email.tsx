@@ -63,7 +63,6 @@ const trySpendShare = ({
 
 export const BudgetIncreaseRequestEmail = (props: BudgetIncreaseRequestEmailProps) => (
   <EmailLayout
-    eyebrow="BUDGET"
     preview={`${props.requesterName ?? props.requesterEmail} needs a higher budget`}
     heading="Budget increase request"
     footNote={`You are receiving this because you administer ${props.organizationName}. You can reply straight to ${props.requesterEmail}.`}

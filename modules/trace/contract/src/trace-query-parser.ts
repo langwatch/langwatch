@@ -20,7 +20,82 @@ export type {
 
 /** Parse already-normalised query syntax without applying browser editor affordances. */
 export function parseTraceQuerySyntax(query: string): LiqeQuery {
-  return liqeParse(query);
+  return parseWithApostrophes(query);
+}
+
+/** A private-use character absent from `query`, standing in for an in-word apostrophe. */
+function standInFor(query: string): string {
+  let code = 0xe000;
+  while (query.includes(String.fromCharCode(code))) code += 1;
+  return String.fromCharCode(code);
+}
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+
+/**
+ * Whether the `'` at `index` belongs to a word (doesn't, member's, members')
+ * rather than opening or closing a single-quoted value. Outside quotes it
+ * follows a letter or digit; inside one it also has one on its right.
+ */
+export function isWordApostrophe({
+  text,
+  index,
+  inSingleQuotes,
+}: {
+  text: string;
+  index: number;
+  inSingleQuotes: boolean;
+}): boolean {
+  if (text.charAt(index) !== "'") return false;
+  const before = WORD_CHAR.test(text.charAt(index - 1));
+  if (!inSingleQuotes) return before;
+  return before && WORD_CHAR.test(text.charAt(index + 1));
+}
+
+function maskWordApostrophes({ text, standIn }: { text: string; standIn: string }): string {
+  let out = "";
+  let quoteChar = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charAt(i);
+    if (ch === "\\" && quoteChar) {
+      out += ch + text.charAt(i + 1);
+      i += 1;
+      continue;
+    }
+    if (isWordApostrophe({ text, index: i, inSingleQuotes: quoteChar === "'" })) {
+      out += quoteChar === '"' ? ch : standIn;
+      continue;
+    }
+    quoteChar = nextQuoteChar({ ch, quoteChar });
+    out += ch;
+  }
+  return out;
+}
+
+function nextQuoteChar({ ch, quoteChar }: { ch: string; quoteChar: string }): string {
+  if (ch !== '"' && ch !== "'") return quoteChar;
+  if (!quoteChar) return ch;
+  return ch === quoteChar ? "" : quoteChar;
+}
+
+function restoreApostrophes<T>({ node, standIn }: { node: T; standIn: string }): T {
+  if (typeof node === "string") return node.replaceAll(standIn, "'") as T;
+  if (Array.isArray(node))
+    return node.map((item) => restoreApostrophes({ node: item, standIn })) as T;
+  if (node && typeof node === "object") {
+    const record = node as Record<string, unknown>;
+    for (const key of Object.keys(record)) {
+      record[key] = restoreApostrophes({ node: record[key], standIn });
+    }
+  }
+  return node;
+}
+
+/** liqe, reading an in-word apostrophe as a letter. @see specs/traces-v2/search.feature */
+function parseWithApostrophes(query: string): LiqeQuery {
+  const standIn = standInFor(query);
+  const masked = maskWordApostrophes({ text: query, standIn });
+  const ast = liqeParse(masked);
+  return masked === query ? ast : restoreApostrophes({ node: ast, standIn });
 }
 
 /**
@@ -36,12 +111,16 @@ function splitOnQuotes(s: string): { text: string; quoted: boolean }[] {
     const ch = s.charAt(i);
     if (quoteChar) {
       buf += ch;
-      if (ch === quoteChar && s[i - 1] !== "\\") {
+      const inWord = isWordApostrophe({ text: s, index: i, inSingleQuotes: quoteChar === "'" });
+      if (ch === quoteChar && s[i - 1] !== "\\" && !inWord) {
         segments.push({ text: buf, quoted: true });
         buf = "";
         quoteChar = "";
       }
-    } else if (ch === '"' || ch === "'") {
+    } else if (
+      (ch === '"' || ch === "'") &&
+      !isWordApostrophe({ text: s, index: i, inSingleQuotes: false })
+    ) {
       if (buf) {
         segments.push({ text: buf, quoted: false });
       }
@@ -110,10 +189,16 @@ export function stripAtSigils(text: string): string {
     const ch = normalized.charAt(i);
     if (quoteChar !== "") {
       out += ch;
-      quoteChar = ch === quoteChar ? "" : quoteChar;
+      const closes =
+        ch === quoteChar &&
+        !isWordApostrophe({ text: normalized, index: i, inSingleQuotes: quoteChar === "'" });
+      quoteChar = closes ? "" : quoteChar;
       continue;
     }
-    if (ch === '"' || ch === "'") {
+    if (
+      (ch === '"' || ch === "'") &&
+      !isWordApostrophe({ text: normalized, index: i, inSingleQuotes: false })
+    ) {
       out += ch;
       quoteChar = ch;
       continue;
@@ -176,7 +261,7 @@ export function parse(query: string): LiqeQuery {
     throw hit.error;
   }
   try {
-    const ast = liqeParse(trimmed);
+    const ast = parseWithApostrophes(trimmed);
     cacheSet(trimmed, { ok: true, ast });
     return ast;
   } catch (e) {

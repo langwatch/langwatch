@@ -256,6 +256,7 @@ func RenderComment(headline PublishHeadline, picks []ScreenPick) (string, []Publ
 	fmt.Fprintf(&body, "### visualdiff: %d screens, %d findings\n\n", headline.Rows, headline.Findings)
 	fmt.Fprintf(&body, "Run `%s` · base `%s` · candidate `%s`\n\n", headline.RunID, short(headline.BaseCommit), short(headline.CandidateCommit))
 	body.WriteString(classLine(headline.Classes) + "\n")
+	body.WriteString("\n" + RenderingOnly + "\n")
 	if headline.Link != "" {
 		fmt.Fprintf(&body, "\n[Full report](%s)\n", headline.Link)
 	}

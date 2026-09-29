@@ -75,6 +75,7 @@ describe("a hosted call on the gateway's control plane", () => {
     expect(classifyForHostedCaller).toHaveBeenCalledWith({
       caller: { virtualKeyId: "vk-license-acme", organizationId: "org-acme", projectId: null },
       payload,
+      signal: expect.any(AbortSignal),
     });
   });
 

@@ -68,6 +68,7 @@ export default function ProjectOnboarding() {
   }, [form, team.data]);
 
   const createProject = api.project.create.useMutation();
+  const utils = api.useUtils();
 
   const onSubmit: SubmitHandler<ProjectFormData> = (data: ProjectFormData) => {
     if (!team.data) return;
@@ -82,7 +83,10 @@ export default function ProjectOnboarding() {
         framework: data.framework,
       },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+          // The cached graph predates the project; unrefreshed, its address
+          // resolves to the previously open project instead.
+          await utils.organization.getAll.invalidate();
           if (safeReturnToPath) {
             void router.push(safeReturnToPath);
             return;

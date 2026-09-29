@@ -1,7 +1,9 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 
@@ -25,6 +27,8 @@ describe("the installed licensing application's plan operation", () => {
     const repository = createApiFixture<LicenseStorage>({ getOrganizationLicense });
     const app = await LicensingApp.create({
       dependencies: {
+        instantEval: createApiFixture<InstantEvalApi>(),
+        projects: createApiFixture<ProjectApi>(),
         gateway: createApiFixture<GatewayApi>(),
         organizations: createApiFixture<OrganizationApi>(),
       },

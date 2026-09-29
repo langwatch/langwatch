@@ -63,6 +63,9 @@
       "path": "../../../../modules/instant-eval/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/internal-slack/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/kernel/tsconfig.build.json"
     },
     {

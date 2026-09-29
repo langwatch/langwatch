@@ -1,20 +1,36 @@
-import { Box, chakra, Grid, HStack, Text } from "@chakra-ui/react";
-import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { useEffect, useRef, useState, type JSX, type SyntheticEvent } from "react";
+import {
+  Callout,
+  IconArrowUpRight,
+  IconButton,
+  Page,
+  Panel,
+  SegmentedControl,
+  Text,
+} from "@langwatch/design-system-internal";
+import { useEffect, useRef, useState, type JSX, type ReactNode, type SyntheticEvent } from "react";
 
+import { WIDTH_OPTIONS } from "./inspect-view.tsx";
 import { prepareMailDocument, WIDTHS, type GalleryEntry } from "./studio-shared.ts";
 
 export type Density = "compact" | "comfortable";
 
-const HtmlIframe = chakra("iframe");
-
 const CARD_WIDTH: Record<Density, number> = { compact: 220, comfortable: 300 };
-const CARD_PADDING: Record<Density, number> = { compact: 2, comfortable: 3.5 };
 const MAX_PREVIEW = 480;
 /** Ample room for the tallest transactional message; only its measured slice ever shows. */
 const IFRAME_HEIGHT = 2400;
 
+const FIXTURE_OPTIONS: { value: "first" | "all"; label: string }[] = [
+  { value: "first", label: "First fixture" },
+  { value: "all", label: "Every fixture" },
+];
+
+const DENSITY_OPTIONS: { value: Density; label: string }[] = [
+  { value: "compact", label: "Compact" },
+  { value: "comfortable", label: "Comfortable" },
+];
+
 export interface GalleryViewProps {
+  nav: ReactNode;
   entries: GalleryEntry[] | null;
   failure: string | null;
   everyFixture: boolean;
@@ -28,6 +44,7 @@ export interface GalleryViewProps {
 }
 
 export const GalleryView = ({
+  nav,
   entries,
   failure,
   everyFixture,
@@ -39,67 +56,42 @@ export const GalleryView = ({
   previewDark,
   onOpen,
 }: GalleryViewProps): JSX.Element => (
-  <Box height="full" overflow="auto" bg="bg.muted">
-    <HStack
-      as="header"
-      gap={4}
-      paddingX={5}
-      paddingY={3}
-      borderBottomWidth="1px"
-      borderColor="border"
-      bg="bg.panel"
-      position="sticky"
-      top={0}
-      zIndex={1}
-      flexWrap="wrap"
-    >
-      <SegmentedControl
-        size="xs"
-        items={[
-          { value: "first", label: "First fixture" },
-          { value: "all", label: "Every fixture" },
-        ]}
-        value={everyFixture ? "all" : "first"}
-        onValueChange={(details) => onEveryFixtureChange(details.value === "all")}
-      />
-      <SegmentedControl
-        size="xs"
-        items={["desktop", "mobile"]}
-        value={width}
-        onValueChange={(details) => onWidthChange(details.value as keyof typeof WIDTHS)}
-      />
-      <SegmentedControl
-        size="xs"
-        items={[
-          { value: "compact", label: "Compact" },
-          { value: "comfortable", label: "Comfortable" },
-        ]}
-        value={density}
-        onValueChange={(details) => onDensityChange(details.value as Density)}
-      />
-      <Text fontSize="xs" color="fg.muted" marginLeft="auto">
-        {entries?.length ?? 0} messages
-      </Text>
-    </HStack>
-
+  <Page
+    nav={nav}
+    width="full"
+    title="Gallery"
+    subtitle={`${entries?.length ?? 0} messages`}
+    actions={
+      <>
+        <SegmentedControl
+          label="Fixtures"
+          options={FIXTURE_OPTIONS}
+          value={everyFixture ? "all" : "first"}
+          onChange={(next) => onEveryFixtureChange(next === "all")}
+        />
+        <SegmentedControl
+          label="Width"
+          options={WIDTH_OPTIONS}
+          value={width}
+          onChange={onWidthChange}
+        />
+        <SegmentedControl
+          label="Density"
+          options={DENSITY_OPTIONS}
+          value={density}
+          onChange={onDensityChange}
+        />
+      </>
+    }
+  >
     {failure && (
-      <Box padding={5} color="red.700" fontSize="sm">
-        The gallery could not load: {failure}
-      </Box>
+      <Callout tone="error" title="The gallery could not load">
+        {failure}
+      </Callout>
     )}
-    {!failure && !entries && (
-      <Box padding={5} color="fg.muted" fontSize="sm">
-        Rendering every message…
-      </Box>
-    )}
-
+    {!failure && !entries && <Text tone="secondary">Rendering every message…</Text>}
     {entries && (
-      <Grid
-        templateColumns={`repeat(auto-fill, minmax(${CARD_WIDTH[density]}px, 1fr))`}
-        autoRows="max-content"
-        gap={5}
-        padding={5}
-      >
+      <div className="mailroom-gallery" data-density={density}>
         {entries.map((entry) => (
           <GalleryCard
             key={`${entry.template}:${entry.fixture}`}
@@ -110,9 +102,9 @@ export const GalleryView = ({
             onOpen={onOpen}
           />
         ))}
-      </Grid>
+      </div>
     )}
-  </Box>
+  </Page>
 );
 
 /** The first non-transparent background a mail document actually paints. */
@@ -168,76 +160,40 @@ const GalleryCard = ({
   const naturalHeight = measuredHeight ? measuredHeight * scale : null;
   const previewHeight = naturalHeight ? Math.min(naturalHeight, MAX_PREVIEW) : MAX_PREVIEW;
   const scrollable = naturalHeight != null && naturalHeight > MAX_PREVIEW;
-  const fallbackBg = previewDark ? "#14161a" : "white";
   const html = prepareMailDocument(entry.html, previewDark);
 
   return (
-    <chakra.button
-      type="button"
-      aria-label={`Open ${entry.title} — ${entry.fixture} in Inspect`}
-      onClick={open}
-      cursor="pointer"
-      textAlign="left"
-      display="flex"
-      flexDirection="column"
-      height="full"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="lg"
-      bg="bg.panel"
-      overflow="hidden"
-      shadow="xs"
-      transition="box-shadow 0.15s ease, border-color 0.15s ease"
-      _hover={{ borderColor: "orange.300", shadow: "sm" }}
-      _focusVisible={{ outline: "2px solid", outlineColor: "orange.400", outlineOffset: "2px" }}
+    <Panel
+      flush
+      title={
+        <Text truncate title={`Subject: ${entry.subject}`}>
+          {entry.title}
+        </Text>
+      }
+      meta={entry.fixture}
+      actions={
+        <IconButton
+          label={`Open ${entry.title}, ${entry.fixture}, in Inspect`}
+          icon={<IconArrowUpRight />}
+          onClick={open}
+        />
+      }
     >
-      <Box
-        flexShrink={0}
-        paddingX={CARD_PADDING[density]}
-        paddingTop={CARD_PADDING[density]}
-        paddingBottom={2}
-      >
-        <Text
-          fontFamily="mono"
-          fontSize="2xs"
-          color="fg.muted"
-          letterSpacing="wide"
-          truncate
-          marginBottom={1}
-        >
-          {entry.template} · {entry.fixture}
-        </Text>
-        <Text fontSize="sm" fontWeight="semibold" lineClamp={2} lineHeight="short">
-          {entry.subject}
-        </Text>
-      </Box>
-      <Box
+      <div
         ref={previewRef}
-        flex="1"
-        minHeight={0}
-        overflow={scrollable ? "auto" : "hidden"}
-        position="relative"
-        bg={documentBg ?? fallbackBg}
-        borderTopWidth="1px"
-        borderColor="border"
+        className="mailroom-card-preview"
+        data-scrollable={scrollable ? "" : undefined}
+        style={documentBg ? { background: documentBg } : undefined}
       >
-        <Box width="full" height={`${previewHeight}px`} position="relative" overflow="hidden">
-          <HtmlIframe
-            title={`${entry.title} — ${entry.fixture}`}
+        <div className="mailroom-card-window" style={{ height: previewHeight }}>
+          <iframe
+            title={`${entry.title}, ${entry.fixture}`}
             srcDoc={html}
             onLoad={onIframeLoad}
-            width={`${viewportWidth}px`}
-            height={`${IFRAME_HEIGHT}px`}
-            border="none"
-            position="absolute"
-            top={0}
-            left={0}
-            pointerEvents="none"
-            transform={`scale(${scale})`}
-            transformOrigin="top left"
+            style={{ width: viewportWidth, height: IFRAME_HEIGHT, transform: `scale(${scale})` }}
           />
-        </Box>
-      </Box>
-    </chakra.button>
+        </div>
+      </div>
+    </Panel>
   );
 };

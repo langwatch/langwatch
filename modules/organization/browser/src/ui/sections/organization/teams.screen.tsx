@@ -18,6 +18,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { teamUserRoleSchema } from "@langwatch/authz-contract";
+import { Link } from "@langwatch/browser-host/link";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Select } from "@langwatch/design-system/select";
@@ -42,7 +43,6 @@ import {
 } from "../../../model/member-role-constraints.ts";
 import { useOrganizationHost } from "../../../model/organization-host.ts";
 import { OrganizationUserRole } from "../../../model/prisma-types.ts";
-import { Link } from "../../../ui/elements/link.tsx";
 import { RandomColorAvatar } from "../../../ui/elements/random-color-avatar.tsx";
 import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
 

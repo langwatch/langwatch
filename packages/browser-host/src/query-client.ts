@@ -26,7 +26,11 @@ export function createUiQueryClient({
   onMutationError = defaultMutationErrorReporter,
 }: UiQueryClientOptions = {}): QueryClient {
   return new QueryClient({
-    defaultOptions: { queries: { retry: shouldRetryQuery } },
+    defaultOptions: {
+      // Navigation and focus do not replay every mounted query; a screen
+      // showing live state opts into focus refresh itself.
+      queries: { retry: shouldRetryQuery, staleTime: 30_000, refetchOnWindowFocus: false },
+    },
     mutationCache: new MutationCache({ onError: onMutationError }),
   });
 }

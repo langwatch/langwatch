@@ -4,6 +4,7 @@ import { lintApplicationBoundaries } from "./boundaries/application-boundaries.t
 import { lintArchitectureRecords } from "./boundaries/architecture-records.ts";
 import { lintCycles } from "./boundaries/cycles.ts";
 import { lintManifests } from "./boundaries/manifests.ts";
+import { lintPeerCycles } from "./boundaries/peer-cycles.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
@@ -16,6 +17,7 @@ import {
   lintBrowserPackageManifestClosure,
 } from "./frontend/browser-packages.ts";
 import { lintClickhouseTableOwnership } from "./persistence/clickhouse-table-ownership.ts";
+import { lintEventingTableAccess } from "./persistence/eventing-table-access.ts";
 import { lintMemoryTwinDrift } from "./persistence/memory-twin-drift.ts";
 import { lintPrismaMigrationAccess } from "./persistence/prisma-migration-access.ts";
 import {
@@ -181,6 +183,16 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "cycles",
     spec: FEATURE_PACKAGE_BOUNDARIES,
     run: lintCycles,
+  }),
+  definePolicy({
+    id: "peer-cycles",
+    spec: "specs/peer-cycles.feature",
+    run: lintPeerCycles,
+  }),
+  definePolicy({
+    id: "eventing-table-access",
+    spec: "specs/eventing-table-access.feature",
+    run: lintEventingTableAccess,
   }),
   definePolicy({
     id: "declarations",

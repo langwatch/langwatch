@@ -298,6 +298,27 @@ describe("given the session endpoint says the reader is not authenticated", () =
   });
 });
 
+describe("given the reader is on the waiting screen", () => {
+  describe("when the screen renders", () => {
+    /** @scenario "The waiting screen carries the LangWatch logo" */
+    it("shows the LangWatch logo above the heading", () => {
+      const view = render(
+        <UiApiWaitingScreen
+          endpoint="http://localhost:5560/api/health"
+          isDevelopment
+          explaining={false}
+        />,
+      );
+      dispose = () => view.unmount();
+
+      const logo = view.getByTestId("api-waiting-logo");
+      expect(logo.querySelector("svg")).toBeTruthy();
+      const heading = view.getByRole("heading");
+      expect(logo.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+});
+
 describe("given the wait has run long enough to be worth explaining", () => {
   describe("when the application is a developer's own stack", () => {
     /** @scenario "A long wait in development names the command that starts the API" */

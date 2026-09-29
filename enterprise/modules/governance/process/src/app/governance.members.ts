@@ -28,7 +28,6 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import {
   type Event,
-  EventSchema,
   type IntentContext,
   type ProcessStore,
   type TriggerContext,
@@ -41,7 +40,6 @@ import type {
 import type { Instant } from "@langwatch/time";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import { z } from "zod";
 export type AnomalyAlertHttpResponse = {
   status: number;
   ok: boolean;
@@ -86,102 +84,6 @@ export interface CliAdminContactReader {
   findAdminEmail(organizationId: string): Promise<string | null>;
 }
 
-/** Mirrors the gateway's spend usage: every quantity an older event lacks reads as zero. */
-const gatewaySpendUsageSchema = z.object({
-  input_tokens: z.number().default(0),
-  output_tokens: z.number().default(0),
-  cache_read_input_tokens: z.number().default(0),
-  cache_creation_input_tokens: z.number().default(0),
-  cache_creation_1h_tokens: z.number().default(0),
-  reasoning_tokens: z.number().default(0),
-  input_audio_tokens: z.number().default(0),
-  output_audio_tokens: z.number().default(0),
-  input_chars: z.number().default(0),
-  audio_ms: z.number().default(0),
-  input_image_tokens: z.number().default(0),
-  output_image_tokens: z.number().default(0),
-  image_count: z.number().default(0),
-});
-export type GatewaySpendUsage = z.infer<typeof gatewaySpendUsageSchema>;
-
-const gatewaySpendAttributionSchema = z.object({
-  organization_id: z.string(),
-  team_id: z.string(),
-  virtual_key_id: z.string(),
-  principal_user_id: z.string(),
-  end_user_id: z.string(),
-});
-export type GatewaySpendAttribution = z.infer<typeof gatewaySpendAttributionSchema>;
-
-const gatewaySpendAdmittedDataSchema = z.object({
-  ...gatewaySpendAttributionSchema.shape,
-  gateway_request_id: z.string(),
-  outcome_carries_attribution: z.boolean(),
-});
-export type GatewaySpendAdmittedData = z.infer<typeof gatewaySpendAdmittedDataSchema>;
-
-const gatewaySpendOutcomeDataSchema = z.object({
-  ...gatewaySpendAttributionSchema.shape,
-  gateway_request_id: z.string(),
-  model: z.string(),
-  model_provider_id: z.string(),
-  usage: gatewaySpendUsageSchema.nullable(),
-  cost_nano_usd: z.number(),
-  rate_version: z.string(),
-  duration_ms: z.number(),
-  occurred_at: z.number(),
-});
-export type GatewaySpendOutcomeData = z.infer<typeof gatewaySpendOutcomeDataSchema>;
-
-const gatewaySpendFailedDataSchema = z.object({
-  ...gatewaySpendOutcomeDataSchema.shape,
-  error: z.object({ type: z.string(), http_status: z.number() }),
-});
-export type GatewaySpendFailedData = z.infer<typeof gatewaySpendFailedDataSchema>;
-
-const gatewaySpendSettledDataSchema = z.object({
-  ...gatewaySpendAttributionSchema.shape,
-  gateway_request_id: z.string(),
-  occurred_at: z.number(),
-  reason: z.string(),
-  model: z.string(),
-  model_provider_id: z.string(),
-});
-export type GatewaySpendSettledData = z.infer<typeof gatewaySpendSettledDataSchema>;
-
-export const GATEWAY_SPEND_ADMITTED_EVENT_TYPE = "lw.gateway.spend.admitted" as const;
-export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE = "lw.gateway.spend.confirmed" as const;
-export const GATEWAY_SPEND_FAILED_EVENT_TYPE = "lw.gateway.spend.failed" as const;
-export const GATEWAY_SPEND_SETTLED_EVENT_TYPE = "lw.gateway.spend.settled" as const;
-
-/** The gateway spend events governance reads, as the gateway's pipeline stores them. */
-export const gatewaySpendAdmittedEventSchema = z.object({
-  ...EventSchema.shape,
-  type: z.literal(GATEWAY_SPEND_ADMITTED_EVENT_TYPE),
-  data: gatewaySpendAdmittedDataSchema,
-});
-export const gatewaySpendConfirmedEventSchema = z.object({
-  ...EventSchema.shape,
-  type: z.literal(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE),
-  data: gatewaySpendOutcomeDataSchema,
-});
-export const gatewaySpendFailedEventSchema = z.object({
-  ...EventSchema.shape,
-  type: z.literal(GATEWAY_SPEND_FAILED_EVENT_TYPE),
-  data: gatewaySpendFailedDataSchema,
-});
-export const gatewaySpendSettledEventSchema = z.object({
-  ...EventSchema.shape,
-  type: z.literal(GATEWAY_SPEND_SETTLED_EVENT_TYPE),
-  data: gatewaySpendSettledDataSchema,
-});
-
-export type GatewaySpendProcessingEvent =
-  | z.infer<typeof gatewaySpendAdmittedEventSchema>
-  | z.infer<typeof gatewaySpendConfirmedEventSchema>
-  | z.infer<typeof gatewaySpendFailedEventSchema>
-  | z.infer<typeof gatewaySpendSettledEventSchema>;
-
 export type GatewayBudgetScope =
   | "ORGANIZATION"
   | "TEAM"
@@ -193,73 +95,12 @@ export type GatewayBudgetScope =
 
 export type GatewayBudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 
-export type GatewayBudgetDefinition = {
-  id: string;
-  scopeType: GatewayBudgetScope;
-  window: GatewayBudgetWindow;
-  onBreach: "BLOCK" | "WARN";
-};
-
-export type GatewayResolvedBudget = {
-  budget: GatewayBudgetDefinition;
-  bucketScopeId: string;
-  endUserId: string | null;
-};
-
-export type GatewayBudgetDebitRow = {
-  tenantId: string;
-  budgetId: string;
-  scope: GatewayBudgetScope;
-  scopeId: string;
-  window: GatewayBudgetWindow;
-  virtualKeyId: string;
-  providerKey: string | null;
-  gatewayRequestId: string;
-  amountNanoUsd: number;
-  tokensInput: number;
-  tokensOutput: number;
-  tokensCacheRead: number;
-  tokensCacheWrite: number;
-  model: string;
-  durationMs: number;
-  status: "SUCCESS" | "BLOCKED_BY_GUARDRAIL" | "PROVIDER_ERROR";
-  occurredAt: Instant;
-};
-
 export type GatewayBudgetCrossingCandidate = {
   tenantId: string;
   budgetId: string;
   bucketScopeId: string;
   endUserId: string | null;
 };
-
-export interface GatewayBudgetLedger {
-  resolve(input: {
-    target: {
-      organizationId: string;
-      teamId: string | null;
-      projectId: string;
-      virtualKeyId: string;
-      principalUserId: string | null;
-      endUserId: string | null;
-    };
-    providerKey: string | null;
-  }): Promise<GatewayResolvedBudget[]>;
-
-  insert(rows: GatewayBudgetDebitRow[]): Promise<void>;
-
-  detectCrossings(rows: GatewayBudgetCrossingCandidate[]): Promise<void>;
-
-  shouldEmitBudgetUpdated: (input: { projectId: string }) => Promise<boolean>;
-
-  emitBudgetUpdated(input: {
-    organizationId: string;
-    projectId: string;
-    gatewayRequestId: string;
-    virtualKeyId: string;
-    budgetIds: string[];
-  }): Promise<void>;
-}
 
 /**
  * Three small read-side signal ports (OCSF export, workspace-view audit,

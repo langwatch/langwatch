@@ -1,4 +1,5 @@
 import { Box, Button, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -10,7 +11,6 @@ import { useCallback, useRef, useState } from "react";
 
 import { formatFileSize } from "../../model/license-status.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
-import { Link } from "../../ui/elements/link.tsx";
 
 type ActivationMethod = "code" | "file" | "key";
 

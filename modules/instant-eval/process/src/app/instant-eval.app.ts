@@ -70,13 +70,29 @@ import { InstantEvalRowSourceService } from "../services/instant-eval-row-source
 import { InstantEvalRunContextService } from "../services/instant-eval-run-context.service.ts";
 import { InstantEvalRunService } from "../services/instant-eval-run.service.ts";
 import { InstantEvalSampleService } from "../services/instant-eval-sample.service.ts";
-import { InstantEvalSpendService } from "../services/instant-eval-spend.service.ts";
+import {
+  InstantEvalSpendService,
+  type InstantEvalSpendPeers,
+} from "../services/instant-eval-spend.service.ts";
 import { InstantEvalStatementService } from "../services/instant-eval-statement.service.ts";
 
 /** Seconds of refill a bucket holds as burst, at the sustained rate. */
 const logger = createLogger("langwatch:instant-eval:judge");
 
 const BUCKET_BURST_SECONDS = 2;
+
+/** The project's organization and team, which every judgement's spend is billed against. */
+function spendAttributionOf(
+  projects: Pick<ProjectApi, "findWithTeam">,
+): InstantEvalSpendPeers["findSpendAttribution"] {
+  return async ({ projectId }) => {
+    const project = await projects.findWithTeam(projectId);
+
+    return project
+      ? { organizationId: project.team.organizationId, teamId: project.team.id }
+      : undefined;
+  };
+}
 
 /**
  * The Redis surface this module uses: the judge's token bucket, the budget
@@ -141,6 +157,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
   private readonly runs: InstantEvalRunService;
   private readonly dispatcher: InstantEvalCommandDispatcherService;
   private readonly pipeline: InstantEvalProcessingPipelineDefinition;
+  private readonly hostedSpend: InstantEvalSpendService;
 
   private constructor(options: {
     access: InstantEvalAccessService;
@@ -149,6 +166,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     runs: InstantEvalRunService;
     dispatcher: InstantEvalCommandDispatcherService;
     pipeline: InstantEvalProcessingPipelineDefinition;
+    hostedSpend: InstantEvalSpendService;
   }) {
     this.access = options.access;
     this.classifications = options.classifications;
@@ -156,6 +174,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     this.runs = options.runs;
     this.dispatcher = options.dispatcher;
     this.pipeline = options.pipeline;
+    this.hostedSpend = options.hostedSpend;
   }
 
   static async create(setup: InstantEvalSetup): Promise<InstantEvalApp> {
@@ -220,7 +239,22 @@ export class InstantEvalApp implements InstantEvalApiContract {
       },
     });
 
+    // Main's hosted-call recorder: always the spend spine and never a log line, because an
+    // unmetered hosted call is usage given away; the caller keeps the spend and retries.
+    const hostedSpend = InstantEvalSpendService.create({
+      peers: {
+        findSpendAttribution: spendAttributionOf(projects),
+        recordPricedSpend: async (input) => {
+          const { status } = await gateway.recordPricedSpend(input);
+          if (status === "unavailable") {
+            throw new Error("the gateway spend pipeline is not registered");
+          }
+        },
+      },
+    });
+
     return new InstantEvalApp({
+      hostedSpend,
       access,
       classifications: InstantEvalClassifyService.create({ judge }),
       reads,
@@ -353,13 +387,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     const finishes = InstantEvalFinishService.create({
       spend: InstantEvalSpendService.create({
         peers: {
-          findSpendAttribution: async ({ projectId }) => {
-            const project = await projects.findWithTeam(projectId);
-
-            return project
-              ? { organizationId: project.team.organizationId, teamId: project.team.id }
-              : undefined;
-          },
+          findSpendAttribution: spendAttributionOf(projects),
           recordPricedSpend: async (input) => {
             await gateway.recordPricedSpend(input);
           },
@@ -530,7 +558,24 @@ export class InstantEvalApp implements InstantEvalApiContract {
     projectId: string;
     text: string;
     questions: readonly InstantEvalQuestion[];
+    signal?: AbortSignal;
   }): Promise<InstantEvalJudgement> {
     return this.classifications.classify(input);
+  }
+
+  priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number } {
+    return this.classifications.priceOf(input);
+  }
+
+  recordSpendForHostedCalls(input: {
+    projectId: string;
+    virtualKeyId: string;
+    inputTokens: number;
+    requests: number;
+    costUsd: number;
+    priceUsd: number;
+    occurredAt: Instant;
+  }): Promise<void> {
+    return this.hostedSpend.recordSpend(input);
   }
 }

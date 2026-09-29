@@ -6,6 +6,7 @@ import {
 import { defineServerModule } from "@langwatch/kernel";
 
 import { WorkflowApp } from "#app/workflow.app";
+import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-cleanup.pipeline";
 import { workflowRepositories } from "#repositories/workflow-repositories.registry";
 import {
   STUDIO_INVOKE_STAGING_THRESHOLD_BYTES,
@@ -15,7 +16,6 @@ import {
   type StudioLambdaFleetFields,
 } from "#rules/nlp-lambda-config.rules";
 import { WorkflowPermissionService } from "#services/workflow-permission.service";
-import { cronRest } from "#transport/cron.rest";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
 import { workflowRunRest } from "#transport/workflow-run.rest";
 import { workflowStudioRest, workflowStudioSession } from "#transport/workflow-studio.rest";
@@ -31,8 +31,8 @@ export const workflowServer = defineServerModule("workflow")
     workflowOptimizationTrpcTransport,
     workflowRunRest,
     workflowStudioRest,
-    cronRest,
   )
+  .withEventing(workflowNlpLambdaCleanupEventing)
   .withTransportFacts(({ dependencies }) => [
     bindRestMiddleware(workflowStudioSession, (context) => {
       const caller = browserCallerOfRequest(context.req.raw);

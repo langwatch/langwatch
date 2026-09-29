@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -28,9 +29,13 @@ import (
 
 const testBase = "http://idp.example"
 
+// testConsole stands in for apps/idpsim-web's build, so a page request can be
+// told apart from a JSON answer without building the bundle.
+var testConsole = fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>idpsim console</title>")}}
+
 func newTestServer(t *testing.T, tenants int) *Server {
 	t.Helper()
-	s, err := NewServer(Config{Addr: ":0", BaseURL: testBase, Tenants: tenants})
+	s, err := newServer(Config{Addr: ":0", BaseURL: testBase, Tenants: tenants}, testConsole)
 	require.NoError(t, err)
 	return s
 }
@@ -141,10 +146,23 @@ func TestAuthorizeAccountPicker(t *testing.T) {
 	}
 	rec := do(s, httptest.NewRequest(http.MethodGet, testBase+"/t/1/oauth/authorize?"+q.Encode(), nil))
 	require.Equal(t, http.StatusOK, rec.Code)
-	body := rec.Body.String()
-	assert.Contains(t, body, "admin@acme1.test")
-	assert.Contains(t, body, "member@acme1.test")
-	assert.Contains(t, body, "login_hint")
+	assert.Contains(t, rec.Body.String(), "idpsim console", "the picker is the console's page")
+
+	picker := getJSON(t, s, "/api/t/1/sign-in?"+q.Encode())
+	assert.Nil(t, picker["refusal"])
+	users := picker["users"].([]any)
+	require.Len(t, users, 2)
+	admin := users[0].(map[string]any)
+	assert.Equal(t, "admin@acme1.test", admin["email"])
+	assert.Equal(t, "member@acme1.test", users[1].(map[string]any)["email"])
+
+	// Choosing somebody is the same authorize request with the hint filled in.
+	chosen := do(s, httptest.NewRequest(http.MethodGet, testBase+admin["href"].(string), nil))
+	require.Equal(t, http.StatusFound, chosen.Code)
+	back, err := url.Parse(chosen.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "app.example", back.Host)
+	assert.NotEmpty(t, back.Query().Get("code"))
 }
 
 // pkceParams derives an S256 challenge pair the way a client would.

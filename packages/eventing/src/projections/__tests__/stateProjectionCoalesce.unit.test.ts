@@ -57,14 +57,13 @@ describe("state projection coalescing wiring", () => {
     });
 
     it("forwards the declared limit and a batch callback into the queue registration", () => {
-      const [defs, , onEventBatch] =
-        vi.mocked(queueManager.initializeStateProjectionQueues).mock.calls[0] ?? [];
-      expect(defs?.batched?.coalesceMaxBatch).toBe(500);
-      expect(onEventBatch).toBeTypeOf("function");
+      const [request] = vi.mocked(queueManager.initializeStateProjectionQueues).mock.calls[0] ?? [];
+      expect(request?.projections.batched?.coalesceMaxBatch).toBe(500);
+      expect(request?.onEventBatch).toBeTypeOf("function");
     });
 
     it("scores dispatch by log-accept time so delivery order agrees with the cursor", () => {
-      const [defs] = vi.mocked(queueManager.initializeStateProjectionQueues).mock.calls[0] ?? [];
+      const [request] = vi.mocked(queueManager.initializeStateProjectionQueues).mock.calls[0] ?? [];
       // Business time a day in the past, appended now: without a createdAt
       // score this event jumps the group's queue, and the cursor its drain
       // commits silently drops everything appended before it.
@@ -79,7 +78,7 @@ describe("state projection coalescing wiring", () => {
         version: "2025-12-17",
         data: {},
       };
-      expect(defs?.batched?.scoreFn?.(backdated)).toBe(2_000);
+      expect(request?.projections.batched?.scoreFn?.(backdated)).toBe(2_000);
     });
   });
 
@@ -94,14 +93,14 @@ describe("state projection coalescing wiring", () => {
         globalJobRegistry: registry as never,
       });
 
-      queueManager.initializeStateProjectionQueues(
-        {
+      queueManager.initializeStateProjectionQueues({
+        projections: {
           batched: { name: "batched", coalesceMaxBatch: 500 },
           oneAtATime: { name: "oneAtATime", coalesceMaxBatch: 1 },
         },
-        async () => undefined,
-        async () => undefined,
-      );
+        onEvent: async () => undefined,
+        onEventBatch: async () => undefined,
+      });
 
       const batched = registry.get(`${TEST_CONSTANTS.PIPELINE_NAME}:stateProjection:batched`);
       expect(

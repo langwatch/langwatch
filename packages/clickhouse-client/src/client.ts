@@ -25,6 +25,8 @@ export interface ClickHouseQueryClientOptions {
   retries?: RetryPolicy | undefined;
   /** Logs and counts each read and write once its retries settle, cold scans included. */
   reporter?: StatementReporter | undefined;
+  /** The routing table's private routes, organization id to endpoint; none by default. */
+  privateRoutes?: ReadonlyMap<string, string> | undefined;
 }
 
 const now = (): number => globalThis.performance.now();
@@ -36,6 +38,7 @@ export class ClickHouseQueryClient {
   private readonly limiter: ConcurrencyLimiter | undefined;
   private readonly retries: RetryPolicy | undefined;
   private readonly reporter: StatementReporter | undefined;
+  private readonly routes: ReadonlyMap<string, string>;
 
   constructor({
     driver,
@@ -44,6 +47,7 @@ export class ClickHouseQueryClient {
     limiter,
     retries,
     reporter,
+    privateRoutes,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
@@ -51,6 +55,15 @@ export class ClickHouseQueryClient {
     this.limiter = limiter;
     this.retries = retries;
     this.reporter = reporter;
+    this.routes = privateRoutes ?? new Map();
+  }
+
+  /**
+   * The organizations this client routes to a private endpoint, parsed once at boot. A
+   * deployment fact a peer reads (cohort exclusion) without declaring the env family again.
+   */
+  privateRoutes(): ReadonlyMap<string, string> {
+    return this.routes;
   }
 
   /**
@@ -81,6 +94,20 @@ export class ClickHouseQueryClient {
         : this.limiter.run({ task: withReport, signal: request.signal });
 
     return this.tracer === undefined ? withSlot() : this.tracer.trace({ request, task: withSlot });
+  }
+
+  /**
+   * Streams one read batch by batch (replay's event reads). The tenant guard applies; the slot and
+   * retries do not, since the reader sets how long it runs and a retried stream would repeat rows.
+   * A driver that cannot stream answers the whole result, under every policy, as one batch.
+   */
+  async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
+    this.tenantGuard?.assert(request);
+    if (this.driver.stream === undefined) {
+      yield (await this.query<Row>(request)).rows;
+      return;
+    }
+    yield* this.driver.stream<Row>(request);
   }
 
   /**

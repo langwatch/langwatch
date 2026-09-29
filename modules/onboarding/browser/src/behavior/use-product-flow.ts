@@ -161,7 +161,6 @@ export function useProductFlow() {
           pathname: router.pathname,
           query: currentQuery,
         },
-        undefined,
         { shallow: true },
       );
     },

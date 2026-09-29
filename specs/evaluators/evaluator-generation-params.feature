@@ -23,7 +23,8 @@ Feature: Evaluator generation parameters reach the judge the same way on every p
   #
   # Bindings:
   #   services/langevals/langevals_core (the Claude temperature/top_p rule)
-  #   modules/evaluation (EvaluationModelEnv.resolveForEvaluator — declared, implementation still owed)
+  #   modules/evaluation/process/src/rules/evaluator-settings.rules.ts (the API route parse)
+  #   modules/model-provider/process/src/services/model-provider-evaluator-model-env.service.ts (X_LITELLM_* build)
 
   @unit
   Scenario: Generation parameters survive the settings schema parse on the API route

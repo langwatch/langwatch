@@ -34,6 +34,9 @@
       "path": "../../auth/contract/tsconfig.build.json"
     },
     {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../automation/contract/tsconfig.build.json"
     },
     {
@@ -47,6 +50,9 @@
     },
     {
       "path": "../../dashboard/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/contract/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"

@@ -7,6 +7,7 @@ import {
   Portal,
   Text,
 } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { modelProviderIcons, ProviderIconGlyph } from "@langwatch/model-provider-browser-kit";
 import { LANGY_CHAT_FEATURE_KEY, findModelById } from "@langwatch/model-provider-contract";
@@ -28,7 +29,6 @@ import { memo, useMemo, useState } from "react";
 import { type LangyModelGroup, profileLangyModel } from "../../../../model/langy-model-profile.ts";
 import { splitLangyModels } from "../../../../model/langy-model-suggestions.ts";
 import { LangyComboboxSearch } from "../../../../ui/elements/langy-combobox-search.tsx";
-import { Link } from "../../../../ui/elements/link.tsx";
 import { useLangyModelOptions } from "../../behavior/panel/use-langy-model-options.ts";
 
 type ProviderKey = keyof typeof modelProviderIcons;

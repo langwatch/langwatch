@@ -14,6 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { ArrowRight } from "lucide-react";
@@ -26,7 +27,6 @@ import {
   shouldShowPlanLimits,
 } from "../../model/plan-management-url.ts";
 import { PricingModel } from "../../model/prisma-types.ts";
-import { Link } from "../../ui/elements/link.tsx";
 import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,

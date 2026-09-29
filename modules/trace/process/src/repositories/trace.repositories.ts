@@ -3,6 +3,7 @@ import type { TraceListRepository } from "@langwatch/trace-contract";
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
+import type { TraceAnalyticsFoldCacheRepository } from "./trace-analytics-fold-cache.repository.ts";
 import type { TraceAnalyticsProjectionRepository } from "./trace-analytics-projection.repository.ts";
 import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository.ts";
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
@@ -12,6 +13,7 @@ import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
+import type { TraceSummaryFoldCacheRepository } from "./trace-summary-fold-cache.repository.ts";
 import type { TraceSummaryProjectionRepository } from "./trace-summary-projection.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "./trace-usage-count.repository.ts";
@@ -26,6 +28,9 @@ export interface TraceRepositories {
   readonly summaryProjection: TraceSummaryProjectionRepository;
   readonly analyticsProjection: TraceAnalyticsProjectionRepository;
   readonly analyticsRollup: TraceAnalyticsRollupRepository;
+  /** The two folds' warm state; without it a fold reads back a lossy row mid-trace. */
+  readonly summaryFoldCache: TraceSummaryFoldCacheRepository;
+  readonly analyticsFoldCache: TraceAnalyticsFoldCacheRepository;
   readonly spanStorage: SpanStorageRepository;
   readonly existence: TraceExistenceRepository;
   readonly derivationSpans: TraceDerivationSpanReaderRepository;

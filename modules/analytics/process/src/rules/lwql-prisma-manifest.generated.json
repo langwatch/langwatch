@@ -4569,6 +4569,15 @@
           "documentation": "The managed gateway key (purpose CONNECT) that hosted-service traffic of\nthis license runs under. One per license, so spend rows name the install.\nCreated when the license first resolves. A plain column, not a relation."
         },
         {
+          "name": "seatsRaisedFrom",
+          "columnName": "seatsRaisedFrom",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The seats of the license this one replaced, set only when a seat change\nraised a linked license. Billing reads it through licensing to invoice\nthe added seats, so the fact commits with the license or not at all."
+        },
+        {
           "name": "createdAt",
           "columnName": "createdAt",
           "type": "DateTime",
@@ -22058,7 +22067,7 @@
     {
       "name": "ConnectedSeatChange",
       "tableName": "ConnectedSeatChange",
-      "documentation": "What a mid-term seat change of one connected license owes (ADR-141,\nsection 7): the seats added on the reissued license, invoiced prorated to\nthe end of the term.\n\nThe row is written before the payment provider is called and completed\nafter it, so a call that failed halfway is retried by the daily billing\ntick without inventing a second invoice. One row per reissued license.",
+      "documentation": "What a mid-term seat change of one connected license owes (ADR-141,\nsection 7): the seats added on the reissued license, invoiced prorated to\nthe end of the term.\n\nThe row is written before the payment provider is called and completed\nafter it, so a call that failed halfway is retried by the next seat\ninvoicing pass without inventing a second invoice. One row per reissued license.",
       "primaryKey": ["id"],
       "fields": [
         {
@@ -22085,8 +22094,17 @@
           "type": "String",
           "kind": "scalar",
           "isList": false,
-          "isOptional": false,
-          "documentation": "The `ConnectedBillingAccount` row the invoice is raised against."
+          "isOptional": true,
+          "documentation": "The `ConnectedBillingAccount` row the invoice is raised against. Null\nwhen the customer had no billing account (`not_onboarded`)."
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The customer organization the license belongs to."
         },
         {
           "name": "changedAt",
@@ -22130,8 +22148,8 @@
           "type": "Currency",
           "kind": "enum",
           "isList": false,
-          "isOptional": false,
-          "documentation": ""
+          "isOptional": true,
+          "documentation": "Null when no billing account named one (`not_onboarded`)."
         },
         {
           "name": "stripeInvoiceId",
@@ -22843,7 +22861,7 @@
     },
     {
       "name": "ConnectedSeatChangeState",
-      "values": ["intent", "invoiced", "nothing_to_invoice"]
+      "values": ["intent", "invoiced", "nothing_to_invoice", "not_onboarded"]
     }
   ]
 }

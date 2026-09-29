@@ -22,6 +22,7 @@ import type {
   FeatureProvider,
   ModuleConfigGuard,
   ModuleConfigRecord,
+  ModuleOperatorReadsScope,
   ModuleSecretsScope,
   ServerFeatureDeclaration,
   ServerRole,
@@ -243,6 +244,8 @@ interface DeclaredFeature {
   readonly tier: Tier;
   /** The handles this module declared, for the root to scope its resolver to. */
   readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  /** The operator-read handles this module declared, scoped the same way (§7). */
+  readonly operatorReads?: Readonly<Record<string, unknown>>;
   readonly install: (args: FeatureInstallArguments<unknown>) => Promise<InstalledFeatureState>;
 }
 
@@ -293,6 +296,8 @@ export interface ApplicationOptions<
    * one anyway is refused by name rather than reading an undeclared secret.
    */
   readonly secrets?: ModuleSecretsScope;
+  /** Scopes the stores' operator reads to one module's declared handles (§7). */
+  readonly operatorReads?: ModuleOperatorReadsScope;
 }
 
 /** An application with its members named, collecting declarations. */
@@ -307,6 +312,7 @@ export class ApplicationBuilder<
   private readonly config: Readonly<Record<string, unknown>>;
   private readonly source: MemberSource<Members>;
   private readonly secrets: ModuleSecretsScope | undefined;
+  private readonly operatorReads: ModuleOperatorReadsScope | undefined;
   readonly name: string;
 
   constructor(options: ApplicationOptions<Members, Config>, state?: BuilderState<Rest, Trpc>) {
@@ -314,6 +320,7 @@ export class ApplicationBuilder<
     this.config = options.config ?? {};
     this.source = options.members ?? noMembers<Members>();
     this.secrets = options.secrets;
+    this.operatorReads = options.operatorReads;
     this.name = options.role;
     this.state = state ?? { features: [], services: [], provisions: [], hosts: {} };
   }
@@ -332,6 +339,7 @@ export class ApplicationBuilder<
         config: this.config as Config,
         members: this.source,
         ...(this.secrets ? { secrets: this.secrets } : {}),
+        ...(this.operatorReads ? { operatorReads: this.operatorReads } : {}),
       },
       { ...this.state, hosts, serve },
     );
@@ -367,6 +375,7 @@ export class ApplicationBuilder<
       // seam rather than failing to compile: without this the root scopes every
       // module's resolver to nothing and every declared handle reads undeclared.
       ...(declaration.secrets ? { secrets: declaration.secrets } : {}),
+      ...(declaration.operatorReads ? { operatorReads: declaration.operatorReads } : {}),
       install: (args) => declaration.install(args as FeatureInstallArguments<Members>),
     });
     return this;
@@ -386,6 +395,23 @@ export class ApplicationBuilder<
     if (!this.secrets) return {};
 
     return { secrets: this.secrets(declaration.name, Object.values(declaration.secrets ?? {})) };
+  }
+
+  /**
+   * The module's own operator reads join only its repository members, so only
+   * the live tier its registry builds can hold a cross-organization client (§7).
+   */
+  private repositoryMembersFor(
+    declaration: DeclaredFeature,
+    members: Readonly<Record<string, unknown>>,
+  ): Readonly<Record<string, unknown>> {
+    if (!this.operatorReads || !declaration.operatorReads) return members;
+
+    const operatorReads = this.operatorReads({
+      owner: declaration.name,
+      declared: Object.values(declaration.operatorReads),
+    });
+    return { ...members, operatorReads };
   }
 
   /** Something the runtime starts and stops around the feature graph. */
@@ -442,7 +468,10 @@ export class ApplicationBuilder<
       })),
     });
     const selections = new Map<string, RepositorySelection>(
-      declarations.map((declaration) => [declaration.name, { tier: declaration.tier, members }]),
+      declarations.map((declaration) => [
+        declaration.name,
+        { tier: declaration.tier, members: this.repositoryMembersFor(declaration, members) },
+      ]),
     );
     // Belt and braces over the union above: a source that answered a claimed
     // member with null built something a factory cannot use.
@@ -682,7 +711,8 @@ function eventingMemberFor<Members>(
 function claimedBy(declaration: DeclaredFeature): readonly string[] {
   const registry = declaration.repositoryRegistry;
   const tier = registry === void 0 ? [] : repositoriesRequire(registry, declaration.tier);
-  return [...declaration.requiredMembers, ...tier];
+  // The root hands `operatorReads` to the live tier itself; no store answers it.
+  return [...declaration.requiredMembers, ...tier.filter((member) => member !== "operatorReads")];
 }
 
 /** Install module's eventing pipeline if runtime exists. */

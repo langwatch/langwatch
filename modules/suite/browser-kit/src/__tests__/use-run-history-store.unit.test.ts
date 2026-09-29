@@ -146,7 +146,6 @@ describe("useRunHistoryStore", () => {
 
       expect(mockRouter.push).toHaveBeenCalledWith(
         { query: expect.not.objectContaining({ groupBy: expect.anything() }) },
-        undefined,
         { shallow: true },
       );
     });
@@ -157,7 +156,6 @@ describe("useRunHistoryStore", () => {
 
       expect(mockRouter.push).toHaveBeenCalledWith(
         { query: expect.objectContaining({ groupBy: "target" }) },
-        undefined,
         { shallow: true },
       );
     });
@@ -168,7 +166,6 @@ describe("useRunHistoryStore", () => {
 
       expect(mockRouter.push).toHaveBeenCalledWith(
         { query: expect.objectContaining({ groupBy: "scenario" }) },
-        undefined,
         { shallow: true },
       );
     });
@@ -200,7 +197,6 @@ describe("useRunHistoryStore", () => {
 
       expect(mockRouter.push).toHaveBeenCalledWith(
         { query: expect.objectContaining({ scenarioId: "scen_1" }) },
-        undefined,
         { shallow: true },
       );
     });
@@ -209,7 +205,7 @@ describe("useRunHistoryStore", () => {
       getState(store).syncToUrl(mockRouter);
 
       const call = vi.mocked(mockRouter.push).mock.calls[0]!;
-      expect(call[2]).toEqual({ shallow: true });
+      expect(call[1]).toEqual({ shallow: true });
     });
   });
 

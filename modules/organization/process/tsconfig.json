@@ -51,6 +51,9 @@
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/internal-slack/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
@@ -79,6 +82,9 @@
     },
     {
       "path": "../../role/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../share/contract/tsconfig.build.json"

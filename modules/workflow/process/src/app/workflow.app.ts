@@ -11,19 +11,21 @@ import {
  * operation serves a browser session, an API key and a background job alike.
  */
 import { DatasetApi } from "@langwatch/dataset-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluator-contract";
+import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
-  NlpLambdaFleetNotComposedError,
   WorkflowApi,
   WorkflowExecutionFailedError,
   WorkflowNotFoundError,
@@ -84,6 +86,8 @@ import {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
 } from "../channels/http/http.workflow-studio-stream.channel.ts";
+import { buildNlpLambdaCleanupPipeline } from "../eventing/workflow-nlp-lambda-cleanup.pipeline.ts";
+import type { WorkflowLineageRepository } from "../repositories/workflow-lineage.repository.ts";
 import {
   workflowRepositories,
   type WorkflowRepositories,
@@ -102,10 +106,12 @@ import { WorkflowCodeCompletionService } from "../services/workflow-code-complet
 import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
 import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
+import { WorkflowLinkedRowsService } from "../services/workflow-linked-rows.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
 import { WorkflowPermissionService } from "../services/workflow-permission.service.ts";
 import { WorkflowProjectEnvironmentService } from "../services/workflow-project-environment.service.ts";
 import { WorkflowPublicationService } from "../services/workflow-publication.service.ts";
+import { WorkflowSignalsService } from "../services/workflow-signals.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
 import { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
@@ -307,9 +313,9 @@ export interface WorkflowInfrastructure {
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
   /**
-   * The account the studio's engines are deployed into, for the cron sweep.
+   * The account the studio's engines are deployed into, for the daily sweep.
    * Absent where the deployment fronts the engine with no Lambdas at all,
-   * and the sweep then refuses by name rather than reporting a clean run.
+   * and the sweep then reads nothing.
    */
   nlpLambdaFleet?: NlpLambdaFleet;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
@@ -335,6 +341,9 @@ export type WorkflowHostMembers = Omit<
   | "studioDispatch"
   | "publicBaseUrl"
   | "evaluations"
+  | "lineage"
+  | "publications"
+  | "signals"
 >;
 
 /** The engine address and public origin are process facts, not this module's env spellings. */
@@ -349,6 +358,37 @@ type WorkflowSetup = FeatureSetup<
   WorkflowServerConfig,
   WorkflowRepositories
 >;
+
+/** The lineage reads: the workflow's own rows, and what hangs off it through its owners. */
+function lineageOf({
+  rows,
+  linked,
+}: {
+  rows: WorkflowLineageRepository;
+  linked: WorkflowLinkedRowsService;
+}): WorkflowLineageReads {
+  return {
+    listWithCopyLineage: (input) => rows.findWithCopyLineage(input),
+    findWorkflow: (input) => rows.findWorkflow(input),
+    findCopiesWithPath: (input) => rows.findCopiesWithPath(input),
+    findWorkflowWithSource: (input) => rows.findWorkflowWithSource(input),
+    findWorkflowWithCopies: (input) => rows.findWorkflowWithCopies(input),
+    findLatestVersionNumber: (input) => rows.findLatestVersionNumber(input),
+    listAgents: (input) => linked.listAgents(input),
+    listMonitorsForEvaluators: (input) => linked.listMonitorsForEvaluators(input),
+    cascadeArchive: (input) => linked.cascadeArchive(input),
+  };
+}
+
+/** The Optimization Studio's publication flags, off the workflow's own rows. */
+function publicationsOf(rows: WorkflowLineageRepository): WorkflowPublicationReads {
+  return {
+    findFlags: (input) => rows.findFlags(input),
+    findVersion: (input) => rows.findVersion(input),
+    setFlags: (input) => rows.setFlags(input),
+    listPublishedComponents: (input) => rows.findPublishedComponents(input),
+  };
+}
 
 /** The module's own id generator - the same ksuid the worker's copy used. */
 class KsuidWorkflowId implements WorkflowId {
@@ -433,6 +473,10 @@ export class WorkflowApp implements WorkflowApi {
     authz: AuthzApi,
     /** Registers and runs a workflow's evaluation over its batch. */
     experiments: ExperimentApi,
+    /** The monitors an archived workflow's evaluators back, deleted with it. */
+    monitors: MonitorApi,
+    /** Where a created workflow is announced, for nurturing. */
+    billing: BillingApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -508,6 +552,19 @@ export class WorkflowApp implements WorkflowApi {
       evaluations: {
         trigger: (input) => setup.dependencies.experiments.triggerWorkflowEvaluation(input),
       },
+      lineage: lineageOf({
+        rows: setup.repositories.lineage,
+        linked: WorkflowLinkedRowsService.create({
+          workflows,
+          agents: setup.dependencies.agents,
+          evaluators: setup.dependencies.evaluators,
+          monitors: setup.dependencies.monitors,
+        }),
+      }),
+      publications: publicationsOf(setup.repositories.lineage),
+      signals: WorkflowSignalsService.create({
+        announce: (input) => setup.dependencies.billing.recordWorkflowCreated(input),
+      }),
     });
   }
 
@@ -1184,17 +1241,25 @@ export class WorkflowApp implements WorkflowApi {
 
   // -- the deployment's own housekeeping ------------------------------------
 
-  /**
-   * Sweeps the studio's quiet per-project NLP Lambda functions and log
-   * groups. Refuses rather than reporting an empty sweep when no fleet was
-   * composed — "nothing to delete" and "nothing was looked at" read alike.
-   */
-  async cleanupOldLambdas(): Promise<void> {
+  /** The daily sweep of the studio's quiet NLP Lambda functions this module's worker hosts. */
+  nlpLambdaCleanupPipeline(deps: {
+    deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
+  }): StaticPipelineDefinition<never> {
+    return buildNlpLambdaCleanupPipeline({
+      sweep: () => this.#sweepQuietNlpLambdas(),
+      deleteDispatchedBefore: deps.deleteDispatchedBefore,
+    });
+  }
+
+  /** A deployment with no Lambda account has no engines of its own to sweep. */
+  async #sweepQuietNlpLambdas(): Promise<void> {
     const fleet = this.#members.nlpLambdaFleet;
+    if (!fleet) {
+      logger.info("no NLP Lambda fleet composed; the daily sweep has nothing to read");
+      return;
+    }
 
-    if (!fleet) throw new NlpLambdaFleetNotComposedError();
-
-    await NlpLambdaCleanupService.create({ fleet }).sweep();
+    await NlpLambdaCleanupService.create({ fleet, logger }).sweep();
   }
 
   /**

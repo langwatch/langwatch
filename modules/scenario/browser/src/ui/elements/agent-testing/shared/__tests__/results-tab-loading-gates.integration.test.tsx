@@ -306,7 +306,6 @@ describe("the Results tab loading gate", () => {
           expect.objectContaining({
             query: expect.objectContaining({ period: "90d" }),
           }),
-          undefined,
           { shallow: true },
         );
       });

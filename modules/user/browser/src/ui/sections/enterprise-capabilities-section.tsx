@@ -3,17 +3,8 @@
  * Cloud only; self-hosted shows capabilities and setup guide.
  */
 
-import {
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Link,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, Heading, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { LucideIcon } from "lucide-react";
 import { ExternalLink, FileClock, KeyRound, TriangleAlert, Users } from "lucide-react";
 
@@ -221,7 +212,9 @@ export function EnterpriseCapabilitiesSection() {
               color="white"
               _hover={{ bg: "orange.800", color: "white" }}
             >
-              <a href="/settings/license">Activate a license</a>
+              <Link unstyled href="/settings/license">
+                Activate a license
+              </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
               <a

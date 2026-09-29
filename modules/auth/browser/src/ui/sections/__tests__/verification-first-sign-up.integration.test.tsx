@@ -6,7 +6,6 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -109,14 +108,6 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
 
 vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
-}));
-
-vi.mock("../../elements/router-link.tsx", () => ({
-  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
 }));
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";

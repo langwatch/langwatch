@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/haven-web",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The haven hub and every stack's home page: a React bundle built by Vite into tools/thuishaven/adapters/dashboard/web/dist and served by that Go process (ADR-160).",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "screenshot": "node scripts/screenshot.ts",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/design-system-internal": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "jsdom": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

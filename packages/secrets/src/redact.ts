@@ -16,7 +16,8 @@ export const REDACTED = "[redacted]";
 export function secretLogRedactPaths(
   declared: readonly SecretHandle<unknown>[],
 ): readonly string[] {
-  const ids = [...new Set(declared.map((handle) => handle.id))];
+  // A family's names are not known until it resolves, and its values are never logged.
+  const ids = [...new Set(declared.filter((handle) => !handle.family).map((handle) => handle.id))];
 
   return ids.flatMap((id) => [id, `*.${id}`]);
 }

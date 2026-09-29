@@ -14,21 +14,23 @@ describe("Feature: Visual diff between two refs", () => {
         const tracker = new InFlightTracker<string>(settings, 0);
         tracker.started({ ...request("http://app/api/traces"), now: 0 });
 
-        expect(tracker.decide(4000).quiet).toBe(false);
+        expect(tracker.decide(2000).quiet).toBe(false);
 
-        tracker.settled({ key: "http://app/api/traces", now: 4000 });
+        tracker.settled({ key: "http://app/api/traces", now: 2000 });
 
-        expect(tracker.decide(4100).quiet).toBe(false);
-        expect(tracker.decide(4500).quiet).toBe(true);
+        expect(tracker.decide(2100).quiet).toBe(false);
+        expect(tracker.decide(2500).quiet).toBe(true);
       });
 
       /** @scenario The runner settles on the in-flight request count rather than a fixed wait */
       it("gives up at the settle deadline rather than hanging", () => {
         const tracker = new InFlightTracker<string>(settings, 0);
         tracker.started({ ...request("http://app/api/poll"), now: 0 });
+        tracker.started({ ...request("http://app/api/slow"), now: 6000 });
 
         expect(tracker.decide(7999).expired).toBe(false);
         expect(tracker.decide(8000)).toEqual({ quiet: false, expired: true });
+        expect(tracker.waitingOn(8000).map((pending) => pending.startedAt)).toEqual([6000]);
       });
 
       it("ignores a response that arrives without its request", () => {
@@ -82,7 +84,7 @@ describe("Feature: Visual diff between two refs", () => {
     describe("when the tracker begins it", () => {
       it("keeps the requests still in flight and resets the deadline", () => {
         const tracker = new InFlightTracker<string>(settings, 0);
-        tracker.started({ ...request("http://app/api/traces"), now: 0 });
+        tracker.started({ ...request("http://app/api/traces"), now: 6000 });
 
         tracker.begin(7000);
 

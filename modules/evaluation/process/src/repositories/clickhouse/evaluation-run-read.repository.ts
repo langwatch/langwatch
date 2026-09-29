@@ -1,3 +1,4 @@
+import { RetentionFloorService } from "@langwatch/clickhouse-client";
 import {
   evaluationRunDataSchema,
   EvaluationNotFoundError,
@@ -11,6 +12,7 @@ import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
+import type { EvaluationRetentionLookup } from "../../app/evaluation.members.ts";
 import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
 import type { EvaluationRunFloorLookup } from "../evaluation.repository.ts";
 import type {
@@ -84,11 +86,27 @@ export class EvaluationRunClickHouseReadRepository {
     return new EvaluationRunClickHouseReadRepository(options);
   }
 
+  /** One floor per tenant lookup, so its cache outlives a read; built on first read. */
+  private readonly floors = new WeakMap<EvaluationRetentionLookup, RetentionFloorService>();
+
   private constructor(
     private readonly options: {
       resolveClient: EvaluationClickHouseResolver;
     },
   ) {}
+
+  /** The tenant's retention plus the floor's margin; the platform default when unreadable. */
+  private floorOver(retention: EvaluationRetentionLookup): RetentionFloorService {
+    const known = this.floors.get(retention);
+    if (known) return known;
+    const floor = new RetentionFloorService({
+      defaultRetentionDays: retention.getPlatformDefaultRetentionDays(),
+      provider: retention,
+      logger,
+    });
+    this.floors.set(retention, floor);
+    return floor;
+  }
 
   async getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
     validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.getByEvaluationId");
@@ -409,7 +427,7 @@ export class EvaluationRunClickHouseReadRepository {
       };
     }
 
-    const floorMs = await input.retentionFloor.getFloorMs({
+    const floorMs = await this.floorOver(input.retention).getFloorMs({
       table: TABLE_NAME,
       tenantId: input.tenantId,
     });

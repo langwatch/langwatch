@@ -5,7 +5,6 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Installed before any import evaluates: the BetterAuth client captures a fetch
@@ -37,14 +36,6 @@ vi.mock("../../../behavior/use-route.ts", () => ({
 
 vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
-}));
-
-vi.mock("../../../ui/elements/router-link.tsx", () => ({
-  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
 }));
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";

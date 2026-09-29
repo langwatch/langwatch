@@ -72,7 +72,7 @@ function withBatchTenant<E extends Event>(
   return first ? run(first.tenantId) : Promise.resolve();
 }
 
-const reactorPayloadSchema = z.object({ event: z.unknown(), foldState: z.unknown() });
+const projectionSubscriberPayloadSchema = z.object({ event: z.unknown(), foldState: z.unknown() });
 
 /** A send's dedup config over the queued envelope: its id was computed at send, in `__routing`. */
 function routedDeduplication<P>(
@@ -227,7 +227,7 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly killSwitch?: KillSwitch;
   private readonly parseEvent: (value: unknown) => EventType;
   private readonly eventQueues = new Map<string, EventSourcedQueueProcessor<EventType>>();
-  private readonly reactorQueues = new Map<
+  private readonly projectionSubscriberQueues = new Map<
     string,
     EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
   >();
@@ -327,6 +327,8 @@ export class QueueManager<EventType extends Event = Event> {
       | "projection"
       | "command"
       | "reactor"
+      | "projectionRebuild"
+      | "stateProjectionRebuild"
       | "job",
     name: string,
   ): string {
@@ -530,6 +532,7 @@ export class QueueManager<EventType extends Event = Event> {
     projections,
     onEvent,
     onEventBatch,
+    onRebuild,
     lane = { queueType: "projection", jobPath: "fold" },
   }: {
     projections: Record<
@@ -550,6 +553,12 @@ export class QueueManager<EventType extends Event = Event> {
     onEventBatch?: (
       projectionName: string,
       events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    /** Rebuilds the missed event's aggregate; its job shares the aggregate's group. */
+    onRebuild?: (
+      projectionName: string,
+      missed: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>;
     lane?: {
@@ -617,6 +626,7 @@ export class QueueManager<EventType extends Event = Event> {
 
       const facade = this.createFacade(lane.queueType, projectionName, jobLane);
       this.eventQueues.set(this.key(lane.queueType, projectionName), facade);
+      this.registerRebuildQueue({ queueType: lane.queueType, projectionName, jobLane, onRebuild });
       if (lane.queueType === "stateProjection") {
         this.stateProjectionCount++;
       } else {
@@ -625,16 +635,49 @@ export class QueueManager<EventType extends Event = Event> {
     }
   };
 
+  /** Registers the lane's rebuild job kind, keyed like the lane so it runs in aggregate order. */
+  private registerRebuildQueue({
+    queueType,
+    projectionName,
+    jobLane,
+    onRebuild,
+  }: {
+    queueType: "projection" | "stateProjection";
+    projectionName: string;
+    jobLane: JobLane<EventType>;
+    onRebuild: ProjectionQueueRequest<EventType>["onRebuild"];
+  }): void {
+    if (!onRebuild) return;
+    const rebuildType = queueType === "projection" ? "projectionRebuild" : "stateProjectionRebuild";
+    const facade = this.createFacade(rebuildType, projectionName, {
+      parse: this.parseEvent,
+      groupKeyFn: jobLane.groupKeyFn,
+      getTenantId: jobLane.getTenantId,
+      preflightGroupKey: jobLane.preflightGroupKey,
+      // Behind whatever the lane already holds: the rebuild reads the log when it runs.
+      scoreFn: () => nowInstant().epochMilliseconds,
+      process: async (missed: EventType, delivery?: JobDelivery) => {
+        await onRebuild(projectionName, missed, {
+          tenantId: missed.tenantId,
+          deliveryAttempt: delivery?.attempt,
+        });
+      },
+      spanAttributes: (missed: EventType) => ({
+        "projection.name": projectionName,
+        "projection.rebuild": true,
+        "event.id": missed.id,
+        "event.aggregate_id": String(missed.aggregateId),
+      }),
+    });
+    this.eventQueues.set(this.key(rebuildType, projectionName), facade);
+  }
+
   // An arrow instance property, for the same reason as initializeProjectionQueues above.
   initializeStateProjectionQueues = (
-    projections: ProjectionQueueRequest<EventType>["projections"],
-    onEvent: ProjectionQueueRequest<EventType>["onEvent"],
-    onEventBatch?: ProjectionQueueRequest<EventType>["onEventBatch"],
+    request: Omit<ProjectionQueueRequest<EventType>, "lane">,
   ): void => {
     this.initializeProjectionQueues({
-      projections,
-      onEvent,
-      onEventBatch,
+      ...request,
       lane: { queueType: "stateProjection", jobPath: "state" },
     });
   };
@@ -797,18 +840,19 @@ export class QueueManager<EventType extends Event = Event> {
       scoreFn: cmdEntry.options.serializeByAggregate
         ? () => nowInstant().epochMilliseconds
         : (payload: Payload) => occurredAtScore(toRecord(payload)),
-      process: async (payload: Payload) => {
-        await processCommand({ ...commandProcessParams, payload });
+      process: async (payload: Payload, delivery?: JobDelivery) => {
+        await processCommand({ ...commandProcessParams, payload, jobId: delivery?.jobId });
       },
       // ADR-066 pillar 2: when the command opts into coalescing, fold a hot
       // aggregate's queued same-command jobs into one multi-row insert. The
       // GroupQueue only drains same-`__jobName` siblings, so every payload
       // here is this command type. Left undefined otherwise (per-job path).
       processBatch: coalescesAppends
-        ? async (payloads: Payload[]) => {
+        ? async (payloads: Payload[], delivery?: JobDelivery) => {
             await processCommandBatch({
               ...commandProcessParams,
               payloads,
+              jobIds: delivery?.jobIds,
             });
           }
         : undefined,
@@ -865,7 +909,7 @@ export class QueueManager<EventType extends Event = Event> {
       });
       const lane: JobLane<{ event: EventType; foldState: unknown }> = {
         parse: (payload) => {
-          const { event, foldState } = reactorPayloadSchema.parse(payload);
+          const { event, foldState } = projectionSubscriberPayloadSchema.parse(payload);
           return { event: this.parseEvent(event), foldState };
         },
         groupKeyFn: subscriberGroupKeyFn,
@@ -888,7 +932,7 @@ export class QueueManager<EventType extends Event = Event> {
             )
           : undefined,
         spanAttributes: (payload: { event: EventType; foldState: unknown }) => ({
-          "reactor.name": subscriberName,
+          "subscriber.name": subscriberName,
           "event.type": payload.event.type,
           "event.id": payload.event.id,
           "event.aggregate_id": String(payload.event.aggregateId),
@@ -898,7 +942,7 @@ export class QueueManager<EventType extends Event = Event> {
       // `reactor` is the physical GroupQueue segment for projection-subscriber
       // jobs: `<tenantId>/<fold|map>/<projection>/reactor/<name>`.
       const facade = this.createFacade("reactor", subscriberName, lane);
-      this.reactorQueues.set(this.key("reactor", subscriberName), facade);
+      this.projectionSubscriberQueues.set(this.key("reactor", subscriberName), facade);
       this.projectionSubscriberCount++;
     }
   }
@@ -945,10 +989,22 @@ export class QueueManager<EventType extends Event = Event> {
     return this.eventQueues.get(this.key("stateProjection", projectionName));
   }
 
+  /** The job lane that rebuilds one aggregate of a fold or state projection, in its group. */
+  getRebuildQueue({
+    kind,
+    projectionName,
+  }: {
+    kind: "fold" | "state";
+    projectionName: string;
+  }): EventSourcedQueueProcessor<EventType> | undefined {
+    const type = kind === "fold" ? "projectionRebuild" : "stateProjectionRebuild";
+    return this.eventQueues.get(this.key(type, projectionName));
+  }
+
   getProjectionSubscriberQueue(
     subscriberName: string,
   ): EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }> | undefined {
-    return this.reactorQueues.get(this.key("reactor", subscriberName));
+    return this.projectionSubscriberQueues.get(this.key("reactor", subscriberName));
   }
 
   getCommandQueue<Payload extends Record<string, unknown>>(
@@ -973,7 +1029,7 @@ export class QueueManager<EventType extends Event = Event> {
   private queueCount(): number {
     return (
       this.eventQueues.size +
-      this.reactorQueues.size +
+      this.projectionSubscriberQueues.size +
       this.commandQueues.size +
       this.jobQueueClosers.size
     );
@@ -992,7 +1048,7 @@ export class QueueManager<EventType extends Event = Event> {
     await Promise.allSettled([
       ...[
         ...this.eventQueues.values(),
-        ...this.reactorQueues.values(),
+        ...this.projectionSubscriberQueues.values(),
         ...this.commandQueues.values(),
       ].map((queue) => queue.close()),
       ...[...this.jobQueueClosers.values()].map((close) => close()),

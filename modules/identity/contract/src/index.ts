@@ -342,7 +342,6 @@ export {
   SsoSamlNotSelfServeError,
   SsoSetupAddressMismatchError,
   SsoSignInRefusedError,
-  ScimSyncNotFoundError,
   SsoTestArrivalCannotCreateOrganizationError,
 } from "./identity.errors.ts";
 export {
@@ -626,73 +625,6 @@ export {
   type SignInMethodPolicyResolver,
 } from "./signin-method-policy.ts";
 export { reduceIdentity } from "./reduce.ts";
-export {
-  emptyScimSync,
-  pickRetiredLetter,
-  reduceScimSync,
-  SCIM_APPLY_FAILED_EVENT_TYPE,
-  SCIM_APPLY_OPS,
-  SCIM_APPLY_RECOVERED_EVENT_TYPE,
-  SCIM_APPLY_RETIRED_EVENT_TYPE,
-  SCIM_GROUP_MAPPED_EVENT_TYPE,
-  SCIM_REVOKE_CAUSES,
-  SCIM_SYNC_EVENT_TYPES,
-  SCIM_SYNC_EVENT_VERSION_LATEST,
-  SCIM_SYNC_STATES,
-  SCIM_TOKEN_ISSUED_EVENT_TYPE,
-  SCIM_TOKEN_REVOKED_EVENT_TYPE,
-  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
-  SCIM_USER_OPS,
-  SCIM_USER_PUSHED_EVENT_TYPE,
-  type ScimApplyOp,
-  type ScimRevokeCause,
-  type ScimSyncActivityEntry,
-  type ScimSyncEventType,
-  type ScimSyncFact,
-  type ScimSyncFactInput,
-  type ScimSyncFailure,
-  type ScimSyncLifecycleState,
-  type ScimSyncState,
-  type ScimUserOp,
-  scimApplyFailedPayloadSchema,
-  scimApplyOpSchema,
-  scimApplyRecoveredPayloadSchema,
-  scimApplyRetiredPayloadSchema,
-  scimGroupMappedPayloadSchema,
-  scimRevokeCauseSchema,
-  scimSyncFactInputSchema,
-  scimSyncFailureSchema,
-  scimSyncIdFor,
-  scimSyncStateSchema,
-  scimTokenIssuedPayloadSchema,
-  scimTokenRevokedPayloadSchema,
-  scimApplyRedrivenPayloadSchema,
-  scimUserOpSchema,
-  scimUserPushedPayloadSchema,
-} from "./scim-sync.ts";
-export {
-  ISSUE_SCIM_TOKEN_COMMAND_TYPE,
-  type IssueScimTokenCommandData,
-  issueScimTokenCommandDataSchema,
-  RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
-  RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
-  RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
-  REDRIVE_SCIM_APPLY_COMMAND_TYPE,
-  REVOKE_SCIM_SYNC_COMMAND_TYPE,
-  type RecordScimApplyFailureCommandData,
-  type RedriveScimApplyCommandData,
-  redriveScimApplyCommandDataSchema,
-  type RecordScimGroupMappingCommandData,
-  type RecordScimUserPushCommandData,
-  type RevokeScimSyncCommandData,
-  recordScimApplyFailureCommandDataSchema,
-  recordScimGroupMappingCommandDataSchema,
-  recordScimUserPushCommandDataSchema,
-  revokeScimSyncCommandDataSchema,
-  SCIM_SYNC_COMMAND_TYPES,
-  type ScimSyncCommand,
-  type ScimSyncCommandType,
-} from "./scim-sync-commands.ts";
 
 export {
   type AccountSignInMethods,
@@ -746,7 +678,6 @@ export {
  */
 export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events.ts";
 export { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "./join-request-events.ts";
-export { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "./scim-sync-events.ts";
 export {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,

@@ -19,6 +19,9 @@ export type UiRouterTarget =
   | string
   | { pathname?: string; query?: Record<string, unknown>; hash?: string };
 
+/** `shallow` and `scroll` are accepted and inert: every push here is in place. */
+export type UiRouterPushOptions = { replace?: boolean; shallow?: boolean; scroll?: boolean };
+
 export type UiRouter = {
   /** Path parameters over the query string, as one bag. */
   query: UiRouterValues;
@@ -34,17 +37,13 @@ export type UiRouter = {
   asPath: string;
   /** False only when nothing published an address at all. */
   isReady: boolean;
-  push: (
-    to: UiRouterTarget,
-    /** The Next router's second address, which no call site passes. */
-    as?: unknown,
-    options?: { replace?: boolean; shallow?: boolean; scroll?: boolean },
-  ) => Promise<boolean>;
-  replace: (
-    to: UiRouterTarget,
-    as?: unknown,
-    options?: { replace?: boolean; shallow?: boolean; scroll?: boolean },
-  ) => Promise<boolean>;
+  /**
+   * Goes to the real address it is handed. There is no Next-style `as`: a route
+   * pattern such as `/[project]/...` is not an address, and pushing one lands
+   * on the default project. Spec: specs/ui/project-scoped-navigation.feature
+   */
+  push: (to: UiRouterTarget, options?: UiRouterPushOptions) => Promise<boolean>;
+  replace: (to: UiRouterTarget, options?: UiRouterPushOptions) => Promise<boolean>;
   back: () => void;
 };
 
@@ -150,7 +149,7 @@ export function useRouter(): UiRouter {
       route: pathname,
       asPath: `${pathname}${stringifyQuery(reading.query)}`,
       isReady: true,
-      push: (to: UiRouterTarget, _as?: unknown, options?: { replace?: boolean }) => go(to, options),
+      push: (to: UiRouterTarget, options?: UiRouterPushOptions) => go(to, options),
       replace: (to: UiRouterTarget) => go(to, { replace: true }),
       back: () => navigation.back(),
     };

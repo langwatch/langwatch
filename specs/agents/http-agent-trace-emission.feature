@@ -23,6 +23,14 @@ Feature: HTTP Agent Test Tracing
     And the trace captures request duration
     And the trace captures the response body
 
+  # Main always executed the editor's "Send Request"; the module port once left
+  # the tester unsupplied, so every test answered agent_http_testing_unavailable.
+  @unit
+  Scenario: Sending a test request from the agent editor executes it
+    When the user executes a test request
+    Then the request runs through the workflow engine
+    And the test answers the extracted output
+
   @unit
   Scenario: Failed request creates a trace
     When the user executes a test request to an endpoint returning 404

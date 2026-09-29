@@ -1,7 +1,7 @@
+import { Link } from "@langwatch/browser-host/link";
 import type { DashboardData } from "@langwatch/ops-contract";
 
 import { api } from "../../../../behavior/ops-api.ts";
-import { Link } from "../../../../ui/elements/ops-link.tsx";
 import { usePausedSchedules } from "../../behavior/use-paused-schedules.ts";
 import { ParkedGroupsView } from "../blocks/parked-groups-view.tsx";
 import { PausedCard as PausedCardView } from "./paused-card.tsx";

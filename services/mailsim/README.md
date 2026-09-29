@@ -23,36 +23,45 @@ MAILSIM_DATA_DIR=/tmp/mailsim make service svc=mailsim   # messages survive a re
 
 ```
 GET    /healthz
+GET    /api/inbox
 GET    /api/messages?to=&subject=
 GET    /api/messages/{id}
 GET    /api/messages/{id}/html
-GET    /api/messages/wait?to=&subject=&timeout=30s
+GET    /api/messages/wait?to=&subject=&after=&timeout=30s
 DELETE /api/messages
 DELETE /api/messages/{id}
 ```
 
 `to` and `subject` are optional case-insensitive substring filters. `wait`
 long-polls: it answers immediately with an existing match, otherwise blocks
-until one arrives or the timeout elapses (204).
+until one arrives or the timeout elapses (204). `after`, a message id, narrows
+it to mail caught after that message. `/api/inbox` names the stack, the SMTP
+listener, the base URL and whether messages persist.
 
 ## The browser inbox
 
-`/` lists caught messages newest first and refreshes every two seconds.
-The page identifies its stack, SMTP listener and whether messages survive
-restarts. Recipient chips list addresses from retained mail with message counts;
-selecting one filters the inbox. Any address can receive captured mail, but
-capture does not create an application account. Each Haven stack has a separate
-inbox even when the same address is used in several stacks.
+The inbox is `apps/mailsim-web`, a React app on the internal console kit,
+built by Vite into `web/dist` and embedded in this binary
+([ADR-160](../../dev/docs/adr/160-internal-consoles-are-go-served-react.md)).
+Build it with `pnpm --filter @langwatch/mailsim-web build` before building the
+Go binary; a binary built without it answers every page with a line naming
+that command. Every non-API path serves the app, so `/messages/{id}` links to
+one message.
 
-Search by subject, sender or recipient. Clear the whole inbox or open a
-message and delete it individually; both actions confirm first and report
-request failures. Live refresh preserves focus and selected text.
+The page names its stack, SMTP listener and whether messages survive restarts.
+The message list sits beside a reading pane (stacked under 720px), with search
+and a recipient filter. New mail appears as it lands: the app long-polls
+`/api/messages/wait?after=<newest id>` and re-reads the list whenever the wait
+answers or lapses. Clearing the inbox and deleting a message each take a second
+press to confirm. "Notify me" raises a desktop notification per arrival, asking
+for permission only when pressed.
 
-A message has preview, plain-text and headers tabs (arrow keys also move
-between them), extracted links with copy buttons, attachment metadata and a
-JSON link. HTML renders inside a sandboxed `<iframe>` pointed at
-`/api/messages/{id}/html` — a caught message is untrusted input, so that one
-endpoint carries its own restrictive headers rather than the API's.
+A message shows its sender, recipients, time and size, then preview, plain
+text (URLs are links), HTML source and headers tabs, its links with copy
+buttons and its attachment metadata. HTML renders inside a sandboxed
+`<iframe>` pointed at `/api/messages/{id}/html`: a caught message is untrusted
+input, so that one endpoint carries its own restrictive headers rather than
+the API's.
 
 ## SMTP intake
 

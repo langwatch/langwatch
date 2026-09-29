@@ -13,6 +13,7 @@ import {
   type EventingSetup,
   type Projection,
   type RegisteredCommand,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -57,6 +58,8 @@ export interface CodingAgentProcessingPipelineDeps {
   clock: CodingAgentClock;
   /** The platform default a tenant with no retention override is stamped with, read per write. */
   defaultRetentionDays: () => number;
+  /** Each tenant's retention, stamped in place of the default (§9); absent, the default stands. */
+  retention?: RetentionPolicyResolver;
   sessionContextMemo: CodingAgentSessionContextMemoRepository;
   sessionFoldCache: CodingAgentSessionFoldCacheRepository;
   /** Absent where there is no GitHub connection to ask: no mapping subscriber is mounted. */
@@ -176,7 +179,7 @@ export class EventingCodingAgentProcessingAdapter {
         )
       : builder;
 
-    return configured.build();
+    return (deps.retention ? configured.withRetention(deps.retention) : configured).build();
   }
 }
 

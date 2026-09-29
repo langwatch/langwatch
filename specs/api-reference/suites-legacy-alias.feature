@@ -49,3 +49,13 @@ Feature: The suites REST family is a deprecated alias
     Given the project holds one test suite
     When I update the test suite through the alias with a target in the body
     Then the response is 422 with the code validation_error
+
+  Scenario: Archiving a run plan through the alias archives it
+    Given the project holds one run plan
+    When I archive the run plan through the alias
+    Then the response is 200 and names the run plan as archived
+
+  Scenario: Archiving an id the project does not hold through the alias answers suite_not_found
+    Given a suite id the project does not hold
+    When I archive that id through the alias
+    Then the response is 404 with the code suite_not_found

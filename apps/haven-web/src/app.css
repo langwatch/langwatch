@@ -1,0 +1,8 @@
+/* Layout glue only (packages/design-system-internal/README.md): tokens, never literals. */
+
+.haven-severity {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

@@ -2,9 +2,9 @@
  * Current Plan Block - displays the active subscription
  */
 import { Badge, Box, Button, Card, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Check } from "lucide-react";
 
-import { Link } from "../../ui/elements/link.tsx";
 import { PricingSummary } from "../../ui/elements/pricing-summary.tsx";
 
 export function CurrentPlanBlock({

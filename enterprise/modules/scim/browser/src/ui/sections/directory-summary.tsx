@@ -7,6 +7,7 @@
  */
 import { Card, HStack, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { UiDirectorySummaryProps } from "@langwatch/browser-host/declarations";
+import { Link } from "@langwatch/browser-host/link";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant } from "@langwatch/time";
@@ -106,9 +107,9 @@ function DirectorySources({ connections }: { connections: DirectoryFactsRead["co
           Nobody is provisioned here automatically.
         </Text>
         <Text asChild fontSize="xs" color="orange.fg">
-          <a href={AUTHENTICATION_PAGE} data-testid="connect-identity-provider">
+          <Link unstyled href={AUTHENTICATION_PAGE} data-testid="connect-identity-provider">
             Connect an identity provider →
-          </a>
+          </Link>
         </Text>
       </VStack>
     );
@@ -128,13 +129,14 @@ function DirectorySources({ connections }: { connections: DirectoryFactsRead["co
         />
       ))}
       {rest > 0 && <Text fontSize="xs" color="fg.muted">{`+${rest} more`}</Text>}
-      <a
+      <Link
+        unstyled
         href={AUTHENTICATION_PAGE}
         aria-label="Connect another identity provider"
         title="Connect another identity provider"
       >
         <Plus size={16} />
-      </a>
+      </Link>
     </HStack>
   );
 }

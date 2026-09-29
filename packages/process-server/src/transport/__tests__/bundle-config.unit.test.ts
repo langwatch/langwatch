@@ -82,6 +82,29 @@ describe("given the page the api serves", () => {
     });
   });
 
+  describe("when the deployment names a haven stack", () => {
+    /** @scenario "the browser is handed the badge label only when the deployment names one" */
+    it("hands the process slice the stack's slug as the badge label", () => {
+      const slice = (environment: Record<string, string>) =>
+        parsePublicConfigSlice({
+          config: projectPublicConfig({
+            modules: [],
+            config: parseProcessConfig({ owners: [processOwner], environment }),
+          }),
+          owner: "process",
+          schema: processWebConfigSchema,
+        });
+
+      expect(
+        slice({ NODE_ENV: "development", DEV_INDICATOR_LABEL: "feat-strict-feature-layout-v0" }),
+      ).toMatchObject({ devIndicatorLabel: "feat-strict-feature-layout-v0" });
+      expect(slice({ NODE_ENV: "development", DEV_INDICATOR_LABEL: " " })).not.toHaveProperty(
+        "devIndicatorLabel",
+      );
+      expect(slice({ NODE_ENV: "development" })).not.toHaveProperty("devIndicatorLabel");
+    });
+  });
+
   describe("when a projection answers a key its schema does not declare", () => {
     it("refuses the boot, naming the module", () => {
       const leaking = defineBrowserConfig({

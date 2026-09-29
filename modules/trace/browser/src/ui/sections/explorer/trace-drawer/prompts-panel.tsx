@@ -1,4 +1,5 @@
 import { Badge, Box, Button, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { formatDuration } from "@langwatch/trace-browser-kit";
 import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
@@ -19,7 +20,6 @@ import {
   parseTracePromptIds,
   promptReferenceKey,
 } from "../../../../model/prompt-attributes.ts";
-import { Link } from "../../../blocks/link.tsx";
 import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";
 import { useSpansFull } from "../hooks/use-spans-full.ts";
 

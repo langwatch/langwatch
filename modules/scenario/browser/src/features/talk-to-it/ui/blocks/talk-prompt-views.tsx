@@ -1,4 +1,5 @@
-import { Button, Input, Link, Text, VStack } from "@chakra-ui/react";
+import { Button, Input, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 
 import type { TalkState } from "../../model/talk-to-it-machine.ts";
 

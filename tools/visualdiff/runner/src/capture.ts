@@ -15,6 +15,7 @@ import {
 } from "./protocol";
 import { StepRecorder, type Drained } from "./recorder";
 import { InFlightTracker, shouldIgnoreRequest } from "./settle";
+import { serveBuiltUi } from "./static-ui";
 
 /** Animations and carets are the largest source of pixel noise between two identical screens. */
 const FREEZE_CSS =
@@ -48,8 +49,49 @@ export const contextOptions = ({
 /** LOADING_WAIT_MILLIS bounds the wait for skeletons after the network settles. */
 const LOADING_WAIT_MILLIS = 5000;
 
+/** LOADING_POLL_MILLIS paces that wait: six pages polling every frame starve the renderer. */
+const LOADING_POLL_MILLIS = 100;
+
 /** SCREENSHOT_TIMEOUT_MILLIS covers a tall page, which the context's default timeout does not. */
 const SCREENSHOT_TIMEOUT_MILLIS = 20_000;
+
+/** EVALUATE_TIMEOUT_MILLIS bounds a page call with no timeout, so a wedged page never hangs. */
+const EVALUATE_TIMEOUT_MILLIS = 5_000;
+
+/** bounded settles to fallback when work takes longer than millis, or fails. */
+export const bounded = async <Value>({
+  work,
+  millis,
+  fallback,
+}: {
+  work: Promise<Value>;
+  millis: number;
+  fallback: Value;
+}): Promise<Value> => {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<Value>((done) => {
+    timer = setTimeout(() => done(fallback), millis);
+  });
+  try {
+    return await Promise.race([work.catch(() => fallback), late]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/** requestTiming renders where a late request spent its time, from the browser's own timing. */
+export const requestTiming = ({
+  request,
+  total,
+}: {
+  request: Pick<Request, "timing">;
+  total: number;
+}): string => {
+  const timing = request.timing();
+  const phase = (from: number, to: number): string =>
+    from >= 0 && to >= from ? `${Math.round(to - from)}ms` : "?";
+  return `total=${total}ms queued=${phase(0, timing.requestStart)} server=${phase(timing.requestStart, timing.responseStart)} body=${phase(timing.responseStart, timing.responseEnd)}`;
+};
 
 /** SettleOutcome is how one settle ended, for the caller's deadline alarm. */
 export interface SettleOutcome {
@@ -68,6 +110,8 @@ const isDocumentLoad = ({ request, page }: { request: Request; page: Page }): bo
 export class Side {
   private readonly recorder = new StepRecorder();
   private readonly tracker: InFlightTracker<Request>;
+  /** late are the requests a settle ran out on, and when each started, logged once they end. */
+  private readonly late = new Map<Request, number>();
 
   constructor(
     readonly name: string,
@@ -88,6 +132,7 @@ export class Side {
     });
     page.on("requestfinished", (request: Request) => {
       this.tracker.settled({ key: request, now: Date.now() });
+      this.lateEnded(request);
     });
     page.on("requestfailed", (request: Request) => this.requestFailed(request));
     page.on("response", (response: Response) => this.responded(response));
@@ -110,8 +155,20 @@ export class Side {
     await this.page.goto(this.baseUrl + path, { waitUntil: "commit", timeout: 20_000 });
   }
 
+  /** lateEnded logs where a request the deadline gave up on spent its time. */
+  private lateEnded(request: Request): void {
+    const startedAt = this.late.get(request);
+    if (startedAt === undefined) return;
+    this.late.delete(request);
+    note({
+      text: `${this.name} late ${request.method()} ${this.relative(request.url())} ${requestTiming({ request, total: Date.now() - startedAt })}`,
+      err: process.stderr,
+    });
+  }
+
   private requestFailed(request: Request): void {
     this.tracker.settled({ key: request, now: Date.now() });
+    this.lateEnded(request);
     const url = request.url();
     const errorText = request.failure()?.errorText ?? "";
     const failure = `FAIL ${request.method()} ${this.relative(url)} ${errorText}`;
@@ -134,9 +191,9 @@ export class Side {
 
   /** recordModuleFailure keeps a failed load of one of the page's own modules apart. */
   private recordModuleFailure({ request, failure }: { request: Request; failure: string }): void {
-    const origin = new URL(this.baseUrl).origin;
     const url = request.url();
     const resourceType = request.resourceType();
+    const origin = new URL(this.baseUrl).origin;
     if (!isModuleRequest({ url, resourceType, origin })) return;
     if (/net::ERR_ABORTED/.test(failure)) return;
     this.recorder.moduleFailure(failure);
@@ -155,18 +212,27 @@ export class Side {
       if (decision.quiet || decision.expired) break;
       await this.page.waitForTimeout(50);
     }
-    const inFlight = expired ? this.tracker.inFlight(Date.now()) : [];
+    const now = Date.now();
+    const waiting = expired ? this.tracker.waitingOn(now) : [];
+    const inFlight = waiting.map((request) => request.url);
+    for (const request of waiting) this.late.set(request.key, request.startedAt);
     if (expired) {
+      const listed = waiting.map(
+        (request) => `${this.relative(request.url)} (${now - request.startedAt}ms)`,
+      );
       note({
-        text: `${this.name} settle deadline at ${this.relative(this.page.url())}; still in flight: ${inFlight.map((url) => this.relative(url)).join(", ") || "none"}`,
+        text: `${this.name} settle deadline at ${this.relative(this.page.url())}; still in flight: ${listed.join(", ") || "none"}`,
         err: process.stderr,
       });
     }
     const stillLoading = await this.page
       .waitForFunction(
-        (selector: string) => document.querySelectorAll(selector).length === 0,
+        // An unmounted shell has no skeleton either; textContent forces no layout.
+        (selector: string) =>
+          document.querySelectorAll(selector).length === 0 &&
+          (document.body?.textContent ?? "").trim() !== "",
         LOADING_SELECTOR,
-        { timeout: LOADING_WAIT_MILLIS },
+        { timeout: LOADING_WAIT_MILLIS, polling: LOADING_POLL_MILLIS },
       )
       .then(
         () => false,
@@ -178,8 +244,19 @@ export class Side {
         err: process.stderr,
       });
     }
-    await this.page.addStyleTag({ content: FREEZE_CSS }).catch(() => undefined);
-    await this.page.evaluate(() => document.fonts?.ready).catch(() => undefined);
+    const millis = EVALUATE_TIMEOUT_MILLIS;
+    await bounded({
+      work: this.page.addStyleTag({ content: FREEZE_CSS }),
+      millis,
+      fallback: undefined,
+    });
+    await bounded({
+      work: this.page.evaluate(async () => {
+        await document.fonts?.ready;
+      }),
+      millis,
+      fallback: undefined,
+    });
     return { expired, inFlight, stillLoading };
   }
 
@@ -211,9 +288,11 @@ export class Side {
 
   async screenshot(file: string): Promise<void> {
     mkdirSync(dirname(file), { recursive: true });
-    const height = await this.page
-      .evaluate(() => document.documentElement.scrollHeight)
-      .catch(() => 0);
+    const height = await bounded({
+      work: this.page.evaluate(() => document.documentElement.scrollHeight),
+      millis: EVALUATE_TIMEOUT_MILLIS,
+      fallback: 0,
+    });
     const viewport = this.page.viewportSize();
     const mask = [this.page.locator("time"), this.page.getByText(RELATIVE_TIME)];
     if (height > MAX_SCREENSHOT_HEIGHT && viewport) {
@@ -235,6 +314,32 @@ export class Side {
     });
   }
 }
+
+/**
+ * FULFILLED_SHELL: a document the runner fulfils has no address space, so Chromium reads it as
+ * public and refuses its own stack's websocket as a local-network request.
+ */
+const FULFILLED_SHELL = "--disable-features=LocalNetworkAccessChecks";
+
+/** builtAssets serves a side's prebuilt UI, or says why the side stays on its dev server. */
+const builtAssets = async ({
+  context,
+  side,
+}: {
+  context: BrowserContext;
+  side: PlanSide;
+}): Promise<void> => {
+  const dir = side.staticDir ?? "";
+  try {
+    await serveBuiltUi({ context, baseUrl: side.baseUrl, dir });
+    note({ text: `${side.name}: serving the prebuilt UI from ${dir}`, err: process.stderr });
+  } catch (thrown) {
+    note({
+      text: `${side.name}: the prebuilt UI could not be served, capturing from the dev server: ${String(thrown)}`,
+      err: process.stderr,
+    });
+  }
+};
 
 /**
  * SideBrowser is one stack's browser and its one signed-in context. Every page
@@ -276,7 +381,9 @@ export const openSideBrowser = async ({
   storageState?: string;
   frozenTime?: number;
 }): Promise<SideBrowser> => {
-  const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
+  const args = ["--disable-dev-shm-usage"];
+  if (side.staticDir !== undefined) args.push(FULFILLED_SHELL);
+  const browser = await chromium.launch({ args });
   const context = await browser.newContext(contextOptions({ viewport, storageState }));
   if (frozenTime !== undefined) await context.clock.setFixedTime(frozenTime);
   await context.addInitScript(() => {
@@ -287,6 +394,7 @@ export const openSideBrowser = async ({
     }
   });
   context.setDefaultTimeout(10_000);
+  if (side.staticDir !== undefined) await builtAssets({ context, side });
   return new SideBrowser(side, browser, context, settle);
 };
 

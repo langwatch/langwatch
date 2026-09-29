@@ -13,6 +13,7 @@ Feature: Customer.io nurturing integration
   #   [gone] ee/billing/nurturing/hooks/promptCreation.unit.test.ts
   #   [gone] ee/billing/nurturing/hooks/promptCreation.integration.test.ts
   #   modules/onboarding/browser/src/behavior/__tests__/use-attribution-capture.unit.test.ts
+  #   enterprise/modules/billing/process/src/app/__tests__/billing-app.unit.test.ts
 
   All scheduling, sequencing, and email delivery is owned by Customer.io.
   LangWatch nurturing hooks fire-and-forget data through the Pipelines API.
@@ -217,6 +218,19 @@ Feature: Customer.io nurturing integration
     When the workflow is saved
     Then the user is identified in Customer.io with updated workflow_count
     And a "workflow_created" event is tracked with workflow_id and project_id
+
+  @unit
+  Scenario: Billing records a created workflow for nurturing
+    Given Customer.io nurturing is configured
+    When another module records a created workflow through billing
+    Then the user is identified in Customer.io with updated workflow_count
+    And a "workflow_created" event is tracked with workflow_id and project_id
+
+  @unit
+  Scenario: A Customer.io failure never fails recording a created workflow
+    Given Customer.io nurturing is configured and unreachable
+    When another module records a created workflow through billing
+    Then recording the workflow resolves
 
   @integration
   Scenario: Scenario creation updates scenario count and fires event

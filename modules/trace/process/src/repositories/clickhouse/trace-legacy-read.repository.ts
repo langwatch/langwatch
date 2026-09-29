@@ -56,6 +56,7 @@ import {
 } from "../../rules/trace-evaluation-mapping.rules.ts";
 import { mapEventAttrsToEvent } from "../../rules/trace-event-attribute-mapping.rules.ts";
 import { type EventSpanRow } from "../../rules/trace-event-attribute-mapping.rules.ts";
+import { translateLegacyFilters } from "../../rules/trace-legacy-filter-conditions.rules.ts";
 import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
 import {
@@ -332,16 +333,6 @@ export class ClickHouseClientUnavailableError extends Error {
   }
 }
 
-/** The analytics filter vocabulary translated into a ClickHouse predicate. */
-export type TraceLegacyFilterConditions = (
-  filters: Record<string, unknown>,
-  window: { startDate: number; endDate: number },
-) => {
-  conditions: string[];
-  params: Record<string, unknown>;
-  hasUnsupportedFilters: boolean;
-};
-
 const retentionFloorLogger = createLogger("langwatch:clickhouse:retention-floor");
 
 /** What a composition root gives the legacy trace read over ClickHouse. */
@@ -349,8 +340,6 @@ export interface ClickHouseTraceLegacyReadOptions {
   traceCanonicalisation: TraceCanonicalisationService;
   /** The process's tenant-keyed connection; absent, every read refuses. */
   resolveClickHouseClient?: ((tenantId: string) => Promise<TraceClickHouseClient>) | undefined;
-  /** The analytics filter translator; absent, a FILTERED list refuses. */
-  filterConditions?: TraceLegacyFilterConditions | undefined;
   resolveTraceSpans?: ResolveTraceSpansFn | undefined;
   resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
   /**
@@ -692,7 +681,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private readonly resolveClickHouseClient:
     | ((tenantId: string) => Promise<TraceClickHouseClient>)
     | undefined;
-  private readonly filterConditions: TraceLegacyFilterConditions | undefined;
   private readonly annotations: AnnotationApi | undefined;
   private readonly traceCanonicalisation: TraceCanonicalisationService;
 
@@ -701,7 +689,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   constructor(options: ClickHouseTraceLegacyReadOptions) {
     super();
     this.resolveClickHouseClient = options.resolveClickHouseClient;
-    this.filterConditions = options.filterConditions;
     this.annotations = options.annotations;
     this.traceCanonicalisation = options.traceCanonicalisation;
     this.resolveTraceSpans = options.resolveTraceSpans;
@@ -728,13 +715,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     if (Object.keys(filters).length === 0) {
       return { conditions: [], params: {}, hasUnsupportedFilters: false };
     }
-    const translate = this.filterConditions;
-    if (!translate) {
-      throw new Error(
-        "This process composed no analytics filter translator, so a filtered trace list cannot be narrowed. Listing every trace instead would answer a narrowed question with the whole project.",
-      );
-    }
-    return translate(filters, window);
+    return translateLegacyFilters({ filters, window });
   }
 
   private async resolveClient(projectId: string): Promise<TraceClickHouseClient> {

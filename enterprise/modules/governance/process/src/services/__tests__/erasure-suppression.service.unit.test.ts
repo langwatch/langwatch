@@ -32,7 +32,7 @@ function serviceOver(input: {
     suppressions: PrismaErasedIdentifierSuppressionRepository.create(
       prismaDouble({ erasedIdentifierSuppression: { findMany } }),
     ),
-    tenantHistory: MemoryGovernanceRepositories.create().tenantHistory,
+    snapshot: MemoryGovernanceRepositories.create().suppressionSnapshot,
     erasureSecret,
     logger,
   });

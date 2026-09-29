@@ -4,6 +4,7 @@
  * team is what ends the wait.
  */
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Clock3 } from "lucide-react";
 
@@ -45,7 +46,9 @@ export function TeamAccessWaiting({
               Check access
             </Button>
             <Button variant="outline" width="full" minHeight="44px" asChild>
-              <a href="/">Back to home</a>
+              <Link unstyled href="/">
+                Back to home
+              </Link>
             </Button>
             <Button variant="outline" width="full" minHeight="44px" onClick={() => host.signOut()}>
               Sign out

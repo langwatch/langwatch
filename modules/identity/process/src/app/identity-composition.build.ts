@@ -6,18 +6,12 @@ import type { EventSourcing } from "@langwatch/eventing";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
-  SCIM_SYNC_PIPELINE_NAME,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
 import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
 import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
-import type { ScimSyncEvent } from "../eventing/scim-sync-state.projection.ts";
 import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
-import {
-  EventingScimSyncActivityRepository,
-  type ScimSyncEventReads,
-} from "../repositories/eventing/eventing.scim-sync-activity.repository.ts";
 import {
   EventingSsoConnectionHistoryRepository,
   type SsoConnectionEventReads,
@@ -96,18 +90,6 @@ const JOIN_REQUEST_COMMAND_NAMES = [
   "expireJoin",
 ] as const;
 
-/**
- * The five an Enterprise directory's push states, and the operator's re-drive.
- */
-const SCIM_SYNC_COMMAND_NAMES = [
-  "issueScimToken",
-  "recordScimUserPush",
-  "recordScimGroupMapping",
-  "recordScimApplyFailure",
-  "redriveScimApply",
-  "revokeScimSync",
-] as const;
-
 /** The fifteen a connection has. */
 const SSO_CONNECTION_COMMAND_NAMES = [
   "registerConnection",
@@ -127,7 +109,7 @@ const SSO_CONNECTION_COMMAND_NAMES = [
   "grandfatherConnection",
 ] as const;
 
-/** The four pipelines and the verbs each one is expected to publish. */
+/** The three pipelines and the verbs each one is expected to publish. */
 const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<
   string,
   readonly string[]
@@ -135,11 +117,10 @@ const EXPECTED_COMMANDS: ReadonlyMap<string, readonly string[]> = new Map<
   [IDENTITY_PIPELINE_NAME, IDENTITY_COMMAND_NAMES],
   [JOIN_REQUEST_PIPELINE_NAME, JOIN_REQUEST_COMMAND_NAMES],
   [SSO_CONNECTION_PIPELINE_NAME, SSO_CONNECTION_COMMAND_NAMES],
-  [SCIM_SYNC_PIPELINE_NAME, SCIM_SYNC_COMMAND_NAMES],
 ]);
 
 /**
- * Identity's command senders, handed over by each of its four eventing modules as the process
+ * Identity's command senders, handed over by each of its three eventing modules as the process
  * connects them. A pipeline not yet connected answers null: not commandable on this process.
  */
 export class ConnectedIdentityEventing implements IdentityEventing {
@@ -195,20 +176,6 @@ function ssoConnectionHistoryStore(options: {
   };
 }
 
-/** How the directory-sync activity reaches this process's log, resolved per read. */
-function scimSyncActivityStore(options: {
-  eventing: EventSourcing;
-}): () => Promise<ScimSyncEventReads> {
-  const { eventing } = options;
-  return async () => {
-    const store = eventing.getEventStore<ScimSyncEvent>();
-    if (!store) {
-      throw new Error("scim sync activity cannot read: the event-sourcing stack is unavailable");
-    }
-    return store;
-  };
-}
-
 /** What this process hands `IdentityApp` at boot, built from its own rows, members and config. */
 export function buildIdentityInfrastructure(input: {
   repositories: Pick<
@@ -218,7 +185,6 @@ export function buildIdentityInfrastructure(input: {
     | "secretCarry"
     | "joinRequestAudience"
     | "ssoPlatformOperators"
-    | "scimSyncs"
   >;
   eventing: EventSourcing;
   identityEventing: ConnectedIdentityEventing;
@@ -253,12 +219,6 @@ export function buildIdentityInfrastructure(input: {
     ssoConnectionHistory: eventing.isEnabled
       ? EventingSsoConnectionHistoryRepository.create({
           eventStore: ssoConnectionHistoryStore({ eventing }),
-        })
-      : null,
-    scimSyncs: repositories.scimSyncs,
-    scimSyncActivity: eventing.isEnabled
-      ? EventingScimSyncActivityRepository.create({
-          eventStore: scimSyncActivityStore({ eventing }),
         })
       : null,
   };

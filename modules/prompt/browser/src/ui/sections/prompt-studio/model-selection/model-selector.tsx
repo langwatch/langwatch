@@ -8,6 +8,7 @@ import {
   Skeleton,
   Text,
 } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -25,7 +26,6 @@ import {
   MODEL_ICON_SIZE_SM,
 } from "../../../../model/model-selection-constants.ts";
 import { titleCase } from "../../../../model/string-casing.ts";
-import { Link } from "../../../../ui/elements/prompt-link.tsx";
 import { type modelProviderIcons, ProviderIconGlyph } from "./model-provider-icons.tsx";
 import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 

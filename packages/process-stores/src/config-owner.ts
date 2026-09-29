@@ -1,3 +1,4 @@
+import { PRIVATE_ROUTE_ENV_PREFIX } from "@langwatch/clickhouse-client";
 import { Config, type ProcessConfigOf } from "@langwatch/config";
 import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 import { z } from "zod";
@@ -53,6 +54,8 @@ export const storesOwner = {
   secrets: {
     database: Secret.load("DATABASE_URL", { optional: true }),
     clickhouse: Secret.load("CLICKHOUSE_URL", { optional: true }),
+    /** Main's `CLICKHOUSE_URL__<label>__<orgId>` family: each organization's own server. */
+    clickhouseRoutes: Secret.family(PRIVATE_ROUTE_ENV_PREFIX),
     redis: Secret.load("REDIS_URL", { optional: true }),
     encryption: credentialsSecret,
     encryptionFallback: sessionSecret,

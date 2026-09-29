@@ -9,6 +9,7 @@ import {
   type EventSubscriberDefinition,
   EventUtils,
   type Projection,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type {
@@ -44,6 +45,8 @@ export interface MetricProcessingPipelineDeps {
   metricCommandShardCount: number;
   /** Cross-pipeline dispatchers (e.g. coding-agent metric-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
+  /** Each tenant's retention, stamped on the metric rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
 }
 
 export interface MetricProcessingServiceOptions {
@@ -51,6 +54,8 @@ export interface MetricProcessingServiceOptions {
   defaultRetentionDays: number;
   metricCommandShardCount: number;
   subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
+  /** Each tenant's retention, stamped on the metric rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
 }
 
 export type MetricProcessingPipeline = StaticPipelineDefinition<
@@ -91,6 +96,7 @@ function createMetricProcessingPipeline(
   for (const subscriber of deps.subscribers ?? []) {
     builder = builder.withEventSubscriber(subscriber.name, subscriber);
   }
+  if (deps.retention) builder = builder.withRetention(deps.retention);
 
   return builder
     .withCommand("recordDataPoint", RecordMetricDataPointCommand, {
@@ -129,6 +135,7 @@ export class MetricProcessingService {
       metricTimeRollupAppendStore: MetricTimeRollupAppendStore.create(repository, retentionDays),
       metricCommandShardCount: this.options.metricCommandShardCount,
       subscribers: this.options.subscribers,
+      ...(this.options.retention === undefined ? {} : { retention: this.options.retention }),
     });
   }
 }

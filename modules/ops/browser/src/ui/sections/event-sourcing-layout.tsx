@@ -1,6 +1,7 @@
 /** Frame for /ops/event-sourcing/* pages; section rail and content column. */
 
 import { Badge, Box, Container, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import {
   Activity,
   CalendarClock,
@@ -14,7 +15,6 @@ import {
 import type { PropsWithChildren, ReactNode } from "react";
 
 import { api } from "../../behavior/ops-api.ts";
-import { Link } from "../elements/ops-link.tsx";
 
 const SECTION_LABEL = "Event Sourcing";
 

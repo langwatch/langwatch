@@ -38,6 +38,7 @@ export type BrowserNavigationReading = {
   pathname: string;
   search: string;
   projectParam: string | undefined;
+  projectSlugFromAddress: string | undefined;
   catchAllPath: string;
   routePattern: string;
   deployment: NavigationDeployment;
@@ -154,6 +155,10 @@ export function browserNavigationHosts(port: typeof NavigationHost): BrowserNavi
 
     projectParam(): string | undefined {
       return this.reading.projectParam;
+    }
+
+    projectSlugFromAddress(): string | undefined {
+      return this.reading.projectSlugFromAddress;
     }
 
     catchAllPath(): string {

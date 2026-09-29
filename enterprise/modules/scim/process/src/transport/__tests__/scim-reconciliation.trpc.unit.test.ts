@@ -6,10 +6,8 @@
  * single sign-on without managing it (ADR-126).
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type {
-  OrganizationSsoConnection,
-  ScimSyncActivityEntry,
-} from "@langwatch/identity-contract";
+import type { ScimSyncActivityEntry } from "@langwatch/enterprise-scim-contract";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 

@@ -50,6 +50,18 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     return rows.map(rowOf);
   }
 
+  async findAllSeatsRaised({
+    organizationId,
+  }: {
+    organizationId?: string;
+  }): Promise<IssuedLicenseRecord[]> {
+    const rows = await this.prisma.issuedLicense.findMany({
+      where: { seatsRaisedFrom: { not: null }, ...(organizationId ? { organizationId } : {}) },
+      orderBy: { issuedAt: "asc" },
+    });
+    return rows.map(rowOf);
+  }
+
   async findAllBoundToInstance(instanceId: string): Promise<IssuedLicenseRecord[]> {
     const rows = await this.prisma.issuedLicense.findMany({
       where: { instanceId, revokedAt: null },

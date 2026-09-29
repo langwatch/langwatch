@@ -300,7 +300,6 @@ const LEGACY_UNBOUND: string[] = [
   // explicit and file-scoped while #3338 drives this list back to empty; new
   // feature files remain enforced by default.
   "specs/home/home-views.feature",
-  "specs/home/learning-resources.feature",
   "specs/langy/langy-api-key-provisioning.feature",
   "specs/langy/langy-capability-cards.feature",
   "specs/langy/langy-cli-tool-envelope.feature",

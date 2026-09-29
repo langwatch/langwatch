@@ -1,12 +1,12 @@
 /**
  * Product-native scope in top bar. Groups from useProjectPickItems (host's
- * workspace graph); create-project entry not offered. Spec:
+ * workspace graph), with a per-team "New Project" entry. Spec:
  * specs/navigation/product-switcher-navigation.feature
  */
 
 import { Badge, Box, Button, HStack, Portal, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 
 import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
@@ -63,6 +63,13 @@ function ProjectScopeMenu() {
 
   if (!organization || !project) return null;
 
+  const onCreateProjectForTeam = ({ teamId, orgId }: { teamId: string; orgId: string }) =>
+    host.openDrawer("createProject", {
+      navigateOnCreate: "true",
+      defaultTeamId: teamId,
+      organizationId: orgId,
+    });
+
   const projectCount = groups.reduce((count, group) => count + group.projects.length, 0);
   const showTeamHeaders = groups.length > 1;
 
@@ -75,7 +82,7 @@ function ProjectScopeMenu() {
           currentProjectId={project.id}
           currentProjectName={project.name}
           showTeamHeaders={showTeamHeaders}
-          onCreateProjectForTeam={void 0}
+          onCreateProjectForTeam={onCreateProjectForTeam}
         />
       ) : (
         <ProjectMenu
@@ -83,6 +90,7 @@ function ProjectScopeMenu() {
           currentProjectId={project.id}
           currentProjectName={project.name}
           showTeamHeaders={showTeamHeaders}
+          onCreateProjectForTeam={onCreateProjectForTeam}
         />
       )}
     </>
@@ -95,11 +103,13 @@ function ProjectMenu({
   currentProjectId,
   currentProjectName,
   showTeamHeaders,
+  onCreateProjectForTeam,
 }: {
   groups: ProjectPickGroup[];
   currentProjectId: string;
   currentProjectName: string;
   showTeamHeaders: boolean;
+  onCreateProjectForTeam: ({ teamId, orgId }: { teamId: string; orgId: string }) => void;
 }) {
   return (
     <Menu.Root>
@@ -143,6 +153,15 @@ function ProjectMenu({
                   </NavigationLink>
                 </Menu.Item>
               ))}
+              {team.canCreateProject && (
+                <Menu.Item
+                  value={`new-project-${team.teamId}`}
+                  fontSize="13px"
+                  onClick={() => onCreateProjectForTeam({ teamId: team.teamId, orgId: team.orgId })}
+                >
+                  <Plus size={13} /> New Project
+                </Menu.Item>
+              )}
             </Menu.ItemGroup>
           ))}
         </Menu.Content>

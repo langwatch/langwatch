@@ -1,8 +1,9 @@
 import type { ScopedSecrets } from "@langwatch/secrets";
 
+import { clickhouseRoutesOf } from "./clickhouse-routes.ts";
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
-import type { ObjectStorageConfig, ProcessConfig } from "./config.ts";
-import { createProcessMembers, type ProcessMemberSource } from "./create-members.ts";
+import type { ClickHousePrivateRoute, ObjectStorageConfig, ProcessConfig } from "./config.ts";
+import { createProcessStores, type ProcessStores } from "./create-members.ts";
 import type { PipelineParticipation } from "./pipeline-selection.ts";
 
 /** The documented single-replica root, when a filesystem deployment names none. */
@@ -83,11 +84,24 @@ function processConfigOf(options: {
     clickhouse: string | undefined;
     redis: string | undefined;
   }>;
+  clickhouseRoutes: readonly ClickHousePrivateRoute[];
   encryption: string | undefined;
   storage: StorageSecrets;
   production: boolean;
 }): ProcessConfig {
-  const { name, config, pipelines, urls, encryption, storage, production } = options;
+  const { name, config, pipelines, urls, clickhouseRoutes, encryption, storage, production } =
+    options;
+  // A deployment whose every tenant is private names no shared URL, and still has ClickHouse.
+  const clickhouse =
+    urls.clickhouse || clickhouseRoutes.length > 0
+      ? {
+          clickhouse: {
+            ...(urls.clickhouse ? { url: urls.clickhouse } : {}),
+            ...(clickhouseRoutes.length > 0 ? { privateRoutes: clickhouseRoutes } : {}),
+            poolSizing: config.clickhousePool,
+          },
+        }
+      : {};
   return {
     processName: name,
     encryptionKey: encryption ?? "",
@@ -95,9 +109,7 @@ function processConfigOf(options: {
     rateLimit: config.rateLimit,
     mail: { provider: "off" },
     ...(urls.database ? { database: { url: urls.database } } : {}),
-    ...(urls.clickhouse
-      ? { clickhouse: { url: urls.clickhouse, poolSizing: config.clickhousePool } }
-      : {}),
+    ...clickhouse,
     ...(urls.redis ? { redis: { url: urls.redis } } : {}),
     eventing: pipelines.configure(config.defaultRetentionDays),
     objectStorage: objectStorageConfig({
@@ -115,25 +127,28 @@ export function openProcessStores(options: {
   secrets: ScopedSecrets;
   pipelines: PipelineParticipation;
   production: boolean;
-}): Promise<ProcessMemberSource> {
+}): Promise<ProcessStores> {
   const { name, config, secrets, pipelines, production } = options;
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
-      secrets.into(storesOwner.secrets.redis, (redis) =>
-        secrets.into(storesOwner.secrets.encryption, (credentials) =>
-          secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
-            withStorageSecrets(secrets, (storage) =>
-              createProcessMembers({
-                config: processConfigOf({
-                  name,
-                  config,
-                  pipelines,
-                  urls: { database, clickhouse, redis },
-                  encryption: credentials ?? session,
-                  storage,
-                  production,
+      secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
+        secrets.into(storesOwner.secrets.redis, (redis) =>
+          secrets.into(storesOwner.secrets.encryption, (credentials) =>
+            secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+              withStorageSecrets(secrets, (storage) =>
+                createProcessStores({
+                  config: processConfigOf({
+                    name,
+                    config,
+                    pipelines,
+                    urls: { database, clickhouse, redis },
+                    clickhouseRoutes: clickhouseRoutesOf(routes),
+                    encryption: credentials ?? session,
+                    storage,
+                    production,
+                  }),
                 }),
-              }),
+              ),
             ),
           ),
         ),

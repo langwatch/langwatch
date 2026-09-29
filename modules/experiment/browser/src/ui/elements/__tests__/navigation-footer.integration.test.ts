@@ -37,7 +37,6 @@ describe("useMessagesNavigationFooter()", () => {
           expect.objectContaining({
             query: expect.objectContaining({ project: "my-project" }),
           }),
-          undefined,
           expect.any(Object),
         );
       });
@@ -53,7 +52,6 @@ describe("useMessagesNavigationFooter()", () => {
           expect.objectContaining({
             query: expect.objectContaining({ pageOffset: "25" }),
           }),
-          undefined,
           expect.any(Object),
         );
       });
@@ -71,7 +69,6 @@ describe("useMessagesNavigationFooter()", () => {
           expect.objectContaining({
             query: expect.objectContaining({ project: "my-project" }),
           }),
-          undefined,
           expect.any(Object),
         );
       });

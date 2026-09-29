@@ -487,7 +487,7 @@ function pricedSpendCommandData(input: GatewayPricedSpend): Record<string, unkno
     rate_version: input.rateVersion,
     duration_ms: 0,
     organization_id: input.organizationId,
-    virtual_key_id: "",
+    virtual_key_id: input.virtualKeyId ?? "",
     end_user_id: "",
     trace_id: "",
     request_type: input.requestType,

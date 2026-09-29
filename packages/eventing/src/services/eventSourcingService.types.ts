@@ -4,6 +4,7 @@ import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event, EventOrderingStrategy } from "../domain/types.ts";
 import type { KillSwitch } from "../kill-switch/index.ts";
+import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck.ts";
 import type {
@@ -113,6 +114,11 @@ export interface EventSourcingServiceOptions<
    * Uses base Event type because the registry receives events from all pipelines.
    */
   globalRegistry?: ProjectionRegistry<Event>;
+  /**
+   * The process store whose outbox records a lane that failed to stage, so it
+   * is re-driven rather than dropped. Absent, the failure is only logged.
+   */
+  handoffStore?: ProcessStore;
   /**
    * Process role — controls whether queue consumers are started.
    * "web": skip queue consumers (only dispatch to queues)

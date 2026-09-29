@@ -35,9 +35,12 @@ export default function IdentityLookupView() {
   );
 
   const setOpenPerson = (userId: string | null) => {
-    router.replace({ query: { ...router.query, person: userId ?? undefined } }, undefined, {
-      shallow: true,
-    });
+    router.replace(
+      { query: { ...router.query, person: userId ?? undefined } },
+      {
+        shallow: true,
+      },
+    );
   };
 
   return (

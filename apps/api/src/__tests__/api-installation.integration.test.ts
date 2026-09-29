@@ -497,6 +497,7 @@ describe("the api process installation", () => {
         "governance_ingestion_templates_archive",
         "governance_ingestion_keys_list",
         "governance_ingestion_keys_mint",
+        "governance_ingestion_keys_revoke",
       ]);
     } finally {
       await runtime.stop();

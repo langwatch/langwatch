@@ -13,7 +13,11 @@ import {
 import type { EventingParticipation } from "@langwatch/kernel";
 
 import type { BillingApp } from "../app/billing.app.ts";
+import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
+import type { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
+import { BillableEventsMeterProjection } from "./billable-events-meter.projection.ts";
+import { BillingMeterDispatchSubscriber } from "./billing-meter-dispatch.subscriber.ts";
 import {
   ReportUsageForMonthCommandHandler,
   type ReportUsageForMonthCommandDeps,
@@ -26,22 +30,40 @@ export type BillingReportingDefinition = StaticPipelineDefinition<
   { name: "reportUsageForMonth"; payload: ReportUsageForMonthCommandData }
 >;
 
+/** The SaaS billable-events meter and the tenant attribution it bills by. */
+export type BillingReportingMeter = Readonly<{
+  meter: BillableEventsMeterRepository;
+  organizations: BillingTenantOrganizationService;
+}>;
+
 /**
- * Command-only billing pipeline. selfDispatch loop closes at registration
- * time, not at first dispatch, to catch misconfiguration at boot.
+ * The monthly roll-up's pipeline. The self-dispatch loop closes at registration,
+ * not at first dispatch; on SaaS it also declares the billable-events meter, whose
+ * dispatch subscriber reports through the same command (main registered it on SaaS only).
  */
 export class BillingReportingPipeline {
-  static create(
-    deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
-  ): BillingReportingPipeline {
-    return new BillingReportingPipeline(deps);
+  static create({
+    meter,
+    ...deps
+  }: Omit<ReportUsageForMonthCommandDeps, "selfDispatch"> & {
+    meter?: BillingReportingMeter | undefined;
+  }): BillingReportingPipeline {
+    return new BillingReportingPipeline(deps, meter);
   }
 
   private send: ((data: ReportUsageForMonthCommandData) => Promise<void>) | undefined;
 
   private constructor(
     private readonly deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
+    private readonly meter: BillingReportingMeter | undefined,
   ) {}
+
+  private dispatch(data: ReportUsageForMonthCommandData): Promise<void> {
+    if (!this.send) {
+      throw new Error("Billing reporting cannot self-dispatch before its pipeline is registered.");
+    }
+    return this.send(data);
+  }
 
   /** The worker resolves the reporter now, so a keyless SaaS worker refuses at boot, as on main. */
   buildProcessing({
@@ -52,17 +74,10 @@ export class BillingReportingPipeline {
     if (participation === "consume") this.deps.getUsageReportingService();
     const reportUsageForMonthCommand = ReportUsageForMonthCommandHandler.create({
       ...this.deps,
-      selfDispatch: (data) => {
-        if (!this.send) {
-          throw new Error(
-            "Billing reporting cannot self-dispatch before its pipeline is registered.",
-          );
-        }
-        return this.send(data);
-      },
+      selfDispatch: (data) => this.dispatch(data),
     });
 
-    return definePipeline({
+    const pipeline = definePipeline({
       name: BILLING_REPORTING_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: "billing_report",
@@ -81,7 +96,15 @@ export class BillingReportingPipeline {
             ttlMs: 310_000, // 310s > 300s delay; replace preserves self-dispatch
           },
         },
-      })
+      });
+    if (!this.meter) return pipeline.build();
+    return pipeline
+      .withGlobalMapProjection(BillableEventsMeterProjection.create(this.meter).build(), [
+        BillingMeterDispatchSubscriber.create({
+          organizations: this.meter.organizations,
+          getDispatch: () => (data) => this.dispatch(data),
+        }).build(),
+      ])
       .build();
   }
 

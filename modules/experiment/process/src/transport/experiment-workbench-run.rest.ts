@@ -36,6 +36,6 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
   .withOutput(abortExperimentRunResponseSchema)
   .withDocs({ hide: true })
-  .handle(({ app, input }) => app.abortWorkbenchRun(input))
+  .handle(({ app, input, actor }) => app.abortWorkbenchRun(input, actor))
 
   .build();

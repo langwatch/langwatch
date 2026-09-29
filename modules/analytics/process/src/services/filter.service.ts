@@ -1,7 +1,4 @@
-import type {
-  AnalyticsFilterValue as FilterParam,
-  FilterField,
-} from "@langwatch/analytics-contract";
+import type { FilterField } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
@@ -9,6 +6,7 @@ import { getLangWatchTracer } from "langwatch";
 import type {
   FilterOption,
   FilterOptionsRepository,
+  FindFilterOptionsInput,
 } from "../repositories/filter-options.repository.ts";
 
 export type GetFilterOptionsInput = {
@@ -19,7 +17,7 @@ export type GetFilterOptionsInput = {
   subkey?: string;
   startDate: number;
   endDate: number;
-  scopeFilters?: Partial<Record<FilterField, FilterParam>>;
+  scope?: FindFilterOptionsInput["scope"];
 };
 
 /**
@@ -75,7 +73,7 @@ export class FilterService {
             subkey: input.subkey,
             startDate: input.startDate,
             endDate: input.endDate,
-            scopeFilters: input.scopeFilters,
+            ...(input.scope ? { scope: input.scope } : {}),
           });
 
           span.setAttribute("clickhouse.result_count", filterOptions.length);

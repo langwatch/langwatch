@@ -1,4 +1,4 @@
-import type { RestIdentity } from "@langwatch/api/rest";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 /**
  * The licensing feature's application: what both of its doors call. It holds every service and
  * port the feature's api files reach, and it is the one typed thing a transport is given.
@@ -45,21 +45,35 @@ import {
   type IssuedLicensePage,
   type LicenseStatus,
   type PlanInfo,
+  type LicenseSeatChange,
   type SeatChangeResult,
   type SignedIssuedLicense,
   type StoreLicenseResult,
-  type GenerateLicenseInput,
+  type GenerateLicenseKeyInput,
+  LicenseSigningNotConfiguredError,
   type GenerateLicenseOutput,
 } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import {
+  reads,
+  type Encryption,
+  type MembersRead,
+  type RateLimiter,
+} from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import { HttpConnectGatewayChannel } from "../channels/http/http.connect-gateway.channel.ts";
 import { HttpConnectLicenseChannel } from "../channels/http/http.connect-license.channel.ts";
+import {
+  type ActivationCodeDatabase,
+  PrismaActivationCodeRepository,
+} from "../repositories/prisma/prisma.activation-code.repository.ts";
 import {
   type ConnectOrganizationDatabase,
   PrismaConnectOrganizationRepository,
@@ -68,13 +82,25 @@ import {
   type InstanceIdentityDatabase,
   PrismaInstanceIdentityRepository,
 } from "../repositories/prisma/prisma.instance-identity.repository.ts";
+import {
+  type IssuedLicenseDatabase,
+  PrismaIssuedLicenseRepository,
+} from "../repositories/prisma/prisma.issued-license.repository.ts";
 import { PrismaOrganizationLicenseRepository } from "../repositories/prisma/prisma.organization-license.repository.ts";
+import {
+  PrismaSelfHostedInstanceRepository,
+  type SelfHostedInstanceDatabase,
+} from "../repositories/prisma/prisma.self-hosted-instance.repository.ts";
+import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
+import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
 import { ActivationCodeService } from "../services/activation-code.service.ts";
 import { ConnectCredentialService } from "../services/connect-credential.service.ts";
 import { ConnectInstallService } from "../services/connect-install.service.ts";
 import { ConnectSpendBufferService } from "../services/connect-spend-buffer.service.ts";
+import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
+import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
 import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { LicenseRefreshService } from "../services/license-refresh.service.ts";
@@ -88,6 +114,7 @@ import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
 import type {
   ConnectInstallInfrastructure,
+  LicenseCustomers,
   HostedServicesInfrastructure,
   LicenseCryptography,
   SelfHostedInstancesInfrastructure,
@@ -134,11 +161,11 @@ export type LicensingInfrastructure = Readonly<{
    */
   registry?: LicenseRegistryInfrastructure;
   /**
-   * The hosted end of Connect (ADR-156, section 5). Only LangWatch Cloud
-   * composes one; everywhere else the hosted operations refuse by name.
+   * The hosted end of Connect (ADR-156, section 5), composed from its owners on
+   * every deployment; each licence's entitlements still gate its services.
    */
   hosted?: HostedServicesInfrastructure;
-  /** The registry of self-hosted installs (ADR-156, section 10), on Cloud only. */
+  /** The registry of self-hosted installs (ADR-156, section 10); else derived from the stores. */
   instances?: SelfHostedInstancesInfrastructure;
   /**
    * The install end of Connect (ADR-156, section 9). Every deployment has one;
@@ -167,7 +194,9 @@ export type LicensingRuntime = Readonly<
  */
 type LicensingProcessMembers = Readonly<{ isSaas: boolean; serviceVersion: string }> &
   (
-    | (MembersRead<readonly ["prisma", "logger"]> & { infrastructure?: never })
+    | (MembersRead<readonly ["prisma", "logger", "encryption", "rateLimiter"]> & {
+        infrastructure?: never;
+      })
     | Readonly<{ prisma?: never; logger?: LicenseLogger; infrastructure: LicensingInfrastructure }>
   );
 
@@ -184,12 +213,26 @@ export class LicensingApp implements LicensingApiContract {
     gateway: GatewayApi,
     /** Whose memberships a licence's seats are counted from. */
     organizations: OrganizationApi,
+    /** The judge a hosted classify call reaches, its price, and where its spend is recorded. */
+    instantEval: InstantEvalApi,
+    /** Whose team a hosted caller's project belongs to, for the budgets that apply to it. */
+    projects: ProjectApi,
   };
   static readonly config = licensingConfig;
-  /** `LANGWATCH_LICENSE_KEY` has one owner: SSO's gate asks this module, never the secret. */
-  static readonly secrets = { instanceLicenseKey: licensingSecrets.instanceLicenseKey } as const;
+  /**
+   * Each secret has one owner: SSO's gate asks this module for `LANGWATCH_LICENSE_KEY`, and
+   * every licence LangWatch issues is signed here with `LANGWATCH_LICENSE_PRIVATE_KEY`.
+   */
+  static readonly secrets = {
+    instanceLicenseKey: licensingSecrets.instanceLicenseKey,
+    licensePrivateKey: licensingSecrets.licensePrivateKey,
+  } as const;
   /** `isSaas` and `serviceVersion` are the process's own facts, drilled in. */
-  static readonly reads = [...reads("prisma", "logger"), "isSaas", "serviceVersion"] as const;
+  static readonly reads = [
+    ...reads("prisma", "logger", "encryption", "rateLimiter"),
+    "isSaas",
+    "serviceVersion",
+  ] as const;
 
   readonly #service: LicenseService;
   readonly #entitlements: LicensingEntitlementSourceService;
@@ -202,12 +245,12 @@ export class LicensingApp implements LicensingApiContract {
   readonly #activation: ActivationCodeService;
   readonly #hosted: HostedServicesService;
   readonly #hostedSpend: ConnectSpendBufferService;
-  readonly #hostedDoor: RestIdentity | undefined;
   readonly #instances: SelfHostedInstanceService;
   readonly #install: ConnectInstallService;
   readonly #identity: InstanceIdentityService;
   readonly #refresh: LicenseRefreshService;
   readonly #isSaas: boolean;
+  readonly #signingKey: string | undefined;
 
   private constructor({
     service,
@@ -217,6 +260,7 @@ export class LicensingApp implements LicensingApiContract {
     install,
     isSaas,
     generation,
+    signingKey,
   }: {
     generation: LicenseGenerationService;
     service: LicenseService;
@@ -225,8 +269,10 @@ export class LicensingApp implements LicensingApiContract {
     registry: LicenseRegistryParts;
     install: ConnectInstallParts;
     isSaas: boolean;
+    signingKey: string | undefined;
   }) {
     this.#isSaas = isSaas;
+    this.#signingKey = signingKey;
     this.#service = service;
     this.#entitlements = entitlements;
     this.#runtime = runtime;
@@ -238,7 +284,6 @@ export class LicensingApp implements LicensingApiContract {
     this.#activation = registry.activation;
     this.#hosted = registry.hosted;
     this.#hostedSpend = registry.spend;
-    this.#hostedDoor = registry.door;
     this.#instances = registry.instances;
     this.#install = install.install;
     this.#identity = install.identity;
@@ -250,12 +295,19 @@ export class LicensingApp implements LicensingApiContract {
       LicensingApp.secrets.instanceLicenseKey,
       (value) => value,
     );
-    return LicensingApp.#assemble(setup, instanceLicenseKey);
+    const licensePrivateKey = await setup.secrets.into(
+      LicensingApp.secrets.licensePrivateKey,
+      (value) => value,
+    );
+    return LicensingApp.#assemble(setup, { instanceLicenseKey, licensePrivateKey });
   }
 
   static #assemble(
     { members, config, resources, dependencies }: LicensingSetup,
-    instanceLicenseKey: string | undefined,
+    {
+      instanceLicenseKey,
+      licensePrivateKey,
+    }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
   ): LicensingApp {
     const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
     // Derived from the closed prisma member: the licence rows are read and written
@@ -265,10 +317,25 @@ export class LicensingApp implements LicensingApiContract {
     const infrastructure =
       members.infrastructure !== undefined
         ? members.infrastructure
-        : partial.withStorage({
-            licenses: PrismaOrganizationLicenseRepository.create(members.prisma),
-            ...seatCountsOver(dependencies.organizations),
-          });
+        : {
+            ...partial.withStorage({
+              licenses: PrismaOrganizationLicenseRepository.create(members.prisma),
+              ...seatCountsOver(dependencies.organizations),
+            }),
+            registry: licenseRegistryOverPrisma({
+              database: members.prisma,
+              organizations: dependencies.organizations,
+              gateway: dependencies.gateway,
+              encryption: members.encryption,
+              rateLimiter: members.rateLimiter,
+              signingKey: licensePrivateKey,
+            }),
+            hosted: hostedServicesOverPeers(dependencies),
+            instances: selfHostedInstancesOverPrisma({
+              database: members.prisma,
+              organizations: dependencies.organizations,
+            }),
+          };
     const {
       repository,
       usage,
@@ -325,6 +392,7 @@ export class LicensingApp implements LicensingApiContract {
         logger: logger ?? members.logger,
       }),
       isSaas: members.isSaas,
+      signingKey: licensePrivateKey,
     });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
     resources.own("hosted-service spend buffer", () => app.flushHostedSpend());
@@ -420,8 +488,11 @@ export class LicensingApp implements LicensingApiContract {
     });
   }
 
-  async generateLicenseKey(input: GenerateLicenseInput): Promise<GenerateLicenseOutput> {
-    return this.#generation.generate(input);
+  /** Signs with licensing's own key; a deployment without one refuses by name. */
+  async generateLicenseKey(input: GenerateLicenseKeyInput): Promise<GenerateLicenseOutput> {
+    const privateKey = this.#signingKey;
+    if (!privateKey || privateKey.trim() === "") throw new LicenseSigningNotConfiguredError();
+    return this.#generation.generate({ ...input, privateKey });
   }
 
   recordIssuedLicense(input: {
@@ -608,6 +679,7 @@ export class LicensingApp implements LicensingApiContract {
   classifyForHostedCaller(input: {
     caller: HostedCaller;
     payload: unknown;
+    signal?: AbortSignal;
   }): Promise<HostedClassifyAnswer> {
     return this.#hosted.classify(input);
   }
@@ -626,6 +698,10 @@ export class LicensingApp implements LicensingApiContract {
 
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats> {
     return this.#registry.getConnectedSeats(input.organizationId);
+  }
+
+  findSeatChanges(input: { organizationId?: string }): Promise<LicenseSeatChange[]> {
+    return this.#registry.findSeatChanges(input);
   }
 
   raiseContractCommit(input: {
@@ -692,16 +768,6 @@ export class LicensingApp implements LicensingApiContract {
   flushHostedSpend(): Promise<void> {
     return this.#hostedSpend.flush();
   }
-
-  /** The signed door the hosted Connect family answers behind. */
-  get hostedDoor(): RestIdentity {
-    return (
-      this.#hostedDoor ??
-      LicensingInfrastructureService.create({
-        processName: "this process",
-      }).unavailableHostedServices().door
-    );
-  }
 }
 
 /** What the registry and the hosted routes resolve to together. */
@@ -713,7 +779,6 @@ type LicenseRegistryParts = Readonly<{
   activation: ActivationCodeService;
   hosted: HostedServicesService;
   spend: ConnectSpendBufferService;
-  door: RestIdentity | undefined;
   instances: SelfHostedInstanceService;
 }>;
 
@@ -754,7 +819,6 @@ function licenseRegistryParts({
     organizations: infrastructure.organizations,
     managedKeys: infrastructure.managedKeys,
     contractBudgets,
-    seatBilling: infrastructure.seatBilling,
     cryptography,
     generation: LicenseGenerationService.create(cryptography),
     cipher: infrastructure.cipher,
@@ -766,11 +830,10 @@ function licenseRegistryParts({
     contractBudgets,
     registry,
     spend,
-    door: hosted.door,
     instances: SelfHostedInstanceService.create({
       repository: instances.repository,
-      licenses: infrastructure.repository,
-      organizations: infrastructure.organizations,
+      licenses: instances.licenses,
+      organizations: instances.organizations,
       optionalReportKeys: instances.optionalReportKeys,
       ...(instances.leads
         ? {
@@ -807,6 +870,143 @@ function licenseRegistryParts({
       systemActorId: infrastructure.systemActorId,
       now,
     }),
+  };
+}
+
+/** The registry's own tables, over one connection. */
+type LicenseRegistryDatabase = IssuedLicenseDatabase & ActivationCodeDatabase;
+
+/**
+ * The licence registry derived from the process's own stores, as main's
+ * `registry/composition.ts` built it on every deployment. Billing reads the seat
+ * changes it records through `findSeatChanges` (ARCHITECTURE.md section 9).
+ */
+function licenseRegistryOverPrisma({
+  database,
+  organizations,
+  gateway,
+  encryption,
+  rateLimiter,
+  signingKey,
+}: {
+  database: LicenseRegistryDatabase;
+  organizations: Pick<
+    OrganizationApi,
+    "findProvisioningSummary" | "createSelfHostedCustomer" | "markSelfHostedCustomer"
+  >;
+  gateway: Pick<
+    GatewayApi,
+    | "provisionConnectManagedKey"
+    | "revokeManagedInternal"
+    | "invalidateManagedInternal"
+    | "setManagedKeyConnectServicesInternal"
+    | "setManagedKeyLicenseInternal"
+  >;
+  encryption: Encryption;
+  rateLimiter: RateLimiter;
+  signingKey: string | undefined;
+}): LicenseRegistryInfrastructure {
+  const systemActorId = SYSTEM_ACTORS.connectLicense;
+  const allowed = async (key: string, limit: { requests: number; seconds: number }) =>
+    (await rateLimiter.check(key, limit)).allowed;
+  return {
+    repository: PrismaIssuedLicenseRepository.create(database),
+    organizations: {
+      findById: customerLookup(organizations),
+      createSelfHostedCustomer: ({ name }) => organizations.createSelfHostedCustomer({ name }),
+      markSelfHostedCustomer: (organizationId) =>
+        organizations.markSelfHostedCustomer({ organizationId }),
+    },
+    managedKeys: {
+      provision: ({ organizationId, licenseId }) =>
+        gateway.provisionConnectManagedKey({
+          organizationId,
+          licenseId,
+          actorUserId: systemActorId,
+        }),
+      retire: (key) => gateway.revokeManagedInternal(key),
+      invalidate: (key) => gateway.invalidateManagedInternal(key),
+      setConnectServices: (key) => gateway.setManagedKeyConnectServicesInternal(key),
+      setLicense: (key) => gateway.setManagedKeyLicenseInternal(key),
+    },
+    activationCodes: PrismaActivationCodeRepository.create(database),
+    activationRateLimit: {
+      allow: ({ codeHash }) => allowed(`activation_code:${codeHash}`, ACTIVATION_ATTEMPTS_LIMIT),
+    },
+    syncRateLimit: {
+      allow: ({ licenseRowId }) => allowed(`license_sync:${licenseRowId}`, LICENSE_SYNCS_LIMIT),
+    },
+    cipher: encryption,
+    signingKey: () => signingKey,
+    systemActorId,
+  };
+}
+
+/**
+ * The hosted end of Connect composed from its owners, as main composed it on every deployment:
+ * instant-eval judges, prices and records the spend, and the gateway keeps the budgets. The door
+ * the family answers behind is the gateway's own, bound in licensing.server.ts.
+ */
+function hostedServicesOverPeers({
+  gateway,
+  instantEval,
+  projects,
+}: {
+  gateway: Pick<
+    GatewayApi,
+    | "listBudgetsWithHealth"
+    | "createBudget"
+    | "updateBudget"
+    | "resetBudget"
+    | "findVirtualKeyById"
+    | "resolveApplicableBudgets"
+  >;
+  instantEval: Pick<InstantEvalApi, "classify" | "priceOf" | "recordSpendForHostedCalls">;
+  projects: Pick<ProjectApi, "findById">;
+}): HostedServicesInfrastructure {
+  return {
+    budgets: ContractBudgetStoreService.create({ gateway }),
+    usage: HostedUsageReaderService.create({ gateway, projects }),
+    judge: {
+      classify: (input, signal) =>
+        instantEval.classify({ ...input, ...(signal ? { signal } : {}) }),
+      priceOf: (input) => instantEval.priceOf(input),
+    },
+    spend: { recordSpend: (entry) => instantEval.recordSpendForHostedCalls(entry) },
+  };
+}
+
+/** The customer's id and name, as the organization feature answers it. */
+function customerLookup(
+  organizations: Pick<OrganizationApi, "findProvisioningSummary">,
+): LicenseCustomers["findById"] {
+  return async (organizationId) => {
+    const summary = await organizations.findProvisioningSummary(organizationId);
+    return summary ? { id: summary.id, name: summary.name } : null;
+  };
+}
+
+/** The install rows and the licences bound to them, over one connection. */
+type SelfHostedInstancesDatabase = SelfHostedInstanceDatabase & IssuedLicenseDatabase;
+
+/**
+ * The instance registry derived from the process's own stores, as main built it on
+ * every deployment: the rows from Postgres, the customer's name from its owner.
+ */
+function selfHostedInstancesOverPrisma({
+  database,
+  organizations,
+}: {
+  database: SelfHostedInstancesDatabase;
+  organizations: Pick<OrganizationApi, "findProvisioningSummary">;
+}): SelfHostedInstancesInfrastructure {
+  return {
+    repository: PrismaSelfHostedInstanceRepository.create(database),
+    licenses: PrismaIssuedLicenseRepository.create(database),
+    organizations: {
+      findById: customerLookup(organizations),
+    },
+    optionalReportKeys: new Set(optionalUsageReportKeys()),
   };
 }
 

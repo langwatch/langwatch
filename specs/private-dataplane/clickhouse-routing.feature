@@ -39,41 +39,32 @@ Feature: Private ClickHouse Routing
     Then the private ClickHouse map is empty
 
   # ---------------------------------------------------------------------------
-  # One classified key for the whole family
+  # The family is a secret (ruled 2026-09-28, ARCHITECTURE §7)
   #
-  # `CLICKHOUSE_URL__<label>__<orgId>` carries the organization in the variable's
-  # NAME, so the secrets classifier cannot match it and `haven env` cannot mask a
-  # connection URL that holds a password. `CLICKHOUSE_PRIVATE_ROUTES` is the same
-  # family as one JSON array under one name, classified once. Both are read, so a
-  # deployment moves without a window where neither answers.
+  # Main's `CLICKHOUSE_URL__<label>__<orgId>` family stays as it is, so no
+  # deployment changes. Each URL carries a password, so the stores declare the
+  # family as one `Secret.family("CLICKHOUSE_URL__")` handle (ADR-132), resolve it
+  # through the chain once at boot, and hand the routing table to the clickhouse
+  # member; nothing else reads the environment, and no route URL is ever printed.
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Routes declared under the one classified key are used
-    Given "CLICKHOUSE_PRIVATE_ROUTES" declares org "org123" on its own instance
-    When the private ClickHouse config is loaded at startup
-    Then org "org123" maps to that instance
+  Scenario: The stores parse the route family into the clickhouse member at boot
+    Given CLICKHOUSE_URL__acme__org_1 names an organization's own server and CLICKHOUSE_URL is unset
+    When the process opens its stores
+    Then the clickhouse member exists and answers org_1 among its private routes
 
   @unit
-  Scenario: A per-customer variable still routes, and says it should move
-    Given org "org123" is declared only in "CLICKHOUSE_URL__acme__org123"
-    When the private ClickHouse config is loaded at startup
-    Then org "org123" still maps to that instance
-    And a warning names the variable and asks for it to move to the one key
+  Scenario: A route entry naming no organization is skipped
+    Given CLICKHOUSE_URL__acme__ is set beside a shared CLICKHOUSE_URL
+    When the process opens its stores
+    Then the clickhouse member answers no private route, and the warning names the variable only
 
   @unit
-  Scenario: One organization declared twice, differently, refuses the boot
-    Given "CLICKHOUSE_PRIVATE_ROUTES" declares org "org123" on one instance
-    And "CLICKHOUSE_URL__acme__org123" declares it on a different one
-    When the private ClickHouse config is loaded at startup
-    Then the process refuses to start rather than guess which holds their data
-
-  @unit
-  Scenario: An entry that is not an organization and a url is skipped and reported
-    Given "CLICKHOUSE_PRIVATE_ROUTES" carries an entry with no url
-    When the private ClickHouse config is loaded at startup
-    Then that entry routes nothing
-    And a warning names its position in the list
+  Scenario: The migration runner reads the stores' parse of the route family
+    Given CLICKHOUSE_URL__acme__org_1 names an organization's own server
+    When the migration runner opens its connections
+    Then its dataplane answers org_1 as private and every other organization as shared
 
   # ---------------------------------------------------------------------------
   # Organization-level routing

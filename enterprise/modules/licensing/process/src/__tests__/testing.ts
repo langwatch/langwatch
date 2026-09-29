@@ -11,9 +11,11 @@ import {
   CONNECT_DEFAULT_LICENSE_ENDPOINT,
 } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { planQuantities } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 
 import { LicensingApp } from "../app/licensing.app.ts";
@@ -173,6 +175,8 @@ class TestLicenseStorage implements LicenseStorage {
 export function createTestLicensingApp(): Promise<LicensingApp> {
   return LicensingApp.create({
     dependencies: {
+      instantEval: createApiFixture<InstantEvalApi>(),
+      projects: createApiFixture<ProjectApi>(),
       gateway: createApiFixture<GatewayApi>(),
       organizations: createApiFixture<OrganizationApi>(),
     },

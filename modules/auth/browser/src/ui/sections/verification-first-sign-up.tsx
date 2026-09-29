@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import type { SignUpEnrollment, SignUpVerificationResult } from "@langwatch/auth-contract";
+import { Link } from "@langwatch/browser-host/link";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -16,7 +17,6 @@ import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import Link from "../elements/router-link.tsx";
 import { SuccessPulse } from "../elements/success-pulse.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
@@ -631,9 +631,7 @@ function LogInLink({ callbackUrl, label }: { callbackUrl: string | undefined; la
         textDecorationColor="border"
         _hover={{ textDecorationColor: "fg" }}
       >
-        <Link viewTransition href={href}>
-          {linked}
-        </Link>
+        <Link href={href}>{linked}</Link>
       </Box>
     </Text>
   );

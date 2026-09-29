@@ -112,14 +112,6 @@ vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-vi.mock("../../../ui/elements/router-link.tsx", () => ({
-  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-}));
-
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
 import ForgotPassword from "../forgot-password-screen.tsx";
 import SignIn from "../signin-screen.tsx";

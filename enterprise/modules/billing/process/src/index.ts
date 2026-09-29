@@ -2,7 +2,7 @@
  * The three declared transports, and the facts two of them ask the process to
  * resolve. A mount binds a fact; nothing else may.
  */
-export { billingServer, createBillableEventsMeterProjection } from "./billing.server.ts";
+export { billingServer } from "./billing.server.ts";
 export {
   type BillingStripeWebhookApi,
   billingStripeWebhookRest,

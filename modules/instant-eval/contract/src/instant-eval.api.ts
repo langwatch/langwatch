@@ -180,7 +180,26 @@ export interface InstantEvalApi {
     projectId: string;
     text: string;
     questions: readonly InstantEvalQuestion[];
+    /** Aborts the judgement when the caller has gone, as a hosted call's request does. */
+    signal?: AbortSignal;
   }): Promise<InstantEvalJudgement>;
+
+  /** What judging these input tokens cost LangWatch and what the customer is charged, in USD. */
+  priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number };
+
+  /**
+   * Main's hosted-call recorder: a Connect licence's judgements, billed to the calling key. It
+   * throws where the spend spine is not registered, so the caller keeps the spend and retries.
+   */
+  recordSpendForHostedCalls(input: {
+    projectId: string;
+    virtualKeyId: string;
+    inputTokens: number;
+    requests: number;
+    costUsd: number;
+    priceUsd: number;
+    occurredAt: Instant;
+  }): Promise<void>;
 
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: {

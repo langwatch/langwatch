@@ -169,6 +169,8 @@ export interface GatewayPricedSpend {
   readonly projectId: string;
   readonly organizationId: string;
   readonly teamId: string;
+  /** The key the spend is billed to, so its budgets are debited. Absent for a project's own. */
+  readonly virtualKeyId?: string;
   /** How the ledger, the budgets and the meters group this spend. */
   readonly requestType: string;
   readonly model: string;

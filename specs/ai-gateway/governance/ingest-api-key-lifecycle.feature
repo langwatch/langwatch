@@ -294,10 +294,9 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And the failure is logged
 
   # The CLI is not the only door to a personal key: the MCP mint an agent
-  # calls reaches the same workspace. It accepts a tool the CLI wraps or a
-  # source a published template names, and minting adds a key rather than
-  # replacing one, so the keys other machines already export with keep
-  # working; only the per-tool cap retires one, least recently used first.
+  # calls reaches the same workspace. It has no session to parent a key to,
+  # so it mints only for sources a published template names and no CLI
+  # wrapper covers, and minting adds a key rather than replacing one.
 
   @integration @ingest-api-key @issue @personal @create-only
   Scenario: An agent minting a template source through MCP adds a key
@@ -314,6 +313,65 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Then the token no longer authorizes trace writes
     And the key is gone from the caller's key list
     And revoking it again is not an error
+
+  @unit @ingest-api-key @issue @personal
+  Scenario: The MCP mint refuses a tool the CLI wraps
+    When an agent mints a personal key for "claude_code" through the MCP tool
+    Then the request is refused with code "ingestion_key_source_not_allowed"
+    And no ingestion key is created
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: An agent revokes one of the caller's own keys through the MCP tool
+    Given jane holds a personal ingestion key
+    When an agent revokes that key by its api_key_id through the MCP tool
+    Then the key is revoked with cause "user"
+    And the tool answers that the key was revoked
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: Revoking an already revoked key through the MCP tool is not an error
+    Given jane's personal ingestion key is already revoked
+    When an agent revokes that key through the MCP tool
+    Then the tool answers that the key was revoked
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: Another person's key answers not found through the MCP tool
+    Given john holds a personal ingestion key
+    When an agent acting for jane revokes john's key through the MCP tool
+    Then the request is refused with code "ingestion_key_not_found"
+    And john's key is not revoked
+
+  # Main audits each door's mint, rotate and revoke, tagging the call surface.
+  # A CLI session's mint writes no row.
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A door's install, rotate and revoke each record main's audit row
+    When a door installs, rotates and revokes one of jane's keys
+    Then the audit log records "ingestionKey.mint", "ingestionKey.rotate" and "ingestionKey.revoke"
+    And each row carries the key id and the door's surface
+    And the mint and rotate rows carry the source type, the rotate row the revoked count
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: The web door's install, rotate and revoke audit rows carry the trpc surface
+    When jane installs, rotates and revokes a key from the web app
+    Then each operation is handed the surface "trpc"
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: The MCP door's mint and revoke audit rows carry the mcp surface
+    When an agent mints and then revokes a key through the MCP tools
+    Then the "ingestionKey.mint" and "ingestionKey.revoke" rows carry the surface "mcp"
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A failed mint audit write does not fail the mint
+    Given the audit log cannot be written
+    When a door installs a key
+    Then the minted token is still answered
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A revoke answers only once its audit row is written
+    Given the audit log cannot be written
+    When a door revokes one of jane's keys
+    Then the key is revoked
+    And the revoke is refused
 
   @integration @ingest-api-key @issue @personal @create-only
   Scenario: A personal key is minted only for a tool the CLI wraps

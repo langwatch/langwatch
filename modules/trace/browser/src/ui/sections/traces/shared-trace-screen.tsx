@@ -1,11 +1,11 @@
 import { Alert, Box, Button, Center, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Link2Off } from "lucide-react";
 import { useMemo } from "react";
 
 import { useDrawerStore } from "../../../behavior/drawer.store.ts";
 import { api } from "../../../behavior/trace-api.ts";
-import { Link } from "../../blocks/link.tsx";
 import { TraceViewerProvider } from "../../elements/explorer/context/trace-viewer-context.tsx";
 import { HandledErrorState } from "../errors/index.ts";
 import { SharedTraceProvider, useSharedTrace } from "../explorer/context/shared-trace-context.tsx";

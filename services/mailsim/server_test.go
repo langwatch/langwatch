@@ -2,10 +2,10 @@ package mailsim
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,19 +76,46 @@ func TestCaughtHTMLHeadersAreSandboxed(t *testing.T) {
 }
 
 // @scenario "The inbox is served in the browser at the stack's mail hostname"
-func TestBrowserInboxRendersListAndMessage(t *testing.T) {
+func TestBrowserInboxServesTheBundleAtEveryPage(t *testing.T) {
 	s := newTestServer(t, Config{})
-	raw := "Subject: from the browser\r\nContent-Type: text/html\r\n\r\n<p>rendered</p>\r\n"
-	require.NoError(t, deliverRaw(t, s, "sender@example.com", []string{"a@stack.local"}, raw, nil))
+	require.NoError(t, deliverRaw(t, s, "sender@example.com", []string{"a@stack.local"}, simpleMessage, nil))
 	id := s.store.List("", "")[0].ID
 
-	index := doHTTP(s, "GET", "/")
-	require.Equal(t, http.StatusOK, index.Code)
-	assert.Contains(t, index.Body.String(), "from the browser")
+	for _, path := range []string{"/", "/messages/" + id} {
+		page := doHTTP(s, "GET", path)
+		require.Equal(t, http.StatusOK, page.Code, path)
+		assert.Contains(t, page.Body.String(), `<div id="root">`, path)
+		assert.Equal(t, "no-store", page.Header().Get("Cache-Control"), path)
+	}
 
-	view := doHTTP(s, "GET", "/messages/"+id)
-	require.Equal(t, http.StatusOK, view.Code)
-	assert.Contains(t, view.Body.String(), "/api/messages/"+id+"/html")
+	asset := doHTTP(s, "GET", "/assets/index-abc.js")
+	require.Equal(t, http.StatusOK, asset.Code)
+	assert.Contains(t, asset.Header().Get("Cache-Control"), "immutable")
+
+	unknownAPI := doHTTP(s, "GET", "/api/nope")
+	assert.Equal(t, http.StatusNotFound, unknownAPI.Code, "an unknown API path is not the app")
+}
+
+func TestBrowserInboxNamesTheBuildWhenTheBundleIsMissing(t *testing.T) {
+	s, err := newServer(Config{}, fstest.MapFS{})
+	require.NoError(t, err)
+	rec := doHTTP(s, "GET", "/")
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Contains(t, rec.Body.String(), consoleBuildCommand)
+}
+
+func TestWaitAfterAnIdAnswersOnlyNewerMail(t *testing.T) {
+	s := newTestServer(t, Config{})
+	require.NoError(t, deliverRaw(t, s, "sender@example.com", []string{"a@stack.local"}, simpleMessage, nil))
+	newest := s.store.List("", "")[0].ID
+
+	idle := doHTTP(s, "GET", "/api/messages/wait?timeout=20ms&after="+newest)
+	assert.Equal(t, http.StatusNoContent, idle.Code, "nothing arrived after the newest id")
+
+	require.NoError(t, deliverRaw(t, s, "sender@example.com", []string{"b@stack.local"}, simpleMessage, nil))
+	fresh := doHTTP(s, "GET", "/api/messages/wait?timeout=1s&after="+newest)
+	require.Equal(t, http.StatusOK, fresh.Code)
+	assert.Equal(t, "b@stack.local", decodeJSON[Message](t, fresh).To[0])
 }
 
 func TestMessageSurvivesRestartWhenDataDirSet(t *testing.T) {
@@ -126,18 +153,15 @@ func TestListFiltersByToAndSubject(t *testing.T) {
 // @scenario "Mail inbox actions load under the inbox security policy"
 func TestInboxScriptAndSandbox(t *testing.T) {
 	s := newTestServer(t, Config{})
-	page := httptest.NewRecorder()
-	s.Handler().ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/", nil))
-	assert.Contains(t, page.Body.String(), `src="/assets/ui.js"`)
-	assert.NotContains(t, page.Body.String(), "onclick=")
-	assert.NotContains(t, page.Header().Get("Content-Security-Policy"), "script-src 'unsafe-inline'")
-	script := httptest.NewRecorder()
-	s.Handler().ServeHTTP(script, httptest.NewRequest(http.MethodGet, "/assets/ui.js", nil))
-	assert.Equal(t, http.StatusOK, script.Code)
-	assert.Equal(t, "text/javascript; charset=utf-8", script.Header().Get("Content-Type"))
-	preview := httptest.NewRecorder()
-	s.Handler().ServeHTTP(preview, httptest.NewRequest(http.MethodGet, "/api/messages/missing/html", nil))
-	assert.Contains(t, preview.Header().Get("Content-Security-Policy"), "sandbox; default-src 'none'")
+	page := doHTTP(s, "GET", "/")
+	require.Equal(t, http.StatusOK, page.Code)
+	assert.Contains(t, page.Body.String(), `src="/assets/index-abc.js"`, "the action script is the bundle's, from this origin")
+	csp := page.Header().Get("Content-Security-Policy")
+	assert.Contains(t, csp, "default-src 'self'")
+	assert.Contains(t, csp, "frame-ancestors 'none'")
+	assert.NotContains(t, csp, "script-src 'unsafe-inline'")
+	preview := doHTTP(s, "GET", "/api/messages/missing/html")
+	assert.Contains(t, preview.Header().Get("Content-Security-Policy"), "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'")
 }
 
 // @scenario "Mail pages identify their stack and retain isolated inboxes"
@@ -145,14 +169,16 @@ func TestMailPageScopeAndIsolation(t *testing.T) {
 	first := newTestServer(t, Config{BaseURL: "https://mail.feature-one.langwatch.localhost:1355", SMTPAddr: ":5581", DataDir: t.TempDir()})
 	second := newTestServer(t, Config{BaseURL: "https://mail.feature-two.langwatch.localhost:1355"})
 	require.NoError(t, deliverRaw(t, first, "sender@example.test", []string{"same@example.test"}, simpleMessage, nil))
-	page := doHTTP(first, "GET", "/")
-	require.Equal(t, http.StatusOK, page.Code)
-	assert.Contains(t, page.Body.String(), "INBOX FOR feature-one")
-	assert.Contains(t, page.Body.String(), "127.0.0.1:5581")
-	assert.Contains(t, page.Body.String(), "survive service restarts")
-	assert.Contains(t, page.Body.String(), "same@example.test")
-	other := doHTTP(second, "GET", "/")
-	assert.Contains(t, other.Body.String(), "INBOX FOR feature-two")
-	assert.NotContains(t, other.Body.String(), "same@example.test")
-	assert.Contains(t, other.Body.String(), "clears when MailSim restarts")
+
+	info := decodeJSON[inboxInfo](t, doHTTP(first, "GET", "/api/inbox"))
+	assert.Equal(t, inboxInfo{Stack: "feature-one", SMTPAddr: "127.0.0.1:5581", BaseURL: "https://mail.feature-one.langwatch.localhost:1355", Persistent: true}, info)
+	assert.Contains(t, doHTTP(first, "GET", "/api/messages").Body.String(), "same@example.test")
+
+	other := decodeJSON[inboxInfo](t, doHTTP(second, "GET", "/api/inbox"))
+	assert.Equal(t, "feature-two", other.Stack)
+	assert.False(t, other.Persistent)
+	assert.NotContains(t, doHTTP(second, "GET", "/api/messages").Body.String(), "same@example.test")
+
+	standalone := decodeJSON[inboxInfo](t, doHTTP(newTestServer(t, Config{BaseURL: "http://localhost:5580"}), "GET", "/api/inbox"))
+	assert.Empty(t, standalone.Stack)
 }

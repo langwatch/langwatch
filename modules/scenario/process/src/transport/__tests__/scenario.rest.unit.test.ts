@@ -59,6 +59,29 @@ describe("the scenarios REST declaration", () => {
     });
   });
 
+  describe("when a legacy project key updates a scenario", () => {
+    /** @scenario "A legacy project key updates a scenario without naming a user" */
+    it("records the update with no user, rather than naming the key", async () => {
+      const family = await buildScenarioFamily({ viewerUserId: null, actorId: PROJECT_ID });
+      const createdResponse = await createScenario(family, {
+        name: "Project-key Scenario",
+        situation: "A project-bound key edits this",
+      });
+      const created = scenarioRestResponseWithPlatformUrlSchema.parse(await createdResponse.json());
+
+      const response = await family.request(`/api/scenarios/${created.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Renamed by key" }),
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ name: "Renamed by key" });
+      const row = await family.app.getById({ id: created.id, projectId: PROJECT_ID });
+      expect(row.lastUpdatedById).toBeNull();
+    });
+  });
+
   describe("when creating with model overrides and turn limits", () => {
     /** @scenario "Create over REST accepts model overrides and turn limits" */
     it("carries the values back on create and read", async () => {

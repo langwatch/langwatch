@@ -85,6 +85,7 @@ export {
   ServerFeatureAssembly,
   ServerFeatureBuilder,
   type ServerFeatureDeclaration,
+  type ModuleOperatorReadsScope,
   type ModuleSecretsScope,
   type ServerRole,
   withMemoryRepositories,

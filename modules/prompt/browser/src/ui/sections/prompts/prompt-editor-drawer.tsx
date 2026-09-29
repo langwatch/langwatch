@@ -85,7 +85,7 @@ function useEditorOpenedWith(props: PromptEditorDrawerProps) {
       props.promptVersionId ??
       drawerParams.promptVersionId ??
       (complexProps.promptVersionId as string | undefined),
-    isOpen: props.headless ? true : props.open === true,
+    isOpen: props.headless ? true : props.open !== false && props.open !== undefined,
   };
 }
 

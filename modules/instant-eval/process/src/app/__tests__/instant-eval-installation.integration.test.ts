@@ -14,7 +14,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { GatewayApi, GatewayPricedSpend } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   InstantEvalApi,
@@ -23,8 +23,13 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/kernel";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import {
+  type ProjectApi,
+  type ProjectWithTeam,
+  projectWithTeamSchema,
+} from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -83,6 +88,54 @@ function judgeSecrets(judgeKey: string | undefined): ModuleSecretsScope {
 
 const instantEval = withMemoryRepositories(instantEvalServer);
 
+const CREATED = new Date("2026-01-01T00:00:00.000Z");
+
+/** The project a spend is attributed through: its team, and that team's organization. */
+function projectWithTeam(id: string): ProjectWithTeam {
+  return projectWithTeamSchema.parse({
+    id,
+    name: "Project",
+    slug: "project",
+    apiKey: "api-key",
+    lwqlKey: "lwql-key",
+    teamId: "team-1",
+    language: "typescript",
+    framework: "none",
+    kind: "application",
+    firstMessage: false,
+    integrated: true,
+    createdAt: CREATED,
+    updatedAt: CREATED,
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    team: {
+      id: "team-1",
+      name: "Team",
+      slug: "team",
+      organizationId: ORGANIZATION,
+      createdAt: CREATED,
+      updatedAt: CREATED,
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  });
+}
+
 /** A connect judge that records which organizations it was asked about. */
 function connectJudgeAskedAbout(asked: string[]): InstantEvalJudgeChannel {
   const memory = MemoryInstantEvalJudgeChannel.create();
@@ -105,6 +158,7 @@ function installation({
   judgeKey = "test-judge-key",
   connectJudge = null,
   isBounded = false,
+  gateway = {},
 }: {
   isReleased?: boolean;
   isFreePlan?: boolean;
@@ -113,6 +167,8 @@ function installation({
   judgeKey?: string | null;
   connectJudge?: InstantEvalJudgeChannel | null;
   isBounded?: boolean;
+  /** The gateway operations a hosted call's spend reaches. */
+  gateway?: Partial<GatewayApi>;
 } = {}) {
   return (
     createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
@@ -158,11 +214,12 @@ function installation({
           findOrganizationId: async () => ORGANIZATION,
           getOrganizationId: async () => ORGANIZATION,
           listIdsByOrganization: async () => [PROJECT],
+          findWithTeam: async (id) => projectWithTeam(id),
         }),
         entitlement: createApiFixture<EntitlementApi>({
           getActivePlan: async () => planFor({ free: isFreePlan }),
         }),
-        gateway: createApiFixture<GatewayApi>({}),
+        gateway: createApiFixture<GatewayApi>(gateway),
         trace: createApiFixture<TraceApi>({}),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
@@ -375,6 +432,109 @@ describe("given a deployment that bounds the free budget", () => {
     it("refuses to install rather than keeping the holds to itself", async () => {
       await expect(installation({ isBounded: true }).boot()).rejects.toThrow(
         /needs a Redis connection for the budget holds/,
+      );
+    });
+  });
+});
+
+/** A hosted Connect judge at its own rate, recording the signal each call carried. */
+function pricedConnectJudge(signals: (AbortSignal | undefined)[]): InstantEvalJudgeChannel {
+  const memory = MemoryInstantEvalJudgeChannel.create();
+  return {
+    limits: memory.limits,
+    pricing: { usdPerMillionInputTokens: 1, markup: 2 },
+    classify: async (_request, signal) => {
+      signals.push(signal);
+      return memory.classify();
+    },
+  };
+}
+
+const HOSTED_SPEND = {
+  projectId: PROJECT,
+  virtualKeyId: "vk-connect",
+  inputTokens: 2_000_000,
+  requests: 3,
+  costUsd: 2,
+  priceUsd: 4,
+  occurredAt: Temporal.Instant.from("2026-09-29T10:00:00Z"),
+};
+
+describe("given a hosted Connect call judged on LangWatch Cloud", () => {
+  describe("when licensing asks what a judgement was worth", () => {
+    /** @scenario "A hosted judgement is priced at the rate of the judge that made it" */
+    it("prices the input tokens at the judge's own rate and markup", async () => {
+      await withInstallation(
+        { judgeKey: null, classifier: undefined, connectJudge: pricedConnectJudge([]) },
+        async (api) => {
+          expect(api.priceOf({ inputTokens: 1_000_000 })).toEqual({ costUsd: 1, priceUsd: 2 });
+        },
+      );
+    });
+  });
+
+  describe("when the calling install hangs up", () => {
+    /** @scenario "A hosted judgement stops when the calling install hangs up" */
+    it("hands the request's signal to the judge", async () => {
+      const signals: (AbortSignal | undefined)[] = [];
+      const hangUp = new AbortController();
+      await withInstallation(
+        { judgeKey: null, classifier: undefined, connectJudge: pricedConnectJudge(signals) },
+        async (api) => {
+          await api.classify({
+            projectId: PROJECT,
+            text: "annoyed users",
+            questions: [],
+            signal: hangUp.signal,
+          });
+        },
+      );
+
+      expect(signals).toEqual([hangUp.signal]);
+    });
+  });
+
+  describe("when the spend spine is registered", () => {
+    /** @scenario "Hosted spend is billed to the calling key on the spend spine" */
+    it("records the customer price under the project's organization and the calling key", async () => {
+      const recorded: GatewayPricedSpend[] = [];
+      await withInstallation(
+        {
+          gateway: {
+            recordPricedSpend: async (input) => {
+              recorded.push(input);
+              return { status: "recorded" };
+            },
+          },
+        },
+        async (api) => {
+          await api.recordSpendForHostedCalls(HOSTED_SPEND);
+        },
+      );
+
+      expect(recorded).toEqual([
+        expect.objectContaining({
+          projectId: PROJECT,
+          organizationId: ORGANIZATION,
+          teamId: "team-1",
+          virtualKeyId: "vk-connect",
+          inputTokens: 2_000_000,
+          costNanoUsd: 4_000_000_000,
+        }),
+      ]);
+    });
+  });
+
+  describe("when the spend spine is not registered", () => {
+    /** @scenario "Hosted spend is refused while the spend spine is not registered" */
+    it("throws, so the caller keeps the spend and tries again", async () => {
+      await withInstallation(
+        { gateway: { recordPricedSpend: async () => ({ status: "unavailable" }) } },
+        async (api) => {
+          await expect(api.recordSpendForHostedCalls(HOSTED_SPEND)).rejects.toThrow(
+            /spend pipeline is not registered/,
+          );
+        },
       );
     });
   });

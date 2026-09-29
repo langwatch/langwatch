@@ -23,6 +23,8 @@ export const processWebConfigSchema = z.strictObject({
   nlp: z.boolean(),
   /** Keeps the development badge off a development build (demos, screenshots). */
   hideDevIndicator: z.boolean().optional(),
+  /** What the development badge reads instead of "DEV": a haven stack's slug. */
+  devIndicatorLabel: z.string().min(1).optional(),
 });
 
 export type ProcessWebConfig = z.infer<typeof processWebConfigSchema>;

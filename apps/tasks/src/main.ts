@@ -24,6 +24,7 @@ import { lwqlProvision } from "./lwql-provision.ts";
 import { lwqlRenderAccessConfig } from "./lwql-render-access-config.ts";
 import { prismaMigrate } from "./prisma-migrate.ts";
 import { storageSeed } from "./storage-seed/storage-seed.ts";
+import { openSystemMigrationsDataplane } from "./system-migrations-dataplane.ts";
 import { systemMigrationsPass } from "./system-migrations-pass.ts";
 
 const tasks = new Map<string, (input: TaskInput) => Promise<void>>([
@@ -126,10 +127,11 @@ async function openConnections(config: TasksConfig): Promise<TaskConnections> {
   const redis = await secrets.into(tasksSecrets.redisUrl, (url) =>
     url === undefined ? null : new RedisConnectionService().connect({ url }),
   );
+  const dataplane = await openSystemMigrationsDataplane(secrets);
 
   resolver.seal();
 
-  return { database, redis };
+  return { database, redis, dataplane };
 }
 
 async function main(): Promise<void> {

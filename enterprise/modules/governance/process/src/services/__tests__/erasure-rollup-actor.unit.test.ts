@@ -14,7 +14,7 @@ function serviceWith(erasureSecret: string | undefined) {
   const repositories = MemoryGovernanceRepositories.create();
   return ErasureSuppressionService.create({
     suppressions: repositories.erasedIdentifierSuppressions,
-    tenantHistory: repositories.tenantHistory,
+    snapshot: repositories.suppressionSnapshot,
     erasureSecret,
   });
 }

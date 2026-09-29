@@ -11,6 +11,7 @@ import {
   type License,
   type TermsForm,
 } from "../../model/license-terms.ts";
+import { seatChangeSummary } from "../../model/seat-change-summary.ts";
 import { LicenseTermsFields } from "../blocks/license-terms-fields.tsx";
 import {
   dateInputToISO,
@@ -78,6 +79,8 @@ function DrawerBody({
   onRevoke: (license: License) => void;
 }) {
   const [linkOrganizationId, setLinkOrganizationId] = useState("");
+  // Each seat change remounts the Billing sections, so they read the change it recorded.
+  const [seatChanges, setSeatChanges] = useState(0);
 
   return (
     <VStack align="start" gap={6} width="full">
@@ -91,9 +94,18 @@ function DrawerBody({
       )}
       <TermsSection license={license} />
       {license.organizationId ? (
-        <LicenseBillingSections license={license} organizationId={license.organizationId} />
+        <LicenseBillingSections
+          license={license}
+          organizationId={license.organizationId}
+          seatChanges={seatChanges}
+        />
       ) : null}
-      {license.status === "active" ? <ChangeSeatsSection license={license} /> : null}
+      {license.status === "active" ? (
+        <ChangeSeatsSection
+          license={license}
+          onChanged={() => setSeatChanges((count) => count + 1)}
+        />
+      ) : null}
       {license.status === "active" || license.status === "expired" ? (
         <ReissueSection license={license} />
       ) : null}
@@ -106,13 +118,15 @@ function DrawerBody({
 function LicenseBillingSections({
   license,
   organizationId,
+  seatChanges,
 }: {
   license: License;
   organizationId: string;
+  seatChanges: number;
 }) {
   const sections = useLicenseBillingSections();
   return sections.map(({ key, Section }) => (
-    <Suspense key={key} fallback={null}>
+    <Suspense key={`${key}:${seatChanges}`} fallback={null}>
       <Section
         organizationId={organizationId}
         organizationName={license.organizationName}
@@ -236,10 +250,10 @@ function TermsSection({ license }: { license: License }) {
   );
 }
 
-function ChangeSeatsSection({ license }: { license: License }) {
+function ChangeSeatsSection({ license, onChanged }: { license: License; onChanged: () => void }) {
   const commands = useLicenseCommands();
   const [seats, setSeats] = useState(() => license.maxMembers.toString());
-  const [issuedKey, setIssuedKey] = useState<string | null>(null);
+  const [changed, setChanged] = useState<{ licenseKey: string; summary: string } | null>(null);
 
   useEffect(() => {
     setSeats(license.maxMembers.toString());
@@ -249,7 +263,7 @@ function ChangeSeatsSection({ license }: { license: License }) {
   // stored anywhere, and refetching this one must not take it off the screen.
   const licenseId = license.id;
   useEffect(() => {
-    setIssuedKey(null);
+    setChanged(null);
   }, [licenseId]);
 
   const requested = Number(seats);
@@ -282,14 +296,26 @@ function ChangeSeatsSection({ license }: { license: License }) {
           onClick={() =>
             commands.changeSeats.mutate(
               { id: license.id, maxMembers: requested },
-              { onSuccess: (result) => setIssuedKey(result.licenseKey) },
+              {
+                onSuccess: (result) => {
+                  setChanged({ licenseKey: result.licenseKey, summary: seatChangeSummary(result) });
+                  onChanged();
+                },
+              },
             )
           }
         >
           Change seats
         </Button>
       </HStack>
-      {issuedKey ? <SignedLicenseOnce licenseKey={issuedKey} /> : null}
+      {changed ? (
+        <>
+          <Text fontSize="sm" data-testid="change-seats-result">
+            {changed.summary}
+          </Text>
+          <SignedLicenseOnce licenseKey={changed.licenseKey} />
+        </>
+      ) : null}
     </Section>
   );
 }

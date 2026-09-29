@@ -27,7 +27,24 @@ export {
   ORG_BEARING_MODEL_NAMES,
   ORG_SCOPED_MODEL_NAMES,
   ORG_TENANCY_EXEMPT,
+  PRISMA_READ_ACTIONS,
 } from "./organization-guard.ts";
+export {
+  ForgedOperatorReadError,
+  OperatorRead,
+  type OperatorReadAction,
+  OperatorReadGuard,
+  type OperatorReadHandle,
+  type OperatorReadMint,
+  OperatorReadRefusedError,
+  OperatorReadsResolver,
+  ScopedOperatorReads,
+  SealedOperatorReadsError,
+  UnavailableOperatorReadError,
+  UndeclaredOperatorReadError,
+  UnguardedOperatorReadError,
+  type OperatorReadLog,
+} from "./operator-read.ts";
 export { PrismaTenancyGuardService } from "./tenancy-guard.ts";
 export {
   type PrismaDriverAdapter,

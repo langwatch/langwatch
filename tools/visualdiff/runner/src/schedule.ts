@@ -64,16 +64,40 @@ export const runPoolWithRecapture = async <Item, Result>({
   return heldBack;
 };
 
-/** LAST_ACTIONS change what every other screen shows, so their flows run alone, after the rest. */
-const LAST_ACTIONS = new Set(["editProjectSettings"]);
+/** READ_ACTIONS only look: a flow of nothing else may run while other pages capture routes. */
+const READ_ACTIONS = new Set(["go", "wait", "sendTrace", "openTrace", "createScenario"]);
 
-/** orderFlows splits the flows that may run side by side from those that must run last. */
-export const orderFlows = (
-  flows: readonly PlanFlow[],
-): { together: PlanFlow[]; last: PlanFlow[] } => {
-  const runsLast = (flow: PlanFlow): boolean =>
-    flow.steps.some((step) => LAST_ACTIONS.has(step.action));
-  return { together: flows.filter((flow) => !runsLast(flow)), last: flows.filter(runsLast) };
+/**
+ * VIEW_ACTIONS change what other screens show (a view's saved filters), and PROJECT_ACTIONS
+ * change every screen (the project's name): their flows run alone, after the rest, the
+ * project's very last.
+ */
+const VIEW_ACTIONS = new Set(["click", "type", "select", "fill"]);
+const PROJECT_ACTIONS = new Set(["editProjectSettings"]);
+
+/** FlowOrder is when each flow may run: beside the routes, after them, or alone at the end. */
+export interface FlowOrder {
+  readers: PlanFlow[];
+  writers: PlanFlow[];
+  last: PlanFlow[];
+}
+
+/** orderFlows sorts flows into FlowOrder, keeping the configured (longest first) order in each. */
+export const orderFlows = (flows: readonly PlanFlow[]): FlowOrder => {
+  const uses = (flow: PlanFlow, actions: Set<string>): boolean =>
+    flow.steps.some((step) => actions.has(step.action));
+  const reads = (flow: PlanFlow): boolean =>
+    flow.steps.every((step) => READ_ACTIONS.has(step.action));
+  const alone = (flow: PlanFlow): boolean =>
+    uses(flow, VIEW_ACTIONS) || uses(flow, PROJECT_ACTIONS);
+  return {
+    readers: flows.filter(reads),
+    writers: flows.filter((flow) => !reads(flow) && !alone(flow)),
+    last: [
+      ...flows.filter((flow) => alone(flow) && !uses(flow, PROJECT_ACTIONS)),
+      ...flows.filter((flow) => uses(flow, PROJECT_ACTIONS)),
+    ],
+  };
 };
 
 /** width reads a configured concurrency, one when absent or nonsense. */

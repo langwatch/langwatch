@@ -9,7 +9,10 @@ import {
   ApiKeyAlreadyRevokedError,
   isApiKeyRevocationCause,
 } from "@langwatch/api-key-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
+  DEFAULT_GOVERNANCE_SURFACE,
+  type GovernanceCallSurface,
   IngestionKeyNotFoundError,
   IngestionKeyRevokeIncompleteError,
   IngestionKeySessionRevokedError,
@@ -35,23 +38,28 @@ type IngestionKeyStore = Pick<
   "create" | "revoke" | "findById" | "findByLookupId" | "findIngestionKeysForUser"
 >;
 
-export class PersonalIngestionKeyService {
-  private constructor(
-    private readonly apiKeys: IngestionKeyStore,
-    private readonly organizations: Pick<OrganizationService, "getPersonalWorkspace">,
-    private readonly templates: IngestionTemplateRepository,
-  ) {}
+type PersonalIngestionKeyMembers = {
+  apiKeys: IngestionKeyStore;
+  organizations: Pick<OrganizationService, "getPersonalWorkspace">;
+  templates: IngestionTemplateRepository;
+  auditLog: Pick<AuditLogApi, "record">;
+};
 
-  static create(options: {
-    apiKeys: IngestionKeyStore;
-    organizations: Pick<OrganizationService, "getPersonalWorkspace">;
-    templates: IngestionTemplateRepository;
-  }): PersonalIngestionKeyService {
-    return new PersonalIngestionKeyService(
-      options.apiKeys,
-      options.organizations,
-      options.templates,
-    );
+export class PersonalIngestionKeyService {
+  private readonly apiKeys: IngestionKeyStore;
+  private readonly organizations: Pick<OrganizationService, "getPersonalWorkspace">;
+  private readonly templates: IngestionTemplateRepository;
+  private readonly auditLog: Pick<AuditLogApi, "record">;
+
+  private constructor(members: PersonalIngestionKeyMembers) {
+    this.apiKeys = members.apiKeys;
+    this.organizations = members.organizations;
+    this.templates = members.templates;
+    this.auditLog = members.auditLog;
+  }
+
+  static create(members: PersonalIngestionKeyMembers): PersonalIngestionKeyService {
+    return new PersonalIngestionKeyService(members);
   }
 
   async list(input: {
@@ -141,9 +149,31 @@ export class PersonalIngestionKeyService {
     return issued;
   }
 
+  /** A door's create-only mint, audited; the audit write never holds up the token shown once. */
+  async install(input: PersonalIngestionKeyMint): Promise<IssuedIngestionKey> {
+    const issued = await this.mint(input);
+    this.recordInBackground({
+      ...input,
+      action: "ingestionKey.mint",
+      apiKeyId: issued.apiKeyId,
+      args: { apiKeyId: issued.apiKeyId, sourceType: input.sourceType },
+    });
+    return issued;
+  }
+
   async rotate(input: PersonalIngestionKeyMint): Promise<RotatedIngestionKey> {
     const revoked = await this.revokeForSource(input);
     const issued = await this.mint(input);
+    this.recordInBackground({
+      ...input,
+      action: "ingestionKey.rotate",
+      apiKeyId: issued.apiKeyId,
+      args: {
+        apiKeyId: issued.apiKeyId,
+        sourceType: input.sourceType,
+        revokedCount: revoked.revokedCount,
+      },
+    });
     return {
       ...issued,
       revokedCount: revoked.revokedCount,
@@ -151,7 +181,28 @@ export class PersonalIngestionKeyService {
     };
   }
 
-  async revoke(input: { userId: string; organizationId: string; apiKeyId: string }): Promise<void> {
+  /** Reports success only once the audit row, the record of who retired the key, is durable. */
+  async revoke(input: {
+    userId: string;
+    organizationId: string;
+    apiKeyId: string;
+    surface?: GovernanceCallSurface;
+  }): Promise<void> {
+    await this.retire(input);
+    await this.auditLog.record({
+      userId: input.userId,
+      organizationId: input.organizationId,
+      action: "ingestionKey.revoke",
+      args: { apiKeyId: input.apiKeyId },
+      metadata: { surface: input.surface ?? DEFAULT_GOVERNANCE_SURFACE },
+    });
+  }
+
+  private async retire(input: {
+    userId: string;
+    organizationId: string;
+    apiKeyId: string;
+  }): Promise<void> {
     const key = await this.apiKeys.findById({ id: input.apiKeyId });
     if (
       !key ||
@@ -303,6 +354,30 @@ export class PersonalIngestionKeyService {
       }
     }
     throw new IngestionKeySessionRevokedError();
+  }
+
+  private recordInBackground(input: {
+    userId: string;
+    organizationId: string;
+    surface?: GovernanceCallSurface;
+    action: string;
+    apiKeyId: string;
+    args: { apiKeyId: string; sourceType: string; revokedCount?: number };
+  }): void {
+    void this.auditLog
+      .record({
+        userId: input.userId,
+        organizationId: input.organizationId,
+        action: input.action,
+        args: input.args,
+        metadata: { surface: input.surface ?? DEFAULT_GOVERNANCE_SURFACE },
+      })
+      .catch((error: unknown) =>
+        logger.warn(
+          { error, apiKeyId: input.apiKeyId },
+          `could not write the ${input.action} audit row`,
+        ),
+      );
   }
 
   private async assertMintableWithoutSession(input: PersonalIngestionKeyMint): Promise<void> {

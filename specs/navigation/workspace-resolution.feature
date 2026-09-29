@@ -40,6 +40,14 @@ Feature: Workspace resolution
     When a screen asks for my workspace
     Then it is told the workspace is still resolving
 
+  @integration @regression
+  Scenario: A project address is not called missing while its scope is still settling
+    Given the organization graph has answered
+    And my session or the project my address names has not settled yet
+    When the project chrome asks for my workspace
+    Then it is told the workspace is still resolving
+    And it does not draw the not-found page
+
   @integration
   Scenario: A workspace whose graph has answered has resolved
     Given my session has resolved

@@ -134,6 +134,23 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     return row !== null;
   }
 
+  /**
+   * Whether a later pass could still move a tenant: `parked` and `migrated` are the two re-entrant
+   * statuses. The hourly re-drive asks this first, so a latched fleet pays one row read per wake.
+   */
+  async hasTenantAwaitingRedrive({
+    migrationNames,
+  }: {
+    migrationNames: readonly string[];
+  }): Promise<boolean> {
+    if (migrationNames.length === 0) return false;
+    const row = await this.prisma.systemMigrationTenantState.findFirst({
+      where: { migrationName: { in: [...migrationNames] }, status: { in: ["parked", "migrated"] } },
+      select: { tenantId: true },
+    });
+    return row !== null;
+  }
+
   /** Ops rollup: how many tenants sit in each status for one migration. */
   async findStatusCounts({
     migrationName,

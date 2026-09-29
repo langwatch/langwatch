@@ -14,6 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -24,7 +25,6 @@ import { useEffect, useState } from "react";
 import { annotationScoresApi } from "../../behavior/annotation-scores-api.ts";
 import { AnnotationScoreDataType } from "../../model/annotation-score-data-type.ts";
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
-import { Link } from "../elements/annotation-link.tsx";
 import { NoDataInfoBlock } from "../elements/no-data-info-block.tsx";
 
 type AnnotationScore = {

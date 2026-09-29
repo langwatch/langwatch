@@ -1,4 +1,5 @@
 import type { WorkflowRepositories } from "../workflow-repositories.registry.ts";
+import { WorkflowLineageMemoryRepository } from "./memory.workflow-lineage.repository.ts";
 import { WorkflowProjectEnvironmentMemoryRepository } from "./memory.workflow-project-environment.repository.ts";
 import { WorkflowRowMemoryRepository } from "./memory.workflow-row.repository.ts";
 import { WorkflowMemoryRepository } from "./memory.workflow.repository.ts";
@@ -18,6 +19,7 @@ export class MemoryWorkflowRepositories {
       workflows: WorkflowMemoryRepository.create(store),
       workflowRows: WorkflowRowMemoryRepository.create(store),
       projectEnvironment: WorkflowProjectEnvironmentMemoryRepository.create(store),
+      lineage: WorkflowLineageMemoryRepository.create(store),
     };
   }
 }

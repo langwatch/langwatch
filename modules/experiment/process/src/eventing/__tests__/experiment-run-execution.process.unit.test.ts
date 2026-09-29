@@ -163,7 +163,7 @@ describe("the run's execution manager", () => {
 
       expect(sentAfter).toEqual([["cell:2:1"], ["cell:3:1"], ["cell:4:1"], ["cell:5:1"], [], []]);
       expect(sent(last?.intents, "complete")).toEqual([
-        { runId: "run_1", experimentId: "experiment_1", outcome: "finished" },
+        { runId: "run_1", experimentId: "experiment_1", outcome: "finished", finishedCells: 6 },
       ]);
       expect(last?.nextWakeAt).toBeNull();
     });
@@ -207,7 +207,7 @@ describe("the run's execution manager", () => {
       expect(aborted.intents ?? []).toEqual([]);
       expect(ordinalsSent(drained.intents)).toEqual([]);
       expect(sent(drained.intents, "complete")).toEqual([
-        { runId: "run_1", experimentId: "experiment_1", outcome: "stopped" },
+        { runId: "run_1", experimentId: "experiment_1", outcome: "stopped", finishedCells: 1 },
       ]);
     });
   });
@@ -260,7 +260,7 @@ describe("the run's execution manager", () => {
       const started = start(plan({ phaseOne: 0, phaseTwo: 0, concurrency: 2 }));
 
       expect(sent(started.intents, "complete")).toEqual([
-        { runId: "run_1", experimentId: "experiment_1", outcome: "finished" },
+        { runId: "run_1", experimentId: "experiment_1", outcome: "finished", finishedCells: 0 },
       ]);
     });
   });

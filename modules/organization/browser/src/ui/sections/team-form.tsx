@@ -14,6 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
@@ -31,7 +32,6 @@ import { api, type RouterOutputs } from "../../behavior/organization-api.ts";
 import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
-import { Link } from "../elements/link.tsx";
 import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
 /**

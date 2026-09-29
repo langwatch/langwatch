@@ -132,7 +132,8 @@ export const signedIssuedLicenseSchema = z.object({
 });
 export type SignedIssuedLicense = z.infer<typeof signedIssuedLicenseSchema>;
 
-const seatChangeBillingOutcomeSchema = z.enum(["invoiced", "nothing_to_invoice", "not_onboarded"]);
+/** `pending`: billing invoices the added seats from the change licensing recorded. */
+const seatChangeBillingOutcomeSchema = z.enum(["pending", "nothing_to_invoice"]);
 
 export const seatChangeResultSchema = z.object({
   ...signedIssuedLicenseSchema.shape,

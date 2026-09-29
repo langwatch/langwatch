@@ -2,9 +2,11 @@ import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event } from "../domain/types.ts";
+import { DispatchError } from "../queues/dispatchError.ts";
 import type { EventSourcedQueueProcessor } from "../queues/index.ts";
 import type { ExecutionTarget } from "../runtime.types.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
+import type { FailedHandoff, HandoffLaneKind } from "../services/handoff/failedHandoff.ts";
 import { type JobRegistryEntry, QueueManager } from "../services/queues/queueManager.ts";
 import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
@@ -211,28 +213,67 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   }
 
   /**
-   * Dispatch events from any pipeline. Called by EventSourcingService after local dispatch.
+   * Dispatch events from any pipeline. Called by EventSourcingService after
+   * local dispatch; answers the lanes it could not stage, for re-drive.
    */
   async dispatch(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
+  ): Promise<FailedHandoff<EventType>[]> {
     if (!this.hasProjections) {
-      return;
+      return [];
     }
     if (!this.router) {
-      // Error, not warning: nothing is thrown and nothing retries, so this is
-      // the last layer that can report the loss. The router is absent either
-      // before initialize() or after close() — in prod overwhelmingly the
-      // latter (SIGTERM mid-dispatch). Naming only the boot case cost five
-      // days chasing a race. See specs/observability/retryable-failure-log-level.feature.
+      // Absent before initialize() or after close(), in prod overwhelmingly
+      // the latter (SIGTERM mid-dispatch). Every lane is answered as failed so
+      // the caller records it. See specs/observability/retryable-failure-log-level.feature.
       this.logger.error(
         { eventCount: events.length },
-        "ProjectionRegistry has no router (not initialized, or already closed); events dropped",
+        "ProjectionRegistry has no router (not initialized, or already closed); its lanes are answered for re-drive",
       );
-      return;
+      return this.everyLaneFailed(events);
     }
-    await this.router.dispatch(events, context);
+    return this.router.dispatch(events, context);
+  }
+
+  /** Re-stages one recorded event onto one lane; throws while the registry cannot route. */
+  async redeliver(params: {
+    kind: HandoffLaneKind;
+    lane: string;
+    event: EventType;
+  }): Promise<void> {
+    if (!this.router) {
+      throw new DispatchError({
+        message: "ProjectionRegistry has no router (not initialized, or already closed)",
+        retryable: true,
+      });
+    }
+    await this.router.redeliver(params);
+  }
+
+  /** The registry's own lanes, each with the events it takes, as failed hand-offs. */
+  private everyLaneFailed(events: readonly EventType[]): FailedHandoff<EventType>[] {
+    const error = new Error(
+      "ProjectionRegistry has no router (not initialized, or already closed)",
+    );
+    const lanes = [
+      ...[...this.foldProjections].map(([lane, { definition }]) => ({
+        kind: "fold" as const,
+        lane,
+        eventTypes: definition.eventTypes,
+      })),
+      ...[...this.mapProjections].map(([lane, { definition }]) => ({
+        kind: "map" as const,
+        lane,
+        eventTypes: definition.eventTypes,
+      })),
+    ];
+    return lanes.flatMap(({ kind, lane, eventTypes }) => {
+      const taken = events.filter(
+        (event) => eventTypes.length === 0 || eventTypes.includes(event.type),
+      );
+      return taken.length > 0 ? [{ kind, lane, events: taken, error }] : [];
+    });
   }
 
   /**

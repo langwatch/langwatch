@@ -376,20 +376,19 @@ export class PrismaExperimentRepository extends ExperimentRepository {
         return this.staleWorkbenchWrite(transaction, input.projectId, row.id);
       }
       const nextVersion = row.workbenchVersion + 1;
-      const updated = await transaction.experiment.updateMany({
-        where: {
-          id: row.id,
-          projectId: input.projectId,
-          archivedAt: null,
-          workbenchVersion: row.workbenchVersion,
-        },
-        data: {
-          name: input.name,
-          workbenchState: input.state as Prisma.InputJsonValue,
-          workbenchVersion: nextVersion,
-        },
-      });
-      if (updated.count === 0) {
+      /** SQL, so the version fence sits on the row: `updateMany` re-checks only the id. */
+      const updated = await transaction.$executeRaw`
+        UPDATE "Experiment"
+           SET "name" = ${input.name},
+               "workbenchState" = ${JSON.stringify(input.state)}::jsonb,
+               "workbenchVersion" = ${nextVersion},
+               "updatedAt" = (now() AT TIME ZONE 'UTC')
+         WHERE "id" = ${row.id}
+           AND "projectId" = ${input.projectId}
+           AND "archivedAt" IS NULL
+           AND "workbenchVersion" = ${row.workbenchVersion}
+      `;
+      if (updated === 0) {
         return this.staleWorkbenchWrite(transaction, input.projectId, row.id);
       }
       const rolling = await transaction.experimentVersion.findFirst({
@@ -540,6 +539,18 @@ export class PrismaExperimentRepository extends ExperimentRepository {
       orderBy: { counterVersion: "desc" },
       take: input.take,
     });
+  }
+
+  async hasWorkbenchVersionOfRun(input: {
+    projectId: string;
+    experimentId: string;
+    runId: string;
+  }): Promise<boolean> {
+    const found = await this.database.experimentVersion.findFirst({
+      where: { projectId: input.projectId, experimentId: input.experimentId, runId: input.runId },
+      select: { id: true },
+    });
+    return found !== null;
   }
 
   async findWorkbenchVersion(input: {

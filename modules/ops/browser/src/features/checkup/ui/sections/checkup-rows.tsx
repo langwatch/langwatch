@@ -1,4 +1,5 @@
-import { Button, HStack, Input, Link, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { CheckGroup, CheckRow as CheckRowData } from "@langwatch/ops-contract";
 import { Activity, Cloud, ExternalLink, Plug, Server } from "lucide-react";
 import type { ReactNode } from "react";

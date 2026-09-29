@@ -239,10 +239,13 @@ function useSavedViewMutations(projectId: string, utils: SavedViewsUtils) {
 function useViewNavigation(router: SavedViewsRouter) {
   const resetAllFilters = useCallback(() => {
     const cleanQuery = keepOnFilterReset(router.query);
-    void router.push({ pathname: router.pathname, query: cleanQuery }, undefined, {
-      shallow: true,
-      scroll: false,
-    });
+    void router.push(
+      { pathname: router.pathname, query: cleanQuery },
+      {
+        shallow: true,
+        scroll: false,
+      },
+    );
   }, [router]);
 
   const applyViewFilters = useCallback(
@@ -257,7 +260,6 @@ function useViewNavigation(router: SavedViewsRouter) {
       });
       return router.push(
         { pathname: router.pathname, query: queryObj as Record<string, string | string[]> },
-        undefined,
         { shallow: true, scroll: false },
       );
     },

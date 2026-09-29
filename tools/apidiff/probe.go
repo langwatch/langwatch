@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -126,7 +127,8 @@ type ProbeResult struct {
 }
 
 // ProbeAll probes every selected operation in lockstep: each case runs on A
-// then immediately on B, keeping both databases in the same state. Operations
+// and B at once, and the next starts only when both answered, keeping both
+// databases in the same state. Operations
 // run in deterministic order (sorted by path, then method).
 func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation) ProbeResult {
 	client := options.Client
@@ -146,43 +148,26 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	// so the closing read has something to be compared against.
 	canaries := engine.credentialCanaries(operations)
 	credentialsBefore := engine.readCanaries(canaries)
+	started := time.Now()
 	engine.seedFixtures()
+	defer engine.fixtureTraceSettled()
 
-	findings := make([]Finding, 0)
-	probed := 0
-	collectionsVerified := false
-	for index := range selected {
-		operation := selected[index]
-		// Deletes run last and remove what the creates made, so the lists are
-		// read for the created entities before the first delete, not after.
-		if !collectionsVerified && operation.Method == http.MethodDelete {
-			findings = append(findings, engine.verifyCollections(selected)...)
-			collectionsVerified = true
-		}
-		if skip := notProbed(operation, options.ExcludePrefixes); skip != "" {
-			engine.progress("skip %s %s (%s) [%d/%d]\n", operation.Method, operation.Path, skip, index+1, len(selected))
-			continue
-		}
-		engine.progress("probe %s %s [%d/%d]\n", operation.Method, operation.Path, index+1, len(selected))
-		probed++
-		operationFindings := engine.probeOperation(operation)
-		findings = append(findings, operationFindings...)
-		if options.OnOperationDone != nil {
-			options.OnOperationDone(operation, operationFindings)
-		}
-	}
+	findings, probed, collectionsVerified := engine.mainPass(selected)
+	engine.progress("timing: main pass done after %s\n", time.Since(started).Round(time.Second))
 
 	// Post passes, after every mutation has had its chance to land.
 	if !collectionsVerified {
 		findings = append(findings, engine.verifyCollections(selected)...)
 	}
 	findings = append(findings, engine.permissionProbes(selected)...)
+	engine.progress("timing: collection and permission passes done after %s\n", time.Since(started).Round(time.Second))
 	findings = append(findings, engine.markUnverifiedLists(selected)...)
 	findings = append(findings, engine.entitledPass()...)
 
 	// The closing assertion: every credential still authenticates. A run that
 	// destroyed one produced agreement, not evidence.
 	checks := buildCredentialChecks(canaries, credentialsBefore, engine.readCanaries(canaries))
+	engine.progress("timing: probing done after %s\n", time.Since(started).Round(time.Second))
 	for _, check := range checks {
 		if !check.Healthy() {
 			engine.progress("credential %s: %s\n", check.Label, check.Note)
@@ -195,6 +180,37 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 		Suppressed:       engine.suppressed,
 		CredentialChecks: checks,
 	}
+}
+
+// mainPass probes every selected operation in order, verifying the lists
+// before the first delete, and answers the findings, the number probed and
+// whether the lists were verified.
+func (engine *probeEngine) mainPass(selected []Operation) ([]Finding, int, bool) {
+	findings := make([]Finding, 0)
+	probed := 0
+	collectionsVerified := false
+	for index := range selected {
+		operation := selected[index]
+		// Deletes run last and remove what the creates made, so the lists are
+		// read for the created entities before the first delete, not after.
+		if !collectionsVerified && operation.Method == http.MethodDelete {
+			findings = append(findings, engine.verifyCollections(selected)...)
+			collectionsVerified = true
+		}
+		if skip := notProbed(operation, engine.options.ExcludePrefixes); skip != "" {
+			engine.progress("skip %s %s (%s) [%d/%d]\n", operation.Method, operation.Path, skip, index+1, len(selected))
+			continue
+		}
+		engine.awaitFixtureTraceFor(operation)
+		engine.progress("probe %s %s [%d/%d]\n", operation.Method, operation.Path, index+1, len(selected))
+		probed++
+		operationFindings := engine.probeOperation(operation)
+		findings = append(findings, operationFindings...)
+		if engine.options.OnOperationDone != nil {
+			engine.options.OnOperationDone(operation, operationFindings)
+		}
+	}
+	return findings, probed, collectionsVerified
 }
 
 // notProbed names why an operation is left out of the run entirely, without
@@ -343,6 +359,13 @@ type probeEngine struct {
 	// (side-credentials.go).
 	credsA sideCredentials
 	credsB sideCredentials
+	// progressMu keeps lines whole when the two sides, the collection and
+	// permission pools, and the fixture-trace wait report at once.
+	progressMu sync.Mutex
+	// fixtureTrace closes when the background fixture-trace wait is over;
+	// traceAwaited says a trace-reading operation already waited on it.
+	fixtureTrace chan struct{}
+	traceAwaited bool
 }
 
 // sideIDs holds one operation's owner-visible IDs, per side.
@@ -362,6 +385,8 @@ func operationKeyOf(operation Operation) string {
 
 func (engine *probeEngine) progress(format string, args ...any) {
 	if engine.options.Progress != nil {
+		engine.progressMu.Lock()
+		defer engine.progressMu.Unlock()
 		fmt.Fprintf(engine.options.Progress, format, args...)
 	}
 }
@@ -601,7 +626,9 @@ type probeTarget struct {
 	headersB map[string]string
 }
 
-// runCase executes one probe case against both sides in lockstep (A then B).
+// runCase executes one probe case against both sides at once and returns when
+// both have answered. The sides share no state, so each side's own order of
+// requests is what lockstep keeps; the pair is still one step of the run.
 func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, target probeTarget) Transcript {
 	transcript := Transcript{
 		Method:       operation.Method,
@@ -615,23 +642,19 @@ func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, tar
 	if probeCase.perSide {
 		transcript.RequestBodyB = probeCase.bodyB
 	}
-	request := probeRequest{
-		method:  operation.Method,
-		headers: target.headersA,
-		body:    probeCase.body,
+	requestA := probeRequest{
+		method: operation.Method, body: probeCase.body,
+		baseURL: engine.options.A, path: target.pathA, query: target.queryA, headers: target.headersA,
 	}
-	request.baseURL = engine.options.A
-	request.path = target.pathA
-	request.query = target.queryA
-	transcript.A = engine.execute(request)
+	requestB := requestA
 	if probeCase.perSide {
-		request.body = probeCase.bodyB
+		requestB.body = probeCase.bodyB
 	}
-	request.headers = target.headersB
-	request.baseURL = engine.options.B
-	request.path = target.pathB
-	request.query = target.queryB
-	transcript.B = engine.execute(request)
+	requestB.baseURL, requestB.path, requestB.query, requestB.headers = engine.options.B, target.pathB, target.queryB, target.headersB
+	var group sync.WaitGroup
+	group.Go(func() { transcript.A = engine.execute(requestA) })
+	transcript.B = engine.execute(requestB)
+	group.Wait()
 	return transcript
 }
 

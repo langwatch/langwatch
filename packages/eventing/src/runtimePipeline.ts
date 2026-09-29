@@ -54,6 +54,7 @@ export class EventSourcingPipeline<
       parseEvent: definition.parseEvent,
       commandRegistrations: definition.commandRegistrations,
       globalRegistry: definition.globalRegistry,
+      handoffStore: definition.handoffStore,
       executionTarget: definition.executionTarget,
       replayMarkerChecker: definition.replayMarkerChecker,
       retentionPolicyResolver: definition.retentionPolicyResolver,

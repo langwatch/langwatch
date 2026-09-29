@@ -5,6 +5,7 @@
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import {
   PopoverAnchor,
   PopoverArrow,
@@ -14,8 +15,6 @@ import {
 } from "@langwatch/design-system/popover";
 import { Sparkles } from "lucide-react";
 import type React from "react";
-
-import NextLink from "../../elements/next-link.tsx";
 
 /** Why an Instant Eval did not start, and so what the popover says. */
 export type InstantEvalRefusal = { kind: "budget" } | { kind: "model" } | { kind: "unreleased" };
@@ -115,7 +114,7 @@ export function InstantEvalRefusalPopover({
                 {copy.body}
               </Text>
               <HStack gap={2}>
-                <NextLink
+                <RoutedLink
                   href={copy.action.href}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -130,7 +129,7 @@ export function InstantEvalRefusalPopover({
                   >
                     {copy.action.label}
                   </Button>
-                </NextLink>
+                </RoutedLink>
                 <Button size="xs" variant="ghost" onClick={onClose}>
                   {copy.dismiss}
                 </Button>

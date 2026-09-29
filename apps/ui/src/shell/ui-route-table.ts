@@ -325,6 +325,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             },
           },
           {
+            // Access's switches moved to Directory and Authentication; it lands on Directory.
+            path: "/settings/access",
+            redirect: { from: "/settings/access", to: "/settings/directory" },
+          },
+          {
             path: "/settings/connect",
             page: "pages/settings/connect",
           },
@@ -948,18 +953,20 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         path: "/ops/backoffice/directory-sync",
         page: "pages/ops/backoffice/directory-sync",
       },
+
+      // Both read the navigation host, which only this layout mounts; main drew
+      // its 404 inside the dashboard layout too.
+      // Spec: specs/navigation/project-address-redirect.feature
+      {
+        path: "/@project/*",
+        page: "pages/@project/[...path]/index",
+      },
+
+      // Catch-all 404 - must stay last.
+      {
+        path: "*",
+        page: "pages/not-found",
+      },
     ],
-  },
-
-  // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path
-  {
-    path: "/@project/*",
-    page: "pages/@project/[...path]/index",
-  },
-
-  // Catch-all 404 - must stay last.
-  {
-    path: "*",
-    page: "pages/not-found",
   },
 ];

@@ -116,3 +116,26 @@ describe("given the project holds one test suite", () => {
     expect(world.testSuites.get(testSuite.id)?.targets).toEqual([]);
   });
 });
+
+describe("given the project holds one run plan to archive", () => {
+  /** @scenario "Archiving a run plan through the alias archives it" */
+  it("falls back from the test suite to the run plan", async () => {
+    const { api, world } = mountSuiteFamilies();
+    const plan = world.addPlan({ name: "Nightly" });
+
+    const response = await api.delete(`${BASE}/${plan.id}`);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ id: plan.id, archived: true });
+  });
+
+  /** @scenario "Archiving an id the project does not hold through the alias answers suite_not_found" */
+  it("answers a named miss when neither noun holds the id", async () => {
+    const { api } = mountSuiteFamilies();
+
+    const response = await api.delete(`${BASE}/suite_nonexistent`);
+
+    expect(response.status).toBe(404);
+    await expect(errorCodeOf(response)).resolves.toBe("suite_not_found");
+  });
+});

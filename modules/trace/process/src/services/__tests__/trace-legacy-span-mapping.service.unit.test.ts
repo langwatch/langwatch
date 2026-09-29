@@ -1,5 +1,9 @@
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
+import {
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+  spanInputOutputSchema,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import * as TraceLegacySpanMappingService from "../../rules/trace-legacy-span-mapping.rules.ts";
@@ -758,6 +762,66 @@ describe("TraceLegacySpanMappingService.unflattenDotNotation", () => {
       const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.input).toEqual({ type: "text", value: "explicit input" });
+    });
+  });
+});
+
+describe("TraceLegacySpanMappingService chat message envelopes", () => {
+  const messages = [
+    { role: "system", content: "You are a judge." },
+    { role: "user", content: "Is the kettle refunded?" },
+  ];
+
+  describe("when an ai.generateText span stores its input as a messages envelope", () => {
+    /** @scenario "An ai.generateText span's input reads as chat messages" */
+    it("reads the input as the chat_messages list the trace schema declares", () => {
+      const span = makeSpan({
+        name: "ai.generateText",
+        spanAttributes: {
+          "gen_ai.input.messages": { messages },
+          "langwatch.reserved.value_types": ["gen_ai.input.messages=chat_messages"],
+        },
+      });
+
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({ type: "chat_messages", value: messages });
+      expect(spanInputOutputSchema.validate(result.input)).toBe(true);
+    });
+
+    /** @scenario "An ai.generateText span's input reads as chat messages" */
+    it("unwraps the envelope when ClickHouse hands it back as a JSON string", () => {
+      const span = makeSpan({
+        spanAttributes: { "gen_ai.input.messages": JSON.stringify({ messages }) },
+      });
+
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({ type: "chat_messages", value: messages });
+    });
+  });
+
+  describe("when the output messages are one message record", () => {
+    /** @scenario "A single stored message reads as a one-message chat" */
+    it("reads the output as a one-message chat", () => {
+      const reply = { role: "assistant", content: "Yes." };
+      const span = makeSpan({ spanAttributes: { "gen_ai.output.messages": reply } });
+
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
+
+      expect(result.output).toEqual({ type: "chat_messages", value: [reply] });
+    });
+  });
+
+  describe("when the input messages attribute carries no messages", () => {
+    /** @scenario "A chat value that carries no messages reads as json" */
+    it("reads it as json rather than an invalid chat_messages value", () => {
+      const span = makeSpan({ spanAttributes: { "gen_ai.input.messages": { prompt: "hi" } } });
+
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({ type: "json", value: { prompt: "hi" } });
+      expect(spanInputOutputSchema.validate(result.input)).toBe(true);
     });
   });
 });

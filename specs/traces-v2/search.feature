@@ -1424,6 +1424,26 @@ Rule: Enter routes a sentence
     And the query is applied as typed rather than routed
 
   @unit
+  Scenario: An apostrophe inside a word is part of the word, not a quote
+    When the user types "where did a member ask about cover their plan doesn't include?"
+    Then the whole text is the sentence and nothing is a syntax error
+    And contractions, possessives and a trailing plural possessive stay words too
+    And a value in single quotes is still a quoted value
+
+  @unit
+  Scenario: A lowercase "not" inside a sentence is a word of the sentence
+    When the user types "where did a member ask about cover that is not in their plan?"
+    Then the whole text, "not" included, is the sentence
+    And an uppercase NOT is still the negation operator
+
+  @unit
+  Scenario: The editor uppercases an operator only where it joins filter terms
+    When the user types "not" after a bare word of a sentence
+    Then it stays lowercase
+    And "and", "or" and "not" typed after a field:value term, a quoted phrase or a group are uppercased
+    And "not" typed at the start, after an opening parenthesis or after an operator is uppercased
+
+  @unit
   Scenario: Joining a query that holds a top-level OR groups it first
     Given a query "(a) OR (b)" and an addition "c"
     Then the joined query reads "((a) OR (b)) AND c"

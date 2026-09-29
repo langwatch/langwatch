@@ -7,7 +7,9 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -21,6 +23,7 @@ import {
   type OpsAppInfrastructure,
   type OpsCapability,
   type OpsEventingIntrospection,
+  type OpsSystemMigrationRunner,
 } from "../ops.app.ts";
 
 /** The staff address every fixture operator is measured against. */
@@ -73,12 +76,13 @@ export function createOpsTestInfrastructure(
       read: () => ({ searchLookbackDays: 365, hotTierDays: null, hotTierEnvVar: null }),
     },
     grafana: { findLinkConfig: () => null },
-    systemMigrations: createApiFixture<OpsAppInfrastructure["systemMigrations"]>({
-      requiresOperatorConfirmation: () => false,
-      enroll: async () => {},
-      withdraw: async () => {},
-      startPass: () => {},
-    }),
+    createSystemMigrations: () =>
+      createApiFixture<OpsSystemMigrationRunner>({
+        requiresOperatorConfirmation: () => false,
+        enroll: async () => {},
+        withdraw: async () => {},
+        startPass: async () => {},
+      }),
     bugReportRateLimiter: { consume: async () => ({ allowed: true }) },
     bugReportNotifier: { notify: async () => {} },
     explainClients: { findClient: () => null },
@@ -98,6 +102,8 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
       identity: createApiFixture<IdentityApi>(),
+      authz: createApiFixture<AuthzApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       auditLog:
         options.auditLog ??

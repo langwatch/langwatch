@@ -101,46 +101,74 @@ main's four points:
 
 Why the flag and not the projection: the fold lags the abort behind every result event already queued
 on the aggregate, and the per-second read inside the stream must be one cheap key read. The event is
-the durable record the manager honours, and the flag is the fast signal. The flag is cleared on `completed`.
+the durable record the manager honours, and the flag is the fast signal. The flag expires after an hour;
+a run id is never reused, so a finished run's flag stops nothing else.
 
 ## 7. Reads
 
-- **Folds the cells read (round 3):** `experimentRunPlan` (the plan `started` carried, written once) and
-  `experimentRunProgress` (finished-cell bitmap, each row's target outputs and traces, and the scored
-  verdicts a comparison folds in). Split so a cell's result never rewrites the plan. Both are stored
-  through `ExperimentRunFoldRepository` in Redis under `eval_v3_run:<runKey>:plan` and `:progress`
-  (24 h TTL); main's poller key `eval_v3_run:<runId>` is untouched until round 4 grows the progress
-  fold into the bullet below. A comparison cell waits (throws, the queue retries) until every target
-  cell's finish is folded, which is exact because a cell appends its results before its finish.
-- **Projection `experimentRunProgress`** (new fold, Redis store under main's key `eval_v3_run:<runId>`,
-  24 h TTL). It has the same JSON the pollers read today: `runId, projectId, experimentId,
-experimentSlug, status, progress, total, startedAt, finishedAt, summary, runUrl, error, recentEvents`
-  (last 50). It adds `seq` (per-run frame counter), the run's plan from `started` (D4), which every
-  cell reads its inputs from, and the `results` draft (`applyRunEvent` over targetOutputs and
-  evaluatorResults), which feeds write-back and the comparison cells (D2, D5). **The imperative Redis
-  progress store goes.** Its read (`findRunState`) stays over the fold store, and its writers
-  (createRun, addEvent, completeRun, failRun, stopRun) are deleted.
-- **SSE push path**, precedent: `RedisScenarioEventBroadcastChannel` and notification's
-  `broadcast:<type>` Redis publish, relayed by the api process to its open streams.
-  - A worker event subscriber (not fold-attached, no delay) maps each run event to its
-    `EvaluationV3Event` frame (`execution_started, target_result, evaluator_result, progress, stopped,
-done, error`) and publishes `{seq, frame}` on `experiment_run:<runId>` through a new channel
-    `ExperimentRunEventStream`, with Redis and memory twins.
-  - `cell_started` is published by the cell command straight onto the same channel, not appended.
-    It is ephemeral, as main's was.
+- **Two folds, split so a cell's result never rewrites the plan**, both through
+  `ExperimentRunFoldRepository` in Redis (24 h TTL), with a memory twin:
+  - `experimentRunPlan`: the plan `started` carried, written once, at `eval_v3_run:<runKey>:plan`.
+  - `experimentRunProgress`: at main's poller key `eval_v3_run:<runId>`, read by runId alone through
+    `readRunProgress` (the pollers, the SSE start and abort read it there; abort takes the run's
+    experimentId and project from it). Its store reads another experiment's run of the same runId as
+    empty, the collision main's key had. It holds main's poller JSON (`runId, projectId, experimentId,
+experimentSlug, status, progress, total, startedAt, finishedAt, summary` with `runUrl`, `error,
+domainError, traceId`), `recentEvents` (last 50, each `{seq, eventId, frame}`), `seq`, `failed`,
+    the finished-cell bitmap, each row's target outputs, traces and scored verdicts for comparison
+    cells, and each result's frame when the run writes its cells back. A cell is counted once, so a
+    redelivered finish neither recounts nor streams; a redelivered start or completion changes nothing.
+  - A comparison cell waits (throws, the queue retries) until every target cell's finish is folded,
+    exact because a cell appends its results before its finish.
+  - `experimentSlug` and `runUrl` come from the plan (optional fields the plan builder fills).
+- **Registration before the answer:** a polled start (`POST /:slug/run` without events) and a workflow
+  evaluation send their command, then wait (50 reads, 100 ms apart) until `readRunProgress` holds the
+  run under its experiment, so a poll straight after the answer finds it, as main's registration did.
+  A wait that runs out answers `service_unavailable` (503, capability "worker that registered the run
+  in time"); the command was sent, so a late worker still runs it.
+- **Runs refused before their start:** the refusal's `completed{failed}` carries the planned `total`,
+  so the poller reads it failed with that total. The ClickHouse `experimentRunState` store writes no
+  row for a run that folded only its completion (`rules/experiment-run-state.rules.ts`).
+- **SSE push path**, precedent: `RedisScenarioEventBroadcastChannel`.
+  - The fold numbers the frames each event streams (`rules/experiment-run-frames.rules.ts`:
+    `execution_started, target_result, evaluator_result, progress, stopped, done, error`). The fold
+    is unbatched (`coalesceMaxBatch: 1`), so its subscriber `experimentRunFrames` (worker) publishes
+    exactly its event's `{seq, frame}` on `experiment_run:<runId>` through `ExperimentRunEventStream`.
+    A redelivery republishes the same `seq`; a listener drops a `seq` it has seen.
+  - `cell_started` is published by the cell command straight onto the channel, not appended. It is
+    ephemeral, as main's was. It carries the last folded `seq` without advancing it, and the api
+    stream passes it through undeduplicated, since only folded frames are deduplicated.
   - The api handler **subscribes first, then sends StartExperimentRun, then streams**, so it misses no
-    frame. It ends on `done` or `stopped`.
+    frame. It ends on `done`, `stopped` or a run-level `error`.
+  - **No resume, as main had none:** a client that drops the stream polls `GET /runs/:runId` over the
+    fold. `seq` and `recentEvents` stay in the fold for the poller; nothing reads a `Last-Event-ID`.
   - Latency: one queue hop and one publish, roughly 50 to 300 ms per frame against main's
     in-process zero.
-- **Polled `GET /runs/:runId`** and `/results` read the fold. Wire unchanged.
-- **Other tabs:** they poll the same fold, which is what main's `runStateMirror` gave them. A reconnecting
-  SSE replays `recentEvents` after its last `seq`, then follows the channel.
-- **Board write-back** (main's per-event writer for execute, and `writeCellsBack` for saved-dataset
-  runs): a projection subscriber on `experimentRunProgress`, coalesced per run (1 s), writes the
-  `results` draft to the saved workbench when `persistResults` is set, with a final write on `completed`.
-- **Workflow evaluations:** the api still registers the run and sends RequestWorkflowEvaluation. The
-  worker's subscriber now prepares the run (workflow, version, dataset) and sends StartExperimentRun;
-  a refusal appends `completed{failed}` with the code.
+- **Polled `GET /runs/:runId`** and `/results` read the fold. Wire unchanged. Abort reads it too,
+  refusing another project's run as `run_not_found`, then sets the flag and sends
+  AbortExperimentRun under the fold's experimentId.
+- **Saved runs (`POST /:slug/run`)** plan an `origin: saved` run credited to the key's person and send
+  StartExperimentRun. Polled, the run answers at once with its link and writes the board for the
+  saved dataset; streamed, it streams like `execute` and writes nothing, as main's stream did. A
+  polled run refused before its start (ownership) is completed `failed` with the refusal and its
+  planned total.
+- **Board write-back, before `completed` (main's order):** the manager's `complete` intent carries
+  the cells it counted finished. Its executor, for a run whose plan persists results, first folds the
+  progress fold's kept result frames into main's draft and writes it through
+  `ExperimentRunResultsWriterService`, then sends CompleteExperimentRun. While the progress fold has
+  folded fewer finished cells than the manager counted, the executor throws and the outbox retries
+  it; the intent's last attempt writes what is folded, so the run always completes. The manager
+  completes only finished or stopped runs, so a failed run writes nothing, as main's did. The write
+  is credited to the plan's actor (a person, a Langy session or a key with no person), else the API.
+  It lands once per run: the write names the run as its actor's `runId`, and a redelivered intent
+  whose run the experiment's version history already holds (`hasWorkbenchVersionOfRun`) writes
+  nothing and bumps no version, even when a later run has written the board since.
+- **Workflow evaluations:** the api sends RequestWorkflowEvaluation and waits for its registration.
+  The progress fold stores the request as `running` with its slug and total (`seq` 0 until the start),
+  as main registered it. The worker's subscriber prepares the run (workflow, version, dataset), plans
+  it with its slug and link, and sends StartExperimentRun unless the fold shows the run already
+  started; a refusal appends `completed{failed}` with the serialised HandledError (none for an unnamed
+  failure) and the requested total, so the poller reads it failed with its code and total.
 
 ## 8. Collaborators per handler, and what is deleted
 
@@ -152,13 +180,18 @@ done, error`) and publishes `{seq, frame}` on `experiment_run:<runId>` through a
 - **The api's start:** `SuiteApi.assertConnectedAgentsRunnable`, execution-data loading, and the plan:
   phase-1 cells from `ExperimentCellPlanService`, phase-2 cells and setup skips from the comparison
   planner's configuration half.
-- **Deleted:**
-  - the orchestrator/driver async generator, `createEventStream`'s in-memory queue, `createSemaphore`
-    and `ExperimentRunLoopService`;
+- **Deleted (round 5c):**
+  - the orchestrator and driver async generator, `createEventStream`'s in-memory queue,
+    `createSemaphore`, `ExperimentRunLoopService` and `ExperimentRunStorageService`;
   - `ExperimentPollingRunService` (`void runExecution`) and `ExperimentRunStateMirrorService`;
-  - `ExperimentV3RunLoop.ports`/`startRun` and the collaborators held on the App;
-  - `buildExperimentRunLoop`, the Redis owner record, and the uncommitted in-process `startRun`.
-  - The collaborators move into the cell command's service unchanged.
+  - `ExperimentV3RunLoop`, `buildExperimentRunLoop`, the App's `run()` accessor and its runLoopOf and
+    runProgressOf gates, `defaultConcurrency` (the `runConcurrency` config replaces it), and
+    `connectedAgentOwnership`;
+  - the imperative progress repository with its Redis store, and the Redis owner record;
+  - the workflow request's in-api `createRun`: the fold registers the run, and `requestedRunIsUntouched`
+    reads the fold.
+  - The collaborators moved into the cell command's service unchanged; the availability refusals
+    moved to `rules/experiment-run-availability.rules.ts`.
 
 ## 9. Wire against main
 
@@ -181,6 +214,18 @@ foreign run, and GET runs' bodies. Differences:
    where main streamed the target's frame before dispatching its evaluators.
 9. A target, prompt or evaluator deleted after the run started fails that cell with its load error;
    main loaded everything once at start and never noticed.
+10. An evaluator that throws streams as its `evaluator_result` with an `error` result, where main
+    sent an `error` frame naming the evaluator; the board renders both alike (`applyRunEvent`).
+11. The board write lands before `completed`, as main's did, but a slow progress fold can delay the
+    completion by up to the intent's retries (about 15 s); past them the run completes with the
+    cells the fold had, where main's in-process writer always had every cell.
+12. A redelivered result event streams its frame again under a new `seq` (the fold keeps no applied
+    event ids); the board shows the same cell. A redelivered finish, start or completion streams
+    nothing.
+13. A streamed saved run can be polled by its runId; main's stream kept no poller state.
+14. A polled start or workflow evaluation whose worker does not fold it within the bounded wait
+    (5 s) answers 503 `service_unavailable`, where main registered the run itself and answered; the
+    command was sent, so the run may still start.
 
 ## 10. Decisions
 

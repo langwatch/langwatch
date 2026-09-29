@@ -148,6 +148,8 @@ function serviceWith({
     privateDataplaneOrganizationIds: () => privateDataplaneOrganizationIds,
     audit,
     runPass: vi.fn(),
+    requestPass: vi.fn(),
+    hasTenantAwaitingRedrive: vi.fn(),
     runTargetedPass,
     ...(waitingReports ? { waitingReports } : {}),
     ...(rollbackEffects ? { rollbackEffects } : {}),

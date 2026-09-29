@@ -3771,24 +3771,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/cron/old_lambdas_cleanup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description The same sweep, for a scheduler that issues it as a GET */
-        get: operations["readOldLambdasCleanup"];
-        put?: never;
-        /** @description Delete the studio's quiet NLP Lambda functions and their log groups */
-        post: operations["runOldLambdasCleanup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/query/reference": {
         parameters: {
             query?: never;
@@ -29043,74 +29025,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         message: string;
-                    };
-                };
-            };
-        };
-    };
-    readOldLambdasCleanup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        message: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        message: string;
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    runOldLambdasCleanup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        message: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        message: string;
-                        error: string;
                     };
                 };
             };

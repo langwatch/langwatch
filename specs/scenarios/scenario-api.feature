@@ -48,6 +48,17 @@ Feature: Scenario API
     When I PATCH the scenario with a new name
     Then the response is 200 and carries the new name
 
+  # A legacy project key names no person. The update is recorded the way main
+  # recorded it: no user is named, rather than the key's id, which is no
+  # User row and was refused by the last-updated-by foreign key.
+  @integration
+  Scenario: A legacy project key updates a scenario without naming a user
+    Given I am authenticated with a legacy project key
+    And a scenario exists
+    When I PATCH the scenario with a new name
+    Then the response is 200 and carries the new name
+    And the scenario names no user as its last editor
+
   @integration
   Scenario: REST rejects a model override with no provider prefix
     Given I am authenticated with a project API key

@@ -45,13 +45,13 @@ function testPorts(): TrpcRuntimeMembers<TestContext> {
 function mount(userId: string) {
   const acts: string[] = [];
   const oversight = ScimOversightService.create({
-    syncs: () => ({
+    syncs: {
       listForOperator: async () => {
         acts.push("listed");
         return { syncs: [], total: 0 };
       },
       findForOperator: async () => [],
-    }),
+    },
     organizations: { findProvisioningSummary: async () => null },
     identities: MemoryScimRepository.create(),
     lifecycle: { applyRedriven: async () => undefined },

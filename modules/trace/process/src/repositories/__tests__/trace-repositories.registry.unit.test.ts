@@ -118,7 +118,7 @@ describe("given the memory-backed trace repositories", () => {
     it("refuses the selection by naming the members it needs", () => {
       expect(() =>
         instantiateRepositories(traceRepositories, { tier: "live", members: {} }),
-      ).toThrow(/clickhouse|prisma/);
+      ).toThrow(/clickhouse|prisma|redis/);
     });
   });
 });

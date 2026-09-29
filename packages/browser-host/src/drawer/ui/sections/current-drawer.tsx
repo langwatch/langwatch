@@ -1,7 +1,7 @@
 /**
- * The one place a URL-addressed drawer is mounted, resolved through the
- * host's registry with its props (query params, complex props, flow
- * callbacks). Restriction collapses into one `restriction` prop from the host.
+ * The one place a URL-addressed drawer is mounted, with its props (query params,
+ * complex props, flow callbacks). A mounted drawer is open: `open` reaches it as
+ * `true`, never the address's drawer name. Restriction is one `restriction` prop.
  */
 
 import { Center, Spinner } from "@chakra-ui/react";
@@ -146,7 +146,12 @@ export function CurrentDrawer({
         }}
       >
         <Suspense fallback={<DrawerLoadingFallback />}>
-          <CurrentDrawerComponent {...queryDrawer} {...complexProps} {...flowCallbacksForDrawer} />
+          <CurrentDrawerComponent
+            {...queryDrawer}
+            {...complexProps}
+            {...flowCallbacksForDrawer}
+            open
+          />
         </Suspense>
       </ErrorBoundary>
     </DrawerOffsetProvider>

@@ -40,7 +40,7 @@ import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.
 import type {
   EvaluationExecution,
   EvaluationInputsResolution,
-  EvaluationRetentionFloor,
+  EvaluationRetentionLookup,
 } from "../evaluation.members.ts";
 
 /** The environment a test names, with nothing inherited from the process. */
@@ -114,9 +114,13 @@ class UnreachableExecution implements EvaluationExecution {
   }
 }
 
-class UnreachableRetentionFloor implements EvaluationRetentionFloor {
-  async getFloorMs(): Promise<number> {
-    return 0;
+class PlatformDefaultRetention implements EvaluationRetentionLookup {
+  getPlatformDefaultRetentionDays(): number {
+    return 30;
+  }
+
+  async findRetentionDays(): Promise<number[]> {
+    return [];
   }
 }
 
@@ -173,7 +177,7 @@ export function createEvaluationTestInfrastructure(
   overrides: Partial<EvaluationInfrastructure> = {},
 ): EvaluationInfrastructure {
   return {
-    retentionFloor: new UnreachableRetentionFloor(),
+    retention: new PlatformDefaultRetention(),
     execution: new UnreachableExecution(),
     inputResolution: new PassThroughInputsResolution(),
     environment: new TestEvaluationInstallEnvironment(),
@@ -243,11 +247,12 @@ export function createEvaluationTestApp(
     eventing: EvaluationEventingService.create({
       runs: EvaluationRunProjectionService.create({
         repository: repositories.runs,
-        retentionFloor: { getFloorMs: async () => 0 },
+        retention: new PlatformDefaultRetention(),
       }),
       analytics: createApiFixture<AnalyticsApi>(),
       analyticsFoldCache: repositories.analyticsFoldCache,
       defaultRetentionDays: () => 30,
+      tenantRetention: { resolve: async () => null },
     }),
   });
 }

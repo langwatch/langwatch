@@ -1,6 +1,6 @@
 /**
  * The address holds the whole state of the Agent Testing page, and every move inside the page is
- * a shallow push into the one catch-all route, so the page never remounts.
+ * a push of the page's real address, in place, so the page never remounts.
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/page-structure.feature
  */
@@ -25,15 +25,11 @@ const openAt = (asPath: string, query: Record<string, string | string[] | undefi
   router.query = { project: "demo", ...query };
 };
 
-/** The three arguments of the last push: route, address, options. */
+/** The one argument of the last push: the address itself. */
 const lastPush = () => {
   const call = router.push.mock.calls.at(-1);
   if (!call) throw new Error("nothing was pushed");
-  return {
-    route: call[0] as { pathname: string; query: Record<string, unknown> },
-    address: call[1] as string,
-    options: call[2] as { shallow: boolean },
-  };
+  return { address: call[0] as string, argumentCount: call.length };
 };
 
 describe("useAgentTestingRouting", () => {
@@ -109,7 +105,6 @@ describe("useAgentTestingRouting", () => {
       result.current.selectSuite({ kind: "suite", slug: "checkout" });
 
       expect(lastPush().address).toBe("/demo/agent-testing/suites/checkout");
-      expect(lastPush().route.pathname).toBe("/[project]/agent-testing/[[...path]]");
     });
 
     /** @scenario "The selected tab, suite and period are held in the address" */
@@ -134,12 +129,17 @@ describe("useAgentTestingRouting", () => {
       expect(lastPush().address).toBe("/demo/agent-testing/suites/checkout");
     });
 
-    it("moves without a page transition", () => {
+    /** @scenario "A section's own navigation pushes the address of the project the reader is in" */
+    it("pushes the real address of the project in the page address, never a route pattern", () => {
+      openAt("/other-project/agent-testing", { project: "other-project" });
       const { result } = renderHook(() => useAgentTestingRouting());
 
       result.current.selectSuite({ kind: "suite", slug: "checkout" });
 
-      expect(lastPush().options).toEqual({ shallow: true });
+      expect(lastPush()).toEqual({
+        address: "/other-project/agent-testing/suites/checkout",
+        argumentCount: 1,
+      });
     });
   });
 

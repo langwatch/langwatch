@@ -3,7 +3,6 @@ import type { StateProjectionStore } from "@langwatch/eventing";
 import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
 import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
 import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
-import type { ScimSyncFoldState } from "../eventing/scim-sync-state.projection.ts";
 import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
 import type { IdentityAccountRekeyRepository } from "./identity-account-rekey.repository.ts";
@@ -24,7 +23,6 @@ import type {
   JoinRequestListReadRepository,
 } from "./join-request.repository.ts";
 import type { MfaEnrollmentRepository } from "./mfa-enrollment.repository.ts";
-import type { ScimSyncReadRepository } from "./scim-sync.repository.ts";
 import type { SsoBreakGlassRepository } from "./sso-break-glass.repository.ts";
 import type { SsoConnectionBackofficeRepository } from "./sso-connection-backoffice.repository.ts";
 import type { SsoConnectionRegistrationRepository } from "./sso-connection-registration.repository.ts";
@@ -87,8 +85,6 @@ export interface IdentityRepositories {
   readonly mfaProjection: StateProjectionStore<MfaFoldState>;
   readonly joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
   readonly ssoConnectionHeads: StateProjectionStore<SsoConnectionFoldState>;
-  /** The directory-sync head and the reads over it (D08). */
-  readonly scimSyncs: StateProjectionStore<ScimSyncFoldState> & ScimSyncReadRepository;
   /** The three backfill reads the D01 secret-carry pass writes through. */
   readonly secretCarry: IdentitySecretCarryRepository;
   /** Who a join-request or domain-proof notice reaches. */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { gatewayDebitsStateSchema } from "../gateway-debit.process.ts";
 import { spendSettlementStateSchema } from "../gateway-spend-settlement.process.ts";
 
 describe("process state stored by the main release", () => {
@@ -10,5 +11,17 @@ describe("process state stored by the main release", () => {
     expect(
       spendSettlementStateSchema.parse({ admittedAtMs: 1, resolved: false, settleIssued: false }),
     ).toEqual({ lastSweepAt: null });
+  });
+  it("parses a gateway debits state as main stored it", () => {
+    const stored = {
+      endUserId: "",
+      virtualKeyId: "vk_1",
+      organizationId: "org_1",
+      teamId: "team_1",
+      principalUserId: "user_1",
+      admitted: true,
+      pendingOutcome: null,
+    };
+    expect(gatewayDebitsStateSchema.parse(stored)).toEqual(stored);
   });
 });

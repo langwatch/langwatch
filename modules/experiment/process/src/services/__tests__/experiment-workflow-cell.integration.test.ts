@@ -10,14 +10,15 @@ import {
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
 /**
- * Tests ExperimentRunOrchestratorService.executeWorkflowCell with a fake studio
+ * Tests ExperimentWorkflowCellService.executeWorkflowCell with a fake studio
  * boundary port fed scripted events instead of live NLP services.
  * @see specs/experiments-v3/evaluation-execution.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
-import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+import { ExperimentCellExecutionService } from "../experiment-cell-execution.service.ts";
+import { ExperimentWorkflowCellService } from "../experiment-workflow-cell.service.ts";
 import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
 
 const scripted: {
@@ -115,7 +116,7 @@ const gradingEvaluator = (sourceField: string): EvaluatorConfig => ({
 
 const run = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of ExperimentRunOrchestratorService.create().executeWorkflowCell({
+  for await (const event of executeWorkflowCell({
     cell,
     projectId: "p1",
     workflowDsl,
@@ -215,7 +216,7 @@ beforeEach(() => {
   scripted.dispatched = [];
 });
 
-describe("ExperimentRunOrchestratorService.executeWorkflowCell", () => {
+describe("ExperimentWorkflowCellService.executeWorkflowCell", () => {
   describe("given a workflow run that succeeds with an evaluator node", () => {
     describe("when the cell is executed", () => {
       /** @scenario "A workflow target produces one result per dataset row" */
@@ -363,3 +364,19 @@ describe("ExperimentRunOrchestratorService.executeWorkflowCell", () => {
     });
   });
 });
+
+/** A workflow cell executed as the run's cell command executes it. */
+function executeWorkflowCell({
+  ports: collaborators,
+  workflows: engine,
+  ...cell
+}: Parameters<ExperimentWorkflowCellService["executeWorkflowCell"]>[0] & {
+  ports: ExperimentRunCollaborators;
+  workflows: WorkflowApi;
+}): AsyncGenerator<EvaluationV3Event> {
+  return ExperimentWorkflowCellService.create({
+    ports: collaborators,
+    workflows: engine,
+    cells: ExperimentCellExecutionService.create({ ports: collaborators, workflows: engine }),
+  }).executeWorkflowCell(cell);
+}

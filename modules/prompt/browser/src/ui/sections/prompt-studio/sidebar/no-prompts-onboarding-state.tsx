@@ -1,13 +1,10 @@
 import { Button, Center, EmptyState, HStack } from "@chakra-ui/react";
 import { LuSparkles } from "react-icons/lu";
 
+import { SetupWithAgentButton } from "../../../../behavior/lent-setup-with-agent-button.tsx";
 import { useCreateDraftPrompt } from "../../../../behavior/use-create-draft-prompt.ts";
 
-/**
- * What a project with no prompts at all shows. `SetupWithAgentButton` DID
- * NOT TRAVEL: 367 lines of `platform/app` chrome reaching Langy, which
- * `apps/ui` may not import - the same loss other families took.
- */
+/** What a project with no prompts at all shows. */
 export function NoPromptsOnboardingState() {
   const { createDraftPrompt } = useCreateDraftPrompt();
 
@@ -27,6 +24,7 @@ export function NoPromptsOnboardingState() {
             <Button variant="outline" size="sm" onClick={() => void createDraftPrompt()}>
               Create First Prompt
             </Button>
+            <SetupWithAgentButton surface="prompts" />
           </HStack>
         </EmptyState.Content>
       </EmptyState.Root>

@@ -1,12 +1,15 @@
 import { Text } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+
+/** Wide enough for a typical worktree slug; a longer one truncates. */
+const LABEL_MAX_WIDTH = "220px";
 
 /**
- * The DEV pill in the top bar of a development build, shared by the
- * legacy chrome and navigation-v2 shells: both draw the same top bar
- * while the two modes ship together, so a style change must reach both.
+ * The development pill in the top bar: "DEV", or the haven stack's slug when
+ * the deployment names one. A long slug truncates; the tooltip holds it whole.
  */
-export function DevBadge() {
-  return (
+export function DevBadge({ label }: { label?: string }) {
+  const pill = (
     <Text
       fontSize="11px"
       fontWeight="bold"
@@ -16,12 +19,16 @@ export function DevBadge() {
       borderColor="whiteAlpha.300"
       borderRadius="full"
       height="32px"
+      lineHeight="30px"
       paddingX={3}
-      display="flex"
-      alignItems="center"
-      letterSpacing="wider"
+      maxWidth={LABEL_MAX_WIDTH}
+      flexShrink={0}
+      truncate
+      letterSpacing={label ? "normal" : "wider"}
     >
-      DEV
+      {label ?? "DEV"}
     </Text>
   );
+  if (!label) return pill;
+  return <Tooltip content={label}>{pill}</Tooltip>;
 }

@@ -22,7 +22,6 @@ vi.mock("@langwatch/langy-browser-kit", () => ({
       : [{ label: "Show me around", icon: () => null, prompt: "show me around" }],
 }));
 
-vi.mock("../dev/home-dev-state.ts", () => ({ useHomeDevState: () => null }));
 vi.mock("../welcome-header.tsx", () => ({ WelcomeHeader: () => <div>Good morning</div> }));
 
 const reachMock = vi.fn();
@@ -53,9 +52,6 @@ class StubProjectHomeHost extends ProjectHomeHost {
   }
   hasPermission(): boolean {
     return true;
-  }
-  featureFlag() {
-    return { enabled: false, isLoading: false };
   }
   langyVisibility() {
     return { show: true, isResolving: false };

@@ -361,13 +361,9 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
 
         // navigateToSuite must fire — router.push called with the run-plans path
         expect(mockRouterPush).toHaveBeenCalled();
-        const pushCall = mockRouterPush.mock.calls[0]!;
-        const [routeArg] = pushCall;
-        expect(routeArg).toMatchObject({
-          query: expect.objectContaining({
-            path: expect.arrayContaining(["run-plans", "newly-saved-slug"]),
-          }),
-        });
+        expect(mockRouterPush.mock.calls[0]).toEqual([
+          "/test-project/simulations/run-plans/newly-saved-slug",
+        ]);
       });
     });
   });
@@ -390,13 +386,9 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
         capturedOnViewRun.current!("suite_target");
 
         expect(mockRouterPush).toHaveBeenCalled();
-        const pushCall = mockRouterPush.mock.calls[0]!;
-        const [routeArg] = pushCall;
-        expect(routeArg).toMatchObject({
-          query: expect.objectContaining({
-            path: expect.arrayContaining(["run-plans", "target-suite-slug"]),
-          }),
-        });
+        expect(mockRouterPush.mock.calls[0]).toEqual([
+          "/test-project/simulations/run-plans/target-suite-slug",
+        ]);
       });
     });
   });

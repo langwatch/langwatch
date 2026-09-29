@@ -39,7 +39,13 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
       "path": "../../experiment/contract/tsconfig.build.json"
@@ -55,6 +61,9 @@
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"

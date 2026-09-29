@@ -5,8 +5,11 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { Encryption, RateLimiter } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterAll, describe, expect, it } from "vitest";
@@ -37,6 +40,8 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
       const cleared: string[] = [];
       const app = await LicensingApp.create({
         dependencies: {
+          instantEval: createApiFixture<InstantEvalApi>(),
+          projects: createApiFixture<ProjectApi>(),
           organizations: createApiFixture<OrganizationApi>(),
           gateway: createApiFixture<GatewayApi>({
             clearConnectUpstreamInternal: async ({ organizationId }) => {
@@ -47,6 +52,8 @@ describe.skipIf(!TEST_DATABASE_URL)("the install's hosted provider slot in produ
         members: {
           prisma,
           logger: createTestLogger().logger,
+          encryption: createApiFixture<Encryption>(),
+          rateLimiter: createApiFixture<RateLimiter>(),
           isSaas: false,
           serviceVersion: "test",
         },

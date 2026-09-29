@@ -322,9 +322,11 @@ func restDiffLines(diff RestDiff) []string {
 // WriteParityPlan is the parity step in -dry-run's plan.
 func WriteParityPlan(writer io.Writer, plan DryRunPlan) {
 	fmt.Fprintf(writer, "  parity (phase one, before any stack boots; -parity-only stops after it)\n")
-	fmt.Fprintf(writer, "    pnpm install + start:prepare:files in both worktrees (no workspace build)\n")
+	fmt.Fprintf(writer, "    both trees at once, once per run: pnpm install + start:prepare:files (+ ensure-built on the modular layout); boot reuses them, and a persistent worktree whose tree was prepared before skips it\n")
 	fmt.Fprintf(writer, "    pnpm exec tsx %s (in %s/platform/app; a modular main runs like the branch), datastore URLs pointed at a closed port\n", inventoryScriptName, plan.MainDir)
-	fmt.Fprintf(writer, "    node --experimental-transform-types %s (in %s/branch/packages/api)\n", inventoryScriptName, plan.WorkRoot)
+	fmt.Fprintf(writer, "    node --experimental-transform-types %s (in %s/packages/api)\n", inventoryScriptName, plan.BranchDir)
 	fmt.Fprintf(writer, "    served routes: %s in the same two places (main's built Hono router; the branch's installed server modules and API lanes)\n", routeScriptName)
+	fmt.Fprintf(writer, "    the inventories run in the background, beside migrate and seed; the probes wait for them\n")
+	fmt.Fprintf(writer, "    a checked-out tree read before reuses its manifests from .apidiff/inventory-cache\n")
 	fmt.Fprintf(writer, "    write %s/parity.json and %s/parity/<module>.md\n", plan.WorkRoot, plan.WorkRoot)
 }

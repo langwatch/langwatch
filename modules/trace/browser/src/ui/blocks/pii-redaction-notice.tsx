@@ -1,8 +1,7 @@
 import { Alert, Link } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { hasRedactionMarker } from "@langwatch/redaction";
 import type React from "react";
-
-import NextLink from "../elements/next-link.tsx";
 
 /**
  * Banner shown when trace content carries redaction markers.
@@ -28,7 +27,7 @@ export function PIIRedactionAlert({ children }: { children?: React.ReactNode }) 
             "Some content was redacted by this project's privacy settings (PII or secrets redaction)."}{" "}
           Review your privacy settings under{" "}
           <Link asChild color="blue.600" textDecoration="underline">
-            <NextLink href={settingsHref}>Settings</NextLink>
+            <RoutedLink href={settingsHref}>Settings</RoutedLink>
           </Link>
           .
         </Alert.Description>

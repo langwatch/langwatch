@@ -215,7 +215,7 @@ describe("map projection enqueue-time contract", () => {
           }),
         );
 
-        await expect(router.dispatch([makeEvent("keep-1")], readContext)).resolves.toBeUndefined();
+        expect(await router.dispatch([makeEvent("keep-1")], readContext)).toEqual([]);
         expect(queued().map((event) => event.id)).toEqual(["evt-keep-1"]);
       });
     });

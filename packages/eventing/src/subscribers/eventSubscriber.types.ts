@@ -30,13 +30,13 @@ export interface EventSubscriberContext {
 }
 
 /**
- * Enqueue-time hooks (routing worker, pre-staging).
- * Hooks MUST be total: dispatch has no retry, so throws are permanent losses.
+ * Enqueue-time hooks (routing worker, pre-staging). A throw fails the staging,
+ * which is recorded in the hand-off outbox and retried until it dead-letters.
  * See ADR-069 for payload-cost doctrine and deploy-order dependencies.
  */
 export interface EnqueueDispatchOptions<E extends Event = Event> {
   /**
-   * Total predicate: false means no job is staged; throws are permanent losses.
+   * Total predicate: false means no job is staged; a throw fails the staging.
    * Use only cheap checks: set lookup, typeof, field comparison.
    */
   filter?: (event: E) => boolean;

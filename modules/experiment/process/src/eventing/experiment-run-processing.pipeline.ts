@@ -10,6 +10,7 @@ import {
   type EventingSetup,
   type FoldProjectionStore,
   type Projection,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
@@ -47,6 +48,7 @@ import {
   experimentRunExecutionProcess,
 } from "./experiment-run-execution.process.ts";
 import { EXPERIMENT_RUN_EXECUTION_PROCESS_NAME } from "./experiment-run-execution.schemas.ts";
+import type { ExperimentRunProgressSubscriber } from "./experiment-run-frames.subscriber.ts";
 import { ExperimentRunPlanFoldProjection } from "./experiment-run-plan.projection.ts";
 import {
   AbortExperimentRunCommand,
@@ -90,6 +92,10 @@ export interface ClickhouseExperimentRunProcessingRepository {
   executeCell: ExecuteExperimentCellCommand;
   /** What the run's execution manager's intents send. */
   runExecution: ExperimentRunExecutionEffects;
+  /** The progress fold's reaction: each event's frames, live on the run's channel. */
+  runFrames: ExperimentRunProgressSubscriber;
+  /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
 }
 
 export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
@@ -149,9 +155,10 @@ export function buildExperimentRunProcessingPipeline(
     .withProcessManager(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
       experimentRunExecutionProcess(deps.runExecution),
-    );
+    )
+    .withProjectionSubscriber(deps.runFrames.name, deps.runFrames.spec);
 
-  return builder
+  return (deps.retention ? builder.withRetention(deps.retention) : builder)
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)

@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -133,44 +134,65 @@ func TestActionsRefuseAnotherOrigin(t *testing.T) {
 	})
 }
 
+// hubActions reads what /api/hub offers: each stack's restart and each idle
+// worktree's start, the flags apps/haven-web draws its buttons from.
+func hubActions(t *testing.T, config Config) (restart map[string]bool, start map[string]bool) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/api/hub", nil)
+	rec := httptest.NewRecorder()
+	New(config).routes().ServeHTTP(rec, req)
+	var hub hubJSON
+	if err := json.Unmarshal(rec.Body.Bytes(), &hub); err != nil {
+		t.Fatalf("decoding /api/hub: %v", err)
+	}
+	restart, start = map[string]bool{}, map[string]bool{}
+	for i := range hub.Stacks {
+		restart[hub.Stacks[i].Slug] = hub.Stacks[i].CanRestart
+	}
+	for _, wt := range hub.Worktrees {
+		start[wt.Dir] = wt.CanStart
+	}
+	return restart, start
+}
+
 // @scenario "A running stack can be restarted from the dashboard"
 func TestButtonsAppearOnlyWhenWired(t *testing.T) {
-	stacks := []domain.Stack{{Slug: "portless", WorktreeDir: "/repos/wt/portless", LauncherPID: 42}}
-	in := renderInputs{
-		sharedURL: func(svc string) string { return "https://" + svc + ".langwatch.localhost" },
-		probes:    Probes{ProcessAlive: func(int) bool { return true }},
-		extras:    Extras{Worktrees: []WorktreeView{{Slug: "idle", Dir: "/repos/wt/idle", Branch: "main"}}},
+	config := Config{
+		Stacks: func() []domain.Stack {
+			return []domain.Stack{{Slug: "portless", WorktreeDir: "/repos/wt/portless", LauncherPID: 42}}
+		},
+		SharedURL: func(svc string) string { return "https://" + svc + ".langwatch.localhost" },
+		Probes:    Probes{ProcessAlive: func(int) bool { return true }},
+		Extras: func() Extras {
+			return Extras{Worktrees: []WorktreeView{{Slug: "idle", Dir: "/repos/wt/idle", Branch: "main"}}}
+		},
 	}
 
 	t.Run("given a haven with no actions wired", func(t *testing.T) {
-		page := renderHTML(stacks, in)
-		// The attribute with a value is a rendered button; the bare word also
-		// appears in the page's own script, which is always present.
-		for _, marker := range []string{`data-restart="`, `data-start="`} {
-			if strings.Contains(page, marker) {
-				t.Errorf("a button nothing is wired to would answer every press with a refusal: %s", marker)
-			}
+		restart, start := hubActions(t, config)
+		if restart["portless"] || start["/repos/wt/idle"] {
+			t.Errorf("a button nothing is wired to would answer every press with a refusal: restart %v start %v", restart, start)
 		}
 	})
 
+	wired := config
+	wired.Actions = Actions{Restart: func(string, string) (string, error) { return "", nil }, Start: func(string) error { return nil }}
+
 	t.Run("given both actions wired", func(t *testing.T) {
-		wired := in
-		wired.canRestart, wired.canStart = true, true
-		page := renderHTML(stacks, wired)
-		if !strings.Contains(page, `data-restart="portless"`) {
+		restart, start := hubActions(t, wired)
+		if !restart["portless"] {
 			t.Error("a live stack offers restart")
 		}
-		if !strings.Contains(page, `data-start="/repos/wt/idle"`) {
+		if !start["/repos/wt/idle"] {
 			t.Error("an idle worktree offers start")
 		}
 	})
 
 	t.Run("given a stack whose launcher is gone", func(t *testing.T) {
-		stale := in
-		stale.canRestart = true
-		stale.probes = Probes{ProcessAlive: func(int) bool { return false }}
-		if strings.Contains(renderHTML(stacks, stale), `data-restart="`) {
-			t.Error("bouncing a stack with no launcher would find nothing to signal — that one is started, not restarted")
+		stale := wired
+		stale.Probes = Probes{ProcessAlive: func(int) bool { return false }}
+		if restart, _ := hubActions(t, stale); restart["portless"] {
+			t.Error("bouncing a stack with no launcher would find nothing to signal; that one is started, not restarted")
 		}
 	})
 }

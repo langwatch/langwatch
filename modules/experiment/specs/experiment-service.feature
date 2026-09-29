@@ -41,17 +41,14 @@ Feature: Experiment service boundary
   # ── The SDK's create-or-take door: POST /api/experiment/init ─────────
   # Every refusal below is a handled error in the canonical envelope.
 
-  @unimplemented
-  # The credential port is the process's, and the composition that binds it is
-  # not landed yet; this is bound where that port is composed.
+  @unit
   Scenario: A create-or-take call with no credential is refused before the body is read
     Given a request to the experiment create-or-take door carrying no project key
     When the door answers
     Then it refuses at 401 with code "missing_credentials"
     And nothing is read from the experiment store
 
-  @unimplemented
-  # As above: the ceiling is enforced by the process's credential port.
+  @unit
   Scenario: A key without permission to manage experiments is refused as sent
     Given a project key that may not manage experiments
     When it calls the experiment create-or-take door

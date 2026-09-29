@@ -82,7 +82,7 @@ export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProp
       </HStack>
 
       <HStack gap={2} justifyContent="flex-end" overflow="hidden">
-        {showDevelopmentIndicator && <DevBadge />}
+        {showDevelopmentIndicator && <DevBadge label={host.deployment().devIndicatorLabel} />}
         {accountMenu?.headerBanner}
         {host.commandBar()?.trigger}
         <AppHeaderUserMenu />

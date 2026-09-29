@@ -42,10 +42,7 @@ import {
 } from "./gateway-spend.intent.ts";
 import { GatewaySpendFoldProjection, type GatewaySpendState } from "./gateway-spend.projection.ts";
 
-/**
- * gateway_spend, registered by the module that owns it. The webhook and debit
- * reactions arrive as subscribers once WebhookApi/GovernanceApi hold their ops (WP-6b).
- */
+/** gateway_spend, registered by the module that owns it, with its debit and settlement managers. */
 export const gatewaySpendEventing = defineEventingModule({
   pipeline: GATEWAY_SPEND_PIPELINE_NAME,
   build: ({ app, participation }: EventingSetup<undefined, GatewayApp>) =>
@@ -54,9 +51,8 @@ export const gatewaySpendEventing = defineEventingModule({
 });
 
 /**
- * A process manager another feature owns, mounted here under the name its
- * durable rows are already keyed by — renaming loses inbox/state/outbox
- * rows. Debits live in a module this one may not depend on.
+ * A process manager mounted under the name its durable rows are already keyed
+ * by: renaming loses inbox/state/outbox rows.
  */
 export interface GatewaySpendProcessManagerMount {
   name: string;
@@ -76,8 +72,8 @@ export interface EventingGatewaySpendAdapterOptions {
   ) => FoldProjectionStore<GatewaySpendState>;
   /** Webhook's own delivery op; each committed spend step is handed to it (WP-6c). */
   webhookSpendDelivery?: Pick<WebhookApi, "requestSpendDelivery">;
-  /** The gateway's budget debits; absent without the ClickHouse spend path
-   *  (the ledger is the only spend store). */
+  /** The gateway's budget debits (`gatewayDebits`); absent without the
+   *  ClickHouse spend path (the ledger is the only spend store). */
   gatewayDebits?: GatewaySpendProcessManagerMount;
   /** The M2 settlement sweeper: settles admissions whose confirmation
    *  never arrived inside the grace window. Its command sender arrives

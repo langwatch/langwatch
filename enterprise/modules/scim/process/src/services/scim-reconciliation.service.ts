@@ -2,10 +2,10 @@
 /**
  * The organization's view of its directory sync (ADR-122).
  *
- * Composed from four owners rather than queried: identity answers where each
- * connection and its sync stand, authz answers what the directory changed,
- * the user module answers who those people are, and the directory ownership
- * rows are this module's own. Nothing here reads a table another module
+ * Composed from four owners rather than queried: identity answers which
+ * connections exist, authz answers what the directory changed, the user
+ * module answers who those people are, and each sync and the directory
+ * ownership rows are this module's own. Nothing here reads a table another module
  * owns, which is the whole reason the view is assembled in a service.
  *
  * Organization-scoped by construction: every read is BUILT from the
@@ -24,12 +24,9 @@ import {
   type ScimReconciliationChange,
   type ScimReconciliationFailure,
   type ScimService,
+  type ScimSyncState,
 } from "@langwatch/enterprise-scim-contract";
-import type {
-  IdentityApi,
-  OrganizationSsoConnection,
-  ScimSyncState,
-} from "@langwatch/identity-contract";
+import type { IdentityApi, OrganizationSsoConnection } from "@langwatch/identity-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -40,11 +37,14 @@ import {
   directoryFailureCopy,
   scimSyncStatusCopy,
 } from "../rules/scim-reconciliation-copy.rules.ts";
+import type { ScimSyncReadsService } from "./scim-sync-reads.service.ts";
 
 /** Every answer this view is assembled from, each from the module that owns it. */
 export type ScimReconciliationReads = {
-  /** The organization's connections, and where each one's sync stands. */
-  identity: Pick<IdentityApi, "ssoConnectionReads" | "scimSyncReads">;
+  /** The organization's connections. Identity owns those rows. */
+  identity: Pick<IdentityApi, "ssoConnectionReads">;
+  /** Where each connection's sync stands. This module's own fold. */
+  syncs: Pick<ScimSyncReadsService, "findForOrganization" | "findByConnection" | "findActivity">;
   /** What the directory attached and took back. Authz owns those rows. */
   grants: Pick<AuthzApi, "findDirectoryCausedChanges">;
   /** Who a change was about, so a reader sees a name rather than an id. */
@@ -67,7 +67,7 @@ export class ScimReconciliationService {
   }): Promise<OrganizationReconciliation> {
     const [connections, syncs] = await Promise.all([
       this.reads.identity.ssoConnectionReads().findForOrganization({ organizationId }),
-      this.reads.identity.scimSyncReads().findForOrganization({ organizationId }),
+      this.reads.syncs.findForOrganization({ organizationId }),
     ]);
     const syncOf = new Map(syncs.map((sync) => [sync.connectionId, sync]));
     const [managed, recentChanges] = await Promise.all([
@@ -104,7 +104,7 @@ export class ScimReconciliationService {
     if (!connection) return [];
 
     const [sync, managed] = await Promise.all([
-      this.reads.identity.scimSyncReads().findByConnection({ organizationId, connectionId }),
+      this.reads.syncs.findByConnection({ organizationId, connectionId }),
       this.#countManagedPeople({ connectionIds: [connectionId] }),
     ]);
 
@@ -129,9 +129,11 @@ export class ScimReconciliationService {
     organizationId: string;
     connectionId: string;
   }): Promise<ScimDirectoryActivityEntry[]> {
-    const entries = await this.reads.identity
-      .scimSyncReads()
-      .findActivity({ organizationId, connectionId, limit: DIRECTORY_ACTIVITY_LIMIT });
+    const entries = await this.reads.syncs.findActivity({
+      organizationId,
+      connectionId,
+      limit: DIRECTORY_ACTIVITY_LIMIT,
+    });
     const names = await this.#peopleNames({
       userIds: entries
         .map((entry) => entry.userId)

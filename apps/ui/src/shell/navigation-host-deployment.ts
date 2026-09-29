@@ -28,6 +28,7 @@ export function readNavigationDeployment(): NavigationDeployment {
       isSaaS: process.deployment === "saas",
       isDevelopment: process.mode === "development",
       ...(process.hideDevIndicator ? { hideDevIndicator: true } : {}),
+      ...(process.devIndicatorLabel ? { devIndicatorLabel: process.devIndicatorLabel } : {}),
       ...authz,
       hasNlpService: process.nlp,
       hasLangevals: evaluation.langevals,

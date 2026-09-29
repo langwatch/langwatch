@@ -7,7 +7,6 @@ import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
  * behind these stays private — composition states substrates, never classes.
  */
 import { BillingApp } from "./app/billing.app.ts";
-import { BillableEventsMeterProjection } from "./eventing/billable-events-meter.projection.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
 import type { BillableEventsMeterRepository } from "./repositories/billable-events-meter.repository.ts";
@@ -77,21 +76,6 @@ export function createBillableEventsMeter(options: {
   clickhouse: ClickHouseQueryClient;
 }): BillableEventsMeterRepository {
   return liveClickhouseRepositories(options.clickhouse).billableEventsMeter;
-}
-
-/**
- * The metering projection a worker registers, over the process's own tenant-keyed
- * endpoint: the meter and the projection are built together here so a composing
- * process names neither class.
- */
-export function createBillableEventsMeterProjection(options: {
-  organizations: BillingTenantOrganizationService;
-  clickhouse: ClickHouseQueryClient;
-}): ReturnType<BillableEventsMeterProjection["build"]> {
-  return BillableEventsMeterProjection.create({
-    organizations: options.organizations,
-    meter: createBillableEventsMeter({ clickhouse: options.clickhouse }),
-  }).build();
 }
 
 function liveClickhouseRepositories(clickhouse: ClickHouseQueryClient) {

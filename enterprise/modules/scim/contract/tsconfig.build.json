@@ -30,6 +30,9 @@
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/identity/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/kernel/tsconfig.build.json"
     },
     {

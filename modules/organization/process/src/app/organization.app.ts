@@ -119,10 +119,12 @@ import type * as organizationContractModule from "@langwatch/organization-contra
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
+import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
 import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
 import type { RecordSeatLimitReachedCommandData } from "../eventing/seat-limit.events.ts";
 import {
   buildSeatLimitPipeline,
@@ -147,6 +149,7 @@ import {
   type PersonalTeamScopeReader,
 } from "../services/personal-team-scope.service.ts";
 import type { SeatLimitNoticeService } from "../services/seat-limit-notice.service.ts";
+import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import type { TeamManagementApi } from "../transport/team.rest.ts";
 import { buildOrganizationInfrastructure } from "./organization-composition.build.ts";
 import type {
@@ -311,9 +314,20 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     "publicBaseUrl",
     "processName",
   ] as const;
+  /** LangWatch's own sign-ups Slack webhook, shared with billing, auth and identity (ADR-132). */
+  static readonly secrets = { internalSlackSignupsWebhook } as const;
   #dependencies: ServerOrganizationAppDependencies;
 
-  static create(setup: OrganizationSetup): ServerOrganizationApp {
+  static async create(setup: OrganizationSetup): Promise<ServerOrganizationApp> {
+    const signupAnnouncements = await setup.secrets.into(
+      ServerOrganizationApp.secrets.internalSlackSignupsWebhook,
+      (webhookUrl) =>
+        SignupAnnouncementService.create({
+          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
+          publicBaseUrl: setup.members.publicBaseUrl,
+          logger: setup.members.logger,
+        }),
+    );
     const members = buildOrganizationInfrastructure({
       prisma: setup.members.prisma,
       encryption: setup.members.encryption,
@@ -321,6 +335,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       redis: setup.members.redis,
       publicBaseUrl: setup.members.publicBaseUrl,
       processName: setup.members.processName,
+      signupAnnouncements,
       // The peer reference is stored now and called on first read, which is
       // after boot: a peer API refuses while the process is still constructing.
       demoProject: {

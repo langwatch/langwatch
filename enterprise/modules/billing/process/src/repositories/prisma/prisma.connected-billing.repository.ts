@@ -188,23 +188,30 @@ export class PrismaConnectedBillingRepository extends ConnectedBillingRepository
     });
   }
 
-  async findSeatChange(licenseRowId: string): Promise<ConnectedSeatChangeRecord | null> {
-    return mapSeatChange(
-      await this.prisma.connectedSeatChange.findUnique({ where: { licenseId: licenseRowId } }),
-    );
+  async findSeatChangesByLicenseRows(
+    licenseRowIds: readonly string[],
+  ): Promise<ConnectedSeatChangeRecord[]> {
+    if (licenseRowIds.length === 0) return [];
+    const rows = await this.prisma.connectedSeatChange.findMany({
+      where: { licenseId: { in: [...licenseRowIds] } },
+    });
+
+    return rows.flatMap((row) => {
+      const mapped = mapSeatChange(row);
+      return mapped ? [mapped] : [];
+    });
+  }
+
+  async createSeatChange(record: ConnectedSeatChangeRecord): Promise<boolean> {
+    const { count } = await this.prisma.connectedSeatChange.createMany({
+      data: [{ licenseId: record.licenseRowId, ...seatChangeColumns(record) }],
+      skipDuplicates: true,
+    });
+    return count === 1;
   }
 
   async recordSeatChange(record: ConnectedSeatChangeRecord): Promise<void> {
-    const columns = {
-      accountId: record.accountId,
-      changedAt: toDate(record.changedAt),
-      addedSeats: record.addedSeats,
-      unitAmountCents: record.unitAmountCents,
-      amountCents: record.amountCents,
-      currency: record.currency,
-      state: record.state,
-      stripeInvoiceId: record.stripeInvoiceId,
-    };
+    const columns = seatChangeColumns(record);
     await this.prisma.connectedSeatChange.upsert({
       where: { licenseId: record.licenseRowId },
       create: { licenseId: record.licenseRowId, ...columns },
@@ -224,9 +231,16 @@ export class PrismaConnectedBillingRepository extends ConnectedBillingRepository
     });
   }
 
-  async findSeatChangesForAccount(accountId: string): Promise<ConnectedSeatChangeRecord[]> {
+  async findSeatChangesForOrganization({
+    organizationId,
+    accountId,
+  }: {
+    organizationId: string;
+    accountId: string | null;
+  }): Promise<ConnectedSeatChangeRecord[]> {
+    // A row the previous image wrote during a roll names only its account.
     const rows = await this.prisma.connectedSeatChange.findMany({
-      where: { accountId },
+      where: { OR: [{ organizationId }, ...(accountId ? [{ accountId }] : [])] },
       orderBy: { changedAt: "desc" },
     });
 
@@ -369,12 +383,27 @@ function mapInvoice(row: InvoiceRow): ConnectedInvoiceRecord | null {
   };
 }
 
+function seatChangeColumns(record: ConnectedSeatChangeRecord) {
+  return {
+    accountId: record.accountId,
+    organizationId: record.organizationId,
+    changedAt: toDate(record.changedAt),
+    addedSeats: record.addedSeats,
+    unitAmountCents: record.unitAmountCents,
+    amountCents: record.amountCents,
+    currency: record.currency,
+    state: record.state,
+    stripeInvoiceId: record.stripeInvoiceId,
+  };
+}
+
 function mapSeatChange(row: SeatChangeRow): ConnectedSeatChangeRecord | null {
   if (!row) return null;
 
   return {
     licenseRowId: row.licenseId,
     accountId: row.accountId,
+    organizationId: row.organizationId,
     changedAt: fromDate(row.changedAt),
     addedSeats: row.addedSeats,
     unitAmountCents: row.unitAmountCents,

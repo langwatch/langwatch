@@ -115,7 +115,7 @@ async function buildWorld({
     sourceCredentials: SourceCredentialAccessService.create({ sources, credentials }),
     suppression: ErasureSuppressionService.create({
       suppressions: repositories.erasedIdentifierSuppressions,
-      tenantHistory: repositories.tenantHistory,
+      snapshot: repositories.suppressionSnapshot,
       erasureSecret: ERASURE_SECRET,
       logger,
     }),

@@ -15,17 +15,15 @@ import {
   type OversightSync,
   type OversightSyncList,
   type RedriveRetiredApplyResult,
-} from "@langwatch/enterprise-scim-contract";
-import {
   pickRetiredLetter,
-  type ScimSyncReadsApi,
   type ScimSyncState,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { ScimRemovalOperation, ScimSyncLifecycle } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimDeprovisionService } from "./scim-deprovision.service.ts";
+import type { ScimSyncReadsService } from "./scim-sync-reads.service.ts";
 
 const REDRIVABLE_OPS: readonly string[] = ["delete_user", "deactivate_user"] as const;
 
@@ -34,8 +32,7 @@ function isRedrivable(op: string): op is ScimRemovalOperation {
 }
 
 export interface ScimOversightDeps {
-  /** Resolved per call: a peer is not callable while the process constructs. */
-  syncs: () => Pick<ScimSyncReadsApi, "listForOperator" | "findForOperator">;
+  syncs: Pick<ScimSyncReadsService, "listForOperator" | "findForOperator">;
   organizations: Pick<OrganizationApi, "findProvisioningSummary">;
   identities: Pick<ScimRepository, "findDirectoryIdentities">;
   lifecycle: Pick<ScimSyncLifecycle, "applyRedriven">;
@@ -50,7 +47,7 @@ export class ScimOversightService {
   }
 
   async list(input: ListOversightSyncsInput): Promise<OversightSyncList> {
-    const { syncs, total } = await this.deps.syncs().listForOperator(input);
+    const { syncs, total } = await this.deps.syncs.listForOperator(input);
     const names = await this.organizationNames(syncs.map((sync) => sync.organizationId));
 
     return {
@@ -60,7 +57,7 @@ export class ScimOversightService {
   }
 
   async find({ connectionId }: { connectionId: string }): Promise<OversightSync[]> {
-    const syncs = await this.deps.syncs().findForOperator({ connectionId });
+    const syncs = await this.deps.syncs.findForOperator({ connectionId });
     const names = await this.organizationNames(syncs.map((sync) => sync.organizationId));
 
     return syncs.map((sync) => toOversightSync(sync, names.get(sync.organizationId) ?? null));
@@ -91,7 +88,7 @@ export class ScimOversightService {
     retiredAtMs: number;
     operator: { userId: string };
   }): Promise<RedriveRetiredApplyResult> {
-    const [sync] = await this.deps.syncs().findForOperator({ connectionId });
+    const [sync] = await this.deps.syncs.findForOperator({ connectionId });
     if (!sync) throw new ScimApplyNotRetiredError({ connectionId });
 
     const alreadyDriven = sync.deadLetters.some(

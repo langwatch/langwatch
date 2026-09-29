@@ -17,7 +17,7 @@ Load the `lint-rule` skill to add or change a rule.
   (`pnpm --filter @langwatch/architecture-enforcer docs`).
 - `@langwatch/architecture-enforcer`: whole-tree policies (package boundaries,
   cycles, frontend/server separation, table ownership, memory-twin drift, dead
-  exports) from one registry (`--list-policies`). No baselines; a policy whose
+  exports) from one registry (`--list-policies`). No policy reads a baseline (two ruled transitions, peer-cycles and eventing-table-access, hold shrink-only lists under tests/baselines/, ARCHITECTURE.md §17); a policy whose
   anchor file is missing refuses the run by name. CI runs the zero-finding
   policies by id.
 - TypeScript 7's root `typescript` export is a version constant. The compiler

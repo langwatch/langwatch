@@ -4,6 +4,7 @@
  * people here on their own (D08, ADR-122). One provider, many connectors, so
  * it is a list of its own beside the identity provider's page.
  */
+import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -26,6 +27,7 @@ const AUTHENTICATION_LINKS: readonly SectionNavigationLink[] = [
 
 export default function ConnectorsScreen() {
   const organizationId = useScimHost().organizationId();
+  const navigation = useOptionalUiCapabilities()?.navigation;
 
   if (!organizationId) return null;
 
@@ -34,6 +36,7 @@ export default function ConnectorsScreen() {
       label="Authentication"
       links={AUTHENTICATION_LINKS}
       activeHref="/settings/authentication/connectors"
+      onNavigate={(href) => navigation?.navigate(href)}
     >
       <ScimSettingsContent
         organizationId={organizationId}

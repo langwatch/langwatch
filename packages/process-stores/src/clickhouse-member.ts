@@ -138,6 +138,9 @@ export function buildClickHouse(options: {
     limiter: new ConcurrencyLimiter({
       maxConcurrent: config.maxConcurrentStatements ?? configuration.poolSizing.size,
     }),
+    privateRoutes: new Map(
+      (config.privateRoutes ?? []).map((route) => [route.organizationId, route.url]),
+    ),
   });
 
   return {

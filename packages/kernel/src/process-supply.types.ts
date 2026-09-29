@@ -49,7 +49,11 @@ type RepositoryMembers<Module> = Module extends {
     };
   };
 }
-  ? ProviderMembers<Module extends { readonly tier: "memory" } ? Memory : Live>
+  ? // The root hands a registry `operatorReads` itself (§7); no process supplies it.
+    Omit<
+      ProviderMembers<Module extends { readonly tier: "memory" } ? Memory : Live>,
+      "operatorReads"
+    >
   : Record<never, never>;
 type Normalise<Members> = {
   readonly [Name in keyof Members as MemberName<Name>]: Name extends

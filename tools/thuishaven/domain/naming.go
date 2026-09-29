@@ -94,6 +94,12 @@ func (n Naming) MailAddressDomain(slug string) string {
 	return fmt.Sprintf("%s.mail.%s.%s", slug, n.Project, n.TLD)
 }
 
+// MailAddress is this worktree's own inbox address. The sink is a catch-all,
+// so any local part lands in the same inbox; dev@ is the one haven prints.
+func (n Naming) MailAddress(slug string) string {
+	return "dev@" + n.MailAddressDomain(slug)
+}
+
 // URL is the full browser URL for a service, reflecting the proxy's real
 // scheme+port so it is correct on the default 443 or an unprivileged port.
 func (n Naming) URL(service, slug, scheme string, port int) string {
@@ -102,4 +108,40 @@ func (n Naming) URL(service, slug, scheme string, port int) string {
 		suffix = fmt.Sprintf(":%d", port)
 	}
 	return fmt.Sprintf("%s://%s%s", scheme, n.Hostname(service, slug), suffix)
+}
+
+// machineWideNames are the one-label hostnames under the project domain that
+// belong to the machine, not to a worktree. A slug spelling one of them gets
+// no home: routing it would take the hub, telemetry, Grafana or the
+// standalone IdP away from every other stack.
+var machineWideNames = map[string]bool{
+	HubService: true, IdPService: true, ObservabilityService: true, "telemetry": true,
+}
+
+// StackHomeService is the routed name of a worktree's home page, served by the
+// daemon at <slug>.langwatch.localhost: Hostname(name, "") is that host. ok is
+// false for a slug that is not a hostname label or that names a machine-wide
+// surface, and such a stack has no home.
+func (n Naming) StackHomeService(slug string) (string, bool) {
+	if !ValidSlug(slug) || slug == n.Project || machineWideNames[slug] {
+		return "", false
+	}
+	return slug, true
+}
+
+// StackHomeSlug is StackHomeService read backwards: the slug whose home a Host
+// header names, and ok=false for any host that is not one (the hub, a
+// service's own host, anything off the project domain). A port is ignored.
+func (n Naming) StackHomeSlug(host string) (string, bool) {
+	if h, _, found := strings.Cut(host, ":"); found {
+		host = h
+	}
+	label, isUnder := strings.CutSuffix(strings.ToLower(host), "."+n.Project+"."+n.TLD)
+	if !isUnder || strings.Contains(label, ".") {
+		return "", false
+	}
+	if _, ok := n.StackHomeService(label); !ok {
+		return "", false
+	}
+	return label, true
 }

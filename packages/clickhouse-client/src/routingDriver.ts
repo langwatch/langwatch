@@ -16,13 +16,23 @@ import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./qu
 export interface RoutableStatementClient extends ClickHouseCloseableClient {
   insert(params: unknown): Promise<unknown>;
   command(params: unknown): Promise<unknown>;
-  query(params: unknown): Promise<{ json(): Promise<unknown> }>;
+  query(params: unknown): Promise<{
+    json(): Promise<unknown>;
+    stream<Row>(): AsyncIterable<readonly { json<Value = Row>(): Value }[]>;
+  }>;
 }
 
 async function serverFor<Client extends RoutableStatementClient>(
   connection: ClickHouseConnection<Client>,
-  request: Pick<QueryRequest, "tenantId" | "organizationId">,
+  request: Pick<QueryRequest, "tenantId" | "organizationId" | "tenantIds">,
 ): Promise<Client> {
+  if (request.tenantIds !== void 0) {
+    return connection.resolveTenantSet({
+      tenantId: request.tenantId,
+      tenantIds: request.tenantIds,
+      organizationId: request.organizationId,
+    });
+  }
   if (request.organizationId !== void 0) {
     return connection.resolveOrganization(request.organizationId);
   }
@@ -85,6 +95,14 @@ export function routingDriver<Client extends RoutableStatementClient>(
       const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
       const rows = (await resultSet.json()) as Row[];
       return { rows, stats: { durationMs: nowInstant().epochMilliseconds - started } };
+    },
+
+    async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
+      const vendor = await serverFor(connection, request);
+      const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+      for await (const batch of resultSet.stream<Row>()) {
+        yield batch.map((row) => row.json());
+      }
     },
   };
 }

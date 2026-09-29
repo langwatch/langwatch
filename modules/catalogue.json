@@ -119,7 +119,7 @@
       "id": "gateway",
       "root": "modules/gateway",
       "classification": "core",
-      "subjects": ["gateway", "virtual-key"]
+      "subjects": ["gateway", "gateway-debit", "virtual-key"]
     },
     {
       "id": "github",
@@ -350,7 +350,6 @@
         "canonical-cost",
         "cost-attribution-policy",
         "department",
-        "gateway-debit",
         "governance",
         "ingestion-credentials",
         "ingestion-pull",
@@ -391,7 +390,7 @@
       "id": "scim",
       "root": "enterprise/modules/scim",
       "classification": "enterprise",
-      "subjects": ["scim"]
+      "subjects": ["scim", "scim-sync"]
     },
     {
       "id": "sso",

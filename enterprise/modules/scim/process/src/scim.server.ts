@@ -2,8 +2,7 @@
 /**
  * The SCIM feature's installer: one application, four declared doors.
  * `ScimApp` declares what it reads off the process and which peer modules it
- * depends on; a process that supplies both, plus the directory-sync history
- * `createScimSyncLifecycle` builds, installs this and mounts what it wants.
+ * depends on; a process that supplies both installs this and mounts what it wants.
  */
 import {
   bindRestMiddleware,
@@ -13,23 +12,17 @@ import {
 import { defineServerModule } from "@langwatch/kernel";
 
 import { ScimApp } from "./app/scim.app.ts";
-import type { ScimSyncLifecycle } from "./app/scim.members.ts";
 import { scimDirectoryEventing } from "./eventing/scim-directory.pipeline.ts";
+import { scimSyncEventing } from "./eventing/scim-sync.pipeline.ts";
 import { scimEventing } from "./eventing/scim.pipeline.ts";
 import { scimRepositories } from "./repositories/scim-repositories.registry.ts";
 import { SCIM_WEBHOOK_SIGNATURE_HEADER } from "./rules/scim-webhook-signature.rules.ts";
-import {
-  ScimSyncLifecycleService,
-  type ScimSyncLifecycleAdapterDeps,
-} from "./services/scim-sync-lifecycle.service.ts";
 import { scimOversightTrpcTransport } from "./transport/scim-oversight.trpc.ts";
 import { scimProtocolRest, scimRestCredential } from "./transport/scim-protocol.rest.ts";
 import { scimReconciliationTrpcTransport } from "./transport/scim-reconciliation.trpc.ts";
 import { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
 import { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
 import { scimWebhookDelivery, scimWebhookRest } from "./transport/scim-webhook.rest.ts";
-
-export type { ScimBespokeMembers } from "./app/scim.app.ts";
 
 export const scimServer = defineServerModule("scim")
   .withRepositories(scimRepositories)
@@ -61,16 +54,5 @@ export const scimServer = defineServerModule("scim")
     })),
   ])
   .withEventing(scimEventing)
-  .withEventing(scimDirectoryEventing);
-
-export type { ScimSyncLifecycleAdapterDeps };
-
-/**
- * The durable directory-sync history for one deployment: the one input
- * `ScimApp` cannot build from `reads()` or a peer alone (see
- * `ScimBespokeMembers`). The adapter behind it stays private to this feature
- * server.
- */
-export function createScimSyncLifecycle(deps: ScimSyncLifecycleAdapterDeps): ScimSyncLifecycle {
-  return ScimSyncLifecycleService.create(deps);
-}
+  .withEventing(scimDirectoryEventing)
+  .withEventing(scimSyncEventing);

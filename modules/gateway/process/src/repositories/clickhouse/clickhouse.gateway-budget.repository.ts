@@ -670,6 +670,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
           earliestFloor: earliestFloorMs,
         },
         format: "JSONEachRow",
+        tenantIds,
       });
       const rows = (await result.json()) as Record<string, string>[];
       const row = rows[0] ?? {};
@@ -727,6 +728,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
           periodStart: currentPeriodStart(window, now).epochMilliseconds,
         },
         format: "JSONEachRow",
+        tenantIds,
       });
       const rows = (await result.json()) as RollupScopeRow[];
       return targets.map((t) => ({
@@ -812,6 +814,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
           periodStart: currentPeriodStart(budget.window, now).epochMilliseconds,
         },
         format: "JSONEachRow",
+        tenantIds: shape.tenantIds,
       });
       for (const row of (await result.json()) as BucketSpendRow[]) {
         spentByBucket.set(row.ScopeId, row.SpentNanoUSD);
@@ -898,6 +901,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
         `,
         query_params: shape.params,
         format: "JSONEachRow",
+        tenantIds: shape.tenantIds,
       });
       return (await result.json()) as BucketSpendRow[];
     } catch (error) {
@@ -956,6 +960,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
       `,
       query_params: params,
       format: "JSONEachRow",
+      tenantIds,
     });
     type Row = Omit<LedgerEventRow, "occurredAt" | "status" | "amountUsd"> & {
       amountNanoUsd: string;

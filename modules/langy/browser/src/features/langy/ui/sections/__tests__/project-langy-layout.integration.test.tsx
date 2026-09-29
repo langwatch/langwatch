@@ -369,6 +369,15 @@ describe("ProjectLangyLayout", () => {
   describe("given the panel is open in sidebar mode", () => {
     const dockWrapper = () => document.querySelector("[data-langy-dock]") as HTMLElement | null;
 
+    /** @scenario "A full-height page still fills the content card around the dock wrapper" */
+    it("passes the page body's flex height on to the routed page", () => {
+      renderAt("/demo/traces");
+      const style = getComputedStyle(dockWrapper() ?? document.body);
+      expect(style.display).toBe("flex");
+      expect(style.flexDirection).toBe("column");
+      expect(style.minHeight).toBe("0px");
+    });
+
     /** @scenario "Pages without the app shell keep the flush dock" */
     it("reserves the width at the page wrapper when no shell is mounted", async () => {
       renderAt("/demo/traces");

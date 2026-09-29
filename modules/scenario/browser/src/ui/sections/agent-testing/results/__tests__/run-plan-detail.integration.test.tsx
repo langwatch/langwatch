@@ -729,7 +729,6 @@ describe("<RunPlanDetail/>", () => {
     expect(screen.getByTestId("scenario-grid")).toBeInTheDocument();
     expect(mockRouterPush).toHaveBeenCalledWith(
       { query: expect.objectContaining({ view: "grid" }) },
-      undefined,
       { shallow: true },
     );
   });

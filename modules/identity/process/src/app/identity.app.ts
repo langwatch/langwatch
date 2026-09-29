@@ -1,8 +1,3 @@
-/**
- * The identity feature's application: guards, ledger writer, backfill,
- * newborn sweep, join-request/SSO-connection/directory-sync guards — every
- * capability crossing a package boundary today (ADR-101, 115, 116, 117).
- */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
@@ -43,8 +38,15 @@ import {
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
+/**
+ * The identity feature's application: guards, ledger writer, backfill,
+ * newborn sweep, join-request/SSO-connection/directory-sync guards — every
+ * capability crossing a package boundary today (ADR-101, 115, 116, 117).
+ */
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
+import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -52,6 +54,7 @@ import { UserApi } from "@langwatch/user-contract";
 import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
+import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
 import { LoggedSsoBreakGlassWarningChannel } from "../channels/sso-break-glass-warning.channel.ts";
 import {
   ssoDomainProofChannels,
@@ -63,7 +66,6 @@ import {
   composeJoinRequestPipeline,
   type JoinRequestPipeline,
 } from "../eventing/join-request.pipeline.ts";
-import { composeScimSyncPipeline, type ScimSyncPipeline } from "../eventing/scim-sync.pipeline.ts";
 import {
   composeSsoConnectionGraph,
   type SsoConnectionPipeline,
@@ -112,10 +114,9 @@ import { OrganizationMfaNotifierService } from "../services/organization-mfa-not
 import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
-import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
-import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { SignInAccountLookupService } from "../services/signin-account-lookup.service.ts";
 import { SignInRouterService } from "../services/signin-router.service.ts";
+import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
 import { SsoArrivalService } from "../services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../services/sso-assertion.service.ts";
@@ -133,6 +134,7 @@ import { SsoConnectionHistoryService } from "../services/sso-connection-history.
 import { SsoConnectionRoutingService } from "../services/sso-connection-routing.service.ts";
 import type { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { SsoDomainCeremonyService } from "../services/sso-domain-ceremony.service.ts";
+import { SsoDomainOwnershipBackfillService } from "../services/sso-domain-ownership-backfill.service.ts";
 import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { SsoEngineProviderService } from "../services/sso-engine-provider.service.ts";
 import { SsoIdpRegistrationService } from "../services/sso-idp-registration.service.ts";
@@ -155,6 +157,7 @@ import {
 } from "../services/sso-test-arrival.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
+import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
 import { TwoStepAccountService } from "../services/two-step-account.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
 import {
@@ -198,6 +201,7 @@ type IdentityAppParts = {
   newbornSweep: IdentityNewbornReconciliationService;
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
+  ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
   joinRequestGuards: JoinRequestGuardsService;
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
@@ -217,8 +221,6 @@ type IdentityAppParts = {
   ssoBreakGlass: SsoBreakGlassService;
   ssoSetup: SsoSetupService;
   ssoSetupCommands: SsoSetupCommandsService | null;
-  scimSyncGuards: ScimSyncGuardsService;
-  scimSyncReads: ScimSyncReadsService;
   lookup: IdentityLookupService;
   twoStepAccounts: TwoStepAccountService;
   organizationMfa: OrganizationMfaService;
@@ -226,12 +228,11 @@ type IdentityAppParts = {
   pipelines: IdentityPipelineBuilders;
 };
 
-/** The four pipelines' definitions over the module's own rows, in every role (Alex, 2026-09-27). */
+/** The three pipelines' definitions over the module's own rows, in every role (2026-09-27). */
 type IdentityPipelineBuilders = {
   eventing: ConnectedIdentityEventing;
   identity: () => IdentityPipeline;
   joinRequests: () => JoinRequestPipeline;
-  scimSync: () => ScimSyncPipeline;
   ssoConnections: () => SsoConnectionPipeline;
 };
 
@@ -418,8 +419,19 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     "adminEmails",
     "publicBaseUrl",
   ] as const;
+  /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
+  static readonly secrets = { internalSlackSignupsWebhook } as const;
 
-  static create(setup: IdentitySetup): IdentityApp {
+  static async create(setup: IdentitySetup): Promise<IdentityApp> {
+    const signupAnnouncements = await setup.secrets.into(
+      IdentityApp.secrets.internalSlackSignupsWebhook,
+      (webhookUrl) =>
+        SignupAnnouncementService.create({
+          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
+          publicBaseUrl: setup.members.publicBaseUrl,
+          logger: createLogger("langwatch:identity:signup-announcement"),
+        }),
+    );
     const engineProviders = SsoEngineProviderService.create({
       credentials: setup.repositories.ssoCredentials,
       rows: setup.repositories.ssoEngineProviders,
@@ -567,6 +579,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       memberships: arrivalMemberships(setup.dependencies.organizations),
       authz: setup.dependencies.permissions,
       adoption: SsoArrivalAdoptionService.create(backfill),
+      signups: signupAnnouncements,
     });
     const ssoTestArrival = SsoTestArrivalService.create({
       accounts: testArrivalAccounts(setup.dependencies.auth),
@@ -643,11 +656,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       activity: setup.repositories.ssoMigrationEvidence,
       migrations: ssoMigrationProgress,
     });
-    const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
-    const scimSyncReads = ScimSyncReadsService.create({
-      syncs: infrastructure.scimSyncs,
-      activity: infrastructure.scimSyncActivity,
-    });
     const auth = setup.dependencies.auth;
     const resolveAuthProvider = () => auth.resolveAuthProvider();
     // Main's router (identity/runtime.ts): projected connections, the method policy, one
@@ -703,6 +711,9 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       newbornSweep,
       backfill,
       secrets,
+      ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
+        setup.repositories.ssoDomainOwnership,
+      ),
       joinRequestGuards,
       ssoConnections,
       ssoConnectionGuards,
@@ -722,8 +733,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       ssoBreakGlass: ssoBreakGlassGrants,
       ssoSetup,
       ssoSetupCommands,
-      scimSyncGuards,
-      scimSyncReads,
       lookup: IdentityLookupService.create({
         reads: setup.repositories.identityLookup,
         history: setup.repositories.identityHistory,
@@ -780,7 +789,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
               plans: setup.dependencies.entitlements,
             }),
           }),
-        scimSync: () => composeScimSyncPipeline(setup.repositories),
         ssoConnections: ssoConnectionGraph.pipeline,
       },
     });
@@ -792,10 +800,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
 
   joinRequestPipeline(): JoinRequestPipeline {
     return this.#parts.pipelines.joinRequests();
-  }
-
-  scimSyncPipeline(): ScimSyncPipeline {
-    return this.#parts.pipelines.scimSync();
   }
 
   ssoConnectionPipeline(): SsoConnectionPipeline {
@@ -967,6 +971,10 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     ] as const;
   }
 
+  registeredMigrations(): readonly SystemMigration[] {
+    return [SsoDomainOwnershipMigrationService.create(this.#parts.ssoDomainOwnershipBackfill)];
+  }
+
   joinRequestGuards(): JoinRequestGuardsService {
     return this.#parts.joinRequestGuards;
   }
@@ -1062,14 +1070,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     }
 
     return this.#parts.ssoSetupCommands;
-  }
-
-  scimSyncGuards(): ScimSyncGuardsService {
-    return this.#parts.scimSyncGuards;
-  }
-
-  scimSyncReads(): ScimSyncReadsService {
-    return this.#parts.scimSyncReads;
   }
 
   lookupAddress(input: {

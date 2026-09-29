@@ -11,13 +11,17 @@ import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { identityServer } from "../../identity.server.ts";
 
+/** An empty secrets chain: every optional handle, the sign-ups webhook included, reads as unset. */
+const noSecretsChain = SecretsResolver.over(SecretsChain.start({ environment: {} }));
+
 const bootIdentity = () =>
-  createApp({ role: "api" })
+  createApp({ role: "api", secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared) })
     .withModules([withMemoryRepositories(identityServer)])
     .withMembers({
       mail: createApiFixture<EmailDelivery>(),

@@ -1,4 +1,5 @@
-import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { Switch } from "@langwatch/design-system/switch";
 import type { UsageReportPreview } from "@langwatch/ops-contract";

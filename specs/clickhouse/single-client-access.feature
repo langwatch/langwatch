@@ -155,6 +155,37 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       Then the client lets it through
       And the reason does not travel to the server as part of the request
 
+  # A replay reads a batch's whole history in one statement; main streamed it so a batch's memory
+  # stays bounded by its accumulators, not its event count (Alex, 2026-09-28). A streamed read is
+  # guarded and routed like any other, but holds no slot and is never retried: its reader sets how
+  # long it runs, and a retried stream would hand the reader rows it already applied.
+  Rule: A large read streams batch by batch through the same routing and guard
+
+    @unit
+    Scenario: A streamed read yields the tenant's rows batch by batch from its own server
+      Given a tenant whose organization has a private endpoint
+      When a repository streams a read for that tenant
+      Then it receives each batch as the server sends it, decoded
+      And only the private endpoint is asked
+
+    @unit
+    Scenario: A streamed read spanning every tenant reads the shared server
+      Given a read that names no tenant and carries a written reason
+      When a repository streams it
+      Then it is read from the shared server
+
+    @unit
+    Scenario: A streamed read that names no tenant is refused before it reaches a server
+      Given a streamed read with no tenant predicate and no written reason
+      When a repository streams it
+      Then the client refuses it before any server is asked
+
+    @unit
+    Scenario: A driver that cannot stream answers the whole read as one batch
+      Given a driver with no streaming read
+      When a repository streams a read
+      Then the whole result arrives as one batch
+
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse

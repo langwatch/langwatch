@@ -4,6 +4,7 @@
  * keyspaces. An unconfigured member REFUSES BY NAME, never a silent omission.
  */
 import { createLogger } from "@langwatch/observability";
+import type { OperatorReadMint } from "@langwatch/prisma-client";
 
 import { buildClickHouse } from "./clickhouse-member.ts";
 import { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./config-members.ts";
@@ -85,7 +86,7 @@ function prismaMember({
 }: {
   config: ProcessConfig;
   read: ReadMember;
-}): BuiltMember<ProcessMembers["prisma"]> {
+}): ReturnType<typeof buildPrisma> {
   const database = config.database;
   if (!database?.url.trim()) {
     throw new MemberNotConfiguredError("prisma", "set DATABASE_URL");
@@ -106,7 +107,7 @@ function clickhouseMember({
   if (!clickhouse || !configured) {
     throw new MemberNotConfiguredError(
       "clickhouse",
-      "set CLICKHOUSE_URL or CLICKHOUSE_PRIVATE_ROUTES",
+      "set CLICKHOUSE_URL or a CLICKHOUSE_URL__<label>__<orgId> route",
     );
   }
   return buildClickHouse({ config: clickhouse, directory: tenantDirectory() });
@@ -175,14 +176,26 @@ type MemberBuilders = {
   readonly [Member in MemberName]: () => BuiltMember<ProcessMembers[Member]>;
 };
 
-export function createProcessMembers(options: {
+type CreateProcessMembersOptions = {
   readonly config: ProcessConfig;
   /**
    * Members this caller built itself. One passed is used as it stands and is
    * never closed here, because the caller that made it owns it.
    */
   readonly members?: { readonly [Name in MemberName]?: ProcessMembers[Name] };
-}): ProcessMemberSource {
+};
+
+export function createProcessMembers(options: CreateProcessMembersOptions): ProcessMemberSource {
+  return createProcessStores(options).members;
+}
+
+/** The opened members, plus the operator-read mint only the process root may hold (§7). */
+export type ProcessStores = Readonly<{
+  members: ProcessMemberSource;
+  operatorReads: OperatorReadMint;
+}>;
+
+export function createProcessStores(options: CreateProcessMembersOptions): ProcessStores {
   const { config } = options;
   const supplied = options.members ?? {};
   refuseUndefinedMembers(supplied);
@@ -215,6 +228,18 @@ export function createProcessMembers(options: {
     return directory;
   };
 
+  let prismaOperatorReads: OperatorReadMint | undefined;
+  const operatorReads: OperatorReadMint = (input) => {
+    read("prisma");
+    if (!prismaOperatorReads) {
+      throw new MemberNotConfiguredError(
+        "prisma",
+        "open it here, not hand it in, to mint operator reads",
+      );
+    }
+    return prismaOperatorReads(input);
+  };
+
   const builders: MemberBuilders = {
     logger: () => ({ value: createLogger(config.processName) }),
     clock: () => ({ value: systemClock() }),
@@ -222,7 +247,11 @@ export function createProcessMembers(options: {
     encryption: () => ({ value: encryptionMember(config) }),
     telemetry: () => ({ value: loggedTelemetry(read("logger")) }),
 
-    prisma: () => prismaMember({ config, read }),
+    prisma: () => {
+      const built = prismaMember({ config, read });
+      prismaOperatorReads = built.operatorReads;
+      return built;
+    },
     clickhouse: () => clickhouseMember({ config, tenantDirectory }),
     // "Not configured" is an answer here, not a refusal: LangWatchQL is optional (ADR-159).
     clickhouseAdmin: () => buildClickHouseAdmin(config.clickhouse),
@@ -262,5 +291,5 @@ export function createProcessMembers(options: {
     [Symbol.asyncDispose]: (): Promise<void> => source.close(),
   };
 
-  return source;
+  return { members: source, operatorReads };
 }

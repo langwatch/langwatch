@@ -4,15 +4,15 @@ vi.mock("../../metrics.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof metricsModule>();
   return {
     ...actual,
-    incrementEsReactorTotal: vi.fn(),
-    incrementEsReactorCollapsedTotal: vi.fn(),
+    incrementEsProjectionSubscriberTotal: vi.fn(),
+    incrementEsProjectionSubscriberCollapsedTotal: vi.fn(),
     incrementEsMapProjectionTotal: vi.fn(),
     observeEsMapProjectionDuration: vi.fn(),
   };
 });
 
 import type { Event } from "../../domain/types.ts";
-import { incrementEsReactorCollapsedTotal } from "../../metrics.ts";
+import { incrementEsProjectionSubscriberCollapsedTotal } from "../../metrics.ts";
 import type * as metricsModule from "../../metrics.ts";
 import {
   createMockAppendStore,
@@ -148,7 +148,7 @@ describe("ProjectionRouter map-subscriber dispatch over a coalesced batch", () =
 
       await dispatchMapBatch(subscriber, batch());
 
-      expect(incrementEsReactorCollapsedTotal).toHaveBeenCalledWith(
+      expect(incrementEsProjectionSubscriberCollapsedTotal).toHaveBeenCalledWith(
         TEST_CONSTANTS.PIPELINE_NAME,
         "spanStorageBroadcast",
         BATCH_SIZE - 1,

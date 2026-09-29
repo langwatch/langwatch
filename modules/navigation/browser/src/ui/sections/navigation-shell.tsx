@@ -10,6 +10,7 @@ import {
   useNavigationShellState,
   type NavigationShellReadyState,
 } from "../../behavior/use-navigation-shell-state.ts";
+import { useProjectAddressRedirect } from "../../behavior/use-project-address-redirect.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { shellContentMaxWidth } from "../../model/shell-layout.ts";
@@ -43,6 +44,7 @@ export function NavigationShell({
     isPersonalScope: personalScope,
     isOrgScope: orgScope,
   });
+  useProjectAddressRedirect();
 
   if (state.status === "not-found") return <>{host.notFound()}</>;
   if (state.status === "loading") return <>{host.waiting()}</>;

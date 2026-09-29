@@ -272,6 +272,7 @@ export class ProcessRuntime {
   private readonly consumersEnabled: boolean;
   private readonly managers = new Map<string, RegisteredProcessManager>();
   private readonly wakeManagers: Record<string, ProcessWakeHandler> = {};
+  private readonly hostedOutboxes: ProcessOutboxWorker[] = [];
   private wakeWorker: ProcessWakeWorker | null = null;
 
   constructor(options: { store: ProcessStore; consumersEnabled: boolean; logger?: Logger }) {
@@ -374,10 +375,37 @@ export class ProcessRuntime {
     return result as SignalHandleResult<State>;
   }
 
+  /**
+   * Hosts an outbox the runtime's own machinery writes (failed hand-offs),
+   * with the lease, backoff and dead letters a process manager's intents get.
+   */
+  hostOutbox({
+    processName,
+    handlers,
+  }: {
+    processName: string;
+    handlers: Record<string, IntentHandler>;
+  }): void {
+    const dispatcher = new OutboxDispatcherService({
+      store: this.store,
+      handlers,
+      processNames: [processName],
+    });
+    const outboxWorker = new ProcessOutboxWorker({
+      dispatcher,
+      logger: this.logger,
+      name: processName,
+      stuckDrainTimeoutMs: stuckDrainTimeoutMs(undefined),
+    });
+    this.hostedOutboxes.push(outboxWorker);
+    if (this.consumersEnabled) outboxWorker.start();
+  }
+
   async stop(): Promise<void> {
     await Promise.all([
       this.wakeWorker?.stop(),
       ...Array.from(this.managers.values(), (manager) => manager.outboxWorker.stop()),
+      ...this.hostedOutboxes.map((outboxWorker) => outboxWorker.stop()),
     ]);
   }
 

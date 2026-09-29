@@ -23,7 +23,7 @@ export function useOpenPlanRun(): (params: OpenPlanRunParams) => void {
     ({ planSlug, batchRunId }: OpenPlanRunParams) => {
       if (!projectSlug) return;
 
-      const { route, address } = buildAgentTestingPush({
+      const address = buildAgentTestingPush({
         projectSlug,
         state: {
           tab: "results",
@@ -34,7 +34,7 @@ export function useOpenPlanRun(): (params: OpenPlanRunParams) => void {
         query: router.query,
       });
 
-      void router.push(route, address, { shallow: true });
+      void router.push(address);
     },
     [router, projectSlug],
   );

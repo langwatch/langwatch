@@ -54,7 +54,7 @@ import type {
   EvaluationExecutionIntent,
   EvaluationInputsResolution,
   EvaluationInstallEnvironment,
-  EvaluationRetentionFloor,
+  EvaluationRetentionLookup,
   EvaluationReport,
   EvaluationRescore,
   EvaluationRunAnalytics,
@@ -97,7 +97,7 @@ import {
   type EvaluationAutomationReactions,
   type EvaluationProcessingPipeline,
 } from "../services/evaluation-processing.service.ts";
-import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
+import { EvaluationRetentionDaysService } from "../services/evaluation-retention-days.service.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
 import { EvaluationSavedEvaluatorService } from "../services/evaluation-saved-evaluator.service.ts";
 import { EvaluationSettingsRecoverySwitchService } from "../services/evaluation-settings-recovery-switch.service.ts";
@@ -111,7 +111,7 @@ import { LangevalsPiiDetectionService } from "../services/langevals-pii-detectio
 import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
 
 export type EvaluationInfrastructure = Readonly<{
-  retentionFloor: EvaluationRetentionFloor;
+  retention: EvaluationRetentionLookup;
   execution: EvaluationExecution;
   inputResolution: EvaluationInputsResolution;
   environment: EvaluationInstallEnvironment;
@@ -139,7 +139,10 @@ function createUnavailableEvaluationInfrastructure(processName: string): Evaluat
   };
 
   return {
-    retentionFloor: { getFloorMs: async () => 0 },
+    retention: {
+      getPlatformDefaultRetentionDays: () => unavailable("data retention"),
+      findRetentionDays: async () => [],
+    },
     execution: { execute: async () => unavailable("evaluation executor") },
     inputResolution: { resolveInputs: async (input) => input.inputs },
     environment: { read: () => ({}) },
@@ -431,7 +434,7 @@ export class EvaluationApp implements EvaluationApiContract {
           recordCost: (input) => costs.recordEntry(input),
           recordDatasetRow: (input) => datasets.recordDatasetRow(input),
         },
-        retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
+        retention: EvaluationRetentionDaysService.create(dependencies.retention),
         execution,
         inputResolution: inputs,
         environment,
@@ -466,11 +469,15 @@ export class EvaluationApp implements EvaluationApiContract {
       eventing: EvaluationEventingService.create({
         runs: EvaluationRunProjectionService.create({
           repository: repositories.runs,
-          retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
+          retention: EvaluationRetentionDaysService.create(dependencies.retention),
         }),
         analytics: dependencies.analytics,
         analyticsFoldCache: repositories.analyticsFoldCache,
         defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
+        tenantRetention: {
+          resolve: (tenantId) =>
+            dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+        },
       }),
     });
   }
@@ -500,7 +507,7 @@ export class EvaluationApp implements EvaluationApiContract {
       service: EvaluationService.create({
         repository: repositories.runs,
         monitorPerformance: repositories.monitorPerformance,
-        retentionFloor: members.retentionFloor,
+        retention: members.retention,
         execution: members.execution,
         inputResolution: members.inputResolution,
         workflows: dependencies.workflows,

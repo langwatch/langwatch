@@ -19,6 +19,7 @@ import {
   definePipeline,
   type FoldProjectionStore,
   type Projection,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
@@ -52,6 +53,8 @@ export interface EvaluationProcessingPipelineDeps {
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
   automations: EvaluationAutomationReactions;
+  /** Each tenant's retention; a producer, which projects nothing, declares none. */
+  retention?: RetentionPolicyResolver;
 }
 
 /** The two automation reactions a terminal evaluation wakes. */
@@ -77,7 +80,7 @@ export class EvaluationProcessingService {
   build(): EvaluationProcessingPipeline {
     const commands = EvaluationCommandService.create();
 
-    return definePipeline({
+    const pipeline = definePipeline({
       name: "evaluation_processing",
       aggregate: defineAggregate({
         type: "evaluation",
@@ -154,8 +157,9 @@ export class EvaluationProcessingService {
       })
       .withCommand("reportEvaluation", commands.report, {
         serializeByAggregate: true,
-      })
-      .build();
+      });
+    const { retention } = this.deps;
+    return (retention === undefined ? pipeline : pipeline.withRetention(retention)).build();
   }
 
   private static graphTriggerActivityGroupKey(event: { tenantId: string }): string {

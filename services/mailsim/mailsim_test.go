@@ -5,12 +5,20 @@ import (
 	"net"
 	"net/http/httptest"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/stretchr/testify/require"
 )
+
+// testBundle stands in for apps/mailsim-web's build, which a Go test cannot
+// rely on having been run.
+var testBundle = fstest.MapFS{
+	"index.html":          {Data: []byte(`<!doctype html><script type="module" src="/assets/index-abc.js"></script><div id="root"></div>`)},
+	"assets/index-abc.js": {Data: []byte("export {};")},
+}
 
 // newTestServer builds a server whose HTTP surface is driven in-process and
 // whose SMTP listener is bound on an ephemeral loopback port, ready to dial.
@@ -22,7 +30,7 @@ func newTestServer(t *testing.T, cfg Config) *Server {
 	if cfg.MaxMessageBytes == 0 {
 		cfg.MaxMessageBytes = defaultMaxMessageBytes
 	}
-	s, err := NewServer(cfg)
+	s, err := newServer(cfg, testBundle)
 	require.NoError(t, err)
 	// The readiness probe below closes its connection before completing a
 	// conversation, which the server would otherwise report as a spurious

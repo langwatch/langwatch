@@ -14,6 +14,8 @@ import {
   CONNECTED_BILLING_TICK_INTERVAL_MS,
   connectedBillingWake,
 } from "../connected-billing.process.ts";
+import { runSeatInvoicingPass } from "../seat-invoicing.intent.ts";
+import { SEAT_INVOICING_PROCESS_NAME, seatInvoicingWake } from "../seat-invoicing.process.ts";
 
 const BOOTED_AT = 1_700_000_000_000;
 const MINUTE_MS = 60 * 1000;
@@ -60,5 +62,52 @@ describe("given the connected billing tick's eventing declaration", () => {
         wakeAt({ at: lastTickAt + CONNECTED_BILLING_TICK_INTERVAL_MS, lastTickAt }),
       ).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("given the seat invoicing pass", () => {
+  /** @scenario "Seat changes are invoiced by a pass every minute on the billing pipeline" */
+  it("asks for one pass on every wake, keyed by the wake", () => {
+    const pass = vi.fn((messageKey: string, payload: JsonValue) => ({
+      messageKey,
+      intentType: "pass",
+      payload,
+    }));
+    const at = BOOTED_AT + MINUTE_MS;
+
+    const evolved = seatInvoicingWake(
+      { lastPassAt: null },
+      {
+        at,
+        now: at,
+        key: SEAT_INVOICING_PROCESS_NAME,
+        projectId: "__global__",
+        intent: intentAccessorOf({ pass }),
+      },
+    );
+
+    expect(evolved.state).toEqual({ lastPassAt: at });
+    expect(pass).toHaveBeenCalledWith(`pass:${at}`, { scheduledFor: at });
+  });
+
+  it("runs the pass, then prunes its own outbox rows older than a day", async () => {
+    const ran: string[] = [];
+    const pruned: { processName: string; before: number }[] = [];
+
+    await runSeatInvoicingPass({
+      pass: async () => {
+        ran.push("pass");
+      },
+      deleteDispatchedBefore: async (params) => {
+        pruned.push(params);
+        return 0;
+      },
+      now: () => BOOTED_AT,
+    })();
+
+    expect(ran).toEqual(["pass"]);
+    expect(pruned).toEqual([
+      { processName: SEAT_INVOICING_PROCESS_NAME, before: BOOTED_AT - 24 * 60 * MINUTE_MS },
+    ]);
   });
 });

@@ -14,11 +14,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 // Boot orchestration constants, verified against dev/compose.dev.yml and
@@ -95,6 +98,12 @@ type BootConfig struct {
 	// DryRun prints the plan (refs, worktree paths, slugs, commands) and runs
 	// nothing at all — no worktree, no haven command, no install.
 	DryRun bool
+	// ParityOnly stops the run after the parity phase, so it starts no
+	// infrastructure for a boot that will not follow.
+	ParityOnly bool
+	// BranchHead boots the branch from -branch-dir's HEAD in its persistent
+	// worktree under -no-haven too, leaving -branch-dir itself untouched.
+	BranchHead bool
 }
 
 // Instance is one booted API copy.
@@ -400,13 +409,6 @@ type commandSpec struct {
 // runner executes external commands; tests swap it out.
 type runner func(ctx context.Context, spec commandSpec, log io.Writer) error
 
-// Boot brings up both instances and returns them with a teardown hook. On
-// any failure the resources created so far are torn down before returning.
-func Boot(ctx context.Context, cfg BootConfig, stderr io.Writer) (*Booted, error) {
-	state := &bootState{cfg: cfg, stderr: stderr, run: execRunner}
-	return state.boot(ctx)
-}
-
 // DryRunPlan is what `-dry-run` prints: the worktrees, slugs and commands a
 // run would use, computed without creating a worktree, starting anything, or
 // running any command at all.
@@ -419,6 +421,8 @@ type DryRunPlan struct {
 	BranchDir  string
 	BranchSlug string // empty on the -no-haven path
 	UseHaven   bool
+	// BranchHead says the branch boots from its HEAD worktree, not in place.
+	BranchHead bool
 	Commands   []string
 }
 
@@ -440,37 +444,43 @@ func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
 		return DryRunPlan{}, err
 	}
 	runID := RunID(workRoot)
-	mainDir := filepath.Join(workRoot, "main")
+	mainDir := persistentWorktree(invoking, "main")
 	plan := DryRunPlan{
 		WorkRoot: workRoot, RunID: runID, MainRef: cfg.MainRef, MainDir: mainDir,
 		BranchDir: invoking, UseHaven: cfg.UseHaven,
 	}
+	plan.Commands = []string{checkoutPlanLine(mainDir, cfg.MainRef, invoking)}
+	if cfg.UseHaven || cfg.BranchHead {
+		plan.BranchDir, plan.BranchHead = persistentWorktree(invoking, "branch"), true
+		plan.Commands = append(plan.Commands, checkoutPlanLine(plan.BranchDir, "HEAD", invoking))
+	}
+	release := "release both persistent worktrees for the next run, deleting the env overlay (a worktree another live run held is <work-root>/<side>, moved aside and deleted in the background)"
 	if !cfg.UseHaven {
-		plan.Commands = []string{
-			"git " + strings.Join(worktreeAddArgs(mainDir, cfg.MainRef), " ") + " (in " + invoking + ")",
+		plan.Commands = append(plan.Commands,
 			"pnpm install / migrate / seed / start, both instances (see README: Boot details)",
-		}
+			"drop the run's databases; the compose project stays up for the next run", release)
 		return plan, nil
 	}
-	plan.BranchDir = filepath.Join(workRoot, "branch")
 	plan.MainSlug = HavenSlug(runID, "main")
 	plan.BranchSlug = HavenSlug(runID, "branch")
 	if plan.MainDir == invoking || plan.BranchDir == invoking {
 		return plan, fmt.Errorf("refusing to boot a haven stack from the invoking checkout %s", invoking)
 	}
-	plan.Commands = []string{
-		"git " + strings.Join(worktreeAddArgs(mainDir, cfg.MainRef), " ") + " (in " + invoking + ")",
-		"git " + strings.Join(worktreeAddArgs(plan.BranchDir, "HEAD"), " ") + " (in " + invoking + ")",
+	plan.Commands = append(plan.Commands,
 		havenPrepareCommandLine(mainDir),
 		havenPrepareCommandLine(plan.BranchDir),
-		havenCommand + " " + strings.Join(havenUpArgs(), " ") + " (in " + mainDir + ", stack " + plan.MainSlug + ")",
-		havenCommand + " " + strings.Join(havenUpArgs(), " ") + " (in " + plan.BranchDir + ", stack " + plan.BranchSlug + ")",
-		havenCommand + " " + strings.Join(havenDestroyArgs(plan.MainSlug), " ") + " (in " + workRoot + ")",
-		havenCommand + " " + strings.Join(havenDestroyArgs(plan.BranchSlug), " ") + " (in " + workRoot + ")",
-		"git worktree remove --force " + mainDir,
-		"git worktree remove --force " + plan.BranchDir,
-	}
+		havenCommand+" "+strings.Join(havenUpArgs(), " ")+" (in "+mainDir+", stack "+plan.MainSlug+")",
+		havenCommand+" "+strings.Join(havenUpArgs(), " ")+" (in "+plan.BranchDir+", stack "+plan.BranchSlug+")",
+		havenCommand+" "+strings.Join(havenDestroyArgs(plan.MainSlug), " ")+" (in "+workRoot+")",
+		havenCommand+" "+strings.Join(havenDestroyArgs(plan.BranchSlug), " ")+" (in "+workRoot+")",
+		release,
+	)
 	return plan, nil
+}
+
+// checkoutPlanLine is how a side's persistent worktree reaches ref's commit.
+func checkoutPlanLine(dir, ref, invoking string) string {
+	return "git worktree add --force --detach " + dir + " <" + ref + ">, or git checkout --detach --force <" + ref + "> in it once it exists (in " + invoking + ")"
 }
 
 // WriteDryRunPlan renders a plan the way visualdiff's own -dry-run does: the
@@ -484,8 +494,10 @@ func WriteDryRunPlan(w io.Writer, plan DryRunPlan) {
 		fmt.Fprintf(w, "             haven stack %s\n", plan.MainSlug)
 		fmt.Fprintf(w, "  branch     HEAD -> %s\n", plan.BranchDir)
 		fmt.Fprintf(w, "             haven stack %s\n", plan.BranchSlug)
+	} else if plan.BranchHead {
+		fmt.Fprintf(w, "  branch     HEAD -> %s\n", plan.BranchDir)
 	} else {
-		fmt.Fprintf(w, "  branch     %s (booted in place; -no-haven has no stack for a worktree to isolate)\n", plan.BranchDir)
+		fmt.Fprintf(w, "  branch     %s (booted in place; -branch-head boots its HEAD in a worktree instead)\n", plan.BranchDir)
 	}
 	fmt.Fprintf(w, "  commands\n")
 	for _, command := range plan.Commands {
@@ -500,15 +512,22 @@ type bootState struct {
 	workRoot string
 	runID    string
 	mainDir  string
-	ownsMain bool
-	// branchDir and ownsBranch are the haven path only: the branch instance's
-	// own HEAD worktree, so it never boots inside the invoking checkout (see
+	// branchDir is the branch's own HEAD worktree, on the haven path and under
+	// -branch-head, so it never boots inside the invoking checkout (see
 	// refuseSelfCheckout and the package comment in haven.go).
-	branchDir  string
-	ownsBranch bool
-	override   string
-	infra      infraURLs
-	processes  []*exec.Cmd
+	branchDir string
+	// checkouts are the trees this run checked out (worktrees.go); teardown
+	// releases the persistent ones and discards the rest.
+	checkouts   []sideCheckout
+	checkoutsMu sync.Mutex
+	// detach starts a command that outlives the run; nil is detachCommand.
+	detach   func(spec commandSpec, log string) error
+	override string
+	// reusedPorts says override came from an earlier run, whose stack may
+	// still be up on its ports; startInfra falls back to fresh ones.
+	reusedPorts bool
+	infra       infraURLs
+	processes   []*exec.Cmd
 	// processesMu guards processes: a worker respawn appends from its own
 	// goroutine while teardown may be killing.
 	processesMu sync.Mutex
@@ -521,6 +540,16 @@ type bootState struct {
 	// langyStub stands in for the Langy agent manager on both sides (compose
 	// and external-infra paths only), started before the first migrate.
 	langyStub *langyAgentStub
+	// started is when the run began; timing lines are measured from it.
+	started time.Time
+	// prepared says the parity phase installed and generated both trees, so
+	// boot runs no install or prepare of its own.
+	prepared bool
+	// infraDone closes when the infrastructure startInfraEarly began is up;
+	// infraErr is what bringing it up returned.
+	infraDone    chan struct{}
+	infraErr     error
+	teardownOnce sync.Once
 }
 
 // environ is the environment child commands inherit.
@@ -554,16 +583,13 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 		}
 	}()
 
-	if err := state.prepareLayout(); err != nil {
-		return nil, err
-	}
-	if err := state.setupWorktree(ctx); err != nil {
+	if err := state.layOut(ctx); err != nil {
 		return nil, err
 	}
 
 	booted = &Booted{
 		WorkRoot: state.workRoot,
-		A:        Instance{Name: "branch", Dir: state.cfg.BranchDir},
+		A:        Instance{Name: "branch", Dir: state.branchTree()},
 		B:        Instance{Name: "main", Dir: state.mainDir},
 	}
 	booted.Teardown = state.teardown
@@ -578,7 +604,29 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 		return booted, err
 	}
 	booted.ActivateEntitlement = state.buildEntitlementActivator()
+	state.timing("both instances healthy")
 	return booted, nil
+}
+
+// layOut creates the work root and checks the trees out, unless the parity
+// phase already did both on this state.
+func (state *bootState) layOut(ctx context.Context) error {
+	if state.workRoot != "" {
+		return nil
+	}
+	if err := state.prepareLayout(); err != nil {
+		return err
+	}
+	return state.setupWorktree(ctx)
+}
+
+// branchTree is the tree the branch side runs from: its own HEAD worktree on
+// the haven path, -branch-dir itself on the -no-haven path.
+func (state *bootState) branchTree() string {
+	if state.branchDir != "" {
+		return state.branchDir
+	}
+	return state.cfg.BranchDir
 }
 
 // buildEntitlementActivator reads the license the entitled pass activates
@@ -623,6 +671,9 @@ func (state *bootState) prepareLayout() error {
 		return err
 	}
 	state.cfg.BranchDir = branchDir
+	if state.started.IsZero() {
+		state.started = time.Now()
+	}
 	state.workRoot = state.cfg.WorkRoot
 	if state.workRoot == "" {
 		state.workRoot = filepath.Join(branchDir, ".apidiff", time.Now().Format("20060102-150405"))
@@ -673,88 +724,122 @@ func (state *bootState) prepareInstances(booted *Booted) error {
 	return nil
 }
 
-// bootInstances runs the per-instance bring-up stages in order.
+// bootInstances brings both sides up at once: each side migrates, seeds,
+// provisions and starts its API and worker beside the other, on the
+// infrastructure startInfraEarly began while the trees were being prepared.
 func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error {
-	stages := []func() error{
-		func() error { return state.startLangyStub() },
-		func() error { return state.resolveInfra() },
-		func() error { return state.preflight(ctx) },
-		func() error { return state.install(ctx, booted.A) },
-		func() error { return state.install(ctx, booted.B) },
-		func() error { return state.startInfra(ctx) },
-		func() error { return state.waitPostgres(ctx) },
-		func() error { return state.prepareDatabases(ctx) },
-		func() error { return state.writeOverlay(booted.A) },
-		func() error { return state.writeOverlay(booted.B) },
-		func() error { return state.migrateAndSeed(ctx, booted.A) },
-		func() error { return state.verifyMigrationTarget(ctx, booted.A) },
-		func() error { return state.provision(ctx, booted.A) },
-		func() error { return state.migrateAndSeed(ctx, booted.B) },
-		func() error { return state.verifyMigrationTarget(ctx, booted.B) },
-		func() error { return state.provision(ctx, booted.B) },
-		func() error { return state.provisionLwql(ctx, booted.A) },
-		func() error { return state.provisionLwql(ctx, booted.B) },
-		func() error { return state.startAPI(ctx, &booted.A) },
-		func() error { return state.startAPI(ctx, &booted.B) },
-		func() error { return state.startWorker(ctx, &booted.A) },
-		func() error { return state.startWorker(ctx, &booted.B) },
+	if err := state.startLangyStub(); err != nil {
+		return err
 	}
-	for _, stage := range stages {
-		if err := stage(); err != nil {
+	if !state.prepared {
+		if err := bothSides(ctx, func(sideCtx context.Context, instance *Instance) error {
+			return state.install(sideCtx, *instance)
+		}, &booted.A, &booted.B); err != nil {
 			return err
 		}
 	}
-	return nil
+	if err := state.infraReady(ctx); err != nil {
+		return err
+	}
+	state.timing("infrastructure ready")
+	// Both sides provision LangWatchQL's server-wide ClickHouse identity, so
+	// main's provisioning still follows the branch's, in the order it always ran.
+	lwqlTurn := make(chan struct{})
+	stepCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var group errgroup.Group
+	for _, side := range []sidePipeline{{instance: &booted.A, lwqlDone: lwqlTurn}, {instance: &booted.B, lwqlAfter: lwqlTurn}} {
+		group.Go(func() error { return cancelOnError(cancel, state.bringUp(ctx, stepCtx, side)) })
+	}
+	return group.Wait()
 }
 
-// setupWorktree prepares the base-ref worktree everywhere, and — for the
-// haven path only — a second worktree checking out the branch's own HEAD.
-// haven registers one stack per directory: booting the branch instance in the
-// invoking checkout is what let `haven up` there replace a developer's own
-// stack registration for that directory, and `haven destroy` take it down
-// (01:36, 2026-09-10). The branch worktree removes that directory collision
-// the same way the main one always has.
-func (state *bootState) setupWorktree(ctx context.Context) error {
-	dir, owned, err := state.addOrReuseWorktree(ctx, "main", state.cfg.MainRef)
-	if err != nil {
-		return fmt.Errorf("git worktree add: %w", err)
+// sidePipeline is one side's bring-up and its place in the LangWatchQL
+// order: the side it provisions after, and the side waiting on it.
+type sidePipeline struct {
+	instance  *Instance
+	lwqlAfter <-chan struct{}
+	lwqlDone  chan<- struct{}
+}
+
+// bringUp is one side's pipeline from an empty database to a healthy API and
+// its worker. Steps run under stepCtx, which the other side's failure cancels;
+// the processes run under ctx, which lives as long as the run.
+func (state *bootState) bringUp(ctx, stepCtx context.Context, side sidePipeline) error {
+	instance := side.instance
+	steps := []func() error{
+		func() error { return state.writeOverlay(*instance) },
+		func() error { return state.migrateAndSeed(stepCtx, *instance) },
+		func() error { return state.verifyMigrationTarget(stepCtx, *instance) },
+		func() error { return state.provision(stepCtx, *instance) },
 	}
-	state.mainDir, state.ownsMain = dir, owned
-	if !state.cfg.UseHaven {
+	for _, step := range steps {
+		if err := step(); err != nil {
+			return err
+		}
+	}
+	if side.lwqlAfter != nil {
+		select {
+		case <-side.lwqlAfter:
+		case <-stepCtx.Done():
+			return stepCtx.Err()
+		}
+	}
+	if err := state.provisionLwql(stepCtx, *instance); err != nil {
+		return err
+	}
+	if side.lwqlDone != nil {
+		close(side.lwqlDone)
+	}
+	state.timing("%s migrated, seeded and provisioned", instance.Name)
+	return state.startProcesses(ctx, stepCtx, instance)
+}
+
+// bothSides runs one step on both instances at once and returns the first
+// error; the first failure cancels the other side's step.
+func bothSides(ctx context.Context, step func(context.Context, *Instance) error, instances ...*Instance) error {
+	group, groupCtx := errgroup.WithContext(ctx)
+	for _, instance := range instances {
+		group.Go(func() error { return step(groupCtx, instance) })
+	}
+	return group.Wait()
+}
+
+// cancelOnError cancels the shared steps when one side fails, so the other
+// side stops waiting on a run that is already lost.
+func cancelOnError(cancel context.CancelFunc, err error) error {
+	if err != nil {
+		cancel()
+	}
+	return err
+}
+
+// setupWorktree checks the base ref out and, on the haven path or under
+// -branch-head, the branch's own HEAD: haven registers one stack per
+// directory, and a branch booted in the invoking checkout replaced and then
+// destroyed a developer's own stack (01:36, 2026-09-10). Both sides reuse
+// their persistent worktree (worktrees.go).
+func (state *bootState) setupWorktree(ctx context.Context) error {
+	main, err := state.checkOut(ctx, "main", state.cfg.MainRef)
+	if err != nil {
+		return err
+	}
+	state.mainDir = main.dir
+	if !state.cfg.UseHaven && !state.cfg.BranchHead {
 		return nil
 	}
-	dir, owned, err = state.addOrReuseWorktree(ctx, "branch", "HEAD")
+	branch, err := state.checkOut(ctx, "branch", "HEAD")
 	if err != nil {
-		return fmt.Errorf("git worktree add (branch): %w", err)
+		return err
 	}
-	state.branchDir, state.ownsBranch = dir, owned
+	state.branchDir = branch.dir
 	return state.refuseSelfCheckout()
-}
-
-// addOrReuseWorktree adds (or, with -reuse-worktrees, adopts) one
-// <workRoot>/<name> worktree at ref, run from the invoking checkout. The bool
-// result says whether this run owns the worktree and so must remove it at
-// teardown.
-func (state *bootState) addOrReuseWorktree(ctx context.Context, name, ref string) (string, bool, error) {
-	dir := filepath.Join(state.workRoot, name)
-	if state.cfg.ReuseWorktrees {
-		if _, err := os.Stat(dir); err == nil {
-			state.logf("reusing worktree %s", dir)
-			return dir, false, nil
-		}
-		return "", false, fmt.Errorf("-reuse-worktrees but %s does not exist", dir)
-	}
-	state.logf("git worktree add %s at %s", ref, dir)
-	if err := state.runHost(ctx, "git", worktreeAddArgs(dir, ref)...); err != nil {
-		return "", false, err
-	}
-	return dir, true, nil
 }
 
 // refuseSelfCheckout is the backstop the 01:36 incident argues for: whatever
 // computed a worktree path, it must never equal the invoking checkout. Both
-// are freshly built <workRoot>/... paths, so this only fires if a future
-// change makes one alias the checkout again.
+// are .apidiff/... paths, so this only fires if a future change makes one
+// alias the checkout again.
 func (state *bootState) refuseSelfCheckout() error {
 	invoking := filepath.Clean(state.cfg.BranchDir)
 	for _, dir := range []string{state.mainDir, state.branchDir} {
@@ -776,18 +861,18 @@ func (state *bootState) compose() composeCmd {
 }
 
 func (state *bootState) install(ctx context.Context, instance Instance) error {
-	if state.cfg.SkipInstall || (instance.Name == "main" && state.cfg.ReuseWorktrees) {
+	if state.cfg.SkipInstall || state.prepared {
 		state.logf("install %s: skipped", instance.Name)
 		return nil
 	}
 	state.logf("install %s: pnpm install --frozen-lockfile (this is the slow step)", instance.Name)
 	install := commandSpec{name: "pnpm", args: []string{"install", "--frozen-lockfile"}, dir: instance.Dir}
-	if err := state.run(ctx, install, state.stderr); err != nil {
+	if err := state.run(ctx, install, state.sideLog(instance.Name)); err != nil {
 		return fmt.Errorf("install %s: %w", instance.Name, err)
 	}
 	for _, argv := range instance.Profile.prepareArgvs {
 		prepare := commandSpec{name: "pnpm", args: argv, dir: instance.Dir}
-		if err := state.run(ctx, prepare, state.stderr); err != nil {
+		if err := state.run(ctx, prepare, state.sideLog(instance.Name)); err != nil {
 			return fmt.Errorf("prepare %s (%s): %w", instance.Name, strings.Join(argv, " "), err)
 		}
 	}
@@ -830,6 +915,21 @@ func (state *bootState) resolveInfra() error {
 		state.logf("infra: using external servers")
 		return nil
 	}
+	state.override = composeOverridePath(state.cfg.BranchDir, state.cfg.ComposeProject)
+	if ports, ok := readOverridePorts(state.override); ok {
+		state.infra.pgPort, state.infra.chPort, state.infra.redisPort = ports[0], ports[1], ports[2]
+		state.reusedPorts = true
+		state.logf("infra: reusing compose project %s's ports from %s", state.cfg.ComposeProject, state.override)
+	} else if err := state.allocateComposePorts(); err != nil {
+		return err
+	}
+	state.setComposeURLs()
+	return nil
+}
+
+// allocateComposePorts picks three free ports and writes the override that
+// publishes the stack on them.
+func (state *bootState) allocateComposePorts() error {
 	for _, port := range []*int{&state.infra.pgPort, &state.infra.chPort, &state.infra.redisPort} {
 		value, err := freePort()
 		if err != nil {
@@ -837,14 +937,18 @@ func (state *bootState) resolveInfra() error {
 		}
 		*port = value
 	}
-	state.override = filepath.Join(state.workRoot, "compose.apidiff.yml")
-	if err := os.WriteFile(state.override, []byte(portsOverrideYAML(state.infra.pgPort, state.infra.chPort, state.infra.redisPort)), 0o600); err != nil {
+	state.reusedPorts = false
+	if err := os.MkdirAll(filepath.Dir(state.override), 0o750); err != nil {
 		return err
 	}
+	return os.WriteFile(state.override, []byte(portsOverrideYAML(state.infra.pgPort, state.infra.chPort, state.infra.redisPort)), 0o600)
+}
+
+// setComposeURLs points the three servers at the managed stack's ports.
+func (state *bootState) setComposeURLs() {
 	state.infra.pgServer = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", pgUser, pgPass, state.infra.pgPort, pgAdminDB)
 	state.infra.chServer = fmt.Sprintf("http://%s:%s@127.0.0.1:%d", chUser, chPass, state.infra.chPort)
 	state.infra.redisServer = fmt.Sprintf("redis://127.0.0.1:%d", state.infra.redisPort)
-	return nil
 }
 
 // preflight validates external infrastructure BEFORE the two pnpm installs.
@@ -922,12 +1026,54 @@ func (state *bootState) startInfra(ctx context.Context) error {
 	if state.override == "" {
 		return nil
 	}
+	err := state.composeUp(ctx)
+	if err == nil || !state.reusedPorts {
+		return err
+	}
+	state.logf("infra: compose up on the previous run's ports failed (%v); starting on fresh ports", err)
+	if err := state.allocateComposePorts(); err != nil {
+		return err
+	}
+	state.setComposeURLs()
+	return state.composeUp(ctx)
+}
+
+// composeUp starts the stack, or finds it already up from an earlier run.
+func (state *bootState) composeUp(ctx context.Context) error {
 	state.logf("infra: docker compose up (pg :%d, clickhouse :%d, redis :%d)", state.infra.pgPort, state.infra.chPort, state.infra.redisPort)
 	args := composeArgs(state.compose(), "up", "-d", "postgres", "redis", "clickhouse", "--wait")
 	if err := state.runHost(ctx, "docker", args...); err != nil {
 		return fmt.Errorf("compose up: %w", err)
 	}
 	return nil
+}
+
+// composeOverridePath is the managed stack's override, kept beside the
+// persistent worktrees so the next run finds the ports the stack is up on.
+func composeOverridePath(root, project string) string {
+	return filepath.Join(toolDir(root), "compose-"+project+".yml")
+}
+
+// overridePort reads one published port out of portsOverrideYAML's output.
+var overridePort = regexp.MustCompile(`"127\.0\.0\.1:(\d+):(5432|8123|6379)"`)
+
+// readOverridePorts answers the postgres, clickhouse and redis ports an
+// earlier run's override published, false unless it names all three.
+func readOverridePorts(path string) ([3]int, bool) {
+	content, err := os.ReadFile(path) // #nosec G304 -- the tool's own override under .apidiff.
+	if err != nil {
+		return [3]int{}, false
+	}
+	slots := map[string]int{"5432": 0, "8123": 1, "6379": 2}
+	var ports [3]int
+	for _, match := range overridePort.FindAllStringSubmatch(string(content), -1) {
+		port, err := strconv.Atoi(match[1])
+		if err != nil || port <= 0 {
+			return [3]int{}, false
+		}
+		ports[slots[match[2]]] = port
+	}
+	return ports, ports[0] > 0 && ports[1] > 0 && ports[2] > 0
 }
 
 // pgAdmin runs one SQL statement against the admin database, via compose exec
@@ -1155,7 +1301,7 @@ func (state *bootState) migrateAndSeed(ctx context.Context, instance Instance) e
 	}
 	for _, step := range steps {
 		spec := commandSpec{name: "pnpm", args: step.args, dir: instance.Dir, env: env}
-		if err := state.run(ctx, spec, state.stderr); err != nil {
+		if err := state.run(ctx, spec, state.sideLog(instance.Name)); err != nil {
 			return fmt.Errorf("%s %s: %w", step.name, instance.Name, err)
 		}
 	}
@@ -1187,7 +1333,7 @@ func (state *bootState) provisionLwql(ctx context.Context, instance Instance) er
 	}
 	state.logf("lwql %s: provision the access model", instance.Name)
 	spec := commandSpec{name: "pnpm", args: instance.Profile.lwqlProvisionArgv, dir: instance.Dir, env: env}
-	if err := state.run(ctx, spec, state.stderr); err != nil {
+	if err := state.run(ctx, spec, state.sideLog(instance.Name)); err != nil {
 		state.logf("lwql %s: provisioning failed (%v); LangWatchQL stays refused on this side", instance.Name, err)
 	}
 	return nil
@@ -1284,16 +1430,23 @@ func (state *bootState) verifyMigrationTarget(ctx context.Context, instance Inst
 	return nil
 }
 
-// startAPI spawns the API process for one instance and waits for health.
-func (state *bootState) startAPI(ctx context.Context, instance *Instance) error {
+// startProcesses spawns one instance's API and worker together, then waits
+// for the API's health. The worker starts with the API rather than after both
+// are healthy, so what the first probes ingest is projected without delay.
+func (state *bootState) startProcesses(ctx, waitCtx context.Context, instance *Instance) error {
 	command, logPath, err := state.spawn(ctx, instanceProcess{instance: *instance, argv: instance.Profile.startArgv, logName: instance.Name})
 	if err != nil {
 		return err
 	}
-	state.logf("start %s on :%d (pid %d, log %s); waiting for health", instance.Name, instance.Port, command.Process.Pid, logPath)
-	if err := state.waitHealthy(ctx, instance.URL, instance.Profile.healthPath); err != nil {
+	state.logf("start %s on :%d (pid %d, log %s)", instance.Name, instance.Port, command.Process.Pid, logPath)
+	if err := state.startWorker(ctx, instance); err != nil {
+		return err
+	}
+	state.logf("%s: waiting for health", instance.Name)
+	if err := state.waitHealthy(waitCtx, instance.URL, instance.Profile.healthPath); err != nil {
 		return fmt.Errorf("health %s: %w (see %s)", instance.Name, err, logPath)
 	}
+	state.timing("%s healthy", instance.Name)
 	return nil
 }
 
@@ -1414,12 +1567,21 @@ func healthy(ctx context.Context, client *http.Client, healthURL string) bool {
 	return response.StatusCode >= 200 && response.StatusCode < 300
 }
 
-// teardown stops the managed compose stack and removes the main worktree,
-// unless -keep is set. With -keep the API processes outlive the tool (the
-// context cancel kills the pnpm wrapper; the tsx child survives for
-// inspection); without it the whole process groups are killed here, before
-// the caller's cancel.
+// teardown kills the instances, drops the run's databases and hands the
+// worktrees back, unless -keep is set. With -keep the API processes outlive
+// the tool (the context cancel kills the pnpm wrapper; the tsx child survives
+// for inspection). Nothing slow runs here: the compose stack stays up for the
+// next run, and a worktree's files are deleted by a process of its own.
 func (state *bootState) teardown() {
+	state.teardownOnce.Do(state.teardownOnceOnly)
+}
+
+// teardownOnceOnly is teardown's body: the parity phase's cleanup and the
+// booted instances share one state, and whichever runs second finds it done.
+func (state *bootState) teardownOnceOnly() {
+	if state.infraDone != nil {
+		<-state.infraDone
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if state.langyStub != nil {
@@ -1436,44 +1598,78 @@ func (state *bootState) teardown() {
 	}
 	if state.cfg.UseHaven {
 		state.destroyHavenStacks(ctx)
-		state.removeOwnedWorktrees(ctx)
+		state.releaseCheckouts(ctx)
 		return
 	}
 	state.killAPIProcesses()
+	state.teardownInfra(ctx)
+	state.releaseCheckouts(ctx)
+}
+
+// teardownInfra drops exactly the run-scoped databases and empties its two
+// Redis logical DBs. The managed compose stack stays up: the next run finds
+// its ports in the override file and skips the start (resolveInfra).
+func (state *bootState) teardownInfra(ctx context.Context) {
+	if state.infra.pgServer == "" {
+		// Nothing was provisioned: the run stopped before its infrastructure.
+		return
+	}
+	state.dropDatabases(ctx)
+	if err := state.flushRedis(ctx); err != nil {
+		state.logf("teardown: flush redis: %v", err)
+	}
 	if state.override != "" {
-		state.logf("teardown: docker compose down -v")
-		args := composeArgs(state.compose(), "down", "-v")
-		if err := state.runHost(ctx, "docker", args...); err != nil {
-			state.logf("teardown: compose down: %v", err)
-		}
-	} else {
-		// External infra has no compose down; drop exactly the run-scoped
-		// databases this run created and empty its two Redis logical DBs.
-		state.dropDatabases(ctx)
-		if err := state.flushRedis(ctx); err != nil {
-			state.logf("teardown: flush redis: %v", err)
-		}
-	}
-	state.removeOwnedWorktrees(ctx)
-}
-
-// removeOwnedWorktrees removes every worktree this run added — the base-ref
-// one always, and the branch's own HEAD worktree on the haven path — and
-// leaves alone anything -reuse-worktrees adopted instead. The invoking
-// checkout itself is never a worktree this run owns, so it is never touched.
-func (state *bootState) removeOwnedWorktrees(ctx context.Context) {
-	if state.ownsMain {
-		state.removeWorktree(ctx, state.mainDir)
-	}
-	if state.ownsBranch {
-		state.removeWorktree(ctx, state.branchDir)
+		state.logf("teardown: compose project %s stays up for the next run; `docker compose -p %s down -v` stops it",
+			state.cfg.ComposeProject, state.cfg.ComposeProject)
 	}
 }
 
-func (state *bootState) removeWorktree(ctx context.Context, dir string) {
-	if err := state.runHost(ctx, "git", "worktree", "remove", "--force", dir); err != nil {
-		state.logf("teardown: worktree remove: %v", err)
+// releaseCheckouts hands each persistent worktree to the next run without the
+// env overlay this run wrote, and discards the worktrees added for this run
+// alone. A worktree adopted with -reuse-worktrees is left as it was.
+func (state *bootState) releaseCheckouts(ctx context.Context) {
+	state.checkoutsMu.Lock()
+	checkouts := append([]sideCheckout(nil), state.checkouts...)
+	state.checkoutsMu.Unlock()
+	for _, checkout := range checkouts {
+		switch {
+		case checkout.persistent:
+			removeOverlay(checkout.dir)
+			releaseWorktree(checkout.dir, state.workRoot)
+		case checkout.owned:
+			state.discardWorktree(ctx, checkout.dir)
+		}
 	}
+}
+
+// discardWorktree takes a worktree out of git's list at once and leaves its
+// files to a process of its own: removing some 2 200 packages in place ran
+// past the teardown deadline and leaked the worktree (r47).
+func (state *bootState) discardWorktree(ctx context.Context, dir string) {
+	discarded := dir + ".discarded"
+	if err := os.Rename(dir, discarded); err != nil {
+		state.logf("teardown: move %s aside: %v; removing it in place", dir, err)
+		if err := state.runHost(ctx, "git", "worktree", "remove", "--force", dir); err != nil {
+			state.logf("teardown: worktree remove: %v", err)
+		}
+		return
+	}
+	if err := state.runHost(ctx, "git", "worktree", "prune"); err != nil {
+		state.logf("teardown: worktree prune: %v", err)
+	}
+	log := filepath.Join(state.workRoot, "logs", "teardown.log")
+	state.logf("teardown: deleting %s in the background (log %s)", discarded, log)
+	if err := state.detachRun(commandSpec{name: "rm", args: []string{"-rf", discarded}, dir: state.workRoot}, log); err != nil {
+		state.logf("teardown: delete %s: %v", discarded, err)
+	}
+}
+
+// detachRun starts a command that outlives the run.
+func (state *bootState) detachRun(spec commandSpec, log string) error {
+	if state.detach != nil {
+		return state.detach(spec, log)
+	}
+	return detachCommand(spec, log)
 }
 
 // killAPIProcesses kills each started API's whole process group — the pnpm
@@ -1506,7 +1702,7 @@ func (state *bootState) dropDatabases(ctx context.Context) {
 // allowedCommands are the only executables the boot orchestration runs; every
 // commandSpec in this package is built from these constants, and the
 // allowlist proves subprocess names are never tainted input.
-var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true, "node": true, "env": true, havenCommand: true}
+var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true, "node": true, "env": true, "rm": true, havenCommand: true}
 
 // execRunner runs one command, streaming output to log.
 func execRunner(ctx context.Context, spec commandSpec, log io.Writer) error {
@@ -1523,4 +1719,25 @@ func execRunner(ctx context.Context, spec commandSpec, log io.Writer) error {
 	command.Stdout = log
 	command.Stderr = log
 	return command.Run()
+}
+
+// detachCommand starts spec in a process group of its own, its output
+// appended to log, and returns without waiting (visualdiff's stagger.go).
+func detachCommand(spec commandSpec, log string) error {
+	if !allowedCommands[spec.name] {
+		return fmt.Errorf("refusing to run unlisted command %q", spec.name)
+	}
+	output, err := os.OpenFile(log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600) // #nosec G304 -- the run's own teardown log.
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	// #nosec G204 -- spec.name is restricted to the allowedCommands allowlist above.
+	command := exec.CommandContext(context.Background(), spec.name, spec.args...)
+	command.Dir, command.Stdout, command.Stderr = spec.dir, output, output
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := command.Start(); err != nil {
+		return err
+	}
+	return command.Process.Release()
 }

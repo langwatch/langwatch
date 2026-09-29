@@ -7,13 +7,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Select } from "@langwatch/design-system/select";
 import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
 import { ArrowRight } from "lucide-react";
 
 import type { BillingInterval, Currency } from "../../model/billing-plans.ts";
 import { LabeledSwitch } from "../../ui/elements/labeled-switch.tsx";
-import { Link } from "../../ui/elements/link.tsx";
 
 const currencyOptions: { label: string; value: Currency }[] = [
   { label: "€ EUR", value: PrismaCurrency.EUR },

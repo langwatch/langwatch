@@ -1,6 +1,6 @@
 /**
- * The run's folds in Redis beside main's progress key, 24-hour TTL: the plan and the progress
- * apart, so a cell's result never rewrites the plan. The poller's own key is not touched yet.
+ * The run's folds in Redis, 24-hour TTL: the progress at main's poller key by runId, the plan
+ * beside it by aggregate key, so a cell's result never rewrites the plan.
  */
 import type { FoldStateRead } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -20,7 +20,7 @@ const logger = createLogger("langwatch:experiment:run-fold");
 const RUN_KEY_PREFIX = "eval_v3_run:";
 const RUN_TTL_SECONDS = 86_400;
 
-const progressKey = (runKey: string): string => `${RUN_KEY_PREFIX}${runKey}:progress`;
+const progressKey = (runId: string): string => `${RUN_KEY_PREFIX}${runId}`;
 const planKey = (runKey: string): string => `${RUN_KEY_PREFIX}${runKey}:plan`;
 
 export class RedisExperimentRunFoldRepository extends ExperimentRunFoldRepository {
@@ -46,18 +46,16 @@ export class RedisExperimentRunFoldRepository extends ExperimentRunFoldRepositor
     await this.redis.set(planKey(runKey), JSON.stringify(state), "EX", RUN_TTL_SECONDS);
   }
 
-  readProgress({ runKey }: { runKey: string }): Promise<FoldStateRead<ExperimentRunProgressState>> {
-    return this.read({ key: progressKey(runKey), schema: experimentRunProgressStateSchema });
+  readRunProgress({
+    runId,
+  }: {
+    runId: string;
+  }): Promise<FoldStateRead<ExperimentRunProgressState>> {
+    return this.read({ key: progressKey(runId), schema: experimentRunProgressStateSchema });
   }
 
-  async writeProgress({
-    runKey,
-    state,
-  }: {
-    runKey: string;
-    state: ExperimentRunProgressState;
-  }): Promise<void> {
-    await this.redis.set(progressKey(runKey), JSON.stringify(state), "EX", RUN_TTL_SECONDS);
+  async writeProgress({ state }: { state: ExperimentRunProgressState }): Promise<void> {
+    await this.redis.set(progressKey(state.runId), JSON.stringify(state), "EX", RUN_TTL_SECONDS);
   }
 
   /** A value that no longer parses reads as empty, so the fold starts over rather than wedging. */

@@ -55,9 +55,6 @@ class StubProjectHomeHost extends ProjectHomeHost {
   hasPermission(): boolean {
     return true;
   }
-  featureFlag() {
-    return { enabled: false, isLoading: false };
-  }
   langyVisibility() {
     return { show: false, isResolving: false };
   }
@@ -102,7 +99,7 @@ describe("<TracesOverview /> presentation", () => {
     it("draws no curve through one or two points", () => {
       for (const days of [1, 2, 3]) {
         period.daysDifference = days;
-        renderWithProviders(<TracesOverview variant="trend" />);
+        renderWithProviders(<TracesOverview variant="strip" />);
 
         expect(screen.queryByTestId("traces-overview-trend")).toBeNull();
         expect(screen.queryByText(/Show the trend/)).toBeNull();

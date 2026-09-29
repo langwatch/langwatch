@@ -1,10 +1,10 @@
 import { HStack, Icon, Link, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { Lock } from "react-feather";
 
-import NextLink from "../elements/next-link.tsx";
 import { useFieldRedaction } from "./use-field-redaction.ts";
 
 interface RedactedFieldProps {
@@ -60,9 +60,9 @@ export const RedactedInline: React.FC<{
           <Text>{explanationFor(visibleTo)}</Text>
           {canOpenSettings && (
             <Link asChild color="inherit" textDecoration="underline">
-              <NextLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
+              <RoutedLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
                 Open privacy settings
-              </NextLink>
+              </RoutedLink>
             </Link>
           )}
         </VStack>

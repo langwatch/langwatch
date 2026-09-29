@@ -30,7 +30,6 @@ import {
 } from "./prisma.join-request.repository.ts";
 import { PrismaMfaEnrollmentProjectionRepository } from "./prisma.mfa-enrollment-projection.repository.ts";
 import { PrismaMfaEnrollmentRepository } from "./prisma.mfa-enrollment.repository.ts";
-import { PrismaScimSyncProjectionRepository } from "./prisma.scim-sync-projection.repository.ts";
 import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.repository.ts";
 import { PrismaSsoConnectionBackofficeRepository } from "./prisma.sso-connection-backoffice.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
@@ -100,7 +99,6 @@ export class PostgresIdentityRepositories {
       mfaProjection: PrismaMfaEnrollmentProjectionRepository.create(database),
       joinRequestProjection: PrismaJoinRequestProjectionRepository.create(database),
       ssoConnectionHeads: PrismaSsoConnectionProjectionRepository.create(database),
-      scimSyncs: PrismaScimSyncProjectionRepository.create(database),
       secretCarry: PrismaIdentitySecretCarryRepository.create(database),
       joinRequestAudience: PrismaJoinRequestAudienceRepository.create(database),
       joinRequestNotificationContext:

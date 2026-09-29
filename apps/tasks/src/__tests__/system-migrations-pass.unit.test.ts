@@ -14,6 +14,7 @@ const dependencies = vi.hoisted(() => ({
   runPass: vi.fn<() => Promise<void>>(),
   redis: vi.fn(),
   database: { name: "database" },
+  dataplane: { dataplaneFor: () => ({ kind: "shared" as const }) },
   sender: { send: vi.fn() },
 }));
 
@@ -63,7 +64,6 @@ vi.mock("@langwatch/identity-process", () => ({
 }));
 vi.mock("@langwatch/ops-process", () => ({
   OpsSystemMigrations: { create: dependencies.createRunner },
-  RoutingTableOrganizationDataplaneService: { create: (options: unknown) => options },
   SystemMigrationsPassTask: {
     create: ({ pass }: { pass: () => (input: { signal: AbortSignal }) => Promise<void> }) => ({
       run: (input: { signal: AbortSignal }) => pass()(input),
@@ -95,6 +95,7 @@ function connections() {
       },
     },
     redis: dependencies.redis() as never,
+    dataplane: dependencies.dataplane,
   };
 }
 
@@ -122,6 +123,7 @@ describe("given the system migration task", () => {
       expect(options.userMigrations()).toEqual(["identifier-backfill", "secret-heal"]);
       expect(options.isSaaS()).toBe(true);
       await expect(options.newbornSweep()).resolves.toBe("swept");
+      expect(options.dataplane).toBe(dependencies.dataplane);
       const identity = dependencies.userMigrations.mock.calls[0]?.[0].eventing;
       expect(dependencies.newbornSweep).toHaveBeenCalledWith({
         database: dependencies.database,

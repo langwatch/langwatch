@@ -14,7 +14,7 @@ export type OpsRouter = {
   query: Readonly<Record<string, string | undefined>>;
   asPath: string;
   push: (to: OpsRouterTarget) => void;
-  replace: (to: OpsRouterTarget, as?: undefined, options?: { shallow?: boolean }) => void;
+  replace: (to: OpsRouterTarget, options?: { shallow?: boolean }) => void;
   back: () => void;
 };
 

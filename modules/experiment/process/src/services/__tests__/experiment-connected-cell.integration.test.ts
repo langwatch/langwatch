@@ -9,7 +9,7 @@ import type {
 import { createInitialResults, createInitialUIState } from "@langwatch/experiment-contract";
 import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
- * Tests ExperimentRunOrchestratorService.executeConnectedCell: running a
+ * Tests ExperimentConnectedCellService.executeConnectedCell: running a
  * connected agent as a workbench column.
  * @see specs/experiments-v3/connected-agent-target.feature
  */
@@ -23,13 +23,20 @@ const scripted = vi.hoisted(() => ({
 }));
 import type { Agent as TypedAgent, CallOutcome } from "@langwatch/agent-contract";
 import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
+import type { RunActor } from "@langwatch/scenario-contract";
 
-import type {
-  ExperimentRunCollaborators,
-  OrchestratorInput,
-} from "../../rules/experiment-run-input.rules.ts";
-import type { ConnectedDispatch } from "../experiment-connected-cell.service.ts";
-import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
+import { MemoryExperimentRunAbortRepository } from "../../repositories/memory/memory.experiment-run-abort.repository.ts";
+import { MemoryExperimentRunFoldRepository } from "../../repositories/memory/memory.experiment-run-fold.repository.ts";
+import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
+import { ExperimentCellExecutionService } from "../experiment-cell-execution.service.ts";
+import {
+  type ConnectedDispatch,
+  ExperimentConnectedCellService,
+} from "../experiment-connected-cell.service.ts";
+import type { ExecutionDataServices } from "../experiment-execution-data.service.ts";
+import { ExperimentWorkbenchPipelineRunService } from "../experiment-workbench-pipeline-run.service.ts";
+import type { ExperimentService } from "../experiment.service.ts";
 
 /**
  * The studio boundary the grading evaluators reach, scripted rather than
@@ -154,16 +161,19 @@ const run = async ({
   now?: () => number;
 }): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of ExperimentRunOrchestratorService.create().executeConnectedCell({
+  const connected = ExperimentConnectedCellService.create({
+    ports,
+    workflows,
+    cells: ExperimentCellExecutionService.create({ ports, workflows }),
+    dispatch,
+    sleep: async () => undefined,
+    ...(now ? { now } : {}),
+  });
+  for await (const event of connected.executeConnectedCell({
     cell,
     projectId: "p1",
     agent,
     datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
-    dispatch,
-    sleep: async () => undefined,
-    ports,
-    workflows,
-    ...(now ? { now } : {}),
   })) {
     events.push(event);
   }
@@ -326,22 +336,25 @@ describe("given a connected agent column", () => {
     it("fails the row with the busy code once the budget ends", async () => {
       const events: EvaluationV3Event[] = [];
       let clock = 0;
-      for await (const event of ExperimentRunOrchestratorService.create().executeConnectedCell({
-        cell: makeCell(),
-        projectId: "p1",
-        agent,
+      const connected = ExperimentConnectedCellService.create({
+        ports,
+        workflows,
+        cells: ExperimentCellExecutionService.create({ ports, workflows }),
         dispatch: async () => {
           throw new AgentBusyError({ retryAfterMs: 10 });
         },
         sleep: async () => undefined,
-        ports,
-        workflows,
         // Every read of the clock is a minute later, so the budget is spent
         // on the first retry rather than in real time.
         now: () => {
           clock += 60_000;
           return clock;
         },
+      });
+      for await (const event of connected.executeConnectedCell({
+        cell: makeCell(),
+        projectId: "p1",
+        agent,
       })) {
         events.push(event);
       }
@@ -399,9 +412,8 @@ describe("given a personal development agent of another person", () => {
   };
 
   /**
-   * The rule itself lives in the Suite feature and is composed onto this port in apps/api.
-   * What this file pins is the seam: the run hands the port every loaded agent and whoever
-   * started it, and refuses on the port's refusal before a single cell exists.
+   * The rule itself lives in the Suite feature. What this file pins is the seam: the run's start
+   * hands the rule every loaded agent and whoever started it, and refuses before any start is sent.
    */
   const assertRunnable = vi.fn(async () => {
     throw new AgentOwnerOnlyError({
@@ -411,13 +423,6 @@ describe("given a personal development agent of another person", () => {
       ownerName: null,
     });
   });
-  const ownershipPorts = createApiFixture<ExperimentRunCollaborators>(
-    {
-      ...ports,
-      connectedAgentOwnership: { assertConnectedAgentsRunnable: assertRunnable },
-    },
-    "ports",
-  );
 
   const stateWithConnectedTarget = (): EvaluationsV3State => ({
     name: "Evaluation",
@@ -430,33 +435,67 @@ describe("given a personal development agent of another person", () => {
     ui: createInitialUIState(),
   });
 
-  const inputFor = (actor: OrchestratorInput["actor"]): OrchestratorInput => ({
-    projectId: "p1",
-    scope: { type: "full" },
-    state: stateWithConnectedTarget(),
-    datasetRows: [{ question: "How do I return a broken item?" }],
-    datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
-    loadedPrompts: new Map(),
-    loadedAgents: new Map([["agent_1", personalAgent]]),
-    ports: ownershipPorts,
-    workflows,
-    defaultConcurrency: 1,
-    ...(actor ? { actor } : {}),
-  });
+  /** A streamed run on the run's pipeline, its frames and the starts it sent. */
+  const streamed = async (actor: RunActor | undefined) => {
+    const starts: unknown[] = [];
+    const runs = ExperimentWorkbenchPipelineRunService.create({
+      experiments: createApiFixture<ExperimentService>({}, "experiments"),
+      observer: { recordExperimentRan: vi.fn(), reportError: vi.fn() },
+      runs: {
+        commands: {
+          startExperimentRun: async (start) => {
+            starts.push(start);
+          },
+          completeExperimentRun: async () => undefined,
+          abortExperimentRun: async () => undefined,
+        },
+        stream: experimentRunEventStreamChannels.memory.create(),
+        folds: MemoryExperimentRunFoldRepository.create(),
+        abort: MemoryExperimentRunAbortRepository.create(),
+        publicBaseUrl: undefined,
+        services: createApiFixture<ExecutionDataServices>({}, "services"),
+        ownership: { assertConnectedAgentsRunnable: assertRunnable },
+        concurrency: 1,
+        refusals: {},
+      },
+    });
+    const frames: EvaluationV3Event[] = [];
+    for await (const frame of runs.streamRun({
+      start: {
+        tenantId: "p1",
+        occurredAt: 0,
+        runId: "run_1",
+        experimentId: "",
+        workflowVersionId: null,
+        total: 1,
+        targets: [],
+      },
+      actor,
+      data: {
+        datasetRows: [{ question: "How do I return a broken item?" }],
+        datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
+        loadedPrompts: new Map(),
+        loadedAgents: new Map([["agent_1", personalAgent]]),
+        loadedEvaluators: new Map(),
+        loadedWorkflows: new Map(),
+      },
+      state: stateWithConnectedTarget(),
+      carriedOverCells: [],
+      reportContext: { projectId: "p1" },
+    })) {
+      frames.push(frame);
+    }
+
+    return { frames, starts };
+  };
 
   describe("when someone else starts the run", () => {
     /** @scenario "Another person's development agent is refused" */
     it("refuses the run with the owner-only code", async () => {
-      const events: EvaluationV3Event[] = [];
-      await expect(async () => {
-        for await (const event of ExperimentRunOrchestratorService.create().runOrchestrator(
-          inputFor({ id: "user_me", label: "user" }),
-        )) {
-          events.push(event);
-        }
-      }).rejects.toMatchObject({ code: "agent_owner_only" });
+      const { frames, starts } = await streamed({ id: "user_me", label: "user" });
 
-      expect(events).toEqual([]);
+      expect(frames).toMatchObject([{ type: "error", message: "agent_owner_only" }]);
+      expect(starts).toEqual([]);
       expect(assertRunnable).toHaveBeenCalledWith({
         agents: [personalAgent],
         actor: { id: "user_me", label: "user" },
@@ -467,13 +506,9 @@ describe("given a personal development agent of another person", () => {
   describe("when the run names no person at all", () => {
     /** @scenario "Another person's development agent is refused" */
     it("refuses it too", async () => {
-      await expect(async () => {
-        for await (const event of ExperimentRunOrchestratorService.create().runOrchestrator(
-          inputFor(undefined),
-        )) {
-          void event;
-        }
-      }).rejects.toMatchObject({ code: "agent_owner_only" });
+      const { frames } = await streamed(undefined);
+
+      expect(frames).toMatchObject([{ type: "error", message: "agent_owner_only" }]);
       expect(assertRunnable).toHaveBeenCalledWith({
         agents: [personalAgent],
         actor: undefined,

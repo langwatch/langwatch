@@ -8,6 +8,7 @@ import {
   type ProcessManagerApplier,
   type Projection,
   type RegisteredCommand,
+  type RetentionPolicyResolver,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
@@ -72,6 +73,8 @@ export interface SimulationProcessingPipelineDeps {
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
   suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
+  /** Each tenant's retention, stamped on the run rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
 }
 
 function buildSimulationProcessingPipelineDefinition(
@@ -79,7 +82,7 @@ function buildSimulationProcessingPipelineDefinition(
 ): SimulationProcessingPipelineDefinition {
   const commands = SimulationProcessingCommandsAdapter.create();
 
-  return definePipeline({
+  const pipeline = definePipeline({
     name: "simulation_processing",
     aggregate: defineAggregate({
       type: "simulation_run",
@@ -152,8 +155,8 @@ function buildSimulationProcessingPipelineDefinition(
           ttlMs: 60_000,
         },
       },
-    })
-    .build();
+    });
+  return (deps.retention ? pipeline.withRetention(deps.retention) : pipeline).build();
 }
 
 /** The pipeline `SimulationProcessingPipelineAdapter.create` answers, its commands erased. */

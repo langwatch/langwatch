@@ -115,6 +115,15 @@ Feature: The local development topology
     Then the "ui" lane carries no readiness probe
     And it is started without waiting for the API to answer
 
+  # The api application reads API_PORT alone (default 6560); LANGWATCH_API_PORT
+  # is main's monolith spelling. Told only that, it bound 6560 and /api was a 502.
+  @unit
+  Scenario: The backend lane binds the API port haven routes /api to
+    Given a stack whose API port haven allocated
+    When haven plans the stack's children
+    Then the backend lane is handed that port as API_PORT
+    And the "ui" lane proxies /api to the same port
+
   @unit
   Scenario: The Go data-plane services share one lane
     Given a stack that selected the gateway and the NLP engine

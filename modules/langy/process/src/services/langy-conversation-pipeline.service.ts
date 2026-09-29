@@ -5,6 +5,7 @@ import {
   type EventSubscriberDefinition,
   type Projection,
   type RegisteredCommand,
+  type RetentionPolicyResolver,
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -85,6 +86,8 @@ export interface LangyConversationProcessingPipelineDeps {
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free event-grain ClickHouse analytics; never an operational read. */
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
+  /** Each tenant's retention, stamped on the analytics rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
   /** Live consumers are independent from projection state and replay. */
   subscribers?: EventSubscriberDefinition<LangyConversationProcessingEvent>[];
   /**
@@ -163,6 +166,7 @@ function buildLangyConversationPipeline(
   for (const subscriber of deps.subscribers ?? []) {
     builder = builder.withEventSubscriber(subscriber.name, subscriber);
   }
+  if (deps.retention) builder = builder.withRetention(deps.retention);
 
   return builder
     .withProcessManager(

@@ -70,7 +70,7 @@ const storesConfig: StoresConfig = {
 
 async function encryptionFrom(environment: Record<string, string>) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
-  const members = await openProcessStores({
+  const { members } = await openProcessStores({
     name: "encryption-member-test",
     config: storesConfig,
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),

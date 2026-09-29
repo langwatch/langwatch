@@ -29,6 +29,10 @@ export const generateLicenseInputSchema = z.object({
 });
 export type GenerateLicenseInput = z.infer<typeof generateLicenseInputSchema>;
 
+/** What a caller asks licensing to sign: licensing signs with its own key. */
+export const generateLicenseKeyInputSchema = generateLicenseInputSchema.omit({ privateKey: true });
+export type GenerateLicenseKeyInput = z.infer<typeof generateLicenseKeyInputSchema>;
+
 export const generateLicenseOutputSchema = z.object({
   licenseKey: z.string().min(1),
   licenseData: licenseDataSchema,

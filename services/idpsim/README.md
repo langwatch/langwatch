@@ -49,10 +49,23 @@ Open `/` for the tenant list, and `/t/<n>/` for a tenant's own page: register
 an application, copy the values the setup wizard asks for, see its users, and
 watch a live feed of everything it serves or refuses. `GET /control/state` is
 the same as JSON. The provider list can be searched by number or domain.
-Tenant pages have direct section links for applications, protocols, users
-and activity. Filter activity by outcome or text, and pause/resume updates
-while inspecting a request. Connection errors are visible and retried; a
-refresh never rewrites a registration form.
+Tenant pages have tabs for set-up, provisioning, domain, users and activity
+(the tab is in the address, so `/t/1/#activity` links straight to it). Filter
+activity by outcome or text, and pause/resume updates while inspecting a
+request. Connection errors are visible and retried.
+
+### The console
+
+The pages are `apps/idpsim-web`, a React app built by Vite into `web/dist` and
+embedded in this binary (ADR-160); the simulator renders no HTML of its own.
+Build it with `pnpm --filter @langwatch/idpsim-web build` before building the
+Go binary; a binary built without it answers every page with one line naming
+that command. The app reads `/api` (JSON, refusals as `{title, detail, hint}`
+with a 4xx status) and the activity feed at `/control/t/<n>/activity`. The
+authorize endpoint and a refused redirect serve the same bundle, so their
+status line is unchanged. `pnpm --filter @langwatch/idpsim-web dev` proxies to
+a simulator on `IDPSIM_URL` (default `http://127.0.0.1:5565`) for work on the
+console itself.
 
 The project terminal viewer has an `idp` tab with searchable tenant summaries;
 Enter opens the chosen tenant in the browser. `haven idp --json` reads those
@@ -128,8 +141,9 @@ OIDC_CLIENT_ID=anything                   # idpsim accepts any client
 OIDC_CLIENT_SECRET=anything
 ```
 
-The authorize endpoint serves an account picker; add `login_hint=<email>` for
-a zero-click login in automated tests. Seeded users per tenant:
+The authorize endpoint serves an account picker, each account a link back into
+the same request with the hint filled in; add `login_hint=<email>` for a
+zero-click login in automated tests. Seeded users per tenant:
 `admin@acme<n>.test` and `member@acme<n>.test`.
 
 To exercise the app's Auth0-brokered-SAML handling (`samlp|` subjects,
@@ -190,7 +204,7 @@ receiving side pages its lists, whether a deactivation reaches the membership
 table, what a thousand joiners does to the screen an administrator is reading.
 Those only appear at scale.
 
-**Directory at scale** on the tenant page has two forms and three verbs:
+**Directory at scale** on the tenant page's provisioning tab has two forms and three verbs:
 
 - **Generate** — how many people, across how many groups. The admin and member
   you sign in as are kept, and growing keeps everybody already there, so a

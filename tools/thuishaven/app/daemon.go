@@ -93,11 +93,13 @@ func (o *Orchestrator) RunDaemon(ctx context.Context, dash Dashboard) error {
 	_ = o.proxy.Register(domain.HubService, "", port) // hub.langwatch.localhost (dashboard)
 	_ = o.proxy.Register(p, "", port)                 // langwatch.localhost (legacy alias)
 	_ = o.proxy.Register("telemetry", "", port)       // telemetry.langwatch.localhost (fan-out)
+	o.routeStackHomes(port)                           // <slug>.langwatch.localhost (stack homes)
 	o.refreshObservability(ctx)
 	defer func() {
 		o.proxy.Remove(domain.HubService, "")
 		o.proxy.Remove(p, "")
 		o.proxy.Remove("telemetry", "")
+		o.unrouteStackHomes()
 	}()
 
 	scheme, pport := o.proxy.Endpoint()

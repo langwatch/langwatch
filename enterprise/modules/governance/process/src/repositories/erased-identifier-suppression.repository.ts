@@ -15,8 +15,6 @@ export abstract class ErasedIdentifierSuppressionRepository {
   abstract findAllByOrganization(input: {
     organizationId: string;
   }): Promise<ErasedIdentifierSuppressionRow[]>;
-  /** Every row across every organization, for the shared snapshot. */
-  abstract findAll(): Promise<ErasedIdentifierSuppressionRow[]>;
   /** Idempotent: erasing the same person twice, or two sharing an identifier, must not fail. */
   abstract recordAll(input: {
     organizationId: string;

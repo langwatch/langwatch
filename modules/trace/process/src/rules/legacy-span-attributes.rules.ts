@@ -13,6 +13,8 @@ import type {
 } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
 
+import { isRecord } from "./canonical-guard.rules.ts";
+
 type JsonSerializable = string | number | boolean | null | Record<string, unknown> | unknown[];
 
 /**
@@ -76,11 +78,8 @@ function unwrapLegacyWrapper(
   _attrKey: string,
 ): LegacySpanInputOutput {
   const { type, value } = wrapper;
-  if (type === "chat_messages" && Array.isArray(value)) {
-    return {
-      type: "chat_messages",
-      value: toJsonSerializable(value) as ChatMessage[],
-    };
+  if (type === "chat_messages") {
+    return chatMessagesOrJson(value);
   }
 
   if (type === "text") {
@@ -98,6 +97,27 @@ function unwrapLegacyWrapper(
   }
 
   return { type: "json", value: toJsonSerializable(value) };
+}
+
+/**
+ * The message list a chat value carries: an array as-is, a `{ messages: [...] }`
+ * envelope (the Vercel AI SDK's `ai.prompt`) unwrapped, one message record as a list.
+ */
+function findChatMessageList(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!isRecord(value)) return [];
+  if (Array.isArray(value.messages)) return value.messages;
+  return typeof value.role === "string" ? [value] : [];
+}
+
+/** A chat value read as `chat_messages` when it carries a message list, else as json. */
+function chatMessagesOrJson(raw: unknown): LegacySpanInputOutput {
+  const value = parseJsonObjectString(raw);
+  const list = findChatMessageList(value);
+  if (list.length === 0 && !Array.isArray(value)) {
+    return { type: "json", value: toJsonSerializable(value) };
+  }
+  return { type: "chat_messages", value: toJsonSerializable(list) as ChatMessage[] };
 }
 
 /**
@@ -160,8 +180,8 @@ function readAnnotatedValue(
   }
 
   const annotatedType = findAnnotatedType(spanAttributes, key);
-  if (annotatedType === "chat_messages" && Array.isArray(value)) {
-    return { type: "chat_messages", value: toJsonSerializable(value) as ChatMessage[] };
+  if (annotatedType === "chat_messages" && findChatMessageList(value).length > 0) {
+    return chatMessagesOrJson(value);
   }
 
   // Only an OUTPUT carries a verdict type; an input annotated with one falls through to json.
@@ -184,13 +204,10 @@ function readAnnotatedValue(
  * emitters whose ingest path never lifted them into langwatch.input).
  */
 export function extractInput(spanAttributes: NormalizedAttributes): LegacySpanInputOutput | null {
-  // Priority 1: gen_ai.input.messages → always chat_messages
+  // Priority 1: gen_ai.input.messages → chat_messages, its envelope unwrapped
   const genAiInputMessages = spanAttributes["gen_ai.input.messages"];
   if (genAiInputMessages !== undefined) {
-    return {
-      type: "chat_messages",
-      value: toJsonSerializable(genAiInputMessages) as ChatMessage[],
-    };
+    return chatMessagesOrJson(genAiInputMessages);
   }
 
   // Priority 2: langwatch.input → use annotated type or infer
@@ -236,13 +253,10 @@ function parseJsonOrText(value: unknown): LegacySpanInputOutput {
  * gen_ai.output.messages, langwatch.output, or gen_ai.tool.call.result (semconv-native emitters).
  */
 export function extractOutput(spanAttributes: NormalizedAttributes): LegacySpanInputOutput | null {
-  // Priority 1: gen_ai.output.messages → always chat_messages
+  // Priority 1: gen_ai.output.messages → chat_messages, its envelope unwrapped
   const genAiOutputMessages = spanAttributes["gen_ai.output.messages"];
   if (genAiOutputMessages !== undefined) {
-    return {
-      type: "chat_messages",
-      value: toJsonSerializable(genAiOutputMessages) as ChatMessage[],
-    };
+    return chatMessagesOrJson(genAiOutputMessages);
   }
 
   // Priority 2: langwatch.output → use annotated type or infer

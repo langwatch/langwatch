@@ -41,3 +41,10 @@ Feature: Prompt Studio page
     When I open the prompts page
     Then the published prompt is listed once
     And opening a prompt in a tab leaves the list as it was
+
+  @integration
+  Scenario: A project with no prompts offers to set them up via an agent
+    Given the project has no prompts yet
+    When I open Prompt Studio
+    Then the empty state offers "Create First Prompt"
+    And beside it the "Setup via Agent" menu for versioning my prompts

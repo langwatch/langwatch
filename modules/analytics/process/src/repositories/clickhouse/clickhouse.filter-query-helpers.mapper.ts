@@ -1,4 +1,3 @@
-import { generateClickHouseFilterConditions } from "../../rules/analytics-filter-conditions.rules.ts";
 import type { FilterOption } from "../filter-options.repository.ts";
 import type { ClickHouseFilterQueryParams } from "./clickhouse.filter-shapes.mapper.ts";
 
@@ -71,7 +70,7 @@ export function extractStandardResults(rows: unknown[]): FilterOption[] {
 }
 
 /**
- * @param params - Query parameters including optional scopeFilters
+ * @param params - Query parameters including the optional scope Trace translated
  * @param scopeParamPrefix - Prefix for parameter names (default: "scope")
  * @returns Object with sql fragment and prefixed params
  */
@@ -79,13 +78,8 @@ export function buildScopeConditions(
   params: ClickHouseFilterQueryParams,
   scopeParamPrefix = "scope",
 ): { sql: string; params: Record<string, unknown> } {
-  if (!params.scopeFilters || Object.keys(params.scopeFilters).length === 0) {
-    return { sql: "", params: {} };
-  }
-
-  const result = generateClickHouseFilterConditions(params.scopeFilters);
-
-  if (result.conditions.length === 0) {
+  const result = params.scope;
+  if (!result || result.conditions.length === 0) {
     return { sql: "", params: {} };
   }
 

@@ -1,4 +1,5 @@
 import { chakra } from "@chakra-ui/react";
+import { Link as UiLink } from "@langwatch/browser-host/link";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 import { createLogger } from "@langwatch/observability/browser";
@@ -8,7 +9,6 @@ import remarkGfm from "remark-gfm";
 
 import { stringifyIfObject } from "../../model/stringify-if-object.ts";
 import { RenderCode } from "../blocks/code/render-code.tsx";
-import { Link as UiLink } from "../blocks/link.tsx";
 import { Prose } from "../elements/prose.tsx";
 import { ConfirmDialog } from "./gateway/confirm-dialog.tsx";
 

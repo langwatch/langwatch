@@ -41,12 +41,6 @@ vi.mock("../annotated-turn-row.tsx", () => ({
   ),
 }));
 
-vi.mock("../../../../../elements/next-link.tsx", () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
-  ),
-}));
-
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { ConversationView } from "../conversation-view.tsx";
 

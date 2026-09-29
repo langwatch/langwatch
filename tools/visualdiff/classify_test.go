@@ -1,6 +1,11 @@
 package visualdiff
 
 import (
+	"image"
+	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -205,5 +210,105 @@ func TestABaseRedirectingAnOperatorScreenToGovernanceIsExpected(t *testing.T) {
 	other := pair(&Capture{URL: "http://base/settings/directory"}, &Capture{URL: "http://candidate/settings/teams"})
 	if class, why := Classify(other); class != ClassRedirect {
 		t.Fatalf("an unlisted redirect: got %s (%s)", class, why)
+	}
+}
+
+// page draws a 320x240 screenshot: a background with one pane of paneHeight
+// rows, and a small word block that moves when word is true.
+func page(t *testing.T, background color.NRGBA, paneHeight int, word bool) string {
+	t.Helper()
+	picture := image.NewNRGBA(image.Rect(0, 0, 320, 240))
+	fill := func(area image.Rectangle, paint color.NRGBA) {
+		for y := area.Min.Y; y < area.Max.Y; y++ {
+			for x := area.Min.X; x < area.Max.X; x++ {
+				picture.SetNRGBA(x, y, paint)
+			}
+		}
+	}
+	fill(picture.Bounds(), background)
+	fill(image.Rect(40, 20, 280, 20+paneHeight), color.NRGBA{R: 253, G: 253, B: 253, A: 255})
+	textAt := 60
+	if word {
+		textAt = 70
+	}
+	fill(image.Rect(textAt, 30, textAt+30, 36), color.NRGBA{R: 40, G: 40, B: 40, A: 255})
+	path := filepath.Join(t.TempDir(), "shot.png")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = file.Close() }()
+	if err := png.Encode(file, picture); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+var white = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
+
+// laidOut is a row whose words differ and whose screenshots are the two pages given.
+func laidOut(t *testing.T, basePath, candidatePath string) Row {
+	t.Helper()
+	candidateText := strings.Replace(baseSnapshotText, "- text: 12 datasets", "- text: 12 collections", 1)
+	captures := []Capture{
+		{Kind: "route", Key: "/p", Side: "base", Screenshot: basePath, AriaSnapshot: baseSnapshotText},
+		{Kind: "route", Key: "/p", Side: "candidate", Screenshot: candidatePath, AriaSnapshot: candidateText},
+	}
+	return BuildRows(captures, []Diff{{Kind: "route", Key: "/p", Ratio: 0.0001}})[0]
+}
+
+// @scenario "A collapsed layout is a layout finding whatever its words say"
+func TestACollapsedLayoutIsALayoutFindingWhateverItsWordsSay(t *testing.T) {
+	row := laidOut(t, page(t, white, 200, false), page(t, white, 30, true))
+
+	if row.Class != ClassLayout || !row.Class.IsFinding() {
+		t.Fatalf("got %s (%s), layout %+v", row.Class, row.Why, row.Layout)
+	}
+	mustContain(t, row.Why, "layout moved")
+}
+
+// @scenario "A small difference in the same layout stays copy"
+func TestASmallDifferenceInTheSameLayoutStaysCopy(t *testing.T) {
+	row := laidOut(t, page(t, white, 200, false), page(t, white, 200, true))
+
+	if row.Class != ClassCopy {
+		t.Fatalf("got %s (%s), layout %+v", row.Class, row.Why, row.Layout)
+	}
+}
+
+// @scenario "A new background color in the same layout is not a layout finding"
+func TestANewBackgroundColorInTheSameLayoutIsNotALayoutFinding(t *testing.T) {
+	tinted := color.NRGBA{R: 240, G: 242, B: 248, A: 255}
+	row := laidOut(t, page(t, color.NRGBA{R: 244, G: 242, B: 240, A: 255}, 200, false), page(t, tinted, 200, false))
+
+	if row.Class == ClassLayout || row.Layout.Changed() {
+		t.Fatalf("got %s (%s), layout %+v", row.Class, row.Why, row.Layout)
+	}
+}
+
+// @scenario "A large pixel difference is a layout finding whatever its words say"
+func TestALargePixelDifferenceIsALayoutFindingWhateverItsWordsSay(t *testing.T) {
+	candidate := strings.Replace(baseSnapshotText, "- text: 12 datasets", "- text: 12 collections", 1)
+	row := pair(&Capture{AriaSnapshot: baseSnapshotText}, &Capture{AriaSnapshot: candidate})
+	row.Ratio = LayoutPixelRatio
+
+	if class, why := Classify(row); class != ClassLayout || !class.IsFinding() {
+		t.Fatalf("got %s (%s)", class, why)
+	}
+
+	row.Ratio = NoiseRatio / 2
+	if class, why := Classify(row); class != ClassCopy {
+		t.Fatalf("a small diff: got %s (%s)", class, why)
+	}
+}
+
+// @scenario "A page that changed size is a layout finding"
+func TestAPageThatChangedSizeIsALayoutFinding(t *testing.T) {
+	base, candidate := image.NewNRGBA(image.Rect(0, 0, 64, 64)), image.NewNRGBA(image.Rect(0, 0, 64, 80))
+
+	diff := defaultLayoutProbe.compare(base, candidate)
+
+	if !diff.Changed() || !diff.Resized {
+		t.Fatalf("layout %+v", diff)
 	}
 }

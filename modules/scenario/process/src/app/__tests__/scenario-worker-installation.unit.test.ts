@@ -84,7 +84,9 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       "audit-log": createApiFixture<AuditLogApi>(),
       trace: createApiFixture<TraceApi>(),
       billing: createApiFixture<BillingApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>(),
+      "data-retention": createApiFixture<DataRetentionApi>({
+        getResolvedForProject: async () => RETAINED,
+      }),
       suite: createApiFixture<SuiteApi>(),
       evaluation: createApiFixture<EvaluationApi>(),
       prompt: createApiFixture<PromptApi>(),
@@ -96,6 +98,8 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       "api-key": createApiFixture<ApiKeyApi>(),
     });
 }
+
+const RETAINED = { traces: 30, scenarios: 365, experiments: 30 };
 
 function eventingFor(role: "api" | "worker"): EventSourcing {
   const eventStore = EventStoreMemory.createForTesting();
@@ -147,6 +151,18 @@ const SIMULATION_KEYS = [
 ].map((key) => `simulation_processing:${key}`);
 
 describe("given the scenario module installed on the worker role", () => {
+  /** @scenario "A module's pipeline declares each tenant's retention from data retention" */
+  it("declares each tenant's retention on simulation processing as data retention resolves it", async () => {
+    const { eventing } = await installedOn("worker");
+    const simulation = eventing.definitions.find(
+      (definition) => definition.metadata.name === "simulation_processing",
+    );
+
+    await expect(
+      simulation?.open((definition) => definition.retentionPolicyResolver?.resolve("project-1")),
+    ).resolves.toEqual(RETAINED);
+  });
+
   /** @scenario "The worker hosts every simulation processing routing key" */
   it("claims every simulation_processing key and nothing else under that pipeline", async () => {
     const { keys, eventing } = await installedOn("worker");

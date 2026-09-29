@@ -1,3 +1,4 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { AggregateSearchResult } from "@langwatch/ops-contract";
 
 import type {
@@ -6,29 +7,23 @@ import type {
   RawEventRow,
 } from "../event-explorer.repository.ts";
 
-/**
- * The read this repository issues, as it asks for it. Narrower than the driver
- * client so an operator-wide statement can carry its `unscoped` reason.
- */
-export interface EventExplorerClickHouseClient {
-  query(input: {
-    query: string;
-    query_params?: Record<string, unknown>;
-    format: "JSONEachRow";
-    unscoped?: { reason: string };
-  }): Promise<{ json(): Promise<unknown> }>;
-}
+/** A cross-tenant operator search names no tenant, so the routed member reads the shared server. */
+const ACROSS_TENANTS = "";
 
+/**
+ * The event explorer's reads over the routed ClickHouse member (§7): one aggregate's history
+ * reads its tenant's server, and an operator search across tenants reads the shared one.
+ */
 export class EventExplorerClickHouseRepository implements EventExplorerRepository {
   static create({
-    client,
+    clickhouse,
   }: {
-    client: EventExplorerClickHouseClient;
+    clickhouse: ClickHouseQueryClient;
   }): EventExplorerClickHouseRepository {
-    return new EventExplorerClickHouseRepository(client);
+    return new EventExplorerClickHouseRepository(clickhouse);
   }
 
-  private constructor(private readonly client: EventExplorerClickHouseClient) {}
+  private constructor(private readonly clickhouse: ClickHouseQueryClient) {}
 
   async findAggregates(params: {
     aggregateTypes: string[];
@@ -49,8 +44,13 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
     // event_log partitions on EventOccurredAt, not EventTimestamp, enabling
     // partition pruning. EventOccurredAt = 0 preserves legacy rows while still
     // pruning.
-    const result = await this.client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<{
+      aggregateType: string;
+      tenantId: string;
+      aggregateCount: string;
+    }>({
+      tenantId: ACROSS_TENANTS,
+      sql: `
         SELECT
           AggregateType AS aggregateType,
           TenantId AS tenantId,
@@ -62,19 +62,12 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
         GROUP BY AggregateType, TenantId
         ORDER BY AggregateType, TenantId
       `,
-      query_params: queryParams,
-      format: "JSONEachRow",
+      params: queryParams,
       unscoped: {
         reason:
           "Operator event explorer: the tenant filter is optional because an operator searches across tenants to find the aggregate to replay.",
       },
     });
-
-    const rows = (await result.json()) as {
-      aggregateType: string;
-      tenantId: string;
-      aggregateCount: string;
-    }[];
 
     return rows.map((row) => ({
       aggregateType: row.aggregateType,
@@ -126,8 +119,15 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
       queryParams.queryPattern = `%${trimmedQuery}%`;
     }
 
-    const result = await this.client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<{
+      aggregateId: string;
+      aggregateType: string;
+      tenantId: string;
+      eventCount: string;
+      lastEventTime: string;
+    }>({
+      tenantId: ACROSS_TENANTS,
+      sql: `
         SELECT
           AggregateId AS aggregateId,
           AggregateType AS aggregateType,
@@ -143,21 +143,12 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
         ORDER BY lastEventTime DESC
         LIMIT 50
       `,
-      query_params: queryParams,
-      format: "JSONEachRow",
+      params: queryParams,
       unscoped: {
         reason:
           "Operator event explorer: the tenant filter is optional because an operator searches across tenants to find the aggregate to replay.",
       },
     });
-
-    const rows = (await result.json()) as {
-      aggregateId: string;
-      aggregateType: string;
-      tenantId: string;
-      eventCount: string;
-      lastEventTime: string;
-    }[];
 
     return rows.map((row) => ({
       aggregateId: row.aggregateId,
@@ -178,8 +169,9 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
     // one aggregate you want its full event history, including projection replays where the
     // fold depends on every event. The partition fan-out is acceptable here because the
     // aggregate-id seek is narrow per partition.
-    const result = await this.client.query({
-      query: `
+    const { rows } = await this.clickhouse.query<RawEventRow>({
+      tenantId: params.tenantId,
+      sql: `
         SELECT
           EventId AS eventId,
           EventType AS eventType,
@@ -191,14 +183,13 @@ export class EventExplorerClickHouseRepository implements EventExplorerRepositor
         ORDER BY EventTimestamp ASC, EventId ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: {
+      params: {
         tenantId: params.tenantId,
         aggregateId: params.aggregateId,
         limit: params.limit,
       },
-      format: "JSONEachRow",
     });
 
-    return (await result.json()) as RawEventRow[];
+    return rows;
   }
 }

@@ -28,10 +28,6 @@ export class MemoryGovernanceTenantHistoryRepository extends GovernanceTenantHis
       .map(({ tenantId }) => ({ organizationId, tenantId }));
   }
 
-  async findAll(): Promise<GovernanceTenantRow[]> {
-    return this.store.tenants.map(({ organizationId, tenantId }) => ({ organizationId, tenantId }));
-  }
-
   async touch(input: { organizationId: string; tenantId: string; at: Instant }): Promise<boolean> {
     const row = this.store.tenants.find(
       (tenant) =>

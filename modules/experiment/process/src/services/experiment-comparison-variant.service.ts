@@ -6,7 +6,6 @@
 
 import {
   isGoldenFieldSatisfied,
-  isRowEmpty,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   type ComparisonEvaluatorConfig,
   type EvaluationsV3State,
@@ -20,10 +19,7 @@ import {
   pickOutputPath,
   toCandidateText,
 } from "../eventing/experiment-comparison-candidates.process.ts";
-import {
-  type ComparisonSetupSkip,
-  type ComparisonSkipReason,
-} from "../eventing/experiment-comparison-skip.process.ts";
+import { type ComparisonSetupSkip } from "../eventing/experiment-comparison-skip.process.ts";
 import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
@@ -95,32 +91,6 @@ export class ExperimentComparisonVariantService {
     cfg: ComparisonEvaluatorConfig;
   }): string | undefined {
     return (cfg.variants ?? []).find((id) => state.targets.some((t) => t.id === id));
-  }
-
-  /** One error row per scoped row for a comparison that cannot be built. */
-  pushSetupSkips({
-    kind,
-    targetId,
-    evaluatorId,
-    rowsInScope,
-    datasetRows,
-    skipReasons,
-  }: {
-    kind: ComparisonSetupSkip;
-    targetId: string;
-    evaluatorId: string;
-    rowsInScope: number[];
-    datasetRows: Record<string, unknown>[];
-    skipReasons: ComparisonSkipReason[];
-  }): void {
-    for (const rowIndex of rowsInScope) {
-      const datasetEntry = datasetRows[rowIndex];
-      if (!datasetEntry || isRowEmpty(datasetEntry)) {
-        continue;
-      }
-
-      skipReasons.push({ rowIndex, targetId, evaluatorId, kind, variantNames: [] });
-    }
   }
 
   /** True if column-target uses legacy pairwise_compare judge. */

@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { UserMinus } from "lucide-react";
 
 interface OverSeatsCalloutProps {
@@ -43,7 +44,9 @@ export function OverSeatsCallout({ currentMembers, maxMembers }: OverSeatsCallou
           </Text>
           <HStack gap={3} paddingTop={1}>
             <Button asChild size="sm" colorPalette="orange">
-              <a href="/settings/members">Choose who to disable</a>
+              <Link unstyled href="/settings/members">
+                Choose who to disable
+              </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
               <a href="mailto:enterprise@langwatch.ai">Get more seats</a>

@@ -81,6 +81,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	// gone before the databases they hold connections to are dropped.
 	o.waitForProcessesDead(downed)
 	o.dropWorktreeDatabases(ctx, slug)
+	o.removeStackHome(slug)
 	fmt.Printf("stack %q destroyed (database %s dropped)\n", slug, db)
 	return nil
 }
@@ -118,10 +119,11 @@ func (o *Orchestrator) DestroyWorktree(ctx context.Context, gitDir, dir, selfDir
 		return fmt.Errorf("%s is not a worktree of this repository", dir)
 	}
 
-	o.stopAndDropForDir(ctx, dir)
+	slug := o.stopAndDropForDir(ctx, dir)
 	if err := o.hyg.RemoveWorktree(gitDir, dir); err != nil {
 		return fmt.Errorf("removing worktree: %w", err)
 	}
+	o.removeStackHome(slug)
 	o.hyg.PruneGitWorktrees(gitDir)
 	return nil
 }
@@ -136,7 +138,7 @@ func (o *Orchestrator) DestroyWorktree(ctx context.Context, gitDir, dir, selfDir
 // admin — the callers decide whether to remove one worktree or rm many and prune
 // once. Safe to run concurrently across distinct dirs: each downs only its own
 // stacks and drops only its own databases.
-func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) {
+func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) string {
 	dbSlug := o.resolveDestroySlug(canonDir)
 
 	var downedPIDs []int
@@ -154,6 +156,7 @@ func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) {
 	// directory, so the removal does not race a node/vite stack still writing.
 	o.waitForProcessesDead(downedPIDs)
 	o.dropWorktreeDatabases(ctx, dbSlug)
+	return dbSlug
 }
 
 // resolveDestroySlug picks the slug whose databases DestroyWorktree may drop,
@@ -308,6 +311,21 @@ type HubStack struct {
 	PortsUp int
 	// ServiceUp is the per-service port probe, keyed by service name.
 	ServiceUp map[string]bool
+	// Uptime is the live launcher's wall-clock age, zero when it is not live.
+	Uptime time.Duration
+}
+
+// launcherAge is a live stack's uptime: its launcher's age in the listing.
+func launcherAge(samples []ProcessSample, row HubStack) time.Duration {
+	if !row.IsLive {
+		return 0
+	}
+	for _, s := range samples {
+		if s.PID == row.Stack.LauncherPID {
+			return s.Elapsed
+		}
+	}
+	return 0
 }
 
 // HubWorktree is a worktree with no registered stack — visible in the hub so
@@ -358,10 +376,13 @@ type HubView struct {
 // from (its row is marked protected); either may be "" to skip the listing.
 func (o *Orchestrator) HubView(gitDir, selfDir string) HubView {
 	stacks := o.store.Stacks()
-	part := o.partitionMachine(stacks)
+	samples := o.sys.ProcessSamples()
+	part := partitionSamples(stacks, samples, o.sys.ProcessAlive)
 	view := HubView{Footprint: o.hubFootprint(part)}
 	for i := range stacks {
-		view.Stacks = append(view.Stacks, o.hubStackRow(&stacks[i], part))
+		row := o.hubStackRow(&stacks[i], part)
+		row.Uptime = launcherAge(samples, row)
+		view.Stacks = append(view.Stacks, row)
 	}
 	view.Worktrees = o.hubWorktrees(gitDir, selfDir, stacks)
 	view.Events = newestFirst(o.store.ReapEvents())
@@ -371,13 +392,18 @@ func (o *Orchestrator) HubView(gitDir, selfDir string) HubView {
 // partitionMachine attributes one process listing across the live stacks'
 // launcher groups and everything else the footprint names.
 func (o *Orchestrator) partitionMachine(stacks []domain.Stack) domain.Footprint {
+	return partitionSamples(stacks, o.sys.ProcessSamples(), o.sys.ProcessAlive)
+}
+
+// partitionSamples is partitionMachine over a listing already taken, so one
+// hub refresh reads the process table once.
+func partitionSamples(stacks []domain.Stack, samples []ProcessSample, alive func(pid int) bool) domain.Footprint {
 	var launchers []int
 	for i := range stacks {
-		if o.sys.ProcessAlive(stacks[i].LauncherPID) {
+		if alive(stacks[i].LauncherPID) {
 			launchers = append(launchers, stacks[i].LauncherPID)
 		}
 	}
-	samples := o.sys.ProcessSamples()
 	fpSamples := make([]domain.FootprintSample, 0, len(samples))
 	for _, s := range samples {
 		fpSamples = append(fpSamples, domain.FootprintSample{PID: s.PID, PPID: s.PPID, PGID: s.PGID, RSS: s.RSSBytes, Command: s.Command})

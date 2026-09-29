@@ -23,6 +23,7 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { nowInstant } from "@langwatch/time";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import {
   comparisonSkipMessage,
   type ComparisonSkipReason,
@@ -121,6 +122,8 @@ const failedToLoad = (failure: LoadFailure): ExperimentCellExecution => ({
 
 type ExperimentRunCellDeps = {
   folds: ExperimentRunFoldRepository;
+  /** Where a cell's start is announced, ephemeral as main's `cell_started` was. */
+  stream: ExperimentRunEventStream;
   collaborators: ExperimentRunCollaborators;
   services: ExecutionDataServices;
   workflows: WorkflowApi;
@@ -132,12 +135,14 @@ export class ExperimentRunCellService {
   }
 
   private readonly folds: ExperimentRunFoldRepository;
+  private readonly stream: ExperimentRunEventStream;
   private readonly collaborators: ExperimentRunCollaborators;
   private readonly services: ExecutionDataServices;
   private readonly workflows: WorkflowApi;
 
   private constructor(deps: ExperimentRunCellDeps) {
     this.folds = deps.folds;
+    this.stream = deps.stream;
     this.collaborators = deps.collaborators;
     this.services = deps.services;
     this.workflows = deps.workflows;
@@ -290,6 +295,10 @@ export class ExperimentRunCellService {
     let failure: { error?: SerializedHandledError } | undefined;
     for await (const event of this.cellEvents({ scope, cell, loaded })) {
       if (await this.isAborted(scope.request)) return stopped(results);
+      if (event.type === "cell_started") {
+        await this.announceStart({ request: scope.request, frame: event });
+        continue;
+      }
 
       results.push(
         ...(await this.record({ scope, event, loadedEvaluators: loaded.loadedEvaluators })),
@@ -531,12 +540,36 @@ export class ExperimentRunCellService {
   private async getPhaseOneProgress(
     request: ExperimentCellRequest,
   ): Promise<ExperimentRunProgressState> {
-    const read = await this.folds.readProgress({ runKey: runKeyOf(request) });
-    if (read.kind === "empty" || !isPhaseOneFolded(read.state)) {
+    const read = await this.folds.readRunProgress({ runId: request.runId });
+    if (
+      read.kind === "empty" ||
+      read.state.experimentId !== request.experimentId ||
+      !isPhaseOneFolded(read.state)
+    ) {
       throw new Error(`Run ${request.runId} has target cells whose results are not folded yet`);
     }
 
     return read.state;
+  }
+
+  /**
+   * Publishes the cell's start straight onto the run's channel, never folded: it carries the last
+   * folded seq without advancing it, so a stream passes it through undeduped. Best-effort.
+   */
+  private async announceStart({
+    request,
+    frame,
+  }: {
+    request: ExperimentCellRequest;
+    frame: EvaluationV3Event;
+  }): Promise<void> {
+    try {
+      const read = await this.folds.readRunProgress({ runId: request.runId });
+      const seq = read.kind === "folded" ? read.state.seq : 0;
+      await this.stream.publish({ runId: request.runId, seq, frame });
+    } catch (error) {
+      logger.warn({ error, runId: request.runId }, "A cell's start could not be announced");
+    }
   }
 
   private isAborted(request: ExperimentCellRequest): Promise<boolean> {

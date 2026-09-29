@@ -4,9 +4,9 @@
  */
 
 import { Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 
 import { useBillingHost } from "../../model/billing-host.ts";
-import { Link } from "../../ui/elements/link.tsx";
 import { SubscriptionPage } from "./subscription-page.tsx";
 
 export default function SubscriptionScreen() {

@@ -232,14 +232,24 @@ Feature: License registry
     When an operator changes it to 58 seats
     Then a replacement is signed for 58 seats and the same term
     And it is held for delivery to the install over sync
-    And billing is asked to invoice the 8 added seats
+    And the replacement records that it raised the seats from 50, in the same write
+    And billing reads that seat change from licensing to invoice the 8 added seats
+    And the operator is told billing invoices the added seats and the Billing section shows the outcome
+
+  @unit
+  Scenario: Seats raised on a license linked to no customer leave billing nothing to invoice
+    Given an active license linked to no customer organization
+    When an operator raises its seats
+    Then a replacement is signed for the new seats
+    And no seat change is recorded for billing
+    And the operator is told nothing is invoiced
 
   @unit
   Scenario: Seats changed on a revoked license are refused
     Given a revoked license
     When an operator changes its seats
     Then the change is refused as not active
-    And billing is asked for nothing
+    And no seat change is recorded for billing
 
   @unit
   Scenario: An overage maximum without overage enabled is refused

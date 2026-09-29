@@ -54,7 +54,7 @@ export const HISTOGRAM_BOUNDARIES: Readonly<Record<string, readonly number[]>> =
   es_subscriber_duration_milliseconds: EVENTING_MS,
   es_process_manager_duration_milliseconds: EVENTING_MS,
   es_process_outbox_duration_milliseconds: EVENTING_SLOW_MS,
-  es_reactor_duration_milliseconds: EVENTING_SLOW_MS,
+  es_projection_subscriber_duration_milliseconds: EVENTING_SLOW_MS,
   // `es_fold_*` and `es_map_*` deliberately stop at 5s: a fold that takes
   // longer is a stall to alert on, not a latency to bucket.
   es_fold_projection_duration_milliseconds: [1, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 5_000],

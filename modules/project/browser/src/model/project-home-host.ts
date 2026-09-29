@@ -37,12 +37,6 @@ export type ProjectHomeUser = {
   name: string | null;
 };
 
-/** A rollout answer, tri-state: `isLoading` is what stops the page deciding. */
-export type ProjectHomeFlagReading = {
-  enabled: boolean;
-  isLoading: boolean;
-};
-
 /**
  * Whether this reader has the assistant, with the wait exposed. Three
  * layers behind one answer (membership, `langy:view`, rollout); `isResolving`
@@ -84,9 +78,6 @@ export abstract class ProjectHomeHost {
   abstract isLoading(): boolean;
 
   abstract hasPermission(permission: string): boolean;
-
-  /** One rollout flag, resolved for this project and organization. */
-  abstract featureFlag(flag: string): ProjectHomeFlagReading;
 
   /** Whether the reader has the assistant, and whether that is settled. */
   abstract langyVisibility(): ProjectHomeLangyVisibility;

@@ -177,6 +177,29 @@ implementation and one imagined one is worse than a port with two real ones.
 - The pino node logger takes `redactPaths`; the three boot seams pass the
   secret class. That is the last line of defence, not the first.
 
+### Amendment (2026-09-29): a family handle answers one prefix
+
+Some credentials are named by convention rather than one fixed key: main's
+`CLICKHOUSE_URL__<label>__<orgId>=<url>` names one private ClickHouse per
+organization, and each URL carries a password. `Secret.load(id)` cannot declare
+a set whose names the deployment chooses, so the chain gains exactly one bounded
+enumeration:
+
+- `Secret.family(prefix)` declares a handle whose value is a name-to-value map of
+  every set, non-empty name under `prefix`. An empty prefix names nothing.
+- The env and `.env` adapters scan by prefix; per name the first adapter in the
+  chain wins, as for a single id. 1Password answers none: a vault is never listed.
+- The resolver scopes a family like any handle (an owner resolves only the
+  families it declared) and answers only names under the declared prefix.
+- The preflight treats a family as optional: an empty family is an ordinary answer.
+- Config may not claim a name under a declared prefix; the parse refuses it with
+  `ConfigClaimsSecretError`, naming both owners.
+- A family adds no log redaction path; its values are spent inside `into` and the
+  consumer logs a skipped entry by its variable name only.
+
+The stores declare `CLICKHOUSE_URL__` as a family and parse it once at boot into
+the `clickhouse` member (ARCHITECTURE.md §6, §7).
+
 ## Alternatives considered
 
 **Leave `.env` as it is.** Free, and the status quo: live provider keys in a

@@ -62,7 +62,6 @@ const formatDeadline = (graceEndsAt: string): string =>
 
 export const SsoDomainProofWaveringEmail = (props: SsoDomainProofWaveringProps) => (
   <EmailLayout
-    eyebrow="DOMAIN VERIFICATION"
     preview={`We can't find the verification record for ${props.domain}`}
     heading="We can't find your domain verification record"
     footNote={adminNotice}
@@ -135,7 +134,6 @@ export const ssoDomainProofLapsedSubject = ({
 
 export const SsoDomainProofLapsedEmail = (props: SsoDomainProofLapsedProps) => (
   <EmailLayout
-    eyebrow="DOMAIN VERIFICATION"
     preview={`${props.domain} is no longer verified`}
     heading="Your domain is no longer verified"
     footNote={adminNotice}

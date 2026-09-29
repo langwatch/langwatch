@@ -68,3 +68,9 @@ export function violationNames({ error, column }: { error: unknown; column: stri
     return false;
   }
 }
+
+/**
+ * A connected install syncs once a day; main allowed 48 a day, room for one every half hour
+ * before a restart loop is refused.
+ */
+export const LICENSE_SYNCS_LIMIT = { requests: 48, seconds: 24 * 60 * 60 } as const;

@@ -55,12 +55,7 @@ const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPR
  * Composed by the process's `experiment-v3-rest.mount.ts` (not a module).
  */
 export interface ExperimentV3RestApi {
-  abortWorkbenchRun(
-    input: Readonly<{
-      projectId: string;
-      runId: string;
-    }>,
-  ): Promise<{ success: true; runId: string; message: "Abort requested" }>;
+  abortWorkbenchRun: ExperimentApp["abortWorkbenchRun"];
   startSavedRun: ExperimentApp["startSavedRun"];
   restoreWorkbenchVersionBySlug: ExperimentApp["restoreWorkbenchVersionBySlug"];
   readWorkbenchStateBySlug: ExperimentApp["readWorkbenchStateBySlug"];

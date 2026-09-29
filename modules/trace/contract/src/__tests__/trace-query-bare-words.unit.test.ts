@@ -83,6 +83,64 @@ describe("splitBareWords", () => {
     });
   });
 
+  describe("given a question with an apostrophe inside a word", () => {
+    /** @scenario "An apostrophe inside a word is part of the word, not a quote" */
+    it("reads the whole question as the sentence", () => {
+      const question = "where did a member ask about cover their plan doesn't include?";
+
+      expect(splitBareWords(question)).toEqual({ sentence: question, explicitQuery: "" });
+    });
+
+    it.each([
+      "why won't the agent answer",
+      "they're asking what's covered",
+      "the member's plan and the agent's reply",
+      "complaints about the members' plans",
+      "I'd like refunds we've denied",
+    ])("keeps %j whole", (sentence) => {
+      expect(splitBareWords(sentence)).toEqual({ sentence, explicitQuery: "" });
+    });
+
+    it("keeps the explicit terms beside a contraction", () => {
+      expect(splitBareWords("status:error why doesn't it work")).toEqual({
+        sentence: "why doesn't it work",
+        explicitQuery: "status:error",
+      });
+    });
+
+    it("keeps a literal private-use character the query already holds", () => {
+      const sentence = "why doesn't  work";
+
+      expect(splitBareWords(sentence)).toEqual({ sentence, explicitQuery: "" });
+    });
+
+    it("still reads a value in single quotes as a quoted value", () => {
+      const ast = parse("model:'gpt 5' refund");
+
+      expect(ast.type).toBe("LogicalExpression");
+      expect(splitBareWords("model:'gpt 5' refund")).toEqual({
+        sentence: "refund",
+        explicitQuery: "model:'gpt 5'",
+      });
+    });
+  });
+
+  describe("given a lowercase not inside a question", () => {
+    /** @scenario "A lowercase \"not\" inside a sentence is a word of the sentence" */
+    it("keeps not as a word of the sentence", () => {
+      const question = "where did a member ask about cover that is not in their plan?";
+
+      expect(splitBareWords(question)).toEqual({ sentence: question, explicitQuery: "" });
+    });
+
+    it("still reads an uppercase NOT as the negation operator", () => {
+      expect(splitBareWords("refund NOT timeout")).toEqual({
+        sentence: "refund",
+        explicitQuery: "NOT timeout",
+      });
+    });
+  });
+
   describe("given text that does not parse", () => {
     it("has no sentence, so the parse error surfaces where it always did", () => {
       expect(splitBareWords('status:"unclosed')).toEqual({

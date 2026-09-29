@@ -79,9 +79,7 @@ export class ExperimentCellPlanService {
    * `datasets[0]` — the wrong bucket runs every node with no inputs. Falls
    * back to the first dataset only when state names no active one.
    */
-  private resolveMappingDatasetId(
-    state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId">,
-  ): string {
+  resolveMappingDatasetId(state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId">): string {
     const activeId = state.activeDatasetId;
     if (activeId && state.datasets.some((d) => d.id === activeId)) {
       return activeId;
@@ -328,7 +326,7 @@ export class ExperimentCellPlanService {
   /**
    * How many cells a scope will dispatch, before the run starts — the plan
    * itself (comparison deps included), not rows times targets. Phase 1
-   * only; `runOrchestrator` adds the comparison count once known.
+   * only; the run's plan adds its comparison cells.
    */
   countScopedCells({
     state,

@@ -11,11 +11,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
-import {
-  TraceCapabilityUnavailableError,
-  type TraceCanonicalisationService,
-  type TraceSummaryData,
-} from "@langwatch/trace-contract";
+import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
 import type {
   TraceProcessingPipelineDefinition,
@@ -60,7 +56,10 @@ import { TraceSpanNormalizationAdapterService } from "./trace-span-normalization
 export interface TraceProcessingPeers {
   codingAgents: Pick<CodingAgentApi, "contributeReceivedSpan">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
-  dataRetention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays">;
+  dataRetention: Pick<
+    DataRetentionApi,
+    "getPlatformDefaultRetentionDays" | "getResolvedForProject"
+  >;
   automations: Pick<
     AutomationApi,
     "handleTraceTriggerMatch" | "handleEvaluationGraphTriggerActivity"
@@ -84,7 +83,12 @@ export interface TraceProcessingPipelineInput {
   peers: TraceProcessingPeers;
   repositories: Pick<
     TraceRepositories,
-    "spanStorage" | "summaryProjection" | "analyticsProjection" | "analyticsRollup"
+    | "spanStorage"
+    | "summaryProjection"
+    | "analyticsProjection"
+    | "analyticsRollup"
+    | "summaryFoldCache"
+    | "analyticsFoldCache"
   >;
   canonicalisation: TraceCanonicalisationService;
   commands: TraceProcessingCommandsService;
@@ -111,10 +115,6 @@ export class TraceProcessingPipelineService {
     return buildTraceProcessingConsumer(this.#projections(), this.#reactions());
   }
 
-  #refuse(capability: string): TraceCapabilityUnavailableError {
-    return new TraceCapabilityUnavailableError(this.input.processName, capability);
-  }
-
   #projections(): ReturnType<EventingTracePipelineAdapter["build"]> {
     const { peers, repositories, canonicalisation } = this.input;
     const defaultRetentionDays = (): number =>
@@ -124,14 +124,15 @@ export class TraceProcessingPipelineService {
         storage: repositories.spanStorage,
         defaultRetentionDays,
       }),
-      summaryStore: TraceSummaryStore.create({
-        storage: repositories.summaryProjection,
-        defaultRetentionDays,
-      }),
-      derivedStore: TraceAnalyticsStore.create({
-        storage: repositories.analyticsProjection,
-        defaultRetentionDays,
-      }),
+      summaryStore: repositories.summaryFoldCache.cached(
+        TraceSummaryStore.create({ storage: repositories.summaryProjection, defaultRetentionDays }),
+      ),
+      derivedStore: repositories.analyticsFoldCache.cached(
+        TraceAnalyticsStore.create({
+          storage: repositories.analyticsProjection,
+          defaultRetentionDays,
+        }),
+      ),
       rollupStore: TraceAnalyticsRollupStore.create({
         storage: repositories.analyticsRollup,
         defaultRetentionDays,
@@ -152,7 +153,11 @@ export class TraceProcessingPipelineService {
         costEnrichment: this.#costEnrichment(),
         tokenEstimation: this.#tokenEstimation(),
       }),
-    }).build();
+    })
+      .build()
+      .withRetention({
+        resolve: (tenantId) => peers.dataRetention.getResolvedForProject({ projectId: tenantId }),
+      });
   }
 
   #tokenEstimation(): TraceSpanTokenEstimation {
@@ -199,9 +204,8 @@ export class TraceProcessingPipelineService {
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
-        recordProductEvent: () => {
-          throw this.#refuse("the product analytics sink");
-        },
+        // No product-analytics sink is composed here; silent, as main was without one.
+        recordProductEvent: () => undefined,
       }),
       simulationMetricsSync: createSimulationMetricsSyncHandler({
         computeRunMetrics: (data) => peers.scenarios.computeRunMetrics(data),

@@ -163,7 +163,6 @@ describe("given an operator who has resolved an address", () => {
 
       expect(routerState.replace).toHaveBeenCalledWith(
         { query: { person: "user_LVYcVYGW1AJqvp2G8vcVd" } },
-        undefined,
         { shallow: true },
       );
     });

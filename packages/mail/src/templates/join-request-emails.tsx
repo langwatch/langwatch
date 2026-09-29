@@ -54,7 +54,6 @@ export const JoinRequestArrivedEmail = ({
   approvedFromDomainCount,
 }: JoinRequestArrivedProps) => (
   <EmailLayout
-    eyebrow="JOIN REQUEST"
     preview={`${requesterName} asked to join ${organizationName}`}
     heading="Someone asked to join your organization"
     footNote={adminNotice}
@@ -136,7 +135,6 @@ export const JoinRequestReminderEmail = ({
   membersSettingsUrl,
 }: JoinRequestReminderProps) => (
   <EmailLayout
-    eyebrow="JOIN REQUEST"
     preview={`${requesterName} is still waiting`}
     heading="A request to join is still waiting"
     footNote={adminNotice}
@@ -217,7 +215,6 @@ export const JoinRequestApprovedEmail = ({
   firstSteps,
 }: JoinRequestApprovedProps) => (
   <EmailLayout
-    eyebrow="WELCOME"
     preview={`Your request to join ${organizationName} was approved`}
     heading={`You are in ${organizationName}`}
   >
@@ -289,7 +286,6 @@ export const joinRequestRejectedSubject = ({
 
 export const JoinRequestRejectedEmail = ({ organizationName }: JoinRequestRejectedProps) => (
   <EmailLayout
-    eyebrow="JOIN REQUEST"
     preview={`Your request to join ${organizationName} was not approved`}
     heading="Your request was not approved"
   >
@@ -346,7 +342,6 @@ export const JoinRequestExpiredEmail = ({
   personalProjectUrl,
 }: JoinRequestExpiredProps) => (
   <EmailLayout
-    eyebrow="JOIN REQUEST"
     preview={`Your request to join ${organizationName} lapsed`}
     heading="Your request lapsed"
   >
@@ -432,7 +427,6 @@ export const DomainAutoJoinedEmail = ({
   seats,
 }: DomainAutoJoinedProps) => (
   <EmailLayout
-    eyebrow="NEW MEMBER"
     preview={`${memberName} joined ${organizationName} automatically`}
     heading="A colleague joined automatically"
     footNote={adminNotice}

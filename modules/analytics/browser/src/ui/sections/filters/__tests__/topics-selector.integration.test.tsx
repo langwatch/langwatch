@@ -62,7 +62,7 @@ function mount(query: Record<string, string | string[]>) {
   return userEvent.setup();
 }
 
-const shallow = [undefined, { shallow: true }];
+const shallow = [{ shallow: true }];
 
 describe("the published topics filter", () => {
   it("lists topics most counted first, with subtopics only under a ticked topic", () => {

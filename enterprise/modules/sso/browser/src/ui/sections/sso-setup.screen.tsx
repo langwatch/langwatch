@@ -5,6 +5,7 @@
  * a control that cannot do anything reads as a broken one (handoff §10).
  */
 import { Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -60,6 +61,7 @@ const AUTHENTICATION_LINKS: readonly SectionNavigationLink[] = [
 
 export default function SsoSetupScreen() {
   const organizationId = useSsoHost().organizationId();
+  const navigation = useOptionalUiCapabilities()?.navigation;
 
   if (!organizationId) return null;
 
@@ -68,6 +70,7 @@ export default function SsoSetupScreen() {
       label="Authentication"
       links={AUTHENTICATION_LINKS}
       activeHref="/settings/authentication/provider"
+      onNavigate={(href) => navigation?.navigate(href)}
     >
       <VStack align="stretch" gap={6} width="full">
         <VStack align="start" gap={1}>

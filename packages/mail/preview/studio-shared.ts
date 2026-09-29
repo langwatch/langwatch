@@ -1,25 +1,32 @@
-export interface TemplateSummary {
-  id: string;
-  title: string;
-  sentWhen: string;
-  fixtures: { name: string; props: unknown }[];
-  formSchema: unknown;
-}
+import { z } from "zod";
 
-export interface Rendered {
-  subject: string;
-  html: string;
-  text: string;
-}
+const templateSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  sentWhen: z.string(),
+  fixtures: z.array(z.object({ name: z.string(), props: z.unknown() })),
+  formSchema: z.unknown(),
+});
+export type TemplateSummary = z.infer<typeof templateSummarySchema>;
 
-export interface GalleryEntry {
-  template: string;
-  title: string;
-  fixture: string;
-  subject: string;
-  html: string;
-  text: string;
-}
+const renderedSchema = z.object({ subject: z.string(), html: z.string(), text: z.string() });
+export type Rendered = z.infer<typeof renderedSchema>;
+
+const galleryEntrySchema = z.object({
+  template: z.string(),
+  title: z.string(),
+  fixture: z.string(),
+  subject: z.string(),
+  html: z.string(),
+  text: z.string(),
+});
+export type GalleryEntry = z.infer<typeof galleryEntrySchema>;
+
+/** Every studio endpoint answers its body or `{ error }`; Zod says which. */
+const failureSchema = z.object({ error: z.string() });
+export const templatesResponseSchema = z.union([failureSchema, z.array(templateSummarySchema)]);
+export const renderResponseSchema = z.union([failureSchema, renderedSchema]);
+export const galleryResponseSchema = z.union([failureSchema, z.array(galleryEntrySchema)]);
 
 export const WIDTHS = { desktop: 680, mobile: 375 } as const;
 

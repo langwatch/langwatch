@@ -12,6 +12,7 @@ import {
   type StoredProjection,
 } from "@langwatch/eventing";
 import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
@@ -142,18 +143,14 @@ describe("replayStateProjection", () => {
         amount: 10,
       }),
     ];
-    const { client, queries } = makeFakeClickHouse(rows);
+    const { client, queries, tenants: resolvedTenants } = makeFakeClickHouse(rows);
     const { store, writes } = spyStore();
-    const resolvedTenants: string[] = [];
     const { redis, calls: redisCalls } = replayRedis();
 
     const ctx: ReplayContext = {
       redis,
       eventSource: new EventingClickHouseReplayEventSource({
-        resolveClient: async (tenantId?: string) => {
-          if (tenantId) resolvedTenants.push(tenantId);
-          return client;
-        },
+        clickhouse: client,
         lean: leanReplayEvent,
       }),
       accumulatorOpts: {},
@@ -202,7 +199,7 @@ describe("replayStateProjection", () => {
       "pause:langy_conversation_processing/stateProjection/counter",
       "unpause:langy_conversation_processing/stateProjection/counter",
     ]);
-    // Both tenants' clients were resolved for the batch read lane.
+    // Every statement named one of the two tenants, so the member routed each to its server.
     expect(new Set(resolvedTenants)).toEqual(new Set(["t-a", "t-b"]));
   });
 
@@ -233,7 +230,7 @@ describe("replayStateProjection", () => {
       ctx: {
         redis,
         eventSource: new EventingClickHouseReplayEventSource({
-          resolveClient: async () => client,
+          clickhouse: client,
           lean: leanReplayEvent,
         }),
         accumulatorOpts: {},
@@ -275,7 +272,7 @@ describe("replayStateProjection", () => {
     const ctx: ReplayContext = {
       redis: forbiddenRedis,
       eventSource: new EventingClickHouseReplayEventSource({
-        resolveClient: async () => client,
+        clickhouse: client,
         lean: leanReplayEvent,
       }),
       accumulatorOpts: {},
@@ -306,9 +303,8 @@ describe("the fold/map engine with state projections", () => {
     const ctx: ReplayContext = {
       redis: forbiddenRedis,
       eventSource: new EventingClickHouseReplayEventSource({
-        resolveClient: async () => {
-          throw new Error("should not resolve — guard must fire first");
-        },
+        // Scripts nothing: any statement throws, so the guard must fire first.
+        clickhouse: clickHouseQueryClientDouble(),
         lean: leanReplayEvent,
       }),
       accumulatorOpts: {},

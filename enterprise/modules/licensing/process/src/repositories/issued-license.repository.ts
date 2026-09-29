@@ -42,6 +42,8 @@ export interface IssuedLicenseRecord {
   reportedMembers: number | null;
   reportedMembersLite: number | null;
   virtualKeyId: string | null;
+  /** The seats of the replaced license, set only when a seat change raised a linked one. */
+  seatsRaisedFrom: number | null;
   createdAt: Instant;
   updatedAt: Instant;
 }
@@ -59,6 +61,8 @@ export interface IssuedLicenseRepository {
   findByReplacesId(replacesId: string): Promise<IssuedLicenseRecord | null>;
   /** Every license of a customer, whatever its state. */
   findAllByOrganization(organizationId: string): Promise<IssuedLicenseRecord[]>;
+  /** Every license a seat change raised, oldest first; one customer's when named. */
+  findAllSeatsRaised(params: { organizationId?: string }): Promise<IssuedLicenseRecord[]>;
   /** Unrevoked licenses bound to one install, the most recently bound first. */
   findAllBoundToInstance(instanceId: string): Promise<IssuedLicenseRecord[]>;
   listAll(params: {

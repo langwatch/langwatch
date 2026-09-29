@@ -168,7 +168,6 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
     (overrides: PaginationOverrides) => {
       void router.push(
         { pathname: router.pathname, query: buildPaginationQuery(overrides) },
-        undefined,
         { shallow: true },
       );
     },
@@ -232,7 +231,6 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
             scrollId: null,
           }),
         },
-        undefined,
         { shallow: true },
       );
     },
@@ -274,7 +272,6 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
           scrollId: null,
         }),
       },
-      undefined,
       { shallow: true },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps

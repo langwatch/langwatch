@@ -51,6 +51,7 @@ import {
   type PersonaResolution,
   type GovernanceOttlGateway,
   type OttlValidationResult,
+  type GovernanceCallSurface,
   type IssuedIngestionKey,
   type PersonalIngestionKeyListing,
   type PersonalIngestionKeyMint,
@@ -190,6 +191,7 @@ import {
   type PulledUsageDefinition,
 } from "../eventing/pulled-usage.pipeline.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
 import { toPullLifecycleSource } from "../rules/pull-schedule.rules.ts";
@@ -454,6 +456,7 @@ export class GovernanceApp implements GovernanceRestApi {
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
+  static readonly operatorReads = governanceOperatorReads;
 
   static async create({
     config,
@@ -467,7 +470,7 @@ export class GovernanceApp implements GovernanceRestApi {
       (erasureSecret) =>
         ErasureSuppressionService.create({
           suppressions: repositories.erasedIdentifierSuppressions,
-          tenantHistory: repositories.tenantHistory,
+          snapshot: repositories.suppressionSnapshot,
           erasureSecret,
         }),
     );
@@ -631,6 +634,7 @@ export class GovernanceApp implements GovernanceRestApi {
       apiKeys: dependencies.apiKeys,
       organizations: dependencies.organizations,
       templates: repositories.ingestionTemplates,
+      auditLog: dependencies.auditLog,
     });
     this.mcpTools = GovernanceMcpToolsService.create({
       projects: dependencies.projects,
@@ -1362,7 +1366,7 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   async ingestionKeyInstall(input: PersonalIngestionKeyMint): Promise<IssuedIngestionKey> {
-    return this.ingestionKeys.mint(input);
+    return this.ingestionKeys.install(input);
   }
 
   async ingestionKeyRotate(input: PersonalIngestionKeyMint): Promise<RotatedIngestionKey> {
@@ -1373,6 +1377,7 @@ export class GovernanceApp implements GovernanceRestApi {
     organizationId: string;
     userId: string;
     apiKeyId: string;
+    surface?: GovernanceCallSurface;
   }): Promise<void> {
     return this.ingestionKeys.revoke(input);
   }

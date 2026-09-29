@@ -1,6 +1,7 @@
-import { Box, Button, Heading, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Heading, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
+import { Link } from "@langwatch/browser-host/link";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { Evaluator } from "@langwatch/evaluator-contract";

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Customer-facing directory state and change copy (ADR-122). */
-import type { ScimSyncStatusCopy } from "@langwatch/enterprise-scim-contract";
-import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import {
+  type ScimSyncStatusCopy,
   SCIM_APPLY_FAILED_EVENT_TYPE,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_APPLY_REDRIVEN_EVENT_TYPE,
@@ -12,7 +11,8 @@ import {
   SCIM_TOKEN_REVOKED_EVENT_TYPE,
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimSyncLifecycleState,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
+import { explainHandledError } from "@langwatch/error-presentation/presentation";
 
 /**
  * The remediation for every failed apply, and the reason no surface here

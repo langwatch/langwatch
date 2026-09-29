@@ -33,7 +33,7 @@ export class PostgresGovernanceRepositories {
     members: Readonly<{ prisma: PrismaClient }>,
   ): Omit<
     GovernanceRepositories,
-    "activityMonitor" | "costRollup" | "rollupErasure" | "ocsfEvents"
+    "activityMonitor" | "costRollup" | "rollupErasure" | "ocsfEvents" | "suppressionSnapshot"
   > {
     const { prisma } = members;
 

@@ -1,7 +1,9 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
@@ -40,6 +42,8 @@ describe("licensing infrastructure composed without licence mutation", () => {
   it("accepts a key activated on an organization when no instance key is set", async () => {
     const app = await LicensingApp.create({
       dependencies: {
+        instantEval: createApiFixture<InstantEvalApi>(),
+        projects: createApiFixture<ProjectApi>(),
         gateway: createApiFixture<GatewayApi>(),
         organizations: createApiFixture<OrganizationApi>(),
       },

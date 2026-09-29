@@ -2,6 +2,7 @@ import {
   type AppendStore,
   createTenantId,
   Deferred,
+  type RetentionPolicyResolver,
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { NotFoundError } from "@langwatch/handled-error";
@@ -67,6 +68,8 @@ export interface EventingLangyConversationAdapterOptions {
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
+  /** Each tenant's retention for the analytics rows; a producer projects nothing and has none. */
+  retention?: RetentionPolicyResolver;
   broadcast: LangyConversationUpdateChannel;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   admissions: Pick<LangyTurnAdmissionCapability, "confirmAccepted" | "release">;
@@ -192,6 +195,7 @@ export class EventingLangyConversationAdapter {
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
       langyMessageProjectionStore: options.langyMessageProjectionStore,
       langyAnalyticsEventProjectionStore: options.langyAnalyticsEventProjectionStore,
+      ...(options.retention === undefined ? {} : { retention: options.retention }),
       langyProcessPorts: effectPorts,
       subscribers: [
         livenessSubscriber,

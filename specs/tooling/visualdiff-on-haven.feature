@@ -108,6 +108,20 @@ Feature: visualdiff boots its stacks through haven
       Then it runs the install and "pnpm --dir platform/app exec prisma generate"
       And it does not run "pnpm run start:prepare:files", because haven's own dev:app runs it before the app starts
 
+    # Run 20260928-235909: the base never left the "instrument your agents"
+    # pane, because nothing ingested its seeded traces, and its signed-in
+    # admin was refused every back-office page. haven's monolith lane runs
+    # dev:app, which starts no workers, and main seeds admin@haven.localhost
+    # where the overlay names only the current seeded admin as an operator.
+    @unit
+    Scenario: A monolith base runs its workers and names every seeded admin an operator
+      Given a checkout on the monolith layout
+      When the worktree is prepared
+      Then the app's own .env asks for its workers in-process
+      And it names both the current and the retired seeded admin in ADMIN_EMAILS
+      And the developer's own lines survive
+      And a modular worktree is left alone
+
     @unit
     Scenario: A tracked dotenv file is never overwritten
       Given the workspace root holds both an untracked .env and the tracked .env.example

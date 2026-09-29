@@ -129,14 +129,18 @@ func maskedToken(token string) string {
 // handleSaveProvisioning takes the address and token from the tenant page and
 // remembers them, so pushing afterwards is one press rather than a form.
 func (s *Server) handleSaveProvisioning(w http.ResponseWriter, r *http.Request) {
-	t, ok := s.provisioningForm(w, r)
+	var body struct {
+		Target string `json:"target"`
+		Token  string `json:"token"`
+	}
+	t, ok := s.apiTenantAndBody(w, r, &body)
 	if !ok {
 		return
 	}
-	base := normalizeSCIMBase(r.PostForm.Get("target"))
-	token := strings.TrimSpace(r.PostForm.Get("token"))
+	base := normalizeSCIMBase(body.Target)
+	token := strings.TrimSpace(body.Token)
 	if notice, bad := s.refuseTarget(t, ProvisioningTarget{BaseURL: base, Token: token}); bad {
-		s.refusalPage(w, t, notice)
+		writeRefusal(w, notice)
 		return
 	}
 	t.SetProvisioning(ProvisioningTarget{BaseURL: base, Token: token})
@@ -145,7 +149,7 @@ func (s *Server) handleSaveProvisioning(w http.ResponseWriter, r *http.Request) 
 		Outcome: OutcomeOK,
 		Detail:  "will provision into " + base,
 	})
-	http.Redirect(w, r, t.BaseURL+"/?connected="+url.QueryEscape(base), http.StatusSeeOther)
+	writeJSON(w, http.StatusOK, provisioningView{Configured: true, BaseURL: base, Token: maskedToken(token)})
 }
 
 // refuseTarget names the three ways a pasted target is wrong, in the words of
@@ -182,9 +186,8 @@ func (s *Server) refuseTarget(t *Tenant, target ProvisioningTarget) (refusalNoti
 
 // handleForgetProvisioning drops the connection.
 func (s *Server) handleForgetProvisioning(w http.ResponseWriter, r *http.Request) {
-	t, ok := s.tenantFor(r)
+	t, ok := s.apiTenant(w, r)
 	if !ok {
-		http.NotFound(w, r)
 		return
 	}
 	t.ClearProvisioning()
@@ -193,7 +196,7 @@ func (s *Server) handleForgetProvisioning(w http.ResponseWriter, r *http.Request
 		Outcome: OutcomeOK,
 		Detail:  "forgot where it was provisioning",
 	})
-	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handlePushProvisioning sends the tenant's directory at the stored target —
@@ -217,7 +220,7 @@ func (s *Server) handlePushProvisioning(w http.ResponseWriter, r *http.Request) 
 		Outcome: outcomeOf(!outcome.Refused),
 		Detail:  outcome.Summary,
 	})
-	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
+	writeJSON(w, http.StatusOK, outcome)
 }
 
 // handlePullProvisioning reads the target's directory back, which is how you
@@ -242,35 +245,19 @@ func (s *Server) handlePullProvisioning(w http.ResponseWriter, r *http.Request) 
 		Outcome: outcomeOf(!outcome.Refused),
 		Detail:  outcome.Summary,
 	})
-	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
-}
-
-// provisioningForm resolves the tenant and parses the posted form.
-func (s *Server) provisioningForm(w http.ResponseWriter, r *http.Request) (*Tenant, bool) {
-	t, ok := s.tenantFor(r)
-	if !ok {
-		http.NotFound(w, r)
-		return nil, false
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "unparseable form", http.StatusBadRequest)
-		return nil, false
-	}
-	return t, true
+	writeJSON(w, http.StatusOK, outcome)
 }
 
 // provisioningAction resolves the tenant and the target a push or read-back
-// needs, refusing on the page when nothing has been connected yet.
+// needs, refusing when nothing has been connected yet.
 func (s *Server) provisioningAction(w http.ResponseWriter, r *http.Request) (*Tenant, ProvisioningTarget, bool) {
-	t, ok := s.tenantFor(r)
+	t, ok := s.apiTenant(w, r)
 	if !ok {
-		http.NotFound(w, r)
 		return nil, ProvisioningTarget{}, false
 	}
 	target := t.Provisioning()
 	if !target.Configured() {
-		s.refusalPage(w, t, refusalNotice{
+		writeRefusal(w, refusalNotice{
 			Status: http.StatusBadRequest,
 			Title:  "This tenant is not provisioning anywhere yet",
 			Detail: "There is nowhere to send the directory until LangWatch's SCIM address and token are filled in.",

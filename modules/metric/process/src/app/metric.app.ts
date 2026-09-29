@@ -1,6 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
@@ -40,6 +41,7 @@ type MetricDependencies = Readonly<{
   dataPrivacy: typeof DataPrivacyApi;
   traces: typeof TraceApi;
   codingAgents: typeof CodingAgentApi;
+  retention: typeof DataRetentionApi;
 }>;
 type MetricSetup = FeatureSetup<MetricDependencies, MetricInfrastructure, MetricServerConfig>;
 
@@ -52,6 +54,8 @@ export class MetricApp implements MetricApiContract {
     traces: TraceApi,
     /** Lifts a received point's session facts onto its own pipeline. */
     codingAgents: CodingAgentApi,
+    /** Each tenant's retention, which the metric rows are stamped with. */
+    retention: DataRetentionApi,
   };
   /** The run this module's durable processing needs, over ClickHouse only. */
   static readonly reads = ["clickhouse"] as const;
@@ -86,6 +90,10 @@ export class MetricApp implements MetricApiContract {
       subscribers: [
         createCodingAgentMetricFactsDispatchSubscriber({ codingAgents: dependencies.codingAgents }),
       ],
+      retention: {
+        resolve: (tenantId) =>
+          dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      },
     }).build();
     const service = MetricService.create({ preparation });
     const collection = MetricRequestCollectionService.create({

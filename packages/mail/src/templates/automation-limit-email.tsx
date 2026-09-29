@@ -80,7 +80,6 @@ export const AutomationLimitEmail = ({
   const offer = !paused && nextStep?.kind === "self_serve" ? nextStep : undefined;
   return (
     <EmailLayout
-      eyebrow="AUTOMATIONS"
       preview={
         paused ? `"${automationName}" was paused` : `"${automationName}" reached its daily limit`
       }

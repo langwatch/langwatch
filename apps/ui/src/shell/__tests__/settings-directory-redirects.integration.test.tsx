@@ -139,6 +139,17 @@ describe("given the retired people and access addresses", () => {
     });
   });
 
+  describe("when the old access address is opened", () => {
+    /** @scenario "The old access address forwards onto the page it became" */
+    it("lands on the directory", async () => {
+      const router = open("/settings/access");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/settings/directory");
+      }, LAZY_CHROME);
+    });
+  });
+
   describe("when the old role bindings address is opened", () => {
     /** @scenario "The old role bindings address forwards onto the tab it became" */
     it("lands on the roles page's assignments tab", async () => {

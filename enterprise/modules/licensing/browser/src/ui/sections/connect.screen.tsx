@@ -3,7 +3,8 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
-import { Heading, Link, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Heading, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 
 import { connectApi } from "../../behavior/connect-api.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";

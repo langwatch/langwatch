@@ -12,7 +12,7 @@ import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contrac
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
-import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
+import { ExperimentCellExecutionService } from "../experiment-cell-execution.service.ts";
 import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
 
 const scripted: {
@@ -117,7 +117,7 @@ const makeCell = (evaluator: EvaluatorConfig): ExecutionCell => ({
 /** Run one cell to its end and collect every event it produced. */
 const runCell = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of ExperimentRunOrchestratorService.create().executeCell({
+  for await (const event of executeCell({
     cell,
     projectId: "p1",
     ports,
@@ -248,7 +248,7 @@ describe("given an evaluator run as its own column", () => {
 
   const runColumn = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
     const events: EvaluationV3Event[] = [];
-    for await (const event of ExperimentRunOrchestratorService.create().executeCell({
+    for await (const event of executeCell({
       cell,
       projectId: "p1",
       ports,
@@ -307,3 +307,18 @@ describe("given an evaluator run as its own column", () => {
     });
   });
 });
+
+/** A cell executed as the run's cell command executes it. */
+function executeCell({
+  ports: collaborators,
+  workflows: engine,
+  ...cell
+}: Parameters<ExperimentCellExecutionService["executeCell"]>[0] & {
+  ports: ExperimentRunCollaborators;
+  workflows: WorkflowApi;
+}): AsyncGenerator<EvaluationV3Event> {
+  return ExperimentCellExecutionService.create({
+    ports: collaborators,
+    workflows: engine,
+  }).executeCell(cell);
+}

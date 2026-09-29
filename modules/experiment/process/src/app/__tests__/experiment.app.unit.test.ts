@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 
-import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
@@ -10,17 +9,13 @@ import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experiment-contract";
-import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
-import type { PromptApi } from "@langwatch/prompt-contract";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
-import type { ExperimentV3RunLoop } from "../experiment-workbench.members.ts";
 import { ExperimentApp } from "../experiment.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
@@ -144,7 +139,6 @@ function harness({
     archive: archiveWorkflow,
     ...workflows,
   });
-  const workflowExecutionService = createApiFixture<WorkflowApi>();
 
   const monitors = {
     deleteForExperiment: vi.fn(async () => undefined),
@@ -176,33 +170,12 @@ function harness({
     cleanupTenantEmitter: vi.fn(),
   };
   const workbenchObserver = { recordExperimentRan: vi.fn(), reportError: vi.fn() };
-  const runLoop: ExperimentV3RunLoop = {
-    ports: null,
-    progress: null,
-    services: {
-      datasets: createApiFixture<DatasetApi>(),
-      prompts: createApiFixture<PromptApi>(),
-      agents: createApiFixture<AgentApi>(),
-      workflows: createApiFixture<ExperimentWorkflowDsl>(),
-      entitlements: {
-        requestBound: async ({ key }: { key: RequestBoundKey }) => resolveRequestBound(key, "FREE"),
-      },
-      projects: {
-        getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
-      },
-    },
-    workflows: workflowExecutionService,
-    defaultConcurrency: 10,
-    startRun: vi.fn(async () => ({ runId: "run-1", runUrl: "https://app/run-1", total: 1 })),
-  };
-
   return {
     experiments: experimentService,
     workflows: workflowService,
     archiveWorkflow,
     monitors,
     workbenchObserver,
-    runLoop,
     app: ExperimentApp.createForTesting({
       experiments: experimentService,
       runLookup,
@@ -216,7 +189,6 @@ function harness({
       modelCosts,
       slugify: (value: string) => value,
       workbenchTargetNames: async () => ({}),
-      runLoop,
       workbenchObserver,
       workflowEvaluations: createApiFixture<WorkflowEvaluationService>({}, "workflowEvaluations"),
     }),
@@ -500,12 +472,6 @@ describe("given the workbench's own doors", () => {
       const { app } = harness();
 
       expect(app.experiments()).toBe(app);
-    });
-
-    it("hands the run doors the loop this deployment composed", () => {
-      const { app, runLoop } = harness();
-
-      expect(app.run()).toBe(runLoop);
     });
   });
 

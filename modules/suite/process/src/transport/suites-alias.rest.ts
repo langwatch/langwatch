@@ -15,16 +15,13 @@ import {
 } from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import {
-  ScenarioTestSuiteNotFoundError,
-  type ScenarioTestSuite,
-  deriveRunActor,
-} from "@langwatch/scenario-contract";
+import { type ScenarioTestSuite, deriveRunActor } from "@langwatch/scenario-contract";
 import {
   type suiteResponseSchema,
   isSuiteKind,
   SuiteApi,
   SuiteExecutionError,
+  SuiteNotFoundError,
   suiteTargetSchema,
   type Suite,
   type SuiteKind,
@@ -385,7 +382,7 @@ async function archiveSuite(params: {
     .archiveTestSuite({ testSuiteId: id, projectId })
     .then(() => true)
     .catch((error: unknown) => {
-      if (error instanceof ScenarioTestSuiteNotFoundError) return false;
+      if (error instanceof SuiteNotFoundError) return false;
       throw error;
     });
   if (archivedTestSuite) return { id, archived: true };

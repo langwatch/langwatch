@@ -221,9 +221,9 @@ export const opsPlatformTrpcTransport = defineTrpcRouter(OpsApi, opsPlatformTrpc
   .procedure("runSystemMigrationPass")
   .withFacts(opsOperatorFact)
   .serviceAuthorized(OPS_MANAGE)
-  .handle(({ app }, operator) => {
+  .handle(async ({ app }, operator) => {
     app.admitOperator(operator, "ops:manage");
-    app.runSystemMigrationPass();
+    await app.runSystemMigrationPass({ operator });
 
     return { started: true as const };
   })

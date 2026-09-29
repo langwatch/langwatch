@@ -263,6 +263,12 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				ProcessAlive: sys.ProcessAlive,
 			},
 			Extras: func() dashboard.Extras { return dashboardExtras(orch.HubView(worktree, worktree)) },
+			Naming: naming,
+			StackURL: func(svc, slug string) string {
+				scheme, port := proxy.Endpoint()
+				return naming.URL(svc, slug, scheme, port)
+			},
+			IdPTenants: dashboard.FetchIdPTenants,
 			// The same two lifecycle actions the hub offers, over HTTP. Restart
 			// bounces a live stack's children; Start brings up a worktree that has
 			// none — and refuses any directory git does not list as one.

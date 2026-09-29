@@ -123,6 +123,12 @@ export abstract class ExperimentRepository {
     take: number;
     beforeCounterVersion?: number;
   }): Promise<WorkbenchVersionSummary[]>;
+  /** Whether a run wrote any version in the experiment's history. */
+  abstract hasWorkbenchVersionOfRun(input: {
+    projectId: string;
+    experimentId: string;
+    runId: string;
+  }): Promise<boolean>;
   abstract findWorkbenchVersion(input: {
     projectId: string;
     experimentId: string;

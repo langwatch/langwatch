@@ -5,11 +5,8 @@
  * touches a table another module owns, and nothing identity or authz holds
  * as a code reaches the reader as one.
  */
-import type {
-  OrganizationSsoConnection,
-  ScimSyncActivityEntry,
-  ScimSyncState,
-} from "@langwatch/identity-contract";
+import type { ScimSyncActivityEntry, ScimSyncState } from "@langwatch/enterprise-scim-contract";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import type { UserFullProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -137,13 +134,11 @@ function createReads({
         getProvider,
         getOrganization: () => Promise.reject(new Error("reconciliation never asks")),
       }),
-      scimSyncReads: () => ({
-        findForOrganization: async () => syncs,
-        findByConnection: async () => null,
-        listForOperator: async () => ({ syncs: [], total: 0 }),
-        findForOperator: async () => [],
-        findActivity,
-      }),
+    },
+    syncs: {
+      findForOrganization: async () => syncs,
+      findByConnection: async () => null,
+      findActivity,
     },
     grants: { findDirectoryCausedChanges: vi.fn(async () => changes) },
     people: { getProfiles: vi.fn(async () => people) },
