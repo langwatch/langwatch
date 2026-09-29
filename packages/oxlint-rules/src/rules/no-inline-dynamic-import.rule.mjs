@@ -20,6 +20,8 @@ const UI_APPLICATION = /^apps\/ui\/src\//;
 // The dev runtime's entry loads its main after the boot guard, so the fatal handlers
 // cover ESM link failures in that graph too (9ef4238a13). That one file only.
 const DEV_RUNTIME_BACKEND_ENTRY = /^tools\/dev-runtime\/src\/backend\.entrypoint\.ts$/;
+// The tasks entry loads every module only for a module task, so migrations stay fast.
+const TASKS_ENTRY = /^apps\/tasks\/src\/main\.ts$/;
 
 function isExempt(workspacePath) {
   return (
@@ -29,7 +31,8 @@ function isExempt(workspacePath) {
     CLI_TSUP_CONFIG.test(workspacePath) ||
     WEB_PACKAGE_ENTRY.test(workspacePath) ||
     UI_APPLICATION.test(workspacePath) ||
-    DEV_RUNTIME_BACKEND_ENTRY.test(workspacePath)
+    DEV_RUNTIME_BACKEND_ENTRY.test(workspacePath) ||
+    TASKS_ENTRY.test(workspacePath)
   );
 }
 

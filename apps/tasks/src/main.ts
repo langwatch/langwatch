@@ -1,13 +1,9 @@
 import "@langwatch/time/polyfill";
 import process from "node:process";
 
-import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { bootNodeExecutable, configureLogger, createLogger } from "@langwatch/observability";
-import { processConfig, Server } from "@langwatch/process-server";
 import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
-import { scenarioChildBundle } from "@langwatch/scenario-child";
 import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
-import { Task, TaskCatalogue } from "@langwatch/task";
 
 import { clickhouseMigrate } from "./clickhouse-migrate.ts";
 import {
@@ -17,7 +13,6 @@ import {
   type TaskConnections,
   type TaskInput,
   type TasksConfig,
-  processEnvironment,
 } from "./config.ts";
 import { openTasksDatabase } from "./database.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
@@ -65,50 +60,6 @@ export async function runTasks(argv: readonly string[], input: TaskInput): Promi
   }
 }
 
-const isTask = (contribution: unknown): contribution is Task => contribution instanceof Task;
-
-/** Boots the modules in the tasks role and runs one declared task: main's `<name> <args…>`. */
-export async function runModuleTask({
-  name,
-  args,
-  signal,
-}: {
-  name: string;
-  args: readonly string[];
-  signal: AbortSignal;
-}): Promise<void> {
-  const server = await Server.create("langwatch-tasks")
-    .withEnvironment(processEnvironment)
-    .withConfig(processConfig(processModules))
-    .withSecrets((config, secrets) =>
-      secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
-    )
-    .withProcessOwnership(false)
-    .start();
-  try {
-    const app = await server
-      .composeProcess("tasks")
-      .withModules(processModules)
-      .withMember("queue", () => void 0)
-      .withMember("content", () => void 0)
-      .withMember("gatewayInternalProtocol", () => ({}))
-      .withMember("connectJudge", () => null)
-      .withMember("scenarioChildBundle", () => scenarioChildBundle)
-      .withMember("monitor", () => void 0)
-      .withPipelines((pipelines) => pipelines.produce())
-      .boot();
-    await server.run(app);
-    const catalogue = TaskCatalogue.create({ tasks: app.tasks(isTask) });
-    const logger = createLogger("langwatch:tasks");
-    signal.throwIfAborted();
-    logger.info({ task: name }, "task starting");
-    await catalogue.get({ name }).run({ args, signal });
-    logger.info({ task: name }, "task finished");
-  } finally {
-    await server.close();
-  }
-}
-
 /**
  * The runner's one secrets seam: each connection string lives only inside the
  * closure `into` hands it to, and what escapes is the connector built there.
@@ -144,6 +95,8 @@ async function main(): Promise<void> {
   process.once("SIGTERM", abort);
   if (first !== undefined && !tasks.has(first)) {
     try {
+      // Only module tasks load every module; the migrations stay a small graph.
+      const { runModuleTask } = await import("./module-task.ts");
       await runModuleTask({ name: first, args: rest, signal: controller.signal });
     } finally {
       process.off("SIGINT", abort);
