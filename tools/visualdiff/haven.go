@@ -173,6 +173,7 @@ func (run *session) startHaven(ctx context.Context, stack Stack, running bool) e
 		run.havenSlugs = append(run.havenSlugs, stack.HavenSlug)
 		return nil
 	}
+	run.booted = true
 	return run.havenUp(ctx, stack)
 }
 
@@ -199,7 +200,29 @@ func (run *session) adoptHaven(ctx context.Context, stack *Stack) (bool, bool, e
 		}
 	}
 	fmt.Fprintf(run.streams.Err, "%s: resumed %s (haven stack %s, running=%t)\n", stack.Name, stack.Dir, stack.HavenSlug, live)
-	return true, live, nil
+	return true, live, run.follow(ctx, *stack)
+}
+
+// follow moves a resumed persistent worktree to the commit its ref names now
+// and prepares it again, each step keyed (reuse.go) so only what changed
+// reruns; the backend lanes' watchers restart on the new files.
+func (run *session) follow(ctx context.Context, stack Stack) error {
+	if !run.request.Options.Follow || !stack.Persistent {
+		return nil
+	}
+	want, err := resolveCommit(ctx, gitRef{run: run.request.Deps.Run, root: run.request.Options.Root, ref: stack.Ref})
+	if err != nil {
+		return err
+	}
+	have, _ := resolveCommit(ctx, gitRef{run: run.request.Deps.Run, root: stack.Dir, ref: "HEAD"})
+	if have == want {
+		return nil
+	}
+	fmt.Fprintf(run.streams.Err, "%s: following %s to %s (was %s)\n", stack.Name, stack.Ref, short(want), short(have))
+	if err := run.checkoutPersistent(ctx, stack); err != nil {
+		return err
+	}
+	return run.havenPrepare(ctx, stack)
 }
 
 // checkoutForHaven adds one ref's worktree and prepares it. haven's own

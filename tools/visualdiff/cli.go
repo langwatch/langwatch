@@ -21,6 +21,8 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-no-fail-fast] [-resume RUNID] [-no-publish] [-include-done]
                  [-rebase-main] [-force] [-max-load N] [-pages N]
 
+  visualdiff flow ID | route PATH [-edition E] [-candidate REF] [-force] [-dev-ui] [-dry-run] [-root DIR]
+  visualdiff down [-root DIR]
   visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E] [-root DIR]
   visualdiff done -run RUNID (-route PATH | -flow ID) [-edition E] -note WHY [-force]
   visualdiff done -list | -undo KEY
@@ -63,6 +65,17 @@ The candidate is captured first, and a candidate whose shell does not render
 stops the run within its first three routes (-no-fail-fast to carry on).
 -resume RUNID continues a -keep run after a fix: its prepared worktrees and
 running stacks are reused, so nothing is checked out or installed again.
+A route with no finding and a flow judged works are recorded in
+.visualdiff/works.json at the candidate commit; a later run skips each while
+git diff since that commit is empty over its module (from the screens its
+web module declares), the shell packages and apps/ui, and a flow's steps are
+unchanged. -include-done, -routes and -flows walk everything named.
+
+flow ID and route PATH are the fix loop: they boot the candidate as a kept
+stack under .visualdiff/loop, or reuse it (its worktree follows the
+candidate's commit, re-preparing only what changed), run that one section
+against main's cached baseline, topping the cache up when it lacks it, and
+print its verdict. down stops the loop's stacks.
 A finished run shows its largest changes, new failures and key pages on the
 open pull request of the checked-out branch, in one comment it edits in place;
 -no-publish skips that, as does a missing PR or a gh that is not signed in.
@@ -112,6 +125,10 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 		return publishCommand(ctx, args[1:], streams)
 	case "done":
 		return doneCommand(args[1:], streams)
+	case "flow", "route":
+		return loopCommand(ctx, args[0], args[1:], streams)
+	case "down":
+		return downCommand(ctx, args[1:], streams)
 	case "-h", "--help", "help":
 		fmt.Fprint(streams.Out, usage)
 		return ExitClean
@@ -241,6 +258,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		Editions: editions, Baseline: !*noBaseline, RefreshBaseline: *refreshBaseline,
 		FailFast: !*noFailFast, NoPublish: *noPublish, DevUI: *devUI,
 		PinMain: !isFlagSet(flags, "base"), RebaseMain: *rebaseMain, Force: *force, MaxLoad: *maxLoad, Pages: *pages,
+		SkipWorks: !*includeDone && *routeList == "" && *flowList == "",
 	}
 	resumeRun(&options, *resume)
 	return &runFlags{options: options, config: config, includeDone: *includeDone}, nil

@@ -39,6 +39,8 @@ type DoneEntry struct {
 	Forced          bool             `json:"forced,omitempty"`
 	// Proof are the flow's expects that held on both sides (FlowProof).
 	Proof []string `json:"proof,omitempty"`
+	// Works marks a section skipped because it worked and is unchanged (works.go), never written.
+	Works bool `json:"-"`
 }
 
 // DoneLedger is every entry under .visualdiff/done.
@@ -78,13 +80,17 @@ func LoadDoneLedger(root string) (DoneLedger, error) {
 }
 
 func (ledger DoneLedger) holds(edition Edition, kind, section string) bool {
+	return ledger.find(DoneKey(edition, kind, section)) != nil
+}
+
+// find is the entry a key names, or nil.
+func (ledger DoneLedger) find(key string) *DoneEntry {
 	for index := range ledger {
-		entry := ledger[index]
-		if entry.Edition == edition && entry.Kind == kind && entry.Section == section {
-			return true
+		if entry := &ledger[index]; DoneKey(entry.Edition, entry.Kind, entry.Section) == key {
+			return entry
 		}
 	}
-	return false
+	return nil
 }
 
 // Scope is the one place a run's routes and flows are narrowed: a copy of
@@ -114,17 +120,42 @@ func (ledger DoneLedger) Scope(config *Config, edition Edition) (*Config, []stri
 	return &scoped, skipped
 }
 
-// writeSkips says how many done sections a run skips, and which.
+// writeSkips says how many done and unchanged working sections a run skips, and which.
 func (ledger DoneLedger) writeSkips(out io.Writer, config *Config, editions []Edition) {
-	var skipped []string
+	var done, works []string
 	for _, edition := range editions {
 		_, keys := ledger.Scope(config, edition)
-		skipped = append(skipped, keys...)
+		for _, key := range keys {
+			if ledger.find(key).Works {
+				works = append(works, key)
+				continue
+			}
+			done = append(done, key)
+		}
 	}
-	if len(skipped) == 0 {
-		return
+	if len(done) > 0 {
+		fmt.Fprintf(out, "  done      skipped %d (-include-done captures them): %s\n", len(done), strings.Join(done, ", "))
 	}
-	fmt.Fprintf(out, "  done      skipped %d (-include-done captures them): %s\n", len(skipped), strings.Join(skipped, ", "))
+	if len(works) > 0 {
+		fmt.Fprintf(out, "  works     skipped %d, unchanged since they worked (-include-done walks them): %s\n", len(works), strings.Join(works, ", "))
+	}
+}
+
+// skipLines are verdict.md's line per skipped section.
+func (ledger DoneLedger) skipLines(config *Config, editions []Edition) []string {
+	var lines []string
+	for _, edition := range editions {
+		_, keys := ledger.Scope(config, edition)
+		for _, key := range keys {
+			entry := ledger.find(key)
+			why := "done: " + entry.Note
+			if entry.Works {
+				why = "works at " + short(entry.CandidateCommit) + ", unchanged"
+			}
+			lines = append(lines, fmt.Sprintf("- [%s] %s %s: skipped (%s)", edition, entry.Kind, entry.Section, why))
+		}
+	}
+	return lines
 }
 
 // DoneRequest is one `visualdiff done -run` invocation.

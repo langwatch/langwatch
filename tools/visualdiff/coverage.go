@@ -313,18 +313,34 @@ var (
 // candidatePatterns lists the candidate's screens at ref: each "pages/..."
 // screen key, or the path: the screen declares under it, which wins.
 func (source coverageSource) candidatePatterns(ctx context.Context, ref string, pathspecs []string) ([]string, error) {
+	parser, err := source.candidateDeclarations(ctx, ref, pathspecs)
+	if err != nil {
+		return nil, err
+	}
+	return parser.patterns, nil
+}
+
+// candidateDeclarations are the candidate's screens at ref with the file declaring each.
+func (source coverageSource) candidateDeclarations(ctx context.Context, ref string, pathspecs []string) (*declarationParser, error) {
+	if len(pathspecs) == 0 {
+		pathspecs = defaultCandidateScreens
+	}
 	var out bytes.Buffer
 	pattern := `"pages/[^"]+"[[:space:]]*:|^[[:space:]]*path:[[:space:]]*"/`
 	args := append([]string{"grep", "-z", "-E", pattern, ref, "--"}, pathspecs...)
 	if err := source.run(ctx, commandSpec{name: "git", args: args, dir: source.root}, &out); err != nil && !noMatches(err) {
 		return nil, fmt.Errorf("list screen declarations at %s: %w", ref, err)
 	}
-	return ParseScreenDeclarations(out.String()), nil
+	return parseDeclarations(out.String()), nil
 }
 
 // ParseScreenDeclarations reads `git grep -z` lines (file NUL line NUL text)
 // in file order: a key is the pattern unless a path: follows it in the same file.
 func ParseScreenDeclarations(output string) []string {
+	return parseDeclarations(output).patterns
+}
+
+func parseDeclarations(output string) *declarationParser {
 	parser := &declarationParser{}
 	for _, line := range strings.Split(output, "\n") {
 		fields := strings.SplitN(line, "\x00", 3)
@@ -333,14 +349,21 @@ func ParseScreenDeclarations(output string) []string {
 		}
 	}
 	parser.flush()
-	return parser.patterns
+	return parser
 }
 
-// declarationParser holds the screen key still waiting for its path:.
+// declarationParser holds the screen key still waiting for its path:, and
+// the file that declared each pattern (files[i] declared patterns[i]).
 type declarationParser struct {
 	patterns []string
+	files    []string
 	pending  string
 	file     string
+}
+
+func (parser *declarationParser) add(pattern string) {
+	parser.patterns = append(parser.patterns, pattern)
+	parser.files = append(parser.files, parser.file)
 }
 
 func (parser *declarationParser) read(file, text string) {
@@ -355,13 +378,13 @@ func (parser *declarationParser) read(file, text string) {
 	}
 	if match := screenPath.FindStringSubmatch(text); match != nil {
 		parser.pending = ""
-		parser.patterns = append(parser.patterns, RouterPathPattern(match[1]))
+		parser.add(RouterPathPattern(match[1]))
 	}
 }
 
 func (parser *declarationParser) flush() {
 	if converted, ok := ScreenPattern(parser.pending); ok {
-		parser.patterns = append(parser.patterns, converted)
+		parser.add(converted)
 	}
 	parser.pending = ""
 }

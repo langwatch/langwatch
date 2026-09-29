@@ -336,6 +336,19 @@ its `report/*/findings.json`: `-pr` names the pull request and `-link` adds
 the full report's address. It exits 0 when it published, 1 when it skipped
 and said why, 2 when it failed.
 
+### The parity status
+
+The same publish also keeps the pull request body's parity status current.
+Between `<!-- parity-status:start -->` and `<!-- parity-status:end -->`, under
+`### visualdiff flows`, each row whose flow this run covered gets its
+`last result` (every edition's verdict and first failure) and `state` (the
+worst edition's: ❌ broken, ❔ broken-both, 🟡 layout-only, ⬜ unproven,
+✅ works) from the run's verdicts. A covered flow with no row gets one, and the
+heading's count follows. Every other row and everything outside the markers
+stays as it was; a body without the markers is left alone. The body is read
+with `gh api repos/{owner}/{repo}/pulls/N` and written back with
+`-X PATCH -F body=@<run>/pr-body.md`.
+
 ## Running in CI
 
 `.github/workflows/visualdiff.yml` runs on every non-draft pull request that
@@ -507,6 +520,41 @@ section with any class but `noise`, `copy` or `intended-restore` unless `-force`
 is given. Every later `run` skips done sections and prints how many and which;
 a skip is neither a finding nor `uncovered`. `-include-done` captures them
 anyway, for a periodic full pass.
+
+## Skipping what works
+
+Every finished run records, in `.visualdiff/works.json`, each route with no
+finding and each flow judged `works`, at the candidate commit; a section that
+fails again is forgotten. A later run skips a recorded section while
+`git diff --name-only <commit> <candidate> --` is empty over what it touches:
+the module whose `defineWebModule` screens declare its path (its `browser`,
+`browser-kit`, `process` and `contract`), `packages/browser-host`,
+`packages/design-system`, `apps/ui` and the runner's source. A flow touches the
+modules of its `go` steps' paths, and its steps and expects must hash as
+recorded. The map is read from the candidate's screen declarations at run
+time. A route no module declares, or a flow with no `go` step, is walked and
+the reason printed. The dry run lists the skips, and verdict.md ends with
+`skipped (works at <sha>, unchanged)` per section. `-include-done`, `-routes`
+and `-flows` walk everything they name.
+
+## The fix loop
+
+```bash
+go run ./cmd/visualdiff flow automation-alert     # boots or reuses the loop's candidate stack
+go run ./cmd/visualdiff route /{slug}/prompts -edition free
+go run ./cmd/visualdiff down                      # stops the loop's stacks
+```
+
+`flow` and `route` run one section against main's pinned, cached baseline
+(topped up when it lacks the section) on a candidate stack kept under
+`.visualdiff/loop`, and print its verdict line and verdict.md's path. The first
+call boots the stack; later calls reuse it. A later call moves the candidate
+worktree to the candidate ref's commit when it changed and re-prepares it with
+the reuse keys, so only a changed lockfile reinstalls and only changed code
+rebuilds the UI; the backend lanes' watchers restart on the new files. The loop
+renders commits, not uncommitted edits. While the loop is up, a full `run`
+refuses to start beside it; `down` destroys its stacks and removes the
+directory.
 
 ## Adding a route
 

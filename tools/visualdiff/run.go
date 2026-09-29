@@ -62,6 +62,11 @@ type Options struct {
 	MaxLoad float64
 	// Pages is how many pages each side captures on at once; zero is half the CPUs.
 	Pages int
+	// SkipWorks skips each section whose last verdict was works while nothing
+	// it touches changed (works.go).
+	SkipWorks bool
+	// Follow moves a resumed worktree to the commit its ref names now (loop.go).
+	Follow bool
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -276,6 +281,9 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 		request.Options.BaseRef = pinMain(ctx, request, streams.Err)
 	}
 	options, config, deps := request.Options, request.Config, request.Deps
+	if options.SkipWorks {
+		request.Done = append(request.Done, skipWorks(ctx, request, streams)...)
+	}
 	plan := buildPlan(options, config)
 	result := Result{Plan: plan, Coverage: runCoverage(ctx, request, streams.Err)}
 	baselines, err := planBaselines(ctx, baselineInputs{options: options, config: config, deps: deps, done: request.Done}, streams.Err)
@@ -462,6 +470,8 @@ type session struct {
 	// phases times the run (phases.go); upAt is when each stack's haven up ran.
 	phases *phaseClock
 	upAt   map[string]time.Time
+	// booted is a stack this run brought up, whose database no earlier seed reached.
+	booted bool
 }
 
 func (run *session) stopAll() {
@@ -556,7 +566,7 @@ func (run *session) editionStacks() []EditionStack {
 func (run *session) seed(ctx context.Context) error {
 	options, deps := run.request.Options, run.request.Deps
 	marker := filepath.Join(options.RunDir, "seeded")
-	if recorded, err := os.ReadFile(marker); err == nil {
+	if recorded, err := os.ReadFile(marker); err == nil && !run.booted {
 		fmt.Fprintln(run.streams.Err, "seed: this run's stacks are already seeded")
 		run.sideFixtures = ReadSeededMarker(recorded)
 		return nil
@@ -800,7 +810,8 @@ func (run *session) finish(result Result) (Result, error) {
 	if err := WriteSummaryFile(options.RunDir, summary); err != nil {
 		return result, fmt.Errorf("write summary: %w", err)
 	}
-	if err := WriteVerdictFile(options.RunDir, result.Rows); err != nil {
+	run.recordWorks(result.Rows)
+	if err := WriteVerdictFile(options.RunDir, result.Rows, run.request.Done.skipLines(run.request.Config, options.Editions)); err != nil {
 		return result, fmt.Errorf("write verdict: %w", err)
 	}
 	if err := WriteSignaturesFile(options.RunDir); err != nil {
@@ -1042,4 +1053,22 @@ func RunnerPreflight(ctx context.Context, root string) error {
 		return fmt.Errorf("runner preflight: %w\n%s", err, output)
 	}
 	return nil
+}
+
+// skipWorks reads the works ledger and returns the sections to skip.
+func skipWorks(ctx context.Context, request Request, streams Streams) DoneLedger {
+	options := request.Options
+	works, err := LoadWorks(options.Root)
+	if err != nil {
+		fmt.Fprintf(streams.Err, "works: skipping nothing, %v\n", err)
+		return nil
+	}
+	out := streams.Err
+	if options.DryRun {
+		out = streams.Out
+	}
+	return WorksSkips(ctx, worksInputs{
+		run: request.Deps.Run, root: options.Root, candidateRef: options.CandidateRef, config: request.Config,
+		editions: options.Editions, works: works, out: out,
+	})
 }

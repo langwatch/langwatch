@@ -393,19 +393,22 @@ Feature: visualdiff catches regressions and reports its own coverage
       Then run.log carries "phase: <name> <duration>"
       And summary.txt ends with every phase's wall time
 
-    @unimplemented
+    @unit
     Scenario: A flow or route whose last verdict was works is skipped while nothing it touches changed
-      Given a flow or route whose last verdict was works at a candidate commit
-      When a later run finds its yaml and expects unchanged, and no change since that commit under its owning module paths in modules/catalogue.json
-      Then it is skipped as the done ledger skips a section, and -include-done walks it anyway
-      And when unsure what it touches, it is walked
+      Given a route with no finding or a flow judged works, recorded in .visualdiff/works.json at its candidate commit
+      And the module that touches it is read from the candidate's defineWebModule screen declarations
+      When a later run finds git diff since that commit empty over that module's browser, process and contract paths, the shell packages, apps/ui and the runner, and a flow's steps and expects unchanged
+      Then it is skipped as the done ledger skips a section, the dry run lists it, and verdict.md says "skipped (works at <sha>, unchanged)"
+      And a route no module declares, or a flow with no go step, is walked with the reason printed
+      And -include-done, -routes and -flows walk it anyway
 
-    @unimplemented
+    @unit
     Scenario: visualdiff flow re-runs one flow against a kept candidate stack in seconds
-      Given main's cached baseline and a candidate stack visualdiff flow booted or reused
-      When a fixer runs `visualdiff flow <id>` or `visualdiff route <path>` again after an edit
-      Then only that flow or route is captured on the kept stack and diffed against the baseline
-      And its verdict line prints, and `visualdiff down` stops the stack
+      Given main's cached baseline and a candidate stack `visualdiff flow` booted and kept under .visualdiff/loop
+      When a fixer runs `visualdiff flow <id>` or `visualdiff route <path>` again after committing an edit
+      Then the kept stack is reused, its worktree follows the candidate's commit and re-prepares only what changed
+      And only that flow or route is captured and diffed against the baseline, topped up when the baseline lacks it
+      And its verdict line prints, and `visualdiff down` stops the stack and removes the loop's directory
 
     @unimplemented
     Scenario: Screens are diffed and classified in the Go tool on a bounded worker pool
@@ -437,6 +440,15 @@ Feature: visualdiff catches regressions and reports its own coverage
       When the comment is rendered
       Then it carries the marker, the run id, both commits and the counts by class
       And each screen shows the candidate beside a readable base, or the candidate alone when the passkey offer covers the base
+
+    @unit
+    Scenario: A run rewrites only its own flows' rows of the parity status in the PR body
+      Given a pull request body with a "### visualdiff flows" table between the parity-status markers
+      When a run publishes
+      Then each row whose flow the run covered gets its "last result" and "state" cells from the flow's verdict
+      And a covered flow with no row gets one appended, and the heading's count follows
+      And every other row, and everything outside the markers, is left byte for byte
+      And gh's own output never reaches the body
 
     @unit
     Scenario: Each run edits the PR's one marked comment in place

@@ -211,7 +211,12 @@ func headAll(lines []string, limit int) []string {
 	return out
 }
 
-// WriteVerdictFile writes verdict.md into the run directory.
-func WriteVerdictFile(runDir string, rows []Row) error {
-	return os.WriteFile(filepath.Join(runDir, VerdictFile), []byte(RenderVerdict(rows)), 0o600)
+// WriteVerdictFile writes verdict.md into the run directory, ending with a
+// line per section the run skipped (done.go skipLines).
+func WriteVerdictFile(runDir string, rows []Row, skipped []string) error {
+	text := RenderVerdict(rows)
+	if len(skipped) > 0 {
+		text += "\nskipped:\n" + strings.Join(skipped, "\n") + "\n"
+	}
+	return os.WriteFile(filepath.Join(runDir, VerdictFile), []byte(text), 0o600)
 }

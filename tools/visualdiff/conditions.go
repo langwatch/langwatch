@@ -42,7 +42,7 @@ func Refusals(conditions Conditions, maxLoad float64) []string {
 	}
 	if len(conditions.LiveStacks) > 0 {
 		reasons = append(reasons, "another visualdiff stack is up: "+strings.Join(conditions.LiveStacks, ", ")+
-			" (haven destroy it, or visualdiff gc -kept)")
+			" (visualdiff down for the fix loop's, haven destroy it, or visualdiff gc -kept)")
 	}
 	return reasons
 }
