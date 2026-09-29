@@ -284,6 +284,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
   return (
     <VStack
       className="js-component-node"
+      data-testid={`workflow-node-${props.type}`}
       position="relative"
       opacity={isNotDroppable ? 0.4 : 1}
       ref={ref}

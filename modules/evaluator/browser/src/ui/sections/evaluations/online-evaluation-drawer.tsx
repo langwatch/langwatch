@@ -473,6 +473,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 <VStack gap={2} width="full" align="stretch">
                   <StepRadio
                     value="trace"
+                    data-testid="online-evaluation-level-trace"
                     title="Trace Level"
                     description="Evaluate each trace individually as it arrives"
                     icon={<LuListTree />}
@@ -480,6 +481,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                   />
                   <StepRadio
                     value="thread"
+                    data-testid="online-evaluation-level-thread"
                     title="Thread Level"
                     description="Evaluate all traces in a thread together"
                     icon={<Spool />}
@@ -531,7 +533,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                   label="Name"
                   helper="A descriptive name for this online evaluation"
                 >
-                  <Input {...form.register("name")} placeholder="Enter evaluation name" />
+                  <Input
+                    {...form.register("name")}
+                    data-testid="online-evaluation-name-input"
+                    placeholder="Enter evaluation name"
+                  />
                 </HorizontalFormControl>
                 <HorizontalFormControl
                   label={
@@ -570,6 +576,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                       <Input
                         width="110px"
                         type="number"
+                        data-testid="online-evaluation-sample-input"
                         min="0.01"
                         max="1"
                         step="0.1"
@@ -609,11 +616,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border" paddingX={4} paddingY={3}>
           <HStack gap={3} width="full" justify="flex-end">
-            <Button variant="outline" onClick={handleClose}>
+            <Button variant="outline" data-testid="online-evaluation-cancel" onClick={handleClose}>
               Cancel
             </Button>
             <Button
               colorPalette="blue"
+              data-testid="online-evaluation-save"
               onClick={handleSave}
               disabled={!canSave}
               title={hasPendingMappings ? "Complete all mappings first" : undefined}

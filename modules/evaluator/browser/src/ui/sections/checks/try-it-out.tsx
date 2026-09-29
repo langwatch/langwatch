@@ -302,6 +302,7 @@ export function TryItOut({
               </Button>
               <Button
                 colorPalette="orange"
+                data-testid="evaluator-try-it-run"
                 size="sm"
                 disabled={firstPassingPrecondition === -1}
                 onClick={() => {

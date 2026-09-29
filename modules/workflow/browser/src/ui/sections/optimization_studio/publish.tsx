@@ -121,7 +121,12 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
     <>
       <Menu.Root>
         <Menu.Trigger asChild>
-          <Button disabled={isDisabled} size="sm" colorPalette="blue">
+          <Button
+            disabled={isDisabled}
+            size="sm"
+            colorPalette="blue"
+            data-testid="workflow-publish-open"
+          >
             Publish <ChevronDown />
           </Button>
         </Menu.Trigger>
@@ -332,7 +337,12 @@ function PublishMenu({
         </>
       )}
       <Tooltip content={canPublish} positioning={{ placement: "right" }}>
-        <Menu.Item onClick={onTogglePublish} disabled={!!canPublish} value="publish">
+        <Menu.Item
+          onClick={onTogglePublish}
+          disabled={!!canPublish}
+          value="publish"
+          data-testid="workflow-publish-item"
+        >
           <ArrowUp size={16} /> <Text textTransform="capitalize">{`Publish ${workflow_type}`}</Text>
         </Menu.Item>
       </Tooltip>
@@ -602,6 +612,7 @@ function PublishModalContent({
                   <Button
                     variant="outline"
                     type="submit"
+                    data-testid="workflow-publish-submit"
                     loading={commitVersion.isPending || publishWorkflow.isPending}
                     disabled={!!isDisabled}
                   >

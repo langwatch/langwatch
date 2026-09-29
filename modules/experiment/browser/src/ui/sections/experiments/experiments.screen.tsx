@@ -281,6 +281,7 @@ const ExperimentRow = ({
   >
     <Table.Row
       cursor="pointer"
+      data-testid={`experiment-row-${experiment.id}`}
       onClick={() =>
         onOpen(
           opensInWorkbench(experiment)

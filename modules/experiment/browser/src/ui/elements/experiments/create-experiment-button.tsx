@@ -19,14 +19,19 @@ export const CreateExperimentButton = ({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <PageLayout.HeaderButton background="bg">
+        <PageLayout.HeaderButton background="bg" data-testid="experiment-new-open">
           <Plus size={16} />
           New Experiment
           <ChevronDown size={14} />
         </PageLayout.HeaderButton>
       </Menu.Trigger>
       <Menu.Content minWidth="320px">
-        <Menu.Item value="experiment-ui" onClick={onCreate} disabled={isCreating}>
+        <Menu.Item
+          value="experiment-ui"
+          data-testid="experiment-new-create"
+          onClick={onCreate}
+          disabled={isCreating}
+        >
           <Box width="100%">
             <Text fontWeight="medium">
               {isCreating && <Spinner size="xs" marginRight={2} />}

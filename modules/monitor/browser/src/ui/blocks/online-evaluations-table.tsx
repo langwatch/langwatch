@@ -71,7 +71,7 @@ export const OnlineEvaluationsTable = ({
         const href = analyticsHref(projectSlug, row.id);
 
         return (
-          <Table.Row key={row.id}>
+          <Table.Row key={row.id} data-testid={`monitor-row-${row.id}`}>
             <Table.Cell>
               <VStack align="start" gap={0.5}>
                 <Text fontWeight="medium">{row.name}</Text>
@@ -148,7 +148,11 @@ export const OnlineEvaluationsTable = ({
                     )}
                     {canManage && (
                       <>
-                        <Menu.Item value="edit" onClick={() => onEdit(row.id)}>
+                        <Menu.Item
+                          value="edit"
+                          data-testid="monitor-action-edit"
+                          onClick={() => onEdit(row.id)}
+                        >
                           <LuPencil />
                           Edit
                         </Menu.Item>
@@ -156,11 +160,20 @@ export const OnlineEvaluationsTable = ({
                           <LuCopy />
                           Replicate to another project
                         </Menu.Item>
-                        <Menu.Item value="toggle" onClick={() => onToggle(row.id)}>
+                        <Menu.Item
+                          value="toggle"
+                          data-testid="monitor-action-toggle"
+                          onClick={() => onToggle(row.id)}
+                        >
                           {row.enabled ? <LuPause /> : <LuPlay />}
                           {row.enabled ? "Disable" : "Enable"}
                         </Menu.Item>
-                        <Menu.Item value="delete" color="red.fg" onClick={() => onDelete(row.id)}>
+                        <Menu.Item
+                          value="delete"
+                          color="red.fg"
+                          data-testid="monitor-action-delete"
+                          onClick={() => onDelete(row.id)}
+                        >
                           <LuTrash />
                           Delete
                         </Menu.Item>

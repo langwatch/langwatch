@@ -242,6 +242,7 @@ export function AddOrEditDatasetDrawer({
               <Input
                 value={name}
                 aria-label="Dataset name"
+                data-testid="dataset-name-input"
                 onChange={(event) => setName(event.target.value)}
               />
               <DatasetSlugDisplay
@@ -267,6 +268,7 @@ export function AddOrEditDatasetDrawer({
                       value={column.name}
                       placeholder="Column name"
                       aria-label={`Column ${index + 1} name`}
+                      data-testid={`dataset-column-name-${index}`}
                       onChange={(event) => setColumn(index, { name: event.target.value })}
                     />
                     <NativeSelect.Root>
@@ -302,6 +304,7 @@ export function AddOrEditDatasetDrawer({
                 <Field.ErrorText>{problems.columnTypes}</Field.ErrorText>
                 <Button
                   type="button"
+                  data-testid="dataset-column-add"
                   onClick={() =>
                     setColumnTypes((current) => [...current, { name: "", type: "string" }])
                   }
@@ -314,6 +317,7 @@ export function AddOrEditDatasetDrawer({
             <Button
               colorPalette="blue"
               type="submit"
+              data-testid="dataset-form-submit"
               minWidth="fit-content"
               loading={upsertDataset.isPending}
             >

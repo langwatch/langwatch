@@ -331,7 +331,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               going to focus on"
               invalid={!!errors.name || (slugInfo?.hasConflict ?? false)}
             >
-              <Input {...register("name")} />
+              <Input {...register("name")} data-testid="dataset-name-input" />
               <DatasetSlugDisplay
                 marginLeft={1}
                 marginTop={1}
@@ -360,6 +360,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                             required: "Column name cannot be empty",
                           })}
                           placeholder="Column name"
+                          data-testid={`dataset-column-name-${index}`}
                         />
                         <NativeSelect.Root>
                           <NativeSelect.Field {...register(`columnTypes.${index}.type`)}>
@@ -405,7 +406,11 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                   })}
                   <Field.ErrorText>{errors.columnTypes?.message}</Field.ErrorText>
                   {!props.isColumnsLocked && (
-                    <Button type="button" onClick={() => append({ name: "", type: "string" })}>
+                    <Button
+                      type="button"
+                      data-testid="dataset-column-add"
+                      onClick={() => append({ name: "", type: "string" })}
+                    >
                       Add Column
                     </Button>
                   )}
@@ -415,6 +420,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             <Button
               colorPalette="blue"
               type="submit"
+              data-testid="dataset-form-submit"
               minWidth="fit-content"
               loading={upsertDataset.isPending}
             >

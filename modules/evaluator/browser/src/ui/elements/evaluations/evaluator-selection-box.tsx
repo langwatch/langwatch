@@ -34,6 +34,7 @@ export function EvaluatorSelectionBox({
 
     return (
       <Button
+        data-testid="evaluator-selection-box-edit"
         onClick={handleClick}
         variant="outline"
         width="full"
@@ -76,6 +77,7 @@ export function EvaluatorSelectionBox({
 
   return (
     <Button
+      data-testid="evaluator-selection-box-open"
       onClick={onSelectClick}
       variant="outline"
       width="full"

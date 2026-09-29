@@ -71,10 +71,10 @@ function UploadOrCreateDatasetMenu({
     <Menu.Root positioning={{ sameWidth: true }}>
       <Menu.Trigger asChild>{children}</Menu.Trigger>
       <Menu.Content>
-        <Menu.Item value="upload" onClick={onUpload}>
+        <Menu.Item value="upload" data-testid="dataset-menu-upload" onClick={onUpload}>
           <Upload size={16} /> Upload datasets
         </Menu.Item>
-        <Menu.Item value="create" onClick={onCreate}>
+        <Menu.Item value="create" data-testid="dataset-menu-create" onClick={onCreate}>
           <Plus size={16} /> Create empty dataset
         </Menu.Item>
       </Menu.Content>
@@ -136,7 +136,12 @@ function DatasetTableBody({
   return (
     <>
       {datasets.map((dataset) => (
-        <Table.Row key={dataset.id} cursor="pointer" onClick={() => goToDataset(dataset.id)}>
+        <Table.Row
+          key={dataset.id}
+          cursor="pointer"
+          data-testid={`dataset-row-${dataset.id}`}
+          onClick={() => goToDataset(dataset.id)}
+        >
           <Table.Cell>
             <HStack gap={2}>
               <Text>{dataset.name}</Text>

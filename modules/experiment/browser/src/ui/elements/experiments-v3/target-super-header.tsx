@@ -41,6 +41,7 @@ export const TargetSuperHeader = React.memo(function TargetSuperHeader({
         <Button
           size="xs"
           variant="ghost"
+          data-testid="experiment-target-add"
           onClick={onAddClick}
           color="fg.muted"
           _hover={{ color: "fg" }}

@@ -110,6 +110,7 @@ export function DatasetTabs({
             size="xs"
             variant="ghost"
             color="fg.muted"
+            data-testid="experiment-dataset-add"
             _hover={{ color: "fg", bg: "bg.subtle" }}
           >
             <Plus size={14} />
@@ -117,19 +118,31 @@ export function DatasetTabs({
           </Button>
         </Menu.Trigger>
         <Menu.Content minWidth="200px">
-          <Menu.Item value="select" onClick={onSelectExisting}>
+          <Menu.Item
+            value="select"
+            data-testid="experiment-dataset-add-select"
+            onClick={onSelectExisting}
+          >
             <HStack gap={2}>
               <Database size={14} />
               <Text>Select existing dataset</Text>
             </HStack>
           </Menu.Item>
-          <Menu.Item value="upload" onClick={onUploadCSV}>
+          <Menu.Item
+            value="upload"
+            data-testid="experiment-dataset-add-upload"
+            onClick={onUploadCSV}
+          >
             <HStack gap={2}>
               <Upload size={14} />
               <Text>Upload CSV</Text>
             </HStack>
           </Menu.Item>
-          <Menu.Item value="new" onClick={handleAddNewDataset}>
+          <Menu.Item
+            value="new"
+            data-testid="experiment-dataset-add-new"
+            onClick={handleAddNewDataset}
+          >
             <HStack gap={2}>
               <Plus size={14} />
               <Text>Create new</Text>

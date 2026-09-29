@@ -151,6 +151,7 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
               <Input
                 {...register("name", { required: "Name is required" })}
                 ref={nameRef}
+                data-testid="workflow-create-name"
                 onChange={(event) => {
                   setValue("name", event.target.value);
                 }}
@@ -169,6 +170,7 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
         <Button
           type="submit"
           colorPalette="blue"
+          data-testid="workflow-create-submit"
           loading={createWorkflowMutation.isPending}
           onClick={() => {
             void handleSubmit(onSubmit)();

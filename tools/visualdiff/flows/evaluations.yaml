@@ -1,0 +1,494 @@
+# Evaluations: online evaluations, experiments, evaluators, datasets and workflows.
+#
+# Every name carries {uid}, so any number of flows share one stack. No flow here
+# calls a model: evaluators are created, not run, and the online evaluation uses
+# lingua/language_detection, which needs only the output field the drawer maps by
+# itself (expected_answer evaluators leave an unmapped expected_output and the
+# drawer's Create button stays disabled). Delete confirmations come from the
+# shared ConfirmDialog, which has no test ids, so its button is clicked by text.
+# Skipped on purpose: instant-evals (no UI), the evaluator "Run on samples"
+# (legacy /evaluations/{id}/edit needs a monitor id no placeholder carries),
+# the workbench full run and the pairwise verdict (both need a saved prompt and
+# a model run; the prompt list drawer belongs to the prompt module).
+flows:
+  - id: eval-online-create-and-list
+    title: Create an online evaluation with a new evaluator and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          testId: monitor-new-open
+      - action: click
+        with:
+          testId: online-evaluation-level-trace
+      - action: click
+        with:
+          testId: evaluator-selection-box-open
+      - action: click
+        with:
+          testId: new-evaluator-button
+      - action: click
+        with:
+          testId: evaluator-category-quality
+      - action: click
+        with:
+          testId: evaluator-type-lingua-language_detection
+      - action: fill
+        with:
+          testId: evaluator-name-input
+          value: vd-eval-{uid}
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: fill
+        with:
+          testId: online-evaluation-name-input
+          value: vd-mon-{uid}
+      - action: click
+        with:
+          testId: online-evaluation-save
+      - action: expect
+        with:
+          api: /api/monitors
+          contains: vd-mon-{uid}
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: vd-mon-{uid}
+          role: row
+          name: vd-mon-{uid}
+
+  - id: eval-online-toggle-edit-delete
+    title: Pause, rename and delete an online evaluation
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          testId: monitor-new-open
+      - action: click
+        with:
+          testId: online-evaluation-level-trace
+      - action: click
+        with:
+          testId: evaluator-selection-box-open
+      - action: click
+        with:
+          testId: new-evaluator-button
+      - action: click
+        with:
+          testId: evaluator-category-quality
+      - action: click
+        with:
+          testId: evaluator-type-lingua-language_detection
+      - action: fill
+        with:
+          testId: evaluator-name-input
+          value: vd-eval-{uid}
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: fill
+        with:
+          testId: online-evaluation-name-input
+          value: vd-mon-{uid}
+      - action: click
+        with:
+          testId: online-evaluation-save
+      - action: expect
+        with:
+          text: Active
+          role: row
+          name: vd-mon-{uid}
+      - action: click
+        with:
+          label: Actions for vd-mon-{uid}
+      - action: click
+        with:
+          testId: monitor-action-toggle
+      - action: expect
+        with:
+          text: Paused
+          role: row
+          name: vd-mon-{uid}
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: Paused
+          role: row
+          name: vd-mon-{uid}
+      - action: click
+        with:
+          label: Actions for vd-mon-{uid}
+      - action: click
+        with:
+          testId: monitor-action-edit
+      - action: fill
+        with:
+          testId: online-evaluation-name-input
+          value: vd-mon-{uid}-renamed
+      - action: click
+        with:
+          testId: online-evaluation-save
+      - action: expect
+        with:
+          text: vd-mon-{uid}-renamed
+          role: row
+          name: vd-mon-{uid}-renamed
+      - action: click
+        with:
+          label: Actions for vd-mon-{uid}-renamed
+      - action: click
+        with:
+          testId: monitor-action-delete
+      - action: click
+        with:
+          text: /^Delete$/
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-mon-{uid}-renamed")'
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-mon-{uid}-renamed")'
+          equals: "0"
+
+  - id: eval-experiment-create-and-rename
+    title: Create an experiment, rename it in the workbench and find it in the list
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: click
+        with:
+          testId: experiment-new-open
+      - action: click
+        with:
+          testId: experiment-new-create
+      - action: expect
+        with:
+          text: Datasets
+      - action: click
+        with:
+          testId: experiment-name-edit
+      - action: fill
+        with:
+          testId: experiment-name-input
+          value: vd-exp-{uid}
+      - action: click
+        with:
+          text: Datasets
+      - action: expect
+        with:
+          api: /api/experiments
+          contains: vd-exp-{uid}
+          timeout: "20000"
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: expect
+        with:
+          text: vd-exp-{uid}
+          role: row
+          name: vd-exp-{uid}
+
+  - id: eval-evaluator-create-code
+    title: Create a custom code evaluator and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          testId: evaluator-new-open
+      - action: click
+        with:
+          testId: evaluator-category-code
+      - action: fill
+        with:
+          testId: code-evaluator-name
+          value: vd-code-{uid}
+      - action: click
+        with:
+          testId: code-evaluator-input-add
+      - action: fill
+        with:
+          testId: code-evaluator-input-identifier-0
+          value: output
+      - action: click
+        with:
+          testId: save-code-evaluator
+      - action: expect
+        with:
+          api: /api/evaluators
+          contains: vd-code-{uid}
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          text: vd-code-{uid}
+
+  - id: eval-evaluator-create-llm-judge
+    title: Create an LLM judge evaluator without running it and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          testId: evaluator-new-open
+      - action: click
+        with:
+          testId: evaluator-category-llm_judge
+      - action: click
+        with:
+          testId: evaluator-type-langevals-llm_boolean
+      - action: fill
+        with:
+          testId: evaluator-name-input
+          value: vd-judge-{uid}
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: expect
+        with:
+          api: /api/evaluators
+          contains: vd-judge-{uid}
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          text: vd-judge-{uid}
+
+  - id: eval-dataset-create-and-edit-rows
+    title: Create an empty dataset with an extra column, add a row and reopen it
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          testId: dataset-menu-create
+      - action: fill
+        with:
+          testId: dataset-name-input
+          value: vd-ds-{uid}
+      - action: click
+        with:
+          testId: dataset-column-add
+      - action: fill
+        with:
+          testId: dataset-column-name-7
+          value: vd_extra
+      - action: click
+        with:
+          testId: dataset-form-submit
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-ds-{uid}
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testIdPrefix: dataset-row-
+          hasText: vd-ds-{uid}
+      - action: expect
+        with:
+          testId: dataset-title
+          hasText: vd-ds-{uid}
+      - action: click
+        with:
+          testId: add-row
+      - action: expect
+        with:
+          testId: save-status-saved
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testIdPrefix: dataset-row-
+          hasText: vd-ds-{uid}
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 /
+
+  - id: eval-dataset-upload-csv
+    title: Upload a CSV as a renamed dataset and find it in the list
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          testId: dataset-menu-upload
+      - action: upload
+        with:
+          testId: dataset-bulk-upload-file
+          fixture: dataset.csv
+      - action: expect
+        with:
+          testId: bulk-summary
+      - action: click
+        with:
+          testId: dataset-bulk-name-edit
+      - action: fill
+        with:
+          testId: dataset-bulk-name-input
+          value: vd-csv-{uid}
+      - action: click
+        with:
+          testId: dataset-bulk-upload-submit
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-csv-{uid}
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: expect
+        with:
+          testIdPrefix: dataset-row-
+          hasText: vd-csv-{uid}
+
+  - id: eval-dataset-use-in-experiment
+    title: Create a dataset, then select it in a new experiment's workbench
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          testId: dataset-menu-create
+      - action: fill
+        with:
+          testId: dataset-name-input
+          value: vd-ds-{uid}
+      - action: click
+        with:
+          testId: dataset-form-submit
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-ds-{uid}
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: click
+        with:
+          testId: experiment-new-open
+      - action: click
+        with:
+          testId: experiment-new-create
+      - action: click
+        with:
+          testId: experiment-dataset-add
+      - action: click
+        with:
+          testId: experiment-dataset-add-select
+      - action: fill
+        with:
+          testId: dataset-picker-search
+          value: vd-ds-{uid}
+      - action: click
+        with:
+          testId: dataset-card-vd-ds-{uid}
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          hasText: vd-ds-{uid}
+
+  - id: eval-workflow-create-blank
+    title: Create a blank workflow and find it in the list
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          testId: workflow-new-open
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          testId: workflow-create-name
+          value: vd-wf-{uid}
+      - action: click
+        with:
+          testId: workflow-create-submit
+      - action: expect
+        with:
+          testId: workflow-node-entry
+      - action: expect
+        with:
+          testId: workflow-node-end
+      - action: expect
+        with:
+          api: /api/workflows
+          contains: vd-wf-{uid}
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          text: vd-wf-{uid}
+
+  - id: eval-workflow-publish
+    title: Create a blank workflow and publish its first version
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          testId: workflow-new-open
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          testId: workflow-create-name
+          value: vd-wfp-{uid}
+      - action: click
+        with:
+          testId: workflow-create-submit
+      - action: expect
+        with:
+          testId: workflow-node-entry
+      - action: click
+        with:
+          testId: workflow-publish-open
+      - action: click
+        with:
+          testId: workflow-publish-item
+      - action: click
+        with:
+          testId: workflow-publish-submit
+      - action: expect
+        with:
+          text: New version published

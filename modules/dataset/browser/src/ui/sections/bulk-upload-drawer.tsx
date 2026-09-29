@@ -360,6 +360,7 @@ function EditableName({
         value={draft}
         fontWeight="medium"
         aria-label="Dataset name"
+        data-testid="dataset-bulk-name-input"
         onChange={(e) => setDraft(e.target.value)}
         onFocus={(e) => e.currentTarget.select()}
         onBlur={commit}
@@ -384,6 +385,7 @@ function EditableName({
       paddingX={0}
       justifyContent="flex-start"
       title="Rename dataset"
+      data-testid="dataset-bulk-name-edit"
       _hover={{ textDecoration: "underline dotted" }}
       onClick={() => setEditing(true)}
     >
@@ -699,6 +701,7 @@ export function BulkUploadDrawer({
                 multiple
                 accept=".csv,.json,.jsonl"
                 aria-label="Add files for bulk upload"
+                data-testid="dataset-bulk-upload-file"
                 style={SR_ONLY_INPUT}
                 onChange={(e) => {
                   onDropFiles(e.target.files);
@@ -764,6 +767,7 @@ export function BulkUploadDrawer({
               </Button>
               <Button
                 colorPalette="blue"
+                data-testid="dataset-bulk-upload-submit"
                 disabled={!bulk.hasUploadable || !projectId || hasInvalidColumns}
                 onClick={() => bulk.start()}
               >

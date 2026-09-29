@@ -36,7 +36,13 @@ export function History() {
       // modal
     >
       <Popover.Trigger asChild>
-        <Button variant="ghost" color="fg.subtle" size="xs" onClick={onToggle}>
+        <Button
+          variant="ghost"
+          color="fg.subtle"
+          size="xs"
+          data-testid="workflow-history-open"
+          onClick={onToggle}
+        >
           <HistoryIcon size={16} />
         </Button>
       </Popover.Trigger>
@@ -188,6 +194,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                   alignSelf="end"
                   colorPalette="orange"
                   size="sm"
+                  data-testid="workflow-version-save"
                   loading={commitVersion.isPending}
                   disabled={!canSaveNewVersion}
                 >

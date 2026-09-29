@@ -47,7 +47,7 @@ export default function WorkflowsScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Workflows</PageLayout.Heading>
         <Spacer />
-        <PageLayout.HeaderButton onClick={onOpen}>
+        <PageLayout.HeaderButton data-testid="workflow-new-open" onClick={onOpen}>
           <Plus size={16} /> New Workflow
         </PageLayout.HeaderButton>
       </PageLayout.Header>

@@ -61,6 +61,7 @@ export function EditableHeading({ value, onSave, isLoading = false }: EditableHe
     return (
       <Input
         ref={inputRef}
+        data-testid="experiment-name-input"
         value={editingValue}
         onChange={(e) => setEditingValue(e.target.value)}
         onBlur={handleFinishEdit}
@@ -76,7 +77,12 @@ export function EditableHeading({ value, onSave, isLoading = false }: EditableHe
   }
 
   return (
-    <HStack cursor="pointer" onClick={handleStartEdit} _hover={{ "& .edit-icon": { opacity: 1 } }}>
+    <HStack
+      cursor="pointer"
+      data-testid="experiment-name-edit"
+      onClick={handleStartEdit}
+      _hover={{ "& .edit-icon": { opacity: 1 } }}
+    >
       <Heading size="md">{value || ""}</Heading>
       <Box className="edit-icon" opacity={0} transition="opacity 0.2s" color="fg.subtle">
         <Edit2 size={14} />
