@@ -15,6 +15,8 @@
  * memory budget tight enough to expose the difference the facet completes
  * while the single-pass shape it replaced does not. The budget is scaled down
  * to container size; prod hits the identical wall at 2 GiB.
+ *
+ * @see specs/traces-v2/search.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -209,6 +211,7 @@ describe("events facet integration", () => {
 
   describe("given spans with heavy payload events and a minority of votes", () => {
     describe("when the facet is built", () => {
+      /** @scenario Event rows carry exactly the metric values their events recorded */
       it("counts every event name, including the ones with no metrics", async () => {
         const rows = await runFacet();
         const counts = Object.fromEntries(
@@ -222,6 +225,7 @@ describe("events facet integration", () => {
         expect(rows.every((r) => Number(r.total_distinct) === 4)).toBe(true);
       });
 
+      /** @scenario Event rows carry exactly the metric values their events recorded */
       it("buckets the vote values and leaves payload events with none", async () => {
         const rows = await runFacet();
         const byName = new Map(rows.map((r) => [r.facet_value, r]));
@@ -237,6 +241,7 @@ describe("events facet integration", () => {
     });
 
     describe("when the memory budget is too tight to read every payload value", () => {
+      /** @scenario The Event name section loads when events carry large payloads */
       it("still completes with the full answer", async () => {
         const rows = await runFacet({ max_memory_usage: MEMORY_CAP });
 
@@ -246,6 +251,7 @@ describe("events facet integration", () => {
         ).toHaveLength(2);
       });
 
+      /** @scenario The Event name section loads when events carry large payloads */
       it("exceeds the same budget with the single-pass shape it replaced", async () => {
         const sql = singlePassSql(buildTimeWhere("StartTime"));
 

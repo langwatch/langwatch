@@ -2431,6 +2431,20 @@ Rule: Event rows drill down into their metric values
     Then the drilldown lists "vote" values "thumbs up" and "thumbs down" with their counts
     And no additional facet query is fired by the expansion
 
+  @integration
+  Scenario: Event rows carry exactly the metric values their events recorded
+    Given the project also has events that carry attributes but no metric values
+    When the sidebar loads the Event name section
+    Then every event name is listed with its count
+    And the "thumbs_up_down" row carries its vote values with their counts
+    And rows for events without metric values carry no drilldown values
+
+  @integration
+  Scenario: The Event name section loads when events carry large payloads
+    Given most of the project's events carry large attribute payloads and no metric values
+    When the sidebar loads the Event name section
+    Then the section loads with every event name and the vote drilldown
+
   # The vote is stored as 1 / 0 / -1, which reads as nothing in a sidebar.
   # Only the label is humanised — the value the filter carries stays the
   # stored string, so the round-trip is unaffected. Every other metric,
