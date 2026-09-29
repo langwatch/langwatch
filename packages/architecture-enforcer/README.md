@@ -16,7 +16,10 @@ same set of policies. `--list-policies` prints the registry: each id and the spe
 scenarios live in. `--policies a,b` runs only the named ids, and an unknown id is a
 usage error.
 
-Every finding is reported: there are no baselines. A policy that reads a fixed file
+Every finding is reported: no policy reads a baseline. Two ruled transitions,
+`peer-cycles` and `eventing-table-access`, hold a shrink-only list with a count per
+key under `tests/baselines/`, compared by `tests/boundary-ratchets.unit.test.ts`
+(dev/docs/ARCHITECTURE.md §17). A policy that reads a fixed file
 of the workspace (the Prisma schema, the ClickHouse migrations, the generated server
 module list, the declaration solution, the process entrypoints) throws a
 `MissingAnchorError` naming itself and the file when it is gone, and the CLI exits 2,

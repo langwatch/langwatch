@@ -662,6 +662,17 @@ dependencies are its own business — only its API travels), cycles refuse at
 boot by name, and an instance bound at create may not be invoked until
 after boot.
 
+**Peer cycles shrink to zero, then refuse** (Alex, 2026-09-29). Refusal stays the rule, but today it
+reaches only supply tokens: the kernel hands every `*Api` token a proxy before any module installs and
+orders modules without them, so two modules naming each other's `*Api` in `static dependencies` boot.
+The transition is a shrink-only list. The `peer-cycles` policy reports every declared peer edge whose
+peer reaches back, and `packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` refuses an
+edge missing from `tests/baselines/peer-cycle-edges.json` and a listed edge that no longer exists, so
+the list only shrinks and a change that cuts an edge removes it. A cycle is cut in §9's shape (a
+command on the other module's pipeline, or a pull by a scheduled process manager where that would
+itself be a cycle). When the list is empty the kernel refuses a peer cycle at boot by name, and the
+list is deleted.
+
 **Registry resolution ends at `ModuleApp.create`.** Inside the module,
 `create()` is the composition root: internal services are built explicitly
 — `LicensingCapService.create({ prisma: process.prisma, graceDays:
@@ -1122,6 +1133,18 @@ answered on that organization's server, never an `unscoped` reason (Alex, 2026-0
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 
+**The event tables are eventing's** (Alex, 2026-09-29). Only `packages/eventing` reads or writes
+`event_log`, the process-manager tables (`ProcessManagerInstance`, `ProcessManagerInbox`,
+`ProcessManagerOutbox`, `ProcessManagerOutboxAttempt`) and the projection checkpoints. A module changes
+an aggregate by sending a command, never by appending events itself: the `eventing` member stops
+handing modules the whole EventSourcing, so no module reaches `getEventStore().storeEvents` for an
+arbitrary aggregate. Operator work over those tables (purge, redrive, lease release, an event
+explorer) is eventing's surface, called through the member, never SQL or a Prisma delegate in the
+calling module. The `eventing-table-access` policy reports raw access by module or application code:
+SQL naming a table, a Prisma delegate over one, the table named as a literal, or a direct
+`storeEvents`/`getEventStore` call. Today's findings are a shrink-only list with a count per file,
+`tests/baselines/eventing-table-access.json`, held by the same ratchet as §5's peer cycles.
+
 ---
 
 ## 8. Transports (REST + tRPC)
@@ -1331,6 +1354,19 @@ Worker semantics: delivery is at-least-once, so subscribers are idempotent;
 ordering is per aggregate via the group queue, so one poisoned aggregate
 retries with backoff without blocking neighbours; projections fold from the
 same ordered stream; every consumer registers drain-first on the server.
+
+### 9.1 Purge, erase and retention across modules
+
+**Cross-module purge, erase and retention are commanded by the owners** (Alex, 2026-09-29). Work
+that removes or rewrites rows in more than one module (a deleted organization's purge, a user's
+erasure, a retention change applied to stored rows) is never done by the module that starts it. The
+initiator records one fact on its own pipeline. Each module owning affected rows reacts from its own
+side and removes or updates only its own rows, idempotently, since delivery is at least once. The
+initiator never deletes, updates or `ALTER`s another module's table, inside one transaction or not,
+and never loops over a list of other modules' tables. Progress is tracked per owner, so the operator
+sees when every owner has finished and which has not. Today's breaks (organization's provisioned
+organization delete, user's data erase, data-retention's retroactive rewrite over other modules'
+tables) move to this shape in their own changes.
 
 ---
 
@@ -1921,6 +1957,10 @@ to this file in the same commit as the code — an out-of-date architecture
 document is worse than none, because it reads authoritative.
 `typescript/no-misused-spread` is off in `packages/*/type-tests/**` only, where the spread is what
 the type test asserts (Alex, 2026-09-27).
+A policy reads no baseline and reports every finding. A ruled transition may hold a shrink-only list
+beside the enforcer's tests (`packages/architecture-enforcer/tests/baselines/`), keyed so that growth
+inside a key is refused (a count per key), with a test that also refuses a listed finding that is
+gone. Two exist: §5's peer cycles and §7's event-table access (Alex, 2026-09-29).
 
 ## 18. Running work
 
