@@ -92,7 +92,7 @@ overrides:
   glob: ^11.1.0
   picomatch: ">=4.0.4"
   # Intersection of platform/app/'s `>=10.6 <11` and skills//mcp/typescript's `>=10.26.0`.
-  liquidjs: ">=10.26.0 <11"
+  liquidjs: ">=10.27.2 <11"
   # `-` removes the dependency outright: the app talks to neither engine and
   # both arrive only as unused transitive baggage.
   "@elastic/elasticsearch": "-"
@@ -152,7 +152,7 @@ overrides:
   tmp: ">=0.2.6"
   # @hono/node-server request smuggling. Per-major: the 2.x line is a separate
   # advisory and an unconditional floor would force 1.x dependents onto 2.
-  "@hono/node-server@<1.19.13": ">=1.19.13"
+  "@hono/node-server@<1.19.13": ">=1.19.13 <2"
   "@hono/node-server@>=2.0.0 <2.0.10": ">=2.0.10"
   # ...and path-scoped for the MCP SDK specifically. With two range selectors
   # already present for this name, pnpm matched only the first and left the
@@ -161,14 +161,14 @@ overrides:
   "@modelcontextprotocol/sdk>@hono/node-server": ">=2.0.10"
   # undici DoS / request smuggling. The 8.x line carries its own advisory and
   # was previously unpinned entirely.
-  "undici@>=6.0.0 <6.27.0": ">=6.27.0 <7"
+  "undici@>=6.0.0 <6.28.1": ">=6.28.1 <7"
   "undici@>=7.0.0 <7.28.0": ">=7.28.0 <8"
-  "undici@>=8.0.0 <8.9.0": ">=8.9.0 <9"
+  "undici@>=8.0.0 <8.10.2": ">=8.10.2 <9"
   # vitest advisory floor. @vitest/browser is a separate package with its own
   # CRITICAL advisory (Browser Mode provider commands bypass the file-access
   # permission gate) and is NOT covered by the vitest pin.
-  "vitest@<4.1.0": ">=4.1.0"
-  "@vitest/browser@>=4.0.0 <4.1.10": ">=4.1.10"
+  "vitest@<4.1.11": ">=4.1.11 <5"
+  "@vitest/browser@>=4.0.0 <4.1.11": ">=4.1.11 <5"
   # brace-expansion ReDoS. Five major lines are published and the tree carries
   # 1.x, 2.x and 5.x, so each needs its own floor; an unconditional pin would
   # force every dependent onto 5.x. The 4.x line is stagnant at 4.0.1 and its
@@ -179,7 +179,7 @@ overrides:
   "file-type@>=13.0.0 <21.3.1": ">=21.3.1 <22"
   "prismjs@<1.30.0": ">=1.30.0"
   "@grpc/grpc-js@<1.14.4": ">=1.14.4"
-  "js-yaml@>=3.0.0 <3.15.0": ">=3.15.0 <4"
+  "js-yaml@>=3.0.0 <3.15.2": ">=3.15.2 <4"
   "dompurify@<3.4.13": ">=3.4.13 <4"
   # validator incomplete filtering (#216) via class-validator
   "validator@<13.15.22": ">=13.15.22"
@@ -195,16 +195,54 @@ overrides:
   "axios@>=1.0.0 <1.16.0": ">=1.16.0"
   # fast-xml-builder attribute value quote bypass (#1028)
   "fast-xml-builder@<1.1.7": ">=1.1.7"
-  # fast-uri path traversal + host confusion (#1031-#1042), with two further
-  # advisories fixed in 3.1.4 and 3.1.5.
-  "fast-uri@<3.1.5": ">=3.1.5"
+  # fast-uri path traversal + host confusion (#1031-#1042), with further
+  # advisories fixed in 3.1.4, 3.1.5 and 3.1.6. Capped: uncapped this resolves
+  # 4.1.2, while its only dependent, ajv 8, declares ^3.0.1. The floor tracks
+  # the 3.x line's own advisories, not just the ones raised against 4.x here:
+  # the alerts on this lock only name `>=4.0.0 <4.1.3` because main resolves
+  # 4.1.2, but `>=3.0.0 <3.1.6` and `>=3.1.2 <3.1.6` are live against the 3.x
+  # line and would apply the moment this cap takes effect.
+  "fast-uri@<3.1.6": ">=3.1.6 <4"
   # systeminformation command injection / privilege issues across five
   # advisories; 5.31.7 is the first release above all of them.
   "systeminformation@<5.31.7": ">=5.31.7"
   # deepmerge-ts prototype pollution fix.
   "deepmerge-ts@<8.0.0": "8.0.0"
-  # body-parser DoS on malformed urlencoded input.
-  "body-parser@<1.20.6": ">=1.20.6"
+  # mysql2 auth-plugin downgrade to mysql_clear_password leaking plaintext
+  # credentials, plus an unbounded zlib inflate in the compressed protocol
+  # handler fixed in 3.23.1. Arrives as better-auth's optional mysql peer.
+  "mysql2@<3.23.1": ">=3.23.1 <4"
+  # @tiptap/core mergeAttributes() turning an own __proto__ key into inherited
+  # executable DOM attributes.
+  "@tiptap/core@<3.30.4": ">=3.30.4 <4"
+  # sanitize-html stored XSS through an SVG SMIL URI-list scheme-policy bypass,
+  # plus an allowedTags bypass via a literal `</textarea/>` close fixed in
+  # 2.17.7.
+  "sanitize-html@<2.17.7": ">=2.17.7 <3"
+  # ...and its parser held on the last line that still ships a CommonJS build.
+  # htmlparser2 11 became `type: "module"` with a single ESM entry and no
+  # `require` condition, while sanitize-html's own entry is still CommonJS.
+  # Node resolves that pairing, but a CJS loader that predates `require(esm)`
+  # does not, and every module that reaches sanitize-html then dies with
+  # "Cannot use import statement outside a module". 10.1.0 carries no advisory
+  # of its own, and sanitize-html 2.17.7 sanitizes identically on it, both
+  # advisory cases included.
+  "htmlparser2@>=11.0.0": ">=10.1.0 <11"
+  # nodemailer: header injection and address-parsing advisories, plus a
+  # process-global DNS cache that reused one transport's TLS server name for
+  # another, which could hand SMTP credentials to the wrong host. The last is
+  # fixed only on the 10.x line, in 10.0.2.
+  "nodemailer@<10.0.2": ">=10.0.2 <11"
+  # @vitest/mocker ships with vitest and has to match it exactly.
+  "@vitest/mocker@>=2.1.0 <4.1.11": ">=4.1.11 <5"
+  # @ai-sdk/provider-utils on the 4.x line (the 3.x line is gone from this tree).
+  "@ai-sdk/provider-utils@>=4.0.0-beta.10 <4.0.33": ">=4.0.33 <5"
+  # body-parser DoS on malformed urlencoded input. Capped to the 1.x line:
+  # uncapped this resolves 2.3.0 under express 4, which declares ~1.20.5. On 2.x
+  # req.body is undefined rather than {} for a request with no body or an
+  # unmatched content-type, so a handler reading req.body throws. 1.20.6 carries
+  # the same fix with no behaviour change.
+  "body-parser@<1.20.6": ">=1.20.6 <2"
   # @langchain/community SSRF / path traversal in loaders is deliberately NOT
   # pinned. The advisory range is `<=1.1.17`, which covers the 0.3.59 this tree
   # actually resolves, and the first patched release is 1.1.18 — i.e. the only
@@ -251,12 +289,14 @@ overrides:
   "@opentelemetry/sdk-node@<0.217.0": ">=0.217.0"
   # From skills/ (liquidjs is in the alignment block above, intersected with
   # platform/app/'s narrower `>=10.6 <11`)
-  "hono@<4.12.34": ">=4.12.34"
+  "hono@<4.13.5": ">=4.13.5 <5"
   "uuid@<11.1.1": ">=11.1.1 <12"
   "ip-address@<10.3.1": ">=10.3.1"
-  "qs@>=6.11.1 <=6.15.1": ">=6.15.2"
+  # qs DoS via an attacker-controlled isBuffer, plus an array-limit bypass
+  # through bracket-key comma parsing fixed in 6.16.0.
+  "qs@>=2.2.5 <6.16.0": ">=6.16.0 <7"
   "form-data@<4.0.6": ">=4.0.6"
-  "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1 <5"
+  "js-yaml@>=4.0.0 <4.3.2": ">=4.3.2 <5"
 
   # --- vite ---
   # platform/app/pnpm-workspace.yaml carried an unconditional `vite: 8.0.10`, but

@@ -90,7 +90,7 @@
     "@types/prompts": "^2.4.9",
     "@types/ws": "^8.18.1",
     "@vercel/otel": "^1.13.0",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "dotenv-cli": "^11.0.0",
     "esbuild": "^0.28.1",
     "eslint": "^9.32.0",
