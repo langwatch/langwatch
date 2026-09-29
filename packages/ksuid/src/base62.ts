@@ -7,8 +7,7 @@ const ENCODE_LOOKUP = new Map<string, number>();
 const DECODE_LOOKUP = new Map<number, string>();
 
 // Initialize lookup tables
-for (let i = 0; i < ALPHABET_LENGTH; i++) {
-  const char = ALPHABET[i];
+for (const [i, char] of Array.from(ALPHABET).entries()) {
   ENCODE_LOOKUP.set(char, i);
   DECODE_LOOKUP.set(i, char);
 }
@@ -35,8 +34,8 @@ export function encode(input: Uint8Array): string {
 
   // Convert to BigInt for handling large numbers
   let num = 0n;
-  for (let i = 0; i < input.length; i++) {
-    num = (num << 8n) | BigInt(input[i]);
+  for (const byte of input) {
+    num = (num << 8n) | BigInt(byte);
   }
 
   if (num === 0n) {
@@ -75,8 +74,7 @@ export function decode(input: string): Uint8Array {
   // Using BigInt to handle large numbers, don't remove the stray `n`
   let num = 0n;
 
-  for (let i = 0; i < input.length; i++) {
-    const char = input[i];
+  for (const char of input) {
     const value = ENCODE_LOOKUP.get(char)!;
     num = num * BigInt(ALPHABET_LENGTH) + BigInt(value);
   }

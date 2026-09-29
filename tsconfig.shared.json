@@ -27,6 +27,13 @@
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    // Stated identically by 178 and 176 package configs respectively; here so
+    // they can stop being. `isolatedModules` states what is already true --
+    // every loader in this repo transpiles file by file (Node's type
+    // stripping, vite, esbuild, tsup) and none of them sees the type graph.
+    "verbatimModuleSyntax": true,
+    "noUncheckedIndexedAccess": true,
+    "isolatedModules": true,
     "noEmit": true,
     "incremental": true,
     // Node strips types rather than compiling, so a relative import must name

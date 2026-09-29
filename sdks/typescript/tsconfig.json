@@ -4,6 +4,12 @@
     // This package emits: `noEmit` from the shared base is turned back off
     // here so a `tsc -p` build still writes its declarations.
     "noEmit": false,
+    // `module: NodeNext` with no `"type": "module"` in this package's own
+    // package.json (its dual CJS/ESM publish is tsup's job, not tsc's)
+    // compiles every file here as CommonJS, so verbatimModuleSyntax's ban on
+    // ECMAScript import/export syntax in a CommonJS file fires tree-wide.
+    // Genuine exception, not a restatement.
+    "verbatimModuleSyntax": false,
     // An emitting project that imports `.ts` paths must rewrite them to `.js`.
     "rewriteRelativeImportExtensions": true,
     // `target` governs EMIT and stays conservative: this package is published
