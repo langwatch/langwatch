@@ -8,8 +8,12 @@ import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { userWeb } from "@langwatch/user-browser/declaration";
 import { lazy, Suspense, type ReactNode } from "react";
 
-const JoinYourTeamTakeover = lazy(organizationWeb.installation.capabilities.joinOffer.load);
-const SecureAccountNudge = lazy(userWeb.installation.capabilities.secureAccountNudge.load);
+// Fetched with the shell, not on first render: main drew the offer statically, and a
+// chunk requested only after the join queries resolve arrives seconds after sign-in.
+const joinOfferChunk = organizationWeb.installation.capabilities.joinOffer.load();
+const secureAccountNudgeChunk = userWeb.installation.capabilities.secureAccountNudge.load();
+const JoinYourTeamTakeover = lazy(() => joinOfferChunk);
+const SecureAccountNudge = lazy(() => secureAccountNudgeChunk);
 const TeamAccessWaiting = lazy(organizationWeb.installation.capabilities.teamAccessWaiting.load);
 
 export function joinOffer({
