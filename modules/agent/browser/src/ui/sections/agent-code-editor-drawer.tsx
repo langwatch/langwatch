@@ -59,7 +59,7 @@ export interface AgentCodeEditorDrawerProps extends AgentCodeEditorOptions {
 
 export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const agentId = props.agentId;
-  const isOpen = props.open === true;
+  const isOpen = props.open !== false && props.open !== undefined;
 
   const form = useAgentCodeEditor(props);
   const { name, code, inputs, outputs, scenarioMappings, scenarioOutputField } = form.draft;

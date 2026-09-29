@@ -49,7 +49,6 @@ export const InviteEmail = ({
   firstSteps,
 }: InviteEmailProps) => (
   <EmailLayout
-    eyebrow="INVITATION"
     preview={`Join ${organization.name} on LangWatch`}
     heading={`You have been invited to ${organization.name}`}
   >

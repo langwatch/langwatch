@@ -188,6 +188,7 @@ export * from "./replay/replayEngine.ts";
 export * from "./replay/replayLog.ts";
 export * from "./replay/replayStatePath.ts";
 export * from "./replay/replayMarkers.ts";
+export * from "./replay/replayProjections.ts";
 export * from "./replay/types.ts";
 export * from "./services/errorHandling.ts";
 export * from "./stores/eventStoreUtils.ts";

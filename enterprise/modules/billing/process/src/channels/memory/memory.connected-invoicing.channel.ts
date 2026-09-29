@@ -11,6 +11,7 @@ type CreateSubscriptionInput = Parameters<ChannelShape["createUsageSubscription"
 type CreateGrantInput = Parameters<ChannelShape["createCreditGrant"]>[0];
 type CreateInput = Parameters<ChannelShape["createOneOffInvoice"]>[0];
 type FinalizedUsageInput = Parameters<ChannelShape["hasFinalizedUsageInvoice"]>[0];
+type FindInvoicesInput = Parameters<ChannelShape["findInvoices"]>[0];
 
 /**
  * Mints an invoice id locally and keeps what it was asked for, where no
@@ -87,6 +88,18 @@ export class MemoryConnectedInvoicingChannel extends ConnectedInvoicingChannel {
     this.byId.set(invoice.id, invoice);
 
     return invoice;
+  }
+
+  async findInvoices(input: FindInvoicesInput): Promise<ProviderInvoice[]> {
+    return this.raised.flatMap((raised) => {
+      const matches =
+        raised.customerId === input.customerId &&
+        Object.entries(input.metadata).every(([name, value]) => raised.metadata[name] === value);
+      const invoice = matches
+        ? this.byKey.get(`${raised.customerId}:${metadataKey(raised.metadata)}`)
+        : undefined;
+      return invoice ? [this.byId.get(invoice.id) ?? invoice] : [];
+    });
   }
 
   async getInvoice(stripeInvoiceId: string): Promise<ProviderInvoice> {

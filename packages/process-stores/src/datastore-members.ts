@@ -5,6 +5,7 @@
  */
 import type { Logger } from "@langwatch/observability";
 import {
+  type OperatorReadMint,
   PrismaConfigService,
   PrismaConnectionService,
   PrismaShutdownService,
@@ -35,7 +36,7 @@ export interface BuiltMember<Value> {
 export function buildPrisma(options: {
   config: DatabaseConfig;
   logger: Logger;
-}): BuiltMember<PrismaClient> {
+}): BuiltMember<PrismaClient> & { operatorReads: OperatorReadMint | undefined } {
   const databaseUrl = options.config.url.trim();
   const configuration = PrismaConfigService.create().resolve({
     databaseUrl,
@@ -49,6 +50,8 @@ export function buildPrisma(options: {
   return {
     value: connection.client,
     close: () => PrismaShutdownService.create().shutdown(connection),
+    // Declared operator reads are built over this same connection, never a second pool.
+    operatorReads: connection.operatorReads,
   };
 }
 

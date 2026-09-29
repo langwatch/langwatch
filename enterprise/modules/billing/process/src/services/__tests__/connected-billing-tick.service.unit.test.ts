@@ -39,23 +39,17 @@ function account(
 }
 
 function tick({
-  failSeats = false,
+  failStatements = false,
   withStatements = true,
-}: { failSeats?: boolean; withStatements?: boolean } = {}) {
+}: { failStatements?: boolean; withStatements?: boolean } = {}) {
   const ran: string[] = [];
   const accounts = [account("org-renewing", pending), account("org-settled", null)];
   const service = ConnectedBillingTickService.create({
-    seats: {
-      completePendingSeatChanges: async () => {
-        ran.push("seats");
-        if (failSeats) throw new Error("payment provider unreachable");
-        return { invoiced: 0, failed: 0 };
-      },
-    },
     statements: withStatements
       ? {
           run: async () => {
             ran.push("statements");
+            if (failStatements) throw new Error("mail unreachable");
             return { sent: 0, alreadySent: 0, noUsage: 0, failed: 0 };
           },
         }
@@ -82,21 +76,21 @@ function tick({
 
 describe("ConnectedBillingTickService", () => {
   describe("given every job succeeds", () => {
-    it("retries the seat invoices, runs the statements and each pending renewal", async () => {
+    it("runs the statements and each pending renewal", async () => {
       const { service, ran } = tick();
 
       await service.run();
 
-      expect(ran).toEqual(["seats", "statements", "renewal:org-renewing"]);
+      expect(ran).toEqual(["statements", "renewal:org-renewing"]);
     });
   });
 
   describe("given one job throws", () => {
     it("still runs the ones after it", async () => {
-      const { service, ran } = tick({ failSeats: true });
+      const { service, ran } = tick({ failStatements: true });
 
       await expect(service.run()).resolves.toBeUndefined();
-      expect(ran).toEqual(["seats", "statements", "renewal:org-renewing"]);
+      expect(ran).toEqual(["statements", "renewal:org-renewing"]);
     });
   });
 
@@ -106,7 +100,7 @@ describe("ConnectedBillingTickService", () => {
 
       await service.run();
 
-      expect(ran).toEqual(["seats", "renewal:org-renewing"]);
+      expect(ran).toEqual(["renewal:org-renewing"]);
     });
   });
 });

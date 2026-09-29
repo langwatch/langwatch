@@ -1,0 +1,115 @@
+/*
+ * The ambient ground: the site's mesh (light) or warp (dark) behind a page.
+ * Static first: the floor is always painted, and the live shader arrives
+ * over it only where motion is welcome. Every animation opts in through a
+ * no-preference query, so reduced motion gets a page that never moves.
+ */
+
+.lw-ambient-ground {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  contain: layout paint;
+}
+
+.lw-ambient-ground-static {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #ffffff 0%, #ffaf6e 35%, #cddcf9 72%, #ffffff 100%);
+  opacity: 0.72;
+}
+
+.dark .lw-ambient-ground-static {
+  background:
+    radial-gradient(circle at 70% 22%, rgba(91, 141, 239, 0.4), transparent 38%),
+    radial-gradient(circle at 86% 66%, rgba(201, 123, 58, 0.26), transparent 46%);
+  opacity: 1;
+}
+
+.dark .lw-ambient-ground--center .lw-ambient-ground-static {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(91, 141, 239, 0.35), transparent 42%),
+    radial-gradient(circle at 58% 72%, rgba(201, 123, 58, 0.22), transparent 48%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lw-ambient-ground-arrive {
+    animation: lw-ambient-ground-arrive 700ms ease 120ms both;
+  }
+}
+
+/* Only a `from`: each layer fades up to its own resting opacity. */
+@keyframes lw-ambient-ground-arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The dark warp, anchored to one side and dissolving toward the reading side.
+   `--lw-ground-hold` (solid until) and `--lw-ground-reach` (width multiplier)
+   come from the shift; the fallbacks are the resting values. */
+.lw-ambient-ground-warp {
+  position: absolute;
+  top: -12%;
+  right: -12%;
+  width: calc(84% * var(--lw-ground-reach, 1));
+  height: 124%;
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black var(--lw-ground-hold, 30%),
+    rgba(0, 0, 0, 0.45) 62%,
+    rgba(0, 0, 0, 0.12) 86%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black var(--lw-ground-hold, 30%),
+    rgba(0, 0, 0, 0.45) 62%,
+    rgba(0, 0, 0, 0.12) 86%,
+    transparent 100%
+  );
+  transition:
+    width 900ms ease,
+    mask-image 900ms ease;
+}
+
+/* Centred: the same warp held in a pool behind the middle of the page. */
+.lw-ambient-ground-warp--center {
+  top: -12%;
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(130% * var(--lw-ground-reach, 1));
+  -webkit-mask-image: radial-gradient(
+    ellipse 62% 70% at 50% 42%,
+    black 0%,
+    black var(--lw-ground-hold, 30%),
+    rgba(0, 0, 0, 0.55) 62%,
+    rgba(0, 0, 0, 0.16) 84%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 62% 70% at 50% 42%,
+    black 0%,
+    black var(--lw-ground-hold, 30%),
+    rgba(0, 0, 0, 0.55) 62%,
+    rgba(0, 0, 0, 0.16) 84%,
+    transparent 100%
+  );
+}
+
+/* The white radial that keeps the reading area clean, over shader and floor
+   alike. Light only: the dark ground fades its glow out instead. */
+.lw-ambient-ground-protect {
+  position: absolute;
+  inset: 0;
+}
+
+.dark .lw-ambient-ground-protect {
+  display: none;
+}

@@ -45,6 +45,7 @@ import {
   type SeatLimitReached,
   SeatLimitNoticeService,
 } from "../services/seat-limit-notice.service.ts";
+import type { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import { TeamIdentityService } from "../services/team-identity.service.ts";
 import type { OrganizationInfrastructure } from "./organization.app.ts";
 import type {
@@ -443,10 +444,16 @@ function organizationPlanGate(options: {
 
 /**
  * The trail a sign-up, an invitation and a chosen integration leave outside
- * this feature. This process composes no product-analytics sink and no
- * marketing gateway, so each one says so once, at debug, and carries on.
+ * this feature. The sign-up announcement posts to our own Slack; no
+ * product-analytics sink or marketing gateway is composed, so those say so at debug.
  */
-function organizationSignals(logger: Logger): OrganizationSignals {
+function organizationSignals({
+  logger,
+  signupAnnouncements,
+}: {
+  logger: Logger;
+  signupAnnouncements: SignupAnnouncementService;
+}): OrganizationSignals {
   const unsent = (what: string) =>
     logger.debug(
       { signal: what },
@@ -458,7 +465,7 @@ function organizationSignals(logger: Logger): OrganizationSignals {
     fireTeamMemberInvitedNurturing: () => unsent("a team member being invited"),
     fireInviteAcceptedNurturing: () => unsent("an invitation being accepted"),
     fireSignupNurturing: () => unsent("somebody signing up"),
-    sendSlackSignupEvent: async () => unsent("a sign-up announcement"),
+    sendSlackSignupEvent: (input) => signupAnnouncements.announce(input),
     sendHubspotSignupForm: async () => unsent("a sign-up form"),
     recordIntegrationMethod: () => unsent("a chosen integration method"),
     reportError: (error) => {
@@ -598,6 +605,8 @@ export function buildOrganizationInfrastructure(input: {
   publicBaseUrl: string | undefined;
   /** A process fact, unresolved — see the handoff. */
   processName: string;
+  /** Main's sign-up announcement, to LangWatch's own sign-ups Slack channel. */
+  signupAnnouncements: SignupAnnouncementService;
   /** Unresolved — collides with `authz`'s landed leaves if redeclared here. */
   demoProject: Readonly<{ userId: string; projectId: string }>;
   dependencies: {
@@ -611,7 +620,7 @@ export function buildOrganizationInfrastructure(input: {
 }): OrganizationInfrastructure {
   const { prisma, logger, dependencies } = input;
   const baseHost = input.publicBaseUrl ?? "";
-  const signals = organizationSignals(logger);
+  const signals = organizationSignals({ logger, signupAnnouncements: input.signupAnnouncements });
   const seatLimits = SeatLimitNoticeService.create({ signals });
 
   return {

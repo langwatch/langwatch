@@ -42,7 +42,7 @@ func (o *Orchestrator) MailAddress(p UpParams) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "dev@" + o.cfg.Naming.MailAddressDomain(slug), nil
+	return o.cfg.Naming.MailAddress(slug), nil
 }
 
 // MailBaseURL is the sink's own HTTP base URL for this worktree's stack —

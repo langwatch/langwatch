@@ -59,6 +59,21 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
       .map((row) => ({ ...row }));
   }
 
+  async findAllSeatsRaised({
+    organizationId,
+  }: {
+    organizationId?: string;
+  }): Promise<IssuedLicenseRecord[]> {
+    return this.all()
+      .filter(
+        (row) =>
+          row.seatsRaisedFrom !== null &&
+          (organizationId === undefined || row.organizationId === organizationId),
+      )
+      .toSorted((a, b) => a.issuedAt.epochMilliseconds - b.issuedAt.epochMilliseconds)
+      .map((row) => ({ ...row }));
+  }
+
   async findAllBoundToInstance(instanceId: string): Promise<IssuedLicenseRecord[]> {
     return this.all()
       .filter((row) => row.instanceId === instanceId && row.revokedAt === null)

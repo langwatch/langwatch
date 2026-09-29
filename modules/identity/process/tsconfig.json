@@ -58,6 +58,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/internal-slack/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
@@ -80,6 +83,9 @@
     },
     {
       "path": "../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/system-migrations/tsconfig.build.json"

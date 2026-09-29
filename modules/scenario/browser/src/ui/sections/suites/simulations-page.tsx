@@ -483,9 +483,12 @@ function useOpenRunFromUrl({
       });
       // Remove the query param to avoid re-opening on navigation
       const { openRun: _, ...restQuery } = router.query;
-      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
-        shallow: true,
-      });
+      void router.replace(
+        { pathname: router.pathname, query: restQuery },
+        {
+          shallow: true,
+        },
+      );
     }
   }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 }
@@ -500,9 +503,12 @@ function useUrlPendingBatch(router: BoardRouter): string | null {
       setUrlPendingBatchId(pendingBatch);
       // Remove the query param to keep URL clean
       const { pendingBatch: _, ...restQuery } = router.query;
-      void router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
-        shallow: true,
-      });
+      void router.replace(
+        { pathname: router.pathname, query: restQuery },
+        {
+          shallow: true,
+        },
+      );
     }
   }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -13,7 +13,7 @@ import {
   joinRequestExpiredTemplate,
 } from "../join-request-emails.tsx";
 import { licenseEmailTemplate } from "../license-email.tsx";
-import { FIRST_STEPS_LINKS } from "../onboarding/first-steps.tsx";
+import { FIRST_STEPS_LINKS, SKILLS_INSTALL_COMMAND } from "../onboarding/first-steps.tsx";
 import { renderMailTemplate, type MailTemplate } from "../registry.ts";
 import { signUpVerificationEmailTemplate } from "../sign-up-verification-email.tsx";
 import { triggerDigestEmailTemplate } from "../trigger-digest-email.tsx";
@@ -32,25 +32,17 @@ const PLAN_URL = "https://app.langwatch.ai/settings/subscription";
 describe("given the sign-up verification email", () => {
   const base = { email: "morgan@acme.example", verificationUrl: "https://app.langwatch.ai/v/1" };
 
-  describe("when a quickstart address is known", () => {
-    /** @scenario "The confirmation mail shows the first-trace step when the quickstart is known" */
-    it("shows the first-trace setup lines and the quickstart link", async () => {
-      const rendered = await html(signUpVerificationEmailTemplate, {
-        ...base,
-        firstSteps: {},
-      });
-
-      expect(rendered).toContain("setupObservability");
-      expect(rendered).toContain(FIRST_STEPS_LINKS.typescript);
-    });
-  });
-
-  describe("when no quickstart address is known", () => {
-    /** @scenario "The confirmation mail is only a confirmation without the quickstart" */
-    it("shows no setup lines", async () => {
-      const rendered = await html(signUpVerificationEmailTemplate, base);
+  describe("when a sender offers it first steps", () => {
+    /** @scenario "The confirmation mail is only a confirmation" */
+    it("carries no onboarding and keeps the expiry under the button", async () => {
+      const rendered = await html(signUpVerificationEmailTemplate, { ...base, firstSteps: {} });
+      const afterButton = rendered.slice(rendered.indexOf(base.verificationUrl));
 
       expect(rendered).not.toContain("setupObservability");
+      expect(rendered).not.toContain(SKILLS_INSTALL_COMMAND);
+      expect(rendered).not.toContain(FIRST_STEPS_LINKS.typescript);
+      expect(afterButton).toContain("expires in 1 hour");
+      expect(afterButton).toContain("If this was not you");
     });
   });
 });

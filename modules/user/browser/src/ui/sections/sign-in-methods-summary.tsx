@@ -5,6 +5,7 @@
  */
 
 import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -62,7 +63,9 @@ export function SignInMethodsSummary() {
           <Text fontWeight={600}>Sign-in methods</Text>
         </HStack>
         <Button asChild size="xs" variant="outline" data-testid="sign-in-methods-manage">
-          <a href="/settings/authentication">Manage on Security</a>
+          <Link unstyled href="/settings/authentication">
+            Manage on Security
+          </Link>
         </Button>
       </HStack>
 

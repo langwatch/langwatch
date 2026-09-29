@@ -1,9 +1,9 @@
 import { HStack, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { getGetPromptSnippets, type PromptSnippetVariable } from "@langwatch/prompt-browser-kit";
 import type React from "react";
 import { useMemo } from "react";
 
-import { Link } from "../../../../ui/elements/prompt-link.tsx";
 import { GenerateApiSnippetDialog } from "./generate-api-snippet-dialog.tsx";
 
 /** Where a reader goes to mint the key the snippet needs. */

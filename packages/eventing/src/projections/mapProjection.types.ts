@@ -25,6 +25,9 @@ export interface MapProjectionDefinition<Record, E extends Event = Event> {
   /** Store for appending records. */
   store: AppendStore<Record>;
 
+  /** The ClickHouse table a replay nudges with OPTIMIZE once it rebuilds; omit for other stores. */
+  targetTable?: string;
+
   /** Optional processing behavior configuration. */
   options?: MapProjectionOptions<E>;
 

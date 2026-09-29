@@ -2,8 +2,10 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
+import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";
 import { ExecuteExperimentCellCommand } from "../../eventing/experiment-run-cell.commands.ts";
 import type { ExperimentRunExecutionEffects } from "../../eventing/experiment-run-execution.process.ts";
+import { createExperimentRunFramesSubscriber } from "../../eventing/experiment-run-frames.subscriber.ts";
 import { ExperimentRunPlanStore } from "../../eventing/experiment-run-plan.store.ts";
 import { buildExperimentRunProcessingPipeline } from "../../eventing/experiment-run-processing.pipeline.ts";
 import { ExperimentRunProgressStore } from "../../eventing/experiment-run-progress.store.ts";
@@ -109,6 +111,9 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
       cells: createApiFixture<ExperimentRunCellService>({}, "cells"),
     }),
     runExecution: createApiFixture<ExperimentRunExecutionEffects>({}, "runExecution"),
+    runFrames: createExperimentRunFramesSubscriber({
+      stream: experimentRunEventStreamChannels.memory.create(),
+    }),
   });
 
   return { pipeline, repository, insert, resolveClient, redis, set };

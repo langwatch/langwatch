@@ -1,6 +1,11 @@
 import { chakra } from "@chakra-ui/react";
 import type React from "react";
 
+type AskChipAction =
+  | { onClick?: () => void; href?: undefined; onNavigate?: undefined }
+  /** Where the chip goes instead of what it asks; a plain click routes in place. */
+  | { href: string; onNavigate: (href: string) => void; onClick?: undefined };
+
 /** Borrowable ask or shortcut link; deliberately near-opaque surface (legible on dark ground);
  * same look for onClick prompts and href router links */
 export function AskChip({
@@ -8,13 +13,8 @@ export function AskChip({
   label,
   onClick,
   href,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick?: () => void;
-  /** Where the chip goes instead of what it asks. */
-  href?: string;
-}) {
+  onNavigate,
+}: { icon: React.ReactNode; label: string } & AskChipAction) {
   const body = (
     <>
       <chakra.span display="grid" color="fg.subtle">
@@ -46,12 +46,19 @@ export function AskChip({
     },
   } as const;
 
-  // A plain anchor, not a client-transition link: a feature-web package may
-  // not import the router (ADR-004), and every other feature-web link (e.g.
-  // `router-link.tsx`) uses this same full-navigation anchor.
+  // A real anchor, so a new tab still works; a plain click routes in place.
   if (href !== undefined) {
     return (
-      <chakra.a href={href} {...styles}>
+      <chakra.a
+        href={href}
+        onClick={(event: React.MouseEvent<HTMLAnchorElement>) => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+          if (event.altKey) return;
+          event.preventDefault();
+          onNavigate(href);
+        }}
+        {...styles}
+      >
         {body}
       </chakra.a>
     );

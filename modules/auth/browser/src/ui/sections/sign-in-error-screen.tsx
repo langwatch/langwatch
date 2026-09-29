@@ -1,5 +1,6 @@
 import { Alert, Button, Card, Container, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { isStableAuthError, normalizeSignInErrorCode } from "@langwatch/auth-contract";
+import { Link } from "@langwatch/browser-host/link";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import { useEffect } from "react";
 
@@ -9,7 +10,6 @@ import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { cutoverSignInRefusal } from "../../model/sign-in-error-code.ts";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
-import Link from "../../ui/elements/router-link.tsx";
 
 /**
  * Server route that clears the app session and, on Auth0 deployments, federates to Auth0
@@ -109,8 +109,11 @@ export default function Error() {
   // the corner of a blank page, sitting there for the full five seconds.
   return (
     <div style={{ padding: "12px" }}>
-      Auth Error: Redirecting back to Sign in... Click <a href="/">here</a> if you are not
-      redirected within 5 seconds.
+      Auth Error: Redirecting back to Sign in... Click{" "}
+      <Link unstyled href="/">
+        here
+      </Link>{" "}
+      if you are not redirected within 5 seconds.
     </div>
   );
 }

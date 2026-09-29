@@ -1,6 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
@@ -39,6 +40,7 @@ type LogDependencies = Readonly<{
   dataPrivacy: typeof DataPrivacyApi;
   traces: typeof TraceApi;
   codingAgents: typeof CodingAgentApi;
+  retention: typeof DataRetentionApi;
 }>;
 type LogSetup = FeatureSetup<LogDependencies, LogInfrastructure, LogServerConfig>;
 
@@ -51,6 +53,8 @@ export class LogApp implements LogApiContract {
     traces: TraceApi,
     /** Lifts a received record's session facts onto its own pipeline. */
     codingAgents: CodingAgentApi,
+    /** Each tenant's retention, which the log rows are stamped with. */
+    retention: DataRetentionApi,
   };
   /** The run this module's durable processing needs, over ClickHouse only. */
   static readonly reads = ["clickhouse"] as const;
@@ -92,6 +96,10 @@ export class LogApp implements LogApiContract {
       subscribers: [
         createCodingAgentLogFactsDispatchSubscriber({ codingAgents: dependencies.codingAgents }),
       ],
+      retention: {
+        resolve: (tenantId) =>
+          dependencies.retention.getResolvedForProject({ projectId: tenantId }),
+      },
     }).build();
     const collection = LogRequestCollectionService.create({
       traces: dependencies.traces,

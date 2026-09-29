@@ -90,3 +90,21 @@ Feature: Trace span-tree read service
     Given a trace carrying no insert or update time
     When it is read in LLM mode
     Then those times read as empty strings, not as dates at the epoch
+
+  @unit
+  Scenario: An ai.generateText span's input reads as chat messages
+    Given a Vercel AI SDK span whose input messages are stored as a messages envelope
+    When the span is read for the trace drawer
+    Then its input is a chat_messages list holding those messages, as the trace schema declares
+
+  @unit
+  Scenario: A single stored message reads as a one-message chat
+    Given a span whose output messages are stored as one message record
+    When the span is read
+    Then its output is a chat_messages list holding that one message
+
+  @unit
+  Scenario: A chat value that carries no messages reads as json
+    Given a span whose input messages attribute holds a record without messages
+    When the span is read
+    Then its input is read as json rather than an invalid chat_messages value

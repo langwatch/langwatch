@@ -151,6 +151,8 @@ function HostProbe() {
       data-testid="probe"
       data-pathname={host.pathname()}
       data-project={host.project()?.slug ?? ""}
+      data-loading={String(host.isLoading())}
+      data-organizations={host.organizations().length}
       data-presence={host.accountMenu()?.presence ? "offered" : "absent"}
       data-langy={host.langy() ? "offered" : "absent"}
       data-flag={JSON.stringify(host.featureFlag("release_langy_enabled"))}
@@ -158,11 +160,24 @@ function HostProbe() {
   );
 }
 
-function renderChrome() {
+/** The session answered by the time the graph did, but the scope it resolves has not. */
+class SettlingScope extends UiScope {
+  activeScope(): UiActiveScope {
+    return { organizationId: ORGANIZATION_ID, projectId: null };
+  }
+}
+
+class SettlingSession extends SignedInSession {
+  override isSettled(): boolean {
+    return false;
+  }
+}
+
+function renderChrome(capabilities: UiCapabilities = CAPABILITIES) {
   return render(
     <MemoryRouter initialEntries={["/my-project/traces"]}>
       <QueryClientProvider client={new QueryClient()}>
-        <UiCapabilityContextProvider value={CAPABILITIES}>
+        <UiCapabilityContextProvider value={capabilities}>
           <UiDesignSystemShell>
             <Routes>
               <Route element={<UiAppChrome capabilities={ROOT} />}>
@@ -211,6 +226,28 @@ describe("the application chrome", () => {
     await waitFor(() =>
       expect(screen.getByTestId("probe").getAttribute("data-project")).toBe("my-project"),
     );
+  });
+
+  describe("when the graph has answered but the session and scope have not settled", () => {
+    /** @scenario "A project address is not called missing while its scope is still settling" */
+    it("reports the workspace as still resolving rather than a project that is not there", async () => {
+      renderChrome({ ...CAPABILITIES, scope: new SettlingScope(), session: new SettlingSession() });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("probe").getAttribute("data-organizations")).toBe("1"),
+      );
+      const probe = screen.getByTestId("probe");
+      expect(probe.getAttribute("data-project")).toBe("");
+      expect(probe.getAttribute("data-loading")).toBe("true");
+    });
+
+    it("reports the workspace resolved once they have", async () => {
+      renderChrome();
+
+      await waitFor(() =>
+        expect(screen.getByTestId("probe").getAttribute("data-loading")).toBe("false"),
+      );
+    });
   });
 
   it("offers the presence toggle on the surface that broadcasts presence", async () => {

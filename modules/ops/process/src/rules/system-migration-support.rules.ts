@@ -1,5 +1,6 @@
 /** Shared stores, hooks, and decisions (migration resolution, cohort sampling) across surface. */
 
+import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { OpsMigrationEnrollmentRecord, OpsMigrationOverview } from "@langwatch/ops-contract";
 import type {
   MigrationPassSummary,
@@ -108,9 +109,14 @@ export type SystemMigrationsServiceDependencies = {
     userId: string;
     organizationId?: string;
     action: string;
-    args?: Record<string, unknown>;
+    args?: RecordAuditLogCommand["args"];
   }) => Promise<void>;
+  /** One full pass over both axes, where a worker executes it. */
   runPass: () => Promise<MigrationPassSummary>;
+  /** Asks a worker for one pass, sent as the operator; resolves once the request is recorded. */
+  requestPass: (args: { actorUserId: string }) => Promise<void>;
+  /** Whether a pass on this installation could still move a tenant: the re-drive's gate. */
+  hasTenantAwaitingRedrive: () => Promise<boolean>;
   /** One migration for one organization; composition scopes runner to (tenant, migration) pair. */
   runTargetedPass: (args: {
     organizationId: string;

@@ -56,6 +56,7 @@ type GovernanceMcpOperations = Pick<
   | "templateArchiveOrg"
   | "ingestionKeyList"
   | "ingestionKeyInstall"
+  | "ingestionKeyRevoke"
 >;
 
 /** Registers the governance MCP tools on one session-scoped McpServer. */
@@ -320,7 +321,7 @@ export class GovernanceMcpToolsService {
     // key every other machine under this login exports with. The explicit rotate is on /me.
     server.tool(
       "governance_ingestion_keys_mint",
-      "Mint an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Minting adds a key rather than replacing one, so the keys other machines already export with keep working; the only exception is the per-source cap, which retires the least recently used key once the workspace holds 32 of them. source_type must be a tool the LangWatch CLI wraps, or match a published ingestion template named by template_id. Requires OAuth-authenticated session + organization:view.",
+      "Mint an ingestion key for the caller's personal project + source_type, returning the ik-lw-* token (shown ONCE). Minting adds a key rather than replacing one, so the keys other machines already export with keep working. source_type must match a published ingestion template named by template_id; a tool the LangWatch CLI wraps (claude_code, codex, gemini, opencode, copilot_*) is refused here, because its key is minted by the CLI on the machine that runs it and retired with that machine's session. Requires OAuth-authenticated session + organization:view.",
       {
         source_type: z.string(),
         template_id: z.string().optional(),
@@ -332,8 +333,28 @@ export class GovernanceMcpToolsService {
             organizationId,
             sourceType: source_type,
             ingestionTemplateId: template_id ?? null,
+            surface: SURFACE,
           }),
         ),
+    );
+
+    // Answers main's plain-text line rather than JSON, as the template archive does.
+    server.tool(
+      "governance_ingestion_keys_revoke",
+      "Revoke one of the caller's own ingestion keys by api_key_id (from governance_ingestion_keys_list). The token stops authorizing trace writes from that moment; past traces stay. Idempotent: a key already revoked stays revoked. Another person's key answers ingestion_key_not_found. Requires OAuth-authenticated session + organization:view.",
+      { api_key_id: z.string() },
+      async ({ api_key_id }) => {
+        const current = await session();
+        const denied = await this.deniedWrite(current, "organization:view");
+        if (denied || !current.callerUserId) return text(denied ?? NEEDS_OAUTH_FOR_WRITES);
+        await this.governance.ingestionKeyRevoke({
+          userId: current.callerUserId,
+          organizationId: current.organizationId,
+          apiKeyId: api_key_id,
+          surface: SURFACE,
+        });
+        return text(`revoked ${api_key_id}`);
+      },
     );
   }
 }

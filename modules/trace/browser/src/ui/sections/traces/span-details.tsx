@@ -1,4 +1,5 @@
 import { Badge, Box, Button, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -22,7 +23,6 @@ import { ChevronDown, Clock, Play, Settings } from "react-feather";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
 import { durationColor } from "../../../model/duration-color.ts";
 import type { Project } from "../../../model/prisma-types.ts";
-import { Link } from "../../blocks/link.tsx";
 import { OverflownTextWithTooltip } from "../../elements/overflown-text.tsx";
 import { RedactedField } from "../redacted-field.tsx";
 import { RenderInputOutput } from "./render-input-output.tsx";

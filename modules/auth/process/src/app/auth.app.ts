@@ -66,7 +66,12 @@ import type { EmailDelivery } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { Secret, sessionSecret, signInProviderSecrets } from "@langwatch/secrets";
+import {
+  internalSlackSignupsWebhook,
+  Secret,
+  sessionSecret,
+  signInProviderSecrets,
+} from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -75,6 +80,7 @@ import type { BetterAuthTransport } from "../channels/http/http.better-auth.chan
 import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
 import { passwordResetMailChannels } from "../channels/password-reset-mail-channels.registry.ts";
 import { signUpVerificationMailChannels } from "../channels/sign-up-verification-mail-channels.registry.ts";
+import { signupAnnouncementChannels } from "../channels/signup-announcement-channels.registry.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
@@ -119,6 +125,7 @@ import {
   type SignInSecurityReleaseEvidence,
 } from "../services/sign-in-security-settings.service.ts";
 import { SignUpEnrollmentService } from "../services/sign-up-enrollment.service.ts";
+import { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import {
   SignUpVerificationService,
   type SignUpVerificationDeps,
@@ -246,6 +253,8 @@ export class AuthApp implements AuthApiContract {
     ...signInProviderSecrets,
     /** The Auth0 Management app's secret; absent, the login app's stands in, as main's did. */
     auth0ManagementSecret: Secret.load("AUTH0_MGMT_CLIENT_SECRET", { optional: true }),
+    /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and identity. */
+    internalSlackSignupsWebhook,
   } as const;
 
   readonly #sessions: BrowserSessionService;
@@ -537,6 +546,16 @@ export class AuthApp implements AuthApiContract {
       platformSsoAllowed: () => dependencies.licensing.isPlatformSsoLicensed(),
     });
 
+    const signupAnnouncements = await setup.secrets.into(
+      AuthApp.secrets.internalSlackSignupsWebhook,
+      (webhookUrl) =>
+        SignupAnnouncementService.create({
+          channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
+          publicBaseUrl: members.publicBaseUrl,
+          logger: members.logger,
+        }),
+    );
+
     return setup.secrets.into(AuthApp.secrets.session, (sessionSecret) => {
       assertAuthServerConfig(config, sessionSecret);
 
@@ -557,6 +576,7 @@ export class AuthApp implements AuthApiContract {
         app.#composeBetterAuth = () =>
           buildBetterAuth({
             identity,
+            signupAnnouncements,
             signInLockout: SignInLockoutService.create({
               locks: repositories.signInLocks,
               settings: repositories.signInSecurity,

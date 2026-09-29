@@ -7,7 +7,9 @@ import {
   type CellEvaluatorConfig,
   type ComparisonEvaluatorConfig,
   type EvaluationsV3State,
+  type EvaluatorConfig,
   type ExecutionCell,
+  isRowEmpty,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
@@ -17,7 +19,10 @@ import {
   buildVariantDisplayNames,
   buildVariantIdentifiers,
 } from "../eventing/experiment-comparison-candidates.process.ts";
-import { type ComparisonSkipReason } from "../eventing/experiment-comparison-skip.process.ts";
+import {
+  type ComparisonSetupSkip,
+  type ComparisonSkipReason,
+} from "../eventing/experiment-comparison-skip.process.ts";
 import { ExperimentComparisonVariantService } from "./experiment-comparison-variant.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 
@@ -30,6 +35,27 @@ export type VariantEvaluatorScore = {
   label?: string;
   passed?: boolean;
 };
+
+/** What carries a comparison: a chip evaluator on its variants, or a column-style target. */
+type ComparisonCarrier =
+  | { style: "chip"; evaluator: EvaluatorConfig }
+  | { style: "column"; target: TargetConfig };
+
+/** One comparison the configuration asks for: its verdict column, rows, and variants or skip. */
+export type PlannedComparison = {
+  /** The column the verdict is stored under. */
+  targetId: string;
+  evaluatorId: string;
+  carrier: ComparisonCarrier;
+  cfg: ComparisonEvaluatorConfig;
+  rowIndices: number[];
+} & (
+  | { variants: TargetConfig[]; setupSkip?: never }
+  | { setupSkip: ComparisonSetupSkip; variants?: never }
+);
+
+/** The scoped rows a buildable comparison covers, and the non-empty ones a setup skip reports. */
+type ComparisonRows = { planned: number[]; setupSkipped: number[] };
 
 export class ExperimentComparisonPlanService {
   static create({
@@ -52,75 +78,194 @@ export class ExperimentComparisonPlanService {
     private readonly variants: ExperimentComparisonVariantService,
   ) {}
 
-  /** Chip-style comparison evaluators, verdict anchored on the first variant's column. */
-  private planChipComparisons({
+  /** The comparisons the configuration asks for, and the rows each covers, before any output. */
+  buildComparisonSet({
     state,
     datasetRows,
-    rowsInScope,
-    datasetId,
-    completedTargetOutputs,
-    completedTargetEvaluatorScores,
-    cells,
-    skipReasons,
+    scopedRowIndices,
   }: {
     state: Pick<EvaluationsV3State, "targets" | "evaluators">;
     datasetRows: Record<string, unknown>[];
-    rowsInScope: number[];
-    datasetId: string;
-    completedTargetOutputs: Map<string, { output: unknown; cost?: number; duration?: number }>;
-    completedTargetEvaluatorScores?: Map<string, VariantEvaluatorScore[]>;
-    cells: ExecutionCell[];
-    skipReasons: ComparisonSkipReason[];
-  }): void {
-    for (const evaluator of state.evaluators) {
+    /** Rows this run is scoped to; omit to mean every row. Required, not defaulted. */
+    scopedRowIndices: number[] | undefined;
+  }): PlannedComparison[] {
+    const rowsInScope = scopedRowIndices ?? datasetRows.map((_, rowIndex) => rowIndex);
+    const rows: ComparisonRows = {
+      planned: rowsInScope.filter((rowIndex) => datasetRows[rowIndex] !== undefined),
+      setupSkipped: rowsInScope.filter((rowIndex) => {
+        const datasetEntry = datasetRows[rowIndex];
+        return datasetEntry !== undefined && !isRowEmpty(datasetEntry);
+      }),
+    };
+
+    return [...this.chipComparisons({ state, rows }), ...this.columnComparisons({ state, rows })];
+  }
+
+  /** Chip-style comparison evaluators, verdict anchored on the first variant's column. */
+  private chipComparisons({
+    state,
+    rows,
+  }: {
+    state: Pick<EvaluationsV3State, "targets" | "evaluators">;
+    rows: ComparisonRows;
+  }): PlannedComparison[] {
+    return state.evaluators.flatMap((evaluator): PlannedComparison[] => {
       const cfg = toComparisonConfig(evaluator);
       if (!cfg) {
-        continue;
+        return [];
       }
 
+      const carrier: ComparisonCarrier = { style: "chip", evaluator };
       const resolution = this.variants.resolveVariants({ state, cfg, ownerId: evaluator.id });
       if (resolution.skip) {
         const anchorId = this.variants.findAnchorVariantId({ state, cfg });
-        if (anchorId) {
-          this.variants.pushSetupSkips({
-            kind: resolution.skip,
-            targetId: anchorId,
-            evaluatorId: evaluator.id,
-            rowsInScope,
-            datasetRows,
-            skipReasons,
-          });
+        if (!anchorId) {
+          return [];
         }
 
-        continue;
+        return [
+          {
+            targetId: anchorId,
+            evaluatorId: evaluator.id,
+            carrier,
+            cfg,
+            setupSkip: resolution.skip,
+            rowIndices: rows.setupSkipped,
+          },
+        ];
       }
 
-      const resolvedVariants = resolution.variants;
+      const [anchorVariant] = resolution.variants;
+      if (!anchorVariant) {
+        return [];
+      }
 
-      const variantIds = buildVariantIdentifiers({
-        resolvedVariants,
-        loadedPrompts: this.loadedPrompts,
-      });
-      const variantDisplayNames = buildVariantDisplayNames({
-        resolvedVariants,
-        loadedPrompts: this.loadedPrompts,
-        loadedEvaluators: this.loadedEvaluators,
-      });
-      const anchorVariant = resolvedVariants[0]!;
+      return [
+        {
+          targetId: anchorVariant.id,
+          evaluatorId: evaluator.id,
+          carrier,
+          cfg,
+          variants: resolution.variants,
+          rowIndices: rows.planned,
+        },
+      ];
+    });
+  }
+
+  /** Column-style comparison targets: each is its own column, verdict stored under its own id. */
+  private columnComparisons({
+    state,
+    rows,
+  }: {
+    state: Pick<EvaluationsV3State, "targets">;
+    rows: ComparisonRows;
+  }): PlannedComparison[] {
+    return state.targets.flatMap((target): PlannedComparison[] => {
+      if (target.type !== "evaluator") {
+        return [];
+      }
+
+      const cfg = toComparisonConfig(target);
+      if (!cfg || !target.targetEvaluatorId) {
+        return [];
+      }
+
+      const carrier: ComparisonCarrier = { style: "column", target };
+      const resolution = this.variants.resolveVariants({ state, cfg, ownerId: target.id });
+      if (resolution.skip) {
+        return [
+          {
+            targetId: target.id,
+            evaluatorId: target.id,
+            carrier,
+            cfg,
+            setupSkip: resolution.skip,
+            rowIndices: rows.setupSkipped,
+          },
+        ];
+      }
+
+      return [
+        {
+          targetId: target.id,
+          evaluatorId: target.id,
+          carrier,
+          cfg,
+          variants: resolution.variants,
+          rowIndices: rows.planned,
+        },
+      ];
+    });
+  }
+
+  /** One buildable comparison's rows: a cell per row whose candidates all answered, else a skip. */
+  private planComparisonRows({
+    comparison,
+    variants,
+    datasetRows,
+    datasetId,
+    outputs,
+    cells,
+    skipReasons,
+  }: {
+    comparison: PlannedComparison;
+    variants: TargetConfig[];
+    datasetRows: Record<string, unknown>[];
+    datasetId: string;
+    outputs: Pick<
+      Parameters<ExperimentComparisonVariantService["buildCandidates"]>[0],
+      "completedTargetOutputs" | "completedTargetEvaluatorScores"
+    >;
+    cells: ExecutionCell[];
+    skipReasons: ComparisonSkipReason[];
+  }): void {
+    const { carrier, cfg } = comparison;
+    const variantIds = buildVariantIdentifiers({
+      resolvedVariants: variants,
+      loadedPrompts: this.loadedPrompts,
+    });
+    const variantDisplayNames = buildVariantDisplayNames({
+      resolvedVariants: variants,
+      loadedPrompts: this.loadedPrompts,
+      loadedEvaluators: this.loadedEvaluators,
+    });
+
+    if (carrier.style === "chip") {
+      const [anchorVariant] = variants;
+      if (!anchorVariant) {
+        return;
+      }
 
       this.planChipRows({
-        evaluator,
+        evaluator: carrier.evaluator,
         anchorVariant,
-        candidates: {
-          cfg,
-          variantIds,
-          variantDisplayNames,
-          completedTargetOutputs,
-          completedTargetEvaluatorScores,
-        },
+        candidates: { cfg, variantIds, variantDisplayNames, ...outputs },
         datasetRows,
-        rowsInScope,
+        rowsInScope: comparison.rowIndices,
         datasetId,
+        cells,
+        skipReasons,
+      });
+
+      return;
+    }
+
+    const legacyPairwise =
+      this.variants.isLegacyPairwiseBacked(carrier.target.targetEvaluatorId) &&
+      variantIds.length === 2;
+
+    for (const rowIndex of comparison.rowIndices) {
+      this.planColumnRow({
+        target: carrier.target,
+        cfg,
+        rowIndex,
+        datasetRows,
+        datasetId,
+        variantIds,
+        variantDisplayNames,
+        legacyPairwise,
+        ...outputs,
         cells,
         skipReasons,
       });
@@ -256,83 +401,6 @@ export class ExperimentComparisonPlanService {
     };
   }
 
-  /** Column-style comparison targets: each is its own column, verdict stored under its own id. */
-  private planColumnComparisons({
-    state,
-    datasetRows,
-    rowsInScope,
-    datasetId,
-    completedTargetOutputs,
-    completedTargetEvaluatorScores,
-    cells,
-    skipReasons,
-  }: {
-    state: Pick<EvaluationsV3State, "targets">;
-    datasetRows: Record<string, unknown>[];
-    rowsInScope: number[];
-    datasetId: string;
-    completedTargetOutputs: Map<string, { output: unknown; cost?: number; duration?: number }>;
-    completedTargetEvaluatorScores?: Map<string, VariantEvaluatorScore[]>;
-    cells: ExecutionCell[];
-    skipReasons: ComparisonSkipReason[];
-  }): void {
-    for (const target of state.targets) {
-      if (target.type !== "evaluator") {
-        continue;
-      }
-
-      const cfg = toComparisonConfig(target);
-      if (!cfg || !target.targetEvaluatorId) {
-        continue;
-      }
-
-      const resolution = this.variants.resolveVariants({ state, cfg, ownerId: target.id });
-      if (resolution.skip) {
-        this.variants.pushSetupSkips({
-          kind: resolution.skip,
-          targetId: target.id,
-          evaluatorId: target.id,
-          rowsInScope,
-          datasetRows,
-          skipReasons,
-        });
-        continue;
-      }
-
-      const resolvedVariants = resolution.variants;
-
-      const variantIds = buildVariantIdentifiers({
-        resolvedVariants,
-        loadedPrompts: this.loadedPrompts,
-      });
-      const variantDisplayNames = buildVariantDisplayNames({
-        resolvedVariants,
-        loadedPrompts: this.loadedPrompts,
-        loadedEvaluators: this.loadedEvaluators,
-      });
-
-      const legacyPairwise =
-        this.variants.isLegacyPairwiseBacked(target.targetEvaluatorId) && variantIds.length === 2;
-
-      for (const rowIndex of rowsInScope) {
-        this.planColumnRow({
-          target,
-          cfg,
-          rowIndex,
-          datasetRows,
-          datasetId,
-          variantIds,
-          variantDisplayNames,
-          legacyPairwise,
-          completedTargetOutputs,
-          completedTargetEvaluatorScores,
-          cells,
-          skipReasons,
-        });
-      }
-    }
-  }
-
   /** One row of one column-style comparison target: its cell, or the reason it was skipped. */
   private planColumnRow({
     target,
@@ -426,29 +494,32 @@ export class ExperimentComparisonPlanService {
     const cells: ExecutionCell[] = [];
     const skipReasons: ComparisonSkipReason[] = [];
     const datasetId = this.resolveMappingDatasetId(state);
-    const rowsInScope = scopedRowIndices ?? datasetRows.map((_, rowIndex) => rowIndex);
+    const outputs = { completedTargetOutputs, completedTargetEvaluatorScores };
 
-    this.planChipComparisons({
-      state,
-      datasetRows,
-      rowsInScope,
-      datasetId,
-      completedTargetOutputs,
-      completedTargetEvaluatorScores,
-      cells,
-      skipReasons,
-    });
+    for (const comparison of this.buildComparisonSet({ state, datasetRows, scopedRowIndices })) {
+      if (comparison.setupSkip) {
+        for (const rowIndex of comparison.rowIndices) {
+          skipReasons.push({
+            rowIndex,
+            targetId: comparison.targetId,
+            evaluatorId: comparison.evaluatorId,
+            kind: comparison.setupSkip,
+            variantNames: [],
+          });
+        }
+        continue;
+      }
 
-    this.planColumnComparisons({
-      state,
-      datasetRows,
-      rowsInScope,
-      datasetId,
-      completedTargetOutputs,
-      completedTargetEvaluatorScores,
-      cells,
-      skipReasons,
-    });
+      this.planComparisonRows({
+        comparison,
+        variants: comparison.variants,
+        datasetRows,
+        datasetId,
+        outputs,
+        cells,
+        skipReasons,
+      });
+    }
 
     return { cells, skipReasons };
   }

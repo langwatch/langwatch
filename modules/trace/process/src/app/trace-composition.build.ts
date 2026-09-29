@@ -36,7 +36,6 @@ import {
 } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import {
-  type TraceLegacyFilterConditions,
   TraceLegacyReadClickHouseRepository,
   type ClickHouseTraceLegacyReadOptions,
 } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
@@ -112,7 +111,6 @@ export type TraceCollaborators = Readonly<{
   commands: TraceProcessingCommands;
   /** Trace's own tenant pushes onto Redis; presence relays them in the serving process. */
   tenantBroadcast: TraceTenantBroadcast;
-  filterConditions?: TraceLegacyFilterConditions;
   fallbackVisibilityDays: number;
   processName: string;
   publicBaseUrl?: string;
@@ -219,8 +217,6 @@ export type TraceReaderCompositionOptions = {
    * and separate from the whole `codingAgents` peer below.
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
-  /** Analytics's filter translator; absent, a FILTERED legacy list refuses. */
-  filterConditions?: TraceLegacyFilterConditions | undefined;
   evaluations: TraceAppDependencies["evaluations"];
   /** The Instant Eval peer the Explorer's judged searches run through. */
   instantEvals?: TraceAppDependencies["instantEvals"];
@@ -298,7 +294,6 @@ export function composeTraceAppDependencies(
     traceRead: composeTraceLegacyRead({
       traceCanonicalisation: options.canonicalisation,
       ...(resolve ? { resolveClickHouseClient: resolve } : {}),
-      ...(options.filterConditions ? { filterConditions: options.filterConditions } : {}),
       retentionResolver: options.dataRetention,
       annotations: options.annotations,
       blobResolutionDeps,

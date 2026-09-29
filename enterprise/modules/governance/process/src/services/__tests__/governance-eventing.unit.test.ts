@@ -22,11 +22,6 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type GatewayBudgetLedger,
-  type GatewayBudgetCrossingCandidate,
-  type GatewayBudgetDebitRow,
-  type GatewayResolvedBudget,
-  type GatewaySpendProcessingEvent,
   type GovernanceWebhookChannel,
   type GovernanceWebhookSendBatch,
   type IngestionPullMetricsSink,
@@ -36,11 +31,6 @@ import {
   type PulledUsageLedgerRepository,
   type PulledUsageLedgerRow,
 } from "../../app/governance.members.ts";
-import {
-  type GatewayDebitsState,
-  GATEWAY_DEBITS_PROCESS_NAME,
-  GatewayDebitProcess,
-} from "../../eventing/gateway-debit.process.ts";
 import { GovernanceEventDeliveryIntent } from "../../eventing/governance-event-delivery.intent.ts";
 import { GovernanceEventDeliveryProcess } from "../../eventing/governance-event-delivery.process.ts";
 import {
@@ -143,32 +133,6 @@ class RecordingPulledUsageLedger implements PulledUsageLedgerRepository {
   readonly rows: PulledUsageLedgerRow[] = [];
   insert(rows: PulledUsageLedgerRow[]): Promise<void> {
     this.rows.push(...rows);
-    return Promise.resolve();
-  }
-}
-
-class RecordingGatewayBudgetLedger implements GatewayBudgetLedger {
-  readonly inserted: GatewayBudgetDebitRow[] = [];
-  readonly crossings: GatewayBudgetCrossingCandidate[] = [];
-  readonly updates: string[] = [];
-  budgets: GatewayResolvedBudget[] = [];
-
-  resolve(): Promise<GatewayResolvedBudget[]> {
-    return Promise.resolve(this.budgets);
-  }
-  insert(rows: GatewayBudgetDebitRow[]): Promise<void> {
-    this.inserted.push(...rows);
-    return Promise.resolve();
-  }
-  detectCrossings(rows: GatewayBudgetCrossingCandidate[]): Promise<void> {
-    this.crossings.push(...rows);
-    return Promise.resolve();
-  }
-  shouldEmitBudgetUpdated(): Promise<boolean> {
-    return Promise.resolve(true);
-  }
-  emitBudgetUpdated(input: { gatewayRequestId: string }): Promise<void> {
-    this.updates.push(input.gatewayRequestId);
     return Promise.resolve();
   }
 }
@@ -569,85 +533,6 @@ describe("pulled usage ledger process", () => {
       scopeId: "team-1",
       amountNanoUsd: 12_345_678_901,
       tokensCacheWrite: 4,
-    });
-  });
-});
-
-describe("gateway debit process", () => {
-  it("stashes an unattributed outcome and releases it when admission arrives", () => {
-    const ledger = new RecordingGatewayBudgetLedger();
-    const service = GatewayDebitProcess.create(ledger);
-    const definition = buildProcessDefinition(
-      buildProcessManager<GatewaySpendProcessingEvent>({
-        name: GATEWAY_DEBITS_PROCESS_NAME,
-        applier: service.processManager(),
-      }).config,
-    ) as ProcessDefinition<GatewayDebitsState>;
-    const ref = {
-      processName: GATEWAY_DEBITS_PROCESS_NAME,
-      projectId: "project-1",
-      processKey: "request-1",
-    };
-    const outcome = definition.evolve({
-      previousState: definition.initialState,
-      ref,
-      input: {
-        kind: "event",
-        now: 2_000,
-        event: processEvent("lw.gateway.spend.confirmed", {
-          gateway_request_id: "request-1",
-          organization_id: "",
-          team_id: "",
-          virtual_key_id: "",
-          principal_user_id: "",
-          end_user_id: "",
-          model: "model-1",
-          model_provider_id: "provider-1",
-          usage: {
-            input_tokens: 1,
-            output_tokens: 0,
-            cache_read_input_tokens: 0,
-            cache_creation_input_tokens: 0,
-            cache_creation_1h_tokens: 0,
-            reasoning_tokens: 0,
-            input_audio_tokens: 0,
-            output_audio_tokens: 0,
-            input_chars: 0,
-            audio_ms: 0,
-            input_image_tokens: 0,
-            output_image_tokens: 0,
-            image_count: 0,
-          },
-          cost_nano_usd: 10,
-          rate_version: "v1",
-          duration_ms: 1,
-          occurred_at: 1_000,
-        }),
-      },
-    });
-    expect(outcome.intents).toEqual([]);
-    expect(outcome.state.pendingOutcome?.cost_nano_usd).toBe(10);
-    const admitted = definition.evolve({
-      previousState: outcome.state,
-      ref,
-      input: {
-        kind: "event",
-        now: 2_100,
-        event: processEvent("lw.gateway.spend.admitted", {
-          gateway_request_id: "request-1",
-          organization_id: "org-1",
-          team_id: "team-1",
-          virtual_key_id: "key-1",
-          principal_user_id: "user-1",
-          end_user_id: "end-1",
-          outcome_carries_attribution: false,
-        }),
-      },
-    });
-    expect(admitted.intents[0]?.messageKey).toContain("debits:late");
-    expect(admitted.intents[0]?.payload).toMatchObject({
-      organization_id: "org-1",
-      cost_nano_usd: 10,
     });
   });
 });

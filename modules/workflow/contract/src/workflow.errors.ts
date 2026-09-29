@@ -84,19 +84,6 @@ export class LlmModelNotSetError extends HandledError {
     this.name = "LlmModelNotSetError";
   }
 }
-/**
- * The deployment asked for the studio's Lambda sweep and composed no fleet
- * for it to run against. Named rather than an empty report: "nothing was
- * quiet" and "nothing was looked at" read alike, and only one is healthy.
- */
-export class NlpLambdaFleetNotComposedError extends Error {
-  readonly code = "nlp_lambda_fleet_not_composed" as const;
-
-  constructor() {
-    super("This deployment composed no NLP Lambda fleet, so there is nothing to sweep.");
-    this.name = "NlpLambdaFleetNotComposedError";
-  }
-}
 
 /**
  * The caller may not act in a project the workflow's copy lineage reaches.

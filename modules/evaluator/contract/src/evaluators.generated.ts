@@ -12,18 +12,18 @@ export const moneySchema = z.object({
 
 export const evaluationResultSchema = z.object({
   status: z.literal("processed"),
-  score: z.number().optional(),
-  passed: z.boolean().optional(),
-  label: z.string().optional(),
-  details: z.string().optional(),
-  cost: moneySchema.optional(),
+  score: z.number().nullish(),
+  passed: z.boolean().nullish(),
+  label: z.string().nullish(),
+  details: z.string().nullish(),
+  cost: moneySchema.nullish(),
   raw_response: z.any().optional(),
 });
 
 export const evaluationResultSkippedSchema = z.object({
   status: z.literal("skipped"),
-  details: z.string().optional(),
-  cost: moneySchema.optional(),
+  details: z.string().nullish(),
+  cost: moneySchema.nullish(),
 });
 
 export const evaluationResultErrorSchema = z.object({

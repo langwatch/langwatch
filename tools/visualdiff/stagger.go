@@ -17,9 +17,10 @@ const PendingBaseFile = "base-side.json"
 
 // PendingSide is the content of PendingBaseFile.
 type PendingSide struct {
-	BaseURL  string            `json:"baseUrl,omitempty"`
-	Fixtures map[string]string `json:"fixtures,omitempty"`
-	Error    string            `json:"error,omitempty"`
+	BaseURL   string            `json:"baseUrl,omitempty"`
+	Fixtures  map[string]string `json:"fixtures,omitempty"`
+	StaticDir string            `json:"staticDir,omitempty"`
+	Error     string            `json:"error,omitempty"`
 }
 
 // staggers reports a run whose candidate may capture before its base is up:
@@ -56,7 +57,7 @@ func claimWorktrees(plan *Plan, options Options) error {
 // forwardBase writes the base's address for the runner the moment the base is
 // ready, and hands the arrival on for the run to adopt once capture ends.
 func (run *session) forwardBase(ctx context.Context, pending string) <-chan baseArrival {
-	from, stderr := run.baseArrival, run.streams.Err
+	from, stderr, static := run.baseArrival, run.streams.Err, run.staticDirs[run.plan.Base.Name]
 	to := make(chan baseArrival, 1)
 	go func() {
 		var arrival baseArrival
@@ -65,7 +66,7 @@ func (run *session) forwardBase(ctx context.Context, pending string) <-chan base
 		case <-ctx.Done():
 			arrival = baseArrival{err: ctx.Err()}
 		}
-		side := PendingSide{BaseURL: arrival.stack.URL(), Fixtures: arrival.fixtures}
+		side := PendingSide{BaseURL: arrival.stack.URL(), Fixtures: arrival.fixtures, StaticDir: static}
 		if arrival.err != nil {
 			side = PendingSide{Error: arrival.err.Error()}
 		}

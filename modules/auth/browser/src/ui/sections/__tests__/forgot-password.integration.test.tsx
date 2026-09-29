@@ -5,7 +5,6 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockRequestPasswordReset, publicEnvRef } = vi.hoisted(() => ({
@@ -30,14 +29,6 @@ vi.mock("../../../behavior/auth-client.tsx", () => ({
 
 vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
-}));
-
-vi.mock("../../../ui/elements/router-link.tsx", () => ({
-  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
 }));
 
 import ForgotPassword from "../forgot-password-screen.tsx";

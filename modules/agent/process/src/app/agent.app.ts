@@ -31,7 +31,6 @@ import {
   type AgentConnectRegisterInput,
   AgentRegisterRefusedError,
   AgentNotFoundError,
-  AgentHttpTestingUnavailableError,
   AgentConnectionsUnavailableError,
   AgentSourcePermissionDeniedError,
   AgentOwnerOnlyError,
@@ -83,7 +82,7 @@ import {
   type AgentPresence,
 } from "../services/connected-agent-presence.service.ts";
 import { ConnectedAgentService } from "../services/connected-agent.service.ts";
-import type { HttpAgentTestService } from "../services/http-agent-test.service.ts";
+import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 
 /**
  * The app's KSUID resource for a call's thread id (`KSUID_RESOURCES.THREAD`).
@@ -133,8 +132,7 @@ export class AgentApp implements AgentApi {
   readonly #presence = ConnectedAgentPresenceService.create();
   readonly #copies: AgentCopyService;
   readonly #connected: ConnectedAgentService | undefined;
-  /** No process supplies HTTP-based agent testing yet; see the batch-a handoff. */
-  readonly #httpTesting: HttpAgentTestService | undefined;
+  readonly #httpTesting: HttpAgentTestService;
   readonly #auditLog: AuditLogApi;
   readonly #permissions: AuthzApi;
   readonly #projects: ProjectApi;
@@ -156,7 +154,10 @@ export class AgentApp implements AgentApi {
     this.#scenarios = dependencies.scenarios;
     this.#users = dependencies.users;
     this.#workflows = dependencies.workflows;
-    this.#httpTesting = void 0;
+    this.#httpTesting = HttpAgentTestService.create({
+      workflows: dependencies.workflows,
+      traces: dependencies.traces,
+    });
 
     const connected = ConnectedAgentService.create({
       agents: this.#agents,
@@ -438,7 +439,6 @@ export class AgentApp implements AgentApi {
   }
 
   executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult> {
-    if (!this.#httpTesting) throw new AgentHttpTestingUnavailableError();
     return this.#httpTesting.execute(input);
   }
 

@@ -835,18 +835,19 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   /**
-   * Saves a scenario, attributed to the caller who asked for it. Both fields are stamped:
-   * `lastUpdatedById` is who the row says last touched it, and `actor` is who the saved VERSION
-   * names as its author.
+   * Saves a scenario, attributed to its caller: `lastUpdatedById` is who last touched the row,
+   * `actor` who authored the VERSION. REST names an explicit actor when its credential names no
+   * person; then the version has no user and the row keeps its last editor.
    */
   update(
-    input: Omit<ScenarioUpdateInput, "lastUpdatedById" | "actor">,
+    input: Omit<ScenarioUpdateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
+    const actor = input.actor ?? this.authorFor(by);
     return this.#dependencies.scenarios.update({
       ...input,
-      lastUpdatedById: by.id,
-      actor: this.authorFor(by),
+      ...(actor.userId === null ? {} : { lastUpdatedById: actor.userId }),
+      actor,
     });
   }
 

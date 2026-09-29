@@ -71,7 +71,6 @@ export {
 export { buildStudioLambdaConfig, workflowServer } from "./workflow.server.ts";
 
 /** The five declarations the installer carries, and the sixth the process builds. */
-export { cronRest } from "./transport/cron.rest.ts";
 export { workflowTrpcTransport } from "./transport/workflow.trpc.ts";
 export { workflowOptimizationTrpcTransport } from "./transport/workflow-optimization.trpc.ts";
 export { workflowRunRest } from "./transport/workflow-run.rest.ts";

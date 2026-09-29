@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/langwatch/langwatch/pkg/webconsole"
 )
 
 // Server is the simulator: the tenant range, the verification store, and the
@@ -28,10 +31,18 @@ type Server struct {
 	dnsAddrMu sync.RWMutex
 	dnsAddr   string
 	now       func() time.Time
+	// bundle is apps/idpsim-web's build and console the handler serving it.
+	bundle  fs.FS
+	console http.Handler
 }
 
-// NewServer provisions the tenant range and its verification records.
+// NewServer provisions the tenant range and its verification records, and
+// serves the console bundle this binary was built with.
 func NewServer(cfg Config) (*Server, error) {
+	return newServer(cfg, embeddedConsole())
+}
+
+func newServer(cfg Config, bundle fs.FS) (*Server, error) {
 	state, err := openState(cfg.DataDir)
 	if err != nil {
 		return nil, err
@@ -46,6 +57,8 @@ func NewServer(cfg Config) (*Server, error) {
 		verification: verification,
 		persistence:  state,
 		now:          time.Now,
+		bundle:       bundle,
+		console:      webconsole.New(bundle, consoleBuildCommand),
 	}
 	if err := s.saveState(); err != nil {
 		return nil, err
@@ -70,14 +83,13 @@ func (s *Server) tenantFor(r *http.Request) (*Tenant, bool) {
 	return s.Tenant(id)
 }
 
-// Handler is the full HTTP surface: the pages a person uses, the three
-// protocols a tenant speaks, and the control API that is the scriptable twin
-// of the pages.
+// Handler is the full HTTP surface: the three protocols a tenant speaks, the
+// control API for scripts, the JSON API the console reads, and the console.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	s.routePages(mux)
 	s.routeProtocols(mux)
 	s.routeControl(mux)
+	s.routeAPI(mux)
 
 	// HTTP (non-DNS) domain verification: any well-known path answers for the
 	// requested Host (or ?domain=).
@@ -85,33 +97,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "tenants": len(s.tenants)})
 	})
-	mux.HandleFunc("/", s.handleIndex)
+	s.routeConsole(mux)
 	return s.persistChanges(mux)
-}
-
-// routePages is what a person clicks: a tenant's own page and the forms on it.
-func (s *Server) routePages(mux *http.ServeMux) {
-	// The tenant's own page: how to wire an application up, what is
-	// registered, and what it has been doing.
-	mux.HandleFunc("GET /assets/ui.js", serveUIScript)
-	mux.HandleFunc("GET /t/{tenant}", s.handleTenantPage)
-	mux.HandleFunc("GET /t/{tenant}/{$}", s.handleTenantPage)
-	mux.HandleFunc("POST /t/{tenant}/apps", s.handleRegisterApplication)
-	// The DNS registry: this machine standing in for the registrar a reserved
-	// name has none of, so a domain proof can be walked the way a customer
-	// walks it rather than through a curl command.
-	mux.HandleFunc("POST /t/{tenant}/dns", s.handlePublishVerification)
-	mux.HandleFunc("POST /t/{tenant}/dns/delete", s.handleUnpublishVerification)
-	mux.HandleFunc("POST /t/{tenant}/apps/{client}/delete", s.handleRemoveApplication)
-	// Provisioning into a real service provider: the address and token that
-	// provider issued, then the two presses that use them.
-	mux.HandleFunc("POST /t/{tenant}/provisioning", s.handleSaveProvisioning)
-	mux.HandleFunc("POST /t/{tenant}/provisioning/delete", s.handleForgetProvisioning)
-	mux.HandleFunc("POST /t/{tenant}/provisioning/push", s.handlePushProvisioning)
-	mux.HandleFunc("POST /t/{tenant}/provisioning/pull", s.handlePullProvisioning)
-	mux.HandleFunc("POST /t/{tenant}/provisioning/sync", s.handleSyncProvisioning)
-	mux.HandleFunc("POST /t/{tenant}/population", s.handlePopulationForm)
-	mux.HandleFunc("POST /t/{tenant}/churn", s.handleChurnForm)
 }
 
 // routeProtocols is what a tenant speaks to an application: OIDC, SAML and

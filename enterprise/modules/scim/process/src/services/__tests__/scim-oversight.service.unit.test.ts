@@ -5,7 +5,7 @@
  * for storage only: the refusals, the ordering and the idempotency are the
  * service's own. specs/identity/scim-reconciliation-surfaces.feature
  */
-import type { ScimSyncFailure, ScimSyncState } from "@langwatch/identity-contract";
+import type { ScimSyncFailure, ScimSyncState } from "@langwatch/enterprise-scim-contract";
 import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -65,13 +65,13 @@ function build(initial: ScimSyncState | null): void {
   failRemoval = null;
   identities = MemoryScimRepository.create();
   service = ScimOversightService.create({
-    syncs: () => ({
+    syncs: {
       listForOperator: async (input) => {
         listed.push(input);
         return { syncs: held ? [held] : [], total: held ? 1 : 0 };
       },
       findForOperator: async () => (held ? [held] : []),
-    }),
+    },
     organizations: {
       findProvisioningSummary: async (organizationId) =>
         organizationId === ORG

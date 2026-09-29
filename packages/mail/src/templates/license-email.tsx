@@ -54,11 +54,7 @@ export const LicenseEmail = ({
   unlockedFeatures,
 }: LicenseEmailProps) => {
   return (
-    <EmailLayout
-      eyebrow="LICENSE"
-      preview="Your license key and how to activate it"
-      heading="Your LangWatch license"
-    >
+    <EmailLayout preview="Your license key and how to activate it" heading="Your LangWatch license">
       <Paragraph>Thank you for your license. Here is what it covers.</Paragraph>
       <DetailTable
         rows={[

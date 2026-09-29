@@ -18,7 +18,7 @@ import type {
   ConnectedOnboardRequest,
   ConnectedRenewRequest,
 } from "./connected-billing.schemas.ts";
-import type { RenewalCompletion, SeatChangeBillingOutcome } from "./connected-billing.ts";
+import type { RenewalCompletion } from "./connected-billing.ts";
 
 /**
  * The staff member a backoffice command is checked against: the impersonator
@@ -32,6 +32,14 @@ export type ScenarioCreatedSignal = Readonly<{
   projectId: string;
   scenarioId: string;
   scenarioCount: number;
+}>;
+
+/** A workflow somebody created, and how many the project holds now. */
+export type WorkflowCreatedSignal = Readonly<{
+  userId: string;
+  projectId: string;
+  workflowId: string;
+  workflowCount: number;
 }>;
 
 /**
@@ -69,20 +77,20 @@ export interface BillingApi {
     input: { stripeInvoiceId: string },
     by: BillingStaff | null,
   ): Promise<void>;
-  /** Invoices the seats a mid-term license change added. */
-  invoiceAddedSeats(input: {
-    organizationId: string;
-    licenseRowId: string;
-    previousSeats: number;
-    seats: number;
-  }): Promise<SeatChangeBillingOutcome>;
-  /** The daily tick: pending seat invoices, monthly statements, due renewals. Cloud only. */
+  /**
+   * One seat invoicing pass: decides every seat change licensing recorded that
+   * has no decision yet, then invoices every intended one. Cloud only.
+   */
+  invoicePendingSeatChanges(): Promise<void>;
+  /** The daily tick: monthly statements and due renewals. Cloud only. */
   runConnectedBillingTick(): Promise<void>;
   /**
    * The `scenario_created` product event, tagged with the onboarding the
    * organization went through, and the nurturing count behind it.
    */
   recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void>;
+  /** Nurturing learns the project's workflow count and the `workflow_created` event. */
+  recordWorkflowCreated(input: WorkflowCreatedSignal): Promise<void>;
   /**
    * The plan an organization's active subscription grants on LangWatch Cloud, with the
    * subscription's own limit overrides; the free plan where none is active or off Cloud.

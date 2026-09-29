@@ -3,6 +3,7 @@
  */
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { toaster } from "@langwatch/design-system/toaster";
@@ -13,7 +14,6 @@ import { type SubmitHandler, useForm } from "react-hook-form";
 import { api } from "../../../behavior/trace-api.ts";
 import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import NextLink from "../../elements/next-link.tsx";
 import { Drawer } from "../drawer.tsx";
 import { showErrorToast } from "../errors/index.ts";
 import { DatasetMappingPreview } from "./dataset-mapping-preview.tsx";
@@ -100,12 +100,12 @@ function toastAddedToDataset({
   toaster.create({
     title: "Successfully added to dataset",
     description: (
-      <NextLink
+      <RoutedLink
         href={`/${projectSlug}/datasets/${datasetId}`}
         style={{ color: "white", textDecoration: "underline" }}
       >
         View the dataset
-      </NextLink>
+      </RoutedLink>
     ),
     type: "success",
   });

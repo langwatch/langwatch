@@ -25,6 +25,7 @@
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/log-contract": "workspace:*",

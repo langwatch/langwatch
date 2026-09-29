@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  * The fire-once redirect guard, and the routing target per experiment type.
- * See specs/experiments-v3/evaluation-creation-entrypoints.feature.
+ * See specs/experiments-v3/evaluation-creation-entrypoints.feature and
+ * modules/experiment/specs/experiment-entry-redirects.feature.
  */
 
 import { cleanup, render } from "@testing-library/react";
@@ -95,10 +96,7 @@ describe("Evaluation wizard redirect", () => {
   });
 
   describe("when the experiment predates the workbench", () => {
-    /**
-     * @scenario Legacy wizard URLs for experiments that predate the workbench
-     * redirect to their workflow
-     */
+    /** @scenario Legacy wizard URLs for experiments that predate the workbench redirect to their workflow */
     it("redirects to the experiment's workflow exactly once", () => {
       routerState.query = { slug: "saved-2" };
       experimentState.data = {
@@ -114,7 +112,36 @@ describe("Evaluation wizard redirect", () => {
     });
   });
 
+  describe("when the experiment has neither a workbench nor a workflow", () => {
+    /** @scenario A wizard link to an experiment with no workbench and no workflow opens its read-only view */
+    it("redirects to the read-only experiment view exactly once", () => {
+      routerState.query = { slug: "sdk-run" };
+      experimentState.data = { type: ExperimentType.BATCH_EVALUATION_V2 };
+      experimentState.isFetched = true;
+
+      renderRepeatedly();
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/experiments/sdk-run");
+    });
+  });
+
+  describe("when reading the experiment fails", () => {
+    /** @scenario A wizard link whose experiment cannot be read opens the read-only view */
+    it("redirects to the read-only experiment view exactly once", () => {
+      routerState.query = { slug: "gone-1" };
+      experimentState.data = undefined;
+      experimentState.isFetched = true;
+
+      renderRepeatedly();
+
+      expect(replaceMock).toHaveBeenCalledTimes(1);
+      expect(replaceMock).toHaveBeenCalledWith("/test-project/experiments/gone-1");
+    });
+  });
+
   describe("when a slugged experiment is still loading", () => {
+    /** @scenario A wizard link waits for its experiment before choosing where it opens */
     it("waits for the experiment before redirecting", () => {
       routerState.query = { slug: "saved-3" };
       experimentState.isFetched = false;

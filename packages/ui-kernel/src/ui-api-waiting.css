@@ -1,9 +1,10 @@
 /*
  * The screen a reader sees while the API is still coming up. The front door's
- * own vocabulary — paper ground, ink text, the mesh band, Sentient for the one
- * heading and JetBrains Mono for the one technical line — declared here in
- * literal values rather than tokens: this screen renders when the platform is
- * not answering, so it must not depend on anything else having loaded.
+ * own vocabulary — paper ground, ink text, Sentient for the one heading and
+ * JetBrains Mono for the one technical line — declared here in literal values
+ * rather than tokens: this screen renders when the platform is not answering,
+ * so it must not depend on anything else having loaded. The ground behind it
+ * is the design system's AmbientGround, whose static floor is plain CSS too.
  *
  * Every animation lives inside a no-preference query rather than being switched
  * off by a reduce one, so somebody who asked for less motion gets a completely
@@ -27,41 +28,6 @@
   color: #f4f2ef;
 }
 
-/* The mesh band: the site's own static gradient, held to a soft field behind
-   the words rather than painted edge to edge. */
-.lw-api-waiting-mesh {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(135deg, #ffffff 0%, #ffaf6e 35%, #cddcf9 72%, #ffffff 100%);
-  opacity: 0.34;
-}
-
-/* The white radial that keeps the reading area clean, the same instrument the
-   front door uses: the mesh is atmosphere, and words do not sit on weather. */
-.lw-api-waiting-mesh::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    ellipse 46% 40% at 50% 47%,
-    #ffffff 0%,
-    rgba(255, 255, 255, 0.72) 45%,
-    rgba(255, 255, 255, 0) 78%
-  );
-}
-
-.dark .lw-api-waiting-mesh::after {
-  display: none;
-}
-
-.dark .lw-api-waiting-mesh {
-  background:
-    radial-gradient(circle at 50% 34%, rgba(91, 141, 239, 0.32), transparent 44%),
-    radial-gradient(circle at 58% 70%, rgba(201, 123, 58, 0.2), transparent 50%);
-  opacity: 1;
-}
-
 .lw-api-waiting-body {
   position: relative;
   z-index: 1;
@@ -71,6 +37,12 @@
   gap: 14px;
   max-width: 34rem;
   text-align: center;
+}
+
+/* The product mark above the heading, the same one the loading screen shows. */
+.lw-api-waiting-logo {
+  display: flex;
+  margin-bottom: 18px;
 }
 
 .lw-api-waiting-heading {

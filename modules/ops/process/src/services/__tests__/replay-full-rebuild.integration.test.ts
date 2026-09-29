@@ -323,10 +323,13 @@ describe("ops replay full rebuild", () => {
       }
     })();
 
-    return ReplayService.create({
+    const service = ReplayService.create({
       repo: ReplayRedisRepository.create({ redis }),
       runtimeFactory,
     });
+    // The pipeline's hop, in process: the request runs the worker's half directly.
+    service.connect({ send: (run) => service.executeReplay(run) });
+    return service;
   }
 
   /** Waits for the run to leave the running state, so its outcome is settled. */
@@ -356,6 +359,7 @@ describe("ops replay full rebuild", () => {
           tenantIds: [tenantId],
           description: "resume",
           userName: "test",
+          requestedByUserId: "user_operator",
         });
         await waitForIdle(service);
 
@@ -382,6 +386,7 @@ describe("ops replay full rebuild", () => {
           fullRebuild: true,
           description: "full rebuild",
           userName: "test",
+          requestedByUserId: "user_operator",
         });
         await waitForIdle(service);
 

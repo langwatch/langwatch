@@ -1,0 +1,35 @@
+{
+  "name": "@langwatch/internal-slack",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Messages LangWatch sends to its own Slack workspace only, never customer-configured Slack: one Block Kit layout and a typed template per notice, each sent through the owning module's Slack channel.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "preview": "node --disable-warning=ExperimentalWarning --experimental-transform-types preview/print-notices.ts",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/time": "workspace:*",
+    "@slack/types": "^2.21.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

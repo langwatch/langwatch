@@ -111,12 +111,12 @@ export function useResultsView(state: AgentTestingRoutingState) {
       const query = { ...router.query };
       for (const key of RESULTS_VIEW_PARAMS) delete query[key];
 
-      const { route, address } = buildAgentTestingPush({
+      const address = buildAgentTestingPush({
         projectSlug,
         state,
         query: { ...query, ...writeResultsViewQuery(next) },
       });
-      void router.push(route, address, { shallow: true });
+      void router.push(address);
     },
     [router, projectSlug, state],
   );

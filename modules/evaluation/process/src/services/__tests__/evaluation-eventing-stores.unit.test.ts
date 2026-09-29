@@ -66,6 +66,7 @@ function storesReading(defaultRetentionDays: () => number) {
     }),
     analyticsFoldCache: MemoryEvaluationAnalyticsFoldCacheRepository.create(),
     defaultRetentionDays,
+    tenantRetention: { resolve: async () => null },
   }).buildStores();
 
   return { stores, runs, analytics };

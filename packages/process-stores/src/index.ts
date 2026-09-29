@@ -33,6 +33,7 @@ export {
   MemberSuppliedUndefinedError,
   type MemberSource,
   type ProcessMemberSource,
+  type ProcessStores,
 } from "./create-members.ts";
 export type {
   ClickHouseConfig,
@@ -83,4 +84,5 @@ export {
   ConsumerPipelines,
 } from "./pipeline-selection.ts";
 export { openProcessStores } from "./open-stores.ts";
+export { clickhouseRoutesOf } from "./clickhouse-routes.ts";
 export { memoryObjectStorage } from "./object-storage-memory.ts";

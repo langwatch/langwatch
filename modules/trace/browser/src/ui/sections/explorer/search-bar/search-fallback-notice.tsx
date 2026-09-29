@@ -1,11 +1,11 @@
 import { Button, HStack, IconButton, Text } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { type SearchNotice, useFilterStore } from "@langwatch/trace-browser-kit";
 import { Sparkles, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useState } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import NextLink from "../../../elements/next-link.tsx";
 
 const MODEL_PROVIDERS_HREF = "/settings/model-providers";
 
@@ -89,11 +89,11 @@ const ConfigureModels: React.FC<{ projectId: string }> = ({ projectId }) => {
 
   return (
     <>
-      <NextLink href={MODEL_PROVIDERS_HREF} target="_blank" rel="noopener noreferrer">
+      <RoutedLink href={MODEL_PROVIDERS_HREF} target="_blank" rel="noopener noreferrer">
         <Button size="2xs" variant="outline">
           Configure models
         </Button>
-      </NextLink>
+      </RoutedLink>
       <IconButton
         size="2xs"
         variant="ghost"

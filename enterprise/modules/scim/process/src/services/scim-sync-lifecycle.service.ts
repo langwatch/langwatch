@@ -47,16 +47,12 @@ import {
   type ScimSyncFactInput,
   type ScimUserOp,
   scimSyncIdFor,
-} from "@langwatch/identity-contract";
+} from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { type ScimSyncLifecycle } from "../app/scim.members.ts";
 
-/**
- * The identity guards and ledger this adapter drives, named by their shape.
- * Identity's server package owns the implementations; this package may only
- * take the contract, so the collaboration is stated here in contract types.
- */
+/** The directory-sync guards and ledger this service drives, named by their shape. */
 export interface ScimSyncLifecycleGuards {
   issueScimToken(data: IssueScimTokenCommandData): Promise<ScimSyncFactInput[]>;
   recordScimUserPush(data: RecordScimUserPushCommandData): Promise<ScimSyncFactInput[]>;
@@ -77,14 +73,10 @@ export interface ScimSyncLifecycleLedger {
  */
 const SCIM_SYNC_ACTOR = { type: "system", id: SYSTEM_ACTORS.scim } as const;
 
-export interface ScimSyncLifecycleAdapterDeps {
+interface ScimSyncLifecycleAdapterDeps {
   guards: ScimSyncLifecycleGuards;
   ledger: ScimSyncLifecycleLedger;
-  /**
-   * Mints one command id per call. Supplied rather than imported: the id
-   * generator is identity's, and this package may not take a value off a core
-   * feature's server package.
-   */
+  /** Mints one command id per call; supplied so a test can pin it. */
   newCommandId: () => string;
   /** Injectable for tests; production reads the wall clock. */
   now?: () => number;

@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
@@ -9,7 +10,6 @@ import { acceptInviteResultSchema } from "../../model/accept-invite-result.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import Link from "../elements/router-link.tsx";
 import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
 
 /** Invitation landing: handles signed-out, signed-in, and expired cases. */

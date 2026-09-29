@@ -68,20 +68,21 @@ func havenEnv(inherit []string, slug string) []string {
 	return havenrun.Env(inherit, slug, havenrun.EnvOptions{})
 }
 
-// bringUpHaven checks out both refs and brings each up as a haven stack.
-// Both are started before either is waited on: `up --detach` returns as soon
-// as the stack is backgrounded, and the expensive part (install, codegen,
-// migrate, seed, then the lanes) then runs on both sides at once.
+// bringUpHaven checks out each ref and brings it up as a haven stack the
+// moment it is prepared: `up --detach` returns as soon as the stack is
+// backgrounded, so the base, the slower boot, migrates and seeds while its UI
+// builds and the candidate prepares. Neither is waited on until both started.
 func (run *session) bringUpHaven(ctx context.Context) error {
 	stacks := run.liveStacks()
-	running, err := run.prepareHaven(ctx, stacks)
-	if err != nil {
-		return err
-	}
 	for _, stack := range stacks {
-		if err := run.startHaven(ctx, *stack, running[stack.Name]); err != nil {
+		running, err := run.prepareStack(ctx, stack)
+		if err != nil {
 			return err
 		}
+		if err := run.startHaven(ctx, *stack, running); err != nil {
+			return err
+		}
+		run.buildUI(ctx, *stack)
 	}
 	if run.stagger && len(stacks) == 2 {
 		arrival := make(chan baseArrival, 1)
@@ -144,23 +145,19 @@ func (run *session) waitForAPI(ctx context.Context, stack Stack) error {
 	return nil
 }
 
-// prepareHaven adopts each stack a -resume run already prepared and checks
-// out the rest, reporting which stacks haven already runs.
-func (run *session) prepareHaven(ctx context.Context, stacks []*Stack) (map[string]bool, error) {
-	running := map[string]bool{}
-	for _, stack := range stacks {
-		adopted, live, err := run.adoptHaven(ctx, stack)
-		if err != nil {
-			return nil, err
-		}
-		running[stack.Name] = live
-		if !adopted {
-			if err := run.checkoutForHaven(ctx, stack); err != nil {
-				return nil, err
-			}
+// prepareStack adopts a stack a -resume run already prepared or checks it
+// out, reporting whether haven already runs it.
+func (run *session) prepareStack(ctx context.Context, stack *Stack) (bool, error) {
+	adopted, live, err := run.adoptHaven(ctx, stack)
+	if err != nil {
+		return false, err
+	}
+	if !adopted {
+		if err := run.checkoutForHaven(ctx, stack); err != nil {
+			return false, err
 		}
 	}
-	return running, nil
+	return live, nil
 }
 
 // startHaven boots a stack unless haven already runs it, recording it for
@@ -284,10 +281,8 @@ func (run *session) havenPrepare(ctx context.Context, stack Stack) error {
 		return fmt.Errorf("copy env for %s: %w", stack.Name, err)
 	}
 	fmt.Fprintf(run.streams.Err, "%s: prepare: copy .env files exit=ok (copied %d)\n", stack.Name, copied)
-	if stack.Layout == LayoutMonolith && stack.HavenSlug != "" {
-		if err := havenrun.PinDotenvOrigin(stack.Dir, havenrun.AppOrigin(stack.HavenSlug)); err != nil {
-			return fmt.Errorf("pin origin for %s: %w", stack.Name, err)
-		}
+	if err := pinMonolithDotenv(stack); err != nil {
+		return err
 	}
 	substituted, err := EnsureGatewaySecrets(stack.Dir, run.runID)
 	if err != nil {
@@ -313,6 +308,21 @@ func (run *session) havenPrepare(ctx context.Context, stack Stack) error {
 		return nil
 	}
 	return recordPrepared(stack.Dir, key)
+}
+
+// pinMonolithDotenv writes what a monolith base's app must read from its own
+// .env, which it reloads with override after haven's overlay.
+func pinMonolithDotenv(stack Stack) error {
+	if stack.Layout != LayoutMonolith || stack.HavenSlug == "" {
+		return nil
+	}
+	if err := havenrun.PinDotenvOrigin(stack.Dir, havenrun.AppOrigin(stack.HavenSlug)); err != nil {
+		return fmt.Errorf("pin origin for %s: %w", stack.Name, err)
+	}
+	if err := PinMonolithDotenv(stack.Dir); err != nil {
+		return fmt.Errorf("pin monolith env for %s: %w", stack.Name, err)
+	}
+	return nil
 }
 
 // preparedAlready reports a persistent worktree whose last finished prepare

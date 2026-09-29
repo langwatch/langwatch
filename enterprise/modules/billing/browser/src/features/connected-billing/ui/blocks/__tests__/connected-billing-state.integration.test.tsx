@@ -138,4 +138,42 @@ describe("the connected billing panel", () => {
       expect(screen.getByText("Seat invoice pending")).toBeInTheDocument();
     });
   });
+
+  describe("given seat changes in every state", () => {
+    /** @scenario "The Billing section shows each seat change and how its invoicing stands" */
+    it("shows one line per change with what finance needs to know", () => {
+      const change = {
+        changedAt: "2026-08-02T00:00:00Z",
+        addedSeats: 5,
+        amountCents: 0,
+        currency: null,
+        stripeInvoiceId: null,
+      };
+      render(
+        <ConnectedBillingState
+          overview={overview({
+            seatChanges: [
+              { ...change, licenseId: "license-3", state: "awaiting" },
+              { ...change, licenseId: "license-4", state: "not_onboarded" },
+              {
+                ...change,
+                licenseId: "license-5",
+                state: "invoiced",
+                amountCents: 2_000_00,
+                currency: "USD",
+                stripeInvoiceId: "in_5",
+              },
+              { ...change, licenseId: "license-6", state: "nothing_to_invoice", currency: "USD" },
+            ],
+          })}
+        />,
+        { wrapper },
+      );
+
+      expect(screen.getByText(/Billing invoices the added seats within a minute/)).toBeVisible();
+      expect(screen.getByText(/finance invoices the added seats by hand/)).toBeVisible();
+      expect(screen.getByText(/were invoiced, prorated to the end of the term/)).toBeVisible();
+      expect(screen.getByText(/the term has no days left to charge for/)).toBeVisible();
+    });
+  });
 });

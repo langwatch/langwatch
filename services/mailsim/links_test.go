@@ -2,7 +2,6 @@ package mailsim
 
 import (
 	"net/http"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -52,56 +51,5 @@ func TestPopupBaseLeavesASenderSBaseAlone(t *testing.T) {
 
 	t.Run("given no HTML body", func(t *testing.T) {
 		assert.Empty(t, withPopupBase(""))
-	})
-}
-
-// @scenario "URLs in a plain-text body are links, not characters to copy"
-func TestPlainTextBodyIsLinkified(t *testing.T) {
-	t.Run("given a text body with a URL in a sentence", func(t *testing.T) {
-		m := &Message{}
-		m.Text = "Open https://app.local/verify?a=1 to continue."
-		got := string(m.LinkifiedText())
-
-		assert.Contains(t, got, `<a href="https://app.local/verify?a=1" target="_blank" rel="noreferrer">`)
-		// The full stop ends the sentence, not the address.
-		assert.Contains(t, got, "</a> to continue.")
-	})
-
-	t.Run("given a text body that contains markup", func(t *testing.T) {
-		m := &Message{}
-		m.Text = "<script>alert(1)</script> and https://app.local/x"
-		got := string(m.LinkifiedText())
-
-		assert.Contains(t, got, "&lt;script&gt;", "a text body is text, whatever it contains")
-		assert.NotContains(t, got, "<script>")
-		assert.Contains(t, got, `href="https://app.local/x"`)
-	})
-}
-
-// @scenario "The inbox can tell you a message arrived without you watching it"
-func TestNotifyToggleStartsOff(t *testing.T) {
-	s := newTestServer(t, Config{})
-	rec := doHTTP(s, "GET", "/")
-	require.Equal(t, http.StatusOK, rec.Code)
-	page := rec.Body.String()
-
-	t.Run("when the inbox is opened", func(t *testing.T) {
-		button := regexp.MustCompile(`<button id="notify"[^>]*>`).FindString(page)
-		require.NotEmpty(t, button, "the inbox offers desktop notifications")
-		// Off until asked for: a page that demands notification permission on
-		// load is one people deny permanently, and then the feature is gone for
-		// good. Nothing on first load may call requestPermission.
-		assert.Contains(t, button, `aria-pressed="false"`, "and it starts off")
-	})
-
-	t.Run("when the page script is served", func(t *testing.T) {
-		script := doHTTP(s, "GET", "/assets/ui.js").Body.String()
-		assert.Contains(t, script, "requestPermission", "permission is asked for")
-		assert.Contains(t, script, `notifyButton.addEventListener("click"`,
-			"and only from the button's own click handler")
-		// The hidden-tab early return is what the toggle buys: with it on, the
-		// tab keeps polling while it is in the background, which is the only
-		// moment a notification is worth anything.
-		assert.Contains(t, script, "document.hidden && !notifying")
 	})
 }

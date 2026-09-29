@@ -5,7 +5,6 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockResetPassword, searchParamsRef } = vi.hoisted(() => ({
@@ -21,14 +20,6 @@ vi.mock("../../../behavior/auth-client.tsx", () => ({
 
 vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
-}));
-
-vi.mock("../../../ui/elements/router-link.tsx", () => ({
-  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
 }));
 
 import ResetPassword from "../reset-password-screen.tsx";

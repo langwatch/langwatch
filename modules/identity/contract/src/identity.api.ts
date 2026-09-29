@@ -66,15 +66,6 @@ import type {
   RegenerateBackupCodesCommandData,
   MfaFactInput,
 } from "./mfa.ts";
-import type {
-  IssueScimTokenCommandData,
-  RecordScimApplyFailureCommandData,
-  RecordScimGroupMappingCommandData,
-  RecordScimUserPushCommandData,
-  RedriveScimApplyCommandData,
-  RevokeScimSyncCommandData,
-} from "./scim-sync-commands.ts";
-import type { ScimSyncActivityEntry, ScimSyncFactInput, ScimSyncState } from "./scim-sync.ts";
 import type { RoutingDecision } from "./signin-routing.ts";
 import type {
   SsoArrivingUser,
@@ -264,37 +255,6 @@ export interface SsoConnectionReadsApi {
 export interface SsoConnectionProviderReading {
   connectionId: string;
   providerId: string;
-}
-
-/**
- * Where each of an organization's directory syncs stands. Identity owns the
- * folded state; the directory module composes its reconciliation view from
- * this plus the people it pushed itself.
- */
-export interface ScimSyncReadsApi {
-  findForOrganization(args: { organizationId: string }): Promise<ScimSyncState[]>;
-  /** One connection's sync, or null where that connection has never synced.
-   *  Scoped to the organization, so a caller cannot read another's. */
-  findByConnection(args: {
-    organizationId: string;
-    connectionId: string;
-  }): Promise<ScimSyncState | null>;
-  /** The platform operator's cross-customer page (ADR-122), newest first;
-   *  searched on the sync, connection or organization id, or the state. */
-  listForOperator(args: {
-    page: number;
-    pageSize: number;
-    search?: string | undefined;
-  }): Promise<{ syncs: ScimSyncState[]; total: number }>;
-  /** One connection's sync across every organization, for the operator. */
-  findForOperator(args: { connectionId: string }): Promise<ScimSyncState[]>;
-  /** One connection's sync log, newest first, at most `limit`. Scanned in the
-   *  organization's tenant, so another organization's connection reads empty. */
-  findActivity(args: {
-    organizationId: string;
-    connectionId: string;
-    limit: number;
-  }): Promise<ScimSyncActivityEntry[]>;
 }
 
 /**
@@ -673,16 +633,6 @@ export interface SsoTestArrivalApi {
   standingFor(args: { userId: string }): Promise<SsoTestArrivalStanding>;
 }
 
-/** The directory-sync guards. */
-export interface ScimSyncGuardsApi {
-  issueScimToken(data: IssueScimTokenCommandData): Promise<ScimSyncFactInput[]>;
-  recordScimUserPush(data: RecordScimUserPushCommandData): Promise<ScimSyncFactInput[]>;
-  recordScimGroupMapping(data: RecordScimGroupMappingCommandData): Promise<ScimSyncFactInput[]>;
-  recordScimApplyFailure(data: RecordScimApplyFailureCommandData): Promise<ScimSyncFactInput[]>;
-  redriveScimApply(data: RedriveScimApplyCommandData): Promise<ScimSyncFactInput[]>;
-  revokeScimSync(data: RevokeScimSyncCommandData): Promise<ScimSyncFactInput[]>;
-}
-
 /** The address-lock reservations the identity ledger claims and releases. */
 export interface IdentityReservationsApi {
   claim(args: {
@@ -769,6 +719,8 @@ export interface IdentityApi {
   newbornSweep(): IdentityNewbornSweepApi;
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
   userMigrations(): readonly SystemMigration[];
+  /** The ORGANIZATION-rooted migrations identity registers (D04), main's `registeredMigrations`. */
+  registeredMigrations(): readonly SystemMigration[];
   joinRequestGuards(): JoinRequestGuardsApi;
   ssoConnections(): SsoConnectionApi;
   ssoConnectionGuards(): SsoConnectionGuardsApi;
@@ -788,8 +740,6 @@ export interface IdentityApi {
   ssoBreakGlass(): SsoBreakGlassApi;
   ssoSetup(): SsoSetupApi;
   ssoSetupCommands(): SsoSetupCommandsApi;
-  scimSyncGuards(): ScimSyncGuardsApi;
-  scimSyncReads(): ScimSyncReadsApi;
 }
 
 export const IdentityApi = moduleApi<IdentityApi>()("identity");

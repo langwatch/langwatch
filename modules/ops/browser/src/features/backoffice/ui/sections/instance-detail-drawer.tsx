@@ -1,4 +1,5 @@
-import { Badge, Box, HStack, Link, SimpleGrid, Table, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, SimpleGrid, Table, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Drawer } from "@langwatch/design-system/drawer";
 
 import { api } from "../../../../behavior/ops-api.ts";

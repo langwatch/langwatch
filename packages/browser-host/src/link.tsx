@@ -1,6 +1,7 @@
 /**
- * An in-application address, as an anchor, without reaching the router.
- * ADR-004 seals the router off from a feature package, so an internal address
+ * The one in-app link: a real anchor whose plain click routes in place through
+ * the navigation capability (§10), so the document never reloads.
+ * Spec: specs/ui/in-app-links.feature
  */
 
 import { Link as ChakraLink } from "@chakra-ui/react";
@@ -13,15 +14,27 @@ type LinkProps = {
   isExternal?: boolean;
 } & Omit<ComponentProps<typeof ChakraLink>, "as" | "href">;
 
+/** The API's own addresses, which the browser must load as a document. */
+const SERVER_PATH = /^\/api(?:[/?#]|$)/;
+
+/** Whether this address is a page of this application, which the router serves. */
+function isInAppHref(href: string | undefined): href is string {
+  if (!href?.startsWith("/") || href.startsWith("//")) return false;
+  return !href.includes("\\") && !SERVER_PATH.test(href);
+}
+
 /** Whether the browser should be left to handle this click itself. */
 function isBrowserClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  const { target } = event.currentTarget;
   return (
     event.defaultPrevented ||
     event.button !== 0 ||
     event.metaKey ||
     event.ctrlKey ||
     event.shiftKey ||
-    event.altKey
+    event.altKey ||
+    (target !== "" && target !== "_self") ||
+    event.currentTarget.hasAttribute("download")
   );
 }
 
@@ -41,7 +54,7 @@ export const Link = ({ href, isExternal, children, onClick, ...props }: LinkProp
       href={href ?? ""}
       onClick={(event: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(event);
-        if (isBrowserClick(event) || !href || !capabilities) return;
+        if (isBrowserClick(event) || !isInAppHref(href) || !capabilities) return;
         event.preventDefault();
         capabilities.navigation.navigate(href);
       }}

@@ -117,6 +117,7 @@ export const opsEventLogTrpcTransport = defineTrpcRouter(OpsApi, opsEventLogTrpc
       fullRebuild: input.fullRebuild,
       description: input.description,
       userName: operator?.name ?? operator?.email ?? "unknown",
+      requestedByUserId: operator?.id,
     });
   })
 

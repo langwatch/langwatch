@@ -105,3 +105,27 @@ Feature: Projection replay
     When the run continues past that lifetime
     Then progress and cancellation keep working for the whole run
     And this holds even when a single batch takes longer than that lifetime
+
+  # The event source reads through the routed ClickHouse member itself (Alex, 2026-09-28): each
+  # statement names its tenant and the member places it on that tenant's server, with no adapter
+  # between them. A read spanning every tenant names none, which the member reads on the shared
+  # server, where main's "default" fallback read.
+  @unit
+  Scenario: A replay batch reads its events streamed rather than held whole
+    Given a batch whose events the server sends in several parts
+    When the replay applies the batch
+    Then each part is applied as it arrives, in order
+    And the read names the batch's tenant
+
+  @unit
+  Scenario: A replay across every tenant discovers on the shared server, as main did
+    Given a replay asked for every tenant
+    When it discovers the affected aggregates
+    Then the discovery names no tenant and states why
+    And a replay asked for one tenant names that tenant
+
+  @unit
+  Scenario: A rebuilt table is optimized on each touched tenant's own server
+    Given a replay that rebuilt rows for a tenant
+    When the rebuilt table is optimized
+    Then the statement names that tenant

@@ -16,7 +16,6 @@ export * from "./ui/sections/observability/platform-grid.tsx";
 export * from "./ui/elements/onboarding-mesh-background.tsx";
 export * from "./features/guided-onboarding/model/kickoff.ts";
 export * from "./features/guided-onboarding/model/guided-providers.ts";
-export * from "./ui/elements/link.tsx";
 export * from "./ui/elements/shared/selectable-icon-card.tsx";
 export * from "./model/shared/accent-surface.ts";
 export * from "./behavior/use-project-by-slug-or-latest.ts";

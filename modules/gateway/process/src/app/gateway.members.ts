@@ -246,6 +246,8 @@ export type GatewayClickHouseClient = {
     clickhouse_settings?: Record<string, string | number | boolean | undefined>;
     /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
     unscoped?: { reason: string };
+    /** One organisation's projects a `TenantId IN (...)` read binds, exactly. */
+    tenantIds?: readonly string[];
   }): Promise<{ json<T = unknown>(): Promise<T[]> }>;
   insert(input: {
     table: string;

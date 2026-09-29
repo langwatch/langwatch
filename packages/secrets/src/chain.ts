@@ -1,7 +1,7 @@
 /**
  * The lookup order the app states on the Server preamble. An order, never a
- * store: nothing pre-fetched, held or enumerated — each fetch walks the
- * adapters front to back for ONE id and forgets the answer it hands over.
+ * store: nothing pre-fetched or held — each fetch walks the adapters front to
+ * back for ONE id, or one declared family's prefix, and forgets its answer.
  */
 import childProcess from "node:child_process";
 import fs from "node:fs";
@@ -9,10 +9,11 @@ import path from "node:path";
 
 import { OnePasswordInProductionError, OnePasswordUnavailableError } from "./secrets.errors.ts";
 
-/** One place a single id can be read from, one key at a time. */
+/** One place a single id can be read from, one key at a time, or scanned by one prefix. */
 type SecretAdapter = Readonly<{
   describe: string;
   read(id: string): Promise<string | undefined>;
+  scan(prefix: string): Promise<ReadonlyMap<string, string>>;
 }>;
 
 export class SecretsChain {
@@ -33,12 +34,17 @@ export class SecretsChain {
     return this.with({
       describe: "env",
       read: (id) => Promise.resolve(presentOrAbsent(this.environment[id])),
+      scan: (prefix) => Promise.resolve(presentUnder(prefix, Object.entries(this.environment))),
     });
   }
 
   /** The workspace `.env` file, scanned per key, never held. */
   withFile(file: string = path.join(process.cwd(), ".env")): SecretsChain {
-    return this.with({ describe: `file:${file}`, read: (id) => readDotenvKey(file, id) });
+    return this.with({
+      describe: `file:${file}`,
+      read: (id) => readDotenvKey(file, id),
+      scan: (prefix) => scanDotenvPrefix(file, prefix),
+    });
   }
 
   /**
@@ -58,6 +64,8 @@ export class SecretsChain {
     return this.with({
       describe: `1password:${chosen}`,
       read: (id) => readOnePasswordField({ account: chosen, id }),
+      // A vault item is not enumerated: a family answers from the environment only.
+      scan: () => Promise.resolve(new Map()),
     });
   }
 
@@ -70,6 +78,19 @@ export class SecretsChain {
     }
 
     return undefined;
+  }
+
+  /** Every name under one prefix, front to back; per name the first answer wins. */
+  async fetchFamily(prefix: string): Promise<ReadonlyMap<string, string>> {
+    const answers = new Map<string, string>();
+
+    for (const adapter of this.adapters) {
+      for (const [name, value] of await adapter.scan(prefix)) {
+        if (!answers.has(name)) answers.set(name, value);
+      }
+    }
+
+    return answers;
   }
 
   private with(adapter: SecretAdapter): SecretsChain {
@@ -114,24 +135,65 @@ function run(
 
 /** Reads one KEY=VALUE line from a dotenv file without holding the file. */
 async function readDotenvKey(file: string, id: string): Promise<string | undefined> {
+  for (const [name, value] of await readDotenvLines(file)) {
+    if (name === id) return presentOrAbsent(value);
+  }
+
+  return undefined;
+}
+
+/** The dotenv lines whose name starts with `prefix`; the first line for a name wins. */
+async function scanDotenvPrefix(
+  file: string,
+  prefix: string,
+): Promise<ReadonlyMap<string, string>> {
+  const found = new Map<string, string>();
+
+  for (const [name, value] of presentUnder(prefix, await readDotenvLines(file))) {
+    if (!found.has(name)) found.set(name, value);
+  }
+
+  return found;
+}
+
+async function readDotenvLines(file: string): Promise<[string, string][]> {
   let content: string;
 
   try {
     content = await fs.promises.readFile(file, "utf8");
   } catch {
     // No file is an ordinary absence: the next adapter answers.
-    return undefined;
+    return [];
   }
 
-  for (const line of content.split("\n")) {
+  return content.split("\n").flatMap((line): [string, string][] => {
     const bare = line.trim();
+    const equals = bare.indexOf("=");
 
-    if (bare.startsWith("#") || !bare.startsWith(`${id}=`)) continue;
+    if (bare.startsWith("#") || equals <= 0) return [];
 
-    return presentOrAbsent(unquote(bare.slice(id.length + 1).trim()));
+    return [[bare.slice(0, equals), unquote(bare.slice(equals + 1).trim())]];
+  });
+}
+
+/** The set, non-empty entries whose name starts with `prefix`; an empty prefix names none. */
+function presentUnder(
+  prefix: string,
+  entries: Iterable<readonly [string, string | undefined]>,
+): Map<string, string> {
+  const found = new Map<string, string>();
+
+  if (prefix === "") return found;
+
+  for (const [name, value] of entries) {
+    const present = presentOrAbsent(value);
+
+    if (name.startsWith(prefix) && present !== undefined && !found.has(name)) {
+      found.set(name, present);
+    }
   }
 
-  return undefined;
+  return found;
 }
 
 function unquote(value: string): string {

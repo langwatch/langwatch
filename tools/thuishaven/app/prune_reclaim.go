@@ -68,9 +68,11 @@ func (o *Orchestrator) ReclaimClassifiedWorktrees(ctx context.Context, repoRoot 
 	}
 	removedAny := false
 	for _, c := range candidates {
+		slug, _ := o.slugForDir(canonicalPath(c.Dir))
 		rerr := o.hyg.RemoveWorktree(repoRoot, c.Dir)
 		if rerr == nil {
 			removedAny = true
+			o.removeStackHome(slug)
 			o.recordReap("worktree", c.Dir, c.Reason)
 			o.log.Info("reclaimed worktree",
 				zap.String("dir", c.Dir), zap.String("branch", c.Branch),

@@ -3,10 +3,8 @@ export {
   analyticsServer,
   type AnalyticsClickHouseClientResolver,
   type AnalyticsServiceCompositionInput,
-  type ClickHouseFilterConditions,
   createAnalyticsComparisonWindow,
   createAnalyticsService,
-  createClickHouseFilterConditions,
   createLegacyFilterMatching,
   createPreconditionTraceData,
 } from "./analytics.server.ts";
@@ -82,7 +80,6 @@ export {
   QueryScanLimitExceededError,
   QueryTimeoutError,
 } from "@langwatch/analytics-contract";
-export { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";
 
 // The LangWatchQL key map: the names a project's access is granted through,
 // and the rows the deploy backfill repairs.

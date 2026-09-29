@@ -1,4 +1,5 @@
 import { Box, Button, Heading, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -55,7 +56,9 @@ export function EnterpriseLockedSurface({ children, featureName, description }: 
               `${featureName} is available on Enterprise plans. Upgrade to unlock this surface for your organization.`}
           </Text>
           <Button asChild size="sm" colorPalette="orange">
-            <a href="/settings/subscription">Upgrade →</a>
+            <Link unstyled href="/settings/subscription">
+              Upgrade →
+            </Link>
           </Button>
         </VStack>
       </Box>

@@ -8,8 +8,13 @@ import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import {
+  ClickHouseGatewayOpenAdmissionsSweepRepository,
+  type GatewayClickHouseInstance,
+} from "../repositories/clickhouse/clickhouse.gateway-open-admissions-sweep.repository.ts";
 import { ClickHouseGatewayPrincipalSpendRepository } from "../repositories/clickhouse/clickhouse.gateway-principal-spend.repository.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+import type { GatewayOpenAdmissionsRepository } from "../repositories/gateway-open-admissions.repository.ts";
 import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
 import {
   PrismaGatewayBudgetRepository,
@@ -67,10 +72,24 @@ import type {
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 
 class GatewayClickHouseSession implements GatewayClickHouseClient {
-  constructor(
-    private readonly clickhouse: ClickHouseQueryClient,
-    private readonly tenantId: string,
-  ) {}
+  private readonly clickhouse: ClickHouseQueryClient;
+  private readonly tenantId: string;
+  /** Routes an install-wide read to one private server; the shared one when absent. */
+  private readonly organizationId: string | undefined;
+
+  constructor({
+    clickhouse,
+    tenantId,
+    organizationId,
+  }: {
+    clickhouse: ClickHouseQueryClient;
+    tenantId: string;
+    organizationId?: string | undefined;
+  }) {
+    this.clickhouse = clickhouse;
+    this.tenantId = tenantId;
+    this.organizationId = organizationId;
+  }
 
   async query(input: {
     query: string;
@@ -78,13 +97,16 @@ class GatewayClickHouseSession implements GatewayClickHouseClient {
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, string | number | boolean | undefined>;
     unscoped?: { reason: string };
+    tenantIds?: readonly string[];
   }): Promise<{ json<T = unknown>(): Promise<T[]> }> {
     const { rows } = await this.clickhouse.query<unknown>({
       tenantId: this.tenantId,
+      ...(this.organizationId === undefined ? {} : { organizationId: this.organizationId }),
       sql: input.query,
       params: input.query_params,
       settings: input.clickhouse_settings as Record<string, string | number> | undefined,
       ...(input.unscoped ? { unscoped: input.unscoped } : {}),
+      ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
     });
 
     return { json: <T = unknown>() => Promise.resolve(rows as T[]) };
@@ -197,7 +219,28 @@ export type GatewayControlPlane = GatewayAppDependencies &
     internalScopeResolution: GatewayScopeResolutionService;
     /** The spend ledger the gateway_spend fold writes, over the same routing client. */
     spendLedger: ClickHouseGatewaySpendEventsRepository;
+    /** The settlement sweeper's read of every server's open admissions. */
+    openAdmissions: GatewayOpenAdmissionsRepository;
   }>;
+
+/**
+ * The shared server, then one routed organization per distinct private server,
+ * as main's `getAllClickHouseInstances` listed them: two organizations on one
+ * private server are swept once. Read per sweep, never at boot.
+ */
+function everyClickHouseServer(clickhouse: ClickHouseQueryClient): GatewayClickHouseInstance[] {
+  const organizationByServer = new Map<string, string>();
+  for (const [organizationId, url] of clickhouse.privateRoutes()) {
+    if (!organizationByServer.has(url)) organizationByServer.set(url, organizationId);
+  }
+  return [
+    { target: "shared", client: new GatewayClickHouseSession({ clickhouse, tenantId: "" }) },
+    ...[...organizationByServer.values()].map((organizationId) => ({
+      target: organizationId,
+      client: new GatewayClickHouseSession({ clickhouse, tenantId: "", organizationId }),
+    })),
+  ];
+}
 
 /**
  * Composes the gateway control plane: the whole of what {@link GatewayApp}'s
@@ -214,7 +257,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
   // One resolution over the one member, per tenant. `Promise.resolve` because
   // there is nothing to open: the client already exists.
   const resolveClickHouse: GatewayClickHouseResolver = (tenantId) =>
-    Promise.resolve(new GatewayClickHouseSession(options.clickhouse, tenantId));
+    Promise.resolve(new GatewayClickHouseSession({ clickhouse: options.clickhouse, tenantId }));
 
   const scopeResolution = GatewayScopeResolutionService.create({
     repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
@@ -236,6 +279,9 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
   const budgetSpend = GatewayBudgetClickHouseRepository.create(resolveClickHouse);
   const principalSpend = ClickHouseGatewayPrincipalSpendRepository.create(resolveClickHouse);
   const spendLedger = ClickHouseGatewaySpendEventsRepository.create(resolveClickHouse);
+  const openAdmissions = ClickHouseGatewayOpenAdmissionsSweepRepository.create(() =>
+    Promise.resolve(everyClickHouseServer(options.clickhouse)),
+  );
   const spendEvents = GatewaySpendEventsService.create(spendLedger);
 
   const budgetDecisions = PrismaGatewayAdapter.create({
@@ -284,6 +330,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     internalChanges: changes,
     internalScopeResolution: scopeResolution,
     spendLedger,
+    openAdmissions,
 
     organizationIdForProject: async (projectId) => {
       const organizationId = await projects.findOrganizationId(projectId);

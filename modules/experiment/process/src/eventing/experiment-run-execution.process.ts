@@ -25,6 +25,7 @@ import {
 import {
   type CompleteRunIntent,
   completeRunIntentSchema,
+  EXPERIMENT_RUN_INTENT_ATTEMPTS,
   EXPERIMENT_RUN_STALL_MS,
   type ExecuteCellIntent,
   executeCellIntentSchema,
@@ -109,6 +110,7 @@ function settle(state: State, ctx: Context, intents: ProcessIntent[]): ProcessEv
         runId: state.runId,
         experimentId: state.experimentId,
         outcome,
+        finishedCells: countFinished({ bitmap: state.finished, from: 0, to: totalCells(state) }),
       }),
     ],
   };
@@ -250,5 +252,5 @@ export function experimentRunExecutionProcess(
       .on(abortRequestedEventSchema, handleAbortRequested)
       .on(experimentRunCompletedEventSchema, handleRunCompleted)
       .onWake(experimentRunStallWake)
-      .outbox({ maxAttempts: 5, concurrency: 5, batchSize: 5 });
+      .outbox({ maxAttempts: EXPERIMENT_RUN_INTENT_ATTEMPTS, concurrency: 5, batchSize: 5 });
 }

@@ -25,7 +25,14 @@ export const Prompt: Story = {
 };
 
 export const Link: Story = {
-  args: { href: "#analytics", label: "Open the cost dashboard", icon: <BarChart3 size={12} /> },
+  render: () => (
+    <AskChip
+      href="#analytics"
+      onNavigate={() => undefined}
+      label="Open the cost dashboard"
+      icon={<BarChart3 size={12} />}
+    />
+  ),
 };
 
 export const Row: Story = {

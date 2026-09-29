@@ -69,7 +69,7 @@ function restHost(authz: AuthzApi): RestHost {
       apiKey: closed,
       scimToken: closed,
       "instance-admin": closed,
-      browser: BrowserSessionIdentity.create(sessions, authz),
+      browser: BrowserSessionIdentity.create({ sessions, authz, publicBaseUrl: void 0 }),
     },
     bearers: () => closed,
     audit: { record: async () => undefined },

@@ -1,12 +1,10 @@
-/** Full-page wait screen with a ghost-on-unmount dissolve on the way out. */
+/** Full-page wait screen: logo static from the first frame, dissolving out on unmount. */
 import { Box } from "@chakra-ui/react";
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { useReducedMotion } from "../use-reduced-motion.ts";
+import { AmbientGround } from "./ambient-ground.tsx";
 import { FullLogo } from "./full-logo.tsx";
-
-let logoVisibleOnce = false;
 
 /** How long the screen takes to dissolve off the page it was covering. */
 const FADE_OUT_MS = 320;
@@ -22,25 +20,10 @@ const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : us
  */
 export const LoadingScreen = () => {
   const reduceMotion = useReducedMotion();
-  const [showLogo, setShowLogo] = useState(logoVisibleOnce);
   const rootRef = useRef<HTMLDivElement>(null);
   // Read at unmount, so the cleanup never closes over a stale preference.
   const reduceMotionRef = useRef(reduceMotion);
   reduceMotionRef.current = reduceMotion;
-
-  useEffect(() => {
-    let logoSettledTimeout: ReturnType<typeof setTimeout> | undefined;
-    const showLogoTimeout = setTimeout(() => {
-      setShowLogo(true);
-      logoSettledTimeout = setTimeout(() => {
-        logoVisibleOnce = true;
-      }, 500);
-    }, 50);
-    return () => {
-      clearTimeout(showLogoTimeout);
-      if (logoSettledTimeout) clearTimeout(logoSettledTimeout);
-    };
-  }, []);
 
   useIsomorphicLayoutEffect(() => {
     return () => {
@@ -79,61 +62,26 @@ export const LoadingScreen = () => {
     };
   }, []);
 
-  const fullLogo = <FullLogo width={155 * 1.2} height={38 * 1.2} />;
-
+  // No entry fade and no delay: the logo is on screen at first paint, and
+  // only the ambient ground's live shader fades in behind it.
   return (
-    <motion.div
+    <Box
       ref={rootRef}
-      style={{ width: "100%", height: "100%", minHeight: "100vh" }}
-      // No entry fade on remount (flashing back from zero repeatedly is a
-      // wink). No `exit` either — it would never run; the ghost in the
-      // layout-effect cleanup above is what survives an early-returned
-      // unmount.
-      initial={reduceMotion || logoVisibleOnce ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: "easeOut" }}
+      data-testid="loading-screen"
+      width="full"
+      height="full"
+      minHeight="100vh"
+      bg="bg.page"
+      position="relative"
+      paddingBottom={16}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
     >
-      <Box
-        width="full"
-        height="full"
-        minHeight="100vh"
-        bg="bg.page"
-        position="relative"
-        paddingBottom={16}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
-        {/* Orange mesh gradient background */}
-        <Box
-          position="absolute"
-          inset={0}
-          pointerEvents="none"
-          overflow="hidden"
-          zIndex={0}
-          style={{
-            contain: "layout paint",
-            background: [
-              "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(237,137,38,0.06) 0%, transparent 70%)",
-              "radial-gradient(ellipse 60% 40% at 70% 100%, rgba(237,137,38,0.02) 0%, transparent 60%)",
-            ].join(", "),
-          }}
-        />
-
-        <Box position="relative" zIndex={1}>
-          {!logoVisibleOnce ? (
-            <AnimatePresence>
-              {showLogo && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  {fullLogo}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          ) : (
-            fullLogo
-          )}
-        </Box>
+      <AmbientGround />
+      <Box position="relative" zIndex={1} data-testid="loading-screen-logo">
+        <FullLogo width={155 * 1.2} height={38 * 1.2} />
       </Box>
-    </motion.div>
+    </Box>
   );
 };

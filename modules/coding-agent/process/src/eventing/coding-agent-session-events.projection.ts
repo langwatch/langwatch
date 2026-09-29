@@ -95,6 +95,7 @@ export class CodingAgentSessionEventsMapProjection
   implements MapEventHandlers<typeof events, CodingAgentSessionEventRecord>
 {
   readonly name = "codingAgentSessionEvents";
+  readonly targetTable = "coding_agent_session_events";
   readonly store: AppendStore<CodingAgentSessionEventRecord>;
   protected readonly events = events;
 

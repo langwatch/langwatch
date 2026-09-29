@@ -220,15 +220,43 @@ Feature: Billing a connected self-hosted customer
   @unit
   Scenario: Changing the seats twice for one reissued license invoices once
     Given the added seats of a reissued license were already invoiced
-    When the same change is run again
+    When the seat invoicing pass runs again
     Then no second invoice is created
 
   @unit
   Scenario: A seat invoice that failed at the payment provider is retried without doubling
     Given the seat change recorded its intent and the payment provider call then failed
-    When the daily billing tick runs
+    When the next seat invoicing pass runs
     Then the invoice is created once
     And the backoffice showed the change as pending until then
+
+  @unit
+  Scenario: A seat invoice raised but never recorded is found rather than raised again
+    Given an earlier pass raised the seat invoice and failed before recording it
+    And the payment provider's idempotency key for it has lapsed
+    When the next seat invoicing pass runs
+    Then the invoice the payment provider already holds is recorded
+    And no second invoice is raised
+
+  @unit
+  Scenario: Seat changes are invoiced by a pass every minute on the billing pipeline
+    Given licensing recorded a seat change that raised a linked license
+    When the billing pipeline's scheduled seat invoicing pass wakes, once a minute across the fleet
+    Then the pass decides the change and invoices it
+    And licensing never calls billing
+
+  @unit
+  Scenario: A seat change recorded while billing was down is invoiced from when it happened
+    Given licensing recorded a seat change while no seat invoicing pass ran
+    When the first pass after billing recovers runs
+    Then the change is invoiced prorated from when the seats changed, not from when the pass ran
+
+  @unit
+  Scenario: A seat change billing cannot decide is retried on the next pass
+    Given two recorded seat changes and one of them cannot be decided
+    When the seat invoicing pass runs
+    Then the other change is decided and invoiced
+    And the first is decided on the next pass
 
   @unit
   Scenario: Seat invoices are never paid from the usage commit
@@ -240,9 +268,10 @@ Feature: Billing a connected self-hosted customer
   @unit
   Scenario: A customer with no billing account gets no seat invoice from LangWatch
     Given "ACME" was never onboarded for billing
-    When an operator raises its seats
+    When an operator raises its seats and the seat invoicing pass runs
     Then the license is reissued
-    And the operator is told finance invoices the added seats by hand
+    And the change is stored as not onboarded, so a later onboarding never invoices it
+    And the Billing section tells the operator finance invoices the added seats by hand
 
   # ============================================================================
   # Monthly statement
@@ -275,6 +304,25 @@ Feature: Billing a connected self-hosted customer
     Given "ACME" was onboarded, has used hosted services and has synced
     When an operator opens the customer in the backoffice
     Then they see the commit, the amount drawn down, the overage, the seats licensed and the seats reported, the time of the last sync and the open invoices
+
+  @unit
+  Scenario: The Billing section shows a seat change until billing decides it
+    Given licensing recorded a seat change billing has not decided yet
+    When an operator opens the customer in the backoffice
+    Then the change is shown as recorded and awaiting billing
+    And once a pass decided it, the change shows that decision
+
+  @integration
+  Scenario: The Billing section shows each seat change and how its invoicing stands
+    Given seat changes that are awaiting, not onboarded, invoiced and owed nothing
+    When an operator opens the customer in the backoffice
+    Then each change has its own line saying what finance needs to know
+
+  @unit
+  Scenario: The Billing section rereads until a seat change settles
+    Given a seat change awaiting billing or the payment provider
+    When the Billing section is open
+    Then it rereads every five seconds until every change is settled
 
   @unit
   Scenario: The backoffice says so when live spend cannot be read

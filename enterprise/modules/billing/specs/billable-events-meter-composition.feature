@@ -51,10 +51,10 @@ Feature: Composing the billable-events meter
 
   @unit
   Scenario: A worker mounts the meter only where the deployment is SaaS
-    Given a background worker composing its own graph
-    When it reads the same deployment variable the App reads
-    Then a SaaS process routes both of the meter pair's shared-queue jobs
-    And a self-hosted process routes neither
+    Given the monthly roll-up's pipeline composed for a SaaS deployment and for a self-hosted one
+    When each is built
+    Then the SaaS build declares the meter with its dispatch subscriber as a global projection
+    And the self-hosted build declares neither
 
   @unit
   Scenario: A worker routes the meter by organization, not by tenant
@@ -64,7 +64,8 @@ Feature: Composing the billable-events meter
     And it is never resolved for the project itself
 
   @unit
-  Scenario: A SaaS worker refuses to meter without a pipeline to report through
-    Given a SaaS worker composed with no billing reporting pipeline
-    When the graph is composed
-    Then composition fails and names the pipeline the reports are sent through
+  Scenario: A SaaS worker meters only through the pipeline its reports are sent through
+    Given the SaaS roll-up's pipeline built with the meter but not yet registered
+    When the meter's dispatch subscriber handles a billable event
+    Then nothing is reported, and the billable row stays in ClickHouse for the next run
+    And once the pipeline is registered the same event reports the month through reportUsageForMonth

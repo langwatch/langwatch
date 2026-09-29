@@ -122,9 +122,12 @@ describe("BugReportsView", () => {
     it("deep-links the report id into the URL", () => {
       renderView();
       fireEvent.click(screen.getByText("agent stuck instrumenting python"));
-      expect(routerState.replace).toHaveBeenCalledWith({ query: { report: "rep-1" } }, undefined, {
-        shallow: true,
-      });
+      expect(routerState.replace).toHaveBeenCalledWith(
+        { query: { report: "rep-1" } },
+        {
+          shallow: true,
+        },
+      );
     });
   });
 

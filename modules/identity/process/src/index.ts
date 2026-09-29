@@ -35,7 +35,6 @@ export {
  */
 export type { IdentityPipeline } from "./eventing/user-identity.pipeline.ts";
 export type { JoinRequestPipeline } from "./eventing/join-request.pipeline.ts";
-export type { ScimSyncPipeline } from "./eventing/scim-sync.pipeline.ts";
 /** The day-7-reminder/day-14-expiry process manager's registered name, named
  *  by a caller that asserts on which process a wake dispatched through. */
 export { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "./eventing/join-request-lifecycle.process.ts";
@@ -72,7 +71,6 @@ export { EventingSsoConnectionHistoryRepository } from "./repositories/eventing/
 export { ssoConnectionHistoryCopy } from "./rules/sso-connection-history-copy.rules.ts";
 export { SsoConnectionHistoryService } from "./services/sso-connection-history.service.ts";
 export { OrganizationSsoConnectionsService } from "./services/organization-sso-connections.service.ts";
-export { ScimSyncReadsService } from "./services/scim-sync-reads.service.ts";
 export { SsoIssuerDirectoryService } from "./services/sso-issuer-directory.service.ts";
 export {
   RequiresLocalDoorAndBinding,
@@ -116,8 +114,6 @@ export type { JoinRequestGuardsDeps } from "./services/join-request-guards.servi
 export type { JoinRequestAudienceRepository } from "./repositories/join-request-audience.repository.ts";
 export { type JoinRequestMail, type SsoDomainProofMail } from "./app/identity.members.ts";
 export type { JoinRequestLedger } from "./rules/join-request-ledger.rules.ts";
-export type { ScimSyncLedger } from "./rules/scim-sync-ledger.rules.ts";
-export type { ScimSyncReadRepository } from "./repositories/scim-sync.repository.ts";
 export type {
   SsoConnectionGrandfatherDeps,
   SsoConnectionGrandfatherOutcome,
@@ -214,11 +210,6 @@ export {
   IdentitySecretHealMigrationService,
 } from "./services/system-migration-identity-secret-heal.service.ts";
 export {
-  ScimSyncLedgerWriterService,
-  type ScimSyncLedgerWriterDeps,
-  type ScimSyncStagedSender,
-} from "./services/eventing-scim-sync-ledger.service.ts";
-export {
   SsoConnectionTeardownDispatcherService,
   type ConnectionDirectoryRevocation,
 } from "./services/sso-connection-teardown.service.ts";
@@ -244,7 +235,6 @@ export {
   composeJoinRequestNotifications,
   composeJoinRequestPipeline,
 } from "./eventing/join-request.pipeline.ts";
-export { composeScimSyncPipeline } from "./eventing/scim-sync.pipeline.ts";
 export {
   composeSsoConnectionGraph,
   type SsoConnectionGraph,

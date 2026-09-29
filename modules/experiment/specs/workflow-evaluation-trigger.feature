@@ -1,6 +1,8 @@
 Feature: A workflow evaluation is requested by the api and run by the worker
-  The api refuses what it can see at once, registers the run for polling and
-  sends the request on experiment_run_processing; the worker runs it.
+  The api refuses what it can see at once, sends the request on
+  experiment_run_processing and answers once the run's progress fold holds it;
+  the worker prepares and plans it and starts it on the run's pipeline, or
+  completes it failed.
   See specs/workflows/evaluate-via-api.feature for the public contract.
 
   @unit
@@ -21,10 +23,32 @@ Feature: A workflow evaluation is requested by the api and run by the worker
   Scenario: A redelivered evaluation request does not run twice
     Given a requested evaluation whose run already completed
     When the worker receives the request again
-    Then it skips the request and records no failure
+    Then it skips the request, starting nothing and failing nothing
 
   @unit
-  Scenario: A worker without a run loop fails the run it was sent
-    Given a worker that composed no run loop
-    When it receives an evaluation request
-    Then the run is recorded as failed for the poller to read
+  Scenario: The worker starts a requested evaluation on the run's pipeline with its plan
+    Given a registered request for a workflow with a committed version
+    When the worker receives it
+    Then it starts the run under the same id with a plan of one cell per row
+    And the plan names the experiment's slug and the run's link for the poller
+
+  @unit
+  Scenario: A requested evaluation the worker cannot prepare completes failed with its code
+    Given a registered request for a workflow with no committed version
+    When the worker receives it
+    Then the run is completed failed carrying the refusal
+    And no run is started
+    And the poller reads it failed with the refusal's code and the requested total
+
+  @unit
+  Scenario: A requested evaluation is polled running before the worker starts it
+    Given a requested evaluation the worker has not started yet
+    When its request is folded
+    Then the poller reads it running with the requested total, as main registered it
+
+  @unit
+  Scenario: A requested evaluation the worker does not register in time is refused as unavailable
+    Given a worker that does not fold the request within the bounded wait
+    When an evaluation is triggered
+    Then the request is sent once
+    And it is refused as service_unavailable, naming the worker that did not register the run

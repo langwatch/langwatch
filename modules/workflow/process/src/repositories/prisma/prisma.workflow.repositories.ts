@@ -1,4 +1,6 @@
 import type { WorkflowRepositories } from "../workflow-repositories.registry.ts";
+import { PrismaWorkflowLineageRepository } from "./prisma.workflow-lineage.repository.ts";
+import type { WorkflowLineageDatabase } from "./prisma.workflow-lineage.repository.ts";
 import { WorkflowProjectEnvironmentPrismaRepository } from "./prisma.workflow-project-environment.repository.ts";
 import type { WorkflowProjectEnvironmentDatabase } from "./prisma.workflow-project-environment.repository.ts";
 import { WorkflowRowPrismaRepository } from "./prisma.workflow-row.repository.ts";
@@ -9,7 +11,8 @@ import type { WorkflowDatabase } from "./prisma.workflow.repository.ts";
 /** Every table the workflow module reads or writes, as one client supplies them. */
 export type WorkflowPrismaDatabase = WorkflowDatabase &
   WorkflowRowDatabase &
-  WorkflowProjectEnvironmentDatabase;
+  WorkflowProjectEnvironmentDatabase &
+  WorkflowLineageDatabase;
 
 /**
  * The live tier: the graph, the copy row and the project environment,
@@ -25,6 +28,7 @@ export class PostgresWorkflowRepositories {
       workflows: PrismaWorkflowRepository.create({ database }),
       workflowRows: WorkflowRowPrismaRepository.create({ database }),
       projectEnvironment: WorkflowProjectEnvironmentPrismaRepository.create({ database }),
+      lineage: PrismaWorkflowLineageRepository.create({ database }),
     };
   }
 }

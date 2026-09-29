@@ -49,14 +49,15 @@ func RetiredRestOperation(path string) bool {
 
 // retiredServedRoutes are routes main serves that Alex ruled out of the
 // branch (2026-09-27): rpc.discover and CopilotKit were removed on purpose,
-// the two crons became scheduled process managers, and dataset generate had
+// the three crons became scheduled process managers, and dataset generate had
 // no caller on main.
 var retiredServedRoutes = map[string]bool{
-	"/api/rpc.discover":         true,
-	"/api/copilotkit":           true,
-	"/api/cron/seed_demo":       true,
-	"/api/cron/trace_analytics": true,
-	"/api/dataset/generate":     true,
+	"/api/rpc.discover":             true,
+	"/api/copilotkit":               true,
+	"/api/cron/old_lambdas_cleanup": true,
+	"/api/cron/seed_demo":           true,
+	"/api/cron/trace_analytics":     true,
+	"/api/dataset/generate":         true,
 }
 
 // DiffRest compares two served documents operation by operation, ignoring

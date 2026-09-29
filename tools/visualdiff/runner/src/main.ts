@@ -33,13 +33,19 @@ const openPages = async ({
   collect: Collect;
 }): Promise<Side[]> => {
   const first = await browser.openPage();
-  await signInSide({ plan, side: first, collect });
   const count = Math.max(width(plan.concurrency?.routes), width(plan.concurrency?.flows));
-  const rest = await Promise.all(Array.from({ length: count - 1 }, () => browser.openPage()));
+  const [, rest] = await Promise.all([
+    signInSide({ plan, side: first, collect }),
+    Promise.all(Array.from({ length: count - 1 }, () => browser.openPage())),
+  ]);
   return [first, ...rest];
 };
 
-/** captureSide renders the routes across its pages, then the flows, project edits last. */
+/**
+ * captureSide renders the routes across its pages, read-only flows taking pages as the
+ * routes drain; then the flows that write, on every page; then the view and project
+ * edits, alone.
+ */
 const captureSide = async ({
   plan,
   browser,
@@ -52,14 +58,13 @@ const captureSide = async ({
   const pages = await openPages({ plan, browser, collect });
   const [first] = pages;
   if (first === undefined) return;
-  await captureRoutes({ plan, pages: pages.slice(0, width(plan.concurrency?.routes)), collect });
   const flows = orderFlows(plan.flows);
-  const flowPages = pages.slice(0, width(plan.concurrency?.flows));
+  await captureRoutes({ plan, pages, collect, alongside: flows.readers });
   await runPool({
-    items: flows.together,
-    width: flowPages.length,
+    items: flows.writers,
+    width: pages.length,
     work: async ({ item, lane }) =>
-      captureFlow({ plan, flow: item, side: flowPages[lane] ?? first, collect }),
+      captureFlow({ plan, flow: item, side: pages[lane] ?? first, collect }),
   });
   for (const flow of flows.last) {
     await captureFlow({ plan, flow, side: first, collect });

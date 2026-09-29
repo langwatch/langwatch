@@ -17,6 +17,7 @@ import {
   type NotificationCadence,
   sanitizeAutomationFilters,
 } from "@langwatch/automation-contract";
+import { Link } from "@langwatch/browser-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
 import { useEffect, useMemo, useState } from "react";
@@ -754,7 +755,9 @@ function DailyCapAdviceAlert({
           alignSelf="center"
           data-testid="daily-cap-advice-upgrade"
         >
-          <a href="/settings/plans">Upgrade Plan</a>
+          <Link unstyled href="/settings/plans">
+            Upgrade Plan
+          </Link>
         </Button>
       </Alert.Root>
     </Box>

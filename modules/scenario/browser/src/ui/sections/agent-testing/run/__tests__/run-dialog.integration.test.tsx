@@ -1461,7 +1461,7 @@ describe("run entries on the Scenarios tab", () => {
     // result lands: the runs rail renders it from this same store value (see
     // the run plan detail tests).
     await waitFor(() => expect(mockRouterPush).toHaveBeenCalled());
-    expect(mockRouterPush.mock.calls[0]![1]).toBe(
+    expect(mockRouterPush.mock.calls[0]![0]).toBe(
       "/test-project/agent-testing/results/refunds-prod-agent/batch_new",
     );
     expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe("batch_new");

@@ -7,7 +7,6 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { useExplorerStore } from "@langwatch/trace-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -21,12 +20,6 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
-}));
-
-vi.mock("../../../../elements/next-link.tsx", () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
-  ),
 }));
 
 vi.mock("../../hooks/use-explorer-counts.ts", () => ({

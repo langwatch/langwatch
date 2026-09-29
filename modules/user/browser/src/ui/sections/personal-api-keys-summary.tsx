@@ -5,6 +5,7 @@
  */
 
 import { Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { toEpochMs } from "@langwatch/time";
 import { useEffect } from "react";
 
@@ -44,7 +45,9 @@ export function PersonalApiKeysSummary() {
       <HStack justify="space-between" width="full">
         <Text fontWeight={600}>Your API keys</Text>
         <Button asChild size="xs" variant="outline" data-testid="api-keys-manage">
-          <a href="/settings/api-keys">Manage API keys</a>
+          <Link unstyled href="/settings/api-keys">
+            Manage API keys
+          </Link>
         </Button>
       </HStack>
 

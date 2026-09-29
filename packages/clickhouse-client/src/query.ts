@@ -27,6 +27,12 @@ export interface QueryRequest {
   tenantId: string;
   /** Route an organisation-wide operation directly; tenant scope checks still apply. */
   organizationId?: string;
+  /**
+   * A declared tenant set, one organisation's projects: the statement's `TenantId IN (...)`
+   * must bind exactly these, `tenantId` among them, and the router refuses a set that spans
+   * organisations.
+   */
+  tenantIds?: readonly string[] | undefined;
   sql: string;
   params?: Record<string, unknown> | undefined;
   /** The primary table, used for metrics and span attributes. */
@@ -103,4 +109,10 @@ export interface QueryDriver {
    * one is a syntax error, not an empty answer.
    */
   command(request: QueryRequest): Promise<void>;
+  /**
+   * Reads one statement's rows batch by batch as the server sends them, so a large read holds one
+   * batch in memory rather than the whole result. Optional: a driver without it answers the whole
+   * result as one batch through {@link execute}.
+   */
+  stream?<Row>(request: QueryRequest): AsyncIterable<Row[]>;
 }

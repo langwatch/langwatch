@@ -269,6 +269,7 @@ describe("given the sign-up succeeded", () => {
       expect(signals.sendHubspotSignupForm).toHaveBeenCalledWith(payload);
     });
 
+    /** @scenario "Slack delivery failure does not block onboarding completion" */
     it("completes the ceremony when a notification door is down", async () => {
       const failure = new Error("Slack down");
       const { onboarding, signals } = harness({

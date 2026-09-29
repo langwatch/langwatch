@@ -45,6 +45,7 @@ func TestAFreshWorktreeIsPreparedBeforeItsStackBoots(t *testing.T) {
 				"env -u CI pnpm install --frozen-lockfile",
 				"pnpm run start:prepare:files",
 				"node dev/scripts/ensure-built.mjs",
+				"haven up --agent --detach",
 			}
 			if got := argvList(base); !equalStrings(got, want) {
 				t.Fatalf("base prepare commands = %v, want %v", got, want)

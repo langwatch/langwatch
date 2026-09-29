@@ -198,41 +198,41 @@ Feature: An experiment run executes on its pipeline
     Then the scored verdict keeps its cost currency
     And the failed verdict keeps its error type, traceback and code, under its own evaluator
 
-  @integration @unimplemented
+  @integration
   Scenario: A streamed workbench run executes on the worker and ends with done
     Given the experiment module installed in an api and a worker sharing one event store
     When the workbench posts one row against one prompt target to execute
     Then the stream carries the cell's result frames in order, produced by the worker's cell command
     And it ends with done carrying the run's summary
 
-  @integration @unimplemented
+  @integration
   Scenario: A polled run answers at once and is read back completed from the fold
     Given a saved workbench with one row and one prompt target
     When the run is started without accepting events
     Then it answers the run id, the total and the link at once
     And polling the run reads it as completed once the worker has finished its cells
 
-  @integration @unimplemented
+  @integration
   Scenario: The worker runs a requested workflow evaluation to completion
     Given the experiment module installed in the worker with a committed workflow
     When a workflow evaluation is requested for a registered run
     Then the worker starts the run on its pipeline and it completes for the poller to read
 
-  @integration @unimplemented
+  @integration
   Scenario: A workflow evaluation the worker cannot prepare completes as failed with its code
     Given a workflow evaluation requested for a workflow with no committed version
     When the worker prepares the run
     Then the run completes as failed carrying the refusal's code
     And no cell is executed
 
-  @integration @unimplemented
+  @integration
   Scenario: Cells of one run never exceed its concurrency
     Given a run of six cells started with a concurrency of two
     When the worker executes it
     Then at most two of its cells are in flight at any moment
     And every cell finishes and the run completes
 
-  @integration @unimplemented
+  @integration
   Scenario: Comparison cells run only after every target cell has finished
     Given a run with two targets and a pairwise comparison evaluator
     When the worker executes it
@@ -240,21 +240,21 @@ Feature: An experiment run executes on its pipeline
     And no comparison cell starts before both targets' cells have finished for every row
     And each comparison reads the targets' outputs the run has folded
 
-  @integration @unimplemented
+  @integration
   Scenario: A comparison row whose variant produced no output finishes skipped
     Given a run with a pairwise comparison where one target fails on a row
     When the worker reaches that row's comparison cell
     Then the comparison records its skip as an evaluator error naming the missing variant
     And the cell finishes skipped and the run completes
 
-  @integration @unimplemented
+  @integration
   Scenario: A comparison that cannot be built is skipped for every row
     Given a run whose comparison evaluator names fewer than two variants
     When the run is planned
     Then every row's comparison cell carries the setup skip
     And each finishes skipped with the setup error, without reaching an evaluator
 
-  @integration @unimplemented
+  @integration
   Scenario: Aborting a running run stops its remaining cells
     Given a run in flight with cells still to execute
     When its project asks to abort it
@@ -262,49 +262,49 @@ Feature: An experiment run executes on its pipeline
     And no comparison cell is planned
     And the stream ends with stopped and the fold reads the run as stopped
 
-  @integration @unimplemented
+  @integration
   Scenario: Aborting a run of another project is refused as not found
     Given a run in flight in one project
     When another project asks to abort it
     Then the abort is refused as run_not_found
     And the run carries on
 
-  @integration @unimplemented
+  @integration
   Scenario: A run against someone else's personal agent is refused before any cell
     Given a workbench whose target is another person's personal development agent
     When the workbench posts it to execute
     Then the run is refused as agent_owner_only
     And no run is started and no cell command is sent
 
-  @integration @unimplemented
+  @integration
   Scenario: A redelivered cell counts once
     Given a run whose cell command and cell finish are each delivered twice
     When the worker executes it
     Then the run's progress ends at its total and not beyond
     And each result is recorded once
 
-  @integration @unimplemented
+  @integration
   Scenario: A cell lost with its worker fails once the run stalls, and the run completes with errors
     Given a run with a cell whose command never finishes
     When no cell of the run has finished for the stall window
     Then the manager fails every unfinished cell as experiment_cell_lost
     And the run completes with those cells counted as failed
 
-  @integration @unimplemented
+  @integration
   Scenario: A failing target is a failed cell, not a failed run
     Given a run whose target answers an error for one row
     When the worker executes it
     Then that cell finishes as failed with the error on its result
     And the other cells finish and the run completes
 
-  @integration @unimplemented
+  @integration
   Scenario: A cell is priced and lent the project's sandbox key
     Given a run whose target executes code on a model the engine reports untariffed
     When the worker executes the cell
     Then the cell's result carries the price from the project's cost rule
     And the code ran with the project's sandbox key
 
-  @integration @unimplemented
+  @integration
   Scenario: A run past the row bound is refused before it starts
     Given a dataset with more rows than the project's tier allows in one run
     When a run over it is started
@@ -336,3 +336,188 @@ Feature: An experiment run executes on its pipeline
     Given a stream subscribed to one run and another subscribed to a second run
     When frames are published for the first run
     Then the first stream hears them in order and the second hears none
+
+  # The progress fold as main's poller JSON, and the frames it publishes (spec section 7).
+  @unit
+  Scenario: A run's live frames are published from its progress fold with their seq
+    Given a planned run whose progress fold has folded a cell's finish
+    When the fold's frames subscriber handles that event
+    Then it publishes main's progress frame with the run's counts, numbered by the fold's seq
+    And a redelivered finish counts nothing and streams nothing again
+
+  @unit
+  Scenario: A poll reads a pipeline run's status and counts from its progress fold
+    Given a planned run whose cells finish, one of them failed and one finish redelivered
+    When the progress fold folds them
+    Then it reads as running with each cell counted once and the failure counted apart
+    And once the run finishes it reads as completed with main's summary and the run's link
+
+  @unit
+  Scenario: A run's progress is read by its runId alone
+    Given a planned run's progress stored under main's poller key
+    When it is read by the run's id
+    Then it is found, and another experiment's run with the same id reads as empty
+
+  # The start path (switchover step 5a, spec sections 7 and 9).
+  @integration
+  Scenario: A streamed workbench run subscribes to its frames, then starts on the run's pipeline
+    Given a workbench run posted to execute
+    When the api plans it and sends its start
+    Then the start carries the plan, credited to the person who posted it
+    And the stream carries the run's frames once each, in seq order, and ends with done
+
+  @integration
+  Scenario: A workbench run against someone else's personal agent streams its refusal and starts nothing
+    Given a workbench whose target is another person's personal development agent
+    When the workbench posts it to execute
+    Then the stream carries main's error frame with code "agent_owner_only"
+    And no start is sent
+
+  @unit
+  Scenario: A run's cells land on the board before it is completed
+    Given a finished or stopped run that writes its results back
+    When the run manager completes it
+    Then the run's result frames are merged into the board, credited to whoever the plan credits
+    And only then is the run completed
+    And a run that keeps its results off the board writes nothing
+
+  @unit
+  Scenario: The board write waits until the progress fold has every finished cell
+    Given a run whose manager counted more finished cells than its progress fold has folded
+    When the completion is delivered
+    Then it throws and is retried, writing and completing nothing
+    And its last attempt writes what is folded and completes the run
+
+  # Polls, abort and saved runs over the pipeline (switchover step 5b, spec sections 6, 7 and 9).
+  @integration
+  Scenario: A poll answers main's poller body from the run's progress fold
+    Given a run whose progress fold reads it running, and another whose fold reads it completed
+    When each is polled by its runId
+    Then the running run answers its progress only
+    And the completed run answers its finish and main's summary with the run's link
+    And a run the fold does not hold, or holds for another project, answers run_not_found
+
+  @integration
+  Scenario: Aborting a run reads its progress fold and refuses another project's run
+    Given a run in flight whose progress fold names its project and experiment
+    When another project asks to abort it
+    Then it is refused as run_not_found and nothing is stopped
+    When its own project asks to abort it
+    Then the run's stop flag is set and the abort is sent under the fold's experiment
+
+  @integration
+  Scenario: A polled saved run starts on the run's pipeline and answers at once
+    Given a saved workbench and a caller that does not accept events
+    When the run is started by slug
+    Then the start carries a saved-origin plan that writes the board, credited to the key's person
+    And it answers main's body with the run id, the total and the link to its results
+
+  @integration
+  Scenario: A polled saved run against someone else's personal agent is stored failed
+    Given a saved workbench whose target is another person's personal development agent
+    When the run is started by slug without accepting events
+    Then it answers started as main did, sends no start
+    And the run is completed failed carrying the refusal's code for the poller
+
+  @integration
+  Scenario: A polled saved run answers once its poller can read it
+    Given a saved workbench and a worker that folds the run's start
+    When the run is started by slug without accepting events
+    Then it answers only once the run's progress fold holds it
+    And a poll straight after the answer reads the run running
+
+  @integration
+  Scenario: A started run the worker does not register in time is refused as unavailable
+    Given a saved workbench and a worker that does not fold the start within the bounded wait
+    When the run is started by slug without accepting events
+    Then the start is sent once
+    And it answers 503 as main did for an unavailable backend, the error coded service_unavailable
+
+  @unit
+  Scenario: A polled run refused before its start polls failed with its planned total
+    Given a run refused before its start whose refusal carries the planned total
+    When its completion is folded
+    Then the poller reads it failed with the refusal's code and that total
+
+  @unit
+  Scenario: A run refused before its start leaves no run row
+    Given a run that folded only its failed completion
+    When its run state is stored
+    Then no ClickHouse run row is written, as main wrote none
+    And a run that started and then failed still writes its row
+
+  @integration
+  Scenario: A streamed saved run starts on the run's pipeline and streams its frames
+    Given a saved workbench and a caller that accepts events
+    When the run is started by slug
+    Then the start carries a saved-origin plan that leaves the board alone and names no link
+    And the stream carries the run's frames until done
+
+  @unit
+  Scenario: A cell's start is published on the run's channel with the last folded seq
+    Given a cell whose run's progress fold has numbered its frames up to a seq
+    When the cell starts
+    Then main's cell_started frame is published on the run's channel carrying that seq
+    And nothing is appended or folded for it
+
+  @integration
+  Scenario: A streamed run passes a cell's start through without deduplicating it
+    Given a run whose channel carries a cell_started frame repeating the last folded seq
+    When the run streams
+    Then the cell_started frame reaches the client, and a repeated folded frame does not
+
+  @unit
+  Scenario: A redelivered completion writes the run's cells to the board once
+    Given a run whose board write already landed, and a later run that wrote the board since
+    When its completion is delivered again
+    Then the board's version history holds the run, so the board is not written again
+    And the later run's results stay on the board
+
+  # The run's plan, built in the request before StartExperimentRun (spec sections 2, 4 and 8, D4, D5).
+  @unit
+  Scenario: A run's plan lists its target cells, then its comparison cells, in one ordinal order
+    Given a full run over two targets with a comparison between them
+    When its plan is built
+    Then its target cells come first, row by row, each with its non-comparison evaluators
+    And one comparison cell per row follows them, numbered on from the last target cell
+    And every row a cell touches is kept once, and mappings read from the active dataset
+
+  @unit
+  Scenario: A run's plan pins each prompt and workflow at the version the run loaded
+    Given a prompt target and a workflow target loaded at their current versions
+    When the run's plan is built
+    Then the plan pins each target to the version that was loaded
+
+  @unit
+  Scenario: A comparison that cannot be built is planned skipped for every row it covers
+    Given a comparison with too few variants, no golden field, or a variant that no longer exists
+    When the run's plan is built
+    Then each non-empty row in scope has a comparison cell carrying that setup skip
+    And a chip comparison's cells sit under its first column that still exists
+
+  @unit
+  Scenario: A run scoped to some rows plans only those rows
+    Given a run scoped to rows 2 and 0 of three
+    When its plan is built
+    Then its target and comparison cells cover only those rows, in the order asked
+    And a target whose output a scoped comparison reuses is not run again
+
+  @unit
+  Scenario: An evaluator re-run plans its precomputed outputs and no comparison
+    Given an evaluator re-run over outputs the targets already produced
+    When its plan is built
+    Then each output is a cell that skips its target and carries the output and its trace
+    And no comparison cell is planned
+
+  @unit
+  Scenario: A run's plan credits whoever started it and names its slug and link
+    Given a run started by a person, a Langy session or a key that names no person
+    When its plan is built
+    Then the plan credits each as it was
+    And it carries the experiment's slug and the run's link for the poller
+
+  @unit
+  Scenario: The comparison set is planned from the run's configuration alone
+    Given a chip comparison and a column comparison, and no target output yet
+    When the comparison set is built
+    Then each comparison is listed under its verdict column with the rows in scope it covers

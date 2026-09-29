@@ -43,12 +43,10 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
 
   async getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
     const run = this.#runs.get(`${input.tenantId}\u0000${input.evaluationId}`);
+    // No partitions to prune and no TTL: only ClickHouse floors an unscheduled lookup.
     const from = input.scheduledAt
       ? input.scheduledAt.getTime() - (input.scheduledAtSlackMs ?? DEFAULT_SCHEDULED_AT_SLACK_MS)
-      : await input.retentionFloor.getFloorMs({
-          table: "evaluation_runs",
-          tenantId: input.tenantId,
-        });
+      : Number.NEGATIVE_INFINITY;
     const to = input.scheduledAt
       ? input.scheduledAt.getTime() + (input.scheduledAtSlackMs ?? DEFAULT_SCHEDULED_AT_SLACK_MS)
       : Number.POSITIVE_INFINITY;

@@ -67,7 +67,6 @@ export type {
   LicenseDeliveryCipher,
   LicenseRegistryInfrastructure,
   LicenseSyncRateLimit,
-  SeatChangeBilling,
 } from "./app/licensing.members.ts";
 export { isInstanceIdShape } from "./rules/license-token.rules.ts";
 export { issuedLicenseView, statusOfIssuedLicense } from "./rules/issued-license.rules.ts";

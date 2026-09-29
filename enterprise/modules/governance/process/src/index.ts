@@ -42,10 +42,6 @@ export type { IngestionSourceDatabase } from "./repositories/prisma/prisma.inges
 export type { IngestionPullRunProjectionDatabase } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
 
 export {
-  GATEWAY_DEBITS_PROCESS_NAME,
-  GatewayDebitProcess,
-} from "./eventing/gateway-debit.process.ts";
-export {
   COST_ROLLUP_WATCH_PROCESS_NAME,
   CostRollupWatchProcess,
   type CostRollupWatchState,

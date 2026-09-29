@@ -175,6 +175,7 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	if done {
 		return code
 	}
+	boot.ParityOnly = probe.parityOnly
 	parity, err := runParityPhase(ctx, boot, out.stderr)
 	if err != nil {
 		fmt.Fprintln(out.stderr, "parity:", err)
@@ -182,20 +183,27 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	}
 	defer parity.cleanup()
 	if probe.parityOnly {
+		if err := parity.finish(); err != nil {
+			fmt.Fprintln(out.stderr, "parity:", err)
+			return exitError
+		}
 		return parity.verdict(probe, out)
 	}
-	parity.continueInto(&boot)
 	probe.parity = parity
 
 	// The child processes inherit this context; canceling it kills them.
 	bootCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	booted, err := Boot(bootCtx, boot, out.stderr)
+	booted, err := parity.boot(bootCtx)
 	if err != nil {
 		fmt.Fprintln(out.stderr, "boot:", err)
 		return exitError
 	}
 	defer booted.Teardown()
+	if err := parity.finish(); err != nil {
+		fmt.Fprintln(out.stderr, "parity:", err)
+		return exitError
+	}
 
 	// One JSON line per operation, appended as its comparison completes, so a
 	// reader can tail .apidiff/<runID>/findings.jsonl during the run rather
@@ -275,10 +283,11 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	probe := &probeFlags{excludePrefixes: stringSlice{"/api/gateway"}, specSettle: specSettleTimeout}
 	flags.StringVar(&boot.MainRef, "main-ref", "origin/main", "git ref to boot as the base instance; the remote ref by default, since a local main falls behind without anyone noticing")
 	flags.StringVar(&boot.BranchDir, "branch-dir", ".", "checkout to diff (haven path: its HEAD is checked out into its own worktree; the checkout itself is never booted)")
-	flags.StringVar(&boot.WorkRoot, "work-root", "", "worktree/log root (default <repo>/.apidiff/<timestamp>)")
+	flags.StringVar(&boot.WorkRoot, "work-root", "", "log, parity and probe root (default <repo>/.apidiff/<timestamp>); the worktrees persist under <repo>/.apidiff/worktrees")
 	flags.BoolVar(&boot.Keep, "keep", false, "keep infra, databases and worktree after the run")
-	flags.BoolVar(&boot.ReuseWorktrees, "reuse-worktrees", false, "reuse the existing <work-root>/main worktree")
-	flags.BoolVar(&boot.SkipInstall, "skip-install", false, "skip pnpm install in both worktrees")
+	flags.BoolVar(&boot.ReuseWorktrees, "reuse-worktrees", false, "adopt the existing <work-root>/main (and <work-root>/branch) worktree as it is, instead of the persistent ones")
+	flags.BoolVar(&boot.BranchHead, "branch-head", false, "-no-haven: boot the branch from -branch-dir's HEAD in the persistent <repo>/.apidiff/worktrees/branch, leaving -branch-dir itself untouched (the haven path always does)")
+	flags.BoolVar(&boot.SkipInstall, "skip-install", false, "skip the install, generated-files and build steps in both trees: they are already prepared")
 	flags.DurationVar(&boot.BootTimeout, "boot-timeout", 5*time.Minute, "per-instance health-wait timeout")
 	flags.StringVar(&boot.PGURL, "pg-url", "", "external postgres server URL (with -ch-url/-redis-url skips compose)")
 	flags.StringVar(&boot.CHURL, "ch-url", "", "external ClickHouse server URL")

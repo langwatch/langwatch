@@ -270,17 +270,13 @@ describe("the Scenarios tab", () => {
   });
 
   /** @scenario "Choosing a suite in the rail does not reload the page" */
-  it("pushes the address of a suite shallowly, so the page never reloads", async () => {
+  it("pushes the real address of a suite, in place, so the page never reloads", async () => {
     const user = userEvent.setup();
     renderTab();
 
     await user.click(screen.getByTestId("suite-rail-item-Refunds"));
 
-    expect(mockRouterPush).toHaveBeenCalledWith(
-      expect.anything(),
-      "/test-project/agent-testing/suites/refunds",
-      { shallow: true },
-    );
+    expect(mockRouterPush).toHaveBeenCalledWith("/test-project/agent-testing/suites/refunds");
   });
 
   /** @scenario "Archive asks for confirmation and names the scenario" */

@@ -1,7 +1,7 @@
 /**
  * What a browser installs when it installs model-provider: the Model
- * Providers and Model Costs settings screens, and the surfaces evaluator,
- * langy and trace mount today.
+ * Providers and Model Costs settings screens, their three drawers, and the
+ * surfaces evaluator, langy and trace mount today.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
@@ -27,6 +27,26 @@ export const modelProviderWeb = defineWebModule("model-provider")
       within: "settings",
       label: "Model Costs",
       load: () => import("./ui/sections/model-costs-screen.tsx"),
+    },
+  })
+  /** The names are the wire (§10): Settings and evaluator open these by address. */
+  .withDrawers({
+    editModelProvider: {
+      load: async () => ({
+        default: (await import("./ui/sections/edit-model-provider-drawer.tsx"))
+          .EditModelProviderDrawer,
+      }),
+    },
+    defaultModelOverride: {
+      load: async () => ({
+        default: (await import("./ui/sections/default-model-override-drawer.tsx"))
+          .DefaultModelOverrideDrawer,
+      }),
+    },
+    llmModelCost: {
+      load: async () => ({
+        default: (await import("./ui/sections/llm-model-cost-drawer.tsx")).LLMModelCostDrawer,
+      }),
     },
   })
   /** Lent, not kitted: each reads this module's providers (§3.4 rule 7). */

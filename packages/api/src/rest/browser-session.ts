@@ -4,6 +4,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { SurfaceUnverifiedError } from "../errors.ts";
 import { recordBrowserCaller, type SessionReader } from "./credential.ts";
 import type { RestCaller, RestIdentity } from "./runtime.ts";
+import { BrowserOriginGuard } from "./security.ts";
 
 export class BrowserOriginRefusedError extends HandledError {
   constructor() {
@@ -16,14 +17,38 @@ export class BrowserOriginRefusedError extends HandledError {
 export class BrowserSessionIdentity implements RestIdentity {
   readonly #sessions: SessionReader;
   readonly #authz: AuthzApi;
+  readonly #publicOrigin: string | null;
 
-  private constructor(sessions: SessionReader, authz: AuthzApi) {
+  private constructor({
+    sessions,
+    authz,
+    publicOrigin,
+  }: {
+    sessions: SessionReader;
+    authz: AuthzApi;
+    publicOrigin: string | null;
+  }) {
     this.#sessions = sessions;
     this.#authz = authz;
+    this.#publicOrigin = publicOrigin;
   }
 
-  static create(sessions: SessionReader, authz: AuthzApi): BrowserSessionIdentity {
-    return new BrowserSessionIdentity(sessions, authz);
+  /** `publicBaseUrl` is the deployment's own address, which a proxy may hide from `request.url`. */
+  static create({
+    sessions,
+    authz,
+    publicBaseUrl,
+  }: {
+    sessions: SessionReader;
+    authz: AuthzApi;
+    publicBaseUrl: string | undefined;
+  }): BrowserSessionIdentity {
+    const publicOrigin =
+      publicBaseUrl !== undefined && URL.canParse(publicBaseUrl)
+        ? new URL(publicBaseUrl).origin
+        : null;
+
+    return new BrowserSessionIdentity({ sessions, authz, publicOrigin });
   }
 
   authenticate(): never {
@@ -38,18 +63,8 @@ export class BrowserSessionIdentity implements RestIdentity {
   }
 
   async identifyOptional({ request }: { request: Request }): Promise<RestCaller | null> {
-    if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
-      const origin = request.headers.get("origin");
-      const referer = request.headers.get("referer");
-      const source = origin ?? referer;
-
-      const sameOrigin =
-        source !== null &&
-        URL.canParse(source) &&
-        new URL(source).origin === new URL(request.url).origin;
-
-      if (!sameOrigin) throw new BrowserOriginRefusedError();
-    }
+    const writes = !["GET", "HEAD", "OPTIONS"].includes(request.method);
+    if (writes && !this.#isFromOwnPages(request)) throw new BrowserOriginRefusedError();
 
     const caller = await this.#sessions.read(request);
     if (!caller?.userId) return null;
@@ -57,6 +72,20 @@ export class BrowserSessionIdentity implements RestIdentity {
     recordBrowserCaller(request, { userId: caller.userId });
 
     return { actor: { type: "user", id: caller.userId }, scope: null };
+  }
+
+  #isFromOwnPages(request: Request): boolean {
+    const header = (name: string) => request.headers.get(name) ?? undefined;
+    const guarded = BrowserOriginGuard.isFromOwnOrigin({ req: { header } });
+    // A browser's Sec-Fetch-Site is final; the origin comparisons are for callers without it.
+    if (guarded || header("sec-fetch-site") !== undefined) return guarded;
+
+    const source = request.headers.get("origin") ?? request.headers.get("referer");
+    if (source === null || !URL.canParse(source)) return false;
+
+    const origin = new URL(source).origin;
+
+    return origin === new URL(request.url).origin || origin === this.#publicOrigin;
   }
 
   authorize({ caller, permission, target }: Parameters<NonNullable<RestIdentity["authorize"]>>[0]) {

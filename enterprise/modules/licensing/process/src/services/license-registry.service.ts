@@ -21,6 +21,7 @@ import {
   type IssuedLicenseSource,
   type IssuedLicenseView,
   type LicenseCustomer,
+  type LicenseSeatChange,
   type LicenseTermsInput,
   type SeatChangeResult,
   type SignedIssuedLicense,
@@ -35,7 +36,6 @@ import type {
   LicenseCryptography,
   LicenseCustomers,
   LicenseDeliveryCipher,
-  SeatChangeBilling,
 } from "../app/licensing.members.ts";
 import type {
   IssuedLicenseDraft,
@@ -55,7 +55,6 @@ export interface LicenseRegistryOptions {
   organizations: LicenseCustomers;
   managedKeys: ConnectManagedKeys;
   contractBudgets: ContractBudgets;
-  seatBilling: SeatChangeBilling;
   cryptography: LicenseCryptography;
   generation: LicenseGenerationService;
   cipher: LicenseDeliveryCipher;
@@ -213,9 +212,9 @@ export class LicenseRegistryService {
   }
 
   /**
-   * Changes the seats of a running license: a replacement is signed for the
-   * same term, added seats are invoiced prorated and removed ones are not
-   * credited. A lapsed license is renewed through `reissue` instead.
+   * Signs a replacement for the same term. Seats raised on a linked license are
+   * recorded in the replacement's own insert, the fact billing invoices from
+   * (ARCHITECTURE.md section 9); removed seats are not credited.
    */
   async changeSeats(input: {
     id: string;
@@ -224,34 +223,40 @@ export class LicenseRegistryService {
   }): Promise<SeatChangeResult> {
     const current = await this.getRow(input.id);
     this.refuseUnlessActive(current);
+    const raised = current.organizationId !== null && input.maxMembers > current.maxMembers;
 
     const { licenseKey, row } = await this.signReplacement({
       current,
       maxMembers: input.maxMembers,
       expiresAt: current.expiresAt,
       operatorId: input.operatorId,
+      ...(raised ? { seatsRaisedFrom: current.maxMembers } : {}),
     });
-
-    // The license is signed and recorded before anything is invoiced, so a
-    // billing failure leaves a customer with seats and an intent row to retry,
-    // never an invoice for seats they never got.
-    const billing =
-      row.organizationId && input.maxMembers > current.maxMembers
-        ? await this.options.seatBilling.invoiceAddedSeats({
-            organizationId: row.organizationId,
-            licenseRowId: row.id,
-            previousSeats: current.maxMembers,
-            seats: input.maxMembers,
-            operatorId: input.operatorId,
-          })
-        : "nothing_to_invoice";
 
     return {
       licenseKey,
       license: this.toView(row),
       previousMaxMembers: current.maxMembers,
-      billing,
+      billing: raised ? "pending" : "nothing_to_invoice",
     };
+  }
+
+  /** Every seat change that raised a linked license, as billing invoices it. */
+  async findSeatChanges(input: { organizationId?: string }): Promise<LicenseSeatChange[]> {
+    const rows = await this.options.repository.findAllSeatsRaised(input);
+    return rows.flatMap((row) =>
+      row.organizationId !== null && row.seatsRaisedFrom !== null
+        ? [
+            {
+              licenseRowId: row.id,
+              organizationId: row.organizationId,
+              previousSeats: row.seatsRaisedFrom,
+              seats: row.maxMembers,
+              changedAt: row.issuedAt.toString(),
+            },
+          ]
+        : [],
+    );
   }
 
   async resetInstanceBinding(input: { id: string }): Promise<IssuedLicenseView> {
@@ -435,6 +440,8 @@ export class LicenseRegistryService {
     maxMessagesPerMonth?: number;
     expiresAt: Instant;
     operatorId: string;
+    /** Set by a seat change that raised a linked license; see `changeSeats`. */
+    seatsRaisedFrom?: number;
   }): Promise<{ licenseKey: string; row: IssuedLicenseRecord }> {
     const { current } = input;
     const { licenseKey } = this.options.generation.generate({
@@ -458,7 +465,10 @@ export class LicenseRegistryService {
         organizationId: current.organizationId,
         source: "BACKOFFICE",
         issuedById: input.operatorId,
-        overrides: replacementColumns({ current, held: this.options.cipher.encrypt(licenseKey) }),
+        overrides: {
+          ...replacementColumns({ current, held: this.options.cipher.encrypt(licenseKey) }),
+          seatsRaisedFrom: input.seatsRaisedFrom ?? null,
+        },
       });
       return { licenseKey, row };
     } catch (error) {
@@ -620,5 +630,6 @@ function blankRow(): Omit<
     reportedMembers: null,
     reportedMembersLite: null,
     virtualKeyId: null,
+    seatsRaisedFrom: null,
   };
 }

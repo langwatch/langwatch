@@ -376,7 +376,7 @@ const useWorkbenchLoad = ({
   // Update URL when experiment slug changes (for URL sync after save)
   useEffect(() => {
     if (!project || !experimentSlug || routerSlug === experimentSlug) return;
-    void router.replace(`/${project.slug}/experiments/workbench/${experimentSlug}`, undefined, {
+    void router.replace(`/${project.slug}/experiments/workbench/${experimentSlug}`, {
       shallow: true,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

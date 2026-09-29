@@ -17,12 +17,10 @@ import {
   type ScimRequestLogQuery,
   type ScimRequestRecord,
   type ScimTokenEntitlement,
+  type ScimSyncActivityEntry,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type {
-  OrganizationSsoConnection,
-  ScimSyncActivityEntry,
-} from "@langwatch/identity-contract";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
@@ -124,15 +122,11 @@ export function scimTestApp(
       identities: { findDirectoryExternalIds: () => Promise.resolve([]) },
     }),
     reconciliation: ScimReconciliationService.create({
-      identity: {
-        ...identity,
-        scimSyncReads: () => ({
-          findForOrganization: () => Promise.resolve([]),
-          findByConnection: () => Promise.resolve(null),
-          listForOperator: () => Promise.resolve({ syncs: [], total: 0 }),
-          findForOperator: () => Promise.resolve([]),
-          findActivity: () => Promise.resolve(options.activity ?? []),
-        }),
+      identity,
+      syncs: {
+        findForOrganization: () => Promise.resolve([]),
+        findByConnection: () => Promise.resolve(null),
+        findActivity: () => Promise.resolve(options.activity ?? []),
       },
       grants: { findDirectoryCausedChanges: () => Promise.resolve([]) },
       people: { getProfiles: () => Promise.resolve([]) },

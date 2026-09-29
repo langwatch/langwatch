@@ -9,9 +9,14 @@ import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-k
  */
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
+import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
+import {
+  DataRetentionApi,
+  type DataRetentionApi as DataRetentionApiContract,
+} from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type {
@@ -250,6 +255,7 @@ import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 import { HttpCheckupProbeChannel } from "../channels/http/http.checkup-probe.channel.ts";
 import { HttpUsageReportChannel } from "../channels/http/http.usage-report.channel.ts";
 import type { AnomalyDetectionTickResult } from "../eventing/ops-anomaly-detection.intent.ts";
+import type { ProjectionReplayRun } from "../eventing/ops-projection-replay.events.ts";
 import { ClickHouseClickHouseHealthRepository } from "../repositories/clickhouse/clickhouse.datastore-health.repository.ts";
 import { PrismaPostgresHealthRepository } from "../repositories/prisma/prisma.datastore-health.repository.ts";
 import { RedisAnomalyRateTrackerRepository } from "../repositories/redis/redis.anomaly-rate-tracker.repository.ts";
@@ -261,9 +267,14 @@ import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.ru
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
 import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import type { OpsService } from "../services/ops.service.ts";
+import type { ProjectionReplayRequestSender } from "../services/replay.service.ts";
 import { SignUpHealthService } from "../services/sign-up-health.service.ts";
 import { StorageStatsCollectionService } from "../services/storage-stats-collection.service.ts";
 import { StorageStatsGaugesService } from "../services/storage-stats-gauges.service.ts";
+import {
+  type SystemMigrationPassRequestSender,
+  SystemMigrationPassRequestsService,
+} from "../services/system-migration-pass-requests.service.ts";
 import {
   buildOpsInfrastructure,
   type OpsProcessMembers,
@@ -418,9 +429,13 @@ export type OpsReplayRunner = {
     fullRebuild?: boolean;
     description: string;
     userName: string;
+    requestedByUserId: string;
   }): Promise<{ runId: string }>;
   getStatus(): Promise<ReplayStatus>;
   cancelReplay(): Promise<{ cancelled: boolean }>;
+  /** The worker's half of a started run, fenced by the replay lock's holder. */
+  executeReplay(run: ProjectionReplayRun): Promise<void>;
+  connect(sender: ProjectionReplayRequestSender): void;
 };
 
 /**
@@ -446,6 +461,10 @@ export interface OpsAppDependencies {
    * answers, per organization.
    */
   identity: IdentityApiContract;
+  /** The authorization engine, answering the migrations it registers. */
+  authz: AuthzApiContract;
+  /** Each tenant's retention, which a replay stamps on the rows it rebuilds. */
+  retention: DataRetentionApiContract;
   projects: ProjectApiContract;
   auditLog: AuditLogApi;
   /** The report schedules the operator scheduler lists and controls. */
@@ -492,7 +511,10 @@ export interface OpsSystemMigrationRunner {
     migrationName: string;
     actorUserId: string;
   }): Promise<OpsMigrationTargetedRunResult>;
-  startPass(): void;
+  /** Asks a worker for one pass now, as the operator; resolves once the request is recorded. */
+  startPass(input: { actorUserId: string }): Promise<void>;
+  /** One pass on this worker: the hourly re-drive only when a tenant could still move. */
+  executePass(input: { redrive: boolean }): Promise<void>;
   assertLegacyWritersDrained(input: {
     migrationName: string;
     tenantId: string;
@@ -565,7 +587,11 @@ export interface OpsAppInfrastructure {
   pipelines: OpsPipelineRegistry;
   eventLogWindow: OpsEventLogWindowReader;
   grafana: OpsGrafanaLinks;
-  systemMigrations: OpsSystemMigrationRunner;
+  /** The migration console and the worker's pass, over the peers' registries and ops' ledger. */
+  createSystemMigrations(input: {
+    dependencies: OpsAppDependencies;
+    passRequests: SystemMigrationPassRequestsService;
+  }): OpsSystemMigrationRunner;
   bugReportRateLimiter: BugReportRateLimiter;
   bugReportNotifier: BugReportNotifier;
   /** The ClickHouse account an operator EXPLAIN runs as. */
@@ -596,6 +622,7 @@ type OpsRuntimeDependencies = Readonly<{
   eventLogWindow: OpsEventLogWindowReader;
   grafana: OpsGrafanaLinks;
   systemMigrations: OpsSystemMigrationRunner;
+  systemMigrationPassRequests: SystemMigrationPassRequestsService;
   inbox: BugReportInboxService;
   intake: BugReportIntakeService;
   explain: OpsExplainService;
@@ -637,6 +664,8 @@ export class OpsApp implements OpsApi {
     users: UserApi,
     auth: AuthApi,
     identity: IdentityApi,
+    authz: AuthzApi,
+    retention: DataRetentionApi,
     // The same identity app, asked through its lookup surface for proved domains (D12).
     projects: ProjectApi,
     auditLog: AuditLogApi,
@@ -775,6 +804,7 @@ export class OpsApp implements OpsApi {
     const { infrastructure: members, dependencies, repositories } = setup;
 
     const inbox = BugReportInboxService.create({ reports: repositories.bugReports });
+    const systemMigrationPassRequests = SystemMigrationPassRequestsService.create();
 
     return new OpsApp({
       ops: members.createCapability(dependencies),
@@ -792,7 +822,11 @@ export class OpsApp implements OpsApi {
       pipelines: members.pipelines,
       eventLogWindow: members.eventLogWindow,
       grafana: members.grafana,
-      systemMigrations: members.systemMigrations,
+      systemMigrations: members.createSystemMigrations({
+        dependencies,
+        passRequests: systemMigrationPassRequests,
+      }),
+      systemMigrationPassRequests,
       explain: OpsExplainService.create({
         repository: OpsExplainClickHouseRepository.create({
           resolver: members.explainClients,
@@ -1037,8 +1071,13 @@ export class OpsApp implements OpsApi {
   findHistoryEntry(input: FindHistoryEntryInput): Promise<ReplayHistoryEntry | null> {
     return this.#dependencies.ops.replay.findHistoryEntry(input);
   }
+  /** `requestedByUserId` files the request under the operator; a start naming none is refused. */
   startReplay(input: StartReplayInput): Promise<StartReplayResult> {
-    return this.#dependencies.ops.replay.startReplay(input);
+    const { requestedByUserId } = input;
+    if (requestedByUserId === undefined) {
+      return Promise.reject(new OpsOperatorSessionRequiredError());
+    }
+    return this.#dependencies.ops.replay.startReplay({ ...input, requestedByUserId });
   }
   getStatus(): Promise<ReplayStatus> {
     return this.#dependencies.ops.replay.getStatus();
@@ -1471,8 +1510,32 @@ export class OpsApp implements OpsApi {
     });
   }
 
-  runSystemMigrationPass(): void {
-    this.#dependencies.systemMigrations.startPass();
+  runSystemMigrationPass(input: { operator: OpsOperator | null }): Promise<void> {
+    return this.#dependencies.systemMigrations.startPass({
+      actorUserId: this.#actorIdOf(input.operator),
+    });
+  }
+
+  /** One pass of `ops_system_migrations`, on the worker hosting it; not on {@link OpsApi}. */
+  executeSystemMigrationPass(input: { redrive: boolean }): Promise<void> {
+    return this.#dependencies.systemMigrations.executePass(input);
+  }
+
+  /** One requested run of `ops_projection_replay`, on its worker; not on {@link OpsApi}. */
+  executeReplay(run: ProjectionReplayRun): Promise<void> {
+    return this.#dependencies.ops.replay.executeReplay(run);
+  }
+
+  /** Opens the replay's command once `ops_projection_replay` has registered and answered. */
+  connectReplay(commands: { requestProjectionReplay: ProjectionReplayRequestSender }): void {
+    this.#dependencies.ops.replay.connect(commands.requestProjectionReplay);
+  }
+
+  /** Opens the kick's command once `ops_system_migrations` has registered and answered. */
+  connectSystemMigrationCommands(commands: {
+    requestSystemMigrationPass: SystemMigrationPassRequestSender;
+  }): void {
+    this.#dependencies.systemMigrationPassRequests.connect(commands.requestSystemMigrationPass);
   }
 
   async assertSystemMigrationLegacyWritersDrained(input: {

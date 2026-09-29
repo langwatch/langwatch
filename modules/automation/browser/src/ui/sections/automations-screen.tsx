@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { RUNAWAY_PAUSE_REASON, type TriggerAction } from "@langwatch/automation-contract";
+import { Link } from "@langwatch/browser-host/link";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Switch } from "@langwatch/design-system/switch";
@@ -36,7 +37,6 @@ import {
   TableShell,
 } from "../../features/overview/ui/elements/automation-table-cells.tsx";
 import { AutomationUseCaseStrip } from "../../features/overview/ui/elements/automation-use-case-strip.tsx";
-import { Link } from "../../ui/elements/automation-link.tsx";
 import { ClampedText } from "../../ui/elements/clamped-text.tsx";
 import { FilterDisplay } from "../../ui/elements/filter-display.tsx";
 import {

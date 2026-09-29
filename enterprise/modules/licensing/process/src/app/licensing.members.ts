@@ -1,9 +1,7 @@
-import type { RestIdentity } from "@langwatch/api/rest";
 import type {
   ConnectService,
   HostedCaller,
   LicenseData,
-  SeatChangeBillingOutcome,
   SignedLicense,
   ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
@@ -169,36 +167,16 @@ export interface HostedSpendRecorder {
 }
 
 /**
- * The hosted end of Connect (ADR-156, section 5): only LangWatch Cloud
- * composes one. An install has no hosted routes, and its operations refuse by
- * name rather than answering an empty entitlement.
+ * The hosted end of Connect (ADR-156, section 5), composed on every deployment.
+ * A process composing none refuses its operations by name rather than
+ * answering an empty entitlement.
  */
 export type HostedServicesInfrastructure = Readonly<{
   budgets: ContractBudgetStore;
   usage: HostedUsageReader;
   judge: HostedJudge;
   spend: HostedSpendRecorder;
-  /**
-   * The door the Go data plane's signed calls arrive at. The signing scheme is
-   * the gateway's own, so the identity is supplied rather than rebuilt here.
-   */
-  door?: RestIdentity;
 }>;
-
-/**
- * What a mid-term seat change owes. The registry only names the change; billing
- * decides the amount and keeps the invoice from being raised twice.
- */
-export interface SeatChangeBilling {
-  invoiceAddedSeats(params: {
-    organizationId: string;
-    /** The reissued registry row the new seat count is signed into. */
-    licenseRowId: string;
-    previousSeats: number;
-    seats: number;
-    operatorId: string;
-  }): Promise<SeatChangeBillingOutcome>;
-}
 
 /** Whether this license may sync again now (48 calls per license per day). */
 export interface LicenseSyncRateLimit {
@@ -220,7 +198,6 @@ export type LicenseRegistryInfrastructure = Readonly<{
   activationCodes: ActivationCodeRepository;
   /** What bounds guessing a code: one limiter, keyed by the code's own hash. */
   activationRateLimit: ActivationRateLimit;
-  seatBilling: SeatChangeBilling;
   syncRateLimit: LicenseSyncRateLimit;
   cipher: LicenseDeliveryCipher;
   /** The signing key, resolved through the secrets chain. Never a config field. */
@@ -311,10 +288,14 @@ export type SelfHostedLeadsInfrastructure = Readonly<{
 
 /**
  * The registry of self-hosted installs (ADR-156, section 10), which the usage
- * report receiver on LangWatch Cloud writes. Only Cloud composes one.
+ * report receiver writes. Every deployment composes it from its own stores.
  */
 export type SelfHostedInstancesInfrastructure = Readonly<{
   repository: SelfHostedInstanceRepository;
+  /** The licence bound to an install, which names its customer. */
+  licenses: Pick<IssuedLicenseRepository, "findAllBoundToInstance">;
+  /** The customer's name, as the organization feature answers it. */
+  organizations: Pick<LicenseCustomers, "findById">;
   /** The usage report's optional-category keys, from its field dictionary. */
   optionalReportKeys: ReadonlySet<string>;
   leads?: SelfHostedLeadsInfrastructure;

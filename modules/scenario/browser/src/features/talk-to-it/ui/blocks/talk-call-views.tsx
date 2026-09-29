@@ -1,4 +1,5 @@
-import { Box, Button, HStack, Link, Progress, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Progress, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { isRedCountdown, remainingSeconds } from "@langwatch/scenario-contract";
 
 import {

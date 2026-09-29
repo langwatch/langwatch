@@ -12,6 +12,7 @@ import type {
   SealedStateProjection,
 } from "../projections/sealedProjection.ts";
 import type { DeduplicationStrategy } from "../queues/queue.types.ts";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
 import type { ProcessManagerDefinition } from "./processManagerDefinition.ts";
@@ -101,6 +102,12 @@ export interface StaticPipelineDefinition<
    * original event.
    */
   prepareEventForProjection?: (event: EventType) => EventType;
+
+  /**
+   * Each tenant's retention, stamped on the rows this pipeline's projections write, declared from
+   * the owning module's data-retention dependency. Registration prefers it to the runtime's (§9).
+   */
+  retentionPolicyResolver?: RetentionPolicyResolver;
 
   /** Fold projections (stateful, reduce events into state) registered in this pipeline */
   foldProjections: Map<

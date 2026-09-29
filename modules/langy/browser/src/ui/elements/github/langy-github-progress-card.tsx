@@ -2,7 +2,8 @@
  * Steps card for the PR-opening flow.
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
-import { Box, HStack, Link, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { GithubProgressEvent, GithubProgressStage } from "@langwatch/langy-contract";
 import { Check } from "lucide-react";
 

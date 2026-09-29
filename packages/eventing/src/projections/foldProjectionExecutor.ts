@@ -13,6 +13,7 @@ import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import { type ProjectionStoreContext, readWindowAround } from "./projectionStoreContext.ts";
+import { projectionConsumes } from "./sealedProjection.ts";
 
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
 
@@ -709,6 +710,69 @@ export class FoldProjectionExecutor {
           deliveredIds: ordered.map((event) => event.id),
         }),
       ),
+    );
+    return state;
+  }
+
+  /**
+   * Rebuilds one aggregate's state from its whole history, for a hand-off that
+   * missed `missed`. It runs as a job in the aggregate's own lane, so no live
+   * fold races it; the stored applied set lets a queued live event skip itself.
+   */
+  async rebuild<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    missed: E,
+    context: ProjectionStoreContext,
+  ): Promise<State> {
+    const key = context.key ?? context.aggregateId;
+    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
+      projection,
+      key,
+      context: withReadHints({ context, event: missed, projection }),
+    });
+    const frontier =
+      typeof loaded === "object" && loaded !== null
+        ? Reflect.get(loaded, projection.LastEventOccurredAtKey)
+        : 0;
+    const { history, gap } = await this.readHistoryUntilComplete({
+      projection,
+      delivered: [missed],
+      context,
+      occurredAtMs: missed.occurredAt,
+      loadedAppliedIds: appliedEventIds,
+      stateFrontierOccurredAtMs: typeof frontier === "number" ? frontier : 0,
+    });
+    if (gap) {
+      throw new Error(
+        `Rebuild of ${projection.name} for aggregate ${context.aggregateId} read an incomplete history; retrying`,
+      );
+    }
+    const consumes = projectionConsumes<E, Event>(projection);
+    const seen = new Set(history.map((event) => event.id));
+    const combined = [
+      ...history.filter(consumes),
+      ...(seen.has(missed.id) || !consumes(missed) ? [] : [missed]),
+    ].toSorted((a, b) => compareFoldEvents(projection, a, b));
+    let state = projection.init();
+    for (const event of combined) {
+      state = projection.apply(state, event);
+    }
+    await projection.store.store(
+      state,
+      withAppliedEventIds(
+        context,
+        mergeAppliedEventIds({ previous: [], applied: combined.map((event) => event.id) }),
+      ),
+    );
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        missedEventId: missed.id,
+        rebuiltEventCount: combined.length,
+      },
+      "Rebuilt the aggregate for a missed hand-off",
     );
     return state;
   }

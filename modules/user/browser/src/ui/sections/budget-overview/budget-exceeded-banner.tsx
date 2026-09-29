@@ -1,4 +1,5 @@
-import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { AlertTriangle, ExternalLink, TrendingUp } from "lucide-react";
 

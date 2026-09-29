@@ -9,10 +9,12 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -35,6 +37,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import type { SystemMigration } from "@langwatch/system-migrations";
 import { createTestLogger } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -42,6 +45,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { opsServer } from "../../ops.server.ts";
+import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { SNAPSHOT_LEASE_KEY } from "../../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
 
@@ -58,7 +62,12 @@ function memberWithoutStore<Value extends object>(commands: unknown[][] = []): V
   }) as Value;
 }
 
-function process(role: "api" | "worker", redisCommands: unknown[][] = []) {
+function process(
+  role: "api" | "worker",
+  redisCommands: unknown[][] = [],
+  identity: IdentityApi = createApiFixture<IdentityApi>(),
+  authz: AuthzApi = createApiFixture<AuthzApi>(),
+) {
   const { logger } = createTestLogger();
 
   return createApp({ role })
@@ -93,7 +102,9 @@ function process(role: "api" | "worker", redisCommands: unknown[][] = []) {
     .provide({
       user: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
-      identity: createApiFixture<IdentityApi>(),
+      identity,
+      authz,
+      "data-retention": createApiFixture<DataRetentionApi>(),
       project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       "audit-log": createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
@@ -183,5 +194,66 @@ describe("ops app installation", () => {
         expect(leaseCommands().at(-1)?.[0]).toBe("eval");
       },
     );
+  });
+
+  describe("given the api role and a peer that registers migrations", () => {
+    const migration = (name: string, title: string): SystemMigration => ({
+      name,
+      title,
+      description: `${title}, as its owner describes it.`,
+      requiresOperatorConfirmation: false,
+      runsAutomaticallyOnSelfHosted: true,
+      enrolledAutomatically: false,
+      migrateTenant: async () => ({ status: "finalized" }),
+    });
+    const identity = createApiFixture<IdentityApi>({
+      registeredMigrations: () => [migration("sso-domain-ownership", "Domain ownership")],
+      userMigrations: () => [migration("identity-identifier-backfill", "Sign-in identifiers")],
+    });
+    const authz = createApiFixture<AuthzApi>({
+      registeredMigrations: () => [migration("authz-grants-genesis-import", "Grant import")],
+    });
+
+    /** @scenario "The migrations page lists every registered migration when served by the api role" */
+    /** @scenario "A migration registered by a peer module appears on the page with its title and description" */
+    it("lists each peer's migrations, in running order, with the owner's title and description", async () => {
+      vi.spyOn(
+        PrismaSystemMigrationStateRepository.prototype,
+        "findStatusCounts",
+      ).mockResolvedValue({ migrated: 0, finalized: 3, parked: 0, rolled_back: 0 });
+      vi.spyOn(
+        PrismaSystemMigrationStateRepository.prototype,
+        "findRecordsByStatus",
+      ).mockResolvedValue([]);
+      const runtime = await process("api", [], identity, authz).boot();
+
+      try {
+        const listed = await runtime.service(OpsApi).listSystemMigrations();
+
+        expect(
+          listed.map(({ name, title, description }) => ({ name, title, description })),
+        ).toEqual([
+          {
+            name: "authz-grants-genesis-import",
+            title: "Grant import",
+            description: "Grant import, as its owner describes it.",
+          },
+          {
+            name: "sso-domain-ownership",
+            title: "Domain ownership",
+            description: "Domain ownership, as its owner describes it.",
+          },
+          {
+            name: "identity-identifier-backfill",
+            title: "Sign-in identifiers",
+            description: "Sign-in identifiers, as its owner describes it.",
+          },
+        ]);
+        expect(listed[1]?.counts.finalized).toBe(3);
+      } finally {
+        vi.restoreAllMocks();
+        await runtime.stop();
+      }
+    });
   });
 });

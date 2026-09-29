@@ -15,6 +15,7 @@ type CreateSubscriptionInput = Parameters<ChannelShape["createUsageSubscription"
 type CreateGrantInput = Parameters<ChannelShape["createCreditGrant"]>[0];
 type CreateInput = Parameters<ChannelShape["createOneOffInvoice"]>[0];
 type FinalizedUsageInput = Parameters<ChannelShape["hasFinalizedUsageInvoice"]>[0];
+type FindInvoicesInput = Parameters<ChannelShape["findInvoices"]>[0];
 
 const MILLISECONDS_PER_SECOND = 1000;
 /** How many invoices of one subscription a renewal check reads. */
@@ -188,6 +189,17 @@ export class HttpConnectedInvoicingChannel extends ConnectedInvoicingChannel {
     );
   }
 
+  async findInvoices(input: FindInvoicesInput): Promise<ProviderInvoice[]> {
+    const clauses = Object.entries(input.metadata).map(
+      ([name, value]) => `metadata['${searchLiteral(name)}']:'${searchLiteral(value)}'`,
+    );
+    const found = await this.stripe.invoices.search({
+      query: [`customer:'${searchLiteral(input.customerId)}'`, ...clauses].join(" AND "),
+      limit: INVOICE_PAGE_SIZE,
+    });
+    return found.data.map(toProviderInvoice);
+  }
+
   async getInvoice(stripeInvoiceId: string): Promise<ProviderInvoice> {
     return toProviderInvoice(await this.stripe.invoices.retrieve(stripeInvoiceId));
   }
@@ -259,6 +271,11 @@ function withPaymentSettings(
 }
 
 /** The metadata, in key order, as the idempotency key's tail. */
+/** A value inside a quoted search clause: its quotes and backslashes escaped. */
+function searchLiteral(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+}
+
 function metadataKey(metadata: Record<string, string>): string {
   return Object.keys(metadata)
     .toSorted()

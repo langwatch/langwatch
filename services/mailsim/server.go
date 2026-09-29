@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"time"
@@ -19,20 +20,26 @@ const defaultWaitTimeout = 30 * time.Second
 // Server is the sink: the message store, the SMTP intake and the HTTP API +
 // browser inbox over it.
 type Server struct {
-	cfg   Config
-	store *Store
-	mux   *http.ServeMux
-	http  *http.Server
-	smtp  *smtp.Server
+	cfg     Config
+	store   *Store
+	mux     *http.ServeMux
+	http    *http.Server
+	smtp    *smtp.Server
+	console http.Handler
 }
 
 // NewServer wires the store, the SMTP intake and the HTTP surface together.
 func NewServer(cfg Config) (*Server, error) {
+	return newServer(cfg, embeddedConsole())
+}
+
+// newServer is NewServer with the inbox bundle named, so tests serve a fixed one.
+func newServer(cfg Config, bundle fs.FS) (*Server, error) {
 	store, err := NewStore(cfg.DataDir)
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{cfg: cfg, store: store}
+	s := &Server{cfg: cfg, store: store, console: newConsole(bundle)}
 	s.mux = s.buildMux()
 	s.http = &http.Server{Handler: s.mux, ReadHeaderTimeout: 10 * time.Second}
 	s.smtp = newSMTPServer(cfg.SMTPAddr, store, cfg.MaxMessageBytes)
@@ -48,15 +55,14 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) buildMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
-	mux.HandleFunc("GET /assets/ui.js", serveUIScript)
+	mux.HandleFunc("GET /api/inbox", s.handleInbox)
 	mux.HandleFunc("GET /api/messages", s.handleListMessages)
 	mux.HandleFunc("GET /api/messages/wait", s.handleWaitMessage)
 	mux.HandleFunc("GET /api/messages/{id}", s.handleGetMessage)
 	mux.HandleFunc("GET /api/messages/{id}/html", s.handleGetMessageHTML)
 	mux.HandleFunc("DELETE /api/messages", s.handleClearMessages)
 	mux.HandleFunc("DELETE /api/messages/{id}", s.handleDeleteMessage)
-	mux.HandleFunc("GET /messages/{id}", s.handleUIMessage)
-	mux.HandleFunc("GET /", s.handleUIIndex)
+	mux.HandleFunc("GET /", s.handleConsole)
 	return mux
 }
 
@@ -78,10 +84,9 @@ func setAPIHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
 }
 
-// setUIHeaders is the base pair plus the browser inbox's own CSP — the page
-// itself is trusted (it is this service's own markup), but it must not load
-// or run anything a caught message could have smuggled in as a same-origin
-// resource.
+// setUIHeaders is the base pair plus the browser inbox's own CSP: the bundle
+// is trusted (it is this service's own build), but it must not load or run
+// anything a caught message could have smuggled in as a same-origin resource.
 func setUIHeaders(w http.ResponseWriter) {
 	setBaseHeaders(w)
 	w.Header().Set("Content-Security-Policy",
@@ -162,7 +167,8 @@ func (s *Server) handleWaitMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
-	msg, ok := s.store.Wait(ctx, r.URL.Query().Get("to"), r.URL.Query().Get("subject"))
+	query := r.URL.Query()
+	msg, ok := s.store.Wait(ctx, WaitFilter{To: query.Get("to"), Subject: query.Get("subject"), After: query.Get("after")})
 	if !ok {
 		w.WriteHeader(http.StatusNoContent)
 		return

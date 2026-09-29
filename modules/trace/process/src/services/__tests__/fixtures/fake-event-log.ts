@@ -1,5 +1,6 @@
+import type { QueryRequest } from "@langwatch/clickhouse-client";
 import type { EventingClickHouseReplayClient } from "@langwatch/eventing/server";
-import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 
 /** One `event_log` row, as the replay reads it back. */
 export interface FakeEventLogRow {
@@ -153,38 +154,31 @@ const QUERY_ANSWERS: readonly [string, (rows: FakeEventLogRow[], p: QueryParams)
 ];
 
 /**
- * A faithful in-memory `event_log` that answers the four query shapes the
- * state replay path issues (discover, count, occurred-at bounds, cutoff,
- * load), computed from `rows` + query_params — no ClickHouse container.
+ * A faithful in-memory `event_log` behind the routed member's surface, answering the query shapes
+ * the state replay path issues (discover, count, occurred-at bounds, cutoff, load), computed from
+ * `rows` + params, and recording each statement's tenant — no ClickHouse container.
  */
 export function makeFakeClickHouse(rows: FakeEventLogRow[]): {
   client: EventingClickHouseReplayClient;
   queries: string[];
+  tenants: string[];
 } {
   const queries: string[] = [];
-  const client = clickHouseClientDouble({
-    query: async ({
-      query,
-      query_params,
-    }: {
-      query: string;
-      query_params?: QueryParams;
-      format?: string;
-    }) => {
-      queries.push(query);
-      const p = query_params ?? {};
-
-      for (const [fragment, answer] of QUERY_ANSWERS) {
-        if (query.includes(fragment)) {
-          const out = answer(rows, p);
-
-          return { json: async () => out };
-        }
-      }
-
-      throw new Error(`unexpected query: ${query.slice(0, 80)}`);
+  const tenants: string[] = [];
+  const answer = ({ sql, params, tenantId }: QueryRequest): unknown[] => {
+    queries.push(sql);
+    tenants.push(tenantId);
+    for (const [fragment, answerFor] of QUERY_ANSWERS) {
+      if (sql.includes(fragment)) return answerFor(rows, params ?? {});
+    }
+    throw new Error(`unexpected query: ${sql.slice(0, 80)}`);
+  };
+  const client = clickHouseQueryClientDouble({
+    query: async (request: QueryRequest) => ({ rows: answer(request) }),
+    stream: async function* (request: QueryRequest) {
+      yield answer(request);
     },
   });
 
-  return { client, queries };
+  return { client, queries, tenants };
 }

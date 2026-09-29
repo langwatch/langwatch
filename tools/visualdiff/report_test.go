@@ -90,7 +90,7 @@ func TestARegressionOutranksARestoredScreen(t *testing.T) {
 // @scenario A small diff with no errors is noise
 func TestClassifyNoise(t *testing.T) {
 	quiet := Row{Base: &Capture{Side: "base"}, Candidate: &Capture{Side: "candidate"}, Ratio: 0.011, Diffed: true}
-	loud := Row{Base: &Capture{Side: "base"}, Candidate: &Capture{Side: "candidate"}, Ratio: 0.31, Diffed: true}
+	loud := Row{Base: &Capture{Side: "base"}, Candidate: &Capture{Side: "candidate"}, Ratio: 0.06, Diffed: true}
 
 	if class, why := Classify(quiet); class != ClassNoise {
 		t.Fatalf("got %s (%s)", class, why)
@@ -108,7 +108,7 @@ func TestBuildRowsPairsBothSidesAndAttachesTheDiff(t *testing.T) {
 		{Kind: "flow", Key: "prompt-create", Index: 1, Label: "click New Prompt", Side: "base"},
 		{Kind: "flow", Key: "prompt-create", Index: 1, Side: "candidate", Error: "timeout"},
 	}
-	diffs := []Diff{{Kind: "route", Key: "/traces", Ratio: 0.5, File: "/tmp/diff.png"}}
+	diffs := []Diff{{Kind: "route", Key: "/traces", Ratio: 0.05, File: "/tmp/diff.png"}}
 
 	rows := BuildRows(captures, diffs)
 
@@ -119,7 +119,7 @@ func TestBuildRowsPairsBothSidesAndAttachesTheDiff(t *testing.T) {
 		t.Fatalf("findings sort first: %+v", rows[0])
 	}
 	route := rows[1]
-	if route.Base == nil || route.Candidate == nil || route.Ratio != 0.5 || route.DiffFile != "/tmp/diff.png" {
+	if route.Base == nil || route.Candidate == nil || route.Ratio != 0.05 || route.DiffFile != "/tmp/diff.png" {
 		t.Fatalf("route row: %+v", route)
 	}
 	if route.Base.Screenshot != "/tmp/base.png" || route.Candidate.Screenshot != "/tmp/candidate.png" {

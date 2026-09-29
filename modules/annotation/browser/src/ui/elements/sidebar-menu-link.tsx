@@ -4,9 +4,8 @@
  */
 
 import { HStack, Spacer, Text } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { ReactNode } from "react";
-
-import { Link } from "./annotation-link.tsx";
 
 export function SidebarMenuLink({
   href,

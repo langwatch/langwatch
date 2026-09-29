@@ -1,5 +1,6 @@
-import { Badge, HStack, Link, Text, VStack } from "@chakra-ui/react";
+import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
+import { Link } from "@langwatch/browser-host/link";
 import type { CheckRow as CheckRowData } from "@langwatch/ops-contract";
 import { ExternalLink } from "lucide-react";
 

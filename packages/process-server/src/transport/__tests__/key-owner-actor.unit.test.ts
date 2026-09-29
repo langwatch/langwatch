@@ -115,6 +115,7 @@ const surface = apiSurface({
   instanceAdmin: bearerDoor({ name: "instance-admin", token: void 0 }),
   trustedProxies: void 0,
   executionProxyBaseUrl: void 0,
+  publicBaseUrl: void 0,
   production: false,
   selection: TransportSelection.create().rest().browserBundle(false),
   sockets: WebSocketHost.create(),

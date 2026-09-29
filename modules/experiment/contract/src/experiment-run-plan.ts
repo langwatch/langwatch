@@ -3,9 +3,9 @@
  * from the run's fold to execute, fixed when the run starts.
  * Design: modules/experiment/specs/experiment-run-execution.md.
  */
-import { runActorSchema } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
+import { workbenchActorSchema } from "./experiment-workbench-version.ts";
 import {
   datasetColumnSchema,
   type EvaluatorConfig,
@@ -75,7 +75,11 @@ export const experimentRunPlanSchema = z.object({
   concurrency: z.number().int().positive(),
   origin: experimentRunOriginSchema,
   persistResults: z.boolean(),
-  actor: runActorSchema.optional(),
+  /** Who the run's board write is credited to: a person, a Langy session or a personless key. */
+  actor: workbenchActorSchema.pick({ userId: true, label: true }).optional(),
+  /** What a poll of the run answers with: its experiment's slug and the link to its results. */
+  experimentSlug: z.string().optional(),
+  runUrl: z.string().optional(),
   scope: executionScopeSchema,
   /** The dataset id a cell reads its mapping buckets from. */
   mappingDatasetId: z.string(),

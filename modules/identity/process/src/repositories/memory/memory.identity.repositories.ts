@@ -25,7 +25,6 @@ import {
   MemoryJoinRequestReadRepository,
 } from "./memory.join-request.repositories.ts";
 import { MemoryMfaEnrollmentRepository } from "./memory.mfa-enrollment.repository.ts";
-import { MemoryScimSyncProjectionRepository } from "./memory.scim-sync-projection.repository.ts";
 import { MemorySsoBreakGlassRepository } from "./memory.sso-break-glass.repository.ts";
 import { MemorySsoConnectionRegistrationRepository } from "./memory.sso-connection-registration.repository.ts";
 import { MemorySsoConnectionRoutingRepository } from "./memory.sso-connection-routing.repository.ts";
@@ -91,7 +90,6 @@ export function identityRepositoriesOverMemory(
     mfaProjection: MemoryStateProjectionRepository.create<MfaFoldState>(),
     joinRequestProjection: MemoryStateProjectionRepository.create<JoinRequestFoldState>(),
     ssoConnectionHeads: MemoryStateProjectionRepository.create<SsoConnectionFoldState>(),
-    scimSyncs: MemoryScimSyncProjectionRepository.create(),
     secretCarry: MemoryIdentitySecretCarryRepository.create(),
     joinRequestAudience: MemoryJoinRequestAudienceRepository.create(store),
     joinRequestNotificationContext: MemoryJoinRequestNotificationContextRepository.create(store),

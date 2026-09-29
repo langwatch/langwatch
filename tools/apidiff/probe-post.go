@@ -41,10 +41,24 @@ func collectionMatches(getPath, postPath string) bool {
 	return getPath == postPath || strings.HasPrefix(postPath, getPath+"/")
 }
 
+// postPassPool is how many collection or permission reads run at once. Each
+// is an independent read, and the pool keeps a side's server unflooded.
+const postPassPool = 6
+
+// collectionCheck is one list GET a successful mutation covered, resolved
+// before the pool runs, and what its visibility wait saw.
+type collectionCheck struct {
+	operation Operation
+	record    mutationRecord
+	target    probeTarget
+	settled   settleOutcome
+}
+
 // verifyCollections re-probes every list GET that a successful mutation
-// covered, in probe order (deterministic).
+// covered. The waits run in a pool; the findings and transcripts are filed
+// in probe order afterwards, so the report stays deterministic.
 func (engine *probeEngine) verifyCollections(operations []Operation) []Finding {
-	findings := make([]Finding, 0)
+	checks := make([]collectionCheck, 0)
 	verified := map[string]bool{}
 	for _, record := range engine.mutations {
 		matched := matchingReads(operations, record.collectionPath)
@@ -55,8 +69,18 @@ func (engine *probeEngine) verifyCollections(operations []Operation) []Finding {
 				continue
 			}
 			verified[key] = true
-			findings = append(findings, engine.verifyCollection(operation, record)...)
+			if target, ok := engine.ownerTarget(operation); ok {
+				checks = append(checks, collectionCheck{operation: operation, record: record, target: target})
+			}
 		}
+	}
+	inPool(len(checks), postPassPool, func(index int) {
+		check := &checks[index]
+		check.settled = engine.settleForVisibility(check.operation, check.record, check.target)
+	})
+	findings := make([]Finding, 0)
+	for index := range checks {
+		findings = append(findings, engine.verifyCollection(checks[index])...)
 	}
 	return findings
 }
@@ -73,16 +97,12 @@ func matchingReads(operations []Operation, collectionPath string) []Operation {
 	return matched
 }
 
-// verifyCollection re-probes one collection GET and checks the created entity
-// is visible on each side: both visible compares the now-non-empty lists, one
-// visible is mutation_not_visible, neither is a probe note. The re-probe is
-// an event-driven settle (settleForVisibility), never a fixed sleep.
-func (engine *probeEngine) verifyCollection(operation Operation, record mutationRecord) []Finding {
-	target, ok := engine.ownerTarget(operation)
-	if !ok {
-		return nil
-	}
-	settled := engine.settleForVisibility(operation, record, target)
+// verifyCollection files one collection's visibility wait: both visible
+// compares the now-non-empty lists, one visible is mutation_not_visible,
+// neither is a probe note. The re-probe is an event-driven settle
+// (settleForVisibility), never a fixed sleep.
+func (engine *probeEngine) verifyCollection(check collectionCheck) []Finding {
+	operation, settled := check.operation, check.settled
 	engine.transcripts = append(engine.transcripts, settled.transcript)
 
 	if settled.visibleA && settled.visibleB {
@@ -223,19 +243,56 @@ func (engine *probeEngine) permissionProbes(operations []Operation) []Finding {
 	if keys.ProjectKeyB == "" || keys.ProjectKeyC == "" {
 		return nil
 	}
+	checks := engine.permissionChecks(operations)
+	inPool(len(checks), postPassPool, func(index int) { engine.runPermissionCheck(&checks[index]) })
 	findings := make([]Finding, 0)
+	for index := range checks {
+		check := &checks[index]
+		engine.transcripts = append(engine.transcripts, check.transcripts...)
+		for keyIndex, foreign := range check.keys {
+			findings = append(findings, engine.classifyPermission(check.operation, foreign, check.transcripts[keyIndex])...)
+		}
+	}
+	return findings
+}
+
+// permissionChecks resolves, in probe order, every project-key read the
+// foreign keys repeat.
+func (engine *probeEngine) permissionChecks(operations []Operation) []permissionCheck {
+	checks := make([]permissionCheck, 0)
 	for index := range operations {
 		operation := operations[index]
-		if !isReadMethod(operation.Method) || !usesProjectKey(operation, engine.options.Schemes, keys) {
+		if !isReadMethod(operation.Method) || !usesProjectKey(operation, engine.options.Schemes, engine.options.Keys) {
 			continue
 		}
 		if engine.statusDiffs[operationKeyOf(operation)] {
 			engine.progress("skip permission pass %s %s (already differs on the owner key)\n", operation.Method, operation.Path)
 			continue
 		}
-		findings = append(findings, engine.permissionProbe(operation)...)
+		if check, ok := engine.permissionCheckFor(operation); ok {
+			checks = append(checks, check)
+		}
 	}
-	return findings
+	return checks
+}
+
+// runPermissionCheck repeats one read with each foreign key in turn.
+func (engine *probeEngine) runPermissionCheck(check *permissionCheck) {
+	for keyIndex, foreign := range check.keys {
+		target := check.target
+		target.headersA, target.headersB = check.headers[keyIndex], check.headers[keyIndex]
+		check.transcripts[keyIndex] = engine.runCase(check.operation, probeCase{name: "permission-" + foreign.label}, target)
+	}
+}
+
+// permissionCheck is one owner-key read to repeat with each foreign key,
+// resolved before the pool runs, and the transcripts the pool fills in.
+type permissionCheck struct {
+	operation   Operation
+	target      probeTarget
+	keys        []foreignKey
+	headers     []map[string]string
+	transcripts []Transcript
 }
 
 // foreignKey is one non-owner credential and the identities that credential
@@ -272,42 +329,35 @@ func (engine *probeEngine) foreignKeys() []foreignKey {
 	}
 }
 
-// permissionProbe runs one operation's read with both foreign keys and
-// classifies each answer against what the OWNER key saw on this same
-// operation.
-func (engine *probeEngine) permissionProbe(operation Operation) []Finding {
+// permissionCheckFor resolves one operation's read for the foreign keys, or
+// reports that it cannot be repeated with them.
+func (engine *probeEngine) permissionCheckFor(operation Operation) (permissionCheck, bool) {
 	paramsA, unresolvedA := resolveParams(operation, engine.symbolsA, false)
 	paramsB, unresolvedB := resolveParams(operation, engine.symbolsB, false)
 	if unresolvedA != "" || unresolvedB != "" {
-		return nil
+		return permissionCheck{}, false
 	}
 	pathA, pathB := operation.SidePaths()
-	target := probeTarget{
-		pathA:  substitutePath(pathA, paramsA.pathValues, operation.Path),
-		pathB:  substitutePath(pathB, paramsB.pathValues, operation.Path),
-		queryA: paramsA.query,
-		queryB: paramsB.query,
+	check := permissionCheck{
+		operation: operation,
+		target: probeTarget{
+			pathA:  substitutePath(pathA, paramsA.pathValues, operation.Path),
+			pathB:  substitutePath(pathB, paramsB.pathValues, operation.Path),
+			queryA: paramsA.query,
+			queryB: paramsB.query,
+		},
+		keys: engine.foreignKeys(),
 	}
-
-	keys := engine.foreignKeys()
-	transcripts := make([]Transcript, 0, len(keys))
-	for _, foreign := range keys {
+	for _, foreign := range check.keys {
 		headers, ok := foreignProjectHeaders(operation, engine.options.Schemes, foreign.key)
 		if !ok {
 			engine.progress("skip permission pass %s %s (a non-project credential cannot be swapped for a foreign one)\n", operation.Method, operation.Path)
-			return nil
+			return permissionCheck{}, false
 		}
-		target.headersA, target.headersB = headers, headers
-		transcript := engine.runCase(operation, probeCase{name: "permission-" + foreign.label}, target)
-		engine.transcripts = append(engine.transcripts, transcript)
-		transcripts = append(transcripts, transcript)
+		check.headers = append(check.headers, headers)
 	}
-
-	findings := make([]Finding, 0)
-	for index, foreign := range keys {
-		findings = append(findings, engine.classifyPermission(operation, foreign, transcripts[index])...)
-	}
-	return findings
+	check.transcripts = make([]Transcript, len(check.keys))
+	return check, true
 }
 
 // classifyPermission reports a leak (an owner-only ID reached a foreign key)

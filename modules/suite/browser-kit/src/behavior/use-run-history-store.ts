@@ -18,11 +18,7 @@ interface Filters {
 /** Minimal router interface for URL sync (avoids coupling to Next.js router) */
 interface RouterLike {
   query: Record<string, string | string[] | undefined>;
-  push: (
-    url: { query: Record<string, string | string[]> },
-    as?: undefined,
-    options?: { shallow: boolean },
-  ) => void;
+  push: (url: { query: Record<string, string | string[]> }, options?: { shallow: boolean }) => void;
 }
 
 /** Query object shape from Next.js router.query */
@@ -118,7 +114,7 @@ export function createRunHistoryStore() {
         delete query.passFailStatus;
       }
 
-      router.push({ query }, undefined, { shallow: true });
+      router.push({ query }, { shallow: true });
     },
 
     hydrateFromUrl: (query: QueryLike) => {

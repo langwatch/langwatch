@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -153,10 +154,9 @@ func TestPinCreatedHonoursTheCreatesBucketAndField(t *testing.T) {
 }
 
 func TestSettleReadWaitsForAProjectionToFill(t *testing.T) {
-	calls := 0
+	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		calls++
-		if calls <= 2 {
+		if calls.Add(1) <= 2 {
 			writeJSON(writer, http.StatusOK, `{"runs":[],"hasMore":false}`)
 			return
 		}

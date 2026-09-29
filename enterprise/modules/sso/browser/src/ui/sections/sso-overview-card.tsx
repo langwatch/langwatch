@@ -5,6 +5,7 @@
  * `withCapabilities`. Spec: specs/identity/organization-authentication-settings.feature
  */
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { OverviewCard, OverviewDetail, StatusChip } from "@langwatch/design-system/settings-card";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { ArrowRight, ExternalLink, RefreshCw, Settings2 } from "lucide-react";
@@ -100,10 +101,10 @@ export function SingleSignOnCard({
           )}
           {canManage && (
             <Button asChild size="sm" variant="ghost">
-              <a href={PROVIDER_PAGE}>
+              <Link unstyled href={PROVIDER_PAGE}>
                 <Settings2 size={14} />
                 Edit
-              </a>
+              </Link>
             </Button>
           )}
         </>
@@ -129,9 +130,9 @@ export function SingleSignOnCard({
       </OverviewDetail>
 
       <OverviewDetail label="New arrivals">
-        <a href={PROVIDER_PAGE} data-testid="sso-arrivals-value">
+        <Link unstyled href={PROVIDER_PAGE} data-testid="sso-arrivals-value">
           {arrivalAnswerLabel(SSO_ANSWER_BY_POLICY[connection.arrivalPolicy])}
-        </a>
+        </Link>
       </OverviewDetail>
 
       <OverviewDetail label="Verified domains">
@@ -191,7 +192,9 @@ function UpdateNotice({
             title={chip.title}
             data-testid="sso-update-chip"
           />
-          <a href={PROVIDER_PAGE}>Where it stands</a>
+          <Link unstyled href={PROVIDER_PAGE}>
+            Where it stands
+          </Link>
         </HStack>
       </OverviewDetail>
     );
@@ -214,10 +217,10 @@ function UpdateNotice({
         </Text>
         {canManage && (
           <Button asChild size="sm" variant="solid" colorPalette="orange">
-            <a href={PROVIDER_PAGE}>
+            <Link unstyled href={PROVIDER_PAGE}>
               Update single sign-on
               <ArrowRight size={14} />
-            </a>
+            </Link>
           </Button>
         )}
       </VStack>
@@ -248,10 +251,10 @@ export function SingleSignOnPreviewCard({
       actions={
         canManage ? (
           <Button asChild size="sm" variant="solid" colorPalette="orange">
-            <a href={PROVIDER_PAGE} data-testid="single-sign-on-preview-action">
+            <Link unstyled href={PROVIDER_PAGE} data-testid="single-sign-on-preview-action">
               {copy.action}
               <ArrowRight size={14} />
-            </a>
+            </Link>
           </Button>
         ) : (
           void 0

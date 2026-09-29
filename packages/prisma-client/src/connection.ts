@@ -5,6 +5,7 @@ import type { Pool } from "pg";
 import type { PrismaConfiguration } from "./config.ts";
 import { PrismaDriverAdapterService, type PrismaDriverAdapterFactory } from "./driver-adapter.ts";
 import { type Prisma, PrismaClient } from "./generated/client.ts";
+import { OperatorReadGuard, type OperatorReadMint } from "./operator-read.ts";
 
 /**
  * A short constant name per Prisma log level, used as the pino `msg` so a
@@ -96,10 +97,16 @@ export class PrismaConnection {
   private constructor(
     readonly client: PrismaClient,
     readonly pool: Pool,
+    /** Builds a declared operator read's client; held by the stores owner only. */
+    readonly operatorReads: OperatorReadMint | undefined,
   ) {}
 
-  static create(input: { client: PrismaClient; pool: Pool }): PrismaConnection {
-    return new PrismaConnection(input.client, input.pool);
+  static create(input: {
+    client: PrismaClient;
+    pool: Pool;
+    operatorReads?: OperatorReadMint;
+  }): PrismaConnection {
+    return new PrismaConnection(input.client, input.pool, input.operatorReads);
   }
 
   /** @internal Prefer PrismaShutdownService from composition code. */
@@ -155,40 +162,52 @@ export class PrismaConnectionService {
       log: configuration.log,
       logger: this.logger,
     });
-    const guard = this.guard;
+    const guarded = guardedClient({ client, guard: this.guard });
+    const logger = this.logger;
+    const operatorReads: OperatorReadMint = ({ owner, handle }) =>
+      guardedClient({ client, guard: OperatorReadGuard.create({ owner, handle, logger }) });
 
-    const guarded = client.$extends({
-      query: {
-        $allModels: {
-          $allOperations({ model, operation, args, query }) {
-            return guard.execute({ model, action: operation, args }, (guardedArgs) =>
-              query(guardedArgs as typeof args),
-            );
-          },
-        },
-        $queryRaw({ args, query }) {
-          return guard.execute({ action: "queryRaw", args }, (guardedArgs) =>
-            query(guardedArgs as typeof args),
-          );
-        },
-        $queryRawUnsafe({ args, query }) {
-          return guard.execute({ action: "queryRaw", args }, (guardedArgs) =>
-            query(guardedArgs as typeof args),
-          );
-        },
-        $executeRaw({ args, query }) {
-          return guard.execute({ action: "executeRaw", args }, (guardedArgs) =>
-            query(guardedArgs as typeof args),
-          );
-        },
-        $executeRawUnsafe({ args, query }) {
-          return guard.execute({ action: "executeRaw", args }, (guardedArgs) =>
+    return PrismaConnection.create({ client: guarded, pool, operatorReads });
+  }
+}
+
+/** Routes every model operation and raw statement of one client through a guard. */
+function guardedClient({
+  client,
+  guard,
+}: {
+  client: PrismaClient;
+  guard: Pick<PrismaQueryGuard, "execute">;
+}): PrismaClient {
+  return client.$extends({
+    query: {
+      $allModels: {
+        $allOperations({ model, operation, args, query }) {
+          return guard.execute({ model, action: operation, args }, (guardedArgs) =>
             query(guardedArgs as typeof args),
           );
         },
       },
-    }) as unknown as PrismaClient;
-
-    return PrismaConnection.create({ client: guarded, pool });
-  }
+      $queryRaw({ args, query }) {
+        return guard.execute({ action: "queryRaw", args }, (guardedArgs) =>
+          query(guardedArgs as typeof args),
+        );
+      },
+      $queryRawUnsafe({ args, query }) {
+        return guard.execute({ action: "queryRaw", args }, (guardedArgs) =>
+          query(guardedArgs as typeof args),
+        );
+      },
+      $executeRaw({ args, query }) {
+        return guard.execute({ action: "executeRaw", args }, (guardedArgs) =>
+          query(guardedArgs as typeof args),
+        );
+      },
+      $executeRawUnsafe({ args, query }) {
+        return guard.execute({ action: "executeRaw", args }, (guardedArgs) =>
+          query(guardedArgs as typeof args),
+        );
+      },
+    },
+  }) as unknown as PrismaClient;
 }

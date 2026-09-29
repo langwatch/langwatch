@@ -39,6 +39,8 @@ export interface InstantEvalSpendRecord {
    * "what did that run cost" a query rather than a guess from timestamps.
    */
   readonly runId?: string;
+  /** The key a hosted call's spend is billed to; absent for a project's own judgements. */
+  readonly virtualKeyId?: string;
   /** Input tokens the classifier billed for. */
   readonly inputTokens: number;
   /** Classifications made, which is one per judged text. */
@@ -102,6 +104,7 @@ export interface InstantEvalPricedSpend {
   readonly projectId: string;
   readonly organizationId: string;
   readonly teamId: string;
+  readonly virtualKeyId?: string;
   readonly requestType: string;
   readonly model: string;
   readonly rateVersion: string;
@@ -128,6 +131,7 @@ export function instantEvalPricedSpend({
     projectId: record.projectId,
     organizationId: attribution.organizationId,
     teamId: attribution.teamId,
+    ...(record.virtualKeyId ? { virtualKeyId: record.virtualKeyId } : {}),
     requestType: INSTANT_EVAL_REQUEST_TYPE,
     model: INSTANT_EVAL_SPEND_MODEL,
     rateVersion: instantEvalRateVersion(pricing),

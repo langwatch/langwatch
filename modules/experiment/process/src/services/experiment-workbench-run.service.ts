@@ -5,13 +5,13 @@
  */
 import {
   ExperimentNotFoundError,
+  ExperimentRunLoopUnavailableError,
   ExperimentRunNotFoundError as RunNotFoundError,
   InvalidExperimentConfigurationError,
   createInitialUIState,
+  generateHumanReadableId,
   persistedEvaluationsV3StateSchema,
-  runInputsBodySchema,
   runsSavedDataset,
-  type EvaluationV3Event,
   type EvaluationsV3State,
   type ExecutionScope,
   type ExperimentRunWithItems,
@@ -27,49 +27,116 @@ import {
 } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { deriveRunActor } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
-import type {
-  ExperimentV3RunLoop,
-  ExperimentWorkbenchObserver,
-} from "../app/experiment-workbench.members.ts";
-import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
-import { runLoopOf, runProgressOf } from "../rules/experiment-run-loop.rules.ts";
+import type { ExperimentWorkbenchObserver } from "../app/experiment-workbench.members.ts";
+import type { ExperimentRunProgressState } from "../repositories/experiment-run-fold.repository.ts";
+import type { ExperimentRunRefusal } from "../rules/experiment-run-availability.rules.ts";
+import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
-import { ExperimentExecutionDataService } from "./experiment-execution-data.service.ts";
-import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
-import { ExperimentRunResultsWriterService } from "./experiment-run-results-writer.service.ts";
-import { ExperimentRunStateMirrorService } from "./experiment-run-state-mirror.service.ts";
+import {
+  ExperimentExecutionDataService,
+  type LoadedExecutionData,
+} from "./experiment-execution-data.service.ts";
+import { ExperimentRunPlanService } from "./experiment-run-plan.service.ts";
 import { ExperimentSavedStateExecutionService } from "./experiment-saved-state-execution.service.ts";
+import {
+  ExperimentWorkbenchPipelineRunService,
+  type PipelineRunStart,
+  type WorkbenchRunPipeline,
+} from "./experiment-workbench-pipeline-run.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 
 export type WorkbenchExecutionRequest = z.infer<typeof executionRequestSchema>;
 
-export class ExperimentWorkbenchRunService {
-  private constructor(
-    private readonly experiments: ExperimentService,
-    private readonly runLoop: ExperimentV3RunLoop,
-    private readonly observer: ExperimentWorkbenchObserver,
-  ) {}
+type WorkbenchRunDeps = {
+  experiments: ExperimentService;
+  observer: ExperimentWorkbenchObserver;
+  /** Absent where a suite builds no run pipeline; a pipeline run is then refused by name. */
+  runs?: WorkbenchRunPipeline;
+};
 
-  static create(options: {
-    experiments: ExperimentService;
-    runLoop: ExperimentV3RunLoop;
-    observer: ExperimentWorkbenchObserver;
-  }): ExperimentWorkbenchRunService {
-    return new ExperimentWorkbenchRunService(
-      options.experiments,
-      options.runLoop,
-      options.observer,
-    );
+export class ExperimentWorkbenchRunService {
+  private readonly experiments: ExperimentService;
+  private readonly observer: ExperimentWorkbenchObserver;
+  private readonly runs: WorkbenchRunPipeline | undefined;
+
+  private constructor(deps: WorkbenchRunDeps) {
+    this.experiments = deps.experiments;
+    this.observer = deps.observer;
+    this.runs = deps.runs;
+  }
+
+  static create(deps: WorkbenchRunDeps): ExperimentWorkbenchRunService {
+    return new ExperimentWorkbenchRunService(deps);
   }
 
   /** `POST /:slug/run`: a polled run by default, a streamed one when the caller accepts events. */
   async startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer> {
     const { projectId, slug } = input;
+    const saved = await this.#prepareSavedRun(input);
 
+    logger.info(
+      { projectId, slug, isSSE: input.acceptsEvents, rowCount: saved.data.datasetRows.length },
+      "Starting CI/CD experiment execution",
+    );
+
+    // The refusal a process without Redis or a public address owes, as before the pipeline.
+    const runs = this.#startable();
+    const runId = generateHumanReadableId();
+    const savedRun = (options: { persistResults: boolean; runUrl?: string }): PipelineRunStart => {
+      const plan = ExperimentRunPlanService.create().buildPlan({
+        request: { state: saved.state, scope: saved.scope },
+        data: saved.data,
+        concurrency: runs.concurrency,
+        origin: "saved",
+        actor: workbenchActorFrom({ credential: input.credential }),
+        experimentSlug: slug,
+        ...options,
+      });
+      return {
+        start: this.#runsOn().startOf({
+          projectId,
+          runId,
+          experimentId: saved.experimentId,
+          plan,
+          state: saved.state,
+          data: saved.data,
+        }),
+        // The person behind a key; a personal agent refuses a key that names nobody, as main did.
+        actor: deriveRunActor({
+          userId: input.credential.kind === "apiKey" ? input.credential.userId : null,
+          surfaceHeader: null,
+        }),
+        data: saved.data,
+        state: saved.state,
+        carriedOverCells: saved.carriedOverCells,
+        reportContext: { projectId, slug },
+      };
+    };
+
+    // A stream never wrote the board; a polled run of the saved dataset fills the cells it shows.
+    if (input.acceptsEvents) {
+      return {
+        kind: "streaming",
+        events: this.#runsOn().streamRun(savedRun({ persistResults: false })),
+      };
+    }
+    const runUrl = this.#runUrl({ projectSlug: input.projectSlug, slug, runId });
+    const run = savedRun({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
+    await this.#runsOn().startRun(run);
+
+    return { kind: "started", runId, status: "running", total: run.start.total, runUrl };
+  }
+
+  /** The saved workbench, the body's run inputs and the data they load, or main's refusals. */
+  async #prepareSavedRun(input: SavedRunRequest) {
+    const { projectId, slug } = input;
+    const runs = this.#pipeline();
     const savedExperiment = await this.experiments.findBySlugAndType({
       projectId,
       slug,
@@ -85,35 +152,19 @@ export class ExperimentWorkbenchRunService {
     if (!parseResult.data.datasets[0]) {
       throw new ExperimentEvaluationInputError({ status: 400, reason: "No dataset configured" });
     }
-
-    let rawBody: unknown = {};
-    if (input.body.trim()) {
-      try {
-        rawBody = JSON.parse(input.body);
-      } catch {
-        throw new ExperimentEvaluationInputError({ status: 400, reason: "Invalid JSON body" });
-      }
-    }
-    const inputsParse = runInputsBodySchema.safeParse(rawBody);
-    if (!inputsParse.success) {
-      const error = inputsParse.error.issues[0]?.message ?? "Invalid request body";
-      throw new ExperimentEvaluationInputError({ status: 400, reason: error });
-    }
-    const runInputs = inputsParse.data;
-
-    const prepared = await ExperimentSavedStateExecutionService.create().prepareSavedStateExecution(
-      {
-        experiments: this.experiments,
-        services: this.runLoop.services,
-        projectId,
-        slug,
-        runInputs: {
-          data: runInputs.data,
-          datasetId: runInputs.dataset_id,
-          parameters: runInputs.parameters,
-        },
+    const savedState = ExperimentSavedStateExecutionService.create();
+    const runInputs = savedState.parseRunInputs({ body: input.body });
+    const prepared = await savedState.prepareSavedStateExecution({
+      experiments: this.experiments,
+      services: runs.services,
+      projectId,
+      slug,
+      runInputs: {
+        data: runInputs.data,
+        datasetId: runInputs.dataset_id,
+        parameters: runInputs.parameters,
       },
-    );
+    });
     if ("error" in prepared) {
       throw new ExperimentEvaluationInputError({ status: prepared.status, reason: prepared.error });
     }
@@ -121,74 +172,25 @@ export class ExperimentWorkbenchRunService {
     const scope: ExecutionScope = runInputs.row_indices
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
-    const carriedOverCells = ExperimentSavedStateExecutionService.create().planSavedRunCarryOver({
-      prepared,
-      scope,
-    });
-    const {
-      experiment,
-      state,
-      datasetRows,
-      datasetColumns,
-      loadedPrompts,
-      loadedAgents,
-      loadedEvaluators,
-      loadedWorkflows,
-    } = prepared;
-    const loaded = {
-      state,
-      datasetRows,
-      datasetColumns,
-      loadedPrompts,
-      loadedAgents,
-      loadedEvaluators,
-      loadedWorkflows,
+    const data: LoadedExecutionData = {
+      datasetRows: prepared.datasetRows,
+      datasetColumns: prepared.datasetColumns,
+      loadedPrompts: prepared.loadedPrompts,
+      loadedAgents: prepared.loadedAgents,
+      loadedEvaluators: prepared.loadedEvaluators,
+      loadedWorkflows: prepared.loadedWorkflows,
     };
-
-    logger.info(
-      { projectId, slug, isSSE: input.acceptsEvents, rowCount: loaded.datasetRows.length },
-      "Starting CI/CD experiment execution",
-    );
-
-    if (input.acceptsEvents) {
-      const { ports } = runLoopOf(this.runLoop);
-      const orchestrator = ExperimentRunOrchestratorService.create().runOrchestrator({
-        projectId,
-        experimentId: experiment.id,
-        scope,
-        ...loaded,
-        ports,
-        workflows: this.runLoop.workflows,
-        defaultConcurrency: this.runLoop.defaultConcurrency,
-        ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
-      });
-
-      return { kind: "streaming", events: this.#savedRunEvents({ orchestrator, projectId, slug }) };
-    }
-
-    const { runId, runUrl, total } = await this.runLoop.startRun({
-      projectId,
-      projectSlug: input.projectSlug,
-      experimentId: experiment.id,
-      experimentSlug: slug,
+    return {
+      experimentId: prepared.experiment.id,
+      state: prepared.state,
+      data,
       scope,
-      ...loaded,
-      ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
-      // A run of the saved dataset fills the cells the workbench shows.
-      ...(runsSavedDataset(runInputs)
-        ? {
-            persistResults: {
-              experiments: this.experiments,
-              actor: workbenchActorFrom({ credential: input.credential }),
-            },
-          }
-        : {}),
-    });
-
-    return { kind: "started", runId, status: "running", total, runUrl };
+      runInputs,
+      carriedOverCells: savedState.planSavedRunCarryOver({ prepared, scope }),
+    };
   }
 
-  /** `POST /execute`: the browser's run, mirrored onto the run store and the saved cells. */
+  /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
   async executeWorkbenchRun(
     input: WorkbenchExecutionRequest,
     by: Readonly<{ id: string }>,
@@ -197,14 +199,15 @@ export class ExperimentWorkbenchRunService {
 
     logger.info({ projectId, scope: input.scope }, "Starting experiment execution");
 
-    const { ports, progress } = runLoopOf(this.runLoop);
+    // The refusal a process without Redis or a public address owes, as before the pipeline.
+    const runs = this.#startable();
 
     const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
       dataset: input.dataset,
       targets: input.targets,
       evaluators: input.evaluators,
-      services: this.runLoop.services,
+      services: runs.services,
       inputs: { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
     });
     if ("error" in dataResult) {
@@ -233,54 +236,50 @@ export class ExperimentWorkbenchRunService {
       ui: createInitialUIState(),
     };
 
-    const mirror = ExperimentRunStateMirrorService.create({
-      projectId,
-      experimentId: input.experimentId,
-      experimentSlug: input.experimentSlug ?? "",
-      progress,
-    });
-
-    // The page saves these cells too, and it is the faster of the two. The
-    // server writes them so the board does not depend on the tab surviving.
-    const resultsWriter = ExperimentRunResultsWriterService.findWriterFor({
-      persistence: { experiments: this.experiments, actor: { userId: by.id, label: "user" } },
-      projectId,
-      experimentId: input.experimentId,
-      scope: input.scope,
-      data: input.data,
-      datasetId: input.dataset_id,
-      parameters: input.parameters,
-    });
-
-    const orchestrator = ExperimentRunOrchestratorService.create().runOrchestrator({
-      projectId,
-      experimentId: input.experimentId,
-      scope: input.scope,
-      state,
-      datasetRows: dataResult.datasetRows,
-      datasetColumns: dataResult.datasetColumns,
-      loadedPrompts: dataResult.loadedPrompts,
-      loadedAgents: dataResult.loadedAgents,
-      loadedEvaluators: dataResult.loadedEvaluators,
-      loadedWorkflows: dataResult.loadedWorkflows,
-      ports,
-      workflows: this.runLoop.workflows,
-      defaultConcurrency: this.runLoop.defaultConcurrency,
-      concurrency: input.concurrency,
-      seedTargetOutputs: input.seedTargetOutputs,
-      carriedOverCells: input.carriedOverCells,
+    const experimentId = input.experimentId ?? "";
+    const plan = ExperimentRunPlanService.create().buildPlan({
+      request: {
+        state,
+        scope: input.scope,
+        ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
+      },
+      data: dataResult,
+      concurrency: input.concurrency ?? runs.concurrency,
+      origin: "workbench",
+      // The page saves these cells too; the server writes them so the board outlives the tab.
+      persistResults:
+        experimentId !== "" &&
+        runsSavedDataset({
+          ...(input.data !== undefined ? { data: input.data } : {}),
+          ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
+          ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
+        }),
+      actor: { userId: by.id, label: "user" },
+      ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
     });
 
     return {
       kind: "streaming",
-      events: this.#workbenchRunEvents({
-        orchestrator,
-        projectId,
-        experimentId: input.experimentId,
-        isFullRun: input.scope.type === "full",
-        userId: by.id,
-        mirror,
-        resultsWriter,
+      events: this.#runsOn().streamRun({
+        start: this.#runsOn().startOf({
+          projectId,
+          runId: generateHumanReadableId(),
+          experimentId,
+          plan,
+          state,
+          data: dataResult,
+        }),
+        actor: { id: by.id, label: "user" },
+        data: dataResult,
+        state,
+        carriedOverCells: input.carriedOverCells ?? [],
+        reportContext: { projectId },
+        ran: {
+          userId: by.id,
+          projectId,
+          experimentId: input.experimentId,
+          isFullRun: input.scope.type === "full",
+        },
       }),
     };
   }
@@ -321,7 +320,7 @@ export class ExperimentWorkbenchRunService {
   async pollRun(input: { projectId: string; runId: string }): Promise<RunStatusAnswer> {
     const { runId } = input;
 
-    const runState = await runProgressOf(this.runLoop).findRunState(runId);
+    const runState = await this.#progressOf(runId);
 
     // All three not-found branches raise the SAME code: from outside they
     // are one answer - this run is not yours to read.
@@ -338,36 +337,32 @@ export class ExperimentWorkbenchRunService {
 
     logger.debug({ runId, status: runState.status }, "Run status queried");
 
-    if (runState.status === "running" || runState.status === "pending") {
-      return {
-        runId: runState.runId,
-        status: runState.status,
-        progress: runState.progress,
-        total: runState.total,
-        startedAt: runState.startedAt,
-      };
+    const { status, progress, total, startedAt } = runState;
+    if (status === "running" || status === "pending") {
+      return { runId: runState.runId, status, progress, total, startedAt };
     }
 
-    if (runState.status === "completed") {
+    const { finishedAt } = runState;
+    if (status === "completed") {
       return {
         runId: runState.runId,
-        status: runState.status,
-        progress: runState.progress,
-        total: runState.total,
-        startedAt: runState.startedAt,
-        finishedAt: runState.finishedAt,
+        status,
+        progress,
+        total,
+        startedAt,
+        finishedAt,
         summary: runState.summary,
       };
     }
 
-    if (runState.status === "failed") {
+    if (status === "failed") {
       return {
         runId: runState.runId,
-        status: runState.status,
-        progress: runState.progress,
-        total: runState.total,
-        startedAt: runState.startedAt,
-        finishedAt: runState.finishedAt,
+        status,
+        progress,
+        total,
+        startedAt,
+        finishedAt,
         // The code, never the thrown message (ADR-045).
         error: runState.error,
         ...(runState.domainError ? { domainError: runState.domainError } : {}),
@@ -375,21 +370,14 @@ export class ExperimentWorkbenchRunService {
       };
     }
 
-    return {
-      runId: runState.runId,
-      status: runState.status,
-      progress: runState.progress,
-      total: runState.total,
-      startedAt: runState.startedAt,
-      finishedAt: runState.finishedAt,
-    };
+    return { runId: runState.runId, status, progress, total, startedAt, finishedAt };
   }
 
   /** `GET /runs/:runId/results`: every row of a run, found through the cache or the slug. */
   async readRunResults(input: RunResultsRequest): Promise<ExperimentRunWithItems> {
     const { projectId, runId } = input;
 
-    const runState = await runProgressOf(this.runLoop).findRunState(runId);
+    const runState = await this.#progressOf(runId);
     const ownState = runState && runState.projectId === projectId ? runState : undefined;
 
     const experimentSlug = input.experimentSlug ?? ownState?.experimentSlug;
@@ -418,69 +406,88 @@ export class ExperimentWorkbenchRunService {
     }
   }
 
-  /** The `:slug/run` stream: the same orchestrator, with no mirror or writer. */
-  async *#savedRunEvents(options: {
-    orchestrator: AsyncIterable<EvaluationV3Event>;
-    projectId: string;
+  /**
+   * `POST /abort`: the run's own project may stop it, read from its progress fold; any other gets
+   * main's 404. The flag is the cells' fast signal, the command the manager's durable record.
+   */
+  async abortRun(
+    input: Readonly<{ projectId: string; runId: string }>,
+    by: Readonly<{ id: string }>,
+  ): Promise<{ success: true; runId: string; message: "Abort requested" }> {
+    const { projectId, runId } = input;
+    const runState = await this.#progressOf(runId);
+    if (!runState || runState.projectId !== projectId) throw new RunNotFoundError(runId);
+
+    logger.info({ projectId, runId }, "Requesting abort");
+    const runs = this.#pipeline();
+    await runs.abort.requestAbort(runId);
+    await runs.commands.abortExperimentRun({
+      tenantId: projectId,
+      occurredAt: nowInstant().epochMilliseconds,
+      runId,
+      experimentId: runState.experimentId,
+      requestedBy: by.id,
+    });
+
+    return { success: true, runId, message: "Abort requested" };
+  }
+
+  /** The run's progress fold, by runId alone as main's poller keyed it. */
+  async #progressOf(runId: string): Promise<ExperimentRunProgressState | undefined> {
+    const runs = this.#pipeline();
+    // The refusal a process without Redis owes: its runs could never be read back.
+    refuse(runs.refusals.read);
+    const read = await runs.folds.readRunProgress({ runId });
+
+    return read.kind === "folded" ? read.state : undefined;
+  }
+
+  /** The link a polled run answers with, which a process with no public address cannot give. */
+  #runUrl({
+    projectSlug,
+    slug,
+    runId,
+  }: {
+    projectSlug: string;
     slug: string;
-  }): AsyncGenerator<EvaluationV3Event> {
-    const { projectId, slug } = options;
-
-    try {
-      for await (const event of options.orchestrator) {
-        yield event;
-        if (event.type === "done" || event.type === "stopped") break;
-      }
-    } catch (error) {
-      logger.error({ error, projectId, slug }, "Orchestrator error");
-      this.observer.reportError(error, { projectId, slug });
-      yield mapThrownErrorEvent({ error });
+    runId: string;
+  }): string {
+    const baseUrl = this.#pipeline().publicBaseUrl;
+    if (!baseUrl) {
+      throw new ExperimentRunLoopUnavailableError({ capability: "public address" });
     }
+
+    return getRunUrl({ baseUrl, projectSlug, experimentSlug: slug, runId });
   }
 
-  /** The `execute` stream: the board first, then the run store, then the customer. */
-  async *#workbenchRunEvents(options: {
-    orchestrator: AsyncIterable<EvaluationV3Event>;
-    projectId: string;
-    experimentId: string | undefined;
-    isFullRun: boolean;
-    userId: string;
-    mirror: ReturnType<typeof ExperimentRunStateMirrorService.create>;
-    resultsWriter: ReturnType<typeof ExperimentRunResultsWriterService.findWriterFor>;
-  }): AsyncGenerator<EvaluationV3Event> {
-    const { projectId, mirror, resultsWriter } = options;
+  /** The run pipeline, once this process may start a run on it. */
+  #startable(): WorkbenchRunPipeline {
+    const runs = this.#pipeline();
+    refuse(runs.refusals.start);
 
-    try {
-      for await (const event of options.orchestrator) {
-        await resultsWriter?.record(event);
-        await mirror.record(event);
-        yield event;
-
-        if (event.type === "done" || event.type === "stopped") {
-          this.observer.recordExperimentRan({
-            userId: options.userId,
-            projectId,
-            experimentId: options.experimentId,
-            isFullRun: options.isFullRun,
-          });
-          break;
-        }
-      }
-    } catch (error) {
-      logger.error({ error, projectId }, "Orchestrator error");
-      this.observer.reportError(error, { projectId });
-
-      const failure = mapThrownErrorEvent({ error });
-      if (failure.type === "error") {
-        await mirror.fail({
-          code: failure.message,
-          domainError: failure.domainError,
-          traceId: failure.traceId,
-        });
-      }
-      yield failure;
-    }
+    return runs;
   }
+
+  #runsOn(): ExperimentWorkbenchPipelineRunService {
+    return ExperimentWorkbenchPipelineRunService.create({
+      experiments: this.experiments,
+      observer: this.observer,
+      runs: this.#pipeline(),
+    });
+  }
+
+  #pipeline(): WorkbenchRunPipeline {
+    if (!this.runs) {
+      throw new Error("Experiment was asked to start a run on its pipeline, but none was built");
+    }
+
+    return this.runs;
+  }
+}
+
+/** Refuses by the capability this process lacks, as the retired run loop did. */
+function refuse(refusal: ExperimentRunRefusal | undefined): void {
+  if (refusal) throw new ExperimentRunLoopUnavailableError(refusal);
 }
 
 /** The page size a list asks for: 50 unless given, never above 200. */

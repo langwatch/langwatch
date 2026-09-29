@@ -3,10 +3,15 @@ import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
 import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
+import {
+  registerNoNurturingSink,
+  registerNurturingSink,
+  settle,
+} from "../../services/__tests__/support/nurturing-harness.ts";
 import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
 import type { MeteredUsageWarningService } from "../../services/metered-usage-warning.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
@@ -41,6 +46,15 @@ function licensedAt(commitUsdCents: number) {
         lastSyncAt: "2026-11-02T00:00:00Z",
         managedVirtualKeyId: null,
       }),
+      findSeatChanges: async () => [
+        {
+          licenseRowId: "license-2",
+          organizationId: ACME,
+          previousSeats: 10,
+          seats: 12,
+          changedAt: "2026-11-01T00:00:00Z",
+        },
+      ],
     }),
     operators: { isAdmin: ({ email }) => email === STAFF.email },
     auditLog: createApiFixture<ConnectedBillingPeers["auditLog"]>({
@@ -108,10 +122,14 @@ describe("the installed billing application", () => {
       });
     });
 
-    it("runs no billing tick at all", async () => {
-      const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
+    it("runs no billing tick and no seat invoicing pass at all", async () => {
+      const { app, repositories } = billingApp({ isSaas: false, stripeSecretKey: undefined });
 
       await expect(app.runConnectedBillingTick()).resolves.toBeUndefined();
+      await expect(app.invoicePendingSeatChanges()).resolves.toBeUndefined();
+      await expect(
+        repositories.connectedBilling.findSeatChangesByLicenseRows(["license-2"]),
+      ).resolves.toEqual([]);
     });
   });
 
@@ -142,17 +160,17 @@ describe("the installed billing application", () => {
       expect(asked).toEqual([ACME]);
     });
 
-    it("answers a seat change for a customer never onboarded without invoicing it", async () => {
+    /** @scenario "The Billing section shows a seat change until billing decides it" */
+    it("shows a recorded seat change as awaiting, then as not onboarded once a pass decided it", async () => {
       const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
+      const seatChangeState = async () =>
+        (await app.getConnectedBillingOverview({ organizationId: ACME }, STAFF)).seatChanges.map(
+          (change) => change.state,
+        );
 
-      await expect(
-        app.invoiceAddedSeats({
-          organizationId: ACME,
-          licenseRowId: "license-1",
-          previousSeats: 10,
-          seats: 12,
-        }),
-      ).resolves.toBe("not_onboarded");
+      await expect(seatChangeState()).resolves.toEqual(["awaiting"]);
+      await app.invoicePendingSeatChanges();
+      await expect(seatChangeState()).resolves.toEqual(["not_onboarded"]);
     });
   });
 
@@ -183,7 +201,17 @@ describe("the installed billing application", () => {
         spend: { spendAvailable: false, limitUsdCents: 100_00, spentUsdCents: null },
         terms: { commitUsdCents: 100_00, maximumUsdCents: 100_00, overageEnabled: false },
         seats: { licensed: 10, reported: 8, lastSyncAt: "2026-11-02T00:00:00Z" },
-        seatChanges: [],
+        seatChanges: [
+          {
+            licenseId: "license-2",
+            changedAt: "2026-11-01T00:00:00Z",
+            addedSeats: 2,
+            amountCents: 0,
+            currency: null,
+            state: "awaiting",
+            stripeInvoiceId: null,
+          },
+        ],
       });
     });
 
@@ -311,14 +339,16 @@ describe("the Stripe callback BillingApp answers", () => {
 
 describe("the currency BillingApp detects", () => {
   describe("given LangWatch Cloud", () => {
+    /** @scenario "LangWatch Cloud detects the currency a reader's prices are shown in" */
     it("answers from the request, falling back when nothing names a country", () => {
       const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
 
-      expect(app.detectCurrency({ headers: {} })).toMatchObject({ country: null });
+      expect(app.detectCurrency({ headers: {} })).toEqual({ currency: "EUR", country: null });
     });
   });
 
   describe("given a self-hosted deployment", () => {
+    /** @scenario "A self-hosted deployment serves no currency detection" */
     it("serves no detection, as main mounted none", () => {
       const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
 
@@ -338,6 +368,48 @@ describe("the subscription door BillingApp serves", () => {
         code: "not_found",
         httpStatus: 404,
       });
+    });
+  });
+});
+
+describe("the created workflow BillingApp records", () => {
+  afterEach(() => registerNoNurturingSink());
+
+  const workflow = {
+    userId: "user-1",
+    projectId: "project-1",
+    workflowId: "workflow-1",
+    workflowCount: 2,
+  };
+
+  describe("given Customer.io nurturing is configured", () => {
+    /** @scenario "Billing records a created workflow for nurturing" */
+    it("identifies the workflow count and tracks workflow_created", async () => {
+      const sink = registerNurturingSink();
+      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+
+      await app.recordWorkflowCreated(workflow);
+      await settle();
+
+      expect(sink.sentTo("/identify")[0]).toMatchObject({
+        userId: "user-1",
+        traits: { workflow_count: 2 },
+      });
+      expect(sink.sentTo("/track")[0]).toMatchObject({
+        event: "workflow_created",
+        properties: { workflow_id: "workflow-1", project_id: "project-1" },
+      });
+    });
+  });
+
+  describe("given Customer.io is unreachable", () => {
+    /** @scenario "A Customer.io failure never fails recording a created workflow" */
+    it("resolves, as main's unawaited hook did", async () => {
+      registerNurturingSink({ failing: true });
+      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+
+      await expect(app.recordWorkflowCreated(workflow)).resolves.toBeUndefined();
+      await settle();
     });
   });
 });

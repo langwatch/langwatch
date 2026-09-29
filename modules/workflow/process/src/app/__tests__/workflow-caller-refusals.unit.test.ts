@@ -1,14 +1,17 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { WorkflowLineageRepository } from "../../repositories/workflow-lineage.repository.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../../repositories/workflow-project-environment.repository.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
 import { WorkflowApp, type WorkflowInfrastructure } from "../workflow.app.ts";
@@ -45,6 +48,8 @@ function appWith(
       authz,
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: members.datasets,
+      monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
+      billing: createApiFixture<BillingApi>({}, "BillingApi"),
     },
     config: { stagingThresholdBytes: void 0, stagingTtlSeconds: 600 },
     resources: { own: () => void 0, ownService: () => void 0 },
@@ -56,6 +61,7 @@ function appWith(
         {},
         "WorkflowProjectEnvironmentRepository",
       ),
+      lineage: createApiFixture<WorkflowLineageRepository>({}, "WorkflowLineageRepository"),
     },
   });
 }

@@ -33,6 +33,9 @@
   "plugins/langwatch/package.json",
   "services/langyworker/package.json",
   "tools/dev-runtime/package.json",
+  "apps/haven-web/package.json",
+  "apps/idpsim-web/package.json",
+  "apps/mailsim-web/package.json",
   "dev/tests/agentic-e2e/package.json",
   "dev/tests/e2e-stack/package.json",
   "tools/visualdiff/runner/package.json"

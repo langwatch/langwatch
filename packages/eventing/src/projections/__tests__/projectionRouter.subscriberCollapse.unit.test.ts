@@ -4,8 +4,8 @@ vi.mock("../../metrics.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof metricsModule>();
   return {
     ...actual,
-    incrementEsReactorTotal: vi.fn(),
-    incrementEsReactorCollapsedTotal: vi.fn(),
+    incrementEsProjectionSubscriberTotal: vi.fn(),
+    incrementEsProjectionSubscriberCollapsedTotal: vi.fn(),
     incrementEsFoldProjectionTotal: vi.fn(),
     observeEsFoldProjectionDuration: vi.fn(),
     incrementEsFoldRefoldTotal: vi.fn(),

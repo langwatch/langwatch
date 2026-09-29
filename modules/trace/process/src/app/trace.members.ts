@@ -63,7 +63,6 @@ import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 
 import type { TraceClickHouseResolver } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
-import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import type { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import type { TracesTrpcEmitters } from "./trace.app.ts";
 
@@ -452,7 +451,6 @@ export type TraceInfrastructure = Readonly<{
     summaryStore: FoldProjectionStore<TraceSummaryData>;
     commands: TraceProcessingCommands;
     broadcast: TracesTrpcEmitters;
-    filterConditions: TraceLegacyFilterConditions;
     fallbackVisibilityDays: number;
     processName: string;
     /** The deployment's public origin, for `platformUrl`. Optional: not every

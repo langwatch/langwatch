@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { incrementEsReactorTotal } from "../../metrics.ts";
+import { incrementEsProjectionSubscriberTotal } from "../../metrics.ts";
 import { ProjectionRouter } from "../projectionRouter.ts";
 
 vi.mock("../../metrics.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof metricsModule>();
   return {
     ...actual,
-    incrementEsReactorTotal: vi.fn(),
+    incrementEsProjectionSubscriberTotal: vi.fn(),
   };
 });
 
@@ -148,7 +148,7 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when a fold projection fails inline", () => {
-      it("attempts all projections and throws AggregateError", async () => {
+      it("attempts all projections and answers the failed lane", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter({
           aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -185,7 +185,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "fold", lane: "failing" }),
+        ]);
 
         // The succeeding projection should still have been attempted
         expect(successStore.get).toHaveBeenCalled();
@@ -228,7 +230,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "fold", lane: "failing-fold" }),
+        ]);
 
         // Map projection should still have been dispatched
         expect(mapStore.append).toHaveBeenCalled();
@@ -236,7 +240,7 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when both fold and map projections fail", () => {
-      it("throws single AggregateError with all errors", async () => {
+      it("answers every failed lane", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter({
           aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -270,10 +274,11 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        // Should contain errors from both fold and map
-        await expect(router.dispatch([event], { tenantId })).rejects.toSatisfy(
-          (error: unknown) => error instanceof AggregateError && error.errors.length >= 2,
-        );
+        // Both lanes are answered, fold first
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "fold", lane: "failing-fold" }),
+          expect.objectContaining({ kind: "map", lane: "failing-map" }),
+        ]);
       });
     });
 
@@ -314,14 +319,16 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "fold", lane: "exploding-fold" }),
+        ]);
 
         expect(subscriberHandle).not.toHaveBeenCalled();
       });
     });
 
     describe("when a map projection fails inline (only map registered)", () => {
-      it("attempts all projections and throws AggregateError", async () => {
+      it("attempts all projections and answers the failed lane", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter({
           aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -355,7 +362,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "map", lane: "failing" }),
+        ]);
 
         // The succeeding projection should still have been attempted
         expect(successStore.append).toHaveBeenCalled();
@@ -363,7 +372,7 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when a subscriber fails inline", () => {
-      it("throws AggregateError", async () => {
+      it("answers the failed lane for re-drive", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter({
           aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -395,7 +404,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "fold", lane: "my-fold" }),
+        ]);
 
         expect(subscriberHandle).toHaveBeenCalled();
       });
@@ -450,7 +461,7 @@ describe("ProjectionRouter", () => {
 
           expect(mockSend).not.toHaveBeenCalled();
           expect(subscriberHandle).not.toHaveBeenCalled();
-          expect(incrementEsReactorTotal).toHaveBeenCalledWith(
+          expect(incrementEsProjectionSubscriberTotal).toHaveBeenCalledWith(
             TEST_CONSTANTS.PIPELINE_NAME,
             "filtered-subscriber",
             "skipped",
@@ -556,7 +567,7 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when a subscriber queue send fails", () => {
-      it("throws AggregateError", async () => {
+      it("answers the failed lane for re-drive", async () => {
         const mockSend = vi.fn().mockRejectedValue(new Error("queue send failed"));
         const queueManager = createMockQueueManager({
           hasProjectionSubscriberQueues: true,
@@ -591,7 +602,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "fold", lane: "my-fold" }),
+        ]);
       });
     });
 
@@ -638,7 +651,7 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when subscriber queue is missing and inline fallback fails", () => {
-      it("throws AggregateError", async () => {
+      it("answers the failed lane for re-drive", async () => {
         const queueManager = createMockQueueManager({
           hasProjectionSubscriberQueues: true,
           getProjectionSubscriberQueue: vi.fn().mockReturnValue(undefined),
@@ -673,7 +686,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "fold", lane: "my-fold" }),
+        ]);
 
         expect(subscriberHandle).toHaveBeenCalled();
       });
@@ -753,7 +768,9 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
+        expect(await router.dispatch([event], { tenantId })).toEqual([
+          expect.objectContaining({ kind: "map", lane: "failing-map" }),
+        ]);
 
         expect(subscriberHandle).not.toHaveBeenCalled();
       });
@@ -1110,7 +1127,7 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when marker throws ReplayDeferralError", () => {
-      it("surfaces the deferral inside the AggregateError so the queue retries the event", async () => {
+      it("answers the deferral as the map lane's failed hand-off so the outbox re-drives it", async () => {
         const queueManager = createMockQueueManager();
         const deferError = new ReplayDeferralError(
           "deferred-map",
@@ -1140,19 +1157,11 @@ describe("ProjectionRouter", () => {
           tenantId,
         );
 
-        const rejection = await router.dispatch([event], { tenantId }).then(
-          () => {
-            throw new Error("expected dispatch to reject");
-          },
-          (error: unknown) => error,
-        );
+        const failures = await router.dispatch([event], { tenantId });
 
-        expect(rejection).toBeInstanceOf(AggregateError);
-        const aggregateError = rejection as AggregateError;
-        expect(aggregateError.message).toContain("1 projection(s) failed during dispatch");
-        expect(aggregateError.errors).toHaveLength(1);
-        expect(aggregateError.errors[0]).toBeInstanceOf(ReplayDeferralError);
-        expect(aggregateError.errors[0]).toBe(deferError);
+        expect(failures).toHaveLength(1);
+        expect(failures[0]).toMatchObject({ kind: "map", lane: "deferred-map", events: [event] });
+        expect(failures[0]?.error).toBe(deferError);
         expect(markerChecker.check).toHaveBeenCalledWith("deferred-map", event);
         expect(store.append).not.toHaveBeenCalled();
       });

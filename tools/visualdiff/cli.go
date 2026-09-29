@@ -178,7 +178,8 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	refreshBaseline := flags.Bool("refresh-baseline", false, "render the base and replace its cached baseline")
 	noFailFast := flags.Bool("no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
 	resume := flags.String("resume", "", "continue a -keep run by id: reuse its worktrees and running stacks")
-	noPublish := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request")
+	noPublish, devUI := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request"),
+		flags.Bool("dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
@@ -206,7 +207,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 			ProjectKey: *projectKey, Slug: *slug, Email: *email, Password: *password,
 		},
 		Editions: editions, Baseline: !*noBaseline, RefreshBaseline: *refreshBaseline,
-		FailFast: !*noFailFast, NoPublish: *noPublish,
+		FailFast: !*noFailFast, NoPublish: *noPublish, DevUI: *devUI,
 	}
 	resumeRun(&options, *resume)
 	return &runFlags{options: options, config: config}, nil

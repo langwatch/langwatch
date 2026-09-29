@@ -34,10 +34,6 @@ export class PrismaErasedIdentifierSuppressionRepository extends ErasedIdentifie
     });
   }
 
-  findAll(): Promise<ErasedIdentifierSuppressionRow[]> {
-    return this.prisma.erasedIdentifierSuppression.findMany({ select: ROW });
-  }
-
   async recordAll({
     organizationId,
     provider,

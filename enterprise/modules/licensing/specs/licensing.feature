@@ -78,6 +78,130 @@ Feature: Enterprise licensing lifecycle
       When that process inspects platform access
       Then the stored key is accepted and only the mutation ports refuse
 
+  Rule: Every deployment composes the self-hosted instance registry from its own stores
+
+    Main built the instance registry from Postgres on every deployment. The
+    operator's instance list names each install's customer through the
+    organization feature, whether or not this process composes the licence registry.
+
+    @integration
+    Scenario: A deployment composed from its stores lists installs with their customer's name
+      Given an install that reported, attributed to an organization
+      When an operator lists the self-hosted instances of a process composed from its stores
+      Then the install is listed with the name the organization feature answers
+
+    @unit
+    Scenario: The instance list names each install's customer without the licence registry
+      Given an install attributed to an organization, and no licence registry composed
+      When an operator lists the self-hosted instances
+      Then the install is listed with its organization's name
+
+    @unit
+    Scenario: An install whose customer the organization feature no longer knows lists without a name
+      Given an install attributed to an organization the organization feature does not know
+      When an operator lists the self-hosted instances
+      Then the install is listed with no organization name
+
+    @unit
+    Scenario: A process that composes no stores refuses the instance registry by name
+      Given a process composed without stores or an instance registry
+      When an operator lists the self-hosted instances
+      Then the read is refused naming the self-hosted instance registry
+
+  Rule: Every deployment composes the licence registry from its own stores
+
+    Main built the licence registry, activation codes and licence sync from
+    Postgres on every deployment. The managed keys and the contract budget are
+    the gateway's, reached through its operations.
+
+    @unit
+    Scenario: The contract budget is the organization's live gateway budget named by the contract's id
+      Given the organization's gateway budgets include one carrying the contract's external id
+      When licensing reads the organization's contract budget
+      Then it answers that budget's limit in cents and whether the customer set the cap
+
+    @unit
+    Scenario: An archived contract budget is no contract budget
+      Given the organization's only contract budget is archived
+      When licensing reads the organization's contract budget
+      Then it answers none
+
+  Rule: Licensing owns the licence signing key
+
+    Every licence LangWatch signs is signed by licensing with LANGWATCH_LICENSE_PRIVATE_KEY:
+    the registry's issue, renew and seat changes, and a Stripe purchase billing asks it to sign.
+
+    @unit
+    Scenario: Licensing signs a purchased licence with its own key
+      Given the deployment holds the licence signing key
+      When billing asks licensing to sign a purchased licence
+      Then the licence verifies against LangWatch's public key
+
+    @unit
+    Scenario: A deployment without the licence signing key refuses to sign by name
+      Given the deployment holds no licence signing key
+      When a peer asks licensing to sign a licence
+      Then it is refused as license_signing_not_configured
+
+  Rule: Every deployment composes the hosted Connect services from their owners
+
+    Main composed the hosted services on every deployment: instant-eval judges a hosted call,
+    prices it at its judge's rate and records the spend under the calling key; the gateway keeps
+    the budgets a connected install reads.
+
+    @integration
+    Scenario: A hosted judgement is priced at the rate of the judge that made it
+      Given LangWatch Cloud judges hosted calls with a judge at its own rate and markup
+      When licensing asks what a judgement's input tokens were worth
+      Then it is told the cost and the customer price at that judge's rate
+
+    @integration
+    Scenario: A hosted judgement stops when the calling install hangs up
+      Given a hosted classify call is being judged
+      When the calling install's request is abandoned
+      Then the judge is handed that request's signal
+
+    @integration
+    Scenario: Hosted spend is billed to the calling key on the spend spine
+      Given the spend spine is registered
+      When a hosted call's spend is recorded
+      Then one outcome at the customer price is recorded under the project's organization and the calling key
+
+    @integration
+    Scenario: Hosted spend is refused while the spend spine is not registered
+      Given the spend spine is not registered
+      When a hosted call's spend is recorded
+      Then the record is refused, so the caller keeps the spend and tries again
+
+    @unit
+    Scenario: Hosted usage lists only the budgets that apply to the calling key
+      Given the organization has budgets of which only some apply to the calling key
+      When a connected install reads its hosted usage
+      Then only the applicable budgets are listed, and the contract budget is marked as the contract
+
+    @unit
+    Scenario: Hosted usage reports spend as unknown when live spend cannot be read
+      Given live spend cannot be read
+      When a connected install reads its hosted usage
+      Then each budget's spend is unknown rather than zero
+
+  Rule: The hosted Connect routes answer behind the gateway's own signed-call door
+
+    Main mounted the hosted routes behind the gateway's signature check. The gateway hands its
+    door out through its Api, so the hosted family verifies the same signature, never a copy.
+
+    @unit
+    Scenario: A hosted call with a bad signature is refused before any route runs
+      Given the Go data plane's call is not signed with the gateway's secret
+      When it reaches a hosted Connect route
+      Then it is refused as unauthenticated and no licence is read
+
+    @unit
+    Scenario: A signed hosted call from a key without a licence is refused by its code
+      Given a correctly signed hosted call from a key no licence carries
+      When it asks for a hosted judgement
+      Then it passes the gateway's door and is refused as connect_service_not_entitled
+
   Scenario: Import licensing without side effects
     When a runtime imports the licensing contract or server package
     Then it reads no environment and registers no route, job, or subscriber

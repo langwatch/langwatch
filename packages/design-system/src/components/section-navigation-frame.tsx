@@ -1,9 +1,10 @@
 /**
  * A section's own navigation rail beside its content: the links it is handed, the
- * current one marked. Presentational only: it holds no data and reads no route.
+ * current one marked. Presentational only: it holds no data and reads no route, so
+ * the page hands it `onNavigate` and a plain click routes in place, never reloading.
  */
 import { Box, HStack, Link, Stack, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 /** One entry on the rail: where it goes and how it reads. */
 export type SectionNavigationLink = {
@@ -12,10 +13,23 @@ export type SectionNavigationLink = {
   icon?: ReactNode;
 };
 
+/** A click the browser keeps: a new tab, a new window, a download. */
+function isBrowserClick(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  );
+}
+
 export function SectionNavigationFrame({
   label,
   links,
   activeHref,
+  onNavigate,
   children,
 }: {
   /** The section's name, over the rail and in the rail's accessible name. */
@@ -23,6 +37,8 @@ export function SectionNavigationFrame({
   links: readonly SectionNavigationLink[];
   /** The entry this page is; the caller knows which page it rendered. */
   activeHref: string;
+  /** Routes an entry in place; a click the browser keeps never reaches it. */
+  onNavigate: (href: string) => void;
   children: ReactNode;
 }) {
   return (
@@ -66,6 +82,11 @@ export function SectionNavigationFrame({
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : void 0}
+                onClick={(event: MouseEvent<HTMLAnchorElement>) => {
+                  if (isBrowserClick(event)) return;
+                  event.preventDefault();
+                  onNavigate(link.href);
+                }}
                 variant="plain"
                 paddingX={3}
                 paddingY={1}

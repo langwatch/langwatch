@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"math/big"
 	"net/http"
 	"net/url"
@@ -63,21 +62,10 @@ func (s *Server) handleJWKS(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// pickerTemplate is the account picker served when authorize gets no login
-// hint: each user links back into the same authorize request with the hint
-// filled in, so a browser test is two clicks and an automated test is one
-// query parameter.
-var pickerTemplate = template.Must(template.New("picker").Parse(`<!doctype html>
-<title>idpsim tenant {{.TenantID}} — choose an account</title>
-<style>body{font-family:system-ui;margin:3rem auto;max-width:28rem}a{display:block;padding:.75rem 1rem;border:1px solid #ccc;border-radius:.5rem;margin:.5rem 0;text-decoration:none;color:inherit}</style>
-<h1>Choose an account</h1>
-<p>Simulated identity provider — tenant {{.TenantID}}</p>
-{{range .Users}}<a href="{{.URL}}"><strong>{{.Name}}</strong><br>{{.Email}}</a>{{end}}
-`))
-
 // handleAuthorize implements the authorization endpoint. With a login hint
 // (login_hint or user) it redirects back immediately with a code — no browser
-// needed; without one it serves the account picker.
+// needed; without one it serves the console's account picker, whose users
+// each link back into this same request with the hint filled in.
 func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
@@ -89,7 +77,7 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "redirect_uri is required", http.StatusBadRequest)
 		return
 	}
-	if s.refuseUnregisteredRedirect(w, t, req) {
+	if s.refuseUnregisteredRedirect(w, r, t) {
 		return
 	}
 	if req.ResponseType != "code" {
@@ -101,7 +89,7 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Hint == "" {
-		s.serveAccountPicker(w, t, r.URL)
+		s.serveConsolePage(w, r, http.StatusOK)
 		return
 	}
 	user, ok := t.FindUser(req.Hint)
@@ -184,18 +172,30 @@ func (req authorizeRequest) redirectWithCode(w http.ResponseWriter, r *http.Requ
 //
 // The refusal is a page rather than a redirect on purpose: bouncing an error
 // to an address the client never registered is the exact move a real identity
-// provider must refuse, and someone who has just mistyped a redirect address
-// learns far more from a page naming both than from a silent bounce.
-func (s *Server) refuseUnregisteredRedirect(w http.ResponseWriter, t *Tenant, req authorizeRequest) bool {
-	app, registered := t.ApplicationByClientID(req.ClientID)
-	if !registered || app.redirectAllowed(req.RedirectURI) {
+// provider must refuse. The console's page reads the reason back through
+// /api/t/{tenant}/sign-in, which asks unregisteredRedirect the same question.
+func (s *Server) refuseUnregisteredRedirect(w http.ResponseWriter, r *http.Request, t *Tenant) bool {
+	req := parseAuthorizeRequest(r.URL.Query())
+	notice, app, refused := unregisteredRedirect(t, req)
+	if !refused {
 		return false
 	}
 	s.record(t, Event{
 		Kind: "oidc.authorize", Outcome: OutcomeRefused, Client: req.ClientID,
 		Detail: "redirect address " + req.RedirectURI + " is not registered for " + app.Name,
 	})
-	s.refusalPage(w, t, refusalNotice{
+	s.serveConsolePage(w, r, notice.Status)
+	return true
+}
+
+// unregisteredRedirect names the refusal when a registered client asks to be
+// sent back to an address it did not register.
+func unregisteredRedirect(t *Tenant, req authorizeRequest) (refusalNotice, *Application, bool) {
+	app, registered := t.ApplicationByClientID(req.ClientID)
+	if !registered || app.redirectAllowed(req.RedirectURI) {
+		return refusalNotice{}, nil, false
+	}
+	return refusalNotice{
 		Status: http.StatusBadRequest,
 		Title:  "That redirect address is not registered",
 		Detail: "The application " + app.Name + " asked to be sent back to " + req.RedirectURI +
@@ -203,25 +203,7 @@ func (s *Server) refuseUnregisteredRedirect(w http.ResponseWriter, t *Tenant, re
 		Hint: "Register that address on the tenant page, or fix the redirect address in the " +
 			"application's own configuration. A {placeholder} segment matches any single segment, " +
 			"so the address LangWatch shows before a connection exists can be registered exactly as written.",
-	})
-	return true
-}
-
-func (s *Server) serveAccountPicker(w http.ResponseWriter, t *Tenant, authorizeURL *url.URL) {
-	type row struct{ Name, Email, URL string }
-	var rows []row
-	for _, u := range t.Users() {
-		if !u.Active {
-			continue
-		}
-		link := *authorizeURL
-		lq := link.Query()
-		lq.Set("login_hint", u.ID)
-		link.RawQuery = lq.Encode()
-		rows = append(rows, row{Name: u.DisplayName(), Email: u.Email, URL: link.String()})
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = pickerTemplate.Execute(w, map[string]any{"TenantID": t.ID, "Users": rows})
+	}, app, true
 }
 
 // authError is one OAuth authorization-endpoint refusal, on its way back to

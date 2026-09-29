@@ -108,6 +108,18 @@ Feature: Composing durable experiment-run processing
     Then the platform default retention has not been read yet
 
   @integration
+  Scenario: The run pipeline declares each tenant's retention from data retention
+    Given the experiment module installed in a worker
+    When the process boots and registers experiment_run_processing
+    Then the pipeline's retention for a tenant is data retention's answer for that project
+
+  @integration
+  Scenario: A DSPy step is stamped with its tenant's traces retention
+    Given the experiment module installed in a worker whose project keeps traces 91 days
+    When a DSPy step is recorded for that project
+    Then its dspy_steps row is stamped with 91 retention days, not a fixed default
+
+  @integration
   Scenario: A run no experiment recorded answers not recorded
     Given a worker whose ClickHouse holds no run for the id
     When the experiment a run was recorded against is looked up

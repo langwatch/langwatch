@@ -2,19 +2,20 @@ import { EventEmitter } from "node:events";
 
 /**
  * Builds what `apps/api/src/features/experiment/experiment.composition.ts`
- * (deleted by b383462d96) used to hand-compose. See the handoff for the run
- * loop's own scope: `ports`/`progress` stay `null` on purpose.
+ * (deleted by b383462d96) used to hand-compose, and a run's pipeline side.
  */
 import type { ClickHouseSettings } from "@clickhouse/client";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { ExperimentRunLoopUnavailableError } from "@langwatch/experiment-contract";
+import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { getStaticModelCostRates, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -26,6 +27,8 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { experimentRunEventStreamChannels } from "../channels/experiment-run-event-stream-channels.registry.ts";
+import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
 import {
   HttpExperimentAttachmentLinkChannel,
   type ExperimentAttachmentEgressPolicy,
@@ -36,6 +39,7 @@ import {
   executeCell,
   failLostCell,
 } from "../eventing/experiment-run-execution.intent.ts";
+import { createExperimentRunFramesSubscriber } from "../eventing/experiment-run-frames.subscriber.ts";
 import { ExperimentRunPlanStore } from "../eventing/experiment-run-plan.store.ts";
 import {
   buildExperimentRunProcessingPipeline,
@@ -49,6 +53,7 @@ import { ClickHouseExperimentRunProcessingRepository } from "../repositories/cli
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
 import { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
+import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
 import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
 import { MemoryExperimentRunAbortRepository } from "../repositories/memory/memory.experiment-run-abort.repository.ts";
 import { MemoryExperimentRunFoldRepository } from "../repositories/memory/memory.experiment-run-fold.repository.ts";
@@ -58,12 +63,15 @@ import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experi
 import { RedisExperimentRunAbortRepository } from "../repositories/redis/redis.experiment-run-abort.repository.ts";
 import { RedisExperimentRunFoldRepository } from "../repositories/redis/redis.experiment-run-fold.repository.ts";
 import { RedisExperimentRunProcessingRepository } from "../repositories/redis/redis.experiment-run-processing.repository.ts";
-import { RedisExperimentRunProgressRepository } from "../repositories/redis/redis.experiment-run-progress.repository.ts";
 import { modelCostRatesOf } from "../rules/experiment-model-cost.rules.ts";
+import {
+  type ExperimentRunRefusals,
+  runRefusalsOf,
+} from "../rules/experiment-run-availability.rules.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentAttachmentInputService } from "../services/experiment-attachment-input.service.ts";
 import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
-import { ExperimentPollingRunService } from "../services/experiment-polling-run.service.ts";
+import { ExperimentRunBoardWriteBackService } from "../services/experiment-run-board-write-back.service.ts";
 import { ExperimentRunCellService } from "../services/experiment-run-cell.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
 import { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
@@ -73,10 +81,7 @@ import { ExperimentWorkbenchTargetNamesService } from "../services/experiment-wo
 import { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
 import { ExperimentWorkflowSourceService } from "../services/experiment-workflow-source.service.ts";
 import { ExperimentService } from "../services/experiment.service.ts";
-import type {
-  ExperimentV3RunLoop,
-  ExperimentWorkbenchObserver,
-} from "./experiment-workbench.members.ts";
+import type { ExperimentWorkbenchObserver } from "./experiment-workbench.members.ts";
 import type {
   ExperimentAppDependencies,
   ExperimentBroadcast,
@@ -85,13 +90,6 @@ import type {
   ExperimentPermissions,
   ExperimentWorkflowAuthoring,
 } from "./experiment.app.ts";
-
-/**
- * The retention floor a DSPy run read is bounded by. Fixed, exactly as the
- * deleted composition's own `FixedExperimentDspyRetention` fixed it, rather
- * than reading a per-project policy nothing here owns.
- */
-const DSPY_DEFAULT_RETENTION_DAYS = 49;
 
 /** A draft name and an archived-slug disambiguator; never a row's own id. */
 const EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE = "expdisambig";
@@ -171,19 +169,25 @@ class ClickHouseMemberSession {
 }
 
 /**
- * A fixed retention floor, over no per-project policy.
+ * A DSPy step's retention: its tenant's traces retention, as main stamped it. Data retention
+ * answers the platform default for a project it cannot place, and a refusal fails the write.
  */
-class FixedExperimentDspyRetention extends ExperimentDspyRetentionRepository {
-  static create(days: number): FixedExperimentDspyRetention {
-    return new FixedExperimentDspyRetention(days);
+class TenantExperimentDspyRetention extends ExperimentDspyRetentionRepository {
+  static create(
+    retention: Pick<DataRetentionApi, "getRetentionDays">,
+  ): TenantExperimentDspyRetention {
+    return new TenantExperimentDspyRetention(retention);
   }
 
-  private constructor(private readonly days: number) {
+  private constructor(private readonly retention: Pick<DataRetentionApi, "getRetentionDays">) {
     super();
   }
 
-  findTraceRetentionDays(_tenantId: string): Promise<number> {
-    return Promise.resolve(this.days);
+  findTraceRetentionDays(tenantId: string): Promise<number> {
+    return this.retention.getRetentionDays({
+      projectId: tenantId,
+      category: RETENTION_TABLE_CATEGORY_MAP.dspy_steps,
+    });
   }
 }
 
@@ -315,10 +319,22 @@ function attachmentInputs(input: {
   });
 }
 
-/** What the worker runs a run's cells with: the run's folds, and the cell service over them. */
+/** A run's folds, cells and board write-back, the channel its frames travel on, and its start. */
 export type ExperimentRunCells = Readonly<{
   folds: ExperimentRunFoldRepository;
+  /** The run's stop signal: the api sets it on abort, a cell reads it. */
+  abort: ExperimentRunAbortRepository;
   cells: ExperimentRunCellService;
+  stream: ExperimentRunEventStream;
+  boardWriteBack: ExperimentRunBoardWriteBackService;
+  /** The peers a run's execution data is loaded through before it is planned. */
+  services: ExecutionDataServices;
+  /** Refuses a run against someone else's personal development agent before it starts. */
+  ownership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
+  /** Cells in flight at once when a run names no limit of its own (`EVAL_V3_CONCURRENCY`). */
+  concurrency: number;
+  /** What this process refuses of a run, for want of Redis or a public address. */
+  refusals: ExperimentRunRefusals;
 }>;
 
 /**
@@ -327,6 +343,13 @@ export type ExperimentRunCells = Readonly<{
  */
 export function buildExperimentRunCells(input: {
   redis: ProcessMembers["redis"] | undefined;
+  /** This deployment's public origin, for the link a polled run answers with. */
+  publicBaseUrl: string | undefined;
+  /** Names this process in a refusal. */
+  processName: string;
+  /** Cells in flight at once when a run names no limit of its own (`EVAL_V3_CONCURRENCY`). */
+  runConcurrency: number;
+  logger: Pick<Logger, "warn">;
   experiments: ExperimentService;
   attachmentEgress: ExperimentAttachmentEgressPolicy;
   dependencies: {
@@ -348,12 +371,16 @@ export function buildExperimentRunCells(input: {
   const folds = redis
     ? RedisExperimentRunFoldRepository.create({ redis })
     : MemoryExperimentRunFoldRepository.create();
+  const abort = redis
+    ? RedisExperimentRunAbortRepository.create({ redis })
+    : MemoryExperimentRunAbortRepository.create();
+  const stream = redis
+    ? experimentRunEventStreamChannels.live.create({ redis })
+    : experimentRunEventStreamChannels.memory.create();
   const collaborators: ExperimentRunCollaborators = {
     studio: dependencies.workflows,
     cost: ExperimentRunModelCostService.create({ modelProviders: dependencies.modelProviders }),
-    abort: redis
-      ? RedisExperimentRunAbortRepository.create({ redis })
-      : MemoryExperimentRunAbortRepository.create(),
+    abort,
     experiments: input.experiments,
     evaluationReporting: dependencies.evaluation,
     sandboxCredentials: ExperimentRunSandboxCredentialService.create({
@@ -361,19 +388,41 @@ export function buildExperimentRunCells(input: {
       apiKeys: dependencies.apiKeys,
     }),
     connectedDispatch: dependencies.agents,
-    connectedAgentOwnership: dependencies.suite,
     attachments: attachmentInputs({
       storedObjects: dependencies.storedObjects,
       policy: input.attachmentEgress,
     }),
   };
+  const refusals = runRefusalsOf({
+    sharedStore: redis !== undefined,
+    publicBaseUrl: input.publicBaseUrl,
+    processName: input.processName,
+  });
+  if (refusals.start) {
+    input.logger.warn(
+      { capability: refusals.start.capability },
+      "experiment runs are refused in this process",
+    );
+  }
+  const services = executionDataServices(dependencies);
 
   return {
     folds,
+    abort,
+    stream,
+    services,
+    ownership: dependencies.suite,
+    concurrency: input.runConcurrency,
+    refusals,
+    boardWriteBack: ExperimentRunBoardWriteBackService.create({
+      folds,
+      experiments: input.experiments.workbench,
+    }),
     cells: ExperimentRunCellService.create({
       folds,
+      stream,
       collaborators,
-      services: executionDataServices(dependencies),
+      services,
       workflows: dependencies.workflows,
     }),
   };
@@ -388,6 +437,8 @@ export function buildExperimentRunProcessing(input: {
   clickhouse: ClickHouseQueryClient;
   redis: ProcessMembers["redis"] | undefined;
   defaultRetentionDays: () => number;
+  /** Each tenant's retention, which the run pipeline declares (§9). */
+  retention: RetentionPolicyResolver;
   workflowEvaluations: WorkflowEvaluationRunner;
   runCells: ExperimentRunCells;
   /** The pipeline's own senders, which the manager's intents send through once connected. */
@@ -405,8 +456,10 @@ export function buildExperimentRunProcessing(input: {
     runExecution: {
       executeCell: executeCell(commands),
       failCell: failLostCell(commands),
-      complete: completeRun(commands),
+      complete: completeRun({ commands, boardWriteBack: runCells.boardWriteBack }),
     },
+    runFrames: createExperimentRunFramesSubscriber({ stream: runCells.stream }),
+    retention: input.retention,
   };
   if (redis) {
     const cached = RedisExperimentRunProcessingRepository.create({
@@ -444,86 +497,6 @@ export function buildExperimentIdLookup(
   }).idLookup();
 }
 
-/**
- * The workbench run loop over this module's own Redis state and its peers' operations, ported
- * from the retired `api-experiment-run.composition.ts`. Without Redis or a public address it
- * refuses to start a run by name, as that composition did; a poll still reads Redis if present.
- */
-export function buildExperimentRunLoop(input: {
-  redis: ProcessMembers["redis"] | undefined;
-  publicBaseUrl: string | undefined;
-  /** Names this process in a refusal. */
-  processName: string;
-  /** Cells in flight at once when a run names no limit of its own (`EVAL_V3_CONCURRENCY`). */
-  runConcurrency: number;
-  logger: Pick<Logger, "warn">;
-  experiments: ExperimentService;
-  services: ExecutionDataServices;
-  attachments: ExperimentAttachmentInputService;
-  connectedAgentOwnership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
-  dependencies: {
-    workflows: WorkflowApi;
-    modelProviders: ModelProviderApi;
-    evaluation: EvaluationApi;
-    projects: ProjectApi;
-    apiKeys: ApiKeyApi;
-    agents: AgentApi;
-  };
-}): ExperimentV3RunLoop {
-  const { redis, publicBaseUrl, dependencies } = input;
-  const shared = {
-    services: input.services,
-    workflows: dependencies.workflows,
-    defaultConcurrency: input.runConcurrency,
-  };
-  if (!redis || !publicBaseUrl) {
-    const capability = redis
-      ? "public address, so a run could not answer with the link to its own results"
-      : "progress store, so a run it started could never be polled for";
-    input.logger.warn({ capability }, "experiment runs are refused in this process");
-    return {
-      ...shared,
-      ports: null,
-      progress: redis ? RedisExperimentRunProgressRepository.create({ redis }) : null,
-      startRun: () =>
-        Promise.reject(
-          new ExperimentRunLoopUnavailableError({ capability, process: input.processName }),
-        ),
-    };
-  }
-
-  const progress = RedisExperimentRunProgressRepository.create({ redis });
-  const ports: ExperimentRunCollaborators = {
-    studio: dependencies.workflows,
-    cost: ExperimentRunModelCostService.create({ modelProviders: dependencies.modelProviders }),
-    abort: RedisExperimentRunAbortRepository.create({ redis }),
-    experiments: input.experiments,
-    evaluationReporting: dependencies.evaluation,
-    sandboxCredentials: ExperimentRunSandboxCredentialService.create({
-      projects: dependencies.projects,
-      apiKeys: dependencies.apiKeys,
-    }),
-    connectedDispatch: dependencies.agents,
-    connectedAgentOwnership: input.connectedAgentOwnership,
-    attachments: input.attachments,
-  };
-
-  return {
-    ...shared,
-    ports,
-    progress,
-    startRun: (run) =>
-      ExperimentPollingRunService.create().startPollingRun({
-        ...run,
-        ports,
-        workflows: dependencies.workflows,
-        progress,
-        baseUrl: publicBaseUrl,
-        defaultConcurrency: run.defaultConcurrency ?? input.runConcurrency,
-      }),
-  };
-}
-
 export function buildExperimentInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   clickhouse: ClickHouseQueryClient;
@@ -557,8 +530,12 @@ export function buildExperimentInfrastructure(input: {
     apiKeys: ApiKeyApi;
     suite: SuiteApi;
     storedObjects: StoredObjectApi;
+    /** Each tenant's traces retention, which DSPy step rows are stamped with. */
+    retention: Pick<DataRetentionApi, "getRetentionDays">;
   };
-}): Omit<ExperimentAppDependencies, "runLookup"> {
+}): Omit<ExperimentAppDependencies, "runLookup" | "runProcessing"> & {
+  runCells: ExperimentRunCells;
+} {
   const { prisma, clickhouse, redis, logger, execution, publicBaseUrl, dependencies } = input;
   const resolveClient = memberSessionResolver(clickhouse);
   const runHistoryTelemetry = LoggedExperimentRunHistoryTelemetry.create(logger);
@@ -573,7 +550,7 @@ export function buildExperimentInfrastructure(input: {
     }),
     dspyRepository: ClickHouseExperimentDspyRepository.create({
       resolveClient,
-      retention: FixedExperimentDspyRetention.create(DSPY_DEFAULT_RETENTION_DAYS),
+      retention: TenantExperimentDspyRetention.create(dependencies.retention),
       telemetry: runHistoryTelemetry,
     }),
     execution,
@@ -589,20 +566,14 @@ export function buildExperimentInfrastructure(input: {
   });
 
   const authz = authzPermissions(dependencies.permissions);
-  const services = executionDataServices(dependencies);
-  const runLoop = buildExperimentRunLoop({
+  const runCells = buildExperimentRunCells({
     redis,
     publicBaseUrl,
     processName: input.processName,
     runConcurrency: input.runConcurrency,
     logger,
     experiments,
-    services,
-    attachments: attachmentInputs({
-      storedObjects: dependencies.storedObjects,
-      policy: input.attachmentEgress,
-    }),
-    connectedAgentOwnership: dependencies.suite,
+    attachmentEgress: input.attachmentEgress,
     dependencies,
   });
 
@@ -625,12 +596,14 @@ export function buildExperimentInfrastructure(input: {
     people: PrismaExperimentPeopleRepository.create(prisma),
     modelCosts: modelCostCatalogue(dependencies.modelProviders),
     workflowAuthoring: workflowAuthoring(dependencies.workflows),
-    runLoop,
+    runCells,
     workflowEvaluations: WorkflowEvaluationService.create({
       experiments,
-      workflowSource: services.workflows,
-      services,
-      runLoop,
+      workflowSource: runCells.services.workflows,
+      services: runCells.services,
+      concurrency: runCells.concurrency,
+      folds: runCells.folds,
+      refusals: runCells.refusals,
       requests: execution,
       baseUrl: publicBaseUrl,
     }),

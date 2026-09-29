@@ -8,8 +8,8 @@ vi.mock("../../metrics.ts", async (importOriginal) => {
     incrementEsFoldProjectionTotal: vi.fn(),
     observeEsFoldProjectionDuration: vi.fn(),
     incrementEsFoldRefoldTotal: vi.fn(),
-    incrementEsReactorTotal: vi.fn(),
-    incrementEsReactorCollapsedTotal: vi.fn(),
+    incrementEsProjectionSubscriberTotal: vi.fn(),
+    incrementEsProjectionSubscriberCollapsedTotal: vi.fn(),
   };
 });
 
@@ -132,7 +132,7 @@ describe("fold failures after the state was stored", () => {
 
       expect(incrementEsFoldPostStoreFailure).toHaveBeenCalledWith({
         projectionName: "counter",
-        stage: "reactor_dispatch",
+        stage: "subscriber_dispatch",
       });
     });
 
@@ -153,7 +153,7 @@ describe("fold failures after the state was stored", () => {
 
       expect(incrementEsFoldPostStoreFailure).toHaveBeenCalledWith({
         projectionName: "counter",
-        stage: "reactor_dispatch",
+        stage: "subscriber_dispatch",
       });
     });
   });

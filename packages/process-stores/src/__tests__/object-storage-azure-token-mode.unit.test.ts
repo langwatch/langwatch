@@ -52,7 +52,7 @@ async function objectStorageFor(options: { production: boolean; azure?: Partial<
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { DATABASE_URL: UNREACHED_DATABASE } }).withEnv(),
   );
-  const members = await openProcessStores({
+  const { members } = await openProcessStores({
     name: "azure-token-mode-test",
     config,
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),

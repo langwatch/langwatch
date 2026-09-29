@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ExperimentRunCommandDispatcherService } from "../../services/experiment-run-command-dispatcher.service.ts";
 import { completeRun, executeCell, failLostCell } from "../experiment-run-execution.intent.ts";
+import { EXPERIMENT_RUN_INTENT_ATTEMPTS } from "../experiment-run-execution.schemas.ts";
 
 type Sent = Parameters<ExperimentRunCommandDispatcherService["failExperimentCell"]>[0];
 type Completed = Parameters<ExperimentRunCommandDispatcherService["completeExperimentRun"]>[0];
@@ -98,14 +99,70 @@ describe("the run manager's intents", () => {
     it("completes the run stopped", async () => {
       const { completed, commands: run } = commands();
 
-      await completeRun(run)(
-        { runId: "run_1", experimentId: "experiment_1", outcome: "stopped" },
+      await completeRun({ commands: run, boardWriteBack: { writeBack: async () => {} } })(
+        { runId: "run_1", experimentId: "experiment_1", outcome: "stopped", finishedCells: 1 },
         intentContext,
       );
 
       expect(completed[0]).toMatchObject({ runId: "run_1", outcome: "stopped" });
       expect(completed[0]).toHaveProperty("stoppedAt");
       expect(completed[0]).not.toHaveProperty("finishedAt");
+    });
+  });
+
+  describe("when a run's last cell finishes", () => {
+    /** @scenario "A run's cells land on the board before it is completed" */
+    it("writes the run's cells to the board first, then completes it", async () => {
+      const order: string[] = [];
+      const { commands: run } = commands();
+      const complete = completeRun({
+        commands: {
+          ...run,
+          completeExperimentRun: async (input: Completed) => {
+            order.push(`complete:${input.runId}`);
+          },
+        },
+        boardWriteBack: {
+          writeBack: async ({ runId, finishedCells }) => {
+            order.push(`board:${runId}:${finishedCells}`);
+          },
+        },
+      });
+
+      await complete(
+        { runId: "run_1", experimentId: "experiment_1", outcome: "finished", finishedCells: 6 },
+        intentContext,
+      );
+
+      expect(order).toEqual(["board:run_1:6", "complete:run_1"]);
+    });
+
+    /** @scenario "The board write waits until the progress fold has every finished cell" */
+    it("does not complete while the board write waits for the fold, and tells its last attempt", async () => {
+      const lastAttempts: boolean[] = [];
+      const { completed, commands: run } = commands();
+      const complete = completeRun({
+        commands: run,
+        boardWriteBack: {
+          writeBack: async ({ lastAttempt }) => {
+            lastAttempts.push(lastAttempt);
+            if (!lastAttempt) throw new Error("Run run_1 has finished cells not folded yet");
+          },
+        },
+      });
+      const intent = {
+        runId: "run_1",
+        experimentId: "experiment_1",
+        outcome: "finished" as const,
+        finishedCells: 2,
+      };
+
+      await expect(complete(intent, intentContext)).rejects.toThrow("not folded yet");
+      expect(completed).toEqual([]);
+      await complete(intent, { ...intentContext, attempt: EXPERIMENT_RUN_INTENT_ATTEMPTS });
+
+      expect(lastAttempts).toEqual([false, true]);
+      expect(completed).toHaveLength(1);
     });
   });
 });

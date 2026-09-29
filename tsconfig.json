@@ -193,6 +193,9 @@
       "path": "packages/design-system/tsconfig.json"
     },
     {
+      "path": "packages/design-system-internal/tsconfig.json"
+    },
+    {
       "path": "tools/dev-runtime/tsconfig.json"
     },
     {
@@ -367,6 +370,9 @@
       "path": "packages/handled-error/tsconfig.json"
     },
     {
+      "path": "apps/haven-web/tsconfig.json"
+    },
+    {
       "path": "modules/hosted-mcp/contract/tsconfig.json"
     },
     {
@@ -379,6 +385,9 @@
       "path": "modules/identity/process/tsconfig.test.json"
     },
     {
+      "path": "apps/idpsim-web/tsconfig.json"
+    },
+    {
       "path": "packages/installed-server-modules/tsconfig.json"
     },
     {
@@ -389,6 +398,9 @@
     },
     {
       "path": "modules/instant-eval/process/tsconfig.json"
+    },
+    {
+      "path": "packages/internal-slack/tsconfig.json"
     },
     {
       "path": "packages/kernel/tsconfig.test.json"
@@ -422,6 +434,9 @@
     },
     {
       "path": "packages/mail/tsconfig.json"
+    },
+    {
+      "path": "apps/mailsim-web/tsconfig.json"
     },
     {
       "path": "modules/metric/contract/tsconfig.json"

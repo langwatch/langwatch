@@ -11,6 +11,10 @@ import (
 // SummaryFile is the run's short text verdict, the first thing to read.
 const SummaryFile = "summary.txt"
 
+// RenderingOnly says what a run compared, so no findings is never read as
+// "works": nothing was clicked through past the configured flows.
+const RenderingOnly = "compared rendering only: no finding means both refs drew a screen alike, not that it works"
+
 // summaryTop is how many findings summary.txt spells out one line each.
 const summaryTop = 20
 
@@ -19,7 +23,7 @@ const summaryUncovered = 60
 
 // classOrder ranks classes worst-first, for the table and the top findings.
 var classOrder = []Classification{
-	ClassMissingBase, ClassMissingCandidate, ClassCaptureFailed, ClassRegression, ClassBrokenBoth, ClassBlank,
+	ClassMissingBase, ClassMissingCandidate, ClassCaptureFailed, ClassRegression, ClassLayout, ClassBrokenBoth, ClassBlank,
 	ClassNotFound, ClassAPIError, ClassRedirect, ClassControls, ClassUncovered,
 	ClassCopy, ClassChanged, ClassIntendedRestore, ClassNoise,
 }
@@ -54,6 +58,7 @@ func RenderSummary(inputs SummaryInputs) string {
 	}
 	fmt.Fprintf(&out, "visualdiff %s vs %s: %d screens, %d findings\n",
 		inputs.BaseRef, inputs.CandidateRef, len(inputs.Rows), len(findings)+uncovered)
+	fmt.Fprintln(&out, RenderingOnly)
 	if inputs.Coverage != nil {
 		fmt.Fprintln(&out, inputs.Coverage.Line())
 	}

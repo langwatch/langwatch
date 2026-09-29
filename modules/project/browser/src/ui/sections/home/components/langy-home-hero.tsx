@@ -3,7 +3,6 @@ import { AskChip } from "@langwatch/design-system/ask-chip";
 import { selectLangySuggestions, useLangyStore } from "@langwatch/langy-browser-kit";
 
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
-import { type HomeDevState, useHomeDevState } from "./dev/home-dev-state.ts";
 
 import "./homeHeroScroll.css";
 import { HeroAskField } from "./hero-ask-field.tsx";
@@ -26,27 +25,6 @@ const ASK_MEASURE = "680px";
  */
 const ASK_ROW_MIN_HEIGHT = "26px";
 
-function isNewProjectFor(devState: HomeDevState | null, detected: boolean): boolean {
-  if (devState === "empty") return true;
-  if (devState === "populated") return false;
-  return detected;
-}
-
-type SuggestionReach = Parameters<typeof selectLangySuggestions>[0]["reach"];
-
-function suggestionReachFor(
-  devState: HomeDevState | null,
-  detected: SuggestionReach,
-): SuggestionReach {
-  if (devState === "empty") {
-    return { hasTraces: false, hasEvaluations: false, hasExperiments: false };
-  }
-  if (devState === "populated") {
-    return { hasTraces: true, hasEvaluations: true, hasExperiments: true };
-  }
-  return detected;
-}
-
 function askPlaceholder(canAsk: boolean, isNewProject: boolean): string {
   if (!canAsk) return "Search, or jump to anything";
   if (isNewProject) return "Ask Langy how to get started, or search";
@@ -54,28 +32,22 @@ function askPlaceholder(canAsk: boolean, isNewProject: boolean): string {
 }
 
 export function LangyHomeHero() {
-  const devState = useHomeDevState();
-
-  const realCanAsk = useProjectHomeHost().canAskLangy();
-  const canAsk = devState === "read-only" ? false : realCanAsk;
+  const canAsk = useProjectHomeHost().canAskLangy();
 
   const reach = useProjectReach();
-  const isNewProject = isNewProjectFor(devState, reach.isNewProject);
+  const { isNewProject } = reach;
 
   // Until the project's reach is known, "has nothing" and "has not answered
   // yet" look identical, and offering the empty-project asks to a project with
   // months of runs (then swapping them out a beat later) is worse than a beat
-  // of nothing: the reader reaches for a chip that moves. A pinned dev state is
-  // an answer, so it skips the wait.
-  const reachKnown = devState === "empty" || devState === "populated" || !reach.isLoading;
+  // of nothing: the reader reaches for a chip that moves.
+  const reachKnown = !reach.isLoading;
   // Only once the answer is actually known: leading with "send your first
   // trace" at a project that already has thousands is the product not knowing
   // its own customer, and `isNewProject` reads false while the check is still
   // in flight.
   const leadWithOnboarding = reachKnown && isNewProject;
-  const suggestions = !reachKnown
-    ? []
-    : selectLangySuggestions({ reach: suggestionReachFor(devState, reach) });
+  const suggestions = !reachKnown ? [] : selectLangySuggestions({ reach });
 
   const askLangy = useLangyStore((s) => s.askLangy);
 

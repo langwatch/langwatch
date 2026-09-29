@@ -76,7 +76,6 @@ export const signInSide = async ({
     if (failure === "" && !new URL(side.page.url()).pathname.startsWith("/auth/")) {
       side.drain();
       await capturePasskeyOffer({ plan, side, collect });
-      await side.waitUntilQuiet();
       side.drain();
       return;
     }

@@ -67,7 +67,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
       updatedAt: Date;
       actorLabel?: "user" | "langy" | "api";
       runId?: string;
-      versions: { version: number; autoSaved: boolean; state: unknown }[];
+      versions: { version: number; autoSaved: boolean; state: unknown; runId?: string }[];
     }
   >();
 
@@ -218,6 +218,7 @@ class MemoryExperimentRepository implements ExperimentRepository {
       version: workbench.version,
       autoSaved: !input.commitMessage,
       state: input.snapshot,
+      ...(input.actor.runId ? { runId: input.actor.runId } : {}),
     });
     return Promise.resolve({
       kind: "saved",
@@ -264,6 +265,12 @@ class MemoryExperimentRepository implements ExperimentRepository {
         .reverse()
         .slice(0, input.take),
     );
+  }
+  hasWorkbenchVersionOfRun(
+    input: Parameters<ExperimentRepository["hasWorkbenchVersionOfRun"]>[0],
+  ): ReturnType<ExperimentRepository["hasWorkbenchVersionOfRun"]> {
+    const versions = this.workbenches.get(input.experimentId)?.versions ?? [];
+    return Promise.resolve(versions.some((version) => version.runId === input.runId));
   }
   findWorkbenchVersion(
     input: Parameters<ExperimentRepository["findWorkbenchVersion"]>[0],

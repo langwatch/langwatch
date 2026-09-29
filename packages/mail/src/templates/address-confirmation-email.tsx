@@ -25,7 +25,6 @@ export const AddressConfirmationEmail = ({
   verificationUrl,
 }: AddressConfirmationEmailProps) => (
   <EmailLayout
-    eyebrow="ACCOUNT"
     preview="Confirm this address to sign in with it"
     heading="Confirm this email address"
   >

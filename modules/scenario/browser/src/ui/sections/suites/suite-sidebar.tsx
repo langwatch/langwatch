@@ -40,6 +40,8 @@ import { useNow } from "../../../behavior/use-now.ts";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
+import { Link } from "@langwatch/browser-host/link";
+
 import type { SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 
@@ -448,10 +450,10 @@ function SidebarButton({
       textDecoration="none"
       color="inherit"
     >
-      <a href={href ?? "#"}>
+      <Link unstyled href={href ?? "#"}>
         {icon}
         <Text fontSize="sm">{label}</Text>
-      </a>
+      </Link>
     </HStack>
   );
 }
@@ -533,7 +535,9 @@ function SidebarListItemWrapper({
       textDecoration="none"
       color="inherit"
     >
-      <a href={href ?? "#"}>{children}</a>
+      <Link unstyled href={href ?? "#"}>
+        {children}
+      </Link>
     </HStack>
   );
 }

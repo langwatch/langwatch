@@ -1,5 +1,4 @@
 import {
-  analyticsFilterValueSchema,
   langWatchQLKeyReach,
   type AnalyticsEvaluationReadMetrics,
   type AnalyticsService,
@@ -7,14 +6,11 @@ import {
 } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, keyCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
-import { z } from "zod";
 
 import { AnalyticsAdapter } from "./app/analytics-composition.build.ts";
 import { AnalyticsApp } from "./app/analytics.app.ts";
 import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "./repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
-import type { GenerateFilterConditionsResult } from "./repositories/clickhouse/clickhouse.filter-shapes.mapper.ts";
-import { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";
 import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
 import { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
@@ -81,22 +77,4 @@ export function createLegacyFilterMatching(): LegacyFilterMatchingService {
 /** The trace shape the in-memory filter matching reads a fold state as. */
 export function createPreconditionTraceData(): PreconditionTraceDataService {
   return PreconditionTraceDataService.create();
-}
-
-const legacyFiltersSchema = z.record(z.string(), analyticsFilterValueSchema);
-
-/** The ClickHouse conditions one legacy `filters` document narrows a read by. */
-export type ClickHouseFilterConditions = (
-  filters: Record<string, unknown>,
-  window?: { startDate?: number; endDate?: number },
-) => GenerateFilterConditionsResult;
-
-/**
- * Parses the legacy `filters` grammar and answers the conditions it means. The
- * parse travels with the grammar, not with each caller: a composition root
- * holding its own copy of the schema is a second place to drift.
- */
-export function createClickHouseFilterConditions(): ClickHouseFilterConditions {
-  return (filters, window) =>
-    generateClickHouseFilterConditions(legacyFiltersSchema.parse(filters), window);
 }

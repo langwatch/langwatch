@@ -102,6 +102,10 @@
       "types": "./dist/langwatch-endpoint-env.d.ts",
       "default": "./src/langwatch-endpoint-env.ts"
     },
+    "./ambient-ground": {
+      "types": "./dist/components/ambient-ground.d.ts",
+      "default": "./src/components/ambient-ground.tsx"
+    },
     "./loading-screen": {
       "types": "./dist/components/loading-screen.d.ts",
       "default": "./src/components/loading-screen.tsx"
@@ -322,6 +326,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@paper-design/shaders-react": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
     "motion": "catalog:",
@@ -338,6 +343,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/design-system-internal": "workspace:*",
     "@storybook/addon-a11y": "^10.5.10",
     "@storybook/addon-docs": "^10.5.10",
     "@storybook/react-vite": "^10.5.10",

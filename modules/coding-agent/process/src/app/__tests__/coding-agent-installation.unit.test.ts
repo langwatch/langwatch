@@ -9,6 +9,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { GithubApi } from "@langwatch/github-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -56,6 +57,8 @@ function project(id: string, overrides: Partial<Project> = {}): Project {
   };
 }
 
+const RETAINED = { traces: 365, scenarios: 30, experiments: 30 };
+
 function installation() {
   const authzAsks: Parameters<AuthzApi["canBatchPermissionsByIds"]>[0][] = [];
   const audits: RecordAuditLogCommand[] = [];
@@ -76,7 +79,9 @@ function installation() {
         findAllByBranches: async () => [],
       }),
       trace: createApiFixture<TraceApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>(),
+      "data-retention": createApiFixture<DataRetentionApi>({
+        getResolvedForProject: async () => RETAINED,
+      }),
       authz: createApiFixture<AuthzApi>({
         canBatchPermissionsByIds: async (args) => {
           authzAsks.push(args);
@@ -111,6 +116,32 @@ function installation() {
 }
 
 describe("given coding-agent installed the way a process installs it", () => {
+  describe("when its pipeline is built", () => {
+    /** @scenario "A module's pipeline declares each tenant's retention from data retention" */
+    it("declares each tenant's retention as data retention resolves it", async () => {
+      const { process } = installation();
+      const eventing = new EventSourcing({
+        enabled: false,
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
+      const runtime = await process.withEventing(eventing).boot();
+
+      try {
+        const pipeline = eventing.definitions.find(
+          (definition) => definition.metadata.name === "coding_agent_processing",
+        );
+
+        await expect(
+          pipeline?.open((definition) =>
+            definition.retentionPolicyResolver?.resolve("project-shared"),
+          ),
+        ).resolves.toEqual(RETAINED);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when an organization key reads a mapped pull request's usage", () => {
     /** @scenario The installed process answers the organization rollup instead of failing */
     it("resolves the caller's scope through the authorization peer and reaches the pull request", async () => {

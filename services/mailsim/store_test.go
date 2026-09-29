@@ -26,7 +26,7 @@ func TestStoreWaitReturnsExistingMatchImmediately(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	msg, ok := st.Wait(ctx, "a@stack.local", "welcome")
+	msg, ok := st.Wait(ctx, WaitFilter{To: "a@stack.local", Subject: "welcome"})
 	require.True(t, ok)
 	assert.Equal(t, "welcome", msg.Subject)
 }
@@ -39,7 +39,7 @@ func TestStoreWaitUnblocksOnArrival(t *testing.T) {
 	defer cancel()
 	resultCh := make(chan *Message, 1)
 	go func() {
-		msg, ok := st.Wait(ctx, "", "invoice")
+		msg, ok := st.Wait(ctx, WaitFilter{Subject: "invoice"})
 		if ok {
 			resultCh <- msg
 		} else {
@@ -65,6 +65,6 @@ func TestStoreWaitTimesOutWithNoMatch(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
 	defer cancel()
-	_, ok := st.Wait(ctx, "", "nothing-will-match")
+	_, ok := st.Wait(ctx, WaitFilter{Subject: "nothing-will-match"})
 	assert.False(t, ok)
 }

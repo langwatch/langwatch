@@ -94,12 +94,12 @@ export const signedIssuedLicenseSchema = z.object({
 });
 export type SignedIssuedLicense = z.infer<typeof signedIssuedLicenseSchema>;
 
-/** What a mid-term seat change owes; billing decides the amount. */
-export const seatChangeBillingOutcomeSchema = z.enum([
-  "invoiced",
-  "nothing_to_invoice",
-  "not_onboarded",
-]);
+/**
+ * What a seat change leaves billing. `pending`: the seats of a linked license
+ * went up, and billing invoices them from the fact licensing recorded; its
+ * outcome shows in the Billing section. Anything else owes nothing here.
+ */
+export const seatChangeBillingOutcomeSchema = z.enum(["pending", "nothing_to_invoice"]);
 export type SeatChangeBillingOutcome = z.infer<typeof seatChangeBillingOutcomeSchema>;
 
 export const seatChangeResultSchema = z.object({
@@ -108,6 +108,18 @@ export const seatChangeResultSchema = z.object({
   billing: seatChangeBillingOutcomeSchema,
 });
 export type SeatChangeResult = z.infer<typeof seatChangeResultSchema>;
+
+/** A seat change that raised a linked license: the fact billing invoices from. */
+export const licenseSeatChangeSchema = z.object({
+  /** The replacement registry row the new seat count is signed into. */
+  licenseRowId: z.string(),
+  organizationId: z.string(),
+  previousSeats: z.number().int(),
+  seats: z.number().int(),
+  /** ISO 8601. When the replacement was signed; proration counts from here. */
+  changedAt: z.string(),
+});
+export type LicenseSeatChange = z.infer<typeof licenseSeatChangeSchema>;
 
 /** The customer organization a license is attributed to, as the registry needs it. */
 export interface IssuedLicenseCustomerRecord {

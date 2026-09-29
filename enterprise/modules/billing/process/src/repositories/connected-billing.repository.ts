@@ -71,12 +71,16 @@ export type ConnectedCreditGrantRecord = {
 export type ConnectedSeatChangeRecord = {
   /** The reissued `IssuedLicense` row the new seat count is signed into. */
   licenseRowId: string;
-  accountId: string;
+  /** Null for a customer with no billing account (`not_onboarded`). */
+  accountId: string | null;
+  /** Null only on a row written before the column existed and never backfilled. */
+  organizationId: string | null;
   changedAt: Instant;
   addedSeats: number;
   unitAmountCents: number;
   amountCents: number;
-  currency: ConnectedCurrency;
+  /** Null when no billing account named one (`not_onboarded`). */
+  currency: ConnectedCurrency | null;
   state: SeatChangeState;
   stripeInvoiceId: string | null;
 };
@@ -111,13 +115,24 @@ export abstract class ConnectedBillingRepository {
     stripeInvoiceId: string,
     patch: Partial<Pick<ConnectedInvoiceRecord, "status" | "paidOutOfBandAt">>,
   ): Promise<void>;
-  abstract findSeatChange(licenseRowId: string): Promise<ConnectedSeatChangeRecord | null>;
+  /** The decisions already stored for these reissued licenses. */
+  abstract findSeatChangesByLicenseRows(
+    licenseRowIds: readonly string[],
+  ): Promise<ConnectedSeatChangeRecord[]>;
+  /**
+   * Stores the first decision for one change, and answers whether this call
+   * stored it. A change already decided is left alone: the table decides.
+   */
+  abstract createSeatChange(record: ConnectedSeatChangeRecord): Promise<boolean>;
   /** Writes the decision for one change, replacing an earlier state of it. */
   abstract recordSeatChange(record: ConnectedSeatChangeRecord): Promise<void>;
   /** Every change whose invoice was intended and never confirmed. */
   abstract findPendingSeatChanges(): Promise<ConnectedSeatChangeRecord[]>;
-  /** Every seat change invoiced against this account, newest first. */
-  abstract findSeatChangesForAccount(accountId: string): Promise<ConnectedSeatChangeRecord[]>;
+  /** Every seat change of the organization, or billed to its account, newest first. */
+  abstract findSeatChangesForOrganization(input: {
+    organizationId: string;
+    accountId: string | null;
+  }): Promise<ConnectedSeatChangeRecord[]>;
   abstract addInvoice(accountId: string, invoice: ConnectedInvoiceRecord): Promise<void>;
   /** The accounts of these organizations; one without an account is left out. */
   abstract findAccountsForOrganizations(

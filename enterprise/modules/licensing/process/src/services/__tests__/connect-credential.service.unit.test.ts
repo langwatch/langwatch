@@ -52,6 +52,7 @@ function rowFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicenseReco
     reportedMembers: null,
     reportedMembersLite: null,
     virtualKeyId: null,
+    seatsRaisedFrom: null,
     createdAt: NOW,
     updatedAt: NOW,
     ...overrides,

@@ -27,6 +27,7 @@ const request = {
   tenantIds: ["tenant_1"],
   description: "repair trace summaries",
   userName: "operator@example.com",
+  requestedByUserId: "user_operator",
 };
 
 const serviceOver = (repo: ReplayRepository): ReplayService => {
@@ -34,7 +35,9 @@ const serviceOver = (repo: ReplayRepository): ReplayService => {
     create: vi.fn<() => OpsReplayRuntime>(),
   };
 
-  return ReplayService.create({ repo, runtimeFactory });
+  const service = ReplayService.create({ repo, runtimeFactory });
+  service.connect({ send: vi.fn(() => Promise.resolve()) });
+  return service;
 };
 
 describe("replay start errors", () => {

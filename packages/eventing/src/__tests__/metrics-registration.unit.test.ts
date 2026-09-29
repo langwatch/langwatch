@@ -11,7 +11,7 @@ import {
   incrementEsProcessManagerTotal,
   incrementEsProcessOutboxTotal,
   incrementEsProjectionTotal,
-  incrementEsReactorTotal,
+  incrementEsProjectionSubscriberTotal,
   incrementEsSubscriberTotal,
   observeEsCommandDuration,
   observeEsFoldCacheGetDuration,
@@ -21,7 +21,7 @@ import {
   observeEsProcessManagerDuration,
   observeEsProcessOutboxDuration,
   observeEsProjectionDuration,
-  observeEsReactorDuration,
+  observeEsProjectionSubscriberDuration,
   observeEsSubscriberDuration,
   withMetrics,
 } from "../metrics.ts";
@@ -75,13 +75,13 @@ describe("ES pipeline metrics", () => {
       expect(register.getSingleMetric(metricName)).toBeDefined();
     });
 
-    it("registers es_reactor_total counter", () => {
-      const metric = register.getSingleMetric("es_reactor_total");
+    it("registers es_projection_subscriber_total counter", () => {
+      const metric = register.getSingleMetric("es_projection_subscriber_total");
       expect(metric).toBeDefined();
     });
 
-    it("registers es_reactor_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric("es_reactor_duration_milliseconds");
+    it("registers es_projection_subscriber_duration_milliseconds histogram", () => {
+      const metric = register.getSingleMetric("es_projection_subscriber_duration_milliseconds");
       expect(metric).toBeDefined();
     });
 
@@ -337,20 +337,22 @@ describe("ES pipeline metrics", () => {
 
   describe("when subscriber metrics are recorded", () => {
     it("increments subscriber total with correct labels", async () => {
-      incrementEsReactorTotal("test-pipeline", "evaluationTrigger", "completed");
+      incrementEsProjectionSubscriberTotal("test-pipeline", "evaluationTrigger", "completed");
 
-      const lines = await register.getSingleMetricAsString("es_reactor_total");
+      const lines = await register.getSingleMetricAsString("es_projection_subscriber_total");
       expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('reactor_name="evaluationTrigger"');
+      expect(lines).toContain('subscriber_name="evaluationTrigger"');
       expect(lines).toContain('status="completed"');
     });
 
     it("records subscriber duration with correct labels", async () => {
-      observeEsReactorDuration("test-pipeline", "evaluationTrigger", 150.0);
+      observeEsProjectionSubscriberDuration("test-pipeline", "evaluationTrigger", 150.0);
 
-      const lines = await register.getSingleMetricAsString("es_reactor_duration_milliseconds");
+      const lines = await register.getSingleMetricAsString(
+        "es_projection_subscriber_duration_milliseconds",
+      );
       expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('reactor_name="evaluationTrigger"');
+      expect(lines).toContain('subscriber_name="evaluationTrigger"');
     });
   });
 

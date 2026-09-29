@@ -175,7 +175,8 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
 
 
 # Fixed result schemas mirroring langevals_core.base_evaluator. These shapes are
-# stable, so they are emitted verbatim rather than reflected.
+# stable, so they are emitted verbatim rather than reflected. Pydantic sends an
+# unset Optional field as null, so those fields are nullish, not optional.
 RESULT_SCHEMAS = """export const moneySchema = z.object({
   currency: z.string(),
   amount: z.number(),
@@ -183,18 +184,18 @@ RESULT_SCHEMAS = """export const moneySchema = z.object({
 
 export const evaluationResultSchema = z.object({
   status: z.literal("processed"),
-  score: z.number().optional(),
-  passed: z.boolean().optional(),
-  label: z.string().optional(),
-  details: z.string().optional(),
-  cost: moneySchema.optional(),
+  score: z.number().nullish(),
+  passed: z.boolean().nullish(),
+  label: z.string().nullish(),
+  details: z.string().nullish(),
+  cost: moneySchema.nullish(),
   raw_response: z.any().optional(),
 });
 
 export const evaluationResultSkippedSchema = z.object({
   status: z.literal("skipped"),
-  details: z.string().optional(),
-  cost: moneySchema.optional(),
+  details: z.string().nullish(),
+  cost: moneySchema.nullish(),
 });
 
 export const evaluationResultErrorSchema = z.object({

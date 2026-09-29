@@ -5,6 +5,11 @@ import { Temporal } from "@langwatch/time";
 import type { ReactNode } from "react";
 
 import { money } from "../../model/connected-billing-form.ts";
+import {
+  isSeatChangeUnsettled,
+  seatChangeBadge,
+  seatChangeOutcome,
+} from "../../model/seat-change-copy.ts";
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -29,7 +34,6 @@ const day = (iso: string): string =>
 /** The commercial state of a connected customer, as finance reads it. */
 export function ConnectedBillingState({ overview }: { overview: ConnectedBillingOverview }) {
   const { account, spend, terms, seats } = overview;
-  const pendingSeatChanges = overview.seatChanges.filter((row) => row.state === "intent");
 
   return (
     <VStack align="start" gap={3} width="full">
@@ -67,14 +71,26 @@ export function ConnectedBillingState({ overview }: { overview: ConnectedBilling
           )}
         </Detail>
       </SimpleGrid>
-      {pendingSeatChanges.length > 0 ? (
-        <HStack gap={2}>
-          <Badge colorPalette="orange">Seat invoice pending</Badge>
-          <Text fontSize="xs" color="fg.muted">
-            {`${pendingSeatChanges.length} seat change(s) still waiting for the payment provider. The daily billing tick retries them.`}
+      <SeatChanges overview={overview} />
+    </VStack>
+  );
+}
+
+/** One line per mid-term seat change, newest first, with how its invoicing stands. */
+function SeatChanges({ overview }: { overview: ConnectedBillingOverview }) {
+  if (overview.seatChanges.length === 0) return null;
+  return (
+    <VStack align="start" gap={1} width="full">
+      {overview.seatChanges.map((change) => (
+        <HStack key={change.licenseId} gap={2} fontSize="xs">
+          <Badge colorPalette={isSeatChangeUnsettled(change) ? "orange" : "gray"}>
+            {seatChangeBadge(change)}
+          </Badge>
+          <Text color="fg.muted">
+            {`${day(change.changedAt)}: ${change.addedSeats} seat(s) added. ${seatChangeOutcome(change)}`}
           </Text>
         </HStack>
-      ) : null}
+      ))}
     </VStack>
   );
 }

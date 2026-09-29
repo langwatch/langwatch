@@ -86,10 +86,16 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
     return () => setDockShifted(false);
   }, [shifted, setDockShifted]);
   const reservation = dockReservation({ shifted, shellClaimed });
+  // The box sits in the shell's page body and passes its flex height on,
+  // or full-height pages (the prompt studio) collapse to their content.
   return (
     <>
       <Box
         width="full"
+        flex="1"
+        minHeight={0}
+        display="flex"
+        flexDirection="column"
         data-langy-dock={reservation}
         paddingRight={reservation === "page" ? `${LANGY_DOCKED_OFFSET}px` : 0}
         transition={`padding-right ${LANGY_TRANSITION}`}

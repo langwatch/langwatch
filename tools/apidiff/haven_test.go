@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -562,12 +563,17 @@ func TestHavenIsTheDefaultAndTheOtherPathsAreOptIn(t *testing.T) {
 
 // worktreeCreatingRunner wraps a fakeHaven so `git worktree add` also creates
 // a real modular-layout worktree on disk (a package.json detectProfile
-// accepts), while every haven command still goes through the fake. This is
-// what lets a test drive the real boot() end to end.
+// accepts) and `git rev-parse` answers a commit, while every haven command
+// still goes through the fake. This is what lets a test drive the real boot()
+// end to end.
 func worktreeCreatingRunner(fake *fakeHaven) runner {
 	return func(ctx context.Context, spec commandSpec, log io.Writer) error {
+		if spec.name == "git" && len(spec.args) > 0 && spec.args[0] == "rev-parse" {
+			_, err := io.WriteString(log, "0123456789abcdef0123456789abcdef01234567\n")
+			return err
+		}
 		if spec.name == "git" && len(spec.args) >= 4 && spec.args[0] == "worktree" && spec.args[1] == "add" {
-			dir := spec.args[3]
+			dir := spec.args[len(spec.args)-2]
 			if err := os.MkdirAll(filepath.Join(dir, "apps", "api"), 0o750); err != nil {
 				return err
 			}
@@ -601,16 +607,16 @@ func TestApidiffRunsAndTheDeveloperStackIsUntouched(t *testing.T) {
 				t.Fatalf("boot: %v", err)
 			}
 
-			wantMain := filepath.Join(state.workRoot, "main")
-			wantBranch := filepath.Join(state.workRoot, "branch")
+			wantMain := persistentWorktree(invoking, "main")
+			wantBranch := persistentWorktree(invoking, "branch")
 
-			t.Run("then the base instance checks out into <work-root>/main", func(t *testing.T) {
+			t.Run("then the base instance checks out its ref into .apidiff/worktrees/main, its persistent worktree", func(t *testing.T) {
 				if booted.B.Dir != wantMain {
 					t.Errorf("main dir = %q, want %q", booted.B.Dir, wantMain)
 				}
 			})
 
-			t.Run("then the branch instance checks out HEAD into <work-root>/branch, a worktree of its own", func(t *testing.T) {
+			t.Run("then the branch instance checks out HEAD into .apidiff/worktrees/branch, a worktree of its own", func(t *testing.T) {
 				if booted.A.Dir != wantBranch {
 					t.Errorf("branch dir = %q, want %q", booted.A.Dir, wantBranch)
 				}
@@ -694,7 +700,7 @@ func TestAWorktreeThatWouldAliasTheInvokingCheckoutRefusesToBoot(t *testing.T) {
 
 // @scenario "Teardown never runs from the invoking checkout"
 func TestTeardownOnHavenPathNeverRunsFromTheInvokingCheckout(t *testing.T) {
-	t.Run("given both instances are up as haven stacks under their own worktrees", func(t *testing.T) {
+	t.Run("given both instances are up as haven stacks under worktrees added for this run alone", func(t *testing.T) {
 		invoking := t.TempDir()
 		workRoot := filepath.Join(invoking, ".apidiff", "run")
 		mainDir := filepath.Join(workRoot, "main")
@@ -708,16 +714,20 @@ func TestTeardownOnHavenPathNeverRunsFromTheInvokingCheckout(t *testing.T) {
 			"apidiff-run-branch": 6560,
 			"apidiff-run-main":   6660,
 		}}
+		var detached []commandSpec
 		state := &bootState{
-			cfg:        BootConfig{UseHaven: true, BranchDir: invoking, WorkRoot: workRoot},
-			stderr:     io.Discard,
-			run:        fake.run,
-			runID:      "run",
-			workRoot:   workRoot,
-			mainDir:    mainDir,
-			ownsMain:   true,
-			branchDir:  branchDir,
-			ownsBranch: true,
+			cfg:       BootConfig{UseHaven: true, BranchDir: invoking, WorkRoot: workRoot},
+			stderr:    io.Discard,
+			run:       fake.run,
+			runID:     "run",
+			workRoot:  workRoot,
+			mainDir:   mainDir,
+			branchDir: branchDir,
+			checkouts: []sideCheckout{
+				{side: "main", dir: mainDir, owned: true},
+				{side: "branch", dir: branchDir, owned: true},
+			},
+			detach:     func(spec commandSpec, _ string) error { detached = append(detached, spec); return nil },
 			havenSlugs: []string{"apidiff-run-branch", "apidiff-run-main"},
 		}
 
@@ -741,19 +751,29 @@ func TestTeardownOnHavenPathNeverRunsFromTheInvokingCheckout(t *testing.T) {
 				}
 			})
 
-			t.Run("then both owned worktrees are removed and the invoking checkout is not one of them", func(t *testing.T) {
-				var removed []string
-				for _, spec := range fake.commands {
-					if spec.name == "git" && len(spec.args) >= 4 && spec.args[0] == "worktree" && spec.args[1] == "remove" {
-						removed = append(removed, spec.args[3])
+			t.Run("then both owned worktrees leave git's list at once and are deleted in the background, never the invoking checkout", func(t *testing.T) {
+				for _, dir := range []string{mainDir, branchDir} {
+					if _, err := os.Stat(dir); err == nil {
+						t.Errorf("%s is still in place after teardown", dir)
 					}
 				}
-				want := []string{mainDir, branchDir}
-				if strings.Join(removed, ",") != strings.Join(want, ",") {
-					t.Errorf("removed %v, want %v", removed, want)
+				var deleted []string
+				for _, spec := range detached {
+					if spec.name != "rm" || len(spec.args) != 2 {
+						t.Errorf("teardown detached %s; only the deletion of a discarded worktree may outlive it", argv(spec))
+						continue
+					}
+					deleted = append(deleted, spec.args[1])
 				}
-				for _, dir := range removed {
-					if dir == invoking {
+				want := []string{mainDir + ".discarded", branchDir + ".discarded"}
+				if strings.Join(deleted, ",") != strings.Join(want, ",") {
+					t.Errorf("deleted %v, want %v", deleted, want)
+				}
+				if !slices.ContainsFunc(fake.commands, func(spec commandSpec) bool { return argv(spec) == "git worktree prune" }) {
+					t.Error("git worktree prune must drop the discarded worktrees from git's list")
+				}
+				for _, dir := range deleted {
+					if strings.TrimSuffix(dir, ".discarded") == invoking {
 						t.Error("the invoking checkout must never be removed as a worktree")
 					}
 				}
@@ -775,8 +795,8 @@ func TestThePlanNamesBothWorktreesAndSlugsAndNoCommandRuns(t *testing.T) {
 			}
 
 			t.Run("then it names the base and branch worktree paths and their haven slugs", func(t *testing.T) {
-				wantMain := filepath.Join(cfg.WorkRoot, "main")
-				wantBranch := filepath.Join(cfg.WorkRoot, "branch")
+				wantMain := persistentWorktree(invoking, "main")
+				wantBranch := persistentWorktree(invoking, "branch")
 				if plan.MainDir != wantMain || plan.BranchDir != wantBranch {
 					t.Errorf("plan dirs = %q / %q, want %q / %q", plan.MainDir, plan.BranchDir, wantMain, wantBranch)
 				}

@@ -7,9 +7,6 @@ import { useCallback, useMemo } from "react";
 
 import { survivesSelectionChange } from "../suites/use-suite-routing.ts";
 
-/** The catch-all page every Agent Testing address is pushed into. */
-export const AGENT_TESTING_PATHNAME = "/[project]/agent-testing/[[...path]]";
-
 export const RESULTS_SEGMENT = "results" as const;
 export const SUITES_SEGMENT = "suites" as const;
 export const EXTERNAL_SEGMENT = "external" as const;
@@ -162,8 +159,8 @@ function toQueryString(params: Record<string, string | string[]>): string {
 }
 
 /**
- * The route and the address one state is pushed as. Pure, so the whole
- * address contract can be read in one place.
+ * The address one state is pushed as: the project, the segments and the carried
+ * params. Pure, so the whole address contract can be read in one place.
  */
 export function buildAgentTestingPush({
   projectSlug,
@@ -173,29 +170,14 @@ export function buildAgentTestingPush({
   projectSlug: string;
   state: AgentTestingRoutingState;
   query: RouterQuery;
-}): {
-  route: { pathname: string; query: Record<string, string | string[]> };
-  address: string;
-} {
-  const carried = carriedParamsOf(query);
+}): string {
   const segments = buildAgentTestingSegments(state);
   const path =
     segments.length > 0
       ? `/${projectSlug}/agent-testing/${segments.join("/")}`
       : `/${projectSlug}/agent-testing`;
-  const queryString = toQueryString(carried);
-
-  return {
-    route: {
-      pathname: AGENT_TESTING_PATHNAME,
-      query: {
-        project: projectSlug,
-        ...(segments.length > 0 ? { path: segments } : {}),
-        ...carried,
-      },
-    },
-    address: queryString ? `${path}?${queryString}` : path,
-  };
+  const queryString = toQueryString(carriedParamsOf(query));
+  return queryString ? `${path}?${queryString}` : path;
 }
 
 export function useAgentTestingRouting(): AgentTestingRouting {
@@ -216,13 +198,7 @@ export function useAgentTestingRouting(): AgentTestingRouting {
     (next: AgentTestingRoutingState) => {
       if (!projectSlug) return;
 
-      const { route, address } = buildAgentTestingPush({
-        projectSlug,
-        state: next,
-        query: router.query,
-      });
-
-      void router.push(route, address, { shallow: true });
+      void router.push(buildAgentTestingPush({ projectSlug, state: next, query: router.query }));
     },
     [router, projectSlug],
   );

@@ -1,22 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Invoicing a mid-term seat change of a connected self-hosted customer
- * (ADR-156 section 7).
- *
- * Two rules shape this. The change is decided once: the intent is written
- * before the provider is called and completed after it, and the call carries a
- * key derived from the reissued license, so a run that failed halfway invoices
- * the same seats once when the daily tick retries it. And the amount is worked
- * out per seat first and then multiplied, so the unit amount and the quantity
- * on the invoice line multiply back to the total a customer reads.
+ * One pass over the seat changes licensing recorded (ARCHITECTURE.md section 9): each is decided
+ * once, `not_onboarded` included, then every intent is invoiced once, per seat then multiplied.
+ * Spec: specs/self-hosting/connected-services/connected-billing.feature, "Changing seats mid-term".
  */
 
-import type { SeatChangeBillingOutcome } from "@langwatch/enterprise-billing-contract";
+import type { LicenseSeatChange, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 
-import type { ConnectedInvoicingChannel } from "../channels/connected-invoicing.channel.ts";
+import type {
+  ConnectedInvoicingChannel,
+  ProviderInvoice,
+} from "../channels/connected-invoicing.channel.ts";
 import type {
   ConnectedBillingAccountRecord,
   ConnectedBillingRepository,
@@ -30,53 +27,57 @@ import {
 
 const logger = createLogger("langwatch:billing:connectedSeatChange");
 
+/** What one pass did: changes it decided, invoices it raised, and what failed. */
+export type SeatInvoicingSummary = { decided: number; invoiced: number; failed: number };
+
 export class ConnectedSeatChangeService {
   private constructor(
     private readonly repository: ConnectedBillingRepository,
     private readonly invoicing: ConnectedInvoicingChannel,
-    private readonly now: () => Instant,
+    private readonly licensing: Pick<LicensingApi, "findSeatChanges">,
   ) {}
 
   static create(input: {
     repository: ConnectedBillingRepository;
     invoicing: ConnectedInvoicingChannel;
-    now?: () => Instant;
+    licensing: Pick<LicensingApi, "findSeatChanges">;
   }): ConnectedSeatChangeService {
-    return new ConnectedSeatChangeService(
-      input.repository,
-      input.invoicing,
-      input.now ?? nowInstant,
+    return new ConnectedSeatChangeService(input.repository, input.invoicing, input.licensing);
+  }
+
+  /** One pass: every undecided change is decided, then every intent is invoiced. */
+  async invoicePendingSeatChanges(): Promise<SeatInvoicingSummary> {
+    const decided = await this.decideNewSeatChanges();
+    const { invoiced, failed } = await this.completePendingSeatChanges();
+    return { decided: decided.decided, invoiced, failed: decided.failed + failed };
+  }
+
+  /** Each change licensing recorded that has no stored decision yet. */
+  private async decideNewSeatChanges(): Promise<{ decided: number; failed: number }> {
+    const changes = await this.licensing.findSeatChanges({});
+    const stored = await this.repository.findSeatChangesByLicenseRows(
+      changes.map((change) => change.licenseRowId),
     );
-  }
-
-  /**
-   * Invoices the seats a change added. A customer with no billing account gets
-   * no invoice from here; finance invoices them by hand, and the operator is
-   * told so.
-   */
-  async invoiceAddedSeats(input: {
-    organizationId: string;
-    licenseRowId: string;
-    previousSeats: number;
-    seats: number;
-  }): Promise<SeatChangeBillingOutcome> {
-    const account = await this.repository.findAccount(input.organizationId);
-    if (!account) return "not_onboarded";
-
-    const existing = await this.repository.findSeatChange(input.licenseRowId);
-    if (existing) {
-      return existing.state === "intent" ? this.complete(existing) : existing.state;
+    const known = new Set(stored.map((change) => change.licenseRowId));
+    const summary = { decided: 0, failed: 0 };
+    for (const change of changes.filter((candidate) => !known.has(candidate.licenseRowId))) {
+      try {
+        const account = await this.repository.findAccount(change.organizationId);
+        const created = await this.repository.createSeatChange(this.decide({ account, change }));
+        if (created) summary.decided += 1;
+      } catch (error) {
+        summary.failed += 1;
+        logger.error(
+          { licenseRowId: change.licenseRowId, error },
+          "seat change could not be decided, retrying on the next pass",
+        );
+      }
     }
-
-    const record = this.decide({ account, ...input });
-    await this.repository.recordSeatChange(record);
-    if (record.state === "nothing_to_invoice") return "nothing_to_invoice";
-
-    return this.complete(record);
+    return summary;
   }
 
-  /** Retries every change whose invoice was intended and never confirmed. */
-  async completePendingSeatChanges(): Promise<{ invoiced: number; failed: number }> {
+  /** Invoices every change whose invoice was intended and never confirmed. */
+  private async completePendingSeatChanges(): Promise<{ invoiced: number; failed: number }> {
     const summary = { invoiced: 0, failed: 0 };
     for (const pending of await this.repository.findPendingSeatChanges()) {
       try {
@@ -86,7 +87,7 @@ export class ConnectedSeatChangeService {
         summary.failed += 1;
         logger.error(
           { licenseRowId: pending.licenseRowId, error },
-          "seat change invoice failed, retrying on the next tick",
+          "seat change invoice failed, retrying on the next pass",
         );
       }
     }
@@ -97,73 +98,88 @@ export class ConnectedSeatChangeService {
   /** What the change owes, before anything is written or invoiced. */
   private decide({
     account,
-    licenseRowId,
-    previousSeats,
-    seats,
+    change,
   }: {
-    account: ConnectedBillingAccountRecord;
-    licenseRowId: string;
-    previousSeats: number;
-    seats: number;
+    account: ConnectedBillingAccountRecord | null;
+    change: LicenseSeatChange;
   }): ConnectedSeatChangeRecord {
-    const addedSeats = seats - previousSeats;
-    const changedAt = this.now();
+    const addedSeats = Math.max(0, change.seats - change.previousSeats);
+    const changedAt = Temporal.Instant.from(change.changedAt);
+    const undecided = {
+      licenseRowId: change.licenseRowId,
+      organizationId: change.organizationId,
+      changedAt,
+      addedSeats,
+      stripeInvoiceId: null,
+    };
+    if (!account) {
+      return {
+        ...undecided,
+        accountId: null,
+        unitAmountCents: 0,
+        amountCents: 0,
+        currency: null,
+        state: "not_onboarded",
+      };
+    }
+
     const unitAmountCents = proratedSeatUnitAmountCents({
       seatRateCents: account.seatRateCents,
       daysRemaining: daysBetween(changedAt, account.termEndsAt),
       termDays: daysBetween(account.termStartsAt, account.termEndsAt),
     });
-    const amountCents = addedSeats > 0 ? unitAmountCents * addedSeats : 0;
+    const amountCents = unitAmountCents * addedSeats;
 
     return {
-      licenseRowId,
+      ...undecided,
       accountId: account.id,
-      changedAt,
-      addedSeats: Math.max(0, addedSeats),
       unitAmountCents,
       amountCents,
       currency: account.seatCurrency,
       state: amountCents > 0 ? "intent" : "nothing_to_invoice",
-      stripeInvoiceId: null,
     };
   }
 
   /** The provider call for an intent, and the record of what it created. */
-  private async complete(intent: ConnectedSeatChangeRecord): Promise<SeatChangeBillingOutcome> {
-    const account = await this.repository.findAccountById(intent.accountId);
-    if (!account) {
-      throw new Error(`seat change ${intent.licenseRowId} names an account that no longer exists`);
+  private async complete(intent: ConnectedSeatChangeRecord): Promise<void> {
+    const account = intent.accountId
+      ? await this.repository.findAccountById(intent.accountId)
+      : null;
+    if (!account || !intent.currency) {
+      throw new Error(`seat change ${intent.licenseRowId} names no account to invoice`);
     }
 
-    const bankTransfer = account.bankTransferType
-      ? {
-          type: account.bankTransferType,
-          ...(account.bankTransferCountry ? { country: account.bankTransferCountry } : {}),
-        }
-      : null;
-    const invoice = await this.invoicing.createOneOffInvoice({
-      customerId: account.stripeCustomerId,
-      currency: intent.currency,
-      lines: [
-        {
-          description: seatInvoiceDescription({
-            addedSeats: intent.addedSeats,
-            changedAt: intent.changedAt,
-            daysRemaining: daysBetween(intent.changedAt, account.termEndsAt),
-            termDays: daysBetween(account.termStartsAt, account.termEndsAt),
-          }),
-          amountCents: intent.amountCents,
-          quantity: intent.addedSeats,
-          unitAmountCents: intent.unitAmountCents,
-        },
-      ],
-      bankTransfer,
-      metadata: {
-        organization_id: account.organizationId,
-        kind: "seat_change",
-        license_row_id: intent.licenseRowId,
-      },
-    });
+    const metadata = {
+      organization_id: account.organizationId,
+      kind: "seat_change",
+      license_row_id: intent.licenseRowId,
+    };
+    const invoice =
+      (await this.alreadyRaised({ customerId: account.stripeCustomerId, metadata })) ??
+      (await this.invoicing.createOneOffInvoice({
+        customerId: account.stripeCustomerId,
+        currency: intent.currency,
+        lines: [
+          {
+            description: seatInvoiceDescription({
+              addedSeats: intent.addedSeats,
+              changedAt: intent.changedAt,
+              daysRemaining: daysBetween(intent.changedAt, account.termEndsAt),
+              termDays: daysBetween(account.termStartsAt, account.termEndsAt),
+            }),
+            amountCents: intent.amountCents,
+            quantity: intent.addedSeats,
+            unitAmountCents: intent.unitAmountCents,
+          },
+        ],
+        bankTransfer: account.bankTransferType
+          ? {
+              type: account.bankTransferType,
+              ...(account.bankTransferCountry ? { country: account.bankTransferCountry } : {}),
+            }
+          : null,
+        metadata,
+      }));
 
     await this.repository.addInvoice(account.id, {
       stripeInvoiceId: invoice.id,
@@ -179,7 +195,14 @@ export class ConnectedSeatChangeService {
       state: "invoiced",
       stripeInvoiceId: invoice.id,
     });
+  }
 
-    return "invoiced";
+  /** A finalized invoice an earlier attempt raised; a draft it left is never sent. */
+  private async alreadyRaised(input: {
+    customerId: string;
+    metadata: Record<string, string>;
+  }): Promise<ProviderInvoice | undefined> {
+    const found = await this.invoicing.findInvoices(input);
+    return found.find((invoice) => invoice.status !== "draft");
   }
 }

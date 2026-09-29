@@ -114,8 +114,19 @@ export class MemoryConnectedBillingRepository extends ConnectedBillingRepository
     this.store.connectedInvoices.set(stripeInvoiceId, { ...stored, ...patch });
   }
 
-  async findSeatChange(licenseRowId: string): Promise<ConnectedSeatChangeRecord | null> {
-    return this.store.connectedSeatChanges.get(licenseRowId) ?? null;
+  async findSeatChangesByLicenseRows(
+    licenseRowIds: readonly string[],
+  ): Promise<ConnectedSeatChangeRecord[]> {
+    return licenseRowIds.flatMap((id) => {
+      const change = this.store.connectedSeatChanges.get(id);
+      return change ? [change] : [];
+    });
+  }
+
+  async createSeatChange(record: ConnectedSeatChangeRecord): Promise<boolean> {
+    if (this.store.connectedSeatChanges.has(record.licenseRowId)) return false;
+    this.store.connectedSeatChanges.set(record.licenseRowId, record);
+    return true;
   }
 
   async recordSeatChange(record: ConnectedSeatChangeRecord): Promise<void> {
@@ -128,9 +139,19 @@ export class MemoryConnectedBillingRepository extends ConnectedBillingRepository
       .toSorted((a, b) => a.changedAt.epochMilliseconds - b.changedAt.epochMilliseconds);
   }
 
-  async findSeatChangesForAccount(accountId: string): Promise<ConnectedSeatChangeRecord[]> {
+  async findSeatChangesForOrganization({
+    organizationId,
+    accountId,
+  }: {
+    organizationId: string;
+    accountId: string | null;
+  }): Promise<ConnectedSeatChangeRecord[]> {
     return [...this.store.connectedSeatChanges.values()]
-      .filter((change) => change.accountId === accountId)
+      .filter(
+        (change) =>
+          change.organizationId === organizationId ||
+          (accountId !== null && change.accountId === accountId),
+      )
       .toSorted((a, b) => b.changedAt.epochMilliseconds - a.changedAt.epochMilliseconds);
   }
 

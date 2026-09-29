@@ -107,17 +107,7 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite("critical-path");
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: {
-            project: "my-project",
-            path: ["run-plans", "critical-path"],
-          },
-        },
-        "/my-project/simulations/run-plans/critical-path",
-        { shallow: true },
-      );
+      expect(mockPush).toHaveBeenCalledWith("/my-project/simulations/run-plans/critical-path");
     });
   });
 
@@ -134,14 +124,7 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite(ALL_RUNS_ID);
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: { project: "my-project" },
-        },
-        "/my-project/simulations",
-        { shallow: true },
-      );
+      expect(mockPush).toHaveBeenCalledWith("/my-project/simulations");
     });
   });
 
@@ -153,14 +136,7 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite(`${EXTERNAL_SET_PREFIX}python-examples`);
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: { project: "my-project", path: ["python-examples"] },
-        },
-        "/my-project/simulations/python-examples",
-        { shallow: true },
-      );
+      expect(mockPush).toHaveBeenCalledWith("/my-project/simulations/python-examples");
     });
   });
 
@@ -175,18 +151,7 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite(`${EXTERNAL_SET_PREFIX}python-examples`);
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: {
-            project: "my-project",
-            path: ["python-examples"],
-            period: "90d",
-          },
-        },
-        "/my-project/simulations/python-examples?period=90d",
-        { shallow: true },
-      );
+      expect(mockPush).toHaveBeenCalledWith("/my-project/simulations/python-examples?period=90d");
     });
 
     /** @scenario "Returning to All Runs keeps the widened date window" */
@@ -203,14 +168,7 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite(ALL_RUNS_ID);
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: { project: "my-project", period: "90d" },
-        },
-        "/my-project/simulations?period=90d",
-        { shallow: true },
-      );
+      expect(mockPush).toHaveBeenCalledWith("/my-project/simulations?period=90d");
     });
   });
 
@@ -230,17 +188,7 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: {
-            project: "my-project",
-            path: ["python-examples"],
-            startDate: "2026-01-01T00:00:00.000Z",
-            endDate: "2026-03-01T00:00:00.000Z",
-          },
-        },
         "/my-project/simulations/python-examples?startDate=2026-01-01T00%3A00%3A00.000Z&endDate=2026-03-01T00%3A00%3A00.000Z",
-        { shallow: true },
       );
     });
   });
@@ -262,18 +210,7 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: {
-            project: "my-project",
-            path: ["run-plans", "critical-path"],
-            groupBy: "scenario",
-            passFailStatus: "fail",
-            scenarioId: "scenario_abc",
-          },
-        },
         "/my-project/simulations/run-plans/critical-path?groupBy=scenario&passFailStatus=fail&scenarioId=scenario_abc",
-        { shallow: true },
       );
     });
   });
@@ -295,18 +232,7 @@ describe("useSuiteRouting()", () => {
         result.current.navigateToSuite(`${EXTERNAL_SET_PREFIX}other-set`);
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: {
-            project: "my-project",
-            path: ["other-set"],
-            period: "90d",
-          },
-        },
-        "/my-project/simulations/other-set?period=90d",
-        { shallow: true },
-      );
+      expect(mockPush).toHaveBeenCalledWith("/my-project/simulations/other-set?period=90d");
     });
   });
 

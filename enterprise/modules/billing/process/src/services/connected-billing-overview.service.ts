@@ -12,12 +12,14 @@ import type {
   ConnectedBillingOverview,
   ConnectedCreditGrantView,
 } from "@langwatch/enterprise-billing-contract";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { LicenseSeatChange, LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { Temporal } from "@langwatch/time";
 
 import type {
   ConnectedBillingAccountRecord,
   ConnectedBillingRepository,
   ConnectedCreditGrantRecord,
+  ConnectedSeatChangeRecord,
 } from "../repositories/connected-billing.repository.ts";
 import type { ConnectedCustomerFactsService } from "./connected-customer-facts.service.ts";
 
@@ -25,13 +27,13 @@ export class ConnectedBillingOverviewService {
   private constructor(
     private readonly repository: ConnectedBillingRepository,
     private readonly facts: Pick<ConnectedCustomerFactsService, "readContractSpend">,
-    private readonly licensing: Pick<LicensingApi, "getContractTerms" | "getConnectedSeats">,
+    private readonly licensing: OverviewLicensing,
   ) {}
 
   static create(input: {
     repository: ConnectedBillingRepository;
     facts: Pick<ConnectedCustomerFactsService, "readContractSpend">;
-    licensing: Pick<LicensingApi, "getContractTerms" | "getConnectedSeats">;
+    licensing: OverviewLicensing;
   }): ConnectedBillingOverviewService {
     return new ConnectedBillingOverviewService(input.repository, input.facts, input.licensing);
   }
@@ -42,13 +44,17 @@ export class ConnectedBillingOverviewService {
     organizationId: string;
   }): Promise<ConnectedBillingOverview> {
     const account = await this.repository.findAccount(organizationId);
-    const [terms, seats, spend, grants, invoices, seatChanges] = await Promise.all([
+    const [terms, seats, spend, grants, invoices, decided, recorded] = await Promise.all([
       this.licensing.getContractTerms({ organizationId }),
       this.licensing.getConnectedSeats({ organizationId }),
       this.facts.readContractSpend(organizationId),
       account ? this.repository.findCreditGrants(account.id) : [],
       account ? this.repository.findInvoices(account.id) : [],
-      account ? this.repository.findSeatChangesForAccount(account.id) : [],
+      this.repository.findSeatChangesForOrganization({
+        organizationId,
+        accountId: account?.id ?? null,
+      }),
+      this.licensing.findSeatChanges({ organizationId }),
     ]);
 
     return {
@@ -69,15 +75,7 @@ export class ConnectedBillingOverviewService {
         overageEnabled: terms.overageEnabled,
       },
       seats: { licensed: seats.licensed, reported: seats.reported, lastSyncAt: seats.lastSyncAt },
-      seatChanges: seatChanges.map((change) => ({
-        licenseId: change.licenseRowId,
-        changedAt: change.changedAt.toString(),
-        addedSeats: change.addedSeats,
-        amountCents: change.amountCents,
-        currency: change.currency,
-        state: change.state,
-        stripeInvoiceId: change.stripeInvoiceId,
-      })),
+      seatChanges: seatChangeViews({ decided, recorded }),
     };
   }
 
@@ -89,6 +87,52 @@ export class ConnectedBillingOverviewService {
   viewCreditGrant(grant: ConnectedCreditGrantRecord): ConnectedCreditGrantView {
     return creditGrantView(grant);
   }
+}
+
+type SeatChangeView = ConnectedBillingOverview["seatChanges"][number];
+
+type OverviewLicensing = Pick<
+  LicensingApi,
+  "getContractTerms" | "getConnectedSeats" | "findSeatChanges"
+>;
+
+/** Every decided change, and each change licensing recorded that billing has not decided yet. */
+function seatChangeViews({
+  decided,
+  recorded,
+}: {
+  decided: ConnectedSeatChangeRecord[];
+  recorded: LicenseSeatChange[];
+}): SeatChangeView[] {
+  const known = new Set(decided.map((change) => change.licenseRowId));
+  const views: SeatChangeView[] = [
+    ...decided.map((change): SeatChangeView => ({
+      licenseId: change.licenseRowId,
+      changedAt: change.changedAt.toString(),
+      addedSeats: change.addedSeats,
+      amountCents: change.amountCents,
+      currency: change.currency,
+      state: change.state,
+      stripeInvoiceId: change.stripeInvoiceId,
+    })),
+    ...recorded
+      .filter((change) => !known.has(change.licenseRowId))
+      .map((change): SeatChangeView => ({
+        licenseId: change.licenseRowId,
+        changedAt: Temporal.Instant.from(change.changedAt).toString(),
+        addedSeats: Math.max(0, change.seats - change.previousSeats),
+        amountCents: 0,
+        currency: null,
+        state: "awaiting",
+        stripeInvoiceId: null,
+      })),
+  ];
+  return views.toSorted((a, b) =>
+    Temporal.Instant.compare(
+      Temporal.Instant.from(b.changedAt),
+      Temporal.Instant.from(a.changedAt),
+    ),
+  );
 }
 
 function accountView(account: ConnectedBillingAccountRecord): ConnectedBillingAccountView {

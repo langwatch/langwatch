@@ -25,16 +25,11 @@ Feature: The growth hooks the transactional messages carry
   says nothing at all.
 
   @unit
-  Scenario: The confirmation mail shows the first-trace step when the quickstart is known
-    Given the sign-up verification email carrying first steps
+  Scenario: The confirmation mail is only a confirmation
+    Given the sign-up verification email, even when a sender offers it first steps
     When it is rendered
-    Then the setup lines appear with a link to the quickstart
-
-  @unit
-  Scenario: The confirmation mail is only a confirmation without the quickstart
-    Given the sign-up verification email carrying no first steps
-    When it is rendered
-    Then no setup lines appear
+    Then no setup lines, skills command or agent prompt appear
+    And the link's expiry and the note for somebody who did not sign up sit under the button
 
   @unit
   Scenario: An invitation names what the team already tracks
@@ -237,6 +232,20 @@ Feature: The growth hooks the transactional messages carry
     Then the skills command, the agent prompt and the quickstart link all appear
 
   @unit
+  Scenario: The agent prompt reads as prose, not code
+    Given the first-steps block
+    When it is rendered
+    Then the agent prompt is in the body face, uncoloured, outside any code block
+    And it names no API key the reader may not have yet
+
+  @unit
+  Scenario: The install command and the code are separate blocks
+    Given the first-steps block with no intent
+    When it is rendered
+    Then the install command is a shell block of its own
+    And the TypeScript block holds no shell line and breaks its import where a formatter would
+
+  @unit
   Scenario: An agent-governance organization is shown the command line, not an SDK
     Given a message for an organization that came to watch its agents
     When it is rendered
@@ -273,13 +282,15 @@ Feature: The growth hooks the transactional messages carry
     Then the three counts appear over the table
 
   @unit
-  Scenario: Every message asks for the display face
+  Scenario: Every message is set in the system face and fetches no font
     Given any rendered message
-    When its head is read
-    Then the stylesheet serving the display face is linked
+    When its head and heading are read
+    Then no web font is linked or declared
+    And the heading uses the same system face as the body
 
   @unit
-  Scenario: A client that drops the face keeps the designed fallback
+  Scenario: No message carries a kicker in spaced capitals
     Given any rendered message
-    When its heading style is read
-    Then a real serif follows the display face at the same tracking
+    When its styles are read
+    Then no text is transformed to capitals or letter-spaced apart
+    And the footer names LangWatch in sentence case

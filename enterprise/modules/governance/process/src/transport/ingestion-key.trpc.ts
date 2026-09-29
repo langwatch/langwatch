@@ -21,6 +21,7 @@ export const ingestionKeyTrpcTransport = defineTrpcRouter(GovernanceRestApi, ing
       organizationId: input.organizationId,
       sourceType: input.sourceType,
       ingestionTemplateId: input.templateId ?? null,
+      surface: "trpc",
     }),
   )
 
@@ -32,13 +33,14 @@ export const ingestionKeyTrpcTransport = defineTrpcRouter(GovernanceRestApi, ing
       organizationId: input.organizationId,
       sourceType: input.sourceType,
       ingestionTemplateId: input.templateId ?? null,
+      surface: "trpc",
     }),
   )
 
   .procedure("revoke")
   .withPermission("organization:view")
   .handle(async ({ app, input, actor }) => {
-    await app.ingestionKeyRevoke({ ...input, userId: actor.id });
+    await app.ingestionKeyRevoke({ ...input, userId: actor.id, surface: "trpc" });
     return { success: true };
   })
   .build();

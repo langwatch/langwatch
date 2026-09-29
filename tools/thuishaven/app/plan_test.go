@@ -168,6 +168,27 @@ func TestTheUILaneStartsWithoutWaitingForTheAPI(t *testing.T) {
 	t.Fatal("no ui lane was planned")
 }
 
+// The api application binds API_PORT and nothing else, defaulting to 6560; the ui
+// lane and the routed hostname dial the port haven allocated. A backend lane told
+// only LANGWATCH_API_PORT bound 6560 and every /api request through the app was a 502.
+//
+// @scenario "The backend lane binds the API port haven routes /api to"
+func TestTheBackendLaneBindsTheRoutedAPIPort(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	st := domain.Stack{Slug: "test", APIPort: 41001}
+	children := o.planChildren(st, PlanOptions{Selection: domain.Selection{}}, t.TempDir(), "")
+
+	for lane, want := range map[string]string{APILane: "API_PORT=41001", "ui": "LANGWATCH_API_PORT=41001"} {
+		child, ok := findChild(children, lane)
+		if !ok {
+			t.Fatalf("no %q lane was planned", lane)
+		}
+		if !hasEnv(child.Env, want) {
+			t.Errorf("%s lane env is missing %q, so the API and its proxy disagree on the port", lane, want)
+		}
+	}
+}
+
 // One Go process, hosting whichever data-plane services the stack selected,
 // each on the port haven allocated for its hostname. SERVER_ADDR cannot name
 // two listeners in one process, so each service gets its own address variable.

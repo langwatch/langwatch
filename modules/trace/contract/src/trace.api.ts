@@ -550,6 +550,14 @@ export interface TraceApi extends TraceOtlpIngestApi {
     evalRuns?: readonly ResolvedInstantEvalRun[];
   }): { sql: string; params: Record<string, unknown> } | null;
   /**
+   * A legacy `filters` document compiled to parameterized ClickHouse conditions
+   * over `trace_summaries ts`. Trace owns the grammar because it owns the tables.
+   */
+  translateLegacyFilters(input: {
+    filters: Readonly<Record<string, unknown>>;
+    window?: { startDate?: number; endDate?: number };
+  }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
+  /**
    * The Explorer's own filter: the query compiled, hidden origins left out
    * unless the query (or `originNamed`) names one; `dateField` refuses a
    * span/event clause on the `updated` axis.

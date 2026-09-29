@@ -20,7 +20,7 @@
 #   make haven status        # every stack + shared-server health, one shot
 #   make haven               # build .bin/haven/haven (no subcommand)
 
-.PHONY: haven observability observability-connect observability-logs \
+.PHONY: haven haven-web observability observability-connect observability-logs \
         observability-status observability-down
 
 HAVEN_PKG = ./cmd/haven
@@ -68,11 +68,19 @@ haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
 	@mkdir -p .bin/haven && go build -o .bin/haven/haven $(HAVEN_PKG) && echo "built .bin/haven/haven"
 else ifeq ($(strip $(HAVEN_ARGS)),install)
+	@$(MAKE) --no-print-directory haven-web || echo "haven-web did not build; the hub and stack homes will name 'make haven-web' until it does"
 	@go install $(HAVEN_PKG)
 	@go run $(HAVEN_PKG) install || true
 else
 	@$(HAVEN) $(HAVEN_ARGS)
 endif
+
+# `make haven-web` builds the consoles the haven binary embeds (ADR-160): the
+# hub and stack homes, the mail inbox and the IdP console. `make haven install`
+# runs it first; a console that fails to build (--no-bail keeps the others)
+# serves a page naming this target instead.
+haven-web:
+	@pnpm --no-bail --filter @langwatch/haven-web --filter @langwatch/mailsim-web --filter @langwatch/idpsim-web build
 
 # =============================================================================
 # LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)

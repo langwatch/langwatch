@@ -370,6 +370,13 @@ Feature: Running system migrations across organizations
     When the cadence comes round again
     Then another pass is attempted
 
+  @unit
+  Scenario: The hourly re-drive runs as a scheduled process once across the fleet
+    Given several workers are running
+    When an hour passes
+    Then one scheduled process wakes on one of them
+    And it asks for exactly one re-drive pass for that wake
+
   # D04 records the configured legacy route WITHOUT treating the old domain
   # string as ownership evidence, which is what let it join the shared
   # registry: existing sign-in stays compatible, while activation, linking and
@@ -731,3 +738,72 @@ Feature: Running system migrations across organizations
     When the run reports
     Then it says it waited
     And it does not report "org_acme" as held
+
+  @unit
+  Scenario: The migrations page lists every registered migration when served by the api role
+    Given the api role serves the migrations page
+    And identity registers an organization-rooted and a user-rooted migration
+    When an operator opens the migrations page
+    Then both migrations are listed, organization-rooted first, with their rollups
+
+  @unit
+  Scenario: A migration registered by a peer module appears on the page with its title and description
+    Given a peer module registers a migration with its own title and description
+    When an operator opens the migrations page
+    Then the migration is listed with that title and description
+
+  # Authz answers its grant import through AuthzApi, as identity answers D04; ops composes both in
+  # main's registry order and never imports either process package (Alex, 2026-09-28).
+  @unit
+  Scenario: The authorization engine answers the migration it registers
+    Given a process that installed authz
+    When the migrations runner asks authz for its registered migrations
+    Then the grant import is answered under its existing name
+
+  @unit
+  Scenario: An authorization app composed without its migration refuses to answer one
+    Given an authz app composed from already-built services
+    When the migrations runner asks it for its registered migrations
+    Then it refuses by name rather than answering an empty registry
+
+  @unit
+  Scenario: The authorization engine's migration runs ahead of identity's, as on main
+    Given authz registers the grant import and identity registers D04
+    When an operator opens the migrations page
+    Then the grant import is listed first and D04 second
+
+  # The exclusion list is the ClickHouse member's own routing table, parsed once at boot from the
+  # CLICKHOUSE_URL__* family (ARCHITECTURE §7), never a second declaration of it.
+  @unit
+  Scenario: A cohort's private-dataplane exclusion is the ClickHouse member's routing table
+    Given the ClickHouse member routes "org_private" to a private endpoint
+    When a cohort is sampled without dedicated-data-plane organizations
+    Then the pool is asked to leave "org_private" out
+
+  @unit
+  Scenario: A cohort on a deployment with no private data planes excludes nobody
+    Given the ClickHouse member routes no organization privately
+    When a cohort is sampled
+    Then the whole pool is sampled rather than the request being refused
+
+  @unit
+  Scenario: Kicking a pass from the page runs one pass on a worker
+    When an operator asks for a pass now
+    Then the request is recorded under the operator
+    And a worker runs one pass for it without first asking whether anything could move
+
+  # Main's kick was fire-and-forget and never failed the page: a kick that cannot be sent is
+  # logged, and the hourly re-drive still runs the pass (Alex, 2026-09-28).
+  @unit
+  Scenario: A kick in a process that never connected the pass command still answers started
+    Given a process that never connected the system migration pass command
+    When an operator asks for a pass now
+    Then the page is told the pass started
+    And nothing is sent
+
+  @unit
+  Scenario: A kick whose send fails still answers started
+    Given the system migration pass command refuses the send
+    When an operator asks for a pass now
+    Then the page is told the pass started
+    And the failure is logged rather than answered

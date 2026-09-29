@@ -29,6 +29,7 @@ import type {
   IssuedLicensePage,
   IssuedLicenseSource,
   IssuedLicenseView,
+  LicenseSeatChange,
   LicenseTermsInput,
   SeatChangeResult,
   SignedIssuedLicense,
@@ -41,7 +42,7 @@ import type {
   LicenseSyncBody,
 } from "./license-sync.ts";
 import type {
-  GenerateLicenseInput,
+  GenerateLicenseKeyInput,
   GenerateLicenseOutput,
   StoreLicenseInput,
 } from "./license.commands.ts";
@@ -91,10 +92,10 @@ export interface LicensingApi {
    */
   issueLicense(input: IssueLicenseInput): Promise<SignedIssuedLicense>;
   /**
-   * Signs a license with the key the caller holds, as main's `generateLicenseKey`
-   * did for a Stripe licence purchase. Records nothing: the caller records it.
+   * Signs a license with licensing's own key, as main's `generateLicenseKey` did for a
+   * Stripe licence purchase. Records nothing: the caller records it.
    */
-  generateLicenseKey(input: GenerateLicenseInput): Promise<GenerateLicenseOutput>;
+  generateLicenseKey(input: GenerateLicenseKeyInput): Promise<GenerateLicenseOutput>;
   /** Records a license another flow already signed: the purchase, the script. */
   recordIssuedLicense(input: {
     licenseKey: string;
@@ -211,6 +212,8 @@ export interface LicensingApi {
   classifyForHostedCaller(input: {
     caller: HostedCaller;
     payload: unknown;
+    /** The calling install's request: a judgement it no longer waits for is abandoned. */
+    signal?: AbortSignal;
   }): Promise<HostedClassifyAnswer>;
   /** What the caller spent against every budget that applies to it. */
   getHostedUsage(input: { caller: HostedCaller }): Promise<HostedUsageAnswer>;
@@ -220,6 +223,8 @@ export interface LicensingApi {
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
   /** The seats a connected customer holds and last reported, for its statement and overview. */
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats>;
+  /** Every seat change that raised a linked license, oldest first; one customer's when named. */
+  findSeatChanges(input: { organizationId?: string }): Promise<LicenseSeatChange[]>;
   /** Raises the prepaid commit a renewal or top-up invoice agreed. */
   raiseContractCommit(input: {
     organizationId: string;

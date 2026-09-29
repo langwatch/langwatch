@@ -1,10 +1,15 @@
 /**
- * The run's two folds, keyed by the run's aggregate key (ARCHITECTURE §9, D2 and D4): the plan
- * `started` carried, written once, and the progress each cell reads, updated per event. Split so
- * a cell's result never rewrites the plan. Design: experiment-run-execution.md section 7.
+ * The run's two folds (ARCHITECTURE §9, D2 and D4): the plan `started` carried, written once under
+ * the run's aggregate key, and its progress, updated per event under main's poller key by runId.
+ * Split so a cell's result never rewrites the plan. Design: experiment-run-execution.md section 7.
  */
 import type { FoldStateRead } from "@langwatch/eventing";
-import { experimentRunPlanSchema } from "@langwatch/experiment-contract";
+import {
+  type EvaluationV3Event,
+  executionSummarySchema,
+  experimentRunPlanSchema,
+} from "@langwatch/experiment-contract";
+import { serializedHandledErrorSchema } from "@langwatch/handled-error";
 import { z } from "zod";
 
 const foldTimestampsShape = {
@@ -45,10 +50,43 @@ export const experimentRunFoldEvaluatorSchema = z.object({
   comparison: z.boolean(),
 });
 
+/** One frame main's SSE sent, as a recorded event produced it. */
+export const experimentRunFrameSchema = z.custom<EvaluationV3Event>(
+  (value) => typeof value === "object" && value !== null && "type" in value,
+);
+
+/** A frame the run streamed, numbered in the run's order, with the event that produced it. */
+export const experimentRunRecentEventSchema = z.object({
+  seq: z.number().int().nonnegative(),
+  eventId: z.string(),
+  frame: experimentRunFrameSchema,
+});
+
 export const experimentRunProgressStateSchema = z.object({
   projectId: z.string(),
   runId: z.string(),
   experimentId: z.string(),
+  /** Main's poller JSON: the run as `GET /runs/:runId` answers it. */
+  experimentSlug: z.string(),
+  status: z.enum(["pending", "running", "completed", "failed", "stopped"]),
+  /** Cells finished, failed ones included. */
+  progress: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  startedAt: z.number(),
+  finishedAt: z.number().optional(),
+  summary: executionSummarySchema.optional(),
+  error: z.string().optional(),
+  domainError: serializedHandledErrorSchema.optional(),
+  traceId: z.string().optional(),
+  /** The last 50 frames, as main kept them; `seq` numbers every frame the run streamed. */
+  recentEvents: z.array(experimentRunRecentEventSchema),
+  seq: z.number().int().nonnegative(),
+  runUrl: z.string().optional(),
+  /** Of `progress`, the cells that failed. */
+  failed: z.number().int().nonnegative(),
+  persistResults: z.boolean(),
+  /** Each cell's result frames, kept only for a run that writes its cells back to the board. */
+  resultFrames: z.record(z.string(), experimentRunFrameSchema),
   /** False for a run started before runs carried a plan: folded, never stored. */
   planned: z.boolean(),
   phaseOneCells: z.number().int().nonnegative(),
@@ -68,17 +106,16 @@ export type ExperimentRunPlanFoldState = z.infer<typeof experimentRunPlanFoldSta
 export type ExperimentRunTargetOutput = z.infer<typeof experimentRunTargetOutputSchema>;
 export type ExperimentRunEvaluatorScore = z.infer<typeof experimentRunEvaluatorScoreSchema>;
 export type ExperimentRunFoldEvaluator = z.infer<typeof experimentRunFoldEvaluatorSchema>;
+export type ExperimentRunRecentEvent = z.infer<typeof experimentRunRecentEventSchema>;
 export type ExperimentRunProgressState = z.infer<typeof experimentRunProgressStateSchema>;
 
 /** Both folds live where every replica reads them. */
 export abstract class ExperimentRunFoldRepository {
   abstract readPlan(input: { runKey: string }): Promise<FoldStateRead<ExperimentRunPlanFoldState>>;
   abstract writePlan(input: { runKey: string; state: ExperimentRunPlanFoldState }): Promise<void>;
-  abstract readProgress(input: {
-    runKey: string;
+  /** A run's progress by its id alone, as main's poller keyed it. */
+  abstract readRunProgress(input: {
+    runId: string;
   }): Promise<FoldStateRead<ExperimentRunProgressState>>;
-  abstract writeProgress(input: {
-    runKey: string;
-    state: ExperimentRunProgressState;
-  }): Promise<void>;
+  abstract writeProgress(input: { state: ExperimentRunProgressState }): Promise<void>;
 }

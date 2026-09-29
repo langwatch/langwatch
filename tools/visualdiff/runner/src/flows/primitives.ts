@@ -18,6 +18,10 @@ export const goTo = async ({
   await side.page.waitForLoadState("domcontentloaded", { timeout: 15_000 }).catch(() => undefined);
 };
 
+/** isClickable is a present, enabled control: a form refusing to save disables its button. */
+const isClickable = async (target: Locator): Promise<boolean> =>
+  (await target.count().catch(() => 0)) > 0 && (await target.isEnabled().catch(() => false));
+
 export const clickText = async ({
   context,
   text,
@@ -39,7 +43,7 @@ export const clickText = async ({
   if ((await target.count().catch(() => 0)) === 0) {
     target = root.getByText(pattern).locator("visible=true").first();
   }
-  if (optional === true && (await target.count().catch(() => 0)) === 0) return;
+  if (optional === true && !(await isClickable(target))) return;
   await target.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => undefined);
   await target.click({ timeout: 6000 });
 };

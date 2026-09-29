@@ -75,22 +75,17 @@ const dark = {
 export const DOCUMENTATION_URL = "https://docs.langwatch.ai";
 
 /**
- * Headings use Sentient from Fontshare (fallback to serif stack where remote
- * fonts unavailable). Weight and tracking stay the same in both.
+ * One system face for headings and body alike, as main's mail had it: no web
+ * font is fetched, because a remote font in mail is a tracking pixel.
  */
-const HEADING_FONT = '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
 const BODY_FONT =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-/**
- * The small technical voice: labels, keys, and the eyebrow over a heading.
- * JetBrains Mono is named for anyone who has it and nothing is fetched for
- * anyone who does not: the ruling above covers every face, not only the serif.
- */
+/** Only for text a reader copies exactly: a command, a key, a snippet. */
 const MONO_FONT =
-  '"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Courier New", monospace';
+  'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Courier New", monospace';
 
 /** The expressive system, as mail cuts it. */
-export const expressive = { light, dark, HEADING_FONT, BODY_FONT, MONO_FONT } as const;
+export const expressive = { light, dark, BODY_FONT, MONO_FONT } as const;
 
 const SPACE = { finePrint: 18, row: 16, block: 26, header: 24, cardTop: 34, cardX: 32 } as const;
 const RADIUS = { card: "14px", field: "10px", action: "999px" } as const;
@@ -126,24 +121,7 @@ const WORDMARK_DARK = "https://app.langwatch.ai/images/logo-full-darktheme.svg";
 const HIDDEN_ASSET = `display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important;`;
 const SHOWN_ASSET = `display: block !important; width: 112px !important; max-height: none !important; overflow: visible !important; font-size: 20px !important; line-height: normal !important;`;
 
-/**
- * The face, from the people who publish it: both a stylesheet `<link>` and
- * an `@font-face` of the same files, so dropping either still gets the font
- * (dropping both falls through cleanly). `swap` keeps headings visible while it loads.
- */
-const SENTIENT_STYLESHEET = "https://api.fontshare.com/v2/css?f[]=sentient@400&display=swap";
-const SENTIENT_FILES =
-  "https://cdn.fontshare.com/wf/RVTZPYAA57KV4AMXRX7ZIPJXSTYCRP7A/36OUS5CBIXRKI2QU7G7OUHOK7HHA53Y2/SIH66VPT4WS2HIF5PEJNDU4INNUF54LG";
-
 const STYLESHEET = `
-@font-face {
-  font-family: 'Sentient';
-  src: url('${SENTIENT_FILES}.woff2') format('woff2'),
-       url('${SENTIENT_FILES}.woff') format('woff');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
 :root { color-scheme: light dark; supported-color-schemes: light dark; }
 .lw-dark-only { ${HIDDEN_ASSET} }
 @media (prefers-color-scheme: dark) {
@@ -155,7 +133,6 @@ const STYLESHEET = `
   .lw-subtle { color: ${dark.textSubtle} !important; }
   .lw-rule { border-color: ${dark.hairline} !important; }
   .lw-link { color: ${dark.accentText} !important; }
-  .lw-eyebrow { color: ${dark.accentText} !important; }
   .lw-mesh { background-color: ${MESH.dark.solid} !important; background-image: ${MESH.dark.image} !important; }
   .lw-action { background-color: ${dark.action} !important; border-color: ${dark.action} !important; color: ${dark.onAction} !important; }
   .lw-action-secondary { background-color: ${dark.card} !important; border-color: ${dark.cardBorder} !important; color: ${dark.text} !important; }
@@ -180,15 +157,12 @@ const STYLESHEET = `
 
 export const EmailLayout = ({
   preview,
-  eyebrow,
   heading,
   children,
   footNote,
 }: {
   /** The line shown beside the subject. Say the outcome, not the product. */
   preview: string;
-  /** One or two words naming what this is about, over the heading. */
-  eyebrow?: string;
   heading: string;
   children: ReactNode;
   /** One sentence under the rule saying why this arrived. */
@@ -198,7 +172,6 @@ export const EmailLayout = ({
     <Head>
       <meta name="color-scheme" content="light dark" />
       <meta name="supported-color-schemes" content="light dark" />
-      <link rel="stylesheet" href={SENTIENT_STYLESHEET} />
       <style>{STYLESHEET}</style>
     </Head>
     <Preview>{preview}</Preview>
@@ -229,17 +202,16 @@ export const EmailLayout = ({
             <Wordmark src={WORDMARK_DARK} className="lw-dark-only" colour={dark.text} hidden />
           </Section>
           <MeshBand />
-          {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
           <Heading
             as="h1"
             className="lw-text"
             style={{
               margin: `0 0 ${SPACE.row}px`,
-              fontFamily: HEADING_FONT,
-              fontSize: "29px",
-              fontWeight: 400,
-              lineHeight: 1.2,
-              letterSpacing: "-0.03em",
+              fontFamily: BODY_FONT,
+              fontSize: "24px",
+              fontWeight: 600,
+              lineHeight: 1.3,
+              letterSpacing: "-0.015em",
               color: light.text,
             }}
           >
@@ -256,10 +228,7 @@ export const EmailLayout = ({
           />
           {footNote && <FinePrint>{footNote}</FinePrint>}
           <FinePrint>
-            <span style={{ fontFamily: MONO_FONT, fontSize: "11px", letterSpacing: "0.08em" }}>
-              LANGWATCH
-            </span>{" "}
-            ·{" "}
+            LangWatch ·{" "}
             <Link className="lw-link" href={DOCUMENTATION_URL} style={linkStyle}>
               Documentation
             </Link>{" "}
@@ -277,7 +246,7 @@ export const EmailLayout = ({
 /**
  * The wordmark, with the brand name as its own fallback. The `alt` is styled
  * for clients that block images by default: where the mark doesn't draw,
- * "LangWatch" arrives in the site's serif at the same size, not a broken-image box.
+ * "LangWatch" arrives in the body face at the same size, not a broken-image box.
  */
 const Wordmark = ({
   src,
@@ -300,7 +269,7 @@ const Wordmark = ({
     style={{
       display: hidden ? "none" : "block",
       border: "none",
-      fontFamily: HEADING_FONT,
+      fontFamily: BODY_FONT,
       fontSize: "20px",
       color: colour,
       textDecoration: "none",
@@ -341,25 +310,6 @@ const MeshBand = () => (
       </tr>
     </tbody>
   </table>
-);
-
-/** The short mono line over a heading, naming what the message is about. */
-export const Eyebrow = ({ children }: { children: ReactNode }) => (
-  <Text
-    className="lw-eyebrow"
-    style={{
-      margin: "0 0 8px",
-      fontFamily: MONO_FONT,
-      fontSize: "11px",
-      fontWeight: 500,
-      lineHeight: 1.4,
-      letterSpacing: "0.12em",
-      textTransform: "uppercase",
-      color: light.detail,
-    }}
-  >
-    {children}
-  </Text>
 );
 
 /** Links carry the brand colour, in the cut that survives on paper. */
@@ -532,12 +482,8 @@ export const DetailTable = ({ rows }: { rows: readonly { label: string; value: R
           <td
             className="lw-muted"
             style={{
-              padding: "8px 16px 8px 0",
-              fontFamily: MONO_FONT,
-              fontSize: "11px",
-              fontWeight: 500,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
+              padding: "7px 16px 7px 0",
+              fontSize: "13.5px",
               color: light.textMuted,
               whiteSpace: "nowrap",
               verticalAlign: "top",
@@ -625,11 +571,8 @@ export const DataTable = ({
                 width: column.width,
                 padding: "0 12px 7px 0",
                 textAlign: column.align ?? "left",
-                fontFamily: MONO_FONT,
-                fontSize: "10px",
-                fontWeight: 500,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
+                fontSize: "12px",
+                fontWeight: 600,
                 color: light.textMuted,
                 borderBottom: `1px solid ${light.hairline}`,
                 whiteSpace: "nowrap",
@@ -730,10 +673,7 @@ export const CountTiles = ({ tiles }: { tiles: readonly { label: string; value: 
               className="lw-muted"
               style={{
                 margin: "2px 0 0",
-                fontFamily: MONO_FONT,
-                fontSize: "10px",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
+                fontSize: "12px",
                 color: light.textMuted,
               }}
             >
@@ -744,6 +684,24 @@ export const CountTiles = ({ tiles }: { tiles: readonly { label: string; value: 
       </tr>
     </tbody>
   </table>
+);
+
+/** Words to paste as they are, such as a prompt: prose, so the body face, not code. */
+export const PlainBlock = ({ children }: { children: ReactNode }) => (
+  <Text
+    className="lw-code"
+    style={{
+      margin: `12px 0 ${SPACE.row}px`,
+      padding: "12px",
+      backgroundColor: light.field,
+      borderRadius: RADIUS.field,
+      fontSize: "14px",
+      lineHeight: 1.55,
+      color: light.text,
+    }}
+  >
+    {children}
+  </Text>
 );
 
 /**

@@ -916,15 +916,7 @@ describe("the scenarios table", () => {
       await user.click(within(list).getByTestId("recent-run-batch_2"));
 
       expect(routerPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/agent-testing/[[...path]]",
-          query: {
-            project: "test-project",
-            path: ["results", "double-charge-acme-support-agent", "batch_2"],
-          },
-        },
         "/test-project/agent-testing/results/double-charge-acme-support-agent/batch_2",
-        { shallow: true },
       );
     });
 
@@ -985,13 +977,7 @@ describe("the scenarios table", () => {
 
       // The row opens the run under the plan that holds it, the way the button
       // above the table does, rather than in the single run drawer.
-      expect(routerPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pathname: "/[project]/agent-testing/[[...path]]",
-        }),
-        expect.stringContaining("/results/"),
-        { shallow: true },
-      );
+      expect(routerPush).toHaveBeenCalledWith(expect.stringContaining("/results/"));
     });
 
     /** @scenario "The runs of a row are read only when its submenu is opened" */

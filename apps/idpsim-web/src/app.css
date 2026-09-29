@@ -1,0 +1,24 @@
+/* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
+
+.idp-grow {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.idp-number {
+  width: 9rem;
+}
+
+/* A client id or secret in a table cell: one line, truncated, copy button kept. */
+.idp-copyable {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.idp-count {
+  width: 7rem;
+}
+
+.idp-status {
+  display: block;
+}

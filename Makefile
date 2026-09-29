@@ -137,6 +137,8 @@ setup-hooks:
 DEV_ENV_FILE ?= .env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
+	@case "$(svc)" in mailsim|idpsim) test -f services/$(svc)/web/dist/index.html \
+		|| pnpm -s --filter @langwatch/$(svc)-web build || echo "$(svc)-web did not build; its console names the fix" ;; esac
 	@_snap=$$(export -p) && \
 		{ test -f $(DEV_ENV_FILE) \
 			&& set -a && . $(DEV_ENV_FILE) && set +a \

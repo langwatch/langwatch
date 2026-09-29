@@ -5629,8 +5629,6 @@ from .put_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_r
 from .put_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_response_500_error_meta import (
     PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse500ErrorMeta,
 )
-from .read_old_lambdas_cleanup_response_200 import ReadOldLambdasCleanupResponse200
-from .read_old_lambdas_cleanup_response_500 import ReadOldLambdasCleanupResponse500
 from .regenerate_project_api_key_response_200 import RegenerateProjectApiKeyResponse200
 from .register_connected_agent_instance_body import RegisterConnectedAgentInstanceBody
 from .register_connected_agent_instance_body_agents_item import RegisterConnectedAgentInstanceBodyAgentsItem
@@ -5708,8 +5706,6 @@ from .rerun_run_plan_response_404 import RerunRunPlanResponse404
 from .revoke_api_key_response_200 import RevokeApiKeyResponse200
 from .revoke_organization_invite_response_200 import RevokeOrganizationInviteResponse200
 from .revoke_scim_token_response_200 import RevokeScimTokenResponse200
-from .run_old_lambdas_cleanup_response_200 import RunOldLambdasCleanupResponse200
-from .run_old_lambdas_cleanup_response_500 import RunOldLambdasCleanupResponse500
 from .run_playground_completion_body import RunPlaygroundCompletionBody
 from .run_run_plan_body import RunRunPlanBody
 from .run_run_plan_body_config import RunRunPlanBodyConfig
@@ -9274,8 +9270,6 @@ __all__ = (
     "PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse500Error",
     "PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse500ErrorFault",
     "PutApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse500ErrorMeta",
-    "ReadOldLambdasCleanupResponse200",
-    "ReadOldLambdasCleanupResponse500",
     "RegenerateProjectApiKeyResponse200",
     "RegisterConnectedAgentInstanceBody",
     "RegisterConnectedAgentInstanceBodyAgentsItem",
@@ -9329,8 +9323,6 @@ __all__ = (
     "RevokeApiKeyResponse200",
     "RevokeOrganizationInviteResponse200",
     "RevokeScimTokenResponse200",
-    "RunOldLambdasCleanupResponse200",
-    "RunOldLambdasCleanupResponse500",
     "RunPlaygroundCompletionBody",
     "RunRunPlanBody",
     "RunRunPlanBodyConfig",

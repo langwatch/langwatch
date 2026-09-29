@@ -11,6 +11,7 @@ import type {
   AbortRequestedEventData,
   CellFinishedEventData,
   ExperimentRunCompletedEventData,
+  ExperimentRunStartedEventData,
   WorkflowEvaluationRequestedEventData,
 } from "../eventing/experiment-run-events.process.ts";
 import { ExperimentExecution } from "./experiment.service.ts";
@@ -47,7 +48,10 @@ export class ExperimentRunCommandDispatcherService extends ExperimentExecution {
     this.#senders = commands;
   }
 
-  async startExperimentRun(input: StartExperimentRunInput): Promise<void> {
+  /** Starts a run; a pipeline-driven start also carries its plan. */
+  async startExperimentRun(
+    input: StartExperimentRunInput | Enveloped<ExperimentRunStartedEventData>,
+  ): Promise<void> {
     await this.#send("startExperimentRun", input);
   }
 

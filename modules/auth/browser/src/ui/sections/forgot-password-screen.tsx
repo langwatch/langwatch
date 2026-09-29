@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Link } from "@langwatch/browser-host/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,7 +12,6 @@ import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
-import Link from "../../ui/elements/router-link.tsx";
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
 

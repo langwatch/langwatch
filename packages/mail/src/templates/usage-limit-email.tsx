@@ -202,7 +202,6 @@ export const UsageLimitEmail = ({
 
   return (
     <EmailLayout
-      eyebrow="USAGE"
       preview={`${usagePercentageFormatted}% of the monthly ${meteredNounSingular(usageUnit)} limit used`}
       heading={`You have used ${usagePercentageFormatted}% of your monthly ${meteredNounSingular(usageUnit)} limit`}
       footNote={`You are receiving this because you administer ${organizationName}.`}

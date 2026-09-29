@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { normalizeSignInErrorCode } from "@langwatch/auth-contract";
+import { Link } from "@langwatch/browser-host/link";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { useEffect, useRef, useState } from "react";
 
@@ -22,7 +23,6 @@ import { signInGreeting } from "../../model/sign-in-greeting.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { CheckYourEmail } from "../elements/check-your-email.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import Link from "../elements/router-link.tsx";
 import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
 import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
 import { IdentifierStepForm } from "./identifier-step-form.tsx";
@@ -336,9 +336,7 @@ function SignUpLink({
         textDecorationColor="border"
         _hover={{ textDecorationColor: "fg" }}
       >
-        <Link viewTransition href={href}>
-          {linked}
-        </Link>
+        <Link href={href}>{linked}</Link>
       </Box>
     </Text>
   );

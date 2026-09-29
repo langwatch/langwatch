@@ -74,7 +74,6 @@ export const ConnectedStatementEmail = ({
   seatsReported,
 }: ConnectedStatementEmailProps) => (
   <EmailLayout
-    eyebrow="STATEMENT"
     preview={`What hosted services cost ${organizationName} in ${monthLabel}`}
     heading={`LangWatch hosted services for ${monthLabel}`}
     footNote="You receive this because you are the billing contact for a LangWatch license."

@@ -14,10 +14,8 @@ export {
   ProjectHomeHostProvider,
   useProjectHomeHost,
   type ProjectHomeDeployment,
-  type ProjectHomeFlagReading,
   type ProjectHomeLangyVisibility,
   type ProjectHomeOrganization,
   type ProjectHomeProject,
   type ProjectHomeUser,
 } from "./model/project-home-host.ts";
-export { SIGNAL_FOCUSED_HOME_FLAG } from "./ui/sections/home/components/use-show-signal-focused-home.ts";

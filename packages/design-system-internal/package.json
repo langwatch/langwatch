@@ -1,0 +1,46 @@
+{
+  "name": "@langwatch/design-system-internal",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The paper look of every internal console (haven hub and stack home, IdP simulator, mail sink): tokens, one stylesheet and a small set of React components (ADR-160).",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./styles.css": "./src/styles.css",
+    "./tokens": {
+      "types": "./dist/tokens.d.ts",
+      "default": "./src/tokens.ts"
+    },
+    "./screenshot": "./gallery/capture.ts"
+  },
+  "scripts": {
+    "dev": "vite --config gallery/vite.config.ts",
+    "screenshot": "node gallery/screenshot.ts",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "jsdom": "catalog:",
+    "playwright": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  }
+}

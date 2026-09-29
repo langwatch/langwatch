@@ -120,13 +120,8 @@
   }
 }
 
-/*
- * The ground's static form: what the server, a reduced-motion visitor and a
- * machine with no WebGL all see. The live shader in `FrontDoorGround`
- * replaces it, never adds to it. Light is the site hero's own static
- * gradient; dark is the site's WarpAccent fallback — two soft glows, blue
- * high and warm low, anchored to the card's side of the page.
- */
+/* The ground itself is the design system's AmbientGround; this only places it
+   under the door, with room for the grid and lens the door adds. */
 .lw-front-door-ambient {
   position: absolute;
   inset: 0;
@@ -134,140 +129,6 @@
   overflow: hidden;
   z-index: 0;
   contain: layout paint;
-}
-
-.lw-front-door-ambient-static {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, #ffffff 0%, #ffaf6e 35%, #cddcf9 72%, #ffffff 100%);
-  opacity: 0.72;
-}
-
-.dark .lw-front-door-ambient-static {
-  background:
-    radial-gradient(circle at 70% 22%, rgba(91, 141, 239, 0.4), transparent 38%),
-    radial-gradient(circle at 86% 66%, rgba(201, 123, 58, 0.26), transparent 46%);
-  opacity: 1;
-}
-
-/* The live shader arrives, it never pops: the static gradient in the same
-   palette is always painted underneath, and the shader fades in over it once
-   its first frame exists. What a visitor sees is colour that sharpens, not a
-   blank page that suddenly acquires a background. */
-/* Declared INSIDE a no-preference query rather than switched off by a reduce
-   one, which is the rule this file states at the top and this animation was
-   the one exception to. The difference is not cosmetic: opting out means a
-   visitor who asked for less motion loads a page that starts animating and
-   then stops, and the pattern also silently fails wherever the override loses
-   a specificity fight. Opting IN means the animation never exists for them. */
-@media (prefers-reduced-motion: no-preference) {
-  .lw-front-door-shader-arrive {
-    animation: lw-front-door-arrive 700ms ease 120ms both;
-  }
-}
-
-/* Only a `from`: each layer fades up to its own resting opacity — the warp
-   to its 0.55, the mesh to its 0.95 — not to a hardcoded 1. */
-@keyframes lw-front-door-arrive {
-  from {
-    opacity: 0;
-  }
-}
-
-/* The live dark shader sits in the site's own frame: anchored to the card's
-   side, full height, bled past every edge so no seam of bare ground shows,
-   dissolving toward the reading side. */
-/*
- * The dissolve is the STAGE's, not this rule's. `--lw-ground-hold` is where
- * the colour is still solid and `--lw-ground-reach` is how much of the page it
- * crosses; `FrontDoorGround` writes both from the tweened stage, so the field
- * opens out or draws back as somebody moves through a door, and the two doors
- * do not get the same amount of the page.
- *
- * The fade also runs much further than it used to. It held solid to 30% and
- * was gone by 84%, which is a band of about half the width — short enough to
- * read as the edge of a shape. Now it holds to whatever the stage says (35%
- * at the tightest, 5% at the loosest) and does not reach nothing until 100%,
- * so what is left is light falling off rather than a cloud with a border.
- *
- * The fallbacks are the resting values, for the frame before React has set
- * anything and for a machine that never runs the component at all.
- */
-.lw-front-door-warp {
-  position: absolute;
-  top: -12%;
-  right: -12%;
-  width: calc(84% * var(--lw-ground-reach, 1));
-  height: 124%;
-  opacity: 0.55;
-  -webkit-mask-image: linear-gradient(
-    to left,
-    black 0%,
-    black var(--lw-ground-hold, 30%),
-    rgba(0, 0, 0, 0.45) 62%,
-    rgba(0, 0, 0, 0.12) 86%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to left,
-    black 0%,
-    black var(--lw-ground-hold, 30%),
-    rgba(0, 0, 0, 0.45) 62%,
-    rgba(0, 0, 0, 0.12) 86%,
-    transparent 100%
-  );
-  transition:
-    width 900ms ease,
-    mask-image 900ms ease;
-}
-
-/* Where the card stands alone, the glow stands behind it instead of off to
-   one side: same shader, held in a centred pool. */
-/* The centred pool takes the same two knobs: `reach` widens the ellipse and
-   `hold` is how much of it stays solid before the fall-off starts. It runs to
-   nothing at 100% for the same reason the side one does — an edge at 85% is
-   an edge. */
-.lw-front-door-warp--center {
-  top: -12%;
-  right: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(130% * var(--lw-ground-reach, 1));
-  -webkit-mask-image: radial-gradient(
-    ellipse 62% 70% at 50% 42%,
-    black 0%,
-    black var(--lw-ground-hold, 30%),
-    rgba(0, 0, 0, 0.55) 62%,
-    rgba(0, 0, 0, 0.16) 84%,
-    transparent 100%
-  );
-  mask-image: radial-gradient(
-    ellipse 62% 70% at 50% 42%,
-    black 0%,
-    black var(--lw-ground-hold, 30%),
-    rgba(0, 0, 0, 0.55) 62%,
-    rgba(0, 0, 0, 0.16) 84%,
-    transparent 100%
-  );
-}
-
-.dark .lw-front-door-ambient--center .lw-front-door-ambient-static {
-  background:
-    radial-gradient(circle at 50% 30%, rgba(91, 141, 239, 0.35), transparent 42%),
-    radial-gradient(circle at 58% 72%, rgba(201, 123, 58, 0.22), transparent 48%);
-}
-
-/* The white radial that keeps one region clean for reading. On its own layer
-   so it sits over the live shader and the static band alike. */
-.lw-front-door-ambient-protect {
-  position: absolute;
-  inset: 0;
-}
-
-.dark .lw-front-door-ambient-protect {
-  /* A white veil is a light-mode instrument. The dark ground keeps its
-	   reading side clean by fading the glow out instead. */
-  display: none;
 }
 
 /*
@@ -311,7 +172,7 @@
  * The lens: the one place the ground is in focus. The field is soft by
  * design — glow, not shapes — but under the pointer the same signal grid
  * sharpens into view, as if the cursor were a glass held over the surface.
- * Pointer-driven, not an animation: it moves exactly when the person does,
+ * Pointer-driven rather than animated: it moves exactly when the person does,
  * so it runs under reduced motion like any other cursor response. The
  * position rides two custom properties `FrontDoorGround` writes straight to
  * the node on pointermove — no React render per mouse event. Dark ground

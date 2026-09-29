@@ -52,6 +52,7 @@ import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.b
 import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
 import { openingSsoProviderConfigs } from "../rules/sso-provider-config.rules.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
+import type { SignupAnnouncementService } from "../services/signup-announcement.service.ts";
 import { SsoRegisteredIssuersService } from "../services/sso-registered-issuers.service.ts";
 
 /** The deployment's browser-session identity: present whole, or not at all. */
@@ -166,13 +167,22 @@ export class AbsentBetterAuthIdentityCeremonies extends BetterAuthIdentityCeremo
   async beforeAccountDelete(_account: BetterAuthAccountRow): Promise<void> {}
 }
 
-/** The announcements, over what this process actually holds. */
+/** The announcements, over what this process holds: the sign-up one reaches our own Slack. */
 export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
-  static create(logger: Logger): LoggedBetterAuthAnnouncements {
-    return new LoggedBetterAuthAnnouncements(logger);
+  static create({
+    logger,
+    signups,
+  }: {
+    logger: Logger;
+    signups: SignupAnnouncementService;
+  }): LoggedBetterAuthAnnouncements {
+    return new LoggedBetterAuthAnnouncements(logger, signups);
   }
 
-  private constructor(private readonly logger: Logger) {
+  private constructor(
+    private readonly logger: Logger,
+    private readonly signups: SignupAnnouncementService,
+  ) {
     super();
   }
 
@@ -187,11 +197,8 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     this.logger.error({ error }, "Better Auth swallowed an error on a best-effort path");
   }
 
-  announceSignup(input: { userEmail: string; organizationName: string }): void {
-    this.logger.info(
-      { organizationName: input.organizationName },
-      "New user joined an organization through its domain; no signup notification transport is composed in this process",
-    );
+  announceSignup(input: { userName: string; userEmail: string; organizationName: string }): void {
+    void this.signups.announce(input).catch((error: unknown) => this.reportError(error));
   }
 
   ssoAutoAddNurturing(): void {}
@@ -296,6 +303,8 @@ export class IdentitySsoArrivals implements SsoArrivalApi {
 export type BuildBetterAuthOptions = Readonly<{
   /** The deployment's browser-session identity; without it, no instance. */
   identity: BetterAuthDeploymentIdentity;
+  /** Main's sign-up announcement, for a user who joins through their domain. */
+  signupAnnouncements: SignupAnnouncementService;
   /** The typed client every database hook reads and writes through. */
   prisma: ProcessMembers["prisma"];
   /** The deployment's cipher, which the engine's dialing documents are kept
@@ -423,7 +432,10 @@ export async function buildBetterAuth(
     }),
     identity: AbsentBetterAuthIdentityCeremonies.create(),
     invites: options.organizations,
-    announcements: LoggedBetterAuthAnnouncements.create(logger),
+    announcements: LoggedBetterAuthAnnouncements.create({
+      logger,
+      signups: options.signupAnnouncements,
+    }),
     shadow: OffSignInRouterShadow.create(),
     authzGrants: options.grants,
     arrivals: IdentitySsoArrivals.create(options.identityApi),

@@ -5,6 +5,7 @@
  * through `withCapabilities`. Spec: specs/identity/organization-authentication-settings.feature
  */
 import { Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { OverviewCard, OverviewDetail, StatusChip } from "@langwatch/design-system/settings-card";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Settings2 } from "lucide-react";
@@ -99,24 +100,24 @@ function DirectoryCardActions({
           variant={waiting ? "outline" : "solid"}
           colorPalette={waiting ? void 0 : "orange"}
         >
-          <a href={CONNECTORS_PAGE}>
+          <Link unstyled href={CONNECTORS_PAGE}>
             {waiting ? "Open the connector" : "Issue a token"}
             <ArrowRight size={14} />
-          </a>
+          </Link>
         </Button>
       ) : (
         <Button asChild size="sm" variant="outline">
-          <a href={DIRECTORY_PAGE}>
+          <Link unstyled href={DIRECTORY_PAGE}>
             See who it manages
             <ArrowRight size={14} />
-          </a>
+          </Link>
         </Button>
       )}
       <Button asChild size="sm" variant="ghost">
-        <a href={CONNECTORS_PAGE}>
+        <Link unstyled href={CONNECTORS_PAGE}>
           <Settings2 size={14} />
           Edit
-        </a>
+        </Link>
       </Button>
     </>
   );

@@ -125,7 +125,6 @@ export const TriggerDigestEmail = (input: TriggerDigestMail) => {
 
   return (
     <EmailLayout
-      eyebrow="TRIGGER"
       preview={`${input.entries.length} matches from ${input.triggerName}`}
       heading={input.triggerName}
       footNote="You are receiving this because an automation in this project sends it."

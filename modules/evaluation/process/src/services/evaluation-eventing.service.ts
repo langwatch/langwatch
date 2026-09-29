@@ -1,6 +1,10 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
+import type {
+  AppendStore,
+  FoldProjectionStore,
+  RetentionPolicyResolver,
+} from "@langwatch/eventing";
 
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsRollupRow } from "../eventing/evaluation-analytics-rollup.projection.ts";
@@ -17,6 +21,8 @@ export interface EvaluationEventingStores {
   readonly evalRunStore: FoldProjectionStore<EvaluationRunData>;
   readonly evaluationAnalyticsStore: FoldProjectionStore<EvaluationAnalyticsData>;
   readonly evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
+  /** Each tenant's retention, which these stores stamp in place of the default (§9). */
+  readonly retention: RetentionPolicyResolver;
 }
 
 /** The analytics operations evaluation's folds write through. */
@@ -35,6 +41,7 @@ export class EvaluationEventingService {
       analyticsFoldCache: EvaluationAnalyticsFoldCacheRepository;
       /** The platform default a tenant with no override is stamped with, read per write. */
       defaultRetentionDays: () => number;
+      tenantRetention: RetentionPolicyResolver;
     },
   ) {}
 
@@ -43,12 +50,14 @@ export class EvaluationEventingService {
     analytics: EvaluationAnalyticsWrites;
     analyticsFoldCache: EvaluationAnalyticsFoldCacheRepository;
     defaultRetentionDays: () => number;
+    tenantRetention: RetentionPolicyResolver;
   }): EvaluationEventingService {
     return new EvaluationEventingService(input);
   }
 
   buildStores(): EvaluationEventingStores {
-    const { runs, analytics, analyticsFoldCache, defaultRetentionDays } = this.input;
+    const { runs, analytics, analyticsFoldCache, defaultRetentionDays, tenantRetention } =
+      this.input;
 
     return {
       evalRunStore: EvaluationRunStore.create({ service: runs, defaultRetentionDays }),
@@ -59,6 +68,7 @@ export class EvaluationEventingService {
         analytics,
         defaultRetentionDays,
       }),
+      retention: tenantRetention,
     };
   }
 }

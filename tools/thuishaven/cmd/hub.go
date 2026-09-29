@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/0xdeafcafe/moron/tui"
 
@@ -140,10 +141,12 @@ func dashboardExtras(v app.HubView) dashboard.Extras {
 			OtherRSS:   v.Footprint.OtherRSS,
 			Pressure:   v.Footprint.Pressure.String(),
 		},
-		StackRSS: map[int]uint64{},
+		StackRSS:    map[int]uint64{},
+		StackUptime: map[int]time.Duration{},
 	}
 	for i := range v.Stacks {
 		out.StackRSS[v.Stacks[i].Stack.LauncherPID] = v.Stacks[i].RSS
+		out.StackUptime[v.Stacks[i].Stack.LauncherPID] = v.Stacks[i].Uptime
 	}
 	for _, wt := range v.Worktrees {
 		out.Worktrees = append(out.Worktrees, dashboard.WorktreeView{

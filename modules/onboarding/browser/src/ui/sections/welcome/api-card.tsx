@@ -1,6 +1,6 @@
 import { Alert, Box, Heading, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { Link } from "@langwatch/onboarding-browser-kit";
+import { Link } from "@langwatch/browser-host/link";
 import type React from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
 

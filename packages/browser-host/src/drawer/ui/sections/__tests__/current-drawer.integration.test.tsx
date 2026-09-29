@@ -51,7 +51,12 @@ function OtherDrawer() {
   );
 }
 
-const drawers = { readable: ReadableDrawer, other: OtherDrawer };
+/** Reads `open` the strict way, as the prompt editor did when every address opened nothing. */
+function StrictDrawer({ open }: { open?: boolean }) {
+  return open === true ? <p>the strict drawer is open</p> : null;
+}
+
+const drawers = { readable: ReadableDrawer, other: OtherDrawer, strict: StrictDrawer };
 
 function Opener() {
   const { openDrawer } = useDrawer<DrawerPropsMapOf<typeof drawers>>();
@@ -118,6 +123,17 @@ describe("the drawer host", () => {
 
         await waitFor(() => expect(address()).toBe("/acme/traces?view=table"));
         expect(screen.queryByText("reading a trace")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given an address that names a drawer checking its open prop", () => {
+    describe("when the page renders", () => {
+      /** @scenario "A drawer the host mounts from an address reads itself as open" */
+      it("hands the drawer open as true rather than the drawer's name", async () => {
+        mount("/acme/traces?drawer.open=strict");
+
+        expect(await screen.findByText("the strict drawer is open")).toBeInTheDocument();
       });
     });
   });

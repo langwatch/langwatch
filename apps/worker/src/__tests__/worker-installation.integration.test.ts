@@ -58,12 +58,18 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
   return module.repositoryRegistry === void 0 ? module : withMemoryRepositories(module);
 }
 
-async function bootWorker({ live = false }: { live?: boolean } = {}) {
+/** A SaaS deployment: the flag and a synthetic, never-called Stripe key its reports need. */
+const SAAS_ENVIRONMENT: Readonly<Record<string, string>> = {
+  ...SYNTHETIC_ENVIRONMENT,
+  IS_SAAS: "true",
+  STRIPE_SECRET_KEY: "sk_test_synthetic",
+};
+
+async function bootWorker({ live = false, saas = false }: { live?: boolean; saas?: boolean } = {}) {
+  const environment = saas ? SAAS_ENVIRONMENT : SYNTHETIC_ENVIRONMENT;
   const owners = processConfig(serverModules, ROLE);
-  const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
-  const resolver = SecretsResolver.over(
-    SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
-  );
+  const config = parseProcessConfig({ owners, environment });
+  const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
   refuseDoubleClaims(owners);
   const declared: readonly SecretHandle<unknown>[] = owners.flatMap((owner) =>
     "secrets" in owner ? Object.values(owner.secrets ?? {}) : [],
@@ -247,6 +253,52 @@ describe("the worker process installation", () => {
           .get("metric_processing")
           ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
       ]).toContain("codingAgentMetricFactsDispatch");
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker hosts the gateway's spend settlement sweeper" */
+  it("hosts the gateway's settlement sweeper on the spend pipeline", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const spend = eventing.definitions.find(
+        (definition) => definition.metadata.name === "gateway_spend_processing",
+      );
+      expect(spend?.processManagers.get("spendSettlement")?.config.schedule).toEqual({
+        everyMs: 5 * 60 * 1000,
+      });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker hosts the gateway's budget debits on the spend pipeline" */
+  it("hosts gatewayDebits on the gateway spend pipeline, under the name its rows are keyed by", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const spend = eventing.definitions.find(
+        (definition) => definition.metadata.name === "gateway_spend_processing",
+      );
+      expect(spend?.processManagers.get("gatewayDebits")?.config.transient).toBe(true);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "A SaaS worker registers the billable-events meter" */
+  it("declares the billable-events meter on the roll-up pipeline of a SaaS worker", async () => {
+    const { runtime, eventing } = await bootWorker({ saas: true });
+
+    try {
+      const rollUp = eventing.definitions.find(
+        (definition) => definition.metadata.name === "billing_reporting",
+      );
+      expect(
+        rollUp?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
+      ).toEqual(["orgBillableEventsMeter"]);
     } finally {
       await runtime.stop();
     }

@@ -51,17 +51,20 @@ describe("Feature: visualdiff catches regressions and reports its own coverage",
     });
   });
 
-  describe("given a flow that edits the project settings", () => {
+  describe("given flows that only read, write, filter a view or edit the project", () => {
     /** @scenario Flows run side by side, and the one editing the project runs last */
-    it("holds it back until the others are done", () => {
+    it("lets readers join the routes, holds writers for them, and runs view and project edits last", () => {
       const ordered = orderFlows([
-        flow("project-settings", ["editProjectSettings"]),
+        flow("project-settings", ["editProjectSettings", "go"]),
+        flow("trace-filters", ["go", "click", "type"]),
         flow("prompt-create", ["createPrompt", "go"]),
         flow("trace-view", ["sendTrace", "openTrace"]),
+        flow("agent-testing", ["createScenario"]),
       ]);
 
-      expect(ordered.together.map((entry) => entry.id)).toEqual(["prompt-create", "trace-view"]);
-      expect(ordered.last.map((entry) => entry.id)).toEqual(["project-settings"]);
+      expect(ordered.readers.map((entry) => entry.id)).toEqual(["trace-view", "agent-testing"]);
+      expect(ordered.writers.map((entry) => entry.id)).toEqual(["prompt-create"]);
+      expect(ordered.last.map((entry) => entry.id)).toEqual(["trace-filters", "project-settings"]);
       expect(width(undefined)).toBe(1);
       expect(width(3)).toBe(3);
     });

@@ -1,6 +1,3 @@
-import type { RestIdentity } from "@langwatch/api/rest";
-import type { SeatChangeBillingOutcome } from "@langwatch/enterprise-licensing-contract";
-
 import type { LicensingInfrastructure } from "../app/licensing.app.ts";
 import type {
   HostedServicesInfrastructure,
@@ -82,6 +79,7 @@ export class LicensingInfrastructureService {
         findByVirtualKeyId: refuse,
         findByReplacesId: refuse,
         findAllByOrganization: () => Promise.resolve([]),
+        findAllSeatsRaised: () => Promise.resolve([]),
         findAllBoundToInstance: () => Promise.resolve([]),
         listAll: () => Promise.resolve({ rows: [], total: 0 }),
         update: refuse,
@@ -112,10 +110,6 @@ export class LicensingInfrastructureService {
         revoke: refuse,
       },
       activationRateLimit: { allow: () => Promise.resolve(false) },
-      seatBilling: {
-        invoiceAddedSeats: (): Promise<SeatChangeBillingOutcome> =>
-          Promise.resolve("not_onboarded"),
-      },
       syncRateLimit: { allow: () => Promise.resolve(false) },
       cipher: {
         encrypt: () => {
@@ -131,7 +125,7 @@ export class LicensingInfrastructureService {
   }
 
   /** Every hosted collaborator refuses rather than reading as "entitled to nothing". */
-  unavailableHostedServices(): HostedServicesInfrastructure & { door: RestIdentity } {
+  unavailableHostedServices(): HostedServicesInfrastructure {
     const unavailable = () =>
       new Error(`${this.processName} does not compose the hosted Connect services`);
     const refuse = () => Promise.reject(unavailable());
@@ -145,11 +139,10 @@ export class LicensingInfrastructureService {
         },
       },
       spend: { recordSpend: refuse },
-      door: this.unavailableHostedDoor(),
     };
   }
 
-  /** The instance registry the usage report receiver writes, on Cloud only. */
+  /** The instance registry the usage report receiver writes, for a process composing no stores. */
   unavailableSelfHostedInstances(): SelfHostedInstancesInfrastructure {
     const refuse = () =>
       Promise.reject(
@@ -164,15 +157,9 @@ export class LicensingInfrastructureService {
         findByInstanceId: refuse,
         findReports: refuse,
       },
+      licenses: { findAllBoundToInstance: refuse },
+      organizations: { findById: refuse },
       optionalReportKeys: new Set(),
     };
-  }
-
-  /** A call reaching the path is refused by name, not by a missing credential binding. */
-  private unavailableHostedDoor(): RestIdentity {
-    const refuse = (): never => {
-      throw new Error(`${this.processName} does not compose the hosted Connect door`);
-    };
-    return { authenticate: refuse, identify: refuse, identifyOptional: refuse, authorize: refuse };
   }
 }

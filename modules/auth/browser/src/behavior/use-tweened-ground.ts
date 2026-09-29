@@ -1,6 +1,6 @@
+import type { AmbientGroundShift } from "@langwatch/design-system/ambient-ground";
 import { useEffect, useRef, useState } from "react";
 
-import type { GroundShift } from "../model/ground-palette.ts";
 import {
   easeInOutCubic,
   GROUND_TWEEN_MS,
@@ -12,9 +12,9 @@ import {
  * Frame tween to new ground position; always from current; respects reduced-motion
  */
 export function useTweenedGround(
-  target: GroundShift,
+  target: AmbientGroundShift,
   { instant = false }: { instant?: boolean } = {},
-): GroundShift {
+): AmbientGroundShift {
   const [current, setCurrent] = useState(target);
   // Read by the frame loop, which must see the newest value without being
   // re-created around it — a tween that restarted on its own output would

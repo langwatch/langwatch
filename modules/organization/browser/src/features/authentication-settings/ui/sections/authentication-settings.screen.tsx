@@ -43,6 +43,7 @@ export default function AuthenticationSettingsScreen() {
       label="Authentication"
       links={AUTHENTICATION_LINKS}
       activeHref="/settings/authentication"
+      onNavigate={(href) => host.navigate(href)}
     >
       <AuthenticationSettings host={host} organizationId={organizationId} />
     </SectionNavigationFrame>

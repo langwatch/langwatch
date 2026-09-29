@@ -28,6 +28,7 @@ const service = {
   getEnrollments: vi.fn<OpsSystemMigrationRunner["getEnrollments"]>(),
   getOverview: vi.fn<OpsSystemMigrationRunner["getOverview"]>(),
   startPass: vi.fn<OpsSystemMigrationRunner["startPass"]>(),
+  executePass: vi.fn<OpsSystemMigrationRunner["executePass"]>(),
   rollBack: vi.fn<OpsSystemMigrationRunner["rollBack"]>(),
   assertLegacyWritersDrained: vi.fn<OpsSystemMigrationRunner["assertLegacyWritersDrained"]>(),
   runForOrganization: vi.fn<OpsSystemMigrationRunner["runForOrganization"]>(),
@@ -57,7 +58,7 @@ const IMPERSONATING: OpsOperator = {
 const demandedPermissions = new Map<string, string>();
 
 function callerFor(operator: OpsOperator) {
-  const { app } = createOpsTestApp({ members: { systemMigrations: service } });
+  const { app } = createOpsTestApp({ members: { createSystemMigrations: () => service } });
   const admitOperator = app.admitOperator.bind(app);
   let current = "";
 

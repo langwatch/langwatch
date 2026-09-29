@@ -45,6 +45,20 @@ const CONVERSATION = {
 };
 
 describe("LangyApp", () => {
+  /** @scenario "A module's pipeline declares each tenant's retention from data retention" */
+  it("declares each tenant's retention on the consuming conversation pipeline", async () => {
+    const retained = { traces: 365, scenarios: 30, experiments: 30 };
+    const app = await createApp({
+      retention: createApiFixture<DataRetentionApi>({
+        getResolvedForProject: async () => retained,
+      }),
+    });
+
+    const pipeline = app.conversationPipeline({ participation: "consume" });
+
+    await expect(pipeline.retentionPolicyResolver?.resolve("project-1")).resolves.toEqual(retained);
+  });
+
   it("calls the matching flat service methods through the real feature factory", async () => {
     const app = await createApp();
     const getPage = vi.spyOn(app.langyService, "getPage").mockResolvedValue({
@@ -201,7 +215,9 @@ async function createApp({
   secrets = noSecrets,
   resources = { own: () => void 0, ownService: () => void 0 },
   repositories = MemoryLangyRepositories.create(),
+  retention = createApiFixture<DataRetentionApi>(),
 }: {
+  retention?: DataRetentionApi;
   presence?: PresenceApi;
   secrets?: ScopedSecrets;
   resources?: LangySetupResources;
@@ -231,7 +247,7 @@ async function createApp({
       }),
       plans: createApiFixture<EntitlementApi>(),
       onboarding: createApiFixture<OnboardingApi>(),
-      retention: createApiFixture<DataRetentionApi>(),
+      retention,
     },
     members: {
       publicBaseUrl: undefined,

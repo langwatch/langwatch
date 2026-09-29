@@ -152,11 +152,19 @@ Feature: Evaluation service boundary
     When a run is looked up for a tenant
     Then every statement names that tenant and carries only settings the member accepts
 
+  # The ClickHouse run read owns the floor: the tenant's retention plus two days' margin, as on main.
+  # The memory tier has no partitions to prune and no TTL, so it does not floor.
   @unit
-  Scenario: A run lookup without a scheduled time stops at the platform default retention
-    Given a process that installs the evaluation module over its repositories
-    When a run older than the platform default retention is looked up without its scheduled time
-    Then it is refused as not found
+  Scenario: A run lookup without a scheduled time stops at the tenant's retention horizon
+    Given the live run read over a tenant's retention from data retention
+    When a run is looked up without its scheduled time
+    Then the fallback scan starts at the tenant's retention plus two days' margin, not the platform default
+
+  @unit
+  Scenario: A run lookup whose tenant retention cannot be read stops at the platform default
+    Given data retention refuses to answer a tenant's retention
+    When a run is looked up without its scheduled time
+    Then the fallback scan starts at the platform default plus the margin, bounded rather than unbounded
 
   @unit
   Scenario: An evaluation report travels on the pipeline's own sender
@@ -253,6 +261,32 @@ Feature: Evaluation service boundary
     Then it is refused naming the expected and received result counts
 
   @unit
+  Scenario: A PII answer whose unset fields langevals sends as null is accepted as sent
+    Given langevals answers a PII batch with label, details and cost set to null
+    When data privacy asks evaluation to detect PII
+    Then the answer carries each result with its unset fields still null
+
+  @unit
+  Scenario: An evaluator result whose unset fields langevals sends as null is accepted as sent
+    Given langevals answers an evaluation with a processed result whose label and cost are null
+    When an evaluator is run over the data
+    Then the result carries its score, passed and details
+    And its label and cost are null
+
+  @unit
+  Scenario: A skipped evaluator result whose unset fields langevals sends as null is accepted as sent
+    Given langevals answers an evaluation with a skipped result whose cost is null
+    When an evaluator is run over the data
+    Then the result is skipped with its details and a null cost
+
+  @unit
+  Scenario: A langevals answer that is not an evaluation result fails the run naming the evaluator
+    Given langevals answers an evaluation with a result whose score is not a number
+    When an evaluator is run over the data
+    Then the run fails with an evaluator execution error for an unexpected response
+    And the failure names the evaluator and carries the validation issues as its reason
+
+  @unit
   Scenario: A tenantless PII batch over the staging threshold posts inline
     Given a deployment that stages langevals payloads over a threshold
     When a PII batch that names no project and is over the threshold is posted
@@ -282,3 +316,11 @@ Feature: Evaluation service boundary
     When the evaluator request is built for langevals
     Then each context is the chunk's content, not the JSON envelope around it
     And an unmapped or empty contexts field is sent as no contexts rather than one empty string
+
+  @unit
+  Scenario: Invalid evaluator settings are refused even when generation parameters ride along
+    Given an evaluator whose settings carry a temperature
+    And the evaluator's own settings fail its settings schema
+    When the settings are parsed for dispatch on the API route
+    Then the parse fails with the schema's error
+    And the route answers 400 rather than dispatching the generation parameters alone

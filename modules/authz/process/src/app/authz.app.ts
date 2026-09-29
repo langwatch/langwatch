@@ -25,6 +25,7 @@ import {
 } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { SystemMigration } from "@langwatch/system-migrations";
 
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
@@ -98,6 +99,8 @@ export class AuthzApp implements AuthzApi {
    * no repositories; the three admission verbs refuse by name there.
    */
   #admissions: AuthzAdmissionService | undefined;
+  /** Absent on an app built by {@link AuthzApp.fromServices}, which composes no migration. */
+  #migration: SystemMigration | undefined;
 
   private constructor(
     permissions: AuthzService,
@@ -106,6 +109,7 @@ export class AuthzApp implements AuthzApi {
       demoProjectId?: string | undefined;
       demoProjectUserId?: string | undefined;
       admissions?: AuthzAdmissionService;
+      migration?: SystemMigration;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: AuthzCommandDispatcherService;
@@ -119,6 +123,7 @@ export class AuthzApp implements AuthzApi {
     this.#demoProjectId = options.demoProjectId;
     this.#demoProjectUserId = options.demoProjectUserId;
     this.#admissions = options.admissions;
+    this.#migration = options.migration;
   }
 
   /**
@@ -157,6 +162,7 @@ export class AuthzApp implements AuthzApi {
       demoProjectId: config.demoProjectId(),
       demoProjectUserId: setup.config.demoProjectUserId,
       admissions: AuthzAdmissionService.create({ admissions: setup.repositories.admissions }),
+      migration: built.migration,
       eventing: { pipeline: built.pipeline, dispatcher },
     });
   }
@@ -320,6 +326,16 @@ export class AuthzApp implements AuthzApi {
   };
   deleteBinding: AuthzApi["deleteBinding"] = (a) => this.#grants.deleteBinding(a);
   applyMemberBindings: AuthzApi["applyMemberBindings"] = (a) => this.#grants.applyMemberBindings(a);
+
+  registeredMigrations(): readonly SystemMigration[] {
+    if (!this.#migration) {
+      throw new Error(
+        "This AuthzApp was composed from already-built services, so it holds no migration: " +
+          "compose it through AuthzApp.create to answer its registered migrations.",
+      );
+    }
+    return [this.#migration];
+  }
 
   private admissions(): AuthzAdmissionService {
     if (!this.#admissions) {

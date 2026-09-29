@@ -27,6 +27,7 @@ import {
   type AnalyticsSuccessNotice,
 } from "../model/analytics-host.ts";
 import { automationDrawerAddress } from "../model/analytics-overlay-address.ts";
+import { analyticsApi } from "./analytics-api.ts";
 
 class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly project_: AnalyticsHostProject | undefined;
@@ -140,11 +141,15 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
   const scopeProjectSlug = scopeProject?.slug;
   const scopeProjectName = scopeProject?.name;
 
+  const firstMessage = analyticsApi.project.getHasFirstMessage.useQuery(
+    { projectId: scopeProjectId ?? "" },
+    { enabled: scopeProjectId !== void 0 },
+  );
+  // Unknown until the project answers: no setup prompt flashes over a project with traces.
+  const hasFirstMessage = firstMessage.data?.firstMessage ?? true;
+
   // Primitive dependencies only, so the host stays the SAME object across
-  // renders that carry the same reading. No capability carries whether
-  // anything has ever been ingested — see the handoff for the widening this
-  // host is waiting on. `false` keeps the setup prompt showing, the safe
-  // direction to be wrong in.
+  // renders that carry the same reading.
   const host = useMemo(
     () =>
       new CapabilityAnalyticsHost({
@@ -154,7 +159,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
                 id: scopeProjectId,
                 slug: scopeProjectSlug ?? "",
                 name: scopeProjectName ?? "",
-                hasFirstMessage: false,
+                hasFirstMessage,
               }
             : void 0,
         organizationId_: organizationId ?? void 0,
@@ -168,6 +173,7 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
       scopeProjectId,
       scopeProjectSlug,
       scopeProjectName,
+      hasFirstMessage,
       projectId,
       organizationId,
       session,

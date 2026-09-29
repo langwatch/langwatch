@@ -1,4 +1,5 @@
 import { Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { nowInstant } from "@langwatch/time";
@@ -23,7 +24,6 @@ import {
 } from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
 import { StaticHero } from "../../../blocks/explorer/onboarding/static-hero.tsx";
 import { TypewriterHero } from "../../../blocks/explorer/onboarding/typewriter-hero.tsx";
-import { Link } from "../../../blocks/link.tsx";
 import { BeadStrip } from "../../../elements/explorer/onboarding/bead-strip.tsx";
 import { HotkeyBindings } from "../../../elements/explorer/onboarding/hotkey-bindings.tsx";
 import { OutroPanel } from "../../../elements/explorer/onboarding/outro-panel.tsx";

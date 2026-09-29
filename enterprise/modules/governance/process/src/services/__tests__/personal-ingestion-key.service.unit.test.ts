@@ -6,6 +6,7 @@ import {
   type ApiKeyApi,
   ApiKeyAlreadyRevokedError,
 } from "@langwatch/api-key-contract";
+import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   findPersonalWorkspaceInputSchema,
   type OrganizationService,
@@ -45,6 +46,7 @@ async function setup(
   keys: ApiKey[],
   revoke?: ApiKeyApi["revoke"],
   findById?: ApiKeyApi["findById"],
+  record?: AuditLogApi["record"],
 ) {
   const templates = MemoryIngestionTemplateRepository.create(MemoryGovernanceStore.create());
   const template = await templates.createWithAudit({
@@ -66,8 +68,17 @@ async function setup(
   );
   const created: unknown[] = [];
   const revoked: string[] = [];
+  const audited: RecordAuditLogCommand[] = [];
   const service = PersonalIngestionKeyService.create({
     templates,
+    auditLog: {
+      record:
+        record ??
+        (async (command) => {
+          audited.push(command);
+          return { id: `audit_${audited.length}`, occurredAt: 0 };
+        }),
+    },
     organizations: createApiFixture<OrganizationService>({
       getPersonalWorkspace: async (input) => {
         findPersonalWorkspaceInputSchema.parse(input);
@@ -93,7 +104,13 @@ async function setup(
     }),
   });
   const mint = { userId: "user_1", organizationId: "org_1", sourceType: "cursor" };
-  return { service, created, revoked, mint: { ...mint, ingestionTemplateId: template.id } };
+  return {
+    service,
+    created,
+    revoked,
+    audited,
+    mint: { ...mint, ingestionTemplateId: template.id },
+  };
 }
 
 describe("PersonalIngestionKeyService", () => {
@@ -300,6 +317,77 @@ describe("PersonalIngestionKeyService", () => {
       expect(created).toMatchObject([
         { userId: null, name: "Ingestion key (claude_code, desktop)" },
       ]);
+    });
+  });
+
+  describe("when a door installs, rotates or revokes a key", () => {
+    /** @scenario "A door's install, rotate and revoke each record main's audit row" */
+    it("records the mint, rotate and revoke rows with the door's surface", async () => {
+      const { service, audited, mint } = await setup([apiKey({ id: "ak_a" })]);
+
+      await service.install({ ...mint, surface: "mcp" });
+      await service.rotate({ ...mint, surface: "trpc" });
+      await service.revoke({ userId: "user_1", organizationId: "org_1", apiKeyId: "ak_a" });
+      await Promise.resolve();
+      expect(audited).toEqual([
+        {
+          userId: "user_1",
+          organizationId: "org_1",
+          action: "ingestionKey.mint",
+          args: { apiKeyId: "ak_new", sourceType: "cursor" },
+          metadata: { surface: "mcp" },
+        },
+        {
+          userId: "user_1",
+          organizationId: "org_1",
+          action: "ingestionKey.rotate",
+          args: { apiKeyId: "ak_new", sourceType: "cursor", revokedCount: 1 },
+          metadata: { surface: "trpc" },
+        },
+        {
+          userId: "user_1",
+          organizationId: "org_1",
+          action: "ingestionKey.revoke",
+          args: { apiKeyId: "ak_a" },
+          metadata: { surface: "trpc" },
+        },
+      ]);
+    });
+
+    it("records no audit row for a CLI session's mint", async () => {
+      const { service, audited } = await setup([]);
+
+      await service.mint({
+        userId: "user_1",
+        organizationId: "org_1",
+        sourceType: "claude_code",
+        fromCliSession: true,
+      });
+      expect(audited).toEqual([]);
+    });
+  });
+
+  describe("when the audit write fails", () => {
+    const failing: AuditLogApi["record"] = async () => {
+      throw new Error("audit store down");
+    };
+
+    /** @scenario "A failed mint audit write does not fail the mint" */
+    it("still answers the minted token", async () => {
+      const { service, mint, created } = await setup([], undefined, undefined, failing);
+
+      await expect(service.install(mint)).resolves.toMatchObject({ apiKeyId: "ak_new" });
+      expect(created).toHaveLength(1);
+    });
+
+    /** @scenario "A revoke answers only once its audit row is written" */
+    it("fails the revoke, whose key is already retired", async () => {
+      const { service, revoked } = await setup([apiKey({})], undefined, undefined, failing);
+
+      await expect(
+        service.revoke({ userId: "user_1", organizationId: "org_1", apiKeyId: "ak_1" }),
+      ).rejects.toThrow("audit store down");
+      expect(revoked).toEqual(["ak_1"]);
     });
   });
 });

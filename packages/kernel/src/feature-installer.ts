@@ -38,6 +38,15 @@ export type ModuleSecretsScope = (
   declared: readonly SecretHandle<unknown>[],
 ) => ScopedSecrets;
 
+/**
+ * Scopes the process's operator reads to one module's declared handles (§7).
+ * Typed opaquely here: the handle and its scope belong to the stores owner.
+ */
+export type ModuleOperatorReadsScope = (input: {
+  owner: string;
+  declared: readonly unknown[];
+}) => unknown;
+
 /** The complete context supplied to a server app's static factory. */
 export type FeatureSetup<
   Dependencies extends TokenMap,
@@ -278,6 +287,8 @@ export interface InstallableServerFeature<Members, Name extends string = string,
   readonly configType?: Config;
   readonly config?: ConfigSlice;
   readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  /** The cross-organization reads this module declared (§7), for the root to scope. */
+  readonly operatorReads?: Readonly<Record<string, unknown>>;
   readonly publicConfig?: (config: unknown) => unknown;
   /** Every door this feature declared, for the process root to mount at boot. */
   readonly transports?: readonly FeatureTransportDescriptor[];
@@ -1447,6 +1458,7 @@ class RepositoryUnconfiguredAppBuilder<
       dependencies: app.dependencies,
       ...(app.reads === undefined ? {} : { reads: app.reads }),
       ...("secrets" in app ? { secrets: app.secrets } : {}),
+      ...("operatorReads" in app ? { operatorReads: app.operatorReads } : {}),
       create: (setup) => app.create(setup),
     } as RepositoryAppDefinition<
       Dependencies,
@@ -1863,12 +1875,19 @@ function resolveTokens(
 function declaredOwner(app: object): {
   config?: ConfigSlice;
   secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+  operatorReads?: Readonly<Record<string, unknown>>;
   publicConfig?: (config: unknown) => unknown;
 } {
   const owner = app as {
     config?: ConfigSlice;
     secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
+    operatorReads?: Readonly<Record<string, unknown>>;
     publicConfig?: (config: unknown) => unknown;
   };
-  return { config: owner.config, secrets: owner.secrets, publicConfig: owner.publicConfig };
+  return {
+    config: owner.config,
+    secrets: owner.secrets,
+    ...(owner.operatorReads ? { operatorReads: owner.operatorReads } : {}),
+    publicConfig: owner.publicConfig,
+  };
 }

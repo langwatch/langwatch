@@ -101,7 +101,7 @@ describe("EvaluationService", () => {
       execution,
       inputResolution: new FakeInputsResolution(),
       monitorPerformance,
-      retentionFloor: { getFloorMs: async () => 0 },
+      retention: { getPlatformDefaultRetentionDays: () => 30, findRetentionDays: async () => [] },
       workflows: createTestWorkflowApi().api,
     });
 
@@ -147,7 +147,7 @@ describe("EvaluationService", () => {
       execution,
       inputResolution: new FakeInputsResolution(),
       monitorPerformance: new FakeMonitorPerformanceRepository(),
-      retentionFloor: { getFloorMs: async () => 0 },
+      retention: { getPlatformDefaultRetentionDays: () => 30, findRetentionDays: async () => [] },
       workflows,
     });
     await evaluation.executeForTrace({
@@ -193,7 +193,7 @@ describe("EvaluationService", () => {
       execution: new FakeExecution(),
       inputResolution,
       monitorPerformance: new FakeMonitorPerformanceRepository(),
-      retentionFloor: { getFloorMs: async () => 0 },
+      retention: { getPlatformDefaultRetentionDays: () => 30, findRetentionDays: async () => [] },
       workflows: createTestWorkflowApi().api,
     });
 

@@ -28,7 +28,7 @@ import {
   type RenewalCompletion,
   type ReportUsageForMonthCommandData,
   type ScenarioCreatedSignal,
-  type SeatChangeBillingOutcome,
+  type WorkflowCreatedSignal,
   type ResourceLimitNotifierInput,
   type SubscriptionPlanInput,
   type BillingPricingModel,
@@ -61,7 +61,11 @@ import {
   BillingReportingPipeline,
 } from "../eventing/billing-reporting.pipeline.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
-import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service.rules.ts";
+import {
+  fireScenarioCreated,
+  fireWorkflowCreated,
+} from "../rules/nurturing-feature-adoption-service.rules.ts";
+import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { resourceLimitCooldown } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
@@ -102,6 +106,7 @@ import { StripeErrorTranslatorService } from "../services/stripe-error-translato
 import { StripeWebhookSignatureService } from "../services/stripe-webhook-signature.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 import { BillingSubscriptionService } from "../services/subscription.service.ts";
+import { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -133,6 +138,7 @@ type ConnectedLicensing = Pick<
   | "resetContractBudget"
   | "getConnectedSeats"
   | "getHostedUsage"
+  | "findSeatChanges"
 >;
 
 /** The peers connected billing reads and gates through, each only as wide as it is used. */
@@ -209,7 +215,10 @@ export class BillingApp
   static readonly secrets = {
     stripeSecretKey: billingSecrets.stripeSecretKey,
     stripeWebhookSecret: billingSecrets.stripeWebhookSecret,
-    licensePrivateKey: billingSecrets.licensePrivateKey,
+    internalSlackPlanLimitWebhook: billingSecrets.internalSlackPlanLimitWebhook,
+    internalSlackSubscriptionsWebhook: billingSecrets.internalSlackSubscriptionsWebhook,
+    internalSlackSelfHostedWebhook: billingSecrets.internalSlackSelfHostedWebhook,
+    internalSlackSignupsWebhook: billingSecrets.internalSlackSignupsWebhook,
   } as const;
   static readonly reads = ["isSaas", "nodeEnvironment", "mail", "publicBaseUrl"] as const;
 
@@ -217,24 +226,18 @@ export class BillingApp
     const signing = await setup.secrets.into(BillingApp.secrets.stripeWebhookSecret, (secret) =>
       StripeWebhookSignatureService.create(secret),
     );
-    const notices = BillingApp.#composeNotices(setup);
-    const licensePurchase = await setup.secrets.into(
-      BillingApp.secrets.licensePrivateKey,
-      (privateKey) =>
-        privateKey
-          ? LicensePurchaseService.create({
-              generateLicense: LicensingLicenseGeneratorService.create({
-                licensing: setup.dependencies.licensing,
-                privateKey,
-              }),
-              delivery: LicensePurchaseDeliveryService.create({
-                licensing: setup.dependencies.licensing,
-                mail: licenseEmailChannels.ses.create(setup.members.mail),
-                notices,
-              }),
-            })
-          : void 0,
-    );
+    const notices = await BillingApp.#composeNotices(setup);
+    // Licensing holds the signing key and refuses a purchase it cannot sign.
+    const licensePurchase = LicensePurchaseService.create({
+      generateLicense: LicensingLicenseGeneratorService.create({
+        licensing: setup.dependencies.licensing,
+      }),
+      delivery: LicensePurchaseDeliveryService.create({
+        licensing: setup.dependencies.licensing,
+        mail: licenseEmailChannels.ses.create(setup.members.mail),
+        notices,
+      }),
+    });
     return setup.secrets.into(BillingApp.secrets.stripeSecretKey, (stripeSecretKey) =>
       BillingApp.assemble({
         members: setup.members,
@@ -259,22 +262,34 @@ export class BillingApp
     );
   }
 
-  /** Main's Slack, HubSpot and usage-limit mail notices, over the configured channels. */
-  static #composeNotices(setup: BillingSetup): BillingUsageNoticeService {
-    const { config } = setup;
-    return BillingUsageNoticeService.create({
-      config: {
-        baseHost: setup.members.publicBaseUrl,
-        slackPlanLimitChannel: config.slackPlanLimitChannel,
-        slackSignupsChannel: config.slackSignupsChannel,
-        slackSelfHostedChannel: config.slackSelfHostedChannel,
-        slackSubscriptionsChannel: config.slackSubscriptionsChannel,
-        hubspotPortalId: config.hubspotPortalId,
-        hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
-        hubspotFormId: config.hubspotFormId,
-      },
-      usageLimitEmail: usageLimitEmailChannels.ses.create(setup.members.mail),
-    });
+  /** Main's Slack, HubSpot and usage-limit mail notices; each Slack webhook is a secret. */
+  static async #composeNotices(setup: BillingSetup): Promise<BillingUsageNoticeService> {
+    const { config, secrets } = setup;
+    const handles = BillingApp.secrets;
+    return secrets.into(handles.stripeSecretKey, (stripeSecretKey) =>
+      secrets.into(handles.internalSlackPlanLimitWebhook, (slackPlanLimitChannel) =>
+        secrets.into(handles.internalSlackSubscriptionsWebhook, (slackSubscriptionsChannel) =>
+          secrets.into(handles.internalSlackSignupsWebhook, (slackSignupsChannel) =>
+            secrets.into(handles.internalSlackSelfHostedWebhook, (slackSelfHostedChannel) =>
+              BillingUsageNoticeService.create({
+                config: {
+                  baseHost: setup.members.publicBaseUrl,
+                  slackPlanLimitChannel,
+                  slackSignupsChannel,
+                  slackSelfHostedChannel,
+                  slackSubscriptionsChannel,
+                  stripeTestMode: isStripeTestModeKey({ secretKey: stripeSecretKey }),
+                  hubspotPortalId: config.hubspotPortalId,
+                  hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
+                  hubspotFormId: config.hubspotFormId,
+                },
+                usageLimitEmail: usageLimitEmailChannels.ses.create(setup.members.mail),
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /** Main's usage-limit warning, sent over the process's mail member. */
@@ -345,6 +360,9 @@ export class BillingApp
       | "webhookOrganizations"
       | "seatEventSubscriptions"
       | "organizations"
+      | "billableEventsMeter"
+      | "tenantOrganizations"
+      | "tenantOrganizationCache"
     >;
     config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
     peers: ConnectedBillingPeers;
@@ -391,6 +409,7 @@ export class BillingApp
         repositories,
         peers,
         facts,
+        isSaas,
         usageReporting: isSaas
           ? () =>
               StripeUsageReportingBuilder.create({
@@ -430,7 +449,7 @@ export class BillingApp
       isSaas,
       bankDetails: () => config.bankDetails ?? null,
     });
-    const seats = ConnectedSeatChangeService.create({ repository, invoicing });
+    const seats = ConnectedSeatChangeService.create({ repository, invoicing, licensing });
 
     return new BillingApp({
       ...gate,
@@ -458,7 +477,6 @@ export class BillingApp
         billing,
         seats,
         tick: ConnectedBillingTickService.create({
-          seats,
           statements: statementMail
             ? ConnectedMonthlyStatementService.create({
                 repository,
@@ -781,14 +799,23 @@ export class BillingApp
     repositories,
     peers,
     facts,
+    isSaas,
     usageReporting,
   }: {
     repositories: Pick<
       BillingRepositories,
-      "checkpoints" | "reportOrganizations" | "billableEvents" | "organizationCache"
+      | "checkpoints"
+      | "reportOrganizations"
+      | "billableEvents"
+      | "organizationCache"
+      | "billableEventsMeter"
+      | "tenantOrganizations"
+      | "tenantOrganizationCache"
     >;
     peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
     facts: ConnectedCustomerFactsService;
+    /** Main registered the billable-events meter on SaaS only. */
+    isSaas: boolean;
     usageReporting: (() => UsageReportingService) | undefined;
   }): BillingReportingPipeline {
     const billableEvents = BillableEventsQueryService.create(repositories.billableEvents);
@@ -819,11 +846,26 @@ export class BillingApp
         const answer = await ceiling.getRemaining(input);
         return answer.kind === "capped" ? answer.remainingUnits : null;
       },
+      meter: isSaas
+        ? {
+            meter: repositories.billableEventsMeter,
+            organizations: BillingTenantOrganizationService.create({
+              organizations: repositories.tenantOrganizations,
+              cache: repositories.tenantOrganizationCache,
+            }),
+          }
+        : void 0,
     });
   }
 
   recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void> {
     return this.#scenarioSignals.record(input);
+  }
+
+  /** Main's workflow router fired this nurturing unawaited; its failures only log. */
+  recordWorkflowCreated(input: WorkflowCreatedSignal): Promise<void> {
+    fireWorkflowCreated(input);
+    return Promise.resolve();
   }
 
   /** Main's composite recomputed `overrideAddingLimitations` from the impersonator. */
@@ -970,13 +1012,10 @@ export class BillingApp
     });
   }
 
-  invoiceAddedSeats(input: {
-    organizationId: string;
-    licenseRowId: string;
-    previousSeats: number;
-    seats: number;
-  }): Promise<SeatChangeBillingOutcome> {
-    return this.#connectedBilling().seats.invoiceAddedSeats(input);
+  /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */
+  async invoicePendingSeatChanges(): Promise<void> {
+    if (!this.#isSaas) return;
+    await this.#connectedBilling().seats.invoicePendingSeatChanges();
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */

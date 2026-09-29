@@ -9,11 +9,11 @@ import type {
   TraceEvaluationsQuery,
 } from "@langwatch/evaluation-contract";
 
-import type { EvaluationRetentionFloor } from "../app/evaluation.members.ts";
+import type { EvaluationRetentionLookup } from "../app/evaluation.members.ts";
 
-/** A run lookup with the floor its unbounded fallback will not read below. */
+/** A run lookup with the tenant retention its unbounded fallback is floored at. */
 export type EvaluationRunFloorLookup = EvaluationRunLookup &
-  Readonly<{ retentionFloor: EvaluationRetentionFloor }>;
+  Readonly<{ retention: EvaluationRetentionLookup }>;
 
 /** Private persistence port for the Evaluation server package. */
 export abstract class EvaluationRunRepository {

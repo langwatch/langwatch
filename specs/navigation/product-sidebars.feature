@@ -103,6 +103,12 @@ Feature: Product sidebars
     And the group headings use the compact heading style
 
   @integration
+  Scenario: A sidebar entry underlines under the pointer
+    Given a product sidebar
+    When the pointer rests on a page entry
+    Then the entry's label is underlined, as every in-app link is
+
+  @integration
   Scenario: The search key cap reads as a quiet hint
     Given a product sidebar
     Then the key cap next to Quick Search is grey with a hairline border

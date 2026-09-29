@@ -1,4 +1,5 @@
-import { chakra, HStack, Link, type SystemStyleObject } from "@chakra-ui/react";
+import { chakra, HStack, type SystemStyleObject } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 

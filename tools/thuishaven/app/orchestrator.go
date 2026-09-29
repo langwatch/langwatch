@@ -291,6 +291,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		o.ensureRedis(ctx, &st)
 	}
 	o.linkObservability(ctx, &st)
+	o.registerStackHomeWithDaemon(slug)
 	st.UpdatedAt = o.sys.Now()
 	o.retireOverlayFiles(p.WorktreeDir)
 	if err := o.store.SaveStack(st); err != nil {

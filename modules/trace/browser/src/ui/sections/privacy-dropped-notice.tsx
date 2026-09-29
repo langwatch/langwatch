@@ -1,7 +1,7 @@
 import { Alert, Button } from "@chakra-ui/react";
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
 
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
-import NextLink from "../elements/next-link.tsx";
 
 /**
  * Banner shown when a trace is missing content because a `drop` privacy policy stripped
@@ -41,9 +41,9 @@ export function PrivacyDroppedNotice({ categories }: { categories?: string[] | n
         </Alert.Description>
         {hasPermission("project:view") && (
           <Button asChild size="xs" variant="outline" marginTop={1} alignSelf="start">
-            <NextLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
+            <RoutedLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
               Privacy settings
-            </NextLink>
+            </RoutedLink>
           </Button>
         )}
       </Alert.Content>

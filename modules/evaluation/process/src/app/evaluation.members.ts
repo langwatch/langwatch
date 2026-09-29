@@ -1,3 +1,4 @@
+import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
   ExecuteEvaluationCommand,
   EvaluationExecutionResult,
@@ -233,7 +234,8 @@ export interface EvaluationInputsOffload {
   }): Promise<Record<string, unknown>>;
 }
 
-/** Physical retention horizon used to prune ClickHouse partitions safely. */
-export interface EvaluationRetentionFloor {
-  getFloorMs(input: { table: "evaluation_runs"; tenantId: string }): Promise<number>;
+/** Each tenant's retention, which the ClickHouse run read floors its partition scan at. */
+export interface EvaluationRetentionLookup extends RetentionDaysProvider {
+  /** What the floor falls back to when the tenant's retention cannot be read. */
+  getPlatformDefaultRetentionDays(): number;
 }

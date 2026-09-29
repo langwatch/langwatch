@@ -50,7 +50,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   );
 
   const pushQuery = (query: Record<string, string | undefined>) =>
-    void router.push({ query: { ...router.query, ...query } }, undefined, { shallow: true });
+    void router.push({ query: { ...router.query, ...query } }, { shallow: true });
 
   const handleTopicChange = (topicId: string, checked: boolean) => {
     const next = toggleTopic({

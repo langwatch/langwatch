@@ -26,6 +26,7 @@ export class CanonicalLogStorageMapProjection
   }
 
   readonly name = "canonicalLogStorage";
+  readonly targetTable = "log_records";
   readonly store: AppendStore<CanonicalLogRecord>;
   protected readonly events = events;
 

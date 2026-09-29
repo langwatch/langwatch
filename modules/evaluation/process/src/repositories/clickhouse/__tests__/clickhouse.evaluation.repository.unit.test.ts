@@ -2,7 +2,7 @@ import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { SecurityError } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluationRetentionFloor } from "../../../app/evaluation.members.ts";
+import type { EvaluationRetentionLookup } from "../../../app/evaluation.members.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,
@@ -78,13 +78,16 @@ type TestClient = EvaluationClickHouseClient & {
   inserts: unknown[];
 };
 
-class TestRetentionFloor implements EvaluationRetentionFloor {
-  readonly getFloorMs = vi.fn(async () => 1_600_000_000_000);
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+class TestRetention implements EvaluationRetentionLookup {
+  readonly getPlatformDefaultRetentionDays = vi.fn(() => 49);
+  readonly findRetentionDays = vi.fn(async (): Promise<number[]> => [30]);
 }
 
 function harness(rows: Record<string, unknown>[][] = []): {
   client: TestClient;
-  floor: TestRetentionFloor;
+  floor: TestRetention;
   repository: ClickHouseEvaluationRepository;
 } {
   const queue = [...rows];
@@ -101,7 +104,7 @@ function harness(rows: Record<string, unknown>[][] = []): {
       return result(queue.shift() ?? []);
     }),
   };
-  const floor = new TestRetentionFloor();
+  const floor = new TestRetention();
   return {
     client,
     floor,
@@ -154,10 +157,10 @@ describe("ClickHouseEvaluationRepository", () => {
       repository.getByEvaluationId({
         tenantId: "org_1",
         evaluationId: "evaluation_1",
-        retentionFloor: floor,
+        retention: floor,
       }),
     ).resolves.toMatchObject({ LastEventOccurredAt: 1_700_000_001_000 });
-    expect(floor.getFloorMs).toHaveBeenCalledWith({
+    expect(floor.findRetentionDays).toHaveBeenCalledWith({
       table: "evaluation_runs",
       tenantId: "org_1",
     });
@@ -178,7 +181,7 @@ describe("ClickHouseEvaluationRepository", () => {
         repository.getByEvaluationId({
           tenantId: "org_1",
           evaluationId: "evaluation_1",
-          retentionFloor: floor,
+          retention: floor,
         }),
       ).rejects.toMatchObject({ code: "evaluation_not_found" });
 
@@ -205,13 +208,14 @@ describe("ClickHouseEvaluationRepository", () => {
         [{ scheduledAtMs: null }],
         [],
       ]);
-      floor.getFloorMs.mockResolvedValueOnce(1_500_000_000_000);
+      floor.findRetentionDays.mockResolvedValueOnce([90]);
+      const floorMs = Date.now() - 92 * DAY_MS;
 
       await expect(
         repository.getByEvaluationId({
           tenantId: "org_1",
           evaluationId: "missing",
-          retentionFloor: floor,
+          retention: floor,
         }),
       ).rejects.toMatchObject({ code: "evaluation_not_found" });
 
@@ -219,13 +223,13 @@ describe("ClickHouseEvaluationRepository", () => {
         .map((query, index) => ({ query, params: client.queryParams[index]! }))
         .filter(({ query }) => query.includes("argMax(ScheduledAt"));
       expect(resolverRequests).toHaveLength(2);
-      expect(resolverRequests[1]?.params.sinceMs).toBe(1_500_000_000_000);
+      expect(resolverRequests[1]?.params.sinceMs).toBe(floorMs);
 
       const heavyIndex = client.queries.findIndex((query) => query.includes("PREWHERE"));
       expect(client.queries[heavyIndex]).toContain("t.ScheduledAt >=");
       expect(client.queries[heavyIndex]).not.toContain("t.ScheduledAt <=");
       expect(client.queryParams[heavyIndex]).toMatchObject({
-        scheduledAtFrom: 1_500_000_000_000,
+        scheduledAtFrom: floorMs,
       });
       expect(client.queryParams[heavyIndex]).not.toHaveProperty("scheduledAtTo");
     } finally {

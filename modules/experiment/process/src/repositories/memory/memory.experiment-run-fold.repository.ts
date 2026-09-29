@@ -34,18 +34,16 @@ export class MemoryExperimentRunFoldRepository extends ExperimentRunFoldReposito
     return Promise.resolve();
   }
 
-  readProgress({ runKey }: { runKey: string }): Promise<FoldStateRead<ExperimentRunProgressState>> {
-    return Promise.resolve(folded(this.progress.get(runKey)));
+  readRunProgress({
+    runId,
+  }: {
+    runId: string;
+  }): Promise<FoldStateRead<ExperimentRunProgressState>> {
+    return Promise.resolve(folded(this.progress.get(runId)));
   }
 
-  writeProgress({
-    runKey,
-    state,
-  }: {
-    runKey: string;
-    state: ExperimentRunProgressState;
-  }): Promise<void> {
-    this.progress.set(runKey, state);
+  writeProgress({ state }: { state: ExperimentRunProgressState }): Promise<void> {
+    this.progress.set(state.runId, state);
     return Promise.resolve();
   }
 }

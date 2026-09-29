@@ -1,0 +1,110 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ExecutionCell } from "@langwatch/experiment-contract";
+import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
+/**
+ * Pins the previously disconnected sandbox credential paths: `findRunSandboxApiKey`
+ * reaches `withSandboxApiKey`, and the dispatched event carries `sandbox_api_key`.
+ */
+import { beforeEach, describe, expect, it } from "vitest";
+
+import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
+import { ExperimentCellExecutionService } from "../experiment-cell-execution.service.ts";
+import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
+
+const datasetColumns = [{ id: "input", name: "input", type: "string" }];
+
+const scripted: {
+  dispatched: { type: string; payload: Record<string, any> }[];
+} = { dispatched: [] };
+
+const resetBoundary = () => {
+  scripted.dispatched = [];
+};
+
+const ports = createApiFixture<ExperimentRunCollaborators>(
+  {
+    attachments: createNoAttachmentsFixture(),
+    studio: {
+      postStudioEvent: async ({
+        event,
+      }: {
+        event: { type: string; payload: Record<string, any> };
+        onEvent: (event: StudioServerEvent) => void;
+      }) => {
+        scripted.dispatched.push(event);
+      },
+    },
+    cost: { findTokenPrice: async () => undefined },
+  },
+  "ports",
+);
+
+const workflows = createApiFixture<WorkflowApi>({
+  enrichStudioEvent: async ({ event }) => event,
+  prepareStudioEvent: async ({ event }) => event,
+});
+
+const makeCell = (): ExecutionCell => ({
+  rowIndex: 0,
+  targetId: "target-1",
+  targetConfig: {
+    id: "target-1",
+    type: "prompt",
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+    mappings: {},
+    localPromptConfig: {
+      llm: { model: "openai/gpt-5-mini", temperature: 0 },
+      messages: [{ role: "user", content: "{{input}}" }],
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+    },
+  },
+  evaluatorConfigs: [],
+  datasetEntry: { _datasetId: "dataset-1", input: "hi" },
+  skipTarget: false,
+});
+
+beforeEach(resetBoundary);
+
+describe("given a run that minted a sandbox credential", () => {
+  describe("when a cell dispatches its target event", () => {
+    /** @scenario "The run's sandbox credential reaches the code it executes" */
+    it("carries the credential on the dispatched workflow", async () => {
+      const loadedData = { sandboxApiKey: "sandbox-key-123" };
+
+      for await (const _event of ExperimentCellExecutionService.create({
+        ports,
+        workflows,
+      }).executeCell({ cell: makeCell(), projectId: "p1", datasetColumns, loadedData })) {
+        // draining the generator is what triggers the dispatch
+      }
+
+      expect(scripted.dispatched).toHaveLength(1);
+      expect(
+        (scripted.dispatched[0]?.payload.workflow as { sandbox_api_key?: string } | undefined)
+          ?.sandbox_api_key,
+      ).toBe("sandbox-key-123");
+    });
+  });
+
+  describe("when the run minted no credential", () => {
+    /** @scenario "A run with no minted credential dispatches no credential field" */
+    it("dispatches the workflow with no sandbox_api_key field", async () => {
+      const loadedData = { sandboxApiKey: undefined };
+
+      for await (const _event of ExperimentCellExecutionService.create({
+        ports,
+        workflows,
+      }).executeCell({ cell: makeCell(), projectId: "p1", datasetColumns, loadedData })) {
+        // draining the generator is what triggers the dispatch
+      }
+
+      expect(scripted.dispatched).toHaveLength(1);
+      expect(
+        (scripted.dispatched[0]?.payload.workflow as { sandbox_api_key?: string } | undefined)
+          ?.sandbox_api_key,
+      ).toBeUndefined();
+    });
+  });
+});

@@ -1,6 +1,7 @@
 import { ApplicationBuilder } from "./application.ts";
 import type {
   InstallableServerFeature,
+  ModuleOperatorReadsScope,
   ModuleSecretsScope,
   ServerRole,
 } from "./feature-installer.ts";
@@ -16,6 +17,8 @@ export async function bootInstalledProcess(options: {
   members: MemberSource<Record<string, unknown>>;
   /** Scopes the process resolver per module; omitted where none was stated. */
   secrets?: ModuleSecretsScope;
+  /** Scopes the stores' operator reads per module; omitted where the stores mint none. */
+  operatorReads?: ModuleOperatorReadsScope;
   surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown>;
 }) {
   let surface: ExposedSurface<unknown, unknown> | undefined;

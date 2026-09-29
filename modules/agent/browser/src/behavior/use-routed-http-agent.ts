@@ -1,5 +1,6 @@
 import { httpAgentTestInputSchema } from "@langwatch/agent-contract";
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { getDrawerStack } from "@langwatch/browser-host/drawer";
 import { useRef } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
@@ -14,7 +15,8 @@ const explainTestError: HttpTestErrorExplanation = ({ error }) => ({
 
 /**
  * What the HTTP agent editor reads and writes when the address opened it (main's editor). A save
- * returns to the drawer that opened it when there is one; any other close ends the stack.
+ * returns to the drawer that opened it, unless that is the type selector (a chooser, not a
+ * caller); any other close ends the stack.
  */
 export function useRoutedHttpAgent({
   agentId,
@@ -46,7 +48,7 @@ export function useRoutedHttpAgent({
     isLoadingAgent: agentQuery.isLoading,
     isSaving: create.isPending || update.isPending,
     projectId,
-    onClose: () => (saved.current && goBack ? goBack() : close()),
+    onClose: () => (saved.current && goBack && !openedFromChooser() ? goBack() : close()),
     onSave: (agent) => {
       saved.current = true;
       onSave?.(agent);
@@ -71,4 +73,9 @@ export function useRoutedHttpAgent({
     onSaveError: (failure) => host.failed(failure),
   };
   return { options, explainTestError };
+}
+
+function openedFromChooser(): boolean {
+  const stack = getDrawerStack();
+  return stack[stack.length - 2]?.drawer === "agentTypeSelector";
 }

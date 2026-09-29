@@ -280,19 +280,7 @@ export function useSuiteRouting(): SuiteRouting {
       const carriedQueryString = queryStringOf(carriedParams);
       const asUrl = carriedQueryString ? `${displayPath}?${carriedQueryString}` : displayPath;
 
-      // All routes are handled by the same [[...path]] page, so shallow works
-      void router.push(
-        {
-          pathname: "/[project]/simulations/[[...path]]",
-          query: {
-            project: projectSlug,
-            ...(pathSegments.length > 0 ? { path: pathSegments } : {}),
-            ...carriedParams,
-          },
-        },
-        asUrl,
-        { shallow: true },
-      );
+      void router.push(asUrl);
     },
     [router, projectSlug],
   );

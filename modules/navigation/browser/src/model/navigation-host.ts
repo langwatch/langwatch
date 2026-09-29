@@ -31,6 +31,8 @@ export type NavigationTeam = {
 export type NavigationOrganization = {
   id: string;
   name: string;
+  /** What the organization declared it is for (ADR-038 v6); null or absent when it has not. */
+  primaryIntent?: string | null;
   teams: NavigationTeam[];
 };
 
@@ -62,6 +64,8 @@ export type NavigationDeployment = {
   isDevelopment: boolean;
   /** A development build that asked to draw without the development badge. */
   hideDevIndicator?: boolean;
+  /** What the development badge reads instead of "DEV": a haven stack's slug. */
+  devIndicatorLabel?: string;
   /** The shared demo project, when this deployment configures one. */
   demoProjectSlug?: string;
   hasNlpService: boolean;
@@ -258,6 +262,13 @@ export abstract class NavigationHost {
    * address, naming none simply means no project.
    */
   abstract projectParam(): string | undefined;
+
+  /**
+   * The `:project` segment when it names a project, undefined when it is
+   * absent or a reserved word such as `analytics`. The rule is organization's
+   * scope resolution; the shell's project-address redirect reads it.
+   */
+  abstract projectSlugFromAddress(): string | undefined;
 
   /** What kind of deployment this is. */
   abstract deployment(): NavigationDeployment;

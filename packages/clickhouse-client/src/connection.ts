@@ -1,5 +1,6 @@
 import type { ClickHouseConfiguration } from "./config.ts";
 import { createTenantRouter, type TenantDirectory, type TenantRouter } from "./tenancy.ts";
+import { TenantScopeError } from "./tenantGuard.ts";
 
 export interface ClickHouseCloseableClient {
   close: () => Promise<void>;
@@ -90,6 +91,32 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
     const route = await this.router.route(tenantId);
     this.assertOpen();
     return route.kind === "shared" ? this.shared() : this.resolveOrganization(route.organizationId);
+  }
+
+  /**
+   * The one server a declared tenant set is answered on: its organisation's. A set spanning
+   * organisations is refused, since no single server holds every tenant's rows.
+   */
+  async resolveTenantSet({
+    tenantId,
+    tenantIds,
+    organizationId: routed,
+  }: {
+    tenantId: string;
+    tenantIds: readonly string[];
+    organizationId?: string | undefined;
+  }): Promise<Client> {
+    this.assertOpen();
+    const resolved = await Promise.all(tenantIds.map((each) => this.router.organizationOf(each)));
+    const organizations = [...new Set(routed === undefined ? resolved : [routed, ...resolved])];
+    const [organizationId] = organizations;
+    if (organizations.length !== 1 || organizationId === undefined) {
+      throw new TenantScopeError(
+        { kind: "tenant-set-spans-organizations", organizations },
+        tenantId,
+      );
+    }
+    return this.resolveOrganization(organizationId);
   }
 
   /** Resolves a known organisation without a directory lookup. */

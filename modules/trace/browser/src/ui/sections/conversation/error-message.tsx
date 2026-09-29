@@ -1,4 +1,5 @@
-import { Alert, Link } from "@chakra-ui/react";
+import { Alert } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 
 interface ErrorMessageProps {

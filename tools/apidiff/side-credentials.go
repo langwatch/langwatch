@@ -175,12 +175,22 @@ var seededAdminEmails = []string{"admin@" + seedEmailDomain, "admin@haven.localh
 
 const seededAdminPassword = "LocalHavenAdmin!2026"
 
+// adminEmailsFor orders the seeded admin addresses for one side: the base
+// (main) seeds its fixed address, so it is tried first there and a sign-in
+// is never spent on the branch's address it does not know.
+func (engine *probeEngine) adminEmailsFor(baseURL string) []string {
+	if baseURL == engine.options.B && baseURL != engine.options.A {
+		return []string{seededAdminEmails[1], seededAdminEmails[0]}
+	}
+	return seededAdminEmails
+}
+
 // mintCLISession signs the seeded admin in on one side and walks the device
 // flow the CLI uses (device-code, approve, exchange), filing the browser
 // session and the minted access token into that side's credentials.
 func (engine *probeEngine) mintCLISession(baseURL string, credentials sideCredentials) {
 	origin := browserOrigin(baseURL)
-	for _, email := range seededAdminEmails {
+	for _, email := range engine.adminEmailsFor(baseURL) {
 		signIn := engine.fixtureRequest(fixtureCall{method: http.MethodPost, url: baseURL + "/api/auth/sign-in/email",
 			headers: map[string]string{"Origin": origin}, body: map[string]any{"email": email, "password": seededAdminPassword}})
 		if cookie := cookieHeader(signIn.header); signIn.status == http.StatusOK && cookie != "" {

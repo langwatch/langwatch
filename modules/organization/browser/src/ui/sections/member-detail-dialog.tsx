@@ -1,4 +1,5 @@
 import { Badge, Box, Button, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,7 +10,6 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "../../model/prisma-types.ts";
-import { Link } from "../elements/link.tsx";
 import { ProvenanceExplanation } from "../elements/member-provenance.tsx";
 import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
 import {

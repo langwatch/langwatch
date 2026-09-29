@@ -21,15 +21,12 @@ export interface BankTransfer {
 
 export type InvoiceKind = "annual" | "seat_change" | "usage";
 
-/** How the invoicing of one seat change stands. */
-export type SeatChangeState = "intent" | "invoiced" | "nothing_to_invoice";
-
 /**
- * What a mid-term seat change owed. `not_onboarded` is a customer with no
- * billing account: finance invoices those by hand, and the operator is told so
- * rather than left thinking an invoice went out.
+ * How the invoicing of one seat change stands, as stored. `not_onboarded` is a
+ * customer with no billing account: finance invoices those by hand, and a later
+ * onboarding never bills the change.
  */
-export type SeatChangeBillingOutcome = "invoiced" | "nothing_to_invoice" | "not_onboarded";
+export type SeatChangeState = "intent" | "invoiced" | "nothing_to_invoice" | "not_onboarded";
 
 /**
  * Which contract an organization's hosted usage is invoiced under.

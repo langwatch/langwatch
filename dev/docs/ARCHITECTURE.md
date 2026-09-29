@@ -32,6 +32,12 @@ module spawns per run, which owns its own logic (adapters, turn execution) and
 reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
 2026-09-28).
 
+`apps/*-web` are the internal consoles (haven hub and stack home, IdP
+simulator, mail sink): React bundles built by Vite and served by their Go
+owner, on `@langwatch/design-system-internal` and `@langwatch/time` only,
+importing nothing from `modules/` ([ADR-160](adr/160-internal-consoles-are-go-served-react.md); Alex,
+2026-09-28).
+
 **The same code runs everywhere.** One `main.ts` per app, byte-identical
 across laptop, CI and production. Only the parsed environment differs. There
 is no dev-only branch anywhere in an app, because an app has nowhere to put
@@ -175,6 +181,9 @@ document, is the authority on filenames):
   subject, per-tier implementations, a memory twin each, a registry offering
   `{ live, memory }`. Repository = owned state; channel = unowned messages;
   service = behaviour over both.
+  Messages to ourselves are `@langwatch/internal-slack` templates sent through
+  the owning module's Slack channel. Slack a customer configures stays in
+  automation's channels and never uses this package (Alex, 2026-09-28).
 - `eventing/` — one folder: the pipeline and everything it names (§9).
 - `transport/` — declarations only (§8).
 - `rules/` — pure functions and constants; no clock, no I/O. Value types (data
@@ -220,6 +229,10 @@ of:
 One unowned service has one owning module: evaluation owns the langevals boundary — its endpoint,
 the S3 staging of large payloads and their config — and topic and workflow reach langevals through
 `EvaluationApi` (Alex, 2026-09-25).
+
+The legacy `filters` grammar (a filter field to a parameterised ClickHouse condition over `trace_summaries` and
+`stored_spans`) is trace's, as the owner of the tables it reads; analytics' filter pickers ask
+`TraceApi.translateLegacyFilters` for their scope (Alex, 2026-09-29).
 
 Enterprise-licensed code stays in enterprise modules: auth (open) obtains the SSO provider configs better-auth needs from
 `SsoApi`, building better-auth lazily so no peer is called during construction (Alex, 2026-09-25).
@@ -653,6 +666,17 @@ dependencies are its own business — only its API travels), cycles refuse at
 boot by name, and an instance bound at create may not be invoked until
 after boot.
 
+**Peer cycles shrink to zero, then refuse** (Alex, 2026-09-29). Refusal stays the rule, but today it
+reaches only supply tokens: the kernel hands every `*Api` token a proxy before any module installs and
+orders modules without them, so two modules naming each other's `*Api` in `static dependencies` boot.
+The transition is a shrink-only list. The `peer-cycles` policy reports every declared peer edge whose
+peer reaches back, and `packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` refuses an
+edge missing from `tests/baselines/peer-cycle-edges.json` and a listed edge that no longer exists, so
+the list only shrinks and a change that cuts an edge removes it. A cycle is cut in §9's shape (a
+command on the other module's pipeline, or a pull by a scheduled process manager where that would
+itself be a cycle). When the list is empty the kernel refuses a peer cycle at boot by name, and the
+list is deleted.
+
 **Registry resolution ends at `ModuleApp.create`.** Inside the module,
 `create()` is the composition root: internal services are built explicitly
 — `LicensingCapService.create({ prisma: process.prisma, graceDays:
@@ -866,6 +890,14 @@ key** (`github.appId ← GITHUB_APP_ID`); a module with a schema and no slice
 fails to compile. `.readonly()` on the schema is the immutability story —
 no `Object.freeze`, no mirror types, no re-plumbing.
 
+**A family handle answers every name under one prefix** (Alex, 2026-09-29; ADR-132 amendment).
+`Secret.family(prefix)` resolves to a name-to-value map, for a credential a deployment names by
+convention (main's `CLICKHOUSE_URL__<label>__<orgId>`). The env and `.env` adapters scan by prefix
+and 1Password answers none; the resolver scopes a family like any handle and answers only names
+under its prefix; the preflight treats a family as optional; and a config leaf may not claim a
+name under a declared prefix (`ConfigClaimsSecretError`). It is the one enumeration the chain
+does, bounded by a prefix its owner declared.
+
 **Defaults are production-shaped; development earns convenience explicitly.**
 `developmentDefault` values (localhost store URLs) apply only under
 `NODE_ENV=development` — so a bare `pnpm dev` boots with zero configuration —
@@ -1028,8 +1060,26 @@ so may `lwql-provision.ts` and `lwql-render-access-config.ts`: LangWatchQL provi
 both schemas under the same migration lock, before serve, and the access-config render runs from
 env alone in its Helm job (Alex, 2026-09-28).
 
+**In-place system migrations belong to their subject; the runner belongs to ops.** Identity and
+authz each answer the migrations they own through their `*Api` (`registeredMigrations()`, with
+identity's user-rooted `userMigrations()` beside it), and ops composes the migrations page,
+enrolment, the targeted run and the pass over its own `SystemMigration*` tables and Redis lease,
+never importing a peer's process package. The api serves the page and awaits a targeted run
+in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
+(Alex, 2026-09-28).
+
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.
+
+**A read across organizations is declared, never exempted** (Alex, 2026-09-28). The guarded
+client stays strict for every model. The module that owns the table declares
+`static readonly operatorReads = { syncs: OperatorRead.of("ScimSyncState", { actions: ["findMany", "count"] }) }`
+beside its secrets. The root scopes the stores' mint to each module's own handles and seals it
+after boot, as it does secrets. The handle's client admits only that model and those actions,
+refuses writes, other models and raw SQL, and logs each read at info with `{ module, model,
+action }` and no row data. Its live repository registry resolves it by requiring the
+`operatorReads` member (`operatorReads.into(handle, build)`); the memory twin needs none.
+Spec: `specs/server/operator-reads.feature`.
 
 **Object storage is a store, like the other three** (ruled 2026-09-24,
 ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
@@ -1060,6 +1110,44 @@ the right physical endpoint internally, per call. No resolver type, no
 `.resolve()` step, and no adapter exists outside that package; a caller
 never thinks about resolution at all. The per-module resolver adapters
 (`create<F>ClickHouseResolver`) are transitional and die when this lands.
+
+**The `clickhouse` member exposes its routing table** (Alex, 2026-09-28):
+`privateRoutes()` answers the organizations it routes to a private endpoint, parsed once at boot
+from main's `CLICKHOUSE_URL__<label>__<orgId>=<url>` family, unchanged for a deployment. The URLs
+carry credentials, so the stores declare the family as one `Secret.family("CLICKHOUSE_URL__")`
+handle (§6), resolve it through the chain and parse it once at boot into the member, which opens
+whenever routes exist even with no shared `CLICKHOUSE_URL`. Nothing reads the environment for a
+route and no route URL is printed: a skipped entry is logged by its variable name.
+`CLICKHOUSE_PRIVATE_ROUTES` is not read. The tasks runner, which opens no member for its
+migration pass, holds the stores' same handle and builds its dataplane from the stores' parse.
+A module needing that deployment fact (ops' cohort exclusion,
+read through `RoutingTableOrganizationDataplaneService`) reads the member, never a second
+declaration of the env family in its own config.
+
+**Routing is folded into the `clickhouse` member** (Alex, 2026-09-28): the member routes every
+statement by its tenant's organization itself, so a module hands the member its statement and
+never writes a routed-client adapter (ops' replay and event-explorer adapters are deleted). A
+statement spanning every tenant names none (`tenantId: ""`) with a written `unscoped` reason, and
+the member reads it on the shared server, where main's `"default"` fallback read. A read across one
+organization's projects (a gateway budget's ledger) declares its **tenant set** (`tenantIds`) instead:
+the tenant guard accepts `TenantId IN (...)` only when the list binds exactly that set, the request's
+`tenantId` among them, with no `OR` disjoining it; the member's router resolves every tenant through
+the tenant directory it already routes by and refuses a set spanning organizations. One statement,
+answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). Eventing's replay
+reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
+batch by batch under the tenant guard and the route, holding no slot and never retried.
+
+**The event tables are eventing's** (Alex, 2026-09-29). Only `packages/eventing` reads or writes
+`event_log`, the process-manager tables (`ProcessManagerInstance`, `ProcessManagerInbox`,
+`ProcessManagerOutbox`, `ProcessManagerOutboxAttempt`) and the projection checkpoints. A module changes
+an aggregate by sending a command, never by appending events itself: the `eventing` member stops
+handing modules the whole EventSourcing, so no module reaches `getEventStore().storeEvents` for an
+arbitrary aggregate. Operator work over those tables (purge, redrive, lease release, an event
+explorer) is eventing's surface, called through the member, never SQL or a Prisma delegate in the
+calling module. The `eventing-table-access` policy reports raw access by module or application code:
+SQL naming a table, a Prisma delegate over one, the table named as a literal, or a direct
+`storeEvents`/`getEventStore` call. Today's findings are a shrink-only list with a count per file,
+`tests/baselines/eventing-table-access.json`, held by the same ratchet as §5's peer cycles.
 
 ---
 
@@ -1163,6 +1251,12 @@ lease-held writer) is not background work: it stays a service the module owns. `
 A module reacting to a peer's event does it through a subscriber on the event owner's pipeline that sends
 the reacting module a command through its `*Api`, so the reaction lands as a durable event on the
 reacting module's own pipeline (Alex, 2026-09-25).
+When the reacting module already depends on the owner, that subscriber would be a peer cycle, so the owner
+records the fact in the same write as the change and answers it through a `find*` read on its
+`*Api`; the reacting module pulls it from a scheduled process manager on its own pipeline, stores each
+decision once keyed by the fact, and shows a fact it has not decided as awaiting. Seat changes are
+the case: licensing's `IssuedLicense.seatsRaisedFrom` and `LicensingApi.findSeatChanges`, read by
+billing's `seatInvoicing` pass every minute on `connected_billing` (Alex, 2026-09-29).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
 projection state keeps its type from declaration to handler (Alex, 2026-09-24).
@@ -1192,6 +1286,16 @@ A process-manager handler emits intents through the typed accessor `ctx.intent(n
 registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline; the
 eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
+Periodic work is a scheduled process manager (`.schedule({ everyMs }).onWake`) on its owner's pipeline;
+there are no cron routes. A route under `/api/cron` is refused by
+`packages/architecture-enforcer/tests/no-cron-routes.unit.test.ts` (Alex, 2026-09-29).
+The system-migration re-drive and an operator's "run a pass now" are one scheduled process manager
+on ops' `ops_system_migrations` (Alex, 2026-09-28): the hourly wake asks for a pass only when the
+stored state holds a tenant a pass could still move, and the kick is a command whose event asks
+the same intent ungated. The kick's tenant is the operator's user, which the event store places on
+the shared cluster, and its aggregate is not the scheduled singleton, whose wake an event would clear.
+A kick that cannot be sent is logged, never refused: the page is told the pass started, as main's
+fire-and-forget kick was, and the hourly wake still re-drives any tenant that could move.
 An experiment run executes on its pipeline, never in a request: `StartRun` is a command, a process manager
 emits one cell intent per row and target, the worker runs each cell as a command appending its result
 events, and projections fold progress that SSE and polling read. Abort is a command the manager honours.
@@ -1205,6 +1309,21 @@ A run's live frames are published from its progress fold, which assigns each fra
 counts, so a reconnect's replay and the live stream cannot disagree; its events carry every detail a
 frame shows (an evaluator's error type, traceback, domain error, raw response and cost currency) as
 additive fields, never a side channel (Alex, 2026-09-28).
+An operator's projection replay runs as a worker process-manager intent, never in a request: the api
+takes the Redis replay lock, records the run and sends `requestProjectionReplay` on ops'
+`ops_projection_replay`; the intent awaits the whole run, fenced by the lock holder, so a delivery
+for a run that no longer holds the lock does nothing. Status, history and cancel stay the Redis keys
+every role reads (Alex, 2026-09-28).
+A replay reads its projections off the pipelines the process registered: `replayProjectionsOf`
+unwraps a `RedisCachedFoldStore` to its durable tier, and a map projection's owner declares the
+`targetTable` a rebuild optimizes on its definition. No list outside the owning module names a
+store or a table (Alex, 2026-09-28).
+A pipeline whose projections write tenant rows declares each tenant's retention itself (Alex,
+2026-09-28): `.withRetention(resolver)`, built from its module's own `DataRetentionApi` dependency
+(`getResolvedForProject`, a tenant being a project), and registration prefers it to the runtime's.
+The eventing member is built before any module, so it holds no late-bound resolver; a pipeline
+declaring none leaves each store to stamp the platform default.
+Spec: `packages/eventing/specs/pipeline-retention.feature`.
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
@@ -1245,6 +1364,25 @@ Worker semantics: delivery is at-least-once, so subscribers are idempotent;
 ordering is per aggregate via the group queue, so one poisoned aggregate
 retries with backoff without blocking neighbours; projections fold from the
 same ordered stream; every consumer registers drain-first on the server.
+The hand-off from an append to its projections, subscribers and process managers is durable: a
+lane that cannot be staged is recorded in the process store's outbox and re-driven, a fold or state
+projection by a rebuild job in the aggregate's own ordered lane, so it cannot race live folds, never
+logged and dropped (Alex, 2026-09-29). A command job
+keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
+append (Alex, 2026-09-29).
+
+### 9.1 Purge, erase and retention across modules
+
+**Cross-module purge, erase and retention are commanded by the owners** (Alex, 2026-09-29). Work
+that removes or rewrites rows in more than one module (a deleted organization's purge, a user's
+erasure, a retention change applied to stored rows) is never done by the module that starts it. The
+initiator records one fact on its own pipeline. Each module owning affected rows reacts from its own
+side and removes or updates only its own rows, idempotently, since delivery is at least once. The
+initiator never deletes, updates or `ALTER`s another module's table, inside one transaction or not,
+and never loops over a list of other modules' tables. Progress is tracked per owner, so the operator
+sees when every owner has finished and which has not. Today's breaks (organization's provisioned
+organization delete, user's data erase, data-retention's retroactive rewrite over other modules'
+tables) move to this shape in their own changes.
 
 ---
 
@@ -1303,6 +1441,8 @@ viewer without the grant opened the list. specs/ui/ui-page-composition.feature.
 Drawers are URL-routed singletons with a navigation stack, opened through the
 host capability, registered through the declaration. One tRPC client for the
 whole browser.
+
+**An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
 
 A surface too wide for a typed hook calls a procedure by PATH through the
 shell's `UiRpc`, and the answer is published under the key the typed hook
@@ -1661,6 +1801,10 @@ peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing is told through its Api, by §9's
 subscriber on the owner's pipeline (Alex, 2026-09-28).
 
+**Enterprise scim owns the directory-sync state** (`ScimSyncState`, its `scim-sync` pipeline,
+guards and ledger); identity keeps none of it, and `ScimApp` builds the sync lifecycle over its
+own rows (Alex, 2026-09-28).
+
 ---
 
 ## 12. Errors
@@ -1829,6 +1973,10 @@ to this file in the same commit as the code — an out-of-date architecture
 document is worse than none, because it reads authoritative.
 `typescript/no-misused-spread` is off in `packages/*/type-tests/**` only, where the spread is what
 the type test asserts (Alex, 2026-09-27).
+A policy reads no baseline and reports every finding. A ruled transition may hold a shrink-only list
+beside the enforcer's tests (`packages/architecture-enforcer/tests/baselines/`), keyed so that growth
+inside a key is refused (a count per key), with a test that also refuses a listed finding that is
+gone. Two exist: §5's peer cycles and §7's event-table access (Alex, 2026-09-29).
 
 ## 18. Running work
 

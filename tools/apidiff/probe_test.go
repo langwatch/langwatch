@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -386,17 +387,17 @@ func TestProbeExcludePrefixAndMethodFilter(t *testing.T) {
 	    "/api/things": {"get": {"operationId": "list", "responses": {"200": {"description": "ok"}}}}
 	  }
 	}`
-	called := false
+	var called atomic.Bool
 	server := newTestServer(t, spec, map[string]http.HandlerFunc{
 		"GET /api/things": func(writer http.ResponseWriter, _ *http.Request) {
-			called = true
+			called.Store(true)
 			writeJSON(writer, 200, `{}`)
 		},
 	})
 	// The default exclude prefix covers /api/gateway without a route.
 	code, _, _ := runProbeCLI(t, "probe", "-a", server.URL, "-b", server.URL)
-	if code != 0 || !called {
-		t.Fatalf("exit = %d, things called = %v; want 0/true", code, called)
+	if code != 0 || !called.Load() {
+		t.Fatalf("exit = %d, things called = %v; want 0/true", code, called.Load())
 	}
 	code, _, stderr := runProbeCLI(t, "probe", "-a", server.URL, "-b", server.URL, "-method", "delete")
 	if code != 0 || !strings.Contains(stderr, "probing 0 operations") {

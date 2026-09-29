@@ -1,18 +1,10 @@
-/**
- * Result of building a filter condition - contains both the SQL fragment
- * and any parameters needed for the query.
- */
-export type FilterConditionResult = {
-  sql: string;
+import type { FilterOption } from "../filter-options.repository.ts";
+
+/** Trace's translation of the other filters a picker is narrowed by. */
+export type FilterOptionsScope = {
+  conditions: string[];
   params: Record<string, unknown>;
 };
-
-import type {
-  AnalyticsFilterValue as FilterParam,
-  FilterField,
-} from "@langwatch/analytics-contract";
-
-import type { FilterOption } from "../filter-options.repository.ts";
 
 export type ClickHouseFilterQueryParams = {
   tenantId: string;
@@ -21,8 +13,8 @@ export type ClickHouseFilterQueryParams = {
   subkey?: string;
   startDate: number;
   endDate: number;
-  /** Optional filters for scoping results to a subset of traces */
-  scopeFilters?: Partial<Record<FilterField, FilterParam>>;
+  /** Conditions over `trace_summaries ts` scoping results to a subset of traces, from Trace. */
+  scope?: FilterOptionsScope;
 };
 
 /**
@@ -52,38 +44,4 @@ export type ClickHouseFilterDefinition = {
  */
 export type SupportedClickHouseFilterDefinition = ClickHouseFilterDefinition & {
   tableName: ClickHouseFilterTable;
-};
-
-/**
- * Type for filter condition builder functions.
- * Each builder takes filter values and returns SQL + params for parameterized queries.
- * The paramId is used to create unique parameter names when multiple filters are combined.
- */
-export type FilterConditionBuilder = (input: {
-  values: string[];
-  paramId: string;
-  key?: string;
-  subkey?: string;
-  options?: FilterConditionOptions;
-}) => FilterConditionResult;
-
-/**
- * Cross-cutting options threaded to every condition builder.
- */
-export type FilterConditionOptions = {
-  /**
-   * Pre-built SQL fragment bounding `sp.StartTime` to the dashboard window,
-   * injected into `stored_spans` EXISTS subqueries to prune partitions.
-   * Empty string when no time window is available.
-   */
-  spanTimeBound?: string;
-};
-
-/**
- * Result of generating filter conditions from filter parameters.
- */
-export type GenerateFilterConditionsResult = {
-  conditions: string[];
-  params: Record<string, unknown>;
-  hasUnsupportedFilters: boolean;
 };

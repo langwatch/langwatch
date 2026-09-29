@@ -40,13 +40,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import { experimentServer } from "../../experiment.server.ts";
 
-/** A ClickHouse that holds no rows: every read answers empty. */
+/** A ClickHouse that holds no rows: every read answers empty, every write is kept. */
 class EmptyDriver implements QueryDriver {
+  readonly inserts: InsertRequest[] = [];
+
   execute<Row>(): Promise<QueryResult<Row>> {
     return Promise.resolve({ rows: [] });
   }
 
-  insert(_request: InsertRequest): Promise<void> {
+  insert(request: InsertRequest): Promise<void> {
+    this.inserts.push(request);
     return Promise.resolve();
   }
 
@@ -72,8 +75,11 @@ const customCost: ModelCost = {
   updatedAt: new Date(0),
 };
 
+const RETAINED = { traces: 91, scenarios: 63, experiments: 126 };
+
 async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
   let retentionReads = 0;
+  const driver = new EmptyDriver();
   const eventing = new EventSourcing({
     enabled: false,
     participation: "consume",
@@ -84,7 +90,7 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
     .withStores(memoryStores())
     .withEventing(eventing)
     .withRelational(createApiFixture<ProcessMembers["prisma"]>({}, "prisma (unused at boot)"))
-    .withAnalytical(new ClickHouseQueryClient({ driver: new EmptyDriver() }))
+    .withAnalytical(new ClickHouseQueryClient({ driver }))
     .withKeyvalue(
       createApiFixture<NonNullable<ProcessMembers["redis"]>>({}, "redis (unused at boot)"),
     )
@@ -117,14 +123,17 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
           retentionReads += 1;
           return 49;
         },
+        getRetentionDays: async ({ category }) => RETAINED[category],
+        getResolvedForProject: async () => RETAINED,
       }),
     })
     .boot();
-  return { runtime, eventing, retentionReads: () => retentionReads };
+  return { runtime, eventing, driver, retentionReads: () => retentionReads };
 }
 
 describe("experiment installed in the worker", () => {
   /** @scenario "The worker registers the run pipeline from experiment's own declaration" */
+  /** @scenario "The worker mounts the pipeline rather than being handed one" */
   it("registers experiment_run_processing from its own declaration", async () => {
     const { runtime, eventing } = await bootWorker();
 
@@ -142,6 +151,52 @@ describe("experiment installed in the worker", () => {
 
     try {
       expect(retentionReads()).toBe(0);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The run pipeline declares each tenant's retention from data retention" */
+  it("declares each tenant's retention on experiment_run_processing", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const pipeline = eventing.definitions.find(
+        (definition) => definition.metadata.name === "experiment_run_processing",
+      );
+      await expect(
+        pipeline?.open((definition) => definition.retentionPolicyResolver?.resolve("project_1")),
+      ).resolves.toEqual(RETAINED);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "A DSPy step is stamped with its tenant's traces retention" */
+  it("stamps a DSPy step with the tenant's traces retention, not a fixed one", async () => {
+    const { runtime, driver } = await bootWorker();
+
+    try {
+      await runtime.service(ExperimentApi).upsertDspyStep({
+        tenantId: "project_1",
+        experimentId: "experiment_1",
+        runId: "run_1",
+        stepIndex: "0",
+        score: 0.5,
+        label: "score",
+        optimizerName: "MIPROv2",
+        optimizerParameters: {},
+        predictors: [],
+        examples: [],
+        llmCalls: [],
+        createdAt: 1_000,
+        insertedAt: 1_100,
+        updatedAt: 1_200,
+      });
+
+      expect(driver.inserts.flatMap((insert) => insert.rows)).toEqual([
+        expect.objectContaining({ _retention_days: RETAINED.traces }),
+      ]);
     } finally {
       await runtime.stop();
     }
