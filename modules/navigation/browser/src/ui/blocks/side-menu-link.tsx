@@ -1,6 +1,6 @@
 /** Navigation menu entry (moved from platform/app; uses this package's NavigationLink). */
 
-import { Badge, Box, chakra, HStack, Text } from "@chakra-ui/react";
+import { Badge, Box, chakra, HStack, Link, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 import { useEffect, useRef } from "react";
@@ -216,32 +216,33 @@ export const SideMenuLink = ({
     );
   }
 
+  // The link recipe's plain variant gives the entry its hover underline.
   return (
-    <NavigationLink
-      ref={linkRef}
-      display="block"
-      width="full"
-      href={href}
-      aria-label={label}
-      data-tour={tourId}
-      // The active item is otherwise only a background colour, which a
-      // screen reader cannot report and a test cannot read.
-      aria-current={isActive ? "page" : undefined}
-      isExternal={isExternal}
-      onClick={onClick}
-    >
-      <SideMenuItem
-        icon={icon}
-        label={label}
-        isActive={isActive}
-        badgeNumber={badgeNumber}
-        showLabel={showLabel}
-        rightElement={rightElement}
-        beta={beta}
-        betaLabel={betaLabel}
-        legacy={legacy}
-        legacyLabel={legacyLabel}
-      />
-    </NavigationLink>
+    <Link asChild variant="plain" display="block" width="full">
+      <NavigationLink
+        ref={linkRef}
+        href={href}
+        aria-label={label}
+        data-tour={tourId}
+        // The active item is otherwise only a background colour, which a
+        // screen reader cannot report and a test cannot read.
+        aria-current={isActive ? "page" : undefined}
+        isExternal={isExternal}
+        onClick={onClick}
+      >
+        <SideMenuItem
+          icon={icon}
+          label={label}
+          isActive={isActive}
+          badgeNumber={badgeNumber}
+          showLabel={showLabel}
+          rightElement={rightElement}
+          beta={beta}
+          betaLabel={betaLabel}
+          legacy={legacy}
+          legacyLabel={legacyLabel}
+        />
+      </NavigationLink>
+    </Link>
   );
 };
