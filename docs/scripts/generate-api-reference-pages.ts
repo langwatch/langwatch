@@ -293,7 +293,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Triggers",
     dirName: "triggers",
-    pathPrefixes: ["/api/triggers", "/api/trigger"],
+    pathPrefixes: ["/api/triggers", "/api/trigger", "/api/slack-connections"],
     overviewDescription:
       "Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.",
   },

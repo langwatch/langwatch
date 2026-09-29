@@ -72113,6 +72113,15 @@ openapi: "GET /api/triggers/{id}"
 
 ---
 
+# FILE: ./api-reference/triggers/list-slack-connections.mdx
+
+---
+title: "List Slack Connections"
+openapi: "GET /api/slack-connections"
+---
+
+---
+
 # FILE: ./api-reference/triggers/list-triggers.mdx
 
 ---

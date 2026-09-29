@@ -1364,6 +1364,7 @@
             "group": "Triggers",
             "pages": [
               "api-reference/triggers/overview",
+              "api-reference/triggers/list-slack-connections",
               "api-reference/triggers/list-triggers",
               "api-reference/triggers/create-a-slack-alert-trigger",
               "api-reference/triggers/create-triggers",
