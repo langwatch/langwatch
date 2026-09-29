@@ -480,6 +480,9 @@ export class OrganizationPermissionError extends HandledError {
     super("insufficient_permissions", `Insufficient permissions. Required: ${permission}`, {
       httpStatus: 403,
       fault: "customer",
+      // Read by the CLI, which names the re-login that grants it when the
+      // refused credential is its own login key.
+      meta: { permission },
     });
 
     this.name = "OrganizationPermissionError";

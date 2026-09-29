@@ -45,6 +45,12 @@ export interface RunUnifiedLoginOptions {
    * wiring changes are printed; the rest is left to `langwatch login`.
    */
   isQuiet?: boolean;
+  /**
+   * `--management`: ask for the CLI key to also carry the management
+   * permissions a CLI login leaves out by default. The approval grants only
+   * the ones the approving person holds in the organization.
+   */
+  management?: boolean;
 }
 
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
@@ -303,7 +309,13 @@ export async function runUnifiedLoginFlow(
     );
   }
 
-  const dc = await startDeviceCode({ baseUrl }, { credentialType: kind });
+  const dc = await startDeviceCode(
+    { baseUrl },
+    {
+      credentialType: kind,
+      management: kind === "device_session" && opts.management === true,
+    },
+  );
   const verifyURL =
     dc.verification_uri_complete ??
     `${normalizeEndpoint(dc.verification_uri)}?user_code=${encodeURIComponent(dc.user_code)}`;

@@ -91,11 +91,14 @@ export function useCliKeyPermissions({
   selectedScopes,
   bindings,
   offeredProjects,
+  management,
 }: {
   organizationId: string | null;
   selectedScopes: ScopeTriadEntry[];
   bindings: Binding[] | undefined;
   offeredProjects: OfferedProject[];
+  /** Whether the CLI asked for management access (`langwatch login --management`). */
+  management: boolean;
 }) {
   const [isCustomized, setIsCustomized] = useState(false);
   const [selections, setSelections] = useState<Record<string, AccessLevel | "none">>({});
@@ -118,8 +121,8 @@ export function useCliKeyPermissions({
 
   const defaultPermissionsHeld = useMemo<string[]>(() => {
     const held = new Set(userPermissions);
-    return defaultCliKeyPermissions().filter((permission) => held.has(permission));
-  }, [userPermissions]);
+    return defaultCliKeyPermissions({ management }).filter((permission) => held.has(permission));
+  }, [userPermissions, management]);
 
   const effectiveSelections = useMemo(
     () => clampSelectionsToAvailability({ selections, userPermissions }),

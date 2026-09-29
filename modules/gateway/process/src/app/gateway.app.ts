@@ -15,6 +15,9 @@ import type {
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   type GatewayBudgetOverviewForUser,
+  type GatewayAuthorizedKeyCaller,
+  type GatewayKeyCaller,
+  type GatewayKeyCallerReach,
   type GatewayRequestCredential,
   type GatewayVirtualKeyScope,
   type VirtualKeyWithScopes,
@@ -2370,5 +2373,57 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     permission: AuthzPermission;
   }): Promise<void> {
     await this.#dependencies.assertCanOperateAtOrganization(input);
+  }
+
+  /**
+   * One gate for every kind of API key, at the key's own reach or at the whole
+   * organization. A legacy project key reaches its own project, and passes the
+   * organization-wide gate as on main; a scoped key is checked with its owner.
+   */
+  async authorizeKeyCaller(input: {
+    caller: GatewayKeyCaller;
+    permission: AuthzPermission;
+    reach: GatewayKeyCallerReach;
+  }): Promise<GatewayAuthorizedKeyCaller> {
+    const { caller, permission, reach } = input;
+    const authorized =
+      caller.kind === "project"
+        ? {
+            organizationId: await this.organizationIdForProject(caller.projectId),
+            projectId: caller.projectId,
+            actor: { kind: "legacyProjectKey", projectId: caller.projectId } as const,
+            actorUserId: `svc_${caller.projectId}`,
+          }
+        : {
+            organizationId: caller.organizationId,
+            projectId: caller.resolvedProject?.id ?? null,
+            actor: {
+              kind: "apiKey",
+              apiKeyId: caller.apiKeyId,
+              userId: caller.userId,
+              organizationId: caller.organizationId,
+            } as const,
+            actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
+          };
+
+    if (reach === "caller" && authorized.projectId) {
+      await this.#dependencies.assertCanOperateOnAnyScope({
+        actor: authorized.actor,
+        scopes: [{ scopeType: "PROJECT", scopeId: authorized.projectId }],
+        permission,
+      });
+    } else {
+      await this.#dependencies.assertCanOperateAtOrganization({
+        actor: authorized.actor,
+        organizationId: authorized.organizationId,
+        permission,
+      });
+    }
+
+    return {
+      organizationId: authorized.organizationId,
+      actor: authorized.actor,
+      actorUserId: authorized.actorUserId,
+    };
   }
 }

@@ -2,6 +2,7 @@ import {
   bindRestCredential,
   bindRestMiddleware,
   ForbiddenError,
+  keyCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
@@ -23,7 +24,11 @@ import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
-import { gatewayPlatformRest, gatewayRestCredential } from "./transport/gateway-platform.rest.ts";
+import {
+  gatewayKeyCaller,
+  gatewayPlatformRest,
+  gatewayRestCredential,
+} from "./transport/gateway-platform.rest.ts";
 import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
@@ -58,6 +63,9 @@ export const gatewayServer = defineServerModule("gateway")
       // The gateway control plane is signed rather than bearer-authenticated.
       // It owns the same declared secret as the data-plane client.
       bindRestCredential("internalSecret", () => app.internalDoor()),
+      // Organization-owned rows take any API key; the application asks the
+      // permission at the reach the operation needs.
+      bindRestMiddleware(gatewayKeyCaller, (context) => keyCredentialOfRequest(context.req.raw)),
       // The callback arrives publicly and the application verifies the raw bytes
       // against the provider row's own stored secret, so the header is all the
       // transport carries.

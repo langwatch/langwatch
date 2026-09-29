@@ -30,6 +30,12 @@ export interface UpdateProjectInput {
   language?: string;
   framework?: string;
   piiRedactionLevel?: "STRICT" | "ESSENTIAL" | "DISABLED";
+  /**
+   * Moves the project to this team. The platform refuses a team outside the
+   * organization, an archived one, and a move across the personal workspace
+   * boundary.
+   */
+  teamId?: string;
 }
 
 export interface ProjectWithServiceKey extends Project {

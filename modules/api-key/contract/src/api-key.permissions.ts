@@ -285,15 +285,45 @@ export function categorizablePermissions(): AuthzPermission[] {
   }) as AuthzPermission[];
 }
 
-export const CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS: readonly AuthzPermission[] = [
-  "organization:manage",
+/**
+ * The permissions a CLI login key leaves out unless the login asked for
+ * management access (`langwatch login --management`), each with what it lets
+ * the CLI do, as the approval screen lists it.
+ */
+export const CLI_KEY_MANAGEMENT_PERMISSIONS = {
+  "organization:manage": "Manage the organization's settings, members and roles",
+  "team:manage": "Create teams and manage their members",
+} as const satisfies Partial<Record<AuthzPermission, string>>;
+
+/** Never on a default CLI login key, not even with `--management`: too destructive. */
+export const CLI_KEY_NEVER_DEFAULT_PERMISSIONS: readonly AuthzPermission[] = [
   "organization:delete",
-  "team:manage",
 ];
 
-export function defaultCliKeyPermissions(): AuthzPermission[] {
-  const excluded = new Set(CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS);
-  return categorizablePermissions().filter((permission) => !excluded.has(permission));
+export type CliKeyManagementPermission = keyof typeof CLI_KEY_MANAGEMENT_PERMISSIONS;
+
+export const cliKeyManagementPermissions = (): CliKeyManagementPermission[] =>
+  Object.keys(CLI_KEY_MANAGEMENT_PERMISSIONS) as CliKeyManagementPermission[];
+
+export const isCliKeyManagementPermission = (
+  permission: string,
+): permission is CliKeyManagementPermission =>
+  Object.hasOwn(CLI_KEY_MANAGEMENT_PERMISSIONS, permission);
+
+/** Whether a default CLI login key leaves this permission out. */
+export const isOffByDefaultOnCliKey = (permission: string): boolean =>
+  isCliKeyManagementPermission(permission) ||
+  (CLI_KEY_NEVER_DEFAULT_PERMISSIONS as readonly string[]).includes(permission);
+
+/** The permissions a CLI login key starts from; the management ones only when asked for. */
+export function defaultCliKeyPermissions({
+  management = false,
+}: { management?: boolean } = {}): AuthzPermission[] {
+  return categorizablePermissions().filter(
+    (permission) =>
+      !CLI_KEY_NEVER_DEFAULT_PERMISSIONS.includes(permission) &&
+      (management || !isCliKeyManagementPermission(permission)),
+  );
 }
 
 export function categoryPermissions({
