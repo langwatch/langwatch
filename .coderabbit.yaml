@@ -41,18 +41,6 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-  # PR #6900 only, revert before merge: brings the PR under the 300-file cap.
-  path_filters:
-    - "!**/*.generated.*"
-    - "!**/zz_generated.gen.go"
-    - "!**/openapiLangWatch.json"
-    - "!docs/llms*.txt"
-    - "!sdks/typescript/src/internal/generated/**"
-    - "!sdks/python/src/langwatch/generated/**"
-    - "!mcp/typescript/src/__tests__/fixtures/**"
-    - "!**/__snapshots__/**"
-    - "!**/__tests__/**"
-    - "!**/*.test.{ts,tsx}"
 
   # Phased rollout. Promote individual checks to mode:error in follow-up PRs
   # after baseline is clean for that check.
