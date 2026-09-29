@@ -500,7 +500,8 @@ The daemon's JSON, which the console reads:
 
 ## More of what haven does
 
-- **Managed ClickHouse.** haven runs one shared native `clickhouse-server` and
+- **Managed ClickHouse.** haven runs one shared `clickhouse-server` in Docker (colima) with its data on the
+  named volume `langwatch-clickhouse-data` (off virtiofs), and
   gives every worktree its own database (`lw_<slug>`) on it — so migration counts
   are always this worktree's own. Light local config (memory cap, no S3 tiering,
   no zero-copy). The server lifecycle is automatic; `haven db url clickhouse`

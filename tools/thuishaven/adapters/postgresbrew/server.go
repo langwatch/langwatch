@@ -174,6 +174,31 @@ func (s *Server) Databases(ctx context.Context) ([]string, error) {
 	return dbs, nil
 }
 
+// StrayDatabases lists lw_*_test and lw_*_ci databases with no connections whose
+// directory was created more than olderThan ago. Reading the directory's mtime
+// needs superuser (true of the brew server); an error is returned, not guessed.
+func (s *Server) StrayDatabases(ctx context.Context, olderThan time.Duration) ([]string, error) {
+	out, err := s.query(ctx, "postgres", fmt.Sprintf(`SELECT d.datname FROM pg_database d
+JOIN pg_stat_database sd ON sd.datid = d.oid
+WHERE d.datname ~ '^lw_.*_(test|ci)$' AND sd.numbackends = 0
+AND (pg_stat_file('base/' || d.oid || '/PG_VERSION')).modification < now() - interval '%d seconds'
+ORDER BY d.datname`, int64(olderThan.Seconds())))
+	if err != nil {
+		return nil, err
+	}
+	var dbs []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			dbs = append(dbs, line)
+		}
+	}
+	return dbs, nil
+}
+
+// devTuning is only recommended, never written: the server is the user's brew
+// install, not haven's. Needs a restart (shared_buffers, pg_stat_statements).
+const devTuning = "synchronous_commit=off shared_buffers=1GB effective_cache_size=16GB random_page_cost=1.1 max_wal_size=4GB shared_preload_libraries=pg_stat_statements"
+
 // Port returns the configured port (0 only if never constructed via New).
 func (s *Server) Port() int { return s.port }
 
@@ -197,7 +222,11 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, formula)
 	}
 	dbs, _ := s.Databases(ctx)
-	return true, fmt.Sprintf("up on :%d (%s), %d stack database(s)", s.port, formula, len(dbs))
+	detail := fmt.Sprintf("up on :%d (%s), %d stack database(s)", s.port, formula, len(dbs))
+	if untuned, err := s.queryBool(ctx, "postgres", "SELECT current_setting('synchronous_commit') = 'on'"); err == nil && untuned {
+		detail += "; untuned for dev, consider in postgresql.conf: " + devTuning
+	}
+	return true, detail
 }
 
 // Stop is deliberately a no-op. A brew-managed Postgres is a machine-wide

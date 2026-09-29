@@ -109,8 +109,13 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	// server.mts / vite.config.ts, this keeps every Node lane starting on real
 	// logs — matching the Go services' clean startup.
 	nodeEnv := func(lane string) []string {
-		return append(append([]string{}, base...),
-			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane))
+		env := append(domain.LaneDatabaseEnv(base, lane),
+			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
+			"NODE_COMPILE_CACHE="+filepath.Join(o.cfg.Home, "node-compile-cache", st.Slug))
+		if lane == "ui" {
+			env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
+		}
+		return env
 	}
 	// A monolith checkout has neither Node package: one process serves the
 	// browser application and its API, so the ui lane below and the backend

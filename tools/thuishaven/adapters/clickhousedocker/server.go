@@ -53,6 +53,8 @@ func New(rt *colima.Runtime, havenHome, image string, limits domain.ClickHouseLi
 	return &Server{rt: rt, home: filepath.Join(havenHome, "clickhouse"), image: image, limits: limits}
 }
 
+// dataDir is the legacy virtiofs bind mount, kept only as the one-time source
+// for the named volume; nothing is ever deleted from it.
 func (s *Server) dataDir() string      { return filepath.Join(s.home, "data") }
 func (s *Server) configPath() string   { return filepath.Join(s.home, domain.ClickHouseConfigFile) }
 func (s *Server) endpointPath() string { return filepath.Join(s.home, "endpoint.json") }
@@ -105,7 +107,7 @@ func (s *Server) Ensure(ctx context.Context) (int, error) {
 			return 0, err
 		}
 		// The container claims to be running but never answers — wedged. Recreate
-		// it once over the same bind-mounted data dir (every database survives)
+		// it once over the same data volume (every database survives)
 		// rather than reporting a dead stack the developer must repair by hand.
 		fmt.Println("clickhouse container is not answering — recreating it (data is kept)…")
 		_ = s.rt.Docker(ctx, dockerHost, "rm", "-f", domain.ClickHouseContainer).Run()
@@ -161,10 +163,10 @@ func (s *Server) applySystemLogPolicy(ctx context.Context) {
 }
 
 func (s *Server) start(ctx context.Context, dockerHost string, ep endpoint) error {
-	if err := os.MkdirAll(s.dataDir(), 0o755); err != nil {
+	if err := s.pull(ctx, dockerHost); err != nil {
 		return err
 	}
-	if err := s.pull(ctx, dockerHost); err != nil {
+	if err := s.migrateLegacyData(ctx, dockerHost); err != nil {
 		return err
 	}
 	if err := s.rt.Docker(ctx, dockerHost, s.runArgs(ep)...).Run(); err != nil {
@@ -206,7 +208,7 @@ func (s *Server) runArgs(ep endpoint) []string {
 		"-e", "MALLOC_CONF=background_thread:true,dirty_decay_ms:1000,muzzy_decay_ms:0",
 		"-e", "CLICKHOUSE_PASSWORD=" + domain.ClickHousePassword,
 
-		"-v", s.dataDir() + ":/var/lib/clickhouse",
+		"-v", domain.ClickHouseDataVolume + ":/var/lib/clickhouse",
 		"-v", s.configPath() + ":/etc/clickhouse-server/config.d/" + domain.ClickHouseConfigFile + ":ro",
 
 		s.image,
@@ -224,16 +226,17 @@ const (
 
 func (s *Server) containerState(ctx context.Context, dockerHost string) containerState {
 	out, err := s.rt.Docker(ctx, dockerHost,
-		"inspect", "-f", "{{.State.Running}} {{.Config.Image}}", domain.ClickHouseContainer,
+		"inspect", "-f", "{{.State.Running}} {{.Config.Image}} {{range .Mounts}}{{.Name}},{{end}}", domain.ClickHouseContainer,
 	).Output()
 	if err != nil {
 		return stateAbsent
 	}
 	fields := strings.Fields(strings.TrimSpace(string(out)))
-	if len(fields) != 2 || fields[0] != "true" {
+	if len(fields) < 2 || fields[0] != "true" {
 		return stateStopped
 	}
-	if fields[1] != s.image {
+	// A container still on the old bind mount is recreated onto the volume.
+	if fields[1] != s.image || len(fields) < 3 || !strings.Contains(fields[2], domain.ClickHouseDataVolume) {
 		return stateRunningWrongImage
 	}
 	return stateRunningCorrectImage
@@ -303,13 +306,30 @@ func (s *Server) Databases(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return splitLines(body), nil
+}
+
+func splitLines(body string) []string {
 	var out []string
 	for _, line := range strings.Split(strings.TrimSpace(body), "\n") {
 		if line != "" {
 			out = append(out, line)
 		}
 	}
-	return out, nil
+	return out
+}
+
+// StrayDatabases lists test, apidiff and bare langwatch databases whose newest
+// table change is older than olderThan (a database with no tables counts as old).
+func (s *Server) StrayDatabases(ctx context.Context, olderThan time.Duration) ([]string, error) {
+	body, err := s.query(ctx, fmt.Sprintf(`SELECT d.name FROM system.databases d
+LEFT JOIN (SELECT database, max(metadata_modification_time) AS m FROM system.tables GROUP BY database) t ON t.database = d.name
+WHERE (d.name LIKE 'test\_%%' OR d.name LIKE 'lw\_apidiff\_%%' OR d.name = 'langwatch' OR d.name LIKE 'langwatch\_%%')
+AND t.m < now() - INTERVAL %d SECOND ORDER BY d.name FORMAT TabSeparated`, int64(olderThan.Seconds())))
+	if err != nil {
+		return nil, err
+	}
+	return splitLines(body), nil
 }
 
 // HTTPPort returns the container's host port if provisioned (0 otherwise).
@@ -345,6 +365,9 @@ func (s *Server) Health(ctx context.Context) (bool, string) {
 	} else {
 		detail += ", memory unreadable"
 	}
+	if s.hasLegacyData() {
+		detail += "; old host data dir " + s.dataDir() + " is unused and can be deleted"
+	}
 	return true, detail
 }
 
@@ -363,8 +386,8 @@ func (s *Server) memoryUse(ctx context.Context) string {
 	return fmt.Sprintf("memory %s of %dMB cap", used, s.limits.ContainerMemoryMB)
 }
 
-// Stop removes the container. Data is a host bind mount, so this loses nothing —
-// the next Ensure recreates the container over the same data dir and port.
+// Stop removes the container. Data is a named volume, so this loses nothing —
+// the next Ensure recreates the container over the same volume and port.
 func (s *Server) Stop() {
 	ctx := context.Background()
 	if !s.rt.IsRunning(ctx) {

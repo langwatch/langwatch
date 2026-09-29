@@ -252,3 +252,8 @@ dev/docs/plans/handover-*.md
 .claude/handoffs/
 .claude/manifests/
 .claude/archives/
+
+# Go profiles (-cpuprofile/-memprofile) and throwaway probe tests
+*.pprof
+*.prof
+**/tmp-probe*

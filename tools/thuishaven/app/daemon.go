@@ -148,6 +148,7 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				}
 				if touchesPersisted {
 					o.pruneIdleDatabases(ctx)
+					o.pruneStrayDatabasesQuietly(ctx)
 				}
 			}
 			// Once a day (and once on the first tick after a daemon start),

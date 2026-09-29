@@ -144,8 +144,8 @@ var envHelpText = `Environment variables.
     HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:
                                  this run is already admitted, do not admit again.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
-    HAVEN_DB_TTL=336h            Background-prune databases whose worktree has not
-                                 been up for this long (default 14 days; 0 disables).
+    HAVEN_DB_TTL=96h             Background-prune databases whose worktree has not
+                                 been up for this long (default 4 days; 0 disables).
                                  Only databases haven itself created are considered,
                                  and lw_main is always kept.
     HAVEN_PRUNE_STALE_DAYS=5     Idle age at which "haven clean" pre-ticks a

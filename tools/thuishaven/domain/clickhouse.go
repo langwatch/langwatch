@@ -26,6 +26,10 @@ func DatabaseForSlug(slug string) string {
 // second worktree finds this one and reuses it rather than standing up a rival.
 const ClickHouseContainer = "langwatch-clickhouse"
 
+// ClickHouseDataVolume holds the server's data on the VM's own disk: a host
+// bind mount is virtiofs, where every part write costs tens of milliseconds.
+const ClickHouseDataVolume = "langwatch-clickhouse-data"
+
 // ClickHouseImage is Altinity's Stable Build: a well-managed, LTS-backported
 // ClickHouse image (as opposed to upstream's own release cadence). Chosen over
 // running clickhouse-server as a native host binary so every contributor's setup

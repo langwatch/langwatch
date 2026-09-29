@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -358,4 +359,35 @@ func EnvMap(lines []string) map[string]string {
 		m[key] = value
 	}
 	return m
+}
+
+// PostgresLaneConnectionLimit caps one Node lane's pool: ui, api and worker
+// each default to ten, which three stacks turn into the server's whole 100.
+const PostgresLaneConnectionLimit = 4
+
+// LaneDatabaseEnv names the lane on its Postgres connections (application_name,
+// so pg_stat_activity can attribute them) and bounds its pool. A DATABASE_URL
+// that already states either is left alone; a URL that does not parse is too.
+func LaneDatabaseEnv(env []string, lane string) []string {
+	out := append([]string{}, env...)
+	for i, kv := range out {
+		raw, ok := strings.CutPrefix(kv, "DATABASE_URL=")
+		if !ok {
+			continue
+		}
+		u, err := url.Parse(raw)
+		if err != nil {
+			return out
+		}
+		q := u.Query()
+		if !q.Has("application_name") {
+			q.Set("application_name", lane)
+		}
+		if !q.Has("connection_limit") {
+			q.Set("connection_limit", fmt.Sprint(PostgresLaneConnectionLimit))
+		}
+		u.RawQuery = q.Encode()
+		out[i] = "DATABASE_URL=" + u.String()
+	}
+	return out
 }

@@ -367,11 +367,12 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "db",
-		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url",
-		args:    "<reset|seed|url> [preset|engine]",
+		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url | prune (stray test/apidiff databases; dry run unless --yes)",
+		args:    "<reset|seed|url|prune> [preset|engine]",
 		maxArgs: 2,
 		flags: []flagSpec{
-			{long: "--yes", summary: "confirm a reset without prompting (required in agent mode)"},
+			{long: "--yes", summary: "confirm a reset without prompting (required in agent mode); drops for prune"},
+			{long: "--dry-run", summary: "prune: list the stray databases only (the default)"},
 		},
 		run: runDB,
 	},

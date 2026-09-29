@@ -78,8 +78,12 @@ func TestStackEnvIsWhatTheOverlayFileHeld(t *testing.T) {
 	for _, child := range children {
 		childValues := domain.EnvMap(child.Env)
 		for _, key := range []string{"LANGWATCH_SLUG", "BASE_HOST", "DATABASE_URL"} {
-			if childValues[key] != values[key] {
-				t.Errorf("lane %s: %s = %q, want the overlay's %q", child.Name, key, childValues[key], values[key])
+			want := values[key]
+			if key == "DATABASE_URL" && childValues[key] != want {
+				want = domain.EnvMap(domain.LaneDatabaseEnv(env, child.Name))[key]
+			}
+			if childValues[key] != want {
+				t.Errorf("lane %s: %s = %q, want the overlay's %q", child.Name, key, childValues[key], want)
 			}
 		}
 	}

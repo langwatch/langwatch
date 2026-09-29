@@ -18,7 +18,7 @@ import (
 // drop and asks, `--yes` replaces the prompt for scripts, and agent mode
 // never destroys without it.
 func runDB(ctx context.Context, d deps, inv invocation) error {
-	usage := "usage: haven db reset [preset] [--yes] | haven db seed [preset] | haven db url [postgres|clickhouse|redis]\n  presets: " + strings.Join(app.SeedPresetNames(), ", ")
+	usage := "usage: haven db reset [preset] [--yes] | haven db seed [preset] | haven db url [postgres|clickhouse|redis] | haven db prune [--dry-run|--yes]\n  presets: " + strings.Join(app.SeedPresetNames(), ", ")
 	if len(inv.args) == 0 {
 		return errors.New(usage)
 	}
@@ -50,6 +50,26 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 			return err
 		}
 		return d.orch.DBSeed(ctx, d.params, dbPresetArg(inv))
+	case "prune":
+		if inv.has("--dry-run") && inv.has("--yes") {
+			return fmt.Errorf("--dry-run and --yes contradict each other")
+		}
+		shouldAct := inv.has("--yes")
+		dbs, err := d.orch.PruneStrayDatabases(ctx, shouldAct)
+		verb := "would drop"
+		if shouldAct {
+			verb = "dropped"
+		}
+		for _, db := range dbs {
+			fmt.Printf("  %s %s\n", verb, db)
+		}
+		if !shouldAct && len(dbs) > 0 {
+			fmt.Println("dry run: re-run with --yes to drop these")
+		}
+		if len(dbs) == 0 {
+			fmt.Println("no stray databases older than HAVEN_DB_TTL")
+		}
+		return err
 	case "url":
 		if inv.has("--yes") {
 			return fmt.Errorf("--yes does not apply to `haven db url`")
