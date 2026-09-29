@@ -265,8 +265,11 @@ settled without whoever owns the D10 exit-gate review confirming it.
 ## References
 
 - `platform/app/scripts/ops/import-auth0-password-hashes.ts` — §1's import,
-  run locally by an operator against prod (`DATABASE_URL=... APPLY=1 pnpm tsx
+  run locally by an operator against prod (`AUTH0_EXPORT_PATH=... DATABASE_URL=...
+  REDIS_URL=... CLICKHOUSE_URL=... BASE_HOST=... ENVIRONMENT=... APPLY=1 pnpm tsx
   scripts/ops/import-auth0-password-hashes.ts`), never as a deployed task.
+  An APPLY ledgers each user id it writes beside the export, so a rerun
+  never attaches a second credential to a latched user.
   Dry-run by default; filters to bcrypt rows per §1's algorithm residual;
   writes through `PrismaCredentialAccountRepository.createCredentialAccount`,
   or `.updateAccountPassword` for a passkey placeholder row.
