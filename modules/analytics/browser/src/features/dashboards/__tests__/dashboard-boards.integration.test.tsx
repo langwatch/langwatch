@@ -77,11 +77,14 @@ function inMemoryServer({
   boards,
   widgets = [],
   refuseVisibility = false,
+  refuseWidgetCreate = false,
 }: {
   boards: Board[];
   widgets?: Widget[];
   /** Answers `setVisibility` as the server does for a member who is neither creator nor admin. */
   refuseVisibility?: boolean;
+  /** Answers `dashboardWidgets.create` as the server does when the write is rejected. */
+  refuseWidgetCreate?: boolean;
 }) {
   const state = {
     boards: boards.map((board) => ({ ...board })),
@@ -130,6 +133,9 @@ function inMemoryServer({
       case "dashboardWidgets.list":
         return Promise.resolve(state.widgets.map((widget) => ({ ...widget })));
       case "dashboardWidgets.create": {
+        if (refuseWidgetCreate) {
+          return Promise.reject(new UiProcedureRefusal("dashboard_widget_definition_invalid", 422));
+        }
         minted += 1;
         const widget: Widget = {
           id: `widget-new-${minted}`,
@@ -350,6 +356,27 @@ describe("a member's board", () => {
         expect(ask?.draft).toContain("Dashboard period:");
         expect(ask?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
         expect(ask?.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
+      });
+    });
+
+    describe("when the write fails", () => {
+      /** @scenario "AC12c A failed add keeps the picker open and does not seed Langy" */
+      it("keeps the picker open, seeds no Langy conversation, and stores no widget", async () => {
+        const user = userEvent.setup();
+        const server = inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true });
+        const { host } = openPicker(server);
+        const traffic = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
+          ({ id }) => id === "traffic",
+        )!;
+
+        await user.click(
+          await screen.findByRole("button", { name: new RegExp(escape(traffic.question)) }),
+        );
+
+        await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        expect(host.langyAsks).toEqual([]);
+        expect(server.state.widgets).toEqual([]);
       });
     });
   });

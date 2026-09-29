@@ -106,22 +106,9 @@ function promptWithWindow({ prompt, period }: { prompt: string; period: BoardPer
   return `${prompt}\n\n${window}`;
 }
 
-/** A picker question's prompt, asked with the board and its concrete window and grain. */
-export function boardPromptQuestion({
-  prompt,
-  board,
-  period,
-}: {
-  prompt: string;
-  board: BoardSubject;
-  period: BoardPeriod;
-}): AnalyticsLangyAskRequest {
-  return boardQuestion({ question: promptWithWindow({ prompt, period }), board, period });
-}
-
 /**
- * The same prompt as `boardPromptQuestion`, handed over as a composer draft
- * rather than sent: the reader adds the block, then reads and sends it (AC12).
+ * A picker question's prompt, handed over as a composer draft rather than
+ * sent: the reader adds the block, then reads and sends it (AC12).
  */
 export function boardPromptDraft({
   prompt,

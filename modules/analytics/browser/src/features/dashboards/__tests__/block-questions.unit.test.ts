@@ -6,7 +6,7 @@
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { boardPromptQuestion, boardSubject } from "../langy/model/board-langy.ts";
+import { boardPromptDraft, boardSubject } from "../langy/model/board-langy.ts";
 import { BLOCK_QUESTION_SECTIONS, searchBlockQuestions } from "../model/block-questions.ts";
 import { BOARD_LWQL_VIEWS } from "../model/board-lwql-views.ts";
 import { addedWidgetSlots, boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
@@ -41,9 +41,9 @@ describe("the picker's questions", () => {
     });
 
     /** @scenario "AC11 Ask Langy by question" */
-    it("asks Langy the prompt with the concrete period and grain and the board attached", () => {
+    it("drafts Langy the prompt with the concrete period and grain and the board attached", () => {
       const [first] = every;
-      const request = boardPromptQuestion({
+      const request = boardPromptDraft({
         prompt: first!.prompt,
         board: boardSubject({
           board: { id: "board-1", name: "Weekly review" },
@@ -52,11 +52,11 @@ describe("the picker's questions", () => {
         period: PERIOD,
       });
 
-      expect(request.question?.startsWith(first!.prompt)).toBe(true);
-      expect(request.question).toContain(
+      expect(request.draft?.startsWith(first!.prompt)).toBe(true);
+      expect(request.draft).toContain(
         "Dashboard period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z",
       );
-      expect(request.question).toContain("one bucket per 1 day");
+      expect(request.draft).toContain("one bucket per 1 day");
       expect(request.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
       expect(request.context[0]?.ref).toContain("widgets: Status");
     });

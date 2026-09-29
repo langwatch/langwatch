@@ -121,6 +121,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And picking one stores its widget on the board and opens no Langy conversation
     # Evidence: screenshot of the picker without Langy and the board with the new widget
 
+  @integration
+  Scenario: AC12c A failed add keeps the picker open and does not seed Langy
+    Given a board with Langy enabled and the member may start a conversation
+    When the member picks a question and the widget write is rejected
+    Then the picker stays open
+    And no widget is stored on the board
+    And Langy opens no conversation
+    # Evidence: the failed create call and the still-open picker
+
   # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
@@ -143,4 +152,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 9: "The docs explain how to build boards from an agent" → Scenario: AC9 The docs explain how to build boards from an agent
   # AC 10: "A non-empty board still offers a way to add a widget" → Scenario: AC10 A non-empty board still offers a way to add a widget
   # AC 11: "Existing boards are unaffected" → Scenario: AC11 Existing boards are unaffected
-  # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget
+  # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add keeps the picker open and does not seed Langy
