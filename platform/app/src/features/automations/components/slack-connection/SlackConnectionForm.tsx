@@ -7,26 +7,29 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
 import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert } from "~/features/errors";
 import type {
   SlackIntegrationKind,
   SlackIntegrationScopeType,
 } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import { DeleteSlackConnectionButton } from "./DeleteSlackConnectionButton";
 import { SlackAppSetupCallout } from "./SlackAppSetupCallout";
-import { maskedSecret, SLACK_CONNECTION_KINDS } from "./slackConnectionCopy";
+import {
+  maskedSecret,
+  narrowingConfirmation,
+  SLACK_CONNECTION_KINDS,
+} from "./slackConnectionCopy";
 import type {
   SlackConnection,
   SlackConnectionSaved,
 } from "./slackConnectionTypes";
+import { useSaveSlackConnection } from "./useSaveSlackConnection";
 import {
   type ConnectionScope,
-  type SlackConnectionDraft,
   useSlackConnectionFormState,
 } from "./useSlackConnectionFormState";
 
@@ -55,6 +58,7 @@ export function SlackConnectionForm({
     canManageOrganization,
   });
   const save = useSaveSlackConnection({ projectId, connection, onSaved });
+  const errorText = form.errorTexts(save.fieldRefusal);
 
   return (
     <VStack align="stretch" gap={5}>
@@ -74,7 +78,7 @@ export function SlackConnectionForm({
         onChange={form.setScopes}
         canManageProject={canManageProject}
         canManageOrganization={canManageOrganization}
-        isInvalid={form.errors.scope}
+        errorText={errorText.scope}
       />
       <SecretField
         kind={form.kind}
@@ -83,16 +87,12 @@ export function SlackConnectionForm({
         onSecretChange={form.setSecret}
         isReplacing={form.isReplacingSecret}
         onReplacingChange={form.changeReplacing}
-        isInvalid={form.errors.secret}
-      />
-      <HandledErrorAlert
-        error={save.error}
-        fallbackTitle="Couldn't save the Slack connection"
+        errorText={errorText.secret}
       />
       <SlackConnectionFormFooter
         projectId={projectId}
         connection={connection}
-        isSaving={save.isPending}
+        save={save}
         onSave={() => {
           const draft = form.submit();
           if (draft) save.run(draft);
@@ -100,6 +100,37 @@ export function SlackConnectionForm({
         onDeleted={onDeleted}
       />
     </VStack>
+  );
+}
+
+/** Asks before an organization connection other projects use is narrowed. */
+function NarrowingConfirmDialog({
+  name,
+  count,
+  isSaving,
+  onConfirm,
+  onCancel,
+}: {
+  name: string;
+  count: number | null;
+  isSaving: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const confirmation = narrowingConfirmation({ name, count: count ?? 0 });
+  return (
+    <ConfirmDialog
+      open={count !== null}
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+      title={confirmation.title}
+      message={confirmation.message}
+      confirmLabel={confirmation.confirmLabel}
+      tone="danger"
+      loading={isSaving}
+      onConfirm={onConfirm}
+    />
   );
 }
 
@@ -127,38 +158,55 @@ function ConnectionNameField({
   );
 }
 
-/** Save stays enabled except while a save is in flight; the handler validates. */
+/** The save's outcome and its buttons. Save stays enabled except while a save
+ *  is in flight (the handler validates), and a refused narrowing opens its
+ *  confirmation here, beside the Save it came from. */
 function SlackConnectionFormFooter({
   projectId,
   connection,
-  isSaving,
+  save,
   onSave,
   onDeleted,
 }: {
   projectId: string;
   connection: SlackConnection | undefined;
-  isSaving: boolean;
+  save: ReturnType<typeof useSaveSlackConnection>;
   onSave: () => void;
   onDeleted: () => void;
 }) {
   return (
-    <HStack justify="space-between">
-      <Button
-        colorPalette="blue"
-        disabled={isSaving}
-        loading={isSaving}
-        onClick={onSave}
-      >
-        {connection ? "Save" : "Add connection"}
-      </Button>
-      {connection ? (
-        <DeleteSlackConnectionButton
-          projectId={projectId}
-          connection={connection}
-          onDeleted={onDeleted}
-        />
-      ) : null}
-    </HStack>
+    <>
+      <HandledErrorAlert
+        error={save.error}
+        fallbackTitle="Couldn't save the Slack connection"
+      />
+      <HStack justify="space-between">
+        <Button
+          colorPalette="blue"
+          disabled={save.isPending}
+          loading={save.isPending}
+          onClick={onSave}
+        >
+          {connection ? "Save" : "Add connection"}
+        </Button>
+        {connection ? (
+          <>
+            <DeleteSlackConnectionButton
+              projectId={projectId}
+              connection={connection}
+              onDeleted={onDeleted}
+            />
+            <NarrowingConfirmDialog
+              name={connection.name}
+              count={save.narrowingCount}
+              isSaving={save.isPending}
+              onConfirm={save.confirmNarrowing}
+              onCancel={save.cancelNarrowing}
+            />
+          </>
+        ) : null}
+      </HStack>
+    </>
   );
 }
 
@@ -168,17 +216,17 @@ function ConnectionScopeField({
   onChange,
   canManageProject,
   canManageOrganization,
-  isInvalid,
+  errorText,
 }: {
   scopes: ConnectionScope[];
   onChange: (scopes: ConnectionScope[]) => void;
   canManageProject: boolean;
   canManageOrganization: boolean;
-  isInvalid: boolean;
+  errorText: string | undefined;
 }) {
   const { organization, project } = useOrganizationTeamProject();
   return (
-    <Field.Root invalid={isInvalid}>
+    <Field.Root invalid={errorText !== undefined}>
       <ScopeChipPicker<SlackIntegrationScopeType>
         value={scopes}
         onChange={onChange}
@@ -193,63 +241,9 @@ function ConnectionScopeField({
         currentOrganizationId={canManageOrganization ? organization?.id : null}
         currentProjectId={canManageProject ? project?.id : null}
       />
-      <Field.ErrorText>Choose who can use the connection.</Field.ErrorText>
+      <Field.ErrorText>{errorText}</Field.ErrorText>
     </Field.Root>
   );
-}
-
-/** Create and update as one save, reporting through the form's inline alert:
- *  a refused secret (already stored, or rejected by Slack) belongs next to the
- *  field that holds it, not in a toast that disappears. */
-function useSaveSlackConnection({
-  projectId,
-  connection,
-  onSaved,
-}: {
-  projectId: string;
-  connection: SlackConnection | undefined;
-  onSaved: (saved: SlackConnectionSaved) => void;
-}) {
-  const utils = api.useUtils();
-  const create = api.slackIntegration.create.useMutation();
-  const update = api.slackIntegration.update.useMutation();
-  const done = (saved: SlackConnectionSaved, title: string) => {
-    void utils.slackIntegration.list.invalidate();
-    toaster.create({ type: "success", title });
-    onSaved(saved);
-  };
-
-  const run = ({ kind, name, scope, secret }: SlackConnectionDraft) => {
-    if (connection) {
-      update.mutate(
-        { projectId, id: connection.id, name, ...scope, secret },
-        {
-          onSuccess: () =>
-            done(
-              { connectionId: connection.id, name, kind: connection.kind },
-              "Slack connection saved",
-            ),
-        },
-      );
-      return;
-    }
-    create.mutate(
-      { projectId, name, kind, ...scope, secret: secret ?? "" },
-      {
-        onSuccess: (created) =>
-          done(
-            { connectionId: created.id, name, kind: created.kind },
-            "Slack connection added",
-          ),
-      },
-    );
-  };
-
-  return {
-    run,
-    error: create.error ?? update.error,
-    isPending: create.isPending || update.isPending,
-  };
 }
 
 function KindField({
@@ -307,7 +301,7 @@ interface SecretFieldProps {
   onSecretChange: (secret: string) => void;
   isReplacing: boolean;
   onReplacingChange: (replacing: boolean) => void;
-  isInvalid: boolean;
+  errorText: string | undefined;
 }
 
 /** A saved secret shows only its last four characters; typing a new one is
@@ -319,7 +313,7 @@ function SecretField({
   onSecretChange,
   isReplacing,
   onReplacingChange,
-  isInvalid,
+  errorText,
 }: SecretFieldProps) {
   const isBot = kind === "BOT";
   const label = isBot ? "Bot User OAuth token" : "Webhook URL";
@@ -335,7 +329,7 @@ function SecretField({
   return (
     <VStack align="stretch" gap={2}>
       {isBot ? <SlackAppSetupCallout /> : <WebhookHelp />}
-      <Field.Root required invalid={isInvalid}>
+      <Field.Root required invalid={errorText !== undefined}>
         <Field.Label>{label}</Field.Label>
         <Input
           type="password"
@@ -344,9 +338,7 @@ function SecretField({
           onChange={(event) => onSecretChange(event.target.value)}
           placeholder={isBot ? "xoxb-…" : "https://hooks.slack.com/services/…"}
         />
-        <Field.ErrorText>
-          {isBot ? "Paste the bot token." : "Paste the webhook URL."}
-        </Field.ErrorText>
+        <Field.ErrorText>{errorText}</Field.ErrorText>
         {secretHint !== undefined ? (
           <Field.HelperText>
             Every automation using this connection switches to the new secret

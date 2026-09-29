@@ -4,6 +4,7 @@ import type {
   SlackIntegrationScopeType,
 } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { SlackFieldRefusal } from "./slackConnectionCopy";
 import type { SlackConnection } from "./slackConnectionTypes";
 
 export interface ConnectionScope {
@@ -45,6 +46,7 @@ export function useSlackConnectionFormState({
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const scope = scopes[0];
   const missing = missingFields({ name, scope, secret, isReplacingSecret });
+  const errors = hasAttemptedSubmit ? missing : NO_ERRORS;
 
   const submit = (): SlackConnectionDraft | undefined => {
     setHasAttemptedSubmit(true);
@@ -73,12 +75,34 @@ export function useSlackConnectionFormState({
     setSecret,
     isReplacingSecret,
     changeReplacing,
-    errors: hasAttemptedSubmit ? missing : NO_ERRORS,
+    errors,
+    errorTexts: (refusal: SlackFieldRefusal) =>
+      fieldErrorTexts({ missing: errors, refusal, isBot: kind === "BOT" }),
     submit,
   };
 }
 
 const NO_ERRORS = { name: false, scope: false, secret: false };
+
+/** Missing-field copy first; otherwise the field a refused save named. */
+function fieldErrorTexts({
+  missing,
+  refusal,
+  isBot,
+}: {
+  missing: { scope: boolean; secret: boolean };
+  refusal: SlackFieldRefusal;
+  isBot: boolean;
+}): SlackFieldRefusal {
+  return {
+    scope: missing.scope ? "Choose who can use the connection." : refusal.scope,
+    secret: missing.secret
+      ? isBot
+        ? "Paste the bot token."
+        : "Paste the webhook URL."
+      : refusal.secret,
+  };
+}
 
 function missingFields({
   name,

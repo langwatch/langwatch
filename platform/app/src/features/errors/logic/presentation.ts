@@ -3402,10 +3402,11 @@ const presentations = {
     title: "Automations still use this Slack connection",
     describe: (error) => {
       const count = num(error, "dependentAutomations", 0);
-      if (count === 1) return "1 automation stops delivering if you delete it.";
+      if (count === 1)
+        return "1 automation delivers through it and would stop.";
       if (count > 1)
-        return `${count} automations stop delivering if you delete it.`;
-      return "Automations using it stop delivering if you delete it.";
+        return `${count} automations deliver through it and would stop.`;
+      return "Automations deliver through it and would stop.";
     },
   },
   missing_annotator: {

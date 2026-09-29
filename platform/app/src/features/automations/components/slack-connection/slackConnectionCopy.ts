@@ -99,3 +99,45 @@ export function readInUseCount({
   const count = handled.meta.dependentAutomations;
   return typeof count === "number" ? count : fallback;
 }
+
+/** What narrowing an organization connection to one project costs. */
+export function narrowingConfirmation({
+  name,
+  count,
+}: {
+  name: string;
+  count: number;
+}): { title: string; message: string; confirmLabel: string } {
+  return {
+    title: `Limit "${name}" to this project?`,
+    message:
+      count === 1
+        ? "1 automation in another project stops delivering until it picks another connection."
+        : `${count} automations in other projects stop delivering until they pick another connection.`,
+    confirmLabel: "Limit to this project",
+  };
+}
+
+/** A save refused on one field, worded for that field. */
+export interface SlackFieldRefusal {
+  scope?: string;
+  secret?: string;
+}
+
+/** The field a refused save names (`invalid_action_params` with `meta.field`), or none. */
+export function readFieldRefusal(error: unknown): SlackFieldRefusal {
+  const handled = readHandledError(error);
+  if (handled?.code !== "invalid_action_params") return {};
+  if (handled.meta.field === "scopeId") {
+    return {
+      scope: "A connection belongs to this project or to its organization.",
+    };
+  }
+  if (handled.meta.field === "secret") {
+    return {
+      secret:
+        "That isn't a Slack incoming webhook URL. It starts with https://hooks.slack.com/services/.",
+    };
+  }
+  return {};
+}

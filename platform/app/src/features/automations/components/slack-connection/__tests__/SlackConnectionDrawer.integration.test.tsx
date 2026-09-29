@@ -37,6 +37,8 @@ const state = vi.hoisted(() => ({
   createError: null as unknown,
   createCalls: [] as Record<string, unknown>[],
   updateCalls: [] as Record<string, unknown>[],
+  /** What each update call answers: an error to raise, or success. */
+  updateAnswers: new Array<unknown>(),
   deleteCalls: [] as Record<string, unknown>[],
   /** What each delete call answers: an error to raise, or success. */
   deleteAnswers: [] as Array<unknown | null>,
@@ -74,8 +76,11 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({
           mutate: (input: Record<string, unknown>, opts?: MutationOptions) => {
             state.updateCalls.push(input);
-            opts?.onSuccess?.({});
+            const answer = state.updateAnswers.shift() ?? null;
+            if (answer) opts?.onError?.(answer);
+            else opts?.onSuccess?.({});
           },
+          reset: vi.fn(),
           isPending: false,
           error: null,
         }),
@@ -148,6 +153,7 @@ describe("SlackConnectionDrawer", () => {
     state.createError = null;
     state.createCalls.length = 0;
     state.updateCalls.length = 0;
+    state.updateAnswers.length = 0;
     state.deleteCalls.length = 0;
     state.deleteAnswers.length = 0;
     state.closeDrawer.mockReset();
@@ -280,6 +286,64 @@ describe("SlackConnectionDrawer", () => {
       expect(
         screen.getByText(/already saved as "Alerts bot"/i),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("when a webhook URL is refused by the server", () => {
+    it("says so on the webhook field instead of in a generic alert", async () => {
+      const user = userEvent.setup();
+      state.createError = handledError("invalid_action_params", {
+        field: "secret",
+      });
+      renderDrawer({});
+
+      await user.click(screen.getByText("Incoming webhook"));
+
+      expect(
+        screen.getByText(/isn't a Slack incoming webhook URL/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("This action isn't configured correctly"),
+      ).toBeNull();
+    });
+  });
+
+  describe("when an organization connection other projects use is narrowed to this project", () => {
+    it("asks first with the count, then resends the update with force", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+      state.connections = [
+        connection({ scopeType: "ORGANIZATION", scopeId: "org-1" }),
+      ];
+      state.updateAnswers.push(
+        handledError("slack_connection_in_use", { dependentAutomations: 2 }),
+      );
+      renderDrawer({ connectionId: "conn-1", onClose });
+
+      await user.click(screen.getByTestId("quick-scope-project"));
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(
+        await screen.findByText(
+          "2 automations in other projects stop delivering until they pick another connection.",
+        ),
+      ).toBeInTheDocument();
+      expect(state.updateCalls).toHaveLength(1);
+      expect(state.updateCalls[0]).not.toHaveProperty("force");
+      expect(onClose).not.toHaveBeenCalled();
+
+      await user.click(
+        screen.getByRole("button", { name: "Limit to this project" }),
+      );
+
+      await waitFor(() => expect(state.updateCalls).toHaveLength(2));
+      expect(state.updateCalls[1]).toMatchObject({
+        id: "conn-1",
+        scopeType: "PROJECT",
+        scopeId: "project-1",
+        force: true,
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 
