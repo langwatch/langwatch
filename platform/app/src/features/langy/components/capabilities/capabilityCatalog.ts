@@ -304,10 +304,11 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "dashboard widget", plural: "dashboard widgets" },
   },
+  // `langwatch trigger` is the CLI's word; the product's is automation.
   trigger: {
     surface: "automations",
     digestStrategy: "id-ref",
-    noun: { singular: "trigger", plural: "triggers" },
+    noun: { singular: "automation", plural: "automations" },
   },
   projects: {
     surface: "projects",

@@ -44,6 +44,14 @@ export const slackActionParamsSchema = z
     // A connection carries its own secret; the server derives the method from
     // its kind, and a bot connection's missing channel is refused there.
     if (p.slackIntegrationId) return;
+    if (!p.slackDelivery && !p.slackWebhook?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Choose a Slack connection.",
+        path: ["slackIntegrationId"],
+      });
+      return;
+    }
     const method = p.slackDelivery ?? "webhook";
     if (method === "webhook") {
       const url = p.slackWebhook?.trim();
