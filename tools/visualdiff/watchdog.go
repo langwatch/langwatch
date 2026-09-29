@@ -52,6 +52,7 @@ type bootWatch struct {
 	lastMove  time.Time
 	lastPhase string
 	lastCPU   float64
+	lastTree  string
 	wasLive   bool
 }
 
@@ -96,9 +97,12 @@ func (watch *bootWatch) check(now time.Time, raw []byte) error {
 	}
 	watch.wasLive = watch.wasLive || stack.Live
 	if watch.stall > 0 && now.Sub(watch.lastMove) > watch.stall {
-		// A silent migration or seed still burns CPU; only a tree that also sat idle is stalled.
-		if cpu := treeCPUSeconds(stack.LauncherPid); cpu > watch.lastCPU+0.5 {
-			watch.lastCPU, watch.lastMove = cpu, now
+		// A quiet stack that still starts, ends or runs processes is working, not stalled.
+		tree, cpu := treeActivity(stack.LauncherPid)
+		moved := tree != watch.lastTree || cpu > watch.lastCPU+0.2
+		watch.lastTree, watch.lastCPU = tree, cpu
+		if moved {
+			watch.lastMove = now
 			return nil
 		}
 		return fmt.Errorf("stack-broken: %s: no log line and no lane change for %s (logs %s)\nlast lines:\n%s\nprocess tree:\n%s",
@@ -140,13 +144,14 @@ func treePids(pid int) []string {
 	return pids
 }
 
-// treeCPUSeconds is the CPU time the launcher's live tree has used, from ps's
-// `time` column ([[h:]m:]s.ss); 0 when there is no launcher.
-func treeCPUSeconds(pid int) float64 {
+// treeActivity is the launcher's live pids and the CPU time they have used,
+// from ps's `time` column ([[h:]m:]s.ss); empty when there is no launcher.
+func treeActivity(pid int) (string, float64) {
 	if pid <= 0 {
-		return 0
+		return "", 0
 	}
-	out, _ := exec.CommandContext(context.Background(), "ps", "-o", "time=", "-p", strings.Join(treePids(pid), ",")).Output()
+	pids := treePids(pid)
+	out, _ := exec.CommandContext(context.Background(), "ps", "-o", "time=", "-p", strings.Join(pids, ",")).Output()
 	total := 0.0
 	for _, field := range strings.Fields(string(out)) {
 		seconds := 0.0
@@ -156,7 +161,7 @@ func treeCPUSeconds(pid int) float64 {
 		}
 		total += seconds
 	}
-	return total
+	return strings.Join(pids, ","), total
 }
 
 // processTree lists pid and every descendant with ps.
