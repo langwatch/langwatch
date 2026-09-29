@@ -124,6 +124,16 @@ describe("given a signed-in reader", () => {
       expect(screen.getByTestId("two-factor-section")).toBeTruthy();
       expect(screen.getByTestId("password-section")).toBeTruthy();
     });
+
+    it("says what the page is for under its heading", () => {
+      renderScreen();
+
+      expect(
+        screen.getByText(
+          "The ways you sign in, and how you would get back in if you lost one of them.",
+        ),
+      ).toBeTruthy();
+    });
   });
 });
 

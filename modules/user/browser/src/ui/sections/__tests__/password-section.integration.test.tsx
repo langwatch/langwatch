@@ -15,15 +15,17 @@ const { state } = vi.hoisted(() => ({
   state: {
     authProvider: "email" as string | undefined,
     emailPasswordEnabled: false,
-    accounts: [] as { provider: string; providerAccountId: string }[],
+    accounts: [] as { id?: string; provider: string; providerAccountId: string }[],
     hasPassword: true,
     changeRejectsWith: void 0 as unknown,
+    identifiers: [] as Record<string, unknown>[],
   },
 }));
 
 const calls = vi.hoisted(() => ({
   changePassword: vi.fn(),
   setPassword: vi.fn(),
+  unlinkAccount: vi.fn(),
 }));
 
 vi.mock("../../../behavior/personal-workspace-api.ts", () => {
@@ -36,8 +38,18 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
   const api = {
     useUtils: () => ({
       user: { getLinkedAccounts: { invalidate: vi.fn() }, hasPassword: { invalidate: vi.fn() } },
+      identity: { myIdentifiers: { invalidate: vi.fn() } },
     }),
+    identity: {
+      myIdentifiers: {
+        useQuery: () => ({ data: state.identifiers, isPending: false, error: null }),
+      },
+    },
     user: {
+      unlinkAccount: mutation((input) => {
+        calls.unlinkAccount(input);
+        return { ok: true };
+      }),
       hasPassword: {
         useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
       },
@@ -62,6 +74,8 @@ beforeEach(() => {
   state.accounts = [];
   state.hasPassword = true;
   state.changeRejectsWith = void 0;
+  state.identifiers = [];
+  calls.unlinkAccount.mockReset();
   calls.changePassword.mockReset();
   calls.setPassword.mockReset();
 });
@@ -110,6 +124,16 @@ describe("given an email deployment", () => {
 
       expect(screen.getByTestId("password-action")).toHaveTextContent("Change Password");
       expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
+    });
+
+    it("describes the section in the words the page always used", () => {
+      renderSection();
+
+      expect(
+        screen.getByText(
+          "The password this account signs in with, on the screens that ask for one.",
+        ),
+      ).toBeTruthy();
     });
 
     /** @scenario "Every password field on the page masks what is typed into it" */
@@ -194,6 +218,71 @@ describe("given an email deployment", () => {
       await waitFor(() =>
         expect(calls.setPassword).toHaveBeenCalledWith({ password: "new-pw-123456" }),
       );
+    });
+  });
+});
+
+function passwordVerdict(overrides: Record<string, unknown> = {}) {
+  return {
+    identifierId: "id-1",
+    accountId: "acc-pw",
+    provider: "email",
+    value: "sam@acme.test",
+    isPrimary: true,
+    confirmed: true,
+    resendable: false,
+    removable: true,
+    refusalCode: null,
+    demotesFirst: false,
+    ...overrides,
+  };
+}
+
+describe("given an account that holds a password and the identity module's verdict on it", () => {
+  beforeEach(() => {
+    state.accounts = [{ id: "acc-pw", provider: "credential", providerAccountId: "u-1" }];
+  });
+
+  describe("when the detach guard allows it", () => {
+    /** @scenario "Removing the password asks first and says what stays" */
+    it("offers Remove password, asks first, and unlinks the credential account on confirm", async () => {
+      state.identifiers = [passwordVerdict()];
+      const host = renderSection();
+
+      await userEvent.click(screen.getByTestId("remove-password"));
+      await waitFor(() => expect(screen.getByTestId("unlink-method-dialog")).toBeTruthy());
+      expect(calls.unlinkAccount).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByTestId("confirm-unlink-method"));
+
+      await waitFor(() =>
+        expect(calls.unlinkAccount).toHaveBeenCalledWith({ accountId: "acc-pw" }),
+      );
+      await waitFor(() =>
+        expect(host.recording.successes).toContainEqual(
+          expect.objectContaining({ title: "Password removed" }),
+        ),
+      );
+    });
+  });
+
+  describe("when the detach guard refuses it", () => {
+    /** @scenario "Removing the password is refused before it is clicked where it is the last way in" */
+    it("stands the button down and says why on hover", async () => {
+      state.identifiers = [
+        passwordVerdict({ removable: false, refusalCode: "last_sign_in_method" }),
+      ];
+      renderSection();
+
+      expect((screen.getByTestId("remove-password") as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.getByTestId("remove-password-blocked")).toBeTruthy();
+    });
+  });
+
+  describe("when the identity module has no verdict for the account yet", () => {
+    it("offers no removal rather than a guess", () => {
+      renderSection();
+
+      expect(screen.queryByTestId("remove-password")).toBeNull();
     });
   });
 });

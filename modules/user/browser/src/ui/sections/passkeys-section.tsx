@@ -3,6 +3,7 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -19,6 +20,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { useLastWayInWarning } from "../../behavior/use-last-way-in-warning.ts";
 import { readableDate } from "../../model/display-formatters.ts";
 import {
   usePersonalWorkspaceHost,
@@ -242,6 +244,20 @@ function PasskeyGroup({
   );
 }
 
+function LastWayInNotice({ passkeys }: { passkeys: number | undefined }) {
+  const warning = useLastWayInWarning({ passkeys });
+  if (!warning) return null;
+
+  return (
+    <Alert.Root status="warning" variant="surface" data-testid="last-way-in-notice">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>{warning.message}</Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
 export function PasskeysSection() {
   const host = usePersonalWorkspaceHost();
   const passkeysEnabled = host.deployment().passkeysEnabled;
@@ -335,11 +351,12 @@ export function PasskeysSection() {
             <Text fontWeight={600}>Passkeys</Text>
           </HStack>
           <Text color="fg.muted" fontSize="sm">
-            Passkeys can be created and saved on your devices, like your phone or laptop, or on
-            security keys. With passkeys on your devices, you don&apos;t need to remember complex
-            passwords.
+            Sign in with the fingerprint, face or screen lock you already use. There is nothing to
+            remember and nothing to phish.
           </Text>
         </VStack>
+
+        <LastWayInNotice passkeys={isPending ? undefined : held.length} />
 
         {isPending ? <Spinner size="sm" /> : null}
 
@@ -347,13 +364,13 @@ export function PasskeysSection() {
           <Card.Root width="full" data-testid="passkeys-empty">
             <Card.Body>
               <VStack align="start" gap={3}>
+                <Text fontWeight={500}>No passkeys yet</Text>
                 {/* Said in terms of what somebody already does with their device,
                   because "public key credential" is not a thing anybody has ever
                   wanted. */}
                 <Text fontSize="sm">
-                  Passkeys are encrypted digital keys you create using your fingerprint, face, or
-                  screen lock. They are saved in your credential manager, so you can sign in on
-                  other devices.
+                  A passkey is an encrypted key you create with your fingerprint, face or screen
+                  lock. It is kept by your passkey provider, so it works on your other devices too.
                 </Text>
                 <Button
                   colorPalette="orange"

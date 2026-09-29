@@ -7,21 +7,19 @@
 import { Heading, Text, VStack } from "@chakra-ui/react";
 
 import { TwoStepVerificationSection } from "../../../features/two-step-verification/ui/sections/two-step-verification-section.tsx";
-import { usePersonalWorkspaceHost } from "../../../model/personal-workspace-host.ts";
 import { EmailAndLinkedAccountsSection } from "../email-and-linked-accounts-section.tsx";
 import { EnterpriseCapabilitiesSection } from "../enterprise-capabilities-section.tsx";
 import { PasskeysSection } from "../passkeys-section.tsx";
 import { PasswordSection } from "../password-section.tsx";
 
 export default function SecurityScreen() {
-  const host = usePersonalWorkspaceHost();
-  const email = host.currentUser()?.email;
-
   return (
     <VStack gap={6} width="full" align="start">
       <VStack align="start" gap={1}>
         <Heading as="h2">Security</Heading>
-        {email && <Text color="fg.muted">({email})</Text>}
+        <Text color="fg.muted">
+          The ways you sign in, and how you would get back in if you lost one of them.
+        </Text>
       </VStack>
 
       <EmailAndLinkedAccountsSection />

@@ -6,16 +6,33 @@
 
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
 import type { FakePersonalHostOptions } from "../../../testing.tsx";
 import { PasskeysSection } from "../passkeys-section.tsx";
 
-vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
-  personalWorkspaceApi: {},
-  api: {},
+const { state } = vi.hoisted(() => ({
+  state: {
+    accounts: [] as { id: string; provider: string; providerAccountId: string }[],
+    hasPassword: false,
+  },
 }));
+
+vi.mock("../../../behavior/personal-workspace-api.ts", () => {
+  const api = {
+    user: {
+      getLinkedAccounts: { useQuery: () => ({ data: state.accounts }) },
+      hasPassword: { useQuery: () => ({ data: { hasPassword: state.hasPassword } }) },
+    },
+  };
+  return { personalWorkspaceApi: api, api };
+});
+
+beforeEach(() => {
+  state.accounts = [];
+  state.hasPassword = false;
+});
 
 const LAPTOP = {
   id: "pk-laptop",
@@ -81,8 +98,20 @@ describe("given an account with no passkeys", () => {
       renderSection({ passkeys: [] });
 
       await waitFor(() => expect(screen.getByTestId("passkeys-empty")).toBeTruthy());
-      expect(screen.getByText(/fingerprint, face, or screen lock/i)).toBeTruthy();
+      expect(screen.getByText("No passkeys yet")).toBeTruthy();
+      expect(screen.getByText(/A passkey is an encrypted key/i)).toBeTruthy();
       expect(screen.getByTestId("create-passkey")).toBeTruthy();
+    });
+  });
+
+  describe("when the password is the only way in", () => {
+    it("warns that a forgotten password would leave them outside", async () => {
+      state.hasPassword = true;
+      state.accounts = [{ id: "acc-pw", provider: "credential", providerAccountId: "u-1" }];
+      renderSection({ passkeys: [] });
+
+      const notice = await screen.findByTestId("last-way-in-notice");
+      expect(notice.textContent).toMatch(/Your password is the only way into this account/);
     });
   });
 
@@ -146,6 +175,17 @@ describe("given an account with no passkeys", () => {
         }),
       );
     });
+  });
+});
+
+describe("given a passkey alongside a password", () => {
+  it("says nothing about a last way in", async () => {
+    state.hasPassword = true;
+    state.accounts = [{ id: "acc-pw", provider: "credential", providerAccountId: "u-1" }];
+    renderSection({ passkeys: [LAPTOP] });
+
+    await screen.findByText("Work laptop");
+    expect(screen.queryByTestId("last-way-in-notice")).toBeNull();
   });
 });
 
