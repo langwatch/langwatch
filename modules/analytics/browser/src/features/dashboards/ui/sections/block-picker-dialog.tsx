@@ -1,7 +1,7 @@
 /**
- * The "Add a block" picker. A question closes it and asks Langy with the board
- * attached, writing nothing; a pinned footer always offers to ask Langy anything else.
- * With Langy unavailable to the member, no question can be sent, so the picker is empty.
+ * The "Add a block" picker. Every question is always listed; choosing one adds
+ * its widget(s) to the board and then, when Langy is available, opens Langy with
+ * the question's prompt as a draft to send. A pinned footer asks Langy anything else.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
@@ -29,7 +29,7 @@ import { useRef, useState } from "react";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
   type BoardSubject,
-  boardPromptQuestion,
+  boardPromptDraft,
   boardQuestion,
 } from "../../langy/model/board-langy.ts";
 import {
@@ -60,28 +60,35 @@ const QUESTION_ICONS: Readonly<Record<BlockQuestionIcon, LucideIcon>> = {
 export function BlockPickerDialog({
   board,
   period,
+  onAddWidgets,
   onClose,
 }: {
   /** The board the picker opened on, attached as Langy's context. */
   board: BoardSubject;
   period: BoardPeriod;
+  /** Adds the picked question's widget(s) to the board; false when the write failed. */
+  onAddWidgets: (question: BlockQuestion) => Promise<boolean>;
   onClose: () => void;
 }) {
   const langy = useLangyAsk();
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const sections = langy.enabled
-    ? searchBlockQuestions({ sections: BLOCK_QUESTION_SECTIONS, search })
-    : [];
+  const sections = searchBlockQuestions({ sections: BLOCK_QUESTION_SECTIONS, search });
   const typed = search.trim();
   const hasMatches = sections.length > 0;
   const canAskOnEnter = langy.enabled && !hasMatches && typed.length > 0;
 
-  const ask = (question: BlockQuestion) => {
-    langy.ask(boardPromptQuestion({ prompt: question.prompt, board, period }));
+  const addBlock = async (question: BlockQuestion) => {
+    // A failed write is reported by the host; leave the picker open and seed nothing.
+    if (!(await onAddWidgets(question))) return;
+    if (langy.enabled) {
+      langy.ask(boardPromptDraft({ prompt: question.prompt, board, period }));
+    }
     onClose();
   };
+
+  const choose = (question: BlockQuestion) => void addBlock(question);
 
   const askLangy = (text: string) => {
     const question = text.trim() === "" ? "Help me build a dashboard" : text;
@@ -124,13 +131,13 @@ export function BlockPickerDialog({
         <Dialog.Body overflowY="auto" paddingY={5}>
           <VStack align="stretch" gap={6}>
             {sections.map((section) => (
-              <QuestionSection key={section.id} section={section} onChoose={ask} />
+              <QuestionSection key={section.id} section={section} onChoose={choose} />
             ))}
             {!hasMatches && (
               <Text fontSize="13px" color="fg.muted">
                 {langy.enabled
                   ? "No matching questions. Ask Langy below."
-                  : "Nothing matches your search."}
+                  : "No matching questions."}
               </Text>
             )}
           </VStack>

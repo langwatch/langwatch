@@ -30,5 +30,7 @@ export interface BoardTemplate {
   readonly id: BoardTemplateId;
   readonly name: string;
   readonly description: string;
+  /** A short, user-facing line for the template card; falls back to `description`. */
+  readonly summary?: string;
   readonly widgets: readonly BoardTemplateWidget[];
 }

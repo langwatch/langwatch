@@ -8,7 +8,14 @@ import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import type { DashboardWidgetDraft } from "../../../model/dashboard-widget-definition.ts";
-import { type BoardWidget, boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
+import type { BlockQuestion } from "../model/block-questions.ts";
+import {
+  addedWidgetSlots,
+  type BoardWidget,
+  boardWidgetsOf,
+  duplicateSlot,
+} from "../model/board-widgets.ts";
+import { questionWidgets } from "../templates/model/question-widgets.ts";
 
 export function useBoardWidgets() {
   const host = useAnalyticsHost();
@@ -61,6 +68,40 @@ export function useBoardWidgets() {
       },
     });
 
+  /**
+   * Adds a picked question's widget(s) to the board below what is there, in one
+   * layout write, and reports whether they landed so the caller only seeds Langy
+   * on success.
+   */
+  const addQuestionWidgets = ({
+    dashboardId,
+    question,
+  }: {
+    dashboardId: string;
+    question: BlockQuestion;
+  }) =>
+    write({
+      fallbackTitle: "Couldn't add the block",
+      work: async () => {
+        const widgets = questionWidgets(question.id);
+        const placements = widgetsOn(dashboardId).map(({ placement }) => placement);
+        const slots = addedWidgetSlots({ placements, widgets });
+        const layouts = await Promise.all(
+          widgets.map(async (widget, index) => {
+            const created = await create.mutateAsync({
+              projectId,
+              dashboardId,
+              name: widget.name,
+              code: widget.definition.code,
+              queries: widget.definition.queries,
+            });
+            return { graphId: created.id, ...slots[index]! };
+          }),
+        );
+        await batchUpdateLayouts.mutateAsync({ projectId, layouts });
+      },
+    });
+
   const saveWidget = ({
     widgetId,
     draft,
@@ -106,6 +147,7 @@ export function useBoardWidgets() {
       remove.isPending ||
       batchUpdateLayouts.isPending,
     duplicateWidget,
+    addQuestionWidgets,
     saveWidget,
     removeWidget,
     commitPlacements,

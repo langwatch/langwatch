@@ -163,6 +163,32 @@ describe("BOARD_TEMPLATES", () => {
           expect(names.length, name).toBe(asked.length);
         }
       });
+
+      /** @scenario "AC6 Template tables are shorter than template charts" */
+      it("keeps every table widget at most 4 grid rows high", () => {
+        for (const { name, definition, layout } of widgets) {
+          if (!definition.code.includes("<table")) continue;
+          expect(layout.rowSpan, name).toBeLessThanOrEqual(4);
+        }
+      });
+
+      /** @scenario "AC6 Template tables are shorter than template charts" */
+      it("never overlaps two widgets on the grid", () => {
+        for (let i = 0; i < widgets.length; i++) {
+          for (let j = i + 1; j < widgets.length; j++) {
+            const a = widgets[i]!.layout;
+            const b = widgets[j]!.layout;
+            const columnsOverlap =
+              a.gridColumn < b.gridColumn + b.colSpan && b.gridColumn < a.gridColumn + a.colSpan;
+            const rowsOverlap =
+              a.gridRow < b.gridRow + b.rowSpan && b.gridRow < a.gridRow + a.rowSpan;
+            expect(
+              columnsOverlap && rowsOverlap,
+              `${widgets[i]!.name} vs ${widgets[j]!.name}`,
+            ).toBe(false);
+          }
+        }
+      });
     },
   );
 });

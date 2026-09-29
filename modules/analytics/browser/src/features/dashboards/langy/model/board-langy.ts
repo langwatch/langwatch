@@ -98,8 +98,19 @@ export function boardQuestion({
   return { question: question.trim(), context: [boardAskContext({ board, period })] };
 }
 
-/** A picker question's prompt, asked with the board and its concrete window and grain. */
-export function boardPromptQuestion({
+/** A picker question's prompt with the board's concrete window and grain appended. */
+function promptWithWindow({ prompt, period }: { prompt: string; period: BoardPeriod }): string {
+  const window =
+    `Dashboard period: ${periodText(period)} (UTC). ` +
+    `Dashboard grain: one bucket per ${grainText(period.granularitySeconds)}.`;
+  return `${prompt}\n\n${window}`;
+}
+
+/**
+ * A picker question's prompt, handed over as a composer draft rather than
+ * sent: the reader adds the block, then reads and sends it (AC12).
+ */
+export function boardPromptDraft({
   prompt,
   board,
   period,
@@ -108,8 +119,8 @@ export function boardPromptQuestion({
   board: BoardSubject;
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
-  const window =
-    `Dashboard period: ${periodText(period)} (UTC). ` +
-    `Dashboard grain: one bucket per ${grainText(period.granularitySeconds)}.`;
-  return boardQuestion({ question: `${prompt}\n\n${window}`, board, period });
+  return {
+    draft: promptWithWindow({ prompt, period }),
+    context: [boardAskContext({ board, period })],
+  };
 }

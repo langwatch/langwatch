@@ -23,7 +23,8 @@ export const statusCode = ({ source }: { source: WidgetSource }) =>
     components: `// rising is what a rise means for this figure: "good", "bad" or "neutral".
 function Change({ current, previous, rising }) {
   const line = { marginTop: 2, fontSize: 11, fontWeight: 500 };
-  if (previous <= 0 && current > 0) return <div style={{ ...line, color: C.faint }}>New</div>;
+  if (previous <= 0 && current > 0)
+    return <div style={{ ...line, color: C.faint }}>No earlier data</div>;
   const delta = previous > 0 ? (current - previous) / previous : 0;
   const up = delta > 0.0005;
   const down = delta < -0.0005;

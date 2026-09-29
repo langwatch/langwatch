@@ -64,3 +64,28 @@ export function duplicateSlot({
     rowSpan: original.rowSpan,
   };
 }
+
+/** One added widget's layout, before the created widget's id is known. */
+type WidgetSlot = Omit<ChartGridPlacement, "graphId">;
+
+/**
+ * Where a run of template widgets lands when added to a board: below what is
+ * there already, keeping the widgets' columns and their layout relative to each
+ * other, with the topmost dropped flush to the board's bottom row (no gap).
+ */
+export function addedWidgetSlots({
+  placements,
+  widgets,
+}: {
+  placements: readonly ChartGridPlacement[];
+  widgets: readonly { layout: WidgetSlot }[];
+}): WidgetSlot[] {
+  const bottom = chartGridBottomRow(placements);
+  const topRow = Math.min(...widgets.map(({ layout }) => layout.gridRow));
+  return widgets.map(({ layout }) => ({
+    gridColumn: layout.gridColumn,
+    gridRow: layout.gridRow - topRow + bottom,
+    colSpan: layout.colSpan,
+    rowSpan: layout.rowSpan,
+  }));
+}

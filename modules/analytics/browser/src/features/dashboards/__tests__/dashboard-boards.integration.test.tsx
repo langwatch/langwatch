@@ -77,11 +77,14 @@ function inMemoryServer({
   boards,
   widgets = [],
   refuseVisibility = false,
+  refuseWidgetCreate = false,
 }: {
   boards: Board[];
   widgets?: Widget[];
   /** Answers `setVisibility` as the server does for a member who is neither creator nor admin. */
   refuseVisibility?: boolean;
+  /** Answers `dashboardWidgets.create` as the server does when the write is rejected. */
+  refuseWidgetCreate?: boolean;
 }) {
   const state = {
     boards: boards.map((board) => ({ ...board })),
@@ -130,6 +133,9 @@ function inMemoryServer({
       case "dashboardWidgets.list":
         return Promise.resolve(state.widgets.map((widget) => ({ ...widget })));
       case "dashboardWidgets.create": {
+        if (refuseWidgetCreate) {
+          return Promise.reject(new UiProcedureRefusal("dashboard_widget_definition_invalid", 422));
+        }
         minted += 1;
         const widget: Widget = {
           id: `widget-new-${minted}`,
@@ -175,7 +181,6 @@ const FLAG_ON = { release_dashboards: true };
 const LANGY_ON = { release_dashboards: true, release_langy_enabled: true };
 const MEMBER = ["analytics:view", "cost:view", "traces:view"];
 const LANGY_MEMBER = [...MEMBER, "langy:create"];
-const WRITES = /^dashboards\.(?!getAll)|^dashboardWidgets\.(?!list)/;
 const OWN_BOARDS: Board[] = [
   {
     id: "board-1",
@@ -232,9 +237,6 @@ function openBoard({
 const callsTo = (server: ReturnType<typeof inMemoryServer>, path: string) =>
   server.state.calls.filter((call) => call.path === path);
 
-const writesTo = (server: ReturnType<typeof inMemoryServer>) =>
-  server.state.calls.filter(({ path }) => WRITES.test(path));
-
 /** The picker's regions, by the name each section carries. */
 async function pickerRegions() {
   const dialog = await screen.findByRole("dialog");
@@ -247,27 +249,19 @@ afterEach(cleanup);
 
 describe("a member's board", () => {
   describe("given a member opens a board with nothing on it", () => {
+    /** @scenario 'AC1 The empty board has no "Add a block" box' */
     /** @scenario "AC10 Blank board matches the reference" */
-    it("shows the blank-board state with the Agent Flight Deck template", async () => {
+    it("shows the template strip and no Add a block box", async () => {
       openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-      expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
-      expect(screen.getByText("Add a description")).toBeInTheDocument();
-      expect(screen.getByText("Start from the question you need answered.")).toBeInTheDocument();
-      expect(screen.getByText("Start from a template")).toBeInTheDocument();
+      expect(await screen.findByText("Add a description")).toBeInTheDocument();
+      expect(await screen.findByText("Start from a template")).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: new RegExp(escape(AGENT_FLIGHT_DECK_TEMPLATE.name)) }),
+        await screen.findByRole("button", {
+          name: new RegExp(escape(AGENT_FLIGHT_DECK_TEMPLATE.name)),
+        }),
       ).toBeInTheDocument();
-    });
-
-    /** @scenario "AC10 Blank board matches the reference" */
-    it("opens the picker from the Add a block area", async () => {
-      const user = userEvent.setup();
-      const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
-
-      await user.click(await screen.findByRole("button", { name: /Add a block/ }));
-
-      expect(host.lastQuery).toEqual({ addBlock: "open" });
+      expect(screen.queryByRole("button", { name: /Add a block/ })).toBeNull();
     });
   });
 
@@ -330,10 +324,16 @@ describe("a member's board", () => {
     });
 
     describe("when they choose a question", () => {
-      /** @scenario "AC11 Ask Langy by question" */
-      it("closes the picker and asks Langy the question's prompt, writing nothing", async () => {
+      const withExistingWidget = () =>
+        inMemoryServer({
+          boards: OWN_BOARDS,
+          widgets: [storedWidget({ id: "w-1", dashboardId: "board-1", name: "Traces" })],
+        });
+
+      /** @scenario "AC12 A picked question adds its widget and seeds Langy" */
+      it("closes the picker, adds the question's widget below the existing ones, and drafts Langy to send", async () => {
         const user = userEvent.setup();
-        const { server, host } = openPicker();
+        const { server, host } = openPicker(withExistingWidget());
         const traffic = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
           ({ id }) => id === "traffic",
         )!;
@@ -342,36 +342,93 @@ describe("a member's board", () => {
           await screen.findByRole("button", { name: new RegExp(escape(traffic.question)) }),
         );
 
-        expect(host.lastQuery).toEqual({ addBlock: void 0 });
+        await waitFor(() => expect(host.lastQuery).toEqual({ addBlock: void 0 }));
+        const created = server.state.widgets.find(({ id }) => id === "widget-new-1")!;
+        expect(created).toMatchObject({
+          dashboardId: "board-1",
+          name: traffic.question,
+          gridRow: 3,
+        });
         expect(host.langyAsks).toHaveLength(1);
         const [ask] = host.langyAsks;
-        expect(ask?.question.startsWith(traffic.prompt)).toBe(true);
-        expect(ask?.question).toContain("Dashboard period:");
+        expect(ask?.question).toBeUndefined();
+        expect(ask?.draft?.startsWith(traffic.prompt)).toBe(true);
+        expect(ask?.draft).toContain("Dashboard period:");
         expect(ask?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
         expect(ask?.context[0]?.ref).toContain('dashboard "Weekly review" (id board-1)');
-        expect(writesTo(server)).toEqual([]);
+      });
+    });
+
+    describe("when the write fails", () => {
+      /** @scenario "AC12c A failed add keeps the picker open and does not seed Langy" */
+      it("keeps the picker open, seeds no Langy conversation, and stores no widget", async () => {
+        const user = userEvent.setup();
+        const server = inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true });
+        const { host } = openPicker(server);
+        const traffic = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
+          ({ id }) => id === "traffic",
+        )!;
+
+        await user.click(
+          await screen.findByRole("button", { name: new RegExp(escape(traffic.question)) }),
+        );
+
+        await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
+        expect(await screen.findByRole("dialog")).toBeInTheDocument();
+        expect(host.langyAsks).toEqual([]);
+        expect(server.state.widgets).toEqual([]);
       });
     });
   });
 
   describe("given the picker is open and Langy is not available to the member", () => {
-    /** @scenario "AC12 Only working questions are offered" */
+    /** @scenario "AC12b Without Langy a picked question still adds its widget" */
     it.each([
       ["the release flag is off", FLAG_ON, LANGY_MEMBER],
       ["the member may not start a conversation", LANGY_ON, MEMBER],
-    ])("shows no questions and nothing to search when %s", async (_case, flags, permissions) => {
-      openBoard({
-        server: inMemoryServer({ boards: OWN_BOARDS }),
-        query: { addBlock: "open" },
-        flags,
-        permissions,
-      });
+    ])(
+      "lists every question and no Ask Langy footer when %s",
+      async (_case, flags, permissions) => {
+        openBoard({
+          server: inMemoryServer({ boards: OWN_BOARDS }),
+          query: { addBlock: "open" },
+          flags,
+          permissions,
+        });
 
-      expect(await pickerRegions()).toEqual([]);
-      expect(await screen.findByText("Nothing matches your search.")).toBeInTheDocument();
-      for (const { question } of BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions)) {
-        expect(screen.queryByRole("button", { name: new RegExp(escape(question)) })).toBeNull();
-      }
+        expect(await pickerRegions()).toEqual(BLOCK_QUESTION_SECTIONS.map(({ title }) => title));
+        for (const { question } of BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions)) {
+          expect(screen.getByRole("button", { name: new RegExp(escape(question)) })).toBeEnabled();
+        }
+        expect(screen.queryByRole("button", { name: "Ask Langy" })).toBeNull();
+      },
+    );
+
+    /** @scenario "AC12b Without Langy a picked question still adds its widget" */
+    it("adds the picked question's widget and seeds no Langy conversation", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({
+        server,
+        query: { addBlock: "open" },
+        flags: FLAG_ON,
+        permissions: MEMBER,
+      });
+      const overall = BLOCK_QUESTION_SECTIONS.flatMap(({ questions }) => questions).find(
+        ({ id }) => id === "overall",
+      )!;
+
+      await user.click(
+        await screen.findByRole("button", { name: new RegExp(escape(overall.question)) }),
+      );
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
+      expect(callsTo(server, "dashboardWidgets.create")[0]?.input).toMatchObject({
+        dashboardId: "board-1",
+        name: overall.question,
+      });
+      expect(host.langyAsks).toEqual([]);
+      expect(host.lastQuery).toEqual({ addBlock: void 0 });
     });
   });
 
@@ -618,6 +675,18 @@ describe("a member's board", () => {
       openBoard({ server });
     };
 
+    describe("when the member clicks the footer's Add a block box", () => {
+      /** @scenario "AC10 A non-empty board still offers a way to add a widget" */
+      it("opens the picker", async () => {
+        const user = userEvent.setup();
+        const { host } = openBoard({ server: boardWithOneWidget() });
+
+        await user.click(await screen.findByRole("button", { name: /Add a block/ }));
+
+        expect(host.lastQuery).toEqual({ addBlock: "open" });
+      });
+    });
+
     describe("when the member opens its menu", () => {
       /** @scenario "AC15 Widget menu actions persist after reload" */
       it("offers Edit, Duplicate and Delete, and nothing else", async () => {
@@ -680,7 +749,7 @@ describe("a member's board", () => {
         await waitFor(() => expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(1));
         reload(server);
 
-        expect(await screen.findByRole("button", { name: /Add a block/ })).toBeInTheDocument();
+        expect(await screen.findByText("Start from a template")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: "Actions for Traces" })).toBeNull();
       });
     });

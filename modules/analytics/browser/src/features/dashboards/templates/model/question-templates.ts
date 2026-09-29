@@ -1,7 +1,7 @@
 /**
  * One board template per question-picker section, named and described after the
  * section, with at least one stored widget answering each of its questions.
- * Pairs are six board rows tall, sized to a figure over a chart or a short table.
+ * A chart pair is six board rows tall; a table is shorter, at TABLE_ROWS.
  */
 
 import { BLOCK_QUESTION_SECTIONS } from "../../model/block-questions.ts";
@@ -12,7 +12,7 @@ import { SCENARIOS_CODE } from "./flight-deck-table-widgets.ts";
 import * as chart from "./question-chart-widgets.ts";
 import * as sql from "./question-queries.ts";
 import * as table from "./question-table-widgets.ts";
-import { definition, full, half } from "./template-widget.ts";
+import { definition, full, half, TABLE_ROWS } from "./template-widget.ts";
 
 const PAIR = 6;
 
@@ -42,7 +42,7 @@ function sectionTemplate({
 }): BoardTemplate {
   const section = BLOCK_QUESTION_SECTIONS.find((candidate) => candidate.id === id);
   if (!section) throw new Error(`No question section "${id}" for its board template`);
-  return { id, name: section.title, description: section.why, widgets };
+  return { id, name: section.title, description: section.why, summary: section.summary, widgets };
 }
 
 const ERROR_TYPES = {
@@ -118,7 +118,7 @@ export const CROSSED_A_LINE_TEMPLATE = sectionTemplate({
       key: "error-types",
       name: "Top error types",
       ...ERROR_TYPES,
-      layout: half({ side: "right", gridRow: PAIR, rowSpan: PAIR }),
+      layout: half({ side: "right", gridRow: PAIR, rowSpan: TABLE_ROWS }),
     }),
   ],
 });
@@ -151,7 +151,7 @@ export const COST_SOURCE_TEMPLATE = sectionTemplate({
       name: "Spend by model",
       code: table.MODEL_SPEND_CODE,
       queries: { models: deck.COST_BY_MODEL_SQL, spend: sql.MODEL_SPEND_TOTAL_SQL },
-      layout: half({ side: "left", gridRow: PAIR, rowSpan: PAIR }),
+      layout: half({ side: "left", gridRow: PAIR, rowSpan: TABLE_ROWS }),
     }),
     widget({
       key: "top-models",
@@ -162,7 +162,7 @@ export const COST_SOURCE_TEMPLATE = sectionTemplate({
         modelCosts: sql.MODEL_COSTS_SQL,
         traffic: sql.TRACE_COUNT_SQL,
       },
-      layout: half({ side: "right", gridRow: PAIR, rowSpan: PAIR }),
+      layout: half({ side: "right", gridRow: PAIR, rowSpan: TABLE_ROWS }),
     }),
   ],
 });
@@ -182,7 +182,7 @@ export const QUALITY_AND_QUANTITY_TEMPLATE = sectionTemplate({
       name: "Lowest-passing evaluators",
       code: table.LOWEST_PASSING_EVALUATORS_CODE,
       queries: { main: sql.LOWEST_PASSING_EVALUATORS_SQL },
-      layout: half({ side: "right", gridRow: 0, rowSpan: PAIR }),
+      layout: half({ side: "right", gridRow: 0, rowSpan: TABLE_ROWS }),
     }),
     widget({
       key: "scenarios",
@@ -196,7 +196,7 @@ export const QUALITY_AND_QUANTITY_TEMPLATE = sectionTemplate({
       name: "Scenario suites",
       code: SCENARIOS_CODE,
       queries: { summary: deck.SCENARIO_SUMMARY_SQL, suites: deck.SCENARIO_SUITES_SQL },
-      layout: half({ side: "right", gridRow: PAIR, rowSpan: PAIR }),
+      layout: half({ side: "right", gridRow: PAIR, rowSpan: TABLE_ROWS }),
     }),
   ],
 });
@@ -209,7 +209,7 @@ export const ROOT_CAUSE_TEMPLATE = sectionTemplate({
       name: "What are users asking about most?",
       code: table.TOPICS_CODE,
       queries: { topics: sql.TOPICS_SQL, topicTraffic: sql.TOPIC_TRACES_SQL },
-      layout: full({ gridRow: 0, rowSpan: 9 }),
+      layout: full({ gridRow: 0, rowSpan: TABLE_ROWS }),
     }),
   ],
 });
@@ -222,34 +222,34 @@ export const HOW_DO_I_TEMPLATE = sectionTemplate({
       name: "Improve latency: slowest operations",
       code: table.SLOWEST_OPERATIONS_CODE,
       queries: { operations: sql.SLOWEST_OPERATIONS_SQL, latency: sql.LATENCY_SPREAD_SQL },
-      layout: half({ side: "left", gridRow: 0, rowSpan: PAIR }),
+      layout: half({ side: "left", gridRow: 0, rowSpan: TABLE_ROWS }),
     }),
     widget({
       key: "slowest-models",
       name: "Improve latency: slowest models",
       code: table.SLOWEST_MODELS_CODE,
       queries: { main: sql.SLOWEST_MODELS_SQL },
-      layout: half({ side: "right", gridRow: 0, rowSpan: PAIR }),
+      layout: half({ side: "right", gridRow: 0, rowSpan: TABLE_ROWS }),
     }),
     widget({
       key: "error-types",
       name: "Improve responses: top error types",
       ...ERROR_TYPES,
-      layout: half({ side: "left", gridRow: PAIR, rowSpan: PAIR }),
+      layout: half({ side: "left", gridRow: TABLE_ROWS, rowSpan: TABLE_ROWS }),
     }),
     widget({
       key: "thumbs-down",
       name: "Improve responses: thumbs-down traces",
       code: table.THUMBS_DOWN_CODE,
       queries: { summary: deck.FEEDBACK_SUMMARY_SQL, traces: sql.THUMBS_DOWN_SQL },
-      layout: half({ side: "right", gridRow: PAIR, rowSpan: PAIR }),
+      layout: half({ side: "right", gridRow: TABLE_ROWS, rowSpan: TABLE_ROWS }),
     }),
     widget({
       key: "lowest-scores",
       name: "Improve responses: lowest-scoring evaluations",
       code: table.LOWEST_SCORES_CODE,
       queries: { main: sql.LOWEST_SCORES_SQL },
-      layout: half({ side: "left", gridRow: 2 * PAIR, rowSpan: PAIR }),
+      layout: half({ side: "left", gridRow: 2 * TABLE_ROWS, rowSpan: TABLE_ROWS }),
     }),
     widget({
       key: "evaluation-coverage",
@@ -260,7 +260,7 @@ export const HOW_DO_I_TEMPLATE = sectionTemplate({
         evaluated: sql.EVALUATED_TRACES_SQL,
         traffic: sql.TRACE_COUNT_SQL,
       },
-      layout: half({ side: "right", gridRow: 2 * PAIR, rowSpan: PAIR }),
+      layout: half({ side: "right", gridRow: 2 * TABLE_ROWS, rowSpan: TABLE_ROWS }),
     }),
   ],
 });
