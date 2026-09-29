@@ -45,6 +45,8 @@ describe("given the organization has spent its free Instant Evals budget", () =>
         <InstantEvalRefusalPopover
           refusal={{ kind: "budget" }}
           onClose={onClose}
+          onEnable={() => {}}
+          isEnabling={false}
         >
           <span>anchor</span>
         </InstantEvalRefusalPopover>,
@@ -96,6 +98,7 @@ describe("given Instant Evals are off for a self-serve organization", () => {
           refusal={{ kind: "opt_in" }}
           onClose={onClose}
           onEnable={onEnable}
+          isEnabling={false}
         >
           <span>anchor</span>
         </InstantEvalRefusalPopover>,
@@ -128,7 +131,7 @@ describe("given Instant Evals are off for a self-serve organization", () => {
         /\/features\/instant-evals\/limits-and-cost#where-the-judged-text-goes$/,
       );
       const copy = instantEvalRefusalCopy({ kind: "opt_in" });
-      expect(copy.action.label).toBe("Enable");
+      expect(copy.action).toEqual({ label: "Enable" });
       expect(copy.more).toEqual({
         label: "Read more",
         href: WHERE_THE_TEXT_GOES_HREF,
@@ -147,6 +150,8 @@ describe("given Instant Evals are off for an enterprise organization", () => {
         <InstantEvalRefusalPopover
           refusal={{ kind: "unreleased" }}
           onClose={onClose}
+          onEnable={() => {}}
+          isEnabling={false}
         >
           <span>anchor</span>
         </InstantEvalRefusalPopover>,
@@ -194,6 +199,8 @@ describe("given Instant Evals are off for an enterprise organization", () => {
         <InstantEvalRefusalPopover
           refusal={{ kind: "unreleased" }}
           onClose={onClose}
+          onEnable={() => {}}
+          isEnabling={false}
         >
           <span>anchor</span>
         </InstantEvalRefusalPopover>,

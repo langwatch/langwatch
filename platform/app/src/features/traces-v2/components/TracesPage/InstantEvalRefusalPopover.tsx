@@ -56,17 +56,25 @@ interface InstantEvalRefusalPopoverProps {
    * this only closes the popover.
    */
   onClose: () => void;
-  /** The organization's switch. Read by the `opt_in` popover only. */
-  onEnable?: () => void;
-  isEnabling?: boolean;
+  /**
+   * The organization's switch. Pressed by the `opt_in` popover only, and
+   * required all the same: an Enable button whose click did nothing would
+   * be the one refusal the popover cannot explain.
+   */
+  onEnable: () => void;
+  isEnabling: boolean;
   children: React.ReactElement;
 }
 
-/** The popover's words, exported so the copy is pinned by a test. */
+/**
+ * The popover's words, exported so the copy is pinned by a test. An action
+ * with an `href` is a link; one without is the organization's switch, a
+ * button, and the render branches on that rather than on the refusal kind.
+ */
 export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   title: string;
   body: string;
-  action: { label: string; href: string };
+  action: { label: string; href?: string };
   /** A second, quieter link beside the action, when the copy has one. */
   more?: { label: string; href: string };
   dismiss: string;
@@ -94,7 +102,7 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
     return {
       title: "Turn on Instant Evals for your organization",
       body: "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model. Enable turns this on for every project in your organization.",
-      action: { label: "Enable", href: "" },
+      action: { label: "Enable" },
       more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
       dismiss: "Not now",
     };
@@ -130,11 +138,12 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
  */
 export const InstantEvalRefusalPopover: React.FC<
   InstantEvalRefusalPopoverProps
-> = ({ refusal, onClose, onEnable, isEnabling = false, children }) => {
+> = ({ refusal, onClose, onEnable, isEnabling, children }) => {
   const copy = refusal ? instantEvalRefusalCopy(refusal) : null;
   const useSupportChat =
     refusal?.kind === "unreleased" && isSupportChatAvailable();
-  const isOptIn = refusal?.kind === "opt_in";
+  const actionHref = copy?.action.href;
+  const isSwitch = actionHref === undefined;
   return (
     <PopoverRoot
       open={refusal !== null}
@@ -174,21 +183,21 @@ export const InstantEvalRefusalPopover: React.FC<
                 {copy.body}
               </Text>
               <HStack gap={2}>
-                {isOptIn || useSupportChat ? (
+                {isSwitch || useSupportChat ? (
                   <Button
                     size="xs"
                     flex={1}
                     bg="orange.solid"
                     color="white"
                     _hover={{ bg: "orange.fg" }}
-                    onClick={isOptIn ? onEnable : toggleSupportChat}
-                    loading={isOptIn && isEnabling}
+                    onClick={isSwitch ? onEnable : toggleSupportChat}
+                    loading={isSwitch && isEnabling}
                   >
                     {copy.action.label}
                   </Button>
                 ) : (
                   <NextLink
-                    href={copy.action.href}
+                    href={actionHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ display: "block", flex: 1 }}
