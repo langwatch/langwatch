@@ -469,7 +469,7 @@ describe("SlackConfigForm connection", () => {
   });
 
   describe("given the project has no Slack connection", () => {
-    /** @scenario "The author is guided to connect Slack for the project" */
+    /** @scenario "The author is guided to add a Slack connection" */
     it("points at the integration settings and asks for no token", () => {
       connectionList.current = [];
       renderForm();

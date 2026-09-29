@@ -9,13 +9,13 @@ Feature: Slack delivery
   them. New automations use the Web API; webhooks stay editable so the
   automations that already have one keep working.
 
-  Since ADR-093 §5 the bot token belongs to the project, not to the automation:
-  it is configured once in the project's integration settings and the composer
-  only ever asks for a channel. An automation saved before that keeps its own
-  encrypted token until someone explicitly switches it over, and the token is
-  never returned to a browser in either form. The resolution order, the
-  migration affordances and the failure code live in source-merge.feature's two
-  Slack rules; this file covers the delivery surface itself.
+  Since ADR-093 §5a an automation points at a named Slack connection, not at a
+  secret of its own: connections are kept in the integration settings and the
+  composer only picks one and, for a bot, a channel. An automation saved before
+  that keeps its own encrypted secret until the one-off migration moves it into
+  a connection, and no secret is ever returned to a browser. Resolution order,
+  the migration and the failure codes live in slack-connections.feature; this
+  file covers the delivery surface itself.
 
   These scenarios lived in platform/app/specs/monitors/slack-bot-delivery.feature
   until ADR-093 §5. That second specs root is not scanned by the feature-parity
@@ -57,8 +57,8 @@ Feature: Slack delivery
     Encryption is the same AES-256-GCM helper the rest of the platform uses.
     What matters to a customer is the consequence: the token they paste is not
     readable afterwards, by them or by anyone reading the row. The composer no
-    longer asks for a token (ADR-093 §5), so only legacy automations saved
-    before the project integration carry one — and they keep these guarantees
+    longer asks for a token (ADR-093 §5a), so only legacy automations saved
+    before Slack connections carry one — and they keep these guarantees
     for as long as they exist.
 
     @unit
@@ -75,8 +75,8 @@ Feature: Slack delivery
 
   Rule: The composer asks only for what the author owns
 
-    The token is the project's, so the only thing left for the author to fill
-    in is where the message goes.
+    The secret belongs to the connection, so the only thing left for the author
+    to fill in is which connection and where the message goes.
 
     @integration
     Scenario: A bot automation is incomplete without a channel
@@ -85,6 +85,7 @@ Feature: Slack delivery
       Then it cannot be saved
 
     @integration
-    Scenario: The author is guided to connect Slack for the project
-      Given the bot connection form in a project with no Slack integration
-      Then it points at the project's integration settings, where creating a Slack app and granting its scopes is explained
+    Scenario: The author is guided to add a Slack connection
+      Given the Slack delivery form in a project with no Slack connection
+      Then it points at the integration settings, where Slack connections are added
+      And it asks for no token itself

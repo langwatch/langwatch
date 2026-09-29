@@ -38882,7 +38882,7 @@ An automation watches something in your project and acts when it happens. There 
 - **Alerts** watch a series on a custom graph and fire when it crosses a threshold, for example p95 latency above 8 seconds.
 - **Reports** send a dashboard, a single graph or a table of traces on a schedule, for example every Monday at 09:00.
 
-All three live on the **Automations** page of your project, which has a tab for each kind and an **Activity** tab with everything they have done.
+All three live on the **Automations** page of your project, which has three tabs: **Overview** shows what is firing and everything your automations have done recently, **Automations** lists automations and alerts, and **Reports** lists scheduled reports.
 
 <Info>**Also check:** [Triggers API](/api-reference/triggers/overview) to manage automations over REST, the CLI or MCP, and [Datasets from traces](/datasets/automatically-from-traces) for the dataset column mapping.</Info>
 
@@ -38957,7 +38957,7 @@ Both can also be created with `langwatch trigger create --graph-alert` and `--re
 
 - **Pause** an automation to stop it acting without deleting it, and resume it later. A paused report stops sending.
 - **Test** sends the automation's message to its saved destination so you can check it arrives. A test is not recorded as a fire.
-- **Activity** lists every fire, newest first. The same history is available with `GET /api/triggers/{id}/fires`, `langwatch trigger fires <id>` and the MCP tool `platform_list_trigger_fires`, each paged by cursor.
+- **History**, in an automation's details, lists every fire, newest first; **Overview** shows the recent fires across all of them. The same history is available with `GET /api/triggers/{id}/fires`, `langwatch trigger fires <id>` and the MCP tool `platform_list_trigger_fires`, each paged by cursor.
 
 ---
 
