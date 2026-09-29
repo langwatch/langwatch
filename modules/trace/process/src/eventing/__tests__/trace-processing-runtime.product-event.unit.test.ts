@@ -19,16 +19,13 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => logger,
 }));
 
-import {
-  createInitState,
-  createSpanReceivedEvent,
-} from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   type TraceProcessingPipelineInput,
-  TraceProcessingPipelineService,
-} from "../trace-processing-pipeline.service.ts";
+  TraceProcessingRuntimeAdapter,
+} from "../trace-processing-runtime.pipeline.ts";
+import { createInitState, createSpanReceivedEvent } from "./trace-summary-test.fixtures.ts";
 
 type Peers = TraceProcessingPipelineInput["peers"];
 
@@ -67,7 +64,7 @@ function project(): Project {
 
 function compose() {
   const updateMetadata = vi.fn<Peers["projects"]["updateMetadata"]>(async () => undefined);
-  const pipeline = TraceProcessingPipelineService.create({
+  const pipeline = TraceProcessingRuntimeAdapter.create({
     processName: "langwatch-test",
     tokenizer: createApiFixture<TraceProcessingPipelineInput["tokenizer"]>(),
     peers: createApiFixture<Peers>({
@@ -97,7 +94,7 @@ function compose() {
   return { pipeline, updateMetadata };
 }
 
-describe("TraceProcessingPipelineService", () => {
+describe("TraceProcessingRuntimeAdapter", () => {
   describe("given no product-analytics sink is composed", () => {
     /** @scenario "A first trace on a deployment with no product-analytics sink logs no metadata failure" */
     it("marks the project integrated on its first trace and logs no metadata failure", async () => {
