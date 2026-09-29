@@ -7,8 +7,6 @@ import {
   createDashboardTestAnalytics,
   createDashboardTestAuthz,
   createDashboardTestAutomation,
-  createDashboardTestFeatureFlags,
-  createDashboardTestOrganizations,
   createDashboardTestProjects,
 } from "./dashboard.fixture.ts";
 
@@ -20,9 +18,7 @@ function process(role: "api" | "worker") {
       analytics: createDashboardTestAnalytics(),
       automation: createDashboardTestAutomation(),
       project: createDashboardTestProjects(),
-      "feature-flag": createDashboardTestFeatureFlags(),
       authz: createDashboardTestAuthz(),
-      organization: createDashboardTestOrganizations(),
     });
 }
 

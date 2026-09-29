@@ -164,6 +164,8 @@ export interface AnalyticsApi {
   ): Promise<readonly Record<string, unknown>[]>;
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+  /** Whether this project's rollout admits it to the Dashboards area at all. */
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
   /** What one signed-in member may see of a project's content and spend. */
   resolveProtections(input: { userId: string; projectId: string }): Promise<LangWatchQLProtections>;
   /**

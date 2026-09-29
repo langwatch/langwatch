@@ -62,6 +62,8 @@ export interface ProjectApi {
   }): Promise<SearchProjectsResult[]>;
   findById(id: string): Promise<Project | null>;
   getOrganizationId(projectId: string): Promise<string>;
+  /** Whether the user belongs to the team that owns this project; false when no such project. */
+  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean>;
   getWithTeam(id: string): Promise<ProjectWithTeam>;
   findWithTeam(id: string): Promise<ProjectWithTeam | null>;
   listByOrganization(input: {

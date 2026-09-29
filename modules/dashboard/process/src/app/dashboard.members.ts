@@ -26,7 +26,8 @@ export interface WorkbenchCaller {
 
 /**
  * The two audience facts visibility needs about a member, asked of the peers
- * that own them: team membership (organization) and admin rights (authz).
+ * that own them: team membership (project, which owns the team) and admin
+ * rights (authz).
  */
 export interface DashboardAudience {
   /** Whether the member belongs to the team that owns the project. */
