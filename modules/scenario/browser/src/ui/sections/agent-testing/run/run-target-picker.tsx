@@ -187,6 +187,7 @@ function AgentBlock({
         truncate
         marginTop={3}
         title={agent.label ?? agent.name}
+        data-testid={`run-dialog-agent-name-${agent.label ?? agent.name}`}
       >
         {agent.label ?? agent.name}
       </Text>

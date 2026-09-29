@@ -118,6 +118,7 @@ function AgentTestingTabTrigger({
   return (
     <Tabs.Trigger
       value={value}
+      data-testid={`agent-testing-tab-${value}`}
       height="full"
       paddingX={3}
       gap={1.5}

@@ -19,6 +19,7 @@ export function RunCaseButton({ caseName, disabled = false, onOpen }: RunCaseBut
     <SmallButton
       disabled={disabled}
       aria-label={`Run ${caseName}`}
+      data-testid={`case-row-${caseName}-run`}
       onClick={(event) => {
         event.stopPropagation();
         onOpen();

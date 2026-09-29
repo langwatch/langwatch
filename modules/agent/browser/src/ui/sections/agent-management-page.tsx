@@ -184,7 +184,11 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
               <EmptyState.Description>
                 Create reusable agents for your evaluations.
               </EmptyState.Description>
-              <Button colorPalette="blue" onClick={() => props.navigation.openTypeSelector()}>
+              <Button
+                colorPalette="blue"
+                onClick={() => props.navigation.openTypeSelector()}
+                data-testid="agents-first-agent-create"
+              >
                 <Plus size={16} /> Create your first agent
               </Button>
             </EmptyState.Content>

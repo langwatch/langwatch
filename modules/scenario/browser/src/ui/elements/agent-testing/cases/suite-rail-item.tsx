@@ -96,15 +96,18 @@ export function RailAddButton({
   label,
   icon,
   onClick,
+  testId,
 }: {
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <chakra.button
       type="button"
       onClick={onClick}
+      data-testid={testId}
       display="flex"
       alignItems="center"
       gap={2}

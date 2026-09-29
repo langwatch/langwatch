@@ -292,7 +292,13 @@ export function PlanRowsTable({
             testId={`run-plan-row-${plan.slug}`}
           >
             <HStack gap={1.5} minWidth={0}>
-              <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+              <Text
+                fontSize="12.5px"
+                fontWeight="medium"
+                color="fg"
+                truncate
+                data-testid={`run-plan-name-${plan.name}`}
+              >
                 {plan.name}
               </Text>
               <PlanBadge kind={plan.kind} />

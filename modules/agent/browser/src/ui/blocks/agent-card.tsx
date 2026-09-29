@@ -233,7 +233,12 @@ export function AgentCard({
       }
       title={
         <HStack gap={2}>
-          <Text color="fg.muted" fontSize="sm" fontWeight={500}>
+          <Text
+            color="fg.muted"
+            fontSize="sm"
+            fontWeight={500}
+            data-testid={`agent-card-name-${agent.name}`}
+          >
             {agent.name}
           </Text>
           {agentHasDevTunnel(agent) && <LocalTunnelBadge />}

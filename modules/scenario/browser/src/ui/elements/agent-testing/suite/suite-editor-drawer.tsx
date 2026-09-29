@@ -76,6 +76,7 @@ function SuiteEditorFields({ model }: { model: SuiteEditorModel }) {
           {...DIALOG_FIELD_STYLE}
           ref={nameRef}
           aria-label="Test suite name"
+          data-testid="suite-editor-name-input"
           placeholder="Case lookups"
           value={draft.name}
           onChange={(event) => model.setName(event.target.value)}

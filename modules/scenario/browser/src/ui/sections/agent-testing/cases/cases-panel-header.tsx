@@ -101,7 +101,7 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
                 onToggle={props.onToggleLabel}
               />
             )}
-            <SmallButton onClick={props.onNewTestCase}>
+            <SmallButton onClick={props.onNewTestCase} data-testid="cases-panel-new-scenario">
               <Plus size={13} />
               New scenario
             </SmallButton>
@@ -117,7 +117,11 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
           hasRun={hasRunInPeriod(props)}
         />
         {canWrite && (
-          <SmallButton loading={props.isRunningSet} onClick={props.onRunSet}>
+          <SmallButton
+            loading={props.isRunningSet}
+            onClick={props.onRunSet}
+            data-testid="cases-panel-run-suite"
+          >
             <Play size={13} />
             Run suite
           </SmallButton>

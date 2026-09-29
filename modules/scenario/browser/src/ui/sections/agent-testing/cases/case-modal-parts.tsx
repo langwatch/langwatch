@@ -139,6 +139,7 @@ function TitleAndSuiteRow({
           {...DIALOG_FIELD_STYLE}
 
           aria-label="Title"
+          data-testid="case-modal-title-input"
           placeholder="Angry customer threatens a chargeback"
           value={draft.title}
           onChange={(event) => setDraft({ title: event.target.value })}
@@ -150,6 +151,7 @@ function TitleAndSuiteRow({
           <NativeSelect.Field
             {...DIALOG_FIELD_STYLE}
             aria-label="Test suite"
+            data-testid="case-modal-suite-select"
             value={draft.testSuiteId ?? ""}
             onChange={(event) => setDraft({ testSuiteId: event.target.value || null })}
           >
@@ -186,6 +188,7 @@ function SituationAndCriteria({
           minHeight={SITUATION_HEIGHT.min}
           maxHeight={SITUATION_HEIGHT.max}
           aria-label="Situation"
+          data-testid="case-modal-situation-input"
           placeholder="The customer is on day three of waiting for a refund and threatens to charge back."
           value={draft.situation}
           onChange={(event) => setDraft({ situation: event.target.value })}
@@ -201,6 +204,7 @@ function SituationAndCriteria({
           minHeight={CRITERIA_HEIGHT.min}
           maxHeight={CRITERIA_HEIGHT.max}
           aria-label="Criteria"
+          data-testid="case-modal-criteria-input"
           placeholder={
             "Keeps a calm tone\nGives the refund status without being asked twice\nDoes not promise compensation we do not offer"
           }

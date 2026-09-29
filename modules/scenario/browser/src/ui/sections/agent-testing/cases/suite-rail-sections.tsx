@@ -42,6 +42,7 @@ export function SuiteRailSections(props: SuiteRailSectionsProps) {
           label="New Test Suite"
           icon={<Icon as={FolderPlus} boxSize="13px" />}
           onClick={props.onNewSuite}
+          testId="agent-testing-rail-new-suite"
         />
       )}
 

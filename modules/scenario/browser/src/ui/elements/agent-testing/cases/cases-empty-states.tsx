@@ -38,7 +38,12 @@ export function ConnectAgentEmptyState({
         </EmptyState.Description>
         {canManage && (
           <Box paddingTop={2}>
-            <Button size="sm" colorPalette="blue" onClick={onConnectAgent}>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={onConnectAgent}
+              data-testid="agent-testing-connect-agent-setup"
+            >
               <Plug size={14} />
               Setup agent
             </Button>
@@ -73,7 +78,12 @@ export function FirstSuiteEmptyState({
         </EmptyState.Description>
         {canManage && (
           <Box paddingTop={2}>
-            <Button size="sm" colorPalette="blue" onClick={onNewSuite}>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={onNewSuite}
+              data-testid="agent-testing-first-suite-new"
+            >
               <Plus size={14} />
               New test suite
             </Button>
@@ -103,7 +113,12 @@ export function FirstCaseEmptyState({ canManage, onNewTestCase }: EmptyStateActi
         </EmptyState.Description>
         {canManage && (
           <Box paddingTop={2}>
-            <Button size="sm" colorPalette="blue" onClick={onNewTestCase}>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={onNewTestCase}
+              data-testid="agent-testing-first-case-new"
+            >
               <Plus size={14} />
               New scenario
             </Button>

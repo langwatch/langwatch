@@ -55,6 +55,7 @@ export function SuiteNameDialog({ open, onClose, onConfirm }: SuiteNameDialogPro
             size="sm"
             placeholder="e.g. Refunds"
             aria-label="Test suite name"
+            data-testid="suite-name-input"
             value={name}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
