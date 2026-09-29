@@ -274,6 +274,32 @@ export class MemoryScimRepository extends ScimRepository {
     this.memberships.splice(index, 1);
   };
 
+  async findDirectoryAssertedRoles(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string[]> {
+    const directoryGroupIds = new Set(
+      this.groups
+        .filter(
+          (group) => group.organizationId === input.organizationId && group.scimSource !== null,
+        )
+        .map((group) => group.id)
+        .filter((groupId) =>
+          this.groupMembers.some((row) => row.groupId === groupId && row.userId === input.userId),
+        ),
+    );
+    return this.bindings
+      .filter(
+        (binding) =>
+          binding.organizationId === input.organizationId &&
+          binding.groupId !== null &&
+          directoryGroupIds.has(binding.groupId) &&
+          binding.scopeType === "ORGANIZATION" &&
+          binding.scopeId === input.organizationId,
+      )
+      .map((binding) => binding.role);
+  }
+
   async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     return (
       this.groups.find(

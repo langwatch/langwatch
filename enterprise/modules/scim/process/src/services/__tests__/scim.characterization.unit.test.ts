@@ -55,6 +55,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     markUserResourceDeleted: vi.fn(async () => undefined),
     addMembership: vi.fn(async () => undefined),
     removeMembership: vi.fn(async () => undefined),
+    findDirectoryAssertedRoles: vi.fn(async () => []),
     findGroup: vi.fn(async () => null),
     findGroupByExternalId: vi.fn(async () => null),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),

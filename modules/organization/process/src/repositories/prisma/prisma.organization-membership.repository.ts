@@ -1089,6 +1089,10 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       }),
       this.prisma.apiKey.deleteMany({ where: { organizationId } }),
       this.prisma.promptTag.deleteMany({ where: { organizationId } }),
+      this.prisma.teamUser.deleteMany({
+        where: { team: { organizationId } },
+      }),
+      this.prisma.organizationUser.deleteMany({ where: { organizationId } }),
       this.prisma.team.deleteMany({ where: { organizationId } }),
       this.prisma.organization.deleteMany({ where: { id: organizationId } }),
     ]);
