@@ -28,7 +28,7 @@ export async function runModuleTask({
     .start();
   try {
     const app = await server
-      .composeProcess("tasks")
+      .container("tasks")
       .withModules(processModules)
       .withMember("queue", () => void 0)
       .withMember("content", () => void 0)

@@ -2,12 +2,12 @@ import { bootInstalledProcess, serverFeature } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import {
-  ApiProcessComposition,
-  WorkerProcessComposition,
+  ApiProcessContainer,
+  WorkerProcessContainer,
   type ProcessBoot,
-} from "../process-composition.ts";
+} from "../process-container.ts";
 
-function compositionRuntime(phases: string[]): ProcessBoot {
+function containerRuntime(phases: string[]): ProcessBoot {
   return {
     surfaceDefaults: {},
     async boot({ role, modules, pipelines }) {
@@ -30,7 +30,7 @@ function compositionRuntime(phases: string[]): ProcessBoot {
   };
 }
 
-describe("process composition", () => {
+describe("process container", () => {
   /** @scenario "A bundle-only API builds a handler without running worker contributions" */
   it("boots a bundle-only API without constructing worker contributions", async () => {
     const phases: string[] = [];
@@ -41,7 +41,7 @@ describe("process composition", () => {
         return {};
       })
       .build();
-    const runtime = await new ApiProcessComposition(compositionRuntime(phases))
+    const runtime = await new ApiProcessContainer(containerRuntime(phases))
       .withModules([module])
       .exposeTransports((transports) => transports.browserBundle())
       .withPipelines((pipelines) => pipelines.produce())
@@ -71,7 +71,7 @@ describe("process composition", () => {
         phases.push("close");
       })
       .build();
-    const worker = new WorkerProcessComposition(compositionRuntime(phases));
+    const worker = new WorkerProcessContainer(containerRuntime(phases));
     const runtime = await worker
       .withModules([module])
       .withPipelines((pipelines) => pipelines.consume())

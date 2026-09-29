@@ -23,13 +23,13 @@ export { observabilityOwner } from "./observability-owner.ts";
 export { ServerPreamble, type Metrics, type PreambleOwner, type Telemetry } from "./preamble.ts";
 export { ProcessServer } from "./process-server.ts";
 export {
-  ApiProcessComposition,
+  ApiProcessContainer,
   type BootedApplication,
-  TasksProcessComposition,
-  WorkerProcessComposition,
+  TasksProcessContainer,
+  WorkerProcessContainer,
   type ModuleBundle,
   type ProcessBoot,
   type ProcessModule,
-} from "./process-composition.ts";
+} from "./process-container.ts";
 
 export { processConfig } from "./config.ts";

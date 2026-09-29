@@ -41,7 +41,7 @@ export interface ProcessBoot {
  */
 export type ProcessMemberFactory = (members: ProcessMemberSource) => unknown;
 
-class Composition {
+class ProcessContainer {
   protected modules: readonly ProcessModule[] = [];
   protected pipelines: PipelineParticipation | undefined;
   protected members: Record<string, ProcessMemberFactory> = {};
@@ -70,7 +70,7 @@ class Composition {
   }
 }
 
-export class ApiProcessComposition extends Composition {
+export class ApiProcessContainer extends ProcessContainer {
   #transports: TransportSelection | undefined;
   constructor(runtime: ProcessBoot) {
     super(runtime);
@@ -107,7 +107,7 @@ export class ApiProcessComposition extends Composition {
   }
 }
 
-export class WorkerProcessComposition extends Composition {
+export class WorkerProcessContainer extends ProcessContainer {
   constructor(runtime: ProcessBoot) {
     super(runtime);
   }
@@ -129,7 +129,7 @@ export class WorkerProcessComposition extends Composition {
 }
 
 /** One-shot work over the installed modules: sends commands, hosts no consumer (§9). */
-export class TasksProcessComposition extends Composition {
+export class TasksProcessContainer extends ProcessContainer {
   constructor(runtime: ProcessBoot) {
     super(runtime);
   }

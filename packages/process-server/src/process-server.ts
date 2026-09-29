@@ -21,13 +21,13 @@ import { z } from "zod";
 
 import { observabilityOwner } from "./observability-owner.ts";
 import {
-  ApiProcessComposition,
-  TasksProcessComposition,
-  WorkerProcessComposition,
+  ApiProcessContainer,
+  TasksProcessContainer,
+  WorkerProcessContainer,
   type ProcessBoot,
   type ProcessBootInput,
   type BootedApplication,
-} from "./process-composition.ts";
+} from "./process-container.ts";
 import {
   Server,
   type ServedApplication,
@@ -98,15 +98,15 @@ export class ProcessServer implements ProcessBoot {
     return this;
   }
 
-  composeProcess(role: "api"): ApiProcessComposition;
-  composeProcess(role: "worker"): WorkerProcessComposition;
-  composeProcess(role: "tasks"): TasksProcessComposition;
-  composeProcess(
+  container(role: "api"): ApiProcessContainer;
+  container(role: "worker"): WorkerProcessContainer;
+  container(role: "tasks"): TasksProcessContainer;
+  container(
     role: "api" | "worker" | "tasks",
-  ): ApiProcessComposition | WorkerProcessComposition | TasksProcessComposition {
-    if (role === "api") return new ApiProcessComposition(this);
-    if (role === "tasks") return new TasksProcessComposition(this);
-    return new WorkerProcessComposition(this);
+  ): ApiProcessContainer | WorkerProcessContainer | TasksProcessContainer {
+    if (role === "api") return new ApiProcessContainer(this);
+    if (role === "tasks") return new TasksProcessContainer(this);
+    return new WorkerProcessContainer(this);
   }
 
   async boot({

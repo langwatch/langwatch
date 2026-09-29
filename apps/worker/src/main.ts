@@ -33,7 +33,7 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
   ).start();
 
   const app = await server
-    .composeProcess("worker")
+    .container("worker")
     .withModules(processModules)
     // Dataset's two optional seams. This process composes neither, so the
     // module's own absent-behaviour applies: normalize runs in-process.

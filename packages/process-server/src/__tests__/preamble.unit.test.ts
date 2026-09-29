@@ -57,7 +57,7 @@ describe("the §4 preamble", () => {
       .start();
     try {
       const runtime = await server
-        .composeProcess("worker")
+        .container("worker")
         .withModules([])
         .withPipelines((pipelines) => pipelines.consume())
         .boot();

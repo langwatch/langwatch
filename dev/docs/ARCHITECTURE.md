@@ -443,11 +443,11 @@ packages/process-server/src/         # boot, lifecycle and peer composition
 ```
 
 The application declares what it serves through `exposeTransports`.
-Framework classes implement hosting, and process composition resolves their
-peer dependencies. Authentication policy stays in the API runtime; wiring
-installed peer APIs into that runtime belongs to process composition. This
-keeps transport machinery out of `main.ts` without making the API framework
-import the feature implementations which depend on it.
+Framework classes implement hosting, and the process container resolves
+their peer dependencies. Authentication policy stays in the API runtime;
+wiring installed peer APIs into that runtime belongs to the process
+container. This keeps transport machinery out of `main.ts` without making
+the API framework import the feature implementations which depend on it.
 
 There is no app config file (ruled 2026-09-18): config comes from the
 installed server modules' own declared schemas, composed by the generated
@@ -469,7 +469,7 @@ const server = await Server.create("langwatch-api")
   .start();
 
 const app = await server
-  .composeProcess("api")
+  .container("api")
   .withModules(processModules)
   .exposeTransports((transports) => transports.trpc().rest().browserBundle())
   .withPipelines((pipelines) => pipelines.produce())
@@ -481,7 +481,7 @@ await server.serve(app);
 ```ts
 // apps/worker/src/main.ts — the whole difference
 const app = await server
-  .composeProcess("worker")
+  .container("worker")
   .withModules(processModules) // SAME module graph: apps install fully, jobs call them in-process
   .withPipelines((pipelines) => pipelines.consume()) // consumers, jobs, process managers
   .boot();
@@ -678,7 +678,7 @@ one role owns (the worker's voice tunnel) is built there and released through
 graceful degenerates to run-to-completion. Migrations are tasks (§7), run before any module boots,
 so `apps/tasks` keeps them by hand. Every other task is a module's: `.withTasks(({ app,
 repositories, dependencies }) => [task])` builds it over the booted App in the tasks role only, and
-`server.composeProcess("tasks")` boots the installed list producer-only and runs the named tasks
+`server.container("tasks")` boots the installed list producer-only and runs the named tasks
 (coordinator ruling, 2026-09-25). A task in `apps/tasks` may read and write the datastores
 directly (Prisma, ClickHouse, Redis): the dev/CI storage seed is such a task, and no module Api
 grows a seeding operation for it (Alex, 2026-09-27).
@@ -771,7 +771,7 @@ reaches the module through its API, never through its factories (2026-09-23).
 The `processModules` list is generated from `modules/catalogue.json`
 (`pnpm generate:modules` → `@langwatch/installed-modules`). **Installing a
 module edits the catalogue, never a root.** A process composes the whole
-list in one call — `server.composeProcess(role).withModules(serverModules)` —
+list in one call — `server.container(role).withModules(serverModules)` —
 and that is also the cheap shape: one call over all 49 modules costs ~88k type
 instantiations, where the ten-step chunked chain it replaced cost 11.3M.
 Instantiation cost grows with the length of the chain, not the size of the

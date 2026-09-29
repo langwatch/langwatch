@@ -37,7 +37,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
   server.with(apiHealthRoute);
 
   const app = await server
-    .composeProcess("api")
+    .container("api")
     .withModules(processModules)
     // Dataset's two optional seams. This process composes neither, so the
     // module's own absent-behaviour applies: normalize runs in-process.
