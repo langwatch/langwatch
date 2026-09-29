@@ -2064,7 +2064,8 @@ and a response that truly needs its own schema goes through
 (`PrismaScheduledJobStore`, `computeNextRunAt` on `Date`): a keyed process manager (§9). · slots:
 `withSlots`, `UiSlots`/`uiSlots`, `useUiSlot`/`useUiSlots`, `<UiSlot>` and the `slots` host service: a
 core screen renders the enterprise kit, and a shell-wide surface is its owner's declared mount (§11;
-Alex, 2026-09-29) · a mail member (notification owns mail, §3.3) · `AesGcmSecretEncryptionService` (§6).
+Alex, 2026-09-29) · a mail member (notification owns mail, §3.3) · `AesGcmSecretEncryptionService` (§6) ·
+`composeProcess` / `*ProcessComposition` (renamed `container` / `*ProcessContainer`, Alex 2026-09-29).
 
 ---
 
