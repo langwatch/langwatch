@@ -38,7 +38,8 @@ const state = vi.hoisted(() => ({
   createCalls: [] as Record<string, unknown>[],
   updateCalls: [] as Record<string, unknown>[],
   /** What each update call answers: an error to raise, or success. */
-  updateAnswers: new Array<unknown>(),
+  updateAnswers: [] as unknown[],
+  updateError: null as unknown,
   deleteCalls: [] as Record<string, unknown>[],
   /** What each delete call answers: an error to raise, or success. */
   deleteAnswers: [] as Array<unknown | null>,
@@ -77,12 +78,13 @@ vi.mock("~/utils/api", () => ({
           mutate: (input: Record<string, unknown>, opts?: MutationOptions) => {
             state.updateCalls.push(input);
             const answer = state.updateAnswers.shift() ?? null;
+            state.updateError = answer;
             if (answer) opts?.onError?.(answer);
             else opts?.onSuccess?.({});
           },
           reset: vi.fn(),
           isPending: false,
-          error: null,
+          error: state.updateError,
         }),
       },
       delete: {
@@ -154,6 +156,7 @@ describe("SlackConnectionDrawer", () => {
     state.createCalls.length = 0;
     state.updateCalls.length = 0;
     state.updateAnswers.length = 0;
+    state.updateError = null;
     state.deleteCalls.length = 0;
     state.deleteAnswers.length = 0;
     state.closeDrawer.mockReset();
@@ -344,6 +347,32 @@ describe("SlackConnectionDrawer", () => {
         force: true,
       });
       expect(onClose).toHaveBeenCalledTimes(1);
+    });
+    describe("when the forced update then fails", () => {
+      it("closes the confirmation and shows the failure inline", async () => {
+        const user = userEvent.setup();
+        state.connections = [
+          connection({ scopeType: "ORGANIZATION", scopeId: "org-1" }),
+        ];
+        state.updateAnswers.push(
+          handledError("slack_connection_in_use", { dependentAutomations: 2 }),
+          handledError("slack_connection_not_found", {}),
+        );
+        renderDrawer({ connectionId: "conn-1", onClose: vi.fn() });
+
+        await user.click(screen.getByTestId("quick-scope-project"));
+        await user.click(screen.getByRole("button", { name: "Save" }));
+        await user.click(
+          await screen.findByRole("button", { name: "Limit to this project" }),
+        );
+
+        await waitFor(() =>
+          expect(
+            screen.queryByRole("button", { name: "Limit to this project" }),
+          ).toBeNull(),
+        );
+        expect(await screen.findByRole("alert")).toBeInTheDocument();
+      });
     });
   });
 

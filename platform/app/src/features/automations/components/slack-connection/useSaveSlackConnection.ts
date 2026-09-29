@@ -113,7 +113,7 @@ function useSlackConnectionUpdate({
             error,
             fallback: existing.dependentAutomations,
           });
-          if (count !== null && !force) setNarrowing({ draft, count });
+          setNarrowing(count !== null && !force ? { draft, count } : null);
         },
       },
     );
