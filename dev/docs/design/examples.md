@@ -203,7 +203,7 @@ export function CategoryDrawer() {
                 <ArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Select Category</Heading>
+            <Drawer.Title>Select Category</Drawer.Title>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>

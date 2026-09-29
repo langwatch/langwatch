@@ -3,12 +3,21 @@ import { Button, Text, VStack } from "@chakra-ui/react";
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signOut, useSession } from "../../behavior/auth-client.tsx";
 import { AuthCard } from "../elements/auth-card.tsx";
+import { FrontDoorShell } from "./front-door-shell.tsx";
 
 /**
  * Where a test sign-in leaves its administrator: it worked, and the way on is
  * back to their own account. Spec: specs/identity/sso-activation.feature.
  */
 export default function SsoTestComplete() {
+  return (
+    <FrontDoorShell>
+      <SsoTestCompleteCard />
+    </FrontDoorShell>
+  );
+}
+
+function SsoTestCompleteCard() {
   const { data: session } = useSession();
   // The same server answer the landing redirect read to send them here.
   const arrival = api.identity.myTestArrival.useQuery({}, { staleTime: 60_000, retry: false });
@@ -29,8 +38,14 @@ export default function SsoTestComplete() {
           yourself to finish turning the connection on.
         </Text>
         <Button
-          colorPalette="orange"
+          className="lw-front-door-primary"
           width="full"
+          minHeight="44px"
+          fontSize="14px"
+          fontWeight={600}
+          backgroundColor="frontDoor.action"
+          color="frontDoor.onAction"
+          _hover={{ backgroundColor: "frontDoor.actionHover" }}
           onClick={() => void signOut()}
           data-testid="sso-test-complete-sign-out"
         >

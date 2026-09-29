@@ -1531,6 +1531,9 @@ Drawers are URL-routed singletons with a navigation stack, opened through the
 host capability, registered through the declaration. One tRPC client for the
 whole browser.
 
+How a screen is laid out (titles, header actions, containers, drawers, empty and loading
+states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4.
+
 **An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
 
 A surface too wide for a typed hook calls a procedure by PATH through the

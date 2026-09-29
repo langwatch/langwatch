@@ -9,7 +9,8 @@ import { useRequiredSession } from "../../behavior/use-required-session.ts";
 import { useRouter } from "../../behavior/use-route.ts";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { InviteLanding } from "../../ui/sections/invite-landing.tsx";
-import { SetupLayout } from "../../ui/sections/setup-layout.tsx";
+import { AuthCard } from "../elements/auth-card.tsx";
+import { FrontDoorShell } from "./front-door-shell.tsx";
 
 /** Invitation link landing; shows inviter, guides sign-in/up or confirms sign-in. */
 export default function Accept() {
@@ -20,10 +21,14 @@ export default function Accept() {
   if (!frontDoor.isResolved) return <LoadingScreen />;
 
   if (frontDoor.enabled) {
-    return typeof inviteCode === "string" && inviteCode.length > 0 ? (
-      <InviteLanding inviteCode={inviteCode} />
-    ) : (
-      <IncompleteInviteLink />
+    return (
+      <FrontDoorShell>
+        {typeof inviteCode === "string" && inviteCode.length > 0 ? (
+          <InviteLanding inviteCode={inviteCode} />
+        ) : (
+          <IncompleteInviteLink />
+        )}
+      </FrontDoorShell>
     );
   }
 
@@ -36,9 +41,14 @@ export default function Accept() {
  */
 function IncompleteInviteLink() {
   return (
-    <SetupLayout>
-      <Text>This invitation link is incomplete. Ask for a new one.</Text>
-    </SetupLayout>
+    <AuthCard
+      title="This invitation link is incomplete"
+      intro="Some email clients cut long links in half. Open the one in your inbox again, or ask whoever invited you for a fresh link."
+    >
+      <Text fontSize="13.5px" lineHeight="1.65" color="fg.muted" data-testid="invite-incomplete">
+        Nothing has been accepted, and nothing expires while you sort it out.
+      </Text>
+    </AuthCard>
   );
 }
 
@@ -63,33 +73,41 @@ function LegacyAccept() {
 
   // Without a code there is nothing to accept, so `idle` is where the hook
   // stays — and the reader waited on a spinner that could never resolve.
-  if (code === void 0) return <IncompleteInviteLink />;
+  if (code === void 0) {
+    return (
+      <FrontDoorShell>
+        <IncompleteInviteLink />
+      </FrontDoorShell>
+    );
+  }
 
   if (isAwaitingOrRedirecting) {
     return <LoadingScreen />;
   }
 
   return (
-    <SetupLayout>
-      <VStack gap={4}>
-        {/* A signed-out visitor with a dead invite link has no other recourse,
+    <FrontDoorShell>
+      <AuthCard title="We could not accept the invitation">
+        <VStack gap={4}>
+          {/* A signed-out visitor with a dead invite link has no other recourse,
             so this has to say something they can act on. The registry supplies
             the words; the raw message would be the code slug (#5984). */}
-        <HandledErrorAlert
-          error={error}
-          fallbackTitle="An error occurred while accepting the invite"
-        />
-        <HStack gap={3}>
-          {/* Hard navigation on purpose: busts caches primed with pre-invite
+          <HandledErrorAlert
+            error={error}
+            fallbackTitle="An error occurred while accepting the invite"
+          />
+          <HStack gap={3}>
+            {/* Hard navigation on purpose: busts caches primed with pre-invite
               "no org" state, same reason the hook redirects hard on success. */}
-          <Button colorPalette="orange" onClick={() => hardRedirect("/")}>
-            Go to Dashboard
-          </Button>
-          <Button variant="outline" onClick={() => void signOut()}>
-            Log Out and Try Again
-          </Button>
-        </HStack>
-      </VStack>
-    </SetupLayout>
+            <Button colorPalette="orange" onClick={() => hardRedirect("/")}>
+              Go to Dashboard
+            </Button>
+            <Button variant="outline" onClick={() => void signOut()}>
+              Log Out and Try Again
+            </Button>
+          </HStack>
+        </VStack>
+      </AuthCard>
+    </FrontDoorShell>
   );
 }

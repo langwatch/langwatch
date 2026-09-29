@@ -5,9 +5,9 @@ import { isNavigatingAway } from "../../behavior/hard-redirect.ts";
 import { useJoinBeforeCreate } from "../../behavior/use-join-before-create.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
 import { JoinBeforeCreateInterstitial } from "../../ui/blocks/join-before-create-interstitial.tsx";
-import { SetupLayout } from "../../ui/sections/setup-layout.tsx";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { FrontDoorShell } from "./front-door-shell.tsx";
 
 /**
  * D12's join-before-create decision. This screen never creates an
@@ -29,7 +29,7 @@ export default function Join() {
   // A failed lookup is not proof that there is nothing to offer.
   if (lookup.isError || mine.isError) {
     return (
-      <SetupLayout>
+      <FrontDoorShell>
         <AuthCard title="We couldn't check for your colleagues">
           <VStack width="full" align="stretch" gap="14px" data-testid="join-lookup-failed">
             <HandledErrorAlert
@@ -50,12 +50,12 @@ export default function Join() {
             </Button>
           </VStack>
         </AuthCard>
-      </SetupLayout>
+      </FrontDoorShell>
     );
   }
 
   return (
-    <SetupLayout>
+    <FrontDoorShell>
       <JoinBeforeCreateInterstitial
         verifiedEmail={email}
         lookup={lookup.data}
@@ -65,6 +65,6 @@ export default function Join() {
         onAlreadyJoined={join.admitAndLand}
       />
       <HandledErrorAlert error={join.requestError} fallbackTitle="Couldn't ask to join" />
-    </SetupLayout>
+    </FrontDoorShell>
   );
 }

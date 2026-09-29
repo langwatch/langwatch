@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Container, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { isStableAuthError, normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { Link } from "@langwatch/browser-host/link";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
@@ -9,7 +9,8 @@ import { hardNavigate } from "../../behavior/browser-navigation.ts";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { cutoverSignInRefusal } from "../../model/sign-in-error-code.ts";
-import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
+import { AuthCard } from "../elements/auth-card.tsx";
+import { FrontDoorShell } from "./front-door-shell.tsx";
 
 /**
  * Server route that clears the app session and, on Auth0 deployments, federates to Auth0
@@ -63,6 +64,14 @@ const errorTitle = (error: string): string => {
 };
 
 export default function Error() {
+  return (
+    <FrontDoorShell>
+      <SignInErrorScreen />
+    </FrontDoorShell>
+  );
+}
+
+function SignInErrorScreen() {
   const { data: session } = useSession();
   const query = useSearchParams();
   const error = normalizeSignInErrorCode(query?.get("error"));
@@ -108,13 +117,27 @@ export default function Error() {
   // a card that says so — this branch used to be an unstyled line of text in
   // the corner of a blank page, sitting there for the full five seconds.
   return (
-    <div style={{ padding: "12px" }}>
-      Auth Error: Redirecting back to Sign in... Click{" "}
-      <Link unstyled href="/">
-        here
-      </Link>{" "}
-      if you are not redirected within 5 seconds.
-    </div>
+    <AuthCard title="Taking you back to sign in">
+      <VStack width="full" align="stretch" gap={4}>
+        <HStack gap={3}>
+          <Spinner size="sm" color="frontDoor.detail" />
+          <Text color="fg.muted">One moment.</Text>
+        </HStack>
+        <Text fontSize="13px" color="fg.muted">
+          If nothing happens,{" "}
+          <Box
+            asChild
+            color="fg"
+            fontWeight={600}
+            textDecoration="underline"
+            textUnderlineOffset="3px"
+          >
+            <Link href="/">go to sign in</Link>
+          </Box>
+          .
+        </Text>
+      </VStack>
+    </AuthCard>
   );
 }
 
@@ -230,37 +253,26 @@ export function SignInError({ error: rawError }: { error: string }) {
   const trace = query?.get("trace") ?? null;
 
   return (
-    <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
-      <Card.Root>
-        <Card.Header>
-          <HStack gap={4}>
-            <LogoIcon width={30.69} height={42} />
-            <Heading size="lg" as="h1">
-              Sign in Error
-            </Heading>
-          </HStack>
-        </Card.Header>
-        <Card.Body>
-          <Alert.Root status={error === "OAuthAccountNotLinked" ? "warning" : "error"}>
-            <Alert.Indicator />
-            <Alert.Content gap={4}>
-              <Alert.Title>{errorTitle(error)}</Alert.Title>
-              <SignInErrorDescription error={error} callbackUrl={callbackUrl} />
-            </Alert.Content>
-          </Alert.Root>
-          {trace && (
-            <Text
-              marginTop={3}
-              fontSize="11.5px"
-              color="fg.subtle"
-              fontFamily="mono"
-              data-testid="sign-in-error-trace"
-            >
-              Reference: {trace}
-            </Text>
-          )}
-        </Card.Body>
-      </Card.Root>
-    </Container>
+    <AuthCard title={errorTitle(error)}>
+      <Alert.Root
+        className="lw-front-door-alert"
+        status={error === "OAuthAccountNotLinked" ? "warning" : "error"}
+      >
+        <Alert.Indicator />
+        <Alert.Content gap={4}>
+          <SignInErrorDescription error={error} callbackUrl={callbackUrl} />
+        </Alert.Content>
+      </Alert.Root>
+      {trace && (
+        <Text
+          fontSize="11.5px"
+          color="fg.subtle"
+          fontFamily="mono"
+          data-testid="sign-in-error-trace"
+        >
+          Reference: {trace}
+        </Text>
+      )}
+    </AuthCard>
   );
 }

@@ -17,6 +17,7 @@ import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { FrontDoorField } from "../../ui/elements/front-door-field.tsx";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { PasswordInput } from "../../ui/elements/password-input.tsx";
+import { FrontDoorShell } from "./front-door-shell.tsx";
 
 // The one password policy, from the module that owns it, so reset cannot accept
 // what sign-up refuses.
@@ -73,7 +74,11 @@ export default function ResetPassword() {
   const query = useSearchParams();
   const token = query?.get("token") ?? null;
 
-  return token ? <ResetPasswordForm token={token} /> : <DeadLinkCard />;
+  return (
+    <FrontDoorShell>
+      {token ? <ResetPasswordForm token={token} /> : <DeadLinkCard />}
+    </FrontDoorShell>
+  );
 }
 
 function DeadLinkCard() {

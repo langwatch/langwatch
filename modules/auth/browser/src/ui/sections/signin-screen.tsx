@@ -104,7 +104,11 @@ function LegacySignIn() {
   }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error]);
 
   if (error) {
-    return <SignInError error={error} />;
+    return (
+      <FrontDoorShell>
+        <SignInError error={error} />
+      </FrontDoorShell>
+    );
   }
 
   if (!publicEnv.data) {

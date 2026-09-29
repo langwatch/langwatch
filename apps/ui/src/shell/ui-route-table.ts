@@ -248,6 +248,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // Spec: specs/langy/langy-mount-scope.feature
   { path: "/cli/auth", page: "pages/cli/auth" },
 
+  // The published workflow chat is a chromeless page, as it was on main: one
+  // full-height card with the wordmark, no header, sidebar or Langy panel.
+  { path: "/:project/chat/:workflow", page: "pages/[project]/chat/[workflow]" },
+
   // Everything behind a session, wrapped in the application chrome.
   {
     layout: "chrome",
@@ -739,10 +743,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/:project/workflows",
             page: "pages/[project]/workflows",
-          },
-          {
-            path: "/:project/chat/:workflow",
-            page: "pages/[project]/chat/[workflow]",
           },
           {
             path: "/:project/studio/:workflow",

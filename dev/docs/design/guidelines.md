@@ -121,7 +121,7 @@ function ParentDrawer() {
               <ArrowLeft />
             </Button>
           )}
-          <Heading>Select Type</Heading>
+          <Drawer.Title>Select Type</Drawer.Title>
         </HStack>
       </Drawer.Header>
       <Drawer.Body>
@@ -136,44 +136,60 @@ See [components.md](./components.md) for detailed `useDrawer` hook documentation
 
 ## 4. Page Layout Standards
 
-All pages should follow a consistent layout structure.
+One standard per concern, ruled 2026-09-29 (Alex) after the UI consistency audit. Each has
+one component and one exemplar; a screen that disagrees is the defect.
 
-### Structure
+### Page title and header actions
 
-1. **Header** - Fixed height (48px), contains title and actions
-2. **Title** - Small, left-aligned heading
-3. **Action Buttons** - Top right, using `PageLayout.HeaderButton`
-4. **Content** - Full width, below the header divider
-
-### Code Pattern
+Every page inside the app chrome, workspace, settings, governance and `/me` alike, opens with
+`PageLayout.Header` (the 48px bar) holding `PageLayout.Heading`. Actions sit after a `<Spacer />`
+and are `PageLayout.HeaderButton` only: no raw `Button`, no solid primary. Full-screen tools
+(studio, traces explorer, workbench) and card screens (auth, onboarding, authorize) carry no bar.
+Exemplar: `modules/workflow/browser/src/ui/sections/workflows/workflows-screen.tsx:46`.
 
 ```tsx
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
-<PageLayout.Container>
-  <PageLayout.Header>
-    <PageLayout.Heading>Page Title</PageLayout.Heading>
-    <Spacer />
-    <HStack gap={2}>
-      <PageLayout.HeaderButton onClick={handleAction}>
-        <Plus /> Add Item
-      </PageLayout.HeaderButton>
-    </HStack>
-  </PageLayout.Header>
-
-  {/* Page content below header */}
-  <VStack gap={4} padding={6}>
-    ...
-  </VStack>
-</PageLayout.Container>;
+<PageLayout.Header>
+  <PageLayout.Heading>Page Title</PageLayout.Heading>
+  <Spacer />
+  <PageLayout.HeaderButton onClick={handleAction}>
+    <Plus /> Add Item
+  </PageLayout.HeaderButton>
+</PageLayout.Header>;
 ```
 
-### Key Points
+### Container: the shell owns padding and width
 
-- Page takes full available width
-- Title should be concise
-- Action buttons grouped on the right
-- Consistent padding and spacing
+A page root adds no padding, `maxWidth` or centring: the shell card, the area layout and
+settings' `PageMeasure` own it. Workspace list pages put `PageLayout.Container` after the
+`PageLayout.Header`, never around it. A page root is transparent over the shell card
+(`bg.surface`); cards use `bg.panel`; tints use semantic tokens, never a numbered palette.
+Exemplar: `workflows-screen.tsx:56`.
+
+### Empty and loading states
+
+"Nothing here yet" is `NoDataInfoBlock` from `@langwatch/design-system/no-data-info-block`, never
+a module-local copy or a raw `EmptyState`. Inside the chrome, loading is `Skeleton` in the content
+region; `LoadingScreen` is for screens outside the chrome only. Exemplar: `workflows-screen.tsx:58`.
+
+### Drawers
+
+Use `Drawer.*` from `@langwatch/design-system/drawer` with `Drawer.Title` inside `Drawer.Header`
+(Chakra wires `aria-labelledby` to it; a bare `Heading` leaves the drawer unnamed).
+Exemplar: `modules/organization/browser/src/ui/sections/invite-member-drawer.tsx:61`.
+
+### Front door
+
+Every `/auth/*` screen and `/invite/accept` renders inside `FrontDoorShell` with its content on an
+`AuthCard`, matching main's `AuthShell`. Wait states are a card too ("Taking you back to sign in"),
+never a bare line of text. Exemplar: `modules/auth/browser/src/ui/sections/signin-screen.tsx`.
+
+### Chrome placement
+
+Inside the chrome: `/authorize`, `/mcp/authorize`. Chromeless: `/:project/chat/:workflow` and the
+top-level card screens. `/share/:id` draws main's public frame (wordmark, sign-in entry, body in a
+card). The route table, `apps/ui/src/shell/ui-route-table.ts`, is the record of placement.
 
 ## 5. Form Validation: Submit-then-Surface, Don't Pre-Disable
 

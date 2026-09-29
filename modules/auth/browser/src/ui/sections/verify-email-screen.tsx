@@ -2,6 +2,7 @@ import { Text, VStack } from "@chakra-ui/react";
 
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
+import { FrontDoorShell } from "./front-door-shell.tsx";
 
 /**
  * Magic-link landing page: renders only, no request — proof stays in URL.
@@ -9,6 +10,14 @@ import { AuthCard } from "../../ui/elements/auth-card.tsx";
  * which is exactly what a scanner spending someone else's link would exploit.
  */
 export default function VerifyEmail() {
+  return (
+    <FrontDoorShell>
+      <VerifyEmailCard />
+    </FrontDoorShell>
+  );
+}
+
+function VerifyEmailCard() {
   const query = useSearchParams();
   // Read for its PRESENCE and nothing else. The value is never held in state,
   // never passed down and never rendered — session-replay and RUM collectors
@@ -22,7 +31,7 @@ export default function VerifyEmail() {
         intro="Some email clients cut long links in half. Open the one in your inbox again, or copy the whole address into your browser."
       >
         <VStack align="stretch" gap={3} data-testid="verify-email-incomplete">
-          <Text color="gray.600">
+          <Text color="fg.muted">
             If it keeps arriving broken, ask for a fresh verification email from the window where
             you requested this one.
           </Text>
@@ -38,7 +47,7 @@ export default function VerifyEmail() {
           Return to the window where you requested this verification to finish confirming your email
           address.
         </Text>
-        <Text color="gray.600">Opening this link on its own does not confirm anything.</Text>
+        <Text color="fg.muted">Opening this link on its own does not confirm anything.</Text>
       </VStack>
     </AuthCard>
   );

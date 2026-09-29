@@ -7,7 +7,6 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type ReadState = {
@@ -51,10 +50,6 @@ vi.mock("../../../behavior/use-required-session.ts", () => ({
 vi.mock("../../../behavior/hard-redirect.ts", () => ({
   hardRedirect: hardRedirectMock,
   isNavigatingAway: () => navigatingAwayRef.current,
-}));
-
-vi.mock("../setup-layout.tsx", () => ({
-  SetupLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
 import Join from "../join-screen.tsx";

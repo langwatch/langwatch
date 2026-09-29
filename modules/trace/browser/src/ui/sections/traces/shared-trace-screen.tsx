@@ -1,8 +1,19 @@
-import { Alert, Box, Button, Center, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Box,
+  Button,
+  Center,
+  HStack,
+  Separator,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { FullLogo } from "@langwatch/design-system/full-logo";
 import { Link2Off } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { useDrawerStore } from "../../../behavior/drawer.store.ts";
 import { api } from "../../../behavior/trace-api.ts";
@@ -106,6 +117,53 @@ function SharePageSignUpInvitation() {
   );
 }
 
+/**
+ * The frame for a page with no session, as main drew it: the wordmark, the
+ * sign-in entry and the body in a card. No sidebar, because every link in one
+ * needs an account.
+ */
+function PublicPageFrame({ token, children }: { token: string; children: ReactNode }) {
+  const callbackUrl = encodeURIComponent(`/share/${token}`);
+
+  return (
+    <Box width="full" minHeight="100vh" background="bg.page">
+      <HStack
+        width="full"
+        height="60px"
+        paddingX={4}
+        paddingY={3}
+        justifyContent="space-between"
+        gap={4}
+      >
+        <Link href="/" display="flex" alignItems="center">
+          <FullLogo width={155 * 0.7} height={38 * 0.7} />
+        </Link>
+        <Link href={`/auth/signin?callbackUrl=${callbackUrl}`}>
+          <Button variant="outline" size="sm">
+            Sign in
+          </Button>
+        </Link>
+      </HStack>
+      <Box
+        width="full"
+        background="bg.surface"
+        borderTopLeftRadius="xl"
+        borderTopWidth="1px"
+        borderLeftWidth="1px"
+        borderColor="border.muted"
+        overflow="auto"
+        display="flex"
+        minHeight="calc(100vh - 60px)"
+        maxHeight="calc(100vh - 60px)"
+        position="relative"
+        data-tour="main-content"
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
 export default function SharePage() {
   const router = useRouter();
   const token = typeof router.query.id === "string" ? router.query.id : "";
@@ -150,12 +208,12 @@ export default function SharePage() {
   }
 
   return (
-    <>
+    <PublicPageFrame token={token}>
       <SharedTraceProvider value={shared.data}>
         <TraceViewerProvider traceId={shared.data.header.traceId} isReadOnly>
           <SharedTraceView />
         </TraceViewerProvider>
       </SharedTraceProvider>
-    </>
+    </PublicPageFrame>
   );
 }
