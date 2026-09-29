@@ -18,15 +18,18 @@ import { docsUrl } from "~/utils/docsUrl";
 /**
  * Why an Instant Eval did not start, and what the popover says about it.
  *
- * `opt_in` and `unreleased` are the same refusal, an organization Instant
- * Evals are not on for, told to two readers: a self-serve organization is
- * offered the switch, an enterprise organization or a self-hosted install is
- * offered a word with us.
+ * `opt_in`, `ask_admin` and `unreleased` are the same refusal, an
+ * organization Instant Evals are not on for, told to three readers: a member
+ * who may manage a self-serve organization is offered the switch, a member
+ * who may not is told where the text would go and to ask an organization
+ * admin, and an enterprise organization or a self-hosted install is offered a
+ * word with us.
  */
 export type InstantEvalRefusal =
   | { kind: "budget" }
   | { kind: "model" }
   | { kind: "opt_in" }
+  | { kind: "ask_admin" }
   | { kind: "unreleased" };
 
 /** Where a paid plan is picked, which is what lifts the free budget. */
@@ -69,12 +72,14 @@ interface InstantEvalRefusalPopoverProps {
 /**
  * The popover's words, exported so the copy is pinned by a test. An action
  * with an `href` is a link; one without is the organization's switch, a
- * button, and the render branches on that rather than on the refusal kind.
+ * button; no action at all leaves only the quieter link and the dismissal,
+ * for the reader who may do nothing here but read. The render branches on
+ * that rather than on the refusal kind.
  */
 export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   title: string;
   body: string;
-  action: { label: string; href?: string };
+  action?: { label: string; href?: string };
   /** A second, quieter link beside the action, when the copy has one. */
   more?: { label: string; href: string };
   dismiss: string;
@@ -98,11 +103,21 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
       dismiss: "Skip",
     };
   }
+  const whereItGoes =
+    "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model.";
   if (refusal.kind === "opt_in") {
     return {
       title: "Turn on Instant Evals for your organization",
-      body: "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model. Enable turns this on for every project in your organization.",
+      body: `${whereItGoes} Enable turns this on for every project in your organization.`,
       action: { label: "Enable" },
+      more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
+      dismiss: "Not now",
+    };
+  }
+  if (refusal.kind === "ask_admin") {
+    return {
+      title: "Instant Evals aren't turned on for your organization yet",
+      body: `${whereItGoes} Ask an organization admin to turn it on for every project in your organization.`,
       more: { label: "Read more", href: WHERE_THE_TEXT_GOES_HREF },
       dismiss: "Not now",
     };
@@ -127,7 +142,9 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
  * The `opt_in` popover is the explanation the organization reads before it
  * switches Instant Evals on: where the judged text goes, under what
  * agreement, and that it is never trained on. "Enable" throws the switch;
- * "Read more" opens the docs paragraph that says the same at length.
+ * "Read more" opens the docs paragraph that says the same at length. The
+ * `ask_admin` popover is the same explanation for a member who may not
+ * throw the switch, with no button the server would refuse.
  *
  * "Contact us" on the unreleased popover opens the support chat when one is
  * available, and falls back to a mailto link otherwise: the copy names
@@ -142,8 +159,9 @@ export const InstantEvalRefusalPopover: React.FC<
   const copy = refusal ? instantEvalRefusalCopy(refusal) : null;
   const useSupportChat =
     refusal?.kind === "unreleased" && isSupportChatAvailable();
-  const actionHref = copy?.action.href;
-  const isSwitch = actionHref === undefined;
+  const action = copy?.action;
+  const actionHref = action?.href;
+  const isSwitch = action !== undefined && actionHref === undefined;
   return (
     <PopoverRoot
       open={refusal !== null}
@@ -183,7 +201,7 @@ export const InstantEvalRefusalPopover: React.FC<
                 {copy.body}
               </Text>
               <HStack gap={2}>
-                {isSwitch || useSupportChat ? (
+                {action && (isSwitch || useSupportChat) && (
                   <Button
                     size="xs"
                     flex={1}
@@ -193,9 +211,10 @@ export const InstantEvalRefusalPopover: React.FC<
                     onClick={isSwitch ? onEnable : toggleSupportChat}
                     loading={isSwitch && isEnabling}
                   >
-                    {copy.action.label}
+                    {action.label}
                   </Button>
-                ) : (
+                )}
+                {action && actionHref !== undefined && !useSupportChat && (
                   <NextLink
                     href={actionHref}
                     target="_blank"
@@ -209,7 +228,7 @@ export const InstantEvalRefusalPopover: React.FC<
                       color="white"
                       _hover={{ bg: "orange.fg" }}
                     >
-                      {copy.action.label}
+                      {action.label}
                     </Button>
                   </NextLink>
                 )}

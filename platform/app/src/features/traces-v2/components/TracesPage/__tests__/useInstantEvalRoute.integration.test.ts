@@ -473,6 +473,23 @@ describe("given Instant Evals are off for an enterprise organization", () => {
       expect(useExplorerStore.getState().queryText).toBe(queryBefore);
     });
 
+    /** @scenario "A member who may not throw the switch is told to ask an admin" */
+    it("opens the ask-admin popover for a member who may not switch, and Enable sends nothing", () => {
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({
+          isInstantEvalAvailable: false,
+          optInOffer: "ask_admin",
+        }),
+      );
+      act(() => result.current.onInstantEvalRoute(payload));
+
+      expect(mutations.estimate.mutate).not.toHaveBeenCalled();
+      expect(result.current.refusal).toEqual({ kind: "ask_admin" });
+
+      act(() => result.current.enableInstantEvals());
+      expect(mutations.enable.mutate).not.toHaveBeenCalled();
+    });
+
     /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
     it("opens the contact-us popover while the offer is still unknown", () => {
       const { result } = renderHook(() =>

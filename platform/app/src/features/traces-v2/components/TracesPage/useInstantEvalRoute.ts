@@ -332,9 +332,10 @@ function useInstantEvalStarter({
  * start. Pending is left null, so dismissing this popover just closes it
  * rather than applying a fallback query.
  *
- * A self-serve organization gets the switch; anyone else gets a word with
- * us. The payload is held aside for the switch, so a thrown switch can go on
- * to the estimate the reader asked for.
+ * A member who may manage a self-serve organization gets the switch; one who
+ * may not is told to ask an admin; anyone else gets a word with us. The
+ * payload is held aside for the switch only, so a thrown switch can go on to
+ * the estimate the reader asked for.
  */
 function bailUnreleased({
   outcome,
@@ -358,6 +359,10 @@ function bailUnreleased({
     return;
   }
   heldRef.current = null;
+  if (optInOffer === "ask_admin") {
+    outcome.setRefusal({ kind: "ask_admin" });
+    return;
+  }
   outcome.setRefusal({ kind: "unreleased" });
 }
 

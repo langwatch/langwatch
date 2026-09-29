@@ -8,7 +8,9 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
   processing agreement with them, and TypeSafe does not train on it. That is a flow an
   organization agrees to, so:
   - a self-serve organization is offered the switch in the popover, with the explanation and a
-    link to the docs paragraph that says the same at length;
+    link to the docs paragraph that says the same at length, to a member who may manage the
+    organization; a member who may not reads the same explanation and is told to ask an
+    organization admin, and is never offered a button the server would refuse;
   - an enterprise organization is offered a word with us instead, and is never switched on by a
     click;
   - a self-hosted install is offered a word with us too, because its judging is a matter of its
@@ -16,19 +18,29 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
   - the operator's release flag stays as it was, and either the flag or the switch makes a
     project judgeable.
 
-  Rule: The offer depends on the plan and the deployment
+  Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
 
     @unit
     Scenario: A self-serve organization is offered the switch
       Given an organization on the hosted service that is not on an enterprise plan
+      And a member who may manage the organization
       When the popover asks what to offer
       Then it is offered the switch
+
+    @unit @integration
+    Scenario: A member who may not throw the switch is told to ask an admin
+      Given an organization on the hosted service that is not on an enterprise plan
+      And a member who may not manage the organization
+      When the popover asks what to offer
+      Then it is offered a word with an organization admin
+      And the popover says where the judged text goes, links "Read more", and offers no "Enable"
+      And no estimate is requested and the typed query stays in the bar
 
     @unit
     Scenario: An enterprise organization is offered a word with us
       Given an organization on the hosted service that is on an enterprise plan
       When the popover asks what to offer
-      Then it is offered a word with us
+      Then it is offered a word with us, whatever the member may do
 
     @unit
     Scenario: A self-hosted install is offered a word with us

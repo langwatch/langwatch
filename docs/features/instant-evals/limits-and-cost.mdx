@@ -75,6 +75,6 @@ LangWatch adds no account or organization identifier and none of your keys to th
 
 TypeSafe processes that text on LangWatch's instructions under a data processing agreement, answers the questions, and does not use it to train its models. TypeSafe is a LangWatch sub-processor; the [privacy policy](https://langwatch.ai/legal/privacy-policy) and the [trust center](https://langwatch.ai/trust-center) carry the current list.
 
-LangWatch sends judged text only after someone in your organization starts a run or a judged query. Judging is off for a self-serve organization until a member with organization management rights switches it on from the search bar. An enterprise organization is switched on by LangWatch once it asks.
+LangWatch sends judged text only after someone in your organization starts a run or a judged query. Judging is off for a self-serve organization until a member with organization management rights switches it on from the search bar; a member without those rights reads the same explanation there and is asked to turn to an organization admin. An enterprise organization is switched on by LangWatch once it asks.
 
 A self-hosted install with its own `JEV_API_KEY` sends the text to TypeSafe directly with that key, under its own agreement with them. A self-hosted install judging through [Connect](/self-hosting/connect) sends it to LangWatch, which passes it to TypeSafe as above.

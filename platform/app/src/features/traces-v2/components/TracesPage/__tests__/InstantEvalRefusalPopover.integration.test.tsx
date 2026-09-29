@@ -141,6 +141,61 @@ describe("given Instant Evals are off for a self-serve organization", () => {
   });
 });
 
+describe("given Instant Evals are off and the reader may not manage the organization", () => {
+  describe("when the popover opens", () => {
+    /** @scenario "A member who may not throw the switch is told to ask an admin" */
+    it("explains where the text goes, names an organization admin, and offers no Enable", () => {
+      const onClose = vi.fn();
+      const onEnable = vi.fn();
+      render(
+        <InstantEvalRefusalPopover
+          refusal={{ kind: "ask_admin" }}
+          onClose={onClose}
+          onEnable={onEnable}
+          isEnabling={false}
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+      expect(
+        screen.getByText(
+          "Instant Evals aren't turned on for your organization yet",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "To judge results, LangWatch sends the text of your traces and your question to TypeSafe's model, under our data processing agreement with them. It is never used to train the model. Ask an organization admin to turn it on for every project in your organization.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Read more" })).toHaveAttribute(
+        "href",
+        WHERE_THE_TEXT_GOES_HREF,
+      );
+      expect(
+        screen.queryByRole("button", { name: "Enable" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Contact us" }),
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onEnable).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A member who may not throw the switch is told to ask an admin" */
+    it("pins the ask-admin copy: no action, the same Read more, Not now", () => {
+      const copy = instantEvalRefusalCopy({ kind: "ask_admin" });
+      expect(copy.action).toBeUndefined();
+      expect(copy.more).toEqual({
+        label: "Read more",
+        href: WHERE_THE_TEXT_GOES_HREF,
+      });
+      expect(copy.dismiss).toBe("Not now");
+    });
+  });
+});
+
 describe("given Instant Evals are off for an enterprise organization", () => {
   describe("when the popover opens", () => {
     /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */

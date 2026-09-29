@@ -25,15 +25,19 @@ import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-prov
 import { InstantEvalOptInNotOfferedError } from "./errors";
 
 /**
- * What the popover offers a refused organization.
+ * What the popover offers a refused organization, to the member reading it.
  *
- * - `enable`: a self-serve organization on the hosted service, which may switch
- *   Instant Evals on itself.
+ * - `enable`: a self-serve organization on the hosted service, read by a
+ *   member who may manage the organization and so may switch Instant Evals on
+ *   for it.
+ * - `ask_admin`: the same organization, read by a member who may not: the
+ *   explanation is the same, but the switch is an organization admin's to
+ *   throw, so the popover offers no button that the server would refuse.
  * - `contact_us`: an enterprise organization, whose agreement is negotiated
  *   rather than clicked; and any self-hosted install, whose judging is a matter
  *   of its own key or its Connect license and not of this switch.
  */
-export type InstantEvalOptInOffer = "enable" | "contact_us";
+export type InstantEvalOptInOffer = "enable" | "ask_admin" | "contact_us";
 
 /** Whether the organization switched Instant Evals on itself. */
 export async function instantEvalsOptedIn({
@@ -51,26 +55,34 @@ export async function instantEvalsOptedIn({
 }
 
 /**
- * The offer for one organization, decided from its plan and the deployment.
+ * The offer for one organization, decided from its plan, the deployment, and
+ * whether the member asking may throw the switch.
  *
- * Both are injectable so a test can state them; the defaults read the process.
- * The plan is resolved with the caller's user because the SaaS provider needs
- * it to answer at all for an impersonated session.
+ * The plan and the deployment are injectable so a test can state them; the
+ * defaults read the process. The plan is resolved with the caller's user
+ * because the SaaS provider needs it to answer at all for an impersonated
+ * session. Whether the member may switch is the caller's to answer, from the
+ * same authority the `enable` mutation declares, so the popover never offers
+ * a button the server would refuse: a member without it is told to ask an
+ * organization admin instead.
  */
 export async function instantEvalOptInOffer({
   organizationId,
   user,
+  maySwitch,
   isSaas = () => env.IS_SAAS === true,
   planTypeOf = async () =>
     (await getApp().planProvider.getActivePlan({ organizationId, user })).type,
 }: {
   organizationId: string;
   user?: PlanProviderUser;
+  maySwitch: () => Promise<boolean>;
   isSaas?: () => boolean;
   planTypeOf?: () => Promise<string>;
 }): Promise<InstantEvalOptInOffer> {
   if (!isSaas()) return "contact_us";
   if (isEnterpriseTier(await planTypeOf())) return "contact_us";
+  if (!(await maySwitch())) return "ask_admin";
   return "enable";
 }
 
@@ -79,6 +91,9 @@ export async function instantEvalOptInOffer({
  * organization the popover offers "Contact us" to, so an enterprise
  * organization is never switched on by a request the popover did not make.
  * Returns what the access read will now say.
+ *
+ * The member's authority is not asked again here: the `enable` mutation
+ * declares it, and a request that reached this far has passed that check.
  */
 export async function switchInstantEvalsOn({
   prisma,
@@ -99,6 +114,7 @@ export async function switchInstantEvalsOn({
 }): Promise<{ released: true; offer: "enable" }> {
   const offer = await instantEvalOptInOffer({
     organizationId,
+    maySwitch: async () => true,
     ...(user ? { user } : {}),
     ...(isSaas ? { isSaas } : {}),
     ...(planTypeOf ? { planTypeOf } : {}),

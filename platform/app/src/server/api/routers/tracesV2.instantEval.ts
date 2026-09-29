@@ -32,6 +32,7 @@ import {
   toInstantEvalExplorerRun,
 } from "~/server/app-layer/instant-evals/run";
 import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand";
+import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import { queryWithoutInstantEvalChips } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
@@ -132,7 +133,8 @@ const projectScopeSchema = z.object({ projectId: z.string() });
 export const tracesV2InstantEvalRouter = createTRPCRouter({
   /**
    * Whether the project may be offered a judgement, and what the popover
-   * offers when it may not: the organization's own switch, or a word with us.
+   * offers when it may not: the organization's own switch, a word with an
+   * organization admin for a member who may not throw it, or a word with us.
    *
    * The organization is the project's, resolved here and never taken from the
    * input: the permission check covers the project only, and an organization
@@ -153,7 +155,19 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
           projectId: input.projectId,
           organizationId,
         }),
-        instantEvalOptInOffer({ organizationId, user: ctx.session.user }),
+        instantEvalOptInOffer({
+          organizationId,
+          user: ctx.session.user,
+          // The same authority `enable` declares below, so a member the
+          // mutation would refuse is offered a word with their admin instead
+          // of a button.
+          maySwitch: () =>
+            probeOrganizationPermission(
+              ctx,
+              organizationId,
+              "organization:manage",
+            ),
+        }),
       ]);
       return { released, offer };
     }),

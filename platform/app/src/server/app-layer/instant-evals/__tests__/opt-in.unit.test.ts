@@ -17,16 +17,31 @@ import {
 } from "../opt-in";
 
 describe("given a self-serve organization on the hosted service", () => {
-  describe("when the popover asks what to offer", () => {
+  describe("when a member who may manage it asks what to offer", () => {
     /** @scenario "A self-serve organization is offered the switch" */
     it("offers the switch", async () => {
       await expect(
         instantEvalOptInOffer({
           organizationId: "organization",
+          maySwitch: async () => true,
           isSaas: () => true,
           planTypeOf: async () => "PRO",
         }),
       ).resolves.toBe("enable");
+    });
+  });
+
+  describe("when a member who may not manage it asks what to offer", () => {
+    /** @scenario "A member who may not throw the switch is told to ask an admin" */
+    it("offers a word with an organization admin", async () => {
+      await expect(
+        instantEvalOptInOffer({
+          organizationId: "organization",
+          maySwitch: async () => false,
+          isSaas: () => true,
+          planTypeOf: async () => "PRO",
+        }),
+      ).resolves.toBe("ask_admin");
     });
   });
 });
@@ -34,14 +49,17 @@ describe("given a self-serve organization on the hosted service", () => {
 describe("given an enterprise organization on the hosted service", () => {
   describe("when the popover asks what to offer", () => {
     /** @scenario "An enterprise organization is offered a word with us" */
-    it("offers a word with us", async () => {
+    it("offers a word with us, whatever the member may do", async () => {
+      const maySwitch = vi.fn(async () => false);
       await expect(
         instantEvalOptInOffer({
           organizationId: "organization",
+          maySwitch,
           isSaas: () => true,
           planTypeOf: async () => "ENTERPRISE",
         }),
       ).resolves.toBe("contact_us");
+      expect(maySwitch).not.toHaveBeenCalled();
     });
   });
 });
@@ -54,6 +72,7 @@ describe("given a self-hosted install", () => {
       await expect(
         instantEvalOptInOffer({
           organizationId: "organization",
+          maySwitch: async () => true,
           isSaas: () => false,
           planTypeOf,
         }),
