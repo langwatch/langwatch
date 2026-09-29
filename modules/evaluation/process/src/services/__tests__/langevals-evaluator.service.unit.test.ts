@@ -100,8 +100,8 @@ describe("LangevalsEvaluatorService", () => {
   });
 
   describe("given langevals sends an unset optional field as null", () => {
-    /** @scenario "An evaluator result whose unset fields langevals sends as null reads them as absent" */
-    it("answers the processed result without the null-valued fields", async () => {
+    /** @scenario "An evaluator result whose unset fields langevals sends as null is accepted as sent" */
+    it("answers the processed result with its null fields as sent", async () => {
       answerWith([
         {
           status: "processed",
@@ -117,17 +117,20 @@ describe("LangevalsEvaluatorService", () => {
         status: "processed",
         score: 1,
         passed: true,
+        label: null,
         details: "hello == hello",
+        cost: null,
       });
     });
 
-    /** @scenario "A skipped evaluator result whose unset fields langevals sends as null reads them as absent" */
-    it("answers the skipped result without the null-valued fields", async () => {
+    /** @scenario "A skipped evaluator result whose unset fields langevals sends as null is accepted as sent" */
+    it("answers the skipped result with its null cost as sent", async () => {
       answerWith([{ status: "skipped", details: "no expected output", cost: null }]);
 
       await expect(httpService().evaluate(params)).resolves.toStrictEqual({
         status: "skipped",
         details: "no expected output",
+        cost: null,
       });
     });
   });

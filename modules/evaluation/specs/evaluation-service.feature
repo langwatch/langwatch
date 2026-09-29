@@ -261,23 +261,23 @@ Feature: Evaluation service boundary
     Then it is refused naming the expected and received result counts
 
   @unit
-  Scenario: A PII answer whose unset fields langevals sends as null reads them as absent
+  Scenario: A PII answer whose unset fields langevals sends as null is accepted as sent
     Given langevals answers a PII batch with label, details and cost set to null
     When data privacy asks evaluation to detect PII
-    Then the answer carries each result without the null-valued fields
+    Then the answer carries each result with its unset fields still null
 
   @unit
-  Scenario: An evaluator result whose unset fields langevals sends as null reads them as absent
+  Scenario: An evaluator result whose unset fields langevals sends as null is accepted as sent
     Given langevals answers an evaluation with a processed result whose label and cost are null
     When an evaluator is run over the data
     Then the result carries its score, passed and details
-    And it carries no label and no cost
+    And its label and cost are null
 
   @unit
-  Scenario: A skipped evaluator result whose unset fields langevals sends as null reads them as absent
+  Scenario: A skipped evaluator result whose unset fields langevals sends as null is accepted as sent
     Given langevals answers an evaluation with a skipped result whose cost is null
     When an evaluator is run over the data
-    Then the result is skipped with its details and no cost
+    Then the result is skipped with its details and a null cost
 
   @unit
   Scenario: A langevals answer that is not an evaluation result fails the run naming the evaluator

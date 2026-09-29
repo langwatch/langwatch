@@ -103,7 +103,7 @@ export type EvaluationRESTResult = (
   | EvaluationResultSkipped
   | Omit<EvaluationResultError, "traceback">
 ) & {
-  passed?: boolean;
+  passed?: boolean | null;
 };
 
 /** Three shapes discriminated by status; error details are stripped at the boundary. */

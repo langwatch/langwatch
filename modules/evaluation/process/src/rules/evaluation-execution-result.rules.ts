@@ -23,10 +23,10 @@ export function executionResultOf({
 
   return {
     status: result.status,
-    score: result.status === "processed" ? result.score : undefined,
-    passed: result.status === "processed" ? result.passed : undefined,
-    label: result.status === "processed" ? result.label : undefined,
-    details: isError ? undefined : rawDetails,
+    score: result.status === "processed" ? (result.score ?? undefined) : undefined,
+    passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
+    label: result.status === "processed" ? (result.label ?? undefined) : undefined,
+    details: isError ? undefined : (rawDetails ?? undefined),
     error: isError ? (rawDetails ?? "Evaluator failed") : undefined,
     errorDetails: traceback,
     cost:
