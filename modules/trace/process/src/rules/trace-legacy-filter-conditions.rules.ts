@@ -1,13 +1,37 @@
-import type {
-  AnalyticsFilterValue as FilterParam,
-  FilterField,
+import {
+  analyticsFilterValueSchema,
+  type AnalyticsFilterValue as FilterParam,
+  type FilterField,
 } from "@langwatch/analytics-contract";
+import { z } from "zod";
 
-import type {
-  FilterConditionBuilder,
-  FilterConditionOptions,
-  GenerateFilterConditionsResult,
-} from "../repositories/clickhouse/clickhouse.filter-shapes.mapper.ts";
+/** One filter field's WHERE fragment and the parameters it binds. */
+export type FilterConditionResult = {
+  sql: string;
+  params: Record<string, unknown>;
+};
+
+/** Cross-cutting options threaded to every condition builder. */
+export type FilterConditionOptions = {
+  /** Bounds `sp.StartTime` to the window in `stored_spans` EXISTS subqueries; empty without one. */
+  spanTimeBound?: string;
+};
+
+/** Builds one field's parameterized condition; `paramId` keeps combined filters' names apart. */
+export type FilterConditionBuilder = (input: {
+  values: string[];
+  paramId: string;
+  key?: string;
+  subkey?: string;
+  options?: FilterConditionOptions;
+}) => FilterConditionResult;
+
+/** The conditions a whole legacy `filters` document narrows a trace read by. */
+export type GenerateFilterConditionsResult = {
+  conditions: string[];
+  params: Record<string, unknown>;
+  hasUnsupportedFilters: boolean;
+};
 
 /** Label values that represent pass/fail status rather than classification labels. */
 const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
@@ -516,4 +540,20 @@ export function generateClickHouseFilterConditions(
   }
 
   return { conditions, params: allParams, hasUnsupportedFilters };
+}
+
+const legacyFiltersSchema = z.record(z.string(), analyticsFilterValueSchema);
+
+/**
+ * Parses a legacy `filters` document and answers the conditions it means. The
+ * parse travels with the grammar, so no caller holds a second copy of the schema.
+ */
+export function translateLegacyFilters({
+  filters,
+  window,
+}: {
+  filters: Readonly<Record<string, unknown>>;
+  window?: { startDate?: number; endDate?: number };
+}): GenerateFilterConditionsResult {
+  return generateClickHouseFilterConditions(legacyFiltersSchema.parse(filters), window);
 }

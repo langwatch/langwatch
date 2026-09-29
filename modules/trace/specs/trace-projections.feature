@@ -50,3 +50,10 @@ Feature: Trace rollups and span storage fold idempotently
     Given a project whose retention window has passed for a trace
     When the trace is read
     Then it is reported as unavailable
+
+  @unit
+  Scenario: A first trace on a deployment with no product-analytics sink logs no metadata failure
+    Given no product-analytics sink is composed
+    When a project's first real trace is processed
+    Then the project is marked integrated
+    And no "Failed to update project metadata" error is logged

@@ -196,6 +196,10 @@ import {
 } from "../rules/trace-filter-hidden-origins.rules.ts";
 import { generateAsciiTree } from "../rules/trace-formatting.rules.ts";
 import {
+  type GenerateFilterConditionsResult,
+  translateLegacyFilters,
+} from "../rules/trace-legacy-filter-conditions.rules.ts";
+import {
   describeTraceLegacyValidationError,
   traceLegacySearchBodySchema,
 } from "../rules/trace-legacy-search-body.rules.ts";
@@ -1796,6 +1800,13 @@ export class TraceApp implements TraceApi, CollectorApp {
       timeRange: input.timeRange,
       ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
     });
+  }
+
+  translateLegacyFilters(input: {
+    filters: Readonly<Record<string, unknown>>;
+    window?: { startDate?: number; endDate?: number };
+  }): GenerateFilterConditionsResult {
+    return translateLegacyFilters(input);
   }
 
   /** The filter compiled against the LangWatchQL trace view, for a statement a caller runs. */

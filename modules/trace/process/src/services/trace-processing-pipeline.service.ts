@@ -11,11 +11,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
-import {
-  TraceCapabilityUnavailableError,
-  type TraceCanonicalisationService,
-  type TraceSummaryData,
-} from "@langwatch/trace-contract";
+import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
 
 import type {
   TraceProcessingPipelineDefinition,
@@ -119,10 +115,6 @@ export class TraceProcessingPipelineService {
     return buildTraceProcessingConsumer(this.#projections(), this.#reactions());
   }
 
-  #refuse(capability: string): TraceCapabilityUnavailableError {
-    return new TraceCapabilityUnavailableError(this.input.processName, capability);
-  }
-
   #projections(): ReturnType<EventingTracePipelineAdapter["build"]> {
     const { peers, repositories, canonicalisation } = this.input;
     const defaultRetentionDays = (): number =>
@@ -212,9 +204,8 @@ export class TraceProcessingPipelineService {
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
-        recordProductEvent: () => {
-          throw this.#refuse("the product analytics sink");
-        },
+        // No product-analytics sink is composed here; silent, as main was without one.
+        recordProductEvent: () => undefined,
       }),
       simulationMetricsSync: createSimulationMetricsSyncHandler({
         computeRunMetrics: (data) => peers.scenarios.computeRunMetrics(data),

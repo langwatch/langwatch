@@ -129,7 +129,7 @@ export type AnalyticsFilterOptionsLookup = Readonly<{
       subkey?: string;
       startDate: number;
       endDate: number;
-      scopeFilters?: Record<string, unknown>;
+      scope?: { conditions: string[]; params: Record<string, unknown> };
     }>,
   ): Promise<AnalyticsFilterOption[]>;
 }>;
@@ -549,6 +549,8 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
     const scopeFilters = Object.fromEntries(
       Object.entries(request.filters ?? {}).filter(([name]) => name !== request.field),
     );
+    // Trace owns the filter grammar because it owns the tables the scope reads.
+    const scope = this.#dependencies.traces.translateLegacyFilters({ filters: scopeFilters });
 
     return this.#dependencies.filterOptions.getFilterOptions({
       projectId: request.projectId,
@@ -558,7 +560,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
       ...(request.subkey === undefined ? {} : { subkey: request.subkey }),
       startDate: request.startDate,
       endDate: request.endDate,
-      scopeFilters,
+      scope,
     });
   }
 
