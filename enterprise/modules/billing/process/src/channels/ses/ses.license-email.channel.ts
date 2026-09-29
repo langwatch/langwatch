@@ -1,15 +1,15 @@
-import { sendLicenseEmail, type EmailDelivery } from "@langwatch/mail";
+import { sendLicenseEmail, type MailSender } from "@langwatch/mail";
 
 import type { LicenseEmailDelivery } from "../../services/license-purchase.service.ts";
 import { LicenseEmailChannel } from "../license-email.channel.ts";
 
-/** Main's licence email over the process's mail member. */
+/** Main's licence email over notification's sender. */
 export class SesLicenseEmailChannel extends LicenseEmailChannel {
-  private constructor(private readonly mailer: EmailDelivery) {
+  private constructor(private readonly mailer: MailSender) {
     super();
   }
 
-  static create(mailer: EmailDelivery): SesLicenseEmailChannel {
+  static create(mailer: MailSender): SesLicenseEmailChannel {
     return new SesLicenseEmailChannel(mailer);
   }
 

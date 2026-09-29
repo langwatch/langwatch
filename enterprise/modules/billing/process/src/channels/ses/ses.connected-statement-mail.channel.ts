@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { sendConnectedStatementEmail, type EmailDelivery } from "@langwatch/mail";
+import { sendConnectedStatementEmail, type MailSender } from "@langwatch/mail";
 
 import { statementMonthLabel } from "../../rules/connected-statement.rules.ts";
 import type { ConnectedStatement } from "../../services/connected-monthly-statement.service.ts";
 import { ConnectedStatementMailChannel } from "../connected-statement-mail.channel.ts";
 
-/** Main's `EmailMonthlyStatementMailer` over the process's mail member. */
+/** Main's `EmailMonthlyStatementMailer` over notification's sender. */
 export class SesConnectedStatementMailChannel extends ConnectedStatementMailChannel {
-  private constructor(private readonly mailer: EmailDelivery) {
+  private constructor(private readonly mailer: MailSender) {
     super();
   }
 
-  static create(mailer: EmailDelivery): SesConnectedStatementMailChannel {
+  static create(mailer: MailSender): SesConnectedStatementMailChannel {
     return new SesConnectedStatementMailChannel(mailer);
   }
 

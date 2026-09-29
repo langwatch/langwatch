@@ -58,7 +58,7 @@ export const serverModuleMembers = {
   user: ["prisma", "redis"],
   webhook: ["isSaas", "rateLimiter", "redis"],
   workflow: ["encryption", "prisma"],
-  billing: ["isSaas", "mail", "nodeEnvironment", "publicBaseUrl"],
+  billing: ["isSaas", "nodeEnvironment", "publicBaseUrl"],
   "demo-data": [],
   "enterprise-gateway": ["isSaas"],
   "enterprise-ops": [],

@@ -1,9 +1,8 @@
 /**
- * The monthly statement mail over the process's mail member.
+ * The monthly statement mail over notification's sender.
  * Spec: specs/self-hosting/connected-services/connected-billing.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { EmailContent, EmailDelivery } from "@langwatch/mail";
+import type { EmailContent, MailSender } from "@langwatch/mail";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -14,8 +13,8 @@ import { SesConnectedStatementMailChannel } from "../ses.connected-statement-mai
 
 const AUGUST = Temporal.Instant.from("2026-08-01T00:00:00Z");
 
-function mailer(send: (content: EmailContent) => Promise<unknown>) {
-  return createApiFixture<EmailDelivery>({ defaultFrom: () => "billing@langwatch.ai", send });
+function mailer(send: (content: EmailContent) => Promise<unknown>): MailSender {
+  return { send };
 }
 
 async function statementRun(send: (content: EmailContent) => Promise<unknown>) {

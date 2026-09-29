@@ -38,7 +38,7 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
-import type { EmailDelivery } from "@langwatch/mail";
+import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -115,7 +115,7 @@ const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
 
 type BillingSetup = FeatureSetup<
   typeof BillingApp.dependencies,
-  BillingMembers & Readonly<{ mail: EmailDelivery; publicBaseUrl: string | undefined }>,
+  BillingMembers & Readonly<{ publicBaseUrl: string | undefined }>,
   BillingServerConfig,
   BillingRepositories
 >;
@@ -209,9 +209,12 @@ export class BillingApp
     internalSlackSelfHostedWebhook: billingSecrets.internalSlackSelfHostedWebhook,
     internalSlackSignupsWebhook: billingSecrets.internalSlackSignupsWebhook,
   } as const;
-  static readonly reads = ["isSaas", "nodeEnvironment", "mail", "publicBaseUrl"] as const;
+  static readonly reads = ["isSaas", "nodeEnvironment", "publicBaseUrl"] as const;
 
   static async create(setup: BillingSetup): Promise<BillingApp> {
+    const mailer: MailSender = {
+      send: (content) => setup.dependencies.notifications.sendEmail(content),
+    };
     const signing = await setup.secrets.into(BillingApp.secrets.stripeWebhookSecret, (secret) =>
       StripeWebhookSignatureService.create(secret),
     );
@@ -223,7 +226,7 @@ export class BillingApp
       }),
       delivery: LicensePurchaseDeliveryService.create({
         licensing: setup.dependencies.licensing,
-        mail: licenseEmailChannels.ses.create(setup.members.mail),
+        mail: licenseEmailChannels.ses.create(mailer),
         notices,
       }),
     });
@@ -234,7 +237,7 @@ export class BillingApp
         config: setup.config,
         peers: setup.dependencies,
         stripeSecretKey,
-        statementMail: connectedStatementMailChannels.ses.create(setup.members.mail),
+        statementMail: connectedStatementMailChannels.ses.create(mailer),
         usageWarnings: BillingApp.#composeUsageWarnings(setup, notices),
         resourceLimitAlerts: BillingApp.#composeResourceLimitAlerts(setup, notices),
         webhook: {
@@ -273,7 +276,9 @@ export class BillingApp
                   hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
                   hubspotFormId: config.hubspotFormId,
                 },
-                usageLimitEmail: usageLimitEmailChannels.ses.create(setup.members.mail),
+                usageLimitEmail: usageLimitEmailChannels.ses.create({
+                  send: (content) => setup.dependencies.notifications.sendEmail(content),
+                }),
               }),
             ),
           ),
@@ -282,7 +287,7 @@ export class BillingApp
     );
   }
 
-  /** Main's usage-limit warning as entitlement decides it, sent over the process's mail member. */
+  /** Main's usage-limit warning as entitlement decides it, sent through notification. */
   static #composeUsageWarnings(
     setup: BillingSetup,
     notices: BillingUsageNoticeService,

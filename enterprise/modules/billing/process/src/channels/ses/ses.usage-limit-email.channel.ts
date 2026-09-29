@@ -1,15 +1,15 @@
-import { sendUsageLimitEmail, type EmailDelivery } from "@langwatch/mail";
+import { sendUsageLimitEmail, type MailSender } from "@langwatch/mail";
 
 import type { UsageLimitEmailData } from "../../services/billing-usage-notice.service.ts";
 import { UsageLimitEmailChannel } from "../usage-limit-email.channel.ts";
 
-/** The approaching-limit mail over the process's mail member, rendered from main's copy. */
+/** The approaching-limit mail over notification's sender, rendered from main's copy. */
 export class SesUsageLimitEmailChannel extends UsageLimitEmailChannel {
-  static create(mailer: EmailDelivery): SesUsageLimitEmailChannel {
+  static create(mailer: MailSender): SesUsageLimitEmailChannel {
     return new SesUsageLimitEmailChannel(mailer);
   }
 
-  private constructor(private readonly mailer: EmailDelivery) {
+  private constructor(private readonly mailer: MailSender) {
     super();
   }
 
