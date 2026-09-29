@@ -186,20 +186,18 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
       data: { name: namespace, slug: namespace, organizationId },
     });
     teamId = team.id;
-    const [project, otherProject] = await Promise.all(
-      ["main", "other"].map((suffix) =>
-        db.project.create({
-          data: {
-            name: `${namespace}-${suffix}`,
-            slug: `${namespace}-${suffix}`,
-            apiKey: `${namespace}-${suffix}`,
-            teamId,
-            language: "typescript",
-            framework: "other",
-          },
-        }),
-      ),
-    );
+    const projectData = (suffix: string) => ({
+      name: `${namespace}-${suffix}`,
+      slug: `${namespace}-${suffix}`,
+      apiKey: `${namespace}-${suffix}`,
+      teamId,
+      language: "typescript",
+      framework: "other",
+    });
+    const [project, otherProject] = await Promise.all([
+      db.project.create({ data: projectData("main") }),
+      db.project.create({ data: projectData("other") }),
+    ]);
     projectId = project.id;
     otherProjectId = otherProject.id;
   });
