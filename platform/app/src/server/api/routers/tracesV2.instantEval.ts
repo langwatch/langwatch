@@ -22,10 +22,9 @@ import {
   instantEvalsReleased,
   organizationOfProject,
 } from "~/server/app-layer/instant-evals/access";
-import { InstantEvalOptInNotOfferedError } from "~/server/app-layer/instant-evals/errors";
 import {
-  enableInstantEvals,
   instantEvalOptInOffer,
+  switchInstantEvalsOn,
 } from "~/server/app-layer/instant-evals/opt-in";
 import {
   getInstantEvalRunService,
@@ -36,7 +35,6 @@ import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import { queryWithoutInstantEvalChips } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
-import { prisma } from "~/server/db";
 
 /**
  * Epoch milliseconds a JavaScript `Date` can represent. The run input is
@@ -146,12 +144,12 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
     .permission("analytics:view")
     .query(async ({ input, ctx }) => {
       const organizationId = await organizationOfProject({
-        prisma,
+        prisma: ctx.prisma,
         projectId: input.projectId,
       });
       const [released, offer] = await Promise.all([
         instantEvalsReleased({
-          prisma,
+          prisma: ctx.prisma,
           projectId: input.projectId,
           organizationId,
         }),
@@ -171,22 +169,15 @@ export const tracesV2InstantEvalRouter = createTRPCRouter({
     .permission("analytics:manage")
     .mutation(async ({ input, ctx }) => {
       const organizationId = await organizationOfProject({
-        prisma,
+        prisma: ctx.prisma,
         projectId: input.projectId,
       });
-      const offer = await instantEvalOptInOffer({
-        organizationId,
-        user: ctx.session.user,
-      });
-      if (offer !== "enable") {
-        throw new InstantEvalOptInNotOfferedError();
-      }
-      await enableInstantEvals({
-        prisma,
+      return await switchInstantEvalsOn({
+        prisma: ctx.prisma,
         organizationId,
         userId: ctx.session.user.id,
+        user: ctx.session.user,
       });
-      return { released: true, offer: "enable" as const };
     }),
 
   estimate: protectedProcedure

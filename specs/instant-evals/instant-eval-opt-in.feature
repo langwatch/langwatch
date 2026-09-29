@@ -87,7 +87,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       And no estimate is requested and the typed query stays in the bar
       And closing it, by Escape or a click outside, keeps the typed query and searches nothing
 
-    @integration
+    @unit
     Scenario: The server refuses a switch the popover did not offer
       Given an organization that is offered a word with us
       When a request tries to throw the switch anyway

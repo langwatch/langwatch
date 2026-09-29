@@ -22,6 +22,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-provider";
+import { InstantEvalOptInNotOfferedError } from "./errors";
 
 /**
  * What the popover offers a refused organization.
@@ -71,6 +72,45 @@ export async function instantEvalOptInOffer({
   if (!isSaas()) return "contact_us";
   if (isEnterpriseTier(await planTypeOf())) return "contact_us";
   return "enable";
+}
+
+/**
+ * The switch as the popover throws it: refused, and nothing recorded, for an
+ * organization the popover offers "Contact us" to, so an enterprise
+ * organization is never switched on by a request the popover did not make.
+ * Returns what the access read will now say.
+ */
+export async function switchInstantEvalsOn({
+  prisma,
+  organizationId,
+  userId,
+  user,
+  isSaas,
+  planTypeOf,
+  now,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  userId: string;
+  user?: PlanProviderUser;
+  isSaas?: () => boolean;
+  planTypeOf?: () => Promise<string>;
+  now?: () => Date;
+}): Promise<{ released: true; offer: "enable" }> {
+  const offer = await instantEvalOptInOffer({
+    organizationId,
+    ...(user ? { user } : {}),
+    ...(isSaas ? { isSaas } : {}),
+    ...(planTypeOf ? { planTypeOf } : {}),
+  });
+  if (offer !== "enable") throw new InstantEvalOptInNotOfferedError();
+  await enableInstantEvals({
+    prisma,
+    organizationId,
+    userId,
+    ...(now ? { now } : {}),
+  });
+  return { released: true, offer: "enable" };
 }
 
 /**

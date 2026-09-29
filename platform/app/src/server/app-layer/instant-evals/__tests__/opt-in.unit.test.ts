@@ -9,7 +9,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
-import { enableInstantEvals, instantEvalOptInOffer } from "../opt-in";
+import { InstantEvalOptInNotOfferedError } from "../errors";
+import {
+  enableInstantEvals,
+  instantEvalOptInOffer,
+  switchInstantEvalsOn,
+} from "../opt-in";
 
 describe("given a self-serve organization on the hosted service", () => {
   describe("when the popover asks what to offer", () => {
@@ -58,9 +63,32 @@ describe("given a self-hosted install", () => {
   });
 });
 
+describe("given an organization that is offered a word with us", () => {
+  describe("when a request tries to throw the switch anyway", () => {
+    /** @scenario "The server refuses a switch the popover did not offer" */
+    it("is refused as not offered, and nothing is recorded", async () => {
+      const updateMany = vi.fn(async () => ({ count: 1 }));
+      const prisma = {
+        organization: { updateMany },
+      } as unknown as PrismaClient;
+
+      await expect(
+        switchInstantEvalsOn({
+          prisma,
+          organizationId: "organization",
+          userId: "member",
+          isSaas: () => true,
+          planTypeOf: async () => "ENTERPRISE",
+        }),
+      ).rejects.toBeInstanceOf(InstantEvalOptInNotOfferedError);
+      expect(updateMany).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given an organization that has not switched Instant Evals on", () => {
   describe("when a member throws the switch", () => {
-    /** @scenario "Enable switches the organization on and the judgement goes ahead" */
+    /** @scenario "Enable records the moment and the member, once" */
     it("records the moment and the member, only where no record exists yet", async () => {
       const updateMany = vi.fn(async () => ({ count: 1 }));
       const prisma = {
