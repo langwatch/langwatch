@@ -128,6 +128,8 @@ export interface TenantRouterOptions {
 
 export interface TenantRouter {
   route(tenantId: string): Promise<TenantRoute>;
+  /** The organisation a tenant belongs to, from the same cached directory `route` reads. */
+  organizationOf(tenantId: string): Promise<string>;
   /**
    * Drop every cached mapping. Nothing in normal operation needs this - the
    * mapping is immutable - but it keeps a test deterministic and gives an
@@ -206,6 +208,11 @@ export function createTenantRouter({
       if (tenantId === "") throw new UnknownTenantError(tenantId);
 
       return routeForOrganization({ table, organizationId: await organizationFor(tenantId) });
+    },
+    async organizationOf(tenantId) {
+      if (tenantId === "") throw new UnknownTenantError(tenantId);
+
+      return organizationFor(tenantId);
     },
     invalidateAll() {
       cache.clear();

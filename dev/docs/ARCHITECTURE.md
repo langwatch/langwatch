@@ -1113,7 +1113,12 @@ declaration of the env family in its own config.
 statement by its tenant's organization itself, so a module hands the member its statement and
 never writes a routed-client adapter (ops' replay and event-explorer adapters are deleted). A
 statement spanning every tenant names none (`tenantId: ""`) with a written `unscoped` reason, and
-the member reads it on the shared server, where main's `"default"` fallback read. Eventing's replay
+the member reads it on the shared server, where main's `"default"` fallback read. A read across one
+organization's projects (a gateway budget's ledger) declares its **tenant set** (`tenantIds`) instead:
+the tenant guard accepts `TenantId IN (...)` only when the list binds exactly that set, the request's
+`tenantId` among them, with no `OR` disjoining it; the member's router resolves every tenant through
+the tenant directory it already routes by and refuses a set spanning organizations. One statement,
+answered on that organization's server, never an `unscoped` reason (Alex, 2026-09-29). Eventing's replay
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 

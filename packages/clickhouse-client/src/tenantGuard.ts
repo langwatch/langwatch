@@ -16,11 +16,19 @@ export type TenantScopeViolation =
       expected: string;
       actual: unknown;
     }
+  | { kind: "tenant-set-mismatch"; declared: readonly string[]; bound: readonly unknown[] }
+  | { kind: "tenant-set-spans-organizations"; organizations: readonly string[] }
   | { kind: "missing-row-tenant"; row: number }
   | { kind: "row-tenant-mismatch"; row: number; actual: unknown };
 
 /** `TenantId = {someName:String}`, allowing an optional table alias. */
 const BOUND_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/i;
+
+/** `TenantId IN ({a:String}, {b:String})`: a declared tenant set's placeholders only. */
+const BOUND_TENANT_SET =
+  /(?:^|[\s.(])TenantId\s+IN\s*\(\s*(\{\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*String\s*\}(?:\s*,\s*\{\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*String\s*\})*)\s*\)/i;
+
+const PLACEHOLDER_NAME = /\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g;
 
 /** `TenantId = 'literal'` or `= "literal"`, which is never acceptable. */
 const LITERAL_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i;
@@ -152,12 +160,16 @@ export function checkTenantScope({
   sql,
   params,
   tenantId,
+  tenantIds,
 }: {
   sql: string;
   params?: Record<string, unknown> | undefined;
   tenantId: string;
+  tenantIds?: readonly string[] | undefined;
 }): TenantScopeViolation | null {
   const statement = maskNonCode(sql);
+  if (tenantIds !== undefined)
+    return checkTenantSetScope({ statement, params, tenantId, tenantIds });
   const bound = BOUND_TENANT_PREDICATE.exec(statement);
 
   if (bound === null) {
@@ -183,6 +195,40 @@ export function checkTenantScope({
     };
   }
   return null;
+}
+
+/**
+ * A declared tenant set: the `IN` list binds exactly the declared tenants, the claimed tenant among
+ * them, and no `OR` can disjoin it away. That they share one organisation is the router's check.
+ */
+function checkTenantSetScope({
+  statement,
+  params,
+  tenantId,
+  tenantIds,
+}: {
+  statement: string;
+  params?: Record<string, unknown> | undefined;
+  tenantId: string;
+  tenantIds: readonly string[];
+}): TenantScopeViolation | null {
+  const bound = BOUND_TENANT_SET.exec(statement);
+  if (bound === null) return { kind: "missing-predicate" };
+  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })) {
+    return { kind: "weakening-disjunction" };
+  }
+
+  const names = [...(bound[1] ?? "").matchAll(PLACEHOLDER_NAME)].map((match) => match[1] ?? "");
+  const missing = names.find((name) => params?.[name] === undefined);
+  if (missing !== undefined) return { kind: "missing-param", param: missing };
+
+  const values = names.map((name) => params?.[name]);
+  const declared = new Set(tenantIds);
+  const matches =
+    declared.has(tenantId) &&
+    values.every((value) => typeof value === "string" && declared.has(value)) &&
+    new Set(values).size === declared.size;
+  return matches ? null : { kind: "tenant-set-mismatch", declared: tenantIds, bound: values };
 }
 
 /**
@@ -240,6 +286,10 @@ export function describeTenantScopeViolation(violation: TenantScopeViolation): s
       return `Statement binds tenant parameter "${violation.param}" but no such parameter was supplied.`;
     case "param-mismatch":
       return `Statement binds tenant parameter "${violation.param}" to a different tenant than the request claims.`;
+    case "tenant-set-mismatch":
+      return "Statement's `TenantId IN (...)` list does not bind exactly the declared tenant set, or the request's tenant is not in it. Bind one placeholder per declared tenant and nothing else.";
+    case "tenant-set-spans-organizations":
+      return `The declared tenant set spans ${violation.organizations.length} organisations. A read across tenants stays inside one organisation, which is also the one server that can answer it.`;
     case "missing-row-tenant":
       return `Row ${violation.row} of the batch carries no TenantId. Every written row names the tenant it belongs to, so a later read scoped to one tenant can never miss it or find someone else's.`;
     case "row-tenant-mismatch":
@@ -284,6 +334,7 @@ export class TenantGuard {
       sql: request.sql,
       params: request.params,
       tenantId: request.tenantId,
+      tenantIds: request.tenantIds,
     });
     if (violation !== null) {
       throw new TenantScopeError(violation, request.tenantId);

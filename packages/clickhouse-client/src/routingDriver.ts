@@ -24,8 +24,15 @@ export interface RoutableStatementClient extends ClickHouseCloseableClient {
 
 async function serverFor<Client extends RoutableStatementClient>(
   connection: ClickHouseConnection<Client>,
-  request: Pick<QueryRequest, "tenantId" | "organizationId">,
+  request: Pick<QueryRequest, "tenantId" | "organizationId" | "tenantIds">,
 ): Promise<Client> {
+  if (request.tenantIds !== void 0) {
+    return connection.resolveTenantSet({
+      tenantId: request.tenantId,
+      tenantIds: request.tenantIds,
+      organizationId: request.organizationId,
+    });
+  }
   if (request.organizationId !== void 0) {
     return connection.resolveOrganization(request.organizationId);
   }

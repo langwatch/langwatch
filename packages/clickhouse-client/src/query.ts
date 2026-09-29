@@ -27,6 +27,12 @@ export interface QueryRequest {
   tenantId: string;
   /** Route an organisation-wide operation directly; tenant scope checks still apply. */
   organizationId?: string;
+  /**
+   * A declared tenant set, one organisation's projects: the statement's `TenantId IN (...)`
+   * must bind exactly these, `tenantId` among them, and the router refuses a set that spans
+   * organisations.
+   */
+  tenantIds?: readonly string[] | undefined;
   sql: string;
   params?: Record<string, unknown> | undefined;
   /** The primary table, used for metrics and span attributes. */
