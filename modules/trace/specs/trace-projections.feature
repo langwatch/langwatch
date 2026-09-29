@@ -8,6 +8,13 @@ Feature: Trace rollups and span storage fold idempotently
   # trace-attribute-cap.service.ts, trace-payload-cap.rules.ts,
   # trace-retention-floor.service.ts
 
+  @unit
+  Scenario: The worker's trace folds read through the Redis fold cache under main's keyspaces
+    Given the worker's trace pipeline built over the process's Redis
+    When the summary and analytics folds store one trace's state
+    Then each is cached under main's keyspace, trace_summaries and trace_analytics
+    And a cache miss falls through to the durable projection
+
   @unit @unimplemented
   Scenario: A trace rolled up twice reports one set of totals, not doubled ones
     Given a trace whose spans have already been rolled up

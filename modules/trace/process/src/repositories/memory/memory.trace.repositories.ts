@@ -4,6 +4,7 @@ import type { TraceRepositories } from "../trace.repositories.ts";
 import { MemoryNullTraceClusteringSampleRepository } from "./memory.null-trace-clustering-sample.repository.ts";
 import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
+import { MemoryTraceAnalyticsFoldCacheRepository } from "./memory.trace-analytics-fold-cache.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
 import { MemoryTraceAttributeSpendRepository } from "./memory.trace-attribute-spend.repository.ts";
@@ -13,6 +14,7 @@ import { MemoryTraceExistenceRepository } from "./memory.trace-existence.reposit
 import { MemoryTraceModelSpendRepository } from "./memory.trace-model-spend.repository.ts";
 import { MemoryTracePayloadReaderRepository } from "./memory.trace-payload-reader.repository.ts";
 import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
+import { MemoryTraceSummaryFoldCacheRepository } from "./memory.trace-summary-fold-cache.repository.ts";
 import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
 import { MemoryTraceSummaryRepository } from "./memory.trace-summary.repository.ts";
 import { MemoryTraceUsageCountRepository } from "./memory.trace-usage-count.repository.ts";
@@ -32,6 +34,8 @@ export class MemoryTraceRepositories {
       summaryProjection: MemoryTraceSummaryProjectionRepository.create(),
       analyticsProjection: MemoryTraceAnalyticsRepository.create(),
       analyticsRollup: MemoryTraceAnalyticsRollupRepository.create(),
+      summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
+      analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),
       existence: MemoryTraceExistenceRepository.create(spans),
       derivationSpans: MemoryTraceDerivationSpanRepository.create(spans),

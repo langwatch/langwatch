@@ -87,7 +87,12 @@ export interface TraceProcessingPipelineInput {
   peers: TraceProcessingPeers;
   repositories: Pick<
     TraceRepositories,
-    "spanStorage" | "summaryProjection" | "analyticsProjection" | "analyticsRollup"
+    | "spanStorage"
+    | "summaryProjection"
+    | "analyticsProjection"
+    | "analyticsRollup"
+    | "summaryFoldCache"
+    | "analyticsFoldCache"
   >;
   canonicalisation: TraceCanonicalisationService;
   commands: TraceProcessingCommandsService;
@@ -127,14 +132,15 @@ export class TraceProcessingPipelineService {
         storage: repositories.spanStorage,
         defaultRetentionDays,
       }),
-      summaryStore: TraceSummaryStore.create({
-        storage: repositories.summaryProjection,
-        defaultRetentionDays,
-      }),
-      derivedStore: TraceAnalyticsStore.create({
-        storage: repositories.analyticsProjection,
-        defaultRetentionDays,
-      }),
+      summaryStore: repositories.summaryFoldCache.cached(
+        TraceSummaryStore.create({ storage: repositories.summaryProjection, defaultRetentionDays }),
+      ),
+      derivedStore: repositories.analyticsFoldCache.cached(
+        TraceAnalyticsStore.create({
+          storage: repositories.analyticsProjection,
+          defaultRetentionDays,
+        }),
+      ),
       rollupStore: TraceAnalyticsRollupStore.create({
         storage: repositories.analyticsRollup,
         defaultRetentionDays,

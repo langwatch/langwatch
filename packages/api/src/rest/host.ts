@@ -8,6 +8,7 @@ import type {
   FeatureRestMountOptions,
   MountableTransport,
 } from "@langwatch/kernel";
+import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 
 import type { RateLimiter } from "../ports.ts";
@@ -18,6 +19,8 @@ import type { IdempotentRunner } from "./idempotency.ts";
 import { isRestCredentialBinding, type RestTransportMiddlewareBinding } from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
 import { createRestRuntime, type RestAuditSink, type RestIdentity } from "./runtime.ts";
+
+const restErrorLogger = createLogger("langwatch:api:rest");
 import { SessionKeyIdentity } from "./session-key-identity.ts";
 
 /** Every credential kind a family may name, except the three a module binds for itself. */
@@ -100,7 +103,16 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       audit: this.options.audit,
     }).mount(declaration, {
       app,
-      onError: (error, context) => canonicalErrorResponse(error, context),
+      onError: (error, context) => {
+        const response = canonicalErrorResponse(error, context);
+        if (response.status >= 500) {
+          restErrorLogger.error(
+            { error, method: context.req.method, path: context.req.path },
+            "REST request failed",
+          );
+        }
+        return response;
+      },
       facts: [
         ...(this.options.facts ?? []),
         ...(bindings.filter(

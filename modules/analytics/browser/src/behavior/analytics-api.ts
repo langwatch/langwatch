@@ -309,6 +309,12 @@ type BorrowedProcedures = {
       };
     };
   };
+  project: {
+    /** Whether the project has ever received a trace; the overview's setup prompt waits on it. */
+    getHasFirstMessage: {
+      query: { input: ProjectScope; output: { firstMessage: boolean } };
+    };
+  };
   licenseEnforcement: {
     checkLimit: {
       query: {
