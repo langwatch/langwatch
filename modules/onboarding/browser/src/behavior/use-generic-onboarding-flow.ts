@@ -124,7 +124,6 @@ function useScreenUrlSync<TScreenIndex extends number>({
           pathname: router.pathname,
           query: currentQuery,
         },
-        void 0,
         { shallow: true },
       )
       .then(() => {

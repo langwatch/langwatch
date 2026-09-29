@@ -110,6 +110,24 @@ describe("useRouter", () => {
       expect(navigated).toContainEqual({ to: "/checkout/datasets", replace: true });
     });
 
+    /** @scenario "A push of a real address navigates to it" */
+    it("navigates to the real address it is pushed, the only address it takes", async () => {
+      const { result } = renderHook(() => useRouter(), {
+        wrapper: mounted({
+          params: { project: "checkout" },
+          query: {},
+          pathname: "/checkout/agent-testing",
+        }),
+      });
+
+      await result.current.push("/checkout/agent-testing/suites/refunds", { shallow: true });
+
+      expect(navigated.at(-1)).toEqual({
+        to: "/checkout/agent-testing/suites/refunds",
+        replace: false,
+      });
+    });
+
     it("writes the query rather than navigating for a query-only address", async () => {
       const { result } = renderHook(() => useRouter(), {
         wrapper: mounted({ params: {}, query: {}, pathname: "/checkout/traces" }),

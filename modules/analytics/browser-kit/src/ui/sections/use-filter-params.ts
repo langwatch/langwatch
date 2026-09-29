@@ -134,18 +134,9 @@ export const useFilterParams = () => {
   const filters = readUrlFilters(queryParams);
   applySavedViewFallback(filters, queryParams, project?.id);
 
-  // Shallow-push helper that works on every page, including those with dynamic route params
-  // beyond [project] (e.g. /[project]/analytics/custom/[id]). The string form router.push("?" +
-  // qs) fails on dynamic-route pages in Next.js 15 Pages Router — the relative "?" URL isn't
-  // resolved correctly for shallow navigation, so the push silently does nothing.
+  // Writes the filters as the whole query string of the page the reader is on.
   const shallowPush = (newQs: string) => {
     const currentPath = router.asPath.split("?")[0] ?? router.asPath;
-    const pathParamKeys = new Set(
-      (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
-    );
-    const routeParams = Object.fromEntries(
-      Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
-    );
     const parsed = qs.parse(newQs, URL_QS_PARSE_OPTIONS);
 
     // Every caller of this changes which rows match, and a keyset cursor describes a position
@@ -160,11 +151,7 @@ export const useFilterParams = () => {
       allowEmptyArrays: true,
     });
 
-    void router.push(
-      { pathname: router.pathname, query: { ...routeParams, ...parsed } },
-      currentPath + "?" + strippedQs,
-      { shallow: true, scroll: false },
-    );
+    void router.push(`${currentPath}?${strippedQs}`);
   };
 
   const qsOpts = {

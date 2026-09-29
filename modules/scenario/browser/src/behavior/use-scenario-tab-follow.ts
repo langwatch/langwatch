@@ -59,9 +59,12 @@ export function useScenarioTabFollow(): ScenarioTabFollowState {
       // Drop the param so the visible URL stays shareable. Shallow: this is a
       // cosmetic rewrite, not a navigation.
       const { [SCENARIO_TAB_QUERY_PARAM]: _dropped, ...rest } = router.query;
-      void router.replace({ pathname: router.pathname, query: rest }, void 0, {
-        shallow: true,
-      });
+      void router.replace(
+        { pathname: router.pathname, query: rest },
+        {
+          shallow: true,
+        },
+      );
     }
 
     const resolvedKey = queryKey ?? readSession(SESSION_KEY);

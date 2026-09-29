@@ -371,11 +371,7 @@ describe("the test suites rail", () => {
 
         // The row opens the run under the plan that holds it, on the Results tab.
         expect(routerPush).toHaveBeenCalledWith(
-          expect.objectContaining({
-            pathname: "/[project]/agent-testing/[[...path]]",
-          }),
           expect.stringContaining("/results/refunds/batch_refunds"),
-          { shallow: true },
         );
       });
     });

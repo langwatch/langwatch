@@ -276,9 +276,12 @@ const useComparisonUrlSync = ({ controlled }: { controlled: boolean }) => {
       if (controlled) return;
       const newQuery = queryWithComparison({ query: router.query, isComparing, comparedRunIds });
       if (router.query.compare === newQuery.compare) return;
-      void router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
-        shallow: true,
-      });
+      void router.replace(
+        { pathname: router.pathname, query: newQuery },
+        {
+          shallow: true,
+        },
+      );
     },
     [controlled, router],
   );
@@ -303,7 +306,6 @@ const useRunSelection = ({
       if (onSelectRunId) return onSelectRunId(runId);
       void router.replace(
         { pathname: router.pathname, query: { ...router.query, runId } },
-        undefined,
         { shallow: true },
       );
     },
@@ -330,9 +332,12 @@ const useGroupBy = ({ controlled }: { controlled: boolean }) => {
       if (controlled) return;
       const newQuery = queryWithGroupBy(router.query, next);
       if (!newQuery) return;
-      void router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
-        shallow: true,
-      });
+      void router.replace(
+        { pathname: router.pathname, query: newQuery },
+        {
+          shallow: true,
+        },
+      );
     },
     [controlled, router],
   );

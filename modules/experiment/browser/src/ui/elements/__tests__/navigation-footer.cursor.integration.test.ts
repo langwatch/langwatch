@@ -84,7 +84,6 @@ describe("useMessagesNavigationFooter()", () => {
           expect.objectContaining({
             query: expect.objectContaining({ scrollId: cursor1 }),
           }),
-          undefined,
           expect.any(Object),
         );
       });
@@ -123,7 +122,6 @@ describe("useMessagesNavigationFooter()", () => {
           expect.objectContaining({
             query: expect.objectContaining({ project: "my-project" }),
           }),
-          undefined,
           expect.any(Object),
         );
         // Should NOT have a scrollId in the query (back to offset mode)

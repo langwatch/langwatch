@@ -19,11 +19,7 @@ function isViewMode(value: unknown): value is AgentTestingViewMode {
 /** Minimal router shape for address sync, so the store stays router agnostic. */
 interface RouterLike {
   query: Record<string, string | string[] | undefined>;
-  push: (
-    url: { query: Record<string, string | string[]> },
-    as?: undefined,
-    options?: { shallow: boolean },
-  ) => void;
+  push: (url: { query: Record<string, string | string[]> }, options?: { shallow: boolean }) => void;
 }
 
 type QueryLike = Record<string, string | string[] | undefined>;
@@ -182,7 +178,7 @@ export function createAgentTestingStore() {
         query.view = viewMode;
       }
 
-      router.push({ query }, undefined, { shallow: true });
+      router.push({ query }, { shallow: true });
     },
 
     hydrateFromUrl: (query) => {

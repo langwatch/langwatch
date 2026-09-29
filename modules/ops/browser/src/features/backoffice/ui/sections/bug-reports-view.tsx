@@ -46,7 +46,7 @@ export default function BugReportsView() {
     } else {
       delete query.report;
     }
-    router.replace({ query }, undefined, { shallow: true });
+    router.replace({ query }, { shallow: true });
   };
 
   return (

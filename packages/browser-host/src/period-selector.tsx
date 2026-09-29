@@ -152,7 +152,6 @@ export const usePeriodSelector = (defaultNDays = 30) => {
             endDate: endDate.toString({ fractionalSecondDigits: 3 }),
           },
         },
-        undefined,
         { shallow: true },
       );
     },
@@ -169,7 +168,6 @@ export const usePeriodSelector = (defaultNDays = 30) => {
             period: presetKey,
           },
         },
-        undefined,
         { shallow: true },
       );
     },

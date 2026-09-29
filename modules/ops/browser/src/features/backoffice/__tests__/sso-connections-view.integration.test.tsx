@@ -350,9 +350,12 @@ describe("the back-office single sign-on list", () => {
       await waitFor(() => {
         expect(routerState.replace).toHaveBeenCalled();
       });
-      expect(routerState.replace).toHaveBeenCalledWith({ query: { q: "acme" } }, undefined, {
-        shallow: true,
-      });
+      expect(routerState.replace).toHaveBeenCalledWith(
+        { query: { q: "acme" } },
+        {
+          shallow: true,
+        },
+      );
     });
   });
 

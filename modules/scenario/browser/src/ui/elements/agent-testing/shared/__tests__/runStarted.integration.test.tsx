@@ -76,14 +76,9 @@ describe("where a queued run lands", () => {
         await user.click(screen.getByRole("button", { name: "Start" }));
 
         expect(mockRouterPush).toHaveBeenCalledTimes(1);
-        const [route, address] = mockRouterPush.mock.calls[0]!;
-        expect(address).toBe("/test-project/agent-testing/results/refunds-prod-agent/batch_new");
-        expect(route).toMatchObject({
-          query: {
-            project: "test-project",
-            path: ["results", "refunds-prod-agent", "batch_new"],
-          },
-        });
+        expect(mockRouterPush.mock.calls[0]).toEqual([
+          "/test-project/agent-testing/results/refunds-prod-agent/batch_new",
+        ]);
         expect(mockToast).not.toHaveBeenCalled();
         expect(mockOpenDrawer).not.toHaveBeenCalled();
         expect(useAgentTestingStore.getState().pendingRun).toEqual({

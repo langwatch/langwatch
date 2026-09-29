@@ -33,8 +33,15 @@ const routerState = vi.hoisted(() => ({
 const rerenderers = vi.hoisted(() => ({ notify: null as null | (() => void) }));
 
 const mockPush = vi.hoisted(() =>
-  vi.fn((route: { query: Record<string, string | string[]> }) => {
-    routerState.query = { ...route.query };
+  vi.fn((address: string) => {
+    const url = new URL(address, "http://localhost");
+    const query: Record<string, string | string[]> = {};
+    for (const key of new Set(url.searchParams.keys())) {
+      const values = url.searchParams.getAll(key);
+      query[key] = values.length > 1 ? values : (values[0] ?? "");
+    }
+    routerState.query = query;
+    routerState.asPath = `${url.pathname}${url.search}`;
     rerenderers.notify?.();
   }),
 );
