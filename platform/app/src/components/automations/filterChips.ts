@@ -41,7 +41,7 @@ function legacyLabel(field: string): string {
     .split(".")
     .filter((word, i) => i !== 0 || word.toLowerCase() === "evaluations")
     .join(" ")
-    .replace("_", " ");
+    .replaceAll("_", " ");
   return words.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

@@ -361,13 +361,14 @@ describe("Feature: an agent configures an automation over MCP", () => {
     it("sends the empty configuration older callers relied on", async () => {
       request.mockResolvedValue(TRIGGER);
 
-      const text = await handleCreateTrigger({
+      const { content, isError } = await handleCreateTrigger({
         name: "Errors to Slack",
         action: "SEND_SLACK_MESSAGE",
         filters: '{"traces.error":["true"]}',
       });
 
-      expect(text).toContain("created");
+      expect(content[0]?.text).toContain("created");
+      expect(isError).toBeUndefined();
       expect(request).toHaveBeenCalledWith(
         "POST",
         "/api/triggers",
@@ -397,24 +398,26 @@ describe("Feature: an agent configures an automation over MCP", () => {
     });
 
     it("refuses a stated Slack configuration with nowhere to post", async () => {
-      const text = await handleCreateTrigger({
+      const { content, isError } = await handleCreateTrigger({
         name: "Errors to Slack",
         action: "SEND_SLACK_MESSAGE",
         actionParams: { slackDelivery: "bot" },
       });
 
-      expect(text).toMatch(/^Error:/);
+      expect(content[0]?.text).toMatch(/^Error:/);
+      expect(isError).toBe(true);
       expect(request).not.toHaveBeenCalled();
     });
 
     it("refuses filters that are not a JSON object", async () => {
-      const text = await handleCreateTrigger({
+      const { content, isError } = await handleCreateTrigger({
         name: "Bad",
         action: "SEND_EMAIL",
         filters: '["traces.error"]',
       });
 
-      expect(text).toBe("Error: filters must be a JSON object");
+      expect(content[0]?.text).toBe("Error: filters must be a JSON object");
+      expect(isError).toBe(true);
       expect(request).not.toHaveBeenCalled();
     });
   });
@@ -423,7 +426,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
     it("sends the graph and its rule for an alert", async () => {
       request.mockResolvedValue({ ...TRIGGER, kind: "ALERT" });
 
-      const text = await handleCreateTrigger({
+      const { content } = await handleCreateTrigger({
         name: "Latency",
         action: "SEND_EMAIL",
         actionParams: { members: ["team@example.com"] },
@@ -437,7 +440,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
         alertType: "WARNING",
       });
 
-      expect(text).toContain("Kind: ALERT");
+      expect(content[0]?.text).toContain("Kind: ALERT");
       expect(request).toHaveBeenCalledWith(
         "POST",
         "/api/triggers",

@@ -3500,8 +3500,8 @@ const presentations = {
   trigger_kind_immutable: {
     title: "This cannot become a different kind of automation",
     describe: () =>
-      "A trace automation, a graph alert and a scheduled report are set up " +
-      "differently. Create the one you want and delete this one.",
+      "An automation that watches traces, one that watches a graph and a " +
+      "report are set up differently. Create the one you want and delete this one.",
   },
 
   trigger_filter_key_required: {
@@ -3528,7 +3528,7 @@ const presentations = {
   },
 
   graph_alert_incomplete: {
-    title: "This alert is missing something it needs",
+    title: "This automation is missing something it needs",
     // `meta.reason` carries the sentence the service wrote for the exact
     // missing piece — the rule, the severity, the channel — which the
     // generic line cannot name.
@@ -3541,7 +3541,7 @@ const presentations = {
   graph_not_found: {
     title: "That graph is not in this project",
     describe: () =>
-      "Alerts fire on a graph in the same project. Check the graph id.",
+      "An automation can only watch a graph in its own project. Check the graph id.",
   },
 
   report_channel_unsupported: {

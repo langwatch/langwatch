@@ -34,14 +34,17 @@ export const WIZARD_STEP_LABELS: Record<WizardStep, string> = {
   review: "Review",
 };
 
+/** The step's position in the wizard, from zero. */
 export function stepIndex(step: WizardStep): number {
   return WIZARD_STEPS.indexOf(step);
 }
 
+/** The step after this one, or null on the last step. */
 export function nextStep(step: WizardStep): WizardStep | null {
   return WIZARD_STEPS[stepIndex(step) + 1] ?? null;
 }
 
+/** The step before this one, or null on the first step. */
 export function previousStep(step: WizardStep): WizardStep | null {
   return stepIndex(step) === 0
     ? null
@@ -87,6 +90,10 @@ export function stepIsComplete({
         stepIsComplete({ step: "watch", draft }) &&
         stepIsComplete({ step: "delivery", draft })
       );
+    default: {
+      const _exhaustive: never = step;
+      return _exhaustive;
+    }
   }
 }
 
@@ -111,6 +118,10 @@ export function stepSummary({
       return draft.action ? deliveryStepSummary(draft) : null;
     case "review":
       return draft.name.trim() || null;
+    default: {
+      const _exhaustive: never = step;
+      return _exhaustive;
+    }
   }
 }
 

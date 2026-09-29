@@ -1635,7 +1635,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
       const { handleCreateTrigger } = await import("./tools/create-trigger.js");
-      return { content: [{ type: "text", text: await handleCreateTrigger(params) }] };
+      return await handleCreateTrigger(params);
     })
   );
 
@@ -1673,13 +1673,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           actionParams: params.actionParams,
         });
         if (!boundParams.ok) {
-          return { content: [{ type: "text", text: `Error: ${boundParams.message}` }] };
+          const { toolError } = await import("./tools/create-trigger.js");
+          return toolError(boundParams.message);
         }
       }
-      const { parseJsonObject } = await import("./tools/create-trigger.js");
+      const { parseJsonObject, toolError } = await import("./tools/create-trigger.js");
       const filters = params.filters ? parseJsonObject(params.filters) : undefined;
       if (params.filters && !filters) {
-        return { content: [{ type: "text", text: "Error: filters must be a JSON object" }] };
+        return toolError("filters must be a JSON object");
       }
       const trigger = await updateTrigger({ ...params, filters });
       return { content: [{ type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` }] };

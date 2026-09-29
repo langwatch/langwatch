@@ -28,6 +28,7 @@ export const SLACK_CONNECTION_KINDS: ReadonlyArray<{
   },
 ];
 
+/** The short name of a connection's kind, for its badge. */
 export function slackConnectionKindLabel(kind: SlackIntegrationKind): string {
   return kind === "BOT" ? "Bot" : "Webhook";
 }
@@ -45,6 +46,7 @@ export function maskedSecret(secretHint: string): string {
   return `••••${secretHint}`;
 }
 
+/** How many automations deliver through a connection, as a sentence. */
 export function usedByLabel(count: number): string {
   if (count === 0) return "Not used by any automation";
   return count === 1 ? "Used by 1 automation" : `Used by ${count} automations`;

@@ -46,6 +46,7 @@ const SUBJECT_NOUN: Record<
   automation: "automation",
 };
 
+/** What the view drawer says about when an automation next acts. */
 export function describeNextFiring(
   next: NextFiringResult,
 ): NextFiringPresentation {
@@ -93,6 +94,10 @@ export function describeNextFiring(
         at: null,
         caveat: `An automation waiting for data to stop arriving is also checked every ${formatDebounce(next.sweepIntervalMs)}.`,
       };
+    default: {
+      const _exhaustive: never = next;
+      return _exhaustive;
+    }
   }
 }
 

@@ -41,6 +41,8 @@ function safeSlackWebhookUrl(value: string | undefined): string | null {
   }
 }
 
+/** How a Slack automation's destination is shown: its connection and, for a
+ *  bot, the channel; for a webhook, the URL safe to show in a tooltip. */
 export function slackDestinationPresentation({
   actionParams,
   connections,
@@ -72,6 +74,10 @@ export function slackDestinationPresentation({
         connectionName,
         tooltipUrl: safeSlackWebhookUrl(actionParams.slackWebhook),
       };
+    default: {
+      const _exhaustive: never = delivery;
+      return _exhaustive;
+    }
   }
 }
 
