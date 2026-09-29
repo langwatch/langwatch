@@ -75,8 +75,7 @@ flows. summary.txt, findings.md, report.html and the PR comment all say so.
    route across the larger of `concurrency.routes` and `concurrency.flows`
    pages of one signed-in session. A page takes a read-only flow once no route
    is left for it; flows that create things wait for every route, then use
-   every page; a flow that filters a view, then one that edits the project,
-   run last, alone. It screenshots as it goes and diffs each pair on worker
+   every page; a flow marked `serial: true` runs last, alone. It screenshots as it goes and diffs each pair on worker
    threads -
    appending one line to `findings.jsonl` as each screen's comparison is
    decided (see "Findings stream and recapture" below), not only at the end.
@@ -249,11 +248,59 @@ A flow ends in `expect` steps; each takes exactly one form and polls up to
   with: { api: /api/triggers, contains: VD Alert }  # field, min, equals too
 ```
 
+An expect can also name an element (`testId`, `testIdPrefix`, `label`, with
+`hasText`, `min` or `equals`), and an api expect takes `status` and `auth`:
+
+```yaml
+- action: expect
+  with: { testId: trace-row, min: "2" }
+- action: expect
+  with: { text: Gone, equals: "0" }                 # absent
+- action: expect
+  with: { api: /api/traces, status: "401", auth: none }   # or auth: "{apiKey}"
+- action: expect
+  with: { text: Shared trace, anonymous: "true" }   # in a fresh cookieless context
+```
+
 An expect failing on the candidate alone is `broken`. Each run writes
 `verdict.md` (one line per flow: works, broken, broken-both, layout-only,
 unproven, with the first failure) and `signatures.md` (log lines by shape,
 new on the candidate first). Read `verdict.md` first; open PNGs only for
 broken rows. `visualdiff done` keeps a flow's held expects as its proof.
+
+## Writing flows
+
+Flows live in `flows/*.yaml` beside `visualdiff.yaml` (`flows:` in either is
+merged; an id may appear once). Each area owns its own file; `flows/core.yaml`
+holds the original twelve. A flow may carry `isolated: true` (it works in the
+seeded second project, `{isolatedSlug}`, and fails if a side has none) or
+`serial: true` (it runs last, alone). Everything else runs across the whole
+page pool, so every name a flow creates ends in `{uid}`.
+
+Steps click and fill by test id, never by text; text only asserts outcomes.
+A click that misses fails the flow: `optional: "true"` is for tours and nudges.
+
+| step | arguments |
+| --- | --- |
+| `click` | `testId` or `testIdPrefix` or `label` or `selector`, or `text`; `hasText`, `optional` |
+| `fill` | `testId` or `label` or `field`, `value` |
+| `select` | `testId`, or `field` (the label beside the select), `option`; native or combobox |
+| `type` | `testId` or `placeholder`, `text`, `submit` |
+| `upload` | `fixture` (a file in `fixtures/`), `testId` or `selector` (default `input[type=file]`) |
+| `drag` | `from`, `to` (test ids) |
+| `capture` | `testId` or `selector`, `as`, `match` (regex, first group kept); stored as `{as}` |
+| `mail` | `to`, `subject`, `as` (default `mailLink`); the newest message's first link, from the side's mailsim |
+| `go` | `path`; `anonymous: "true"` opens it in a fresh cookieless context |
+| `expect` | see above |
+| `wait`, `signIn`, `dismissTour` | as before |
+
+Any argument may hold `{uid}` (unique per run and flow, equal on both sides),
+`{slug}`, `{isolatedSlug}`, a seeded fixture (`{dataset}`, `{graph}`, `{monitor}`,
+`{errorTrace}`, `{conversation}`, `{bugReport}`, `{virtualKey}`, ...) or a value a
+`capture` or `mail` step stored earlier. The seed also writes rows into the
+dataset, an error trace, and a two-turn conversation. haven starts each stack
+with `release_ui_agent_testing_v2_enabled` and `release_custom_chart_playground`
+forced on (`FEATURE_FLAG_FORCE_ENABLE`); a root `.env` that sets the variable wins.
 
 ## Classification
 

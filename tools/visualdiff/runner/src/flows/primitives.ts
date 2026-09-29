@@ -1,7 +1,8 @@
 import type { Locator, Page } from "playwright";
 
 import type { Action, ActionContext } from "./context";
-import { argument, asRegExp, fillPath, scope } from "./context";
+import { argument, asRegExp, escapeRegExp, fillPath, scope } from "./context";
+import { isTargeted, targetOf } from "./target";
 
 const CLICKABLE =
   "button, a, [role=button], [role=menuitem], [role=tab], [role=option], [role=radio]";
@@ -81,36 +82,84 @@ export const fillField = async ({
 export const go: Action = async (context) =>
   goTo({ context, path: argument({ context, name: "path" }) });
 
-export const click: Action = async (context) =>
-  clickText({
+/** clickTarget clicks the named element; an optional one absent or disabled is skipped. */
+const clickTarget = async ({
+  context,
+  optional,
+}: {
+  context: ActionContext;
+  optional: boolean;
+}): Promise<void> => {
+  const target = targetOf({ root: context.side.page, args: context.args }).first();
+  if (optional && !(await isClickable(target))) return;
+  await target.scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => undefined);
+  await target.click({ timeout: 6000 });
+};
+
+export const click: Action = async (context) => {
+  const optional = context.args.optional === "true";
+  if (isTargeted(context.args)) return clickTarget({ context, optional });
+  return clickText({
     context,
     text: argument({ context, name: "text" }),
     selector: context.args.selector,
-    optional: context.args.optional === "true",
+    optional,
   });
-
-export const fill: Action = async (context) =>
-  fillField({
-    context,
-    target: argument({ context, name: "field" }),
-    value: argument({ context, name: "value" }),
-  });
-
-export const select: Action = async (context) => {
-  const root = await scope(context.side.page);
-  await root
-    .locator("select")
-    .locator("visible=true")
-    .first()
-    .selectOption({ label: argument({ context, name: "option" }) }, { timeout: 6000 });
 };
 
-/** type puts text into a placeholder-identified box and optionally submits it. */
+export const fill: Action = async (context) => {
+  const value = argument({ context, name: "value" });
+  if (context.args.field !== undefined && !isTargeted(context.args)) {
+    return fillField({ context, target: context.args.field, value });
+  }
+  await targetOf({ root: context.side.page, args: context.args })
+    .first()
+    .fill(value, { timeout: 6000 });
+};
+
+/** fieldPattern matches a field's label text whole, allowing the required marker after it. */
+const fieldPattern = (field: string): RegExp =>
+  /^\/.+\/[dgimsuvy]*$/.test(field)
+    ? asRegExp(field)
+    : new RegExp(String.raw`^\s*${escapeRegExp(field)}\s*\*?\s*$`, "i");
+
+/** selectBox is the select a step names: by target, by the label text beside it, or the first. */
+const selectBox = async (context: ActionContext): Promise<Locator> => {
+  const { args, side } = context;
+  if (isTargeted(args)) return targetOf({ root: side.page, args }).first();
+  const root = await scope(side.page);
+  if (args.field === undefined) return root.locator("select").locator("visible=true").first();
+  return root
+    .getByText(fieldPattern(args.field))
+    .locator("visible=true")
+    .first()
+    .locator("xpath=ancestor::*[.//select or .//*[@role='combobox']][1]")
+    .locator("select, [role=combobox]")
+    .first();
+};
+
+/** select picks an option in a native select, or opens a combobox and picks the option in its list. */
+export const select: Action = async (context) => {
+  const option = argument({ context, name: "option" });
+  const box = await selectBox(context);
+  const native = await box.evaluate((node) => node.tagName === "SELECT", undefined, { timeout: 6000 });
+  if (native) {
+    const labels = (await box.locator("option").allTextContents()).map((label) => label.trim());
+    const label = labels.find((text) => text === option) ?? labels.find((text) => asRegExp(option).test(text));
+    if (label === undefined) throw new Error(`no option "${option}" among: ${labels.join(" | ")}`);
+    await box.selectOption({ label }, { timeout: 6000 });
+    return;
+  }
+  await box.click({ timeout: 6000 });
+  await context.side.page.getByRole("option", { name: option }).first().click({ timeout: 6000 });
+};
+
+/** type puts text into a box (placeholder, test id, label or selector) and optionally submits it. */
 export const type: Action = async (context) => {
   const { side } = context;
-  const box = side.page
-    .getByPlaceholder(asRegExp(argument({ context, name: "placeholder" })))
-    .first();
+  const box = isTargeted(context.args)
+    ? targetOf({ root: side.page, args: context.args }).first()
+    : side.page.getByPlaceholder(asRegExp(argument({ context, name: "placeholder" }))).first();
   await box.click({ timeout: 6000 });
   await side.page.keyboard.type(argument({ context, name: "text" }), { delay: 12 });
   if (context.args.submit === "true") await side.page.keyboard.press("Enter");

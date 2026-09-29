@@ -167,4 +167,6 @@ type RunnerSide struct {
 	// StaticDir holds this side's built UI, which the runner serves instead
 	// of the dev server's modules; empty keeps the side on its dev server.
 	StaticDir string `json:"staticDir,omitempty"`
+	// MailURL is this side's mail sink, which a flow's mail step reads.
+	MailURL string `json:"mailUrl,omitempty"`
 }

@@ -107,6 +107,12 @@ const isDocumentLoad = ({ request, page }: { request: Request; page: Page }): bo
   return request.frame() === page.mainFrame();
 };
 
+/** SideExtras are what only a browser-opened Side carries: a way to a cookieless page, its own context. */
+export interface SideExtras {
+  openAnonymous?: () => Promise<Side>;
+  owns?: BrowserContext;
+}
+
 /** Side is one running stack, with its page and everything that page reported. */
 export class Side {
   private readonly recorder = new StepRecorder();
@@ -119,6 +125,7 @@ export class Side {
     readonly baseUrl: string,
     readonly page: Page,
     settle: SettleConfig,
+    private readonly extras: SideExtras = {},
   ) {
     this.tracker = new InFlightTracker<Request>(settle, Date.now());
     page.on("request", (request: Request) => {
@@ -148,6 +155,17 @@ export class Side {
     page.on("pageerror", (error) => {
       this.recorder.consoleError(`pageerror: ${String(error.message)}`);
     });
+  }
+
+  /** openAnonymous is a fresh page of this stack with no cookies: a share link, a revoked key. */
+  async openAnonymous(): Promise<Side> {
+    if (this.extras.openAnonymous === undefined) throw new Error("this side cannot open an anonymous page");
+    return this.extras.openAnonymous();
+  }
+
+  /** dispose closes the page, and the context too when this side opened its own. */
+  async dispose(): Promise<void> {
+    await (this.extras.owns ?? this.page).close().catch(() => undefined);
   }
 
   /** goto opens a path on this side; the tracker forgets the document it leaves. */
@@ -353,6 +371,7 @@ export class SideBrowser {
     private readonly browser: Browser,
     private readonly context: BrowserContext,
     private readonly settle: SettleConfig,
+    private readonly freshContext: () => Promise<BrowserContext>,
   ) {}
 
   get name(): string {
@@ -361,7 +380,15 @@ export class SideBrowser {
 
   async openPage(): Promise<Side> {
     const page = await this.context.newPage();
-    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle);
+    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
+      openAnonymous: async () => this.openAnonymousPage(),
+    });
+  }
+
+  private async openAnonymousPage(): Promise<Side> {
+    const context = await this.freshContext();
+    const page = await context.newPage();
+    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, { owns: context });
   }
 
   async close(): Promise<void> {
@@ -385,18 +412,21 @@ export const openSideBrowser = async ({
   const args = ["--disable-dev-shm-usage"];
   if (side.staticDir !== undefined) args.push(FULFILLED_SHELL);
   const browser = await chromium.launch({ args });
-  const context = await browser.newContext(contextOptions({ viewport, storageState }));
-  if (frozenTime !== undefined) await context.clock.setFixedTime(frozenTime);
-  await context.addInitScript(() => {
-    try {
-      localStorage.setItem("chakra-ui-color-mode", "light");
-    } catch {
-      // A context that refuses storage still renders; the colour mode just falls back.
-    }
-  });
-  context.setDefaultTimeout(10_000);
-  if (side.staticDir !== undefined) await builtAssets({ context, side });
-  return new SideBrowser(side, browser, context, settle);
+  const fresh = async (state?: string): Promise<BrowserContext> => {
+    const context = await browser.newContext(contextOptions({ viewport, storageState: state }));
+    if (frozenTime !== undefined) await context.clock.setFixedTime(frozenTime);
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem("chakra-ui-color-mode", "light");
+      } catch {
+        // A context that refuses storage still renders; the colour mode just falls back.
+      }
+    });
+    context.setDefaultTimeout(10_000);
+    if (side.staticDir !== undefined) await builtAssets({ context, side });
+    return context;
+  };
+  return new SideBrowser(side, browser, await fresh(storageState), settle, async () => fresh());
 };
 
 /** captureMessage assembles one protocol capture from a side's current state. */

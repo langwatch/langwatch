@@ -269,6 +269,9 @@ func TestSeedPostsTracesAndADatasetThroughTheCandidateAPI(t *testing.T) {
 		t.Fatalf("calls: %+v", calls)
 	}
 	for _, call := range calls {
+		if call.path == "/api/bug-reports" {
+			continue // the bug-report intake is unauthenticated on purpose
+		}
 		if call.key != DefaultProjectKey {
 			t.Fatalf("every fixture is posted with the project key: %+v", call)
 		}

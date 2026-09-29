@@ -20,7 +20,7 @@ func (run *session) fillBaseline(ctx context.Context, edition Edition, baseline 
 	runnerPlan := RunnerPlan{
 		Viewport: options.Viewport, Settle: config.Settle,
 		Sides: []RunnerSide{{
-			Name: "base", BaseURL: plan.Base.URL(), Fixtures: run.sideFixtures[plan.Base.Name],
+			Name: "base", BaseURL: plan.Base.URL(), MailURL: plan.Base.MailURL(), Fixtures: run.sideFixtures[plan.Base.Name],
 			StaticDir: run.staticDirs[plan.Base.Name],
 		}},
 		OutDir: filepath.Join(options.RunDir, "shots", string(edition), "base-fill"),

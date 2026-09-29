@@ -65,8 +65,12 @@ func havenSelected(onPath, noHaven bool) bool {
 // developer's own, minus every datastore address visualdiff must not decide,
 // plus the slug naming this stack.
 func havenEnv(inherit []string, slug string) []string {
-	return havenrun.Env(inherit, slug, havenrun.EnvOptions{})
+	return havenrun.Env(inherit, slug, havenrun.EnvOptions{Extra: []string{FeatureFlagsOn}})
 }
+
+// FeatureFlagsOn turns on the flags the flow suite's screens sit behind: agent
+// testing v2 and the chart playground. It is the product's own local override.
+const FeatureFlagsOn = "FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled,release_custom_chart_playground"
 
 // bringUpHaven checks out each ref and brings it up as a haven stack the
 // moment it is prepared: `up --detach` returns as soon as the stack is

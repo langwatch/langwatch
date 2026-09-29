@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"time"
 )
@@ -114,6 +115,9 @@ func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 	result.Fixtures, result.Warnings = seedEntities(ctx, entityRequest{
 		client: client, apiURL: request.APIURL, key: request.Identity.ProjectKey, seeds: entitySeeds,
 	})
+	extra, extraWarnings := seedForFlows(ctx, flowSeedRequest{client: client, apiURL: request.APIURL, key: request.Identity.ProjectKey, now: now})
+	maps.Copy(result.Fixtures, extra)
+	result.Warnings = append(result.Warnings, extraWarnings...)
 	if id, err := StringAt(answer, "id"); err == nil {
 		result.Fixtures[FixtureDataset] = id
 	} else {

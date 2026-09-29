@@ -120,3 +120,14 @@ func mustContain(t *testing.T, haystack, needle string) {
 		t.Fatalf("expected %q in:\n%s", needle, haystack)
 	}
 }
+
+// @scenario A flow's mail step reads the side's own mail sink
+func TestMailURLIsTheAppHostnameOnTheMailService(t *testing.T) {
+	stack := Stack{HavenURL: "https://app.visualdiff-1-base.langwatch.localhost"}
+	if got := stack.MailURL(); got != "https://mail.visualdiff-1-base.langwatch.localhost" {
+		t.Fatalf("MailURL = %q", got)
+	}
+	if got := (Stack{}).MailURL(); got != "" {
+		t.Fatalf("a stack off haven has no mail sink, got %q", got)
+	}
+}

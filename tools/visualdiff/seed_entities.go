@@ -23,6 +23,7 @@ const (
 // fixture in visualdiff.yaml, because the seed fills them.
 var SeededFixtureNames = []string{
 	FixtureDataset, FixtureExperiment, FixtureMonitor, FixtureGraph, FixtureVirtualKey, FixtureBudget,
+	FixtureErrorTrace, FixtureConversation, FixtureBugReport, FixtureIsolatedSlug, FixtureIsolatedKey,
 }
 
 // entitySeed is one entity posted through a REST surface main and the branch

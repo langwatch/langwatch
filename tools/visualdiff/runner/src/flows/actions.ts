@@ -2,8 +2,8 @@ import type { Action } from "./context";
 import { argument, scope } from "./context";
 import { clickText, dismissTour, fillField, goTo } from "./primitives";
 
-const optionalClick = async (context: Parameters<Action>[0], text: string): Promise<void> =>
-  clickText({ context, text, optional: true });
+const required = async (context: Parameters<Action>[0], text: string): Promise<void> =>
+  clickText({ context, text });
 
 /** signIn signs the run in, signing up first when the account does not exist yet. */
 export const signIn: Action = async (context) => {
@@ -75,11 +75,11 @@ export const createAutomation: Action = async (context) => {
   await clickText({ context, text: "Automate" });
   await context.snapshot("automation drawer");
   if (context.args.kind === "alert") {
-    await clickText({ context, text: "Watch a metric" });
+    await required(context, "Watch a metric");
     await context.snapshot("alert form");
   } else {
     // Choosing the type re-renders the form, so it comes before the name.
-    await optionalClick(context, "Act on each matching trace");
+    await required(context, "Act on each matching trace");
   }
   // By its label: the placeholder names an example, and each kind shows its own.
   await fillField({ context, target: "/^Name$/", value: argument({ context, name: "name" }) });
@@ -95,7 +95,10 @@ export const createAutomation: Action = async (context) => {
       .fill(settleWindow, { timeout: 6000 });
   }
   await context.snapshot("automation filled in");
-  await optionalClick(context, "Create automation");
+  // submit "none" leaves the drawer open for the steps that set its subject.
+  const fallback = context.args.kind === "alert" ? "Create alert" : "Create automation";
+  const submit = argument({ context, name: "submit", fallback });
+  if (submit !== "none") await required(context, submit);
   await context.snapshot("after create");
 };
 
@@ -104,45 +107,33 @@ export const createEvaluation: Action = async (context) => {
     context,
     path: argument({ context, name: "start", fallback: "/{slug}/online-evaluations" }),
   });
-  await optionalClick(context, "New Online Evaluation");
-  const pages = Number(argument({ context, name: "steps", fallback: "3" }));
-  for (let page = 1; page <= pages; page++) {
-    await context.snapshot(`wizard step ${page}`);
-    await optionalClick(context, "/^(Next|Continue)\\b/");
-  }
+  await required(context, "New Online Evaluation");
+  await context.snapshot("online evaluation drawer");
 };
 
-/** sendTrace opens the seeded trace list and reads one trace's spans. */
+/** sendTrace opens the seeded trace list: it shows no trace ids to click, openTrace reads one. */
 export const sendTrace: Action = async (context) => {
   await goTo({ context, path: "/{slug}/traces" });
   await context.snapshot("trace list");
-  await optionalClick(
-    context,
-    argument({ context, name: "traceId", fallback: "trace_visualdiff_" }),
-  );
-  await context.snapshot("trace opened");
 };
 
 /** openTrace opens a trace by its address: the list shows no trace ids to click. */
 export const openTrace: Action = async (context) => {
   await goTo({ context, path: `/{slug}/traces/${argument({ context, name: "traceId" })}` });
   await context.snapshot("trace drawer");
-  await optionalClick(context, "/^(Spans|Trace Details|Details)/");
   await context.snapshot("spans tab");
-  await optionalClick(context, "/^(Evaluations|Evals)/");
-  await context.snapshot("evaluations tab");
 };
 
 export const annotate: Action = async (context) => {
   await goTo({ context, path: `/{slug}/traces/${argument({ context, name: "traceId" })}` });
-  await optionalClick(context, "/^(Annotate|Add annotation|Annotations)/");
+  await required(context, "/^(Annotate|Add annotation|Annotations)/");
   await context.snapshot("annotation form");
   const comment = argument({ context, name: "comment", fallback: "Visual diff note" });
   await context.side.page
     .locator("textarea")
     .last()
     .fill(`${comment} (${context.side.name})`, { timeout: 8000 });
-  await optionalClick(context, "/^(Save|Add|Submit|Comment)/");
+  await required(context, "/^(Save|Add|Submit|Comment)/");
   await context.snapshot("after annotating");
 };
 
@@ -153,7 +144,7 @@ export const editProjectSettings: Action = async (context) => {
     .locator('input[name="name"], input[name="displayName"]')
     .first()
     .fill(`${argument({ context, name: "name" })} ${context.side.name}`, { timeout: 6000 });
-  await optionalClick(context, "/^(Update|Save)/");
+  await required(context, "/^(Update|Save)/");
   await context.snapshot("after saving");
 };
 
@@ -168,14 +159,19 @@ export const createPrompt: Action = async (context) => {
     .fill(argument({ context, name: "message", fallback: "You are the visual-diff assistant." }), {
       timeout: 8000,
     });
-  await optionalClick(context, "/^(Save|Publish|Create)/");
+  await required(context, String.raw`/^\s*Save\s*$/`);
+  // Saving a new prompt asks for its handle, then saves again from the dialog.
+  await context.side.page
+    .getByPlaceholder("prompt-name")
+    .fill(argument({ context, name: "handle", fallback: "vd-prompt" }), { timeout: 8000 });
+  await required(context, String.raw`/^\s*Save\s*$/`);
   await context.snapshot("after saving");
 };
 
 export const createExperiment: Action = async (context) => {
   await goTo({ context, path: "/{slug}/experiments" });
   await context.snapshot("experiments");
-  await optionalClick(context, "New Experiment");
+  await required(context, "New Experiment");
   await context.snapshot("new experiment");
 };
 
@@ -205,7 +201,6 @@ export const createScenario: Action = async (context) => {
     path: argument({ context, name: "start", fallback: "/{slug}/agent-testing" }),
   });
   await context.snapshot("agent testing");
-  await optionalClick(context, "Scenarios");
   await goTo({ context, path: "/{slug}/simulations/scenarios" });
   await context.snapshot("scenarios");
 };
@@ -224,17 +219,17 @@ export const createRunSet: Action = async (context) => {
       delay: 12,
     },
   );
-  await optionalClick(context, "/^(Run|Execute)/");
+  await required(context, "/^(Run|Execute)/");
   await context.snapshot("after running");
 };
 
 export const createDashboard: Action = async (context) => {
   await goTo({
     context,
-    path: argument({ context, name: "start", fallback: "/{slug}/analytics/custom" }),
+    path: argument({ context, name: "start", fallback: "/{slug}/analytics/reports" }),
   });
   await context.snapshot("chart builder");
-  await optionalClick(context, "/(Add chart|New chart|Add graph|New dashboard)/");
+  await required(context, "Add chart");
   await context.snapshot("after adding a chart");
 };
 

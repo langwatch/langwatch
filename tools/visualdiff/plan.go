@@ -2,6 +2,7 @@ package visualdiff
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -80,6 +81,17 @@ func (stack Stack) URL() string {
 		return stack.HavenURL
 	}
 	return "http://localhost:" + strconv.Itoa(stack.Ports.UI)
+}
+
+// MailURL is the origin of the stack's mail sink (services/mailsim): haven
+// routes it as mail.<slug>... beside app.<slug>..., so it is derived from the
+// app hostname. Empty off haven, where no sink runs.
+func (stack Stack) MailURL() string {
+	parsed, err := url.Parse(stack.HavenURL)
+	if err != nil || !strings.HasPrefix(parsed.Host, "app.") {
+		return ""
+	}
+	return parsed.Scheme + "://mail." + strings.TrimPrefix(parsed.Host, "app.")
 }
 
 // APIURL is the origin the seeder posts fixtures to. haven serves the API

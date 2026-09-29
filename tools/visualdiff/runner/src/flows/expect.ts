@@ -1,5 +1,6 @@
 import type { Action, ActionContext } from "./context";
 import { asRegExp, fillPath } from "./context";
+import { hasTarget, targetOf } from "./target";
 
 /** EXPECT_TIMEOUT_MILLIS bounds how long an expect polls before it fails. */
 export const EXPECT_TIMEOUT_MILLIS = 10_000;
@@ -8,22 +9,35 @@ export const EXPECT_TIMEOUT_MILLIS = 10_000;
 const POLL_MILLIS = 250;
 
 /** The keys an expect step may carry; tools/visualdiff/config.go refuses any other. */
-export const EXPECT_FORMS = ["text", "count", "url", "api"] as const;
+export const EXPECT_FORMS = ["text", "count", "url", "api", "testId", "testIdPrefix", "label"] as const;
+
+const TARGET_FORMS = ["testId", "testIdPrefix", "label"] as const;
+
+/** hasBodyCheck is an api expect that reads the body, not only the status. */
+const hasBodyCheck = (args: Record<string, string>): boolean =>
+  ["field", "contains", "equals", "min"].some((key) => args[key] !== undefined);
 
 /**
  * describeExpect is an expect's one-line proof, the same on both sides:
- * `text "VD Alert"`, `count role=row >= 3`, `url /traces`, `api /api/triggers contains "VD"`.
+ * `text "VD Alert"`, `count role=row >= 3`, `url /traces`, `api /api/triggers contains "VD"`,
+ * `testId trace-row >= 1`, `api /api/triggers status 401`.
  */
 export const describeExpect = (args: Record<string, string>): string => {
   const bound = args.equals !== undefined ? ` == ${args.equals}` : ` >= ${args.min ?? "1"}`;
   if (args.text !== undefined) {
     const within = args.role === undefined ? "" : ` within ${args.role} "${args.name ?? ""}"`;
-    return `text "${args.text}"${within}`;
+    return `text "${args.text}"${within}${args.equals === undefined ? "" : bound}`;
+  }
+  const element = TARGET_FORMS.find((form) => args[form] !== undefined);
+  if (element !== undefined) {
+    const narrowed = args.hasText === undefined ? "" : ` with text "${args.hasText}"`;
+    return `${element} ${args[element]}${narrowed}${bound}`;
   }
   if (args.count !== undefined) return `count ${args.count}${bound}`;
   if (args.url !== undefined) return `url ${args.url}`;
   if (args.api !== undefined) {
     const field = args.field === undefined ? "" : ` ${args.field}`;
+    if (args.status !== undefined && !hasBodyCheck(args)) return `api ${args.api} status ${args.status}`;
     if (args.contains !== undefined) return `api ${args.api}${field} contains "${args.contains}"`;
     if (args.equals !== undefined) return `api ${args.api}${field} == ${args.equals}`;
     return `api ${args.api}${field} length >= ${args.min ?? "1"}`;
@@ -85,7 +99,11 @@ const readOnce = async (context: ActionContext): Promise<string> => {
       .locator("visible=true")
       .count()
       .catch(() => 0);
-    return visible > 0 ? "" : "not visible";
+    return judgeCount({ found: visible, args });
+  }
+  if (hasTarget(args)) {
+    const found = await targetOf({ root: page, args }).count().catch(() => 0);
+    return judgeCount({ found, args });
   }
   if (args.count !== undefined) {
     const found = await page
@@ -102,11 +120,20 @@ const readOnce = async (context: ActionContext): Promise<string> => {
       : `on ${path}`;
   }
   if (args.api !== undefined) {
+    const token = args.auth ?? context.credential.projectKey;
     const response = await page.request.get(
       side.baseUrl + fillPath({ path: args.api, slug: context.slug }),
-      { headers: { "X-Auth-Token": context.credential.projectKey }, failOnStatusCode: false, ignoreHTTPSErrors: true },
+      {
+        headers: token === "none" ? {} : { "X-Auth-Token": token },
+        failOnStatusCode: false,
+        ignoreHTTPSErrors: true,
+      },
     );
-    if (!response.ok()) return `answered ${response.status()}`;
+    if (args.status !== undefined && String(response.status()) !== args.status) {
+      return `answered ${response.status()}, want ${args.status}`;
+    }
+    if (args.status === undefined && !response.ok()) return `answered ${response.status()}`;
+    if (args.status !== undefined && !hasBodyCheck(args)) return "";
     return judgeBody({ body: await response.json().catch(() => undefined), args });
   }
   return `no form: give one of ${EXPECT_FORMS.join(", ")}`;

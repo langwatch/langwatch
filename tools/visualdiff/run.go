@@ -731,7 +731,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	options, deps := run.request.Options, run.request.Deps
 	config, _ := run.request.Done.Scope(run.request.Config, edition)
 	plan := run.plan
-	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL(), Fixtures: run.sideFixtures[plan.Base.Name], StaticDir: run.staticDirs[plan.Base.Name]}
+	base := RunnerSide{Name: "base", BaseURL: plan.Base.URL(), MailURL: plan.Base.MailURL(), Fixtures: run.sideFixtures[plan.Base.Name], StaticDir: run.staticDirs[plan.Base.Name]}
 	if baseline.Cached {
 		base = RunnerSide{Name: "base", Replay: baseline.CapturesPath()}
 		fmt.Fprintf(run.streams.Err, "%s: base replayed from %s\n", edition, baseline.Dir)
@@ -740,7 +740,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 		Viewport: options.Viewport,
 		Settle:   config.Settle,
 		Sides: []RunnerSide{base, {
-			Name: "candidate", BaseURL: plan.Candidate.URL(), Fixtures: run.sideFixtures[plan.Candidate.Name],
+			Name: "candidate", BaseURL: plan.Candidate.URL(), MailURL: plan.Candidate.MailURL(), Fixtures: run.sideFixtures[plan.Candidate.Name],
 			StaticDir: run.staticDirs[plan.Candidate.Name],
 		}},
 		OutDir:      filepath.Join(options.RunDir, "shots", string(edition)),

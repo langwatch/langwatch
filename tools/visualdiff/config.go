@@ -8,6 +8,7 @@ package visualdiff
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -57,12 +58,20 @@ type Step struct {
 	With     map[string]string `json:"with,omitempty"     yaml:"with,omitempty"`
 }
 
-// Flow is a named sequence of steps captured on both refs.
+// Flow is a named sequence of steps captured on both refs. Isolated runs it in
+// the seeded second project; Serial runs it alone, after every other flow.
 type Flow struct {
-	ID    string `json:"id"    yaml:"id"`
-	Title string `json:"title" yaml:"title"`
-	Steps []Step `json:"steps" yaml:"steps"`
+	ID       string `json:"id"                 yaml:"id"`
+	Title    string `json:"title"              yaml:"title"`
+	Isolated bool   `json:"isolated,omitempty" yaml:"isolated,omitempty"`
+	Serial   bool   `json:"serial,omitempty"   yaml:"serial,omitempty"`
+	Steps    []Step `json:"steps"              yaml:"steps"`
 }
+
+// FlowsDir is where the per-area flow files live, beside ConfigFile. Each
+// holds a `flows:` list; LoadConfig appends them, in file-name order, to the
+// flows visualdiff.yaml declares.
+const FlowsDir = "flows"
 
 // Settle carries the runner's event-driven settle knobs: the run waits for
 // the in-flight request count to sit at zero for QuietMillis, and gives up at
@@ -73,8 +82,8 @@ type Settle struct {
 }
 
 // Concurrency is how many pages each side captures on at once: routes spread
-// over Routes pages, flows over Flows (a flow editing the project runs last,
-// alone). Absent or zero is one page, the serial capture.
+// over Routes pages, flows over Flows (a Serial flow runs last, alone). Absent
+// or zero is one page, the serial capture.
 type Concurrency struct {
 	Routes int `json:"routes,omitempty" yaml:"routes"`
 	Flows  int `json:"flows,omitempty"  yaml:"flows"`
@@ -106,6 +115,7 @@ type Config struct {
 var RunnerActions = []string{
 	// primitives
 	"go", "click", "fill", "select", "dismissTour", "type", "wait", "expect",
+	"upload", "drag", "capture", "mail",
 	// named flow actions
 	"signIn", "createAutomation", "createEvaluation", "sendTrace", "openTrace",
 	"annotate", "editProjectSettings", "createPrompt", "createExperiment",
@@ -131,10 +141,42 @@ func LoadConfig(path string) (*Config, error) {
 	if err := yaml.Unmarshal(content, config); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
 	}
+	extra, err := loadFlowFiles(filepath.Join(filepath.Dir(path), FlowsDir))
+	if err != nil {
+		return nil, err
+	}
+	config.Flows = append(config.Flows, extra...)
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return config, nil
+}
+
+// flowFile is one area's file under FlowsDir.
+type flowFile struct {
+	Flows []Flow `yaml:"flows"`
+}
+
+// loadFlowFiles reads every *.yaml under dir in name order; no directory is no flows.
+func loadFlowFiles(dir string) ([]Flow, error) {
+	names, err := filepath.Glob(filepath.Join(dir, "*.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(names)
+	var flows []Flow
+	for _, name := range names {
+		content, err := os.ReadFile(name) // #nosec G304 -- listed from the tool's own flows directory.
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", name, err)
+		}
+		file := flowFile{}
+		if err := yaml.Unmarshal(content, &file); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", name, err)
+		}
+		flows = append(flows, file.Flows...)
+	}
+	return flows, nil
 }
 
 // Validate refuses a configuration the run could not honor.
@@ -213,12 +255,18 @@ func validateFlow(flow Flow) error {
 // ExpectAction is the step that proves a flow's outcome (runner/src/flows/expect.ts).
 const ExpectAction = "expect"
 
-// expectForms are what an expect checks; exactly one per step.
-var expectForms = []string{"text", "count", "url", "api"}
+// expectForms are what an expect checks; exactly one per step. testId,
+// testIdPrefix and label count the matching visible elements.
+var expectForms = []string{"text", "count", "url", "api", "testId", "testIdPrefix", "label"}
 
 // expectOptions qualify the form: role/name scope a text, min/equals bound a
-// count or an api field's length, field/contains pick into an api body.
-var expectOptions = []string{"role", "name", "min", "equals", "field", "contains", "timeout"}
+// count or an api field's length, field/contains pick into an api body,
+// hasText narrows an element form, status and auth shape an api request, and
+// anonymous reads it in a fresh cookieless context.
+var expectOptions = []string{
+	"role", "name", "min", "equals", "field", "contains", "timeout",
+	"hasText", "status", "auth", "anonymous",
+}
 
 // validateExpect refuses an expect with no form, two forms, or a key the runner ignores.
 func validateExpect(with map[string]string) error {

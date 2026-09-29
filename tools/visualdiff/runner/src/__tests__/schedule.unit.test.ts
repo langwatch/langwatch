@@ -51,20 +51,20 @@ describe("Feature: visualdiff catches regressions and reports its own coverage",
     });
   });
 
-  describe("given flows that only read, write, filter a view or edit the project", () => {
+  describe("given flows that only read, write, or declare themselves serial", () => {
     /** @scenario Flows run side by side, and the one editing the project runs last */
-    it("lets readers join the routes, holds writers for them, and runs view and project edits last", () => {
+    it("lets readers join the routes, runs writers across the pool and serial flows last", () => {
       const ordered = orderFlows([
-        flow("project-settings", ["editProjectSettings", "go"]),
+        { ...flow("project-settings", ["editProjectSettings", "go"]), serial: true },
         flow("trace-filters", ["go", "click", "type"]),
         flow("prompt-create", ["createPrompt", "go"]),
         flow("trace-view", ["sendTrace", "openTrace"]),
-        flow("agent-testing", ["createScenario"]),
+        { ...flow("agent-testing", ["createScenario"]), isolated: true },
       ]);
 
       expect(ordered.readers.map((entry) => entry.id)).toEqual(["trace-view", "agent-testing"]);
-      expect(ordered.writers.map((entry) => entry.id)).toEqual(["prompt-create"]);
-      expect(ordered.last.map((entry) => entry.id)).toEqual(["trace-filters", "project-settings"]);
+      expect(ordered.writers.map((entry) => entry.id)).toEqual(["trace-filters", "prompt-create"]);
+      expect(ordered.last.map((entry) => entry.id)).toEqual(["project-settings"]);
       expect(width(undefined)).toBe(1);
       expect(width(3)).toBe(3);
     });

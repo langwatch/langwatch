@@ -141,3 +141,99 @@ func TestRepositoryConfigIsValid(t *testing.T) {
 		t.Fatal("the repository configuration lists no routes")
 	}
 }
+
+// @scenario Flows load from flows/*.yaml beside visualdiff.yaml
+func TestFlowsLoadFromTheFlowsDirectoryAndMerge(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, ConfigFile), sampleConfig)
+	mustWrite(t, filepath.Join(dir, filepath.Dir(ConfigFile), FlowsDir, "area.yaml"), `flows:
+  - id: area-flow
+    title: An area's flow
+    isolated: true
+    steps:
+      - action: click
+        with:
+          testId: area-button
+      - action: expect
+        with:
+          api: /api/things
+          status: "401"
+          auth: none
+`)
+	mustWrite(t, filepath.Join(dir, filepath.Dir(ConfigFile), FlowsDir, "serial.yaml"), `flows:
+  - id: serial-flow
+    title: Runs alone
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /
+`)
+
+	config, err := LoadConfig(filepath.Join(dir, ConfigFile))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{}
+	for _, flow := range config.Flows {
+		ids = append(ids, flow.ID)
+	}
+	want := []string{"automation-create", "prompt-create", "area-flow", "serial-flow"}
+	if len(ids) != len(want) {
+		t.Fatalf("flows %v, want %v", ids, want)
+	}
+	for index, id := range want {
+		if ids[index] != id {
+			t.Fatalf("flows %v, want %v", ids, want)
+		}
+	}
+	if !config.Flows[2].Isolated || !config.Flows[3].Serial || config.Flows[0].Isolated {
+		t.Fatalf("isolated and serial did not parse: %+v", config.Flows)
+	}
+}
+
+// @scenario A flow id defined in two files is refused
+func TestAFlowIDInTwoFilesIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, ConfigFile), sampleConfig)
+	mustWrite(t, filepath.Join(dir, filepath.Dir(ConfigFile), FlowsDir, "again.yaml"), `flows:
+  - id: prompt-create
+    title: Again
+    steps:
+      - action: createPrompt
+`)
+
+	if _, err := LoadConfig(filepath.Join(dir, ConfigFile)); err == nil {
+		t.Fatal("a flow id defined twice was accepted")
+	}
+}
+
+// @scenario An expect with an unknown key is refused
+func TestExpectKeysAreTheRunnersVocabulary(t *testing.T) {
+	good := map[string]string{"testId": "row", "hasText": "VD", "min": "2"}
+	if err := validateExpect(good); err != nil {
+		t.Fatalf("testId with hasText and min: %v", err)
+	}
+	if err := validateExpect(map[string]string{"api": "/api/x", "status": "401", "auth": "none", "anonymous": "true"}); err != nil {
+		t.Fatalf("api with status, auth and anonymous: %v", err)
+	}
+	if err := validateExpect(map[string]string{"testId": "row", "text": "x"}); err == nil {
+		t.Fatal("two forms were accepted")
+	}
+	if err := validateExpect(map[string]string{"testId": "row", "colour": "red"}); err == nil {
+		t.Fatal("an unknown option was accepted")
+	}
+}
+
+// @scenario The shipped flows all validate
+func TestTheShippedConfigLoadsWithItsCoreFlows(t *testing.T) {
+	config, err := LoadConfig(filepath.Base(ConfigFile))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.Flows) < 12 {
+		t.Fatalf("the twelve core flows did not load: %d", len(config.Flows))
+	}
+}

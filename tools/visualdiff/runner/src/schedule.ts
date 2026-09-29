@@ -72,14 +72,6 @@ export const runPoolWithRecapture = async <Item, Result>({
 /** READ_ACTIONS only look: a flow of nothing else may run while other pages capture routes. */
 const READ_ACTIONS = new Set(["go", "wait", "sendTrace", "openTrace", "createScenario"]);
 
-/**
- * VIEW_ACTIONS change what other screens show (a view's saved filters), and PROJECT_ACTIONS
- * change every screen (the project's name): their flows run alone, after the rest, the
- * project's very last.
- */
-const VIEW_ACTIONS = new Set(["click", "type", "select", "fill"]);
-const PROJECT_ACTIONS = new Set(["editProjectSettings"]);
-
 /** FlowOrder is when each flow may run: beside the routes, after them, or alone at the end. */
 export interface FlowOrder {
   readers: PlanFlow[];
@@ -87,21 +79,20 @@ export interface FlowOrder {
   last: PlanFlow[];
 }
 
-/** orderFlows sorts flows into FlowOrder, keeping the configured (longest first) order in each. */
+/**
+ * orderFlows sorts flows into FlowOrder, keeping the configured order in each. Flows that only
+ * look join the routes; every other flow runs across the whole page pool once the routes are done
+ * (each names what it creates with a `{uid}`, so they cannot collide); only a flow that declares
+ * `serial` waits to run alone at the end.
+ */
 export const orderFlows = (flows: readonly PlanFlow[]): FlowOrder => {
-  const uses = (flow: PlanFlow, actions: Set<string>): boolean =>
-    flow.steps.some((step) => actions.has(step.action));
+  const alone = (flow: PlanFlow): boolean => flow.serial === true;
   const reads = (flow: PlanFlow): boolean =>
     flow.steps.every((step) => READ_ACTIONS.has(step.action));
-  const alone = (flow: PlanFlow): boolean =>
-    uses(flow, VIEW_ACTIONS) || uses(flow, PROJECT_ACTIONS);
   return {
-    readers: flows.filter(reads),
-    writers: flows.filter((flow) => !reads(flow) && !alone(flow)),
-    last: [
-      ...flows.filter((flow) => alone(flow) && !uses(flow, PROJECT_ACTIONS)),
-      ...flows.filter((flow) => uses(flow, PROJECT_ACTIONS)),
-    ],
+    readers: flows.filter((flow) => !alone(flow) && reads(flow)),
+    writers: flows.filter((flow) => !alone(flow) && !reads(flow)),
+    last: flows.filter(alone),
   };
 };
 

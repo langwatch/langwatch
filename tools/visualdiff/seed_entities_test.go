@@ -23,6 +23,7 @@ func entityServer(t *testing.T, refuse string) (*httptest.Server, map[string]map
 		"/api/graphs":                  `{"id":"graph_1"}`,
 		"/api/gateway/v1/virtual-keys": `{"virtual_key":{"id":"vk_1"},"secret":"s"}`,
 		"/api/gateway/v1/budgets":      `{"budget":{"id":"budget_1"}}`,
+		"/api/bug-reports":             `{"id":"bug_1"}`,
 	}
 	bodies := map[string]map[string]any{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +52,7 @@ func TestEachStackSeedsTheEntitiesItsDynamicRoutesOpenAndKeepsItsOwnIDs(t *testi
 	want := map[string]string{
 		FixtureDataset: "dataset_1", FixtureExperiment: "visual-diff-experiment", FixtureMonitor: "monitor_1",
 		FixtureGraph: "graph_1", FixtureVirtualKey: "vk_1", FixtureBudget: "budget_1",
+		FixtureErrorTrace: SeedErrorTraceID, FixtureConversation: SeedConversationThread, FixtureBugReport: "bug_1",
 	}
 	if len(result.Warnings) != 0 || len(result.Fixtures) != len(want) {
 		t.Fatalf("fixtures %+v, warnings %v", result.Fixtures, result.Warnings)

@@ -67,6 +67,7 @@ export const signInSide = async ({
       slug: plan.slug,
       credential: { ...plan.credential, email },
       args: {},
+      values: {},
       snapshot: async () => undefined,
     }).then(
       () => "",

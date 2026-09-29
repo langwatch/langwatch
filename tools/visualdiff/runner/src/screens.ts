@@ -3,12 +3,13 @@ import { join } from "node:path";
 import { captureMessage, type Side } from "./capture";
 import { DeadlineAlarm } from "./deadline-alarm";
 import { fillPath, sideFixtures } from "./flows/context";
+import { fillArgs, ISOLATED_KEY, ISOLATED_SLUG, uidFor } from "./flows/values";
 import { describeExpect } from "./flows/expect";
 import { declinePasskeyOffer } from "./flows/primitives";
 import { resolveAction } from "./flows/registry";
 import { needsRecapture } from "./module-load";
 import { safeName } from "./pairing";
-import { note, type CaptureMessage, type Plan, type PlanFlow } from "./protocol";
+import { note, type CaptureMessage, type Credential, type Plan, type PlanFlow } from "./protocol";
 import { runPoolWithRecapture } from "./schedule";
 import { SHELL_PROBE, shellBroken, type ShellProbe } from "./shell";
 
@@ -191,6 +192,32 @@ export const captureRoutes = async ({
   return { captureMillis: Date.now() - startedAt - recaptureMillis, recaptureMillis };
 };
 
+/** FlowProject is the project a flow works in, and why it cannot when it has none. */
+interface FlowProject {
+  slug: string;
+  credential: Credential;
+  missing: string;
+}
+
+/** flowProject is the plan's project, or the seeded second one for an `isolated` flow. */
+export const flowProject = ({
+  plan,
+  flow,
+  fixtures,
+}: {
+  plan: Pick<Plan, "slug" | "credential">;
+  flow: PlanFlow;
+  fixtures: Record<string, string>;
+}): FlowProject => {
+  if (flow.isolated !== true) return { slug: plan.slug, credential: plan.credential, missing: "" };
+  const slug = fixtures[ISOLATED_SLUG];
+  const projectKey = fixtures[ISOLATED_KEY];
+  if (slug === undefined || projectKey === undefined) {
+    return { slug: plan.slug, credential: plan.credential, missing: "this side seeded no isolated project" };
+  }
+  return { slug, credential: { ...plan.credential, slug, projectKey }, missing: "" };
+};
+
 /** captureFlow runs one flow's steps on one page; each step's first action opens its own screen. */
 export const captureFlow = async ({
   plan,
@@ -205,8 +232,14 @@ export const captureFlow = async ({
 }): Promise<void> => {
   side.drain();
   let failed = 0;
+  const fixtures = sideFixtures({ plan, side: side.name });
+  const project = flowProject({ plan, flow, fixtures });
+  const values: Record<string, string> = { ...fixtures, slug: project.slug, uid: uidFor(flow.id) };
+  const mailUrl = plan.sides.find((candidate) => candidate.name === side.name)?.mailUrl;
+  let anonymous: Side | undefined;
   for (const [stepIndex, step] of flow.steps.entries()) {
     let snapshots = 0;
+    let active = side;
     const startedAt = Date.now();
     const shoot = async ({ label, error }: { label: string; error: string }): Promise<void> => {
       const index = stepIndex * SNAPSHOT_STRIDE + snapshots;
@@ -218,21 +251,21 @@ export const captureFlow = async ({
         flow.id,
         `${String(index).padStart(4, "0")}.png`,
       );
-      await side.waitUntilQuiet();
-      await photograph({ side, file }).catch(() => undefined);
+      await active.waitUntilQuiet();
+      await photograph({ side: active, file }).catch(() => undefined);
       collect(
         captureMessage({
           kind: "flow",
           key: flow.id,
           index,
           label: `${step.action}${label === "" ? "" : `: ${label}`}`,
-          side,
+          side: active,
           screenshot: file,
           error,
           durationMs: Date.now() - startedAt,
           notFound: false,
-          blank: await side.blank(),
-          ariaSnapshot: await side.ariaSnapshot(),
+          blank: await active.blank(),
+          ariaSnapshot: await active.ariaSnapshot(),
           expect: step.action === "expect" ? describeExpect(step.with ?? {}) : undefined,
         }),
       );
@@ -240,11 +273,18 @@ export const captureFlow = async ({
 
     let error = "";
     try {
+      if (project.missing !== "") throw new Error(project.missing);
+      if (step.with?.anonymous === "true") {
+        anonymous ??= await side.openAnonymous();
+        active = anonymous;
+      }
       await resolveAction(step.action)({
-        side,
-        slug: plan.slug,
-        credential: plan.credential,
-        args: step.with ?? {},
+        side: active,
+        slug: project.slug,
+        credential: project.credential,
+        args: fillArgs({ args: step.with ?? {}, values }),
+        values,
+        mailUrl,
         snapshot: async (label: string) => shoot({ label, error: "" }),
       });
     } catch (thrown) {
@@ -259,6 +299,7 @@ export const captureFlow = async ({
     }
     await shoot({ label: "after", error });
   }
+  await anonymous?.dispose();
   const outcome = failed === 0 ? "ok" : `${failed} failed`;
   note({
     text: `${side.name} ${flow.id}: ${flow.steps.length} steps, ${outcome}`,

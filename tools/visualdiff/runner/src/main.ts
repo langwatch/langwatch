@@ -43,8 +43,7 @@ const openPages = async ({
 
 /**
  * captureSide renders the routes across its pages, read-only flows taking pages as the
- * routes drain; then the flows that write, on every page; then the view and project
- * edits, alone.
+ * routes drain; then every other flow, on every page; then the `serial` flows, alone.
  */
 const captureSide = async ({
   plan,

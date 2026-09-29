@@ -7,7 +7,12 @@ export interface ActionContext {
   side: Side;
   slug: string;
   credential: Credential;
+  /** args are the step's arguments with every placeholder filled (values.ts). */
   args: Record<string, string>;
+  /** values are the flow's captured strings, by name; a later step's placeholders read them. */
+  values: Record<string, string>;
+  /** mailUrl is the side's mail sink (services/mailsim), absent where the stack has none. */
+  mailUrl?: string;
   /** snapshot photographs the screen mid-action, so a wizard's every page is evidence. */
   snapshot: (label: string) => Promise<void>;
 }

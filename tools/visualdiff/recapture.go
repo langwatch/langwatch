@@ -52,6 +52,9 @@ func Recapture(ctx context.Context, request RecaptureRequest, streams Streams) (
 		return RecaptureResult{}, fmt.Errorf("recapture: read %s: %w", planPath, err)
 	}
 	plan.Routes = request.Routes
+	if plan.Routes == nil {
+		plan.Routes = []string{} // the runner reads null as no list at all
+	}
 	plan.Flows = selectFlows(plan.Flows, request.Flows)
 	plan.FailFast = false
 	if len(plan.Stacks) > 0 {

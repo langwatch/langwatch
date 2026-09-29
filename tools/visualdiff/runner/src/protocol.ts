@@ -23,6 +23,10 @@ export interface PlanStep {
 export interface PlanFlow {
   id: string;
   title: string;
+  /** isolated runs the flow in the seeded second project. */
+  isolated?: boolean;
+  /** serial runs the flow alone, after every other flow. */
+  serial?: boolean;
   steps: PlanStep[];
 }
 
@@ -33,6 +37,8 @@ export interface PlanSide {
   replay?: string;
   /** pending names the file this side's address arrives in once its stack is up. */
   pending?: string;
+  /** mailUrl is this side's mail sink (services/mailsim), where its stack has one. */
+  mailUrl?: string;
   /** fixtures are the ids this side's seed generated; they win over the plan's. */
   fixtures?: Record<string, string>;
   /** staticDir holds this side's prebuilt UI; absent, the side is captured from its dev server. */
