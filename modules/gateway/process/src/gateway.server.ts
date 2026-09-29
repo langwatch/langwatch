@@ -3,6 +3,7 @@ import {
   bindRestMiddleware,
   ForbiddenError,
   keyCredentialOfRequest,
+  organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
@@ -35,6 +36,15 @@ import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 
 export type { GatewayInfrastructure } from "./app/gateway.app.ts";
+
+/**
+ * The organization a spend-plan check reads (ADR-072): off the raw request
+ * the credential door recorded it against, never a context variable no door
+ * here ever sets.
+ */
+export function gatewaySpendPlanOrganizationId(context: { req: { raw: Request } }): string {
+  return organizationCredentialOfRequest(context.req.raw).organizationId;
+}
 
 export const gatewayServer = defineServerModule("gateway")
   .withApp(GatewayApp)
@@ -89,9 +99,8 @@ export const gatewayServer = defineServerModule("gateway")
        * Fail-closed: a rejected lookup refuses; no plan store refuses at boot.
        */
       bindRestMiddleware(gatewaySpendBillingPlanGate, async (context) => {
-        const organization = context.get("organization") as { id: string };
         const plan = await dependencies.entitlement.getActivePlan({
-          organizationId: organization.id,
+          organizationId: gatewaySpendPlanOrganizationId(context),
         });
         if (plan.webhookEndpointsEnabled !== true) {
           throw new ForbiddenError(

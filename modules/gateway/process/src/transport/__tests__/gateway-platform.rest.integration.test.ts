@@ -22,6 +22,7 @@ import {
   type GatewayCacheRuleResource,
   type GatewayRequestCredential,
   type GatewayVirtualKeySnakeDto,
+  VirtualKeyRevokedError,
 } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { Prisma } from "@langwatch/prisma-client/generated";
@@ -460,6 +461,33 @@ function mountAs({
     });
 }
 
+describe("the gateway platform family's virtual-key error mapping", () => {
+  /** @scenario Rotating a revoked virtual key answers 400, not the generic 500 an unhandled error would */
+  it("answers bad_request when the service refuses to rotate a revoked key", async () => {
+    const app = createApiFixture<GatewayApi>({
+      ...callerOf,
+      organizationIdForProject: async () => ORGANIZATION_ID,
+      actorForCredential: () => ({ actor: { kind: "legacyProjectKey" }, actorUserId: "svc" }),
+      authorizeVirtualKeyOperation: async () => virtualKeyRow(),
+      rotateVirtualKey: async () => {
+        throw new VirtualKeyRevokedError("Cannot rotate a revoked virtual key");
+      },
+    });
+    const hono = mountFamily({ app, idempotency: passthroughIdempotency });
+
+    const response = await hono.request("/api/gateway/v1/virtual-keys/vk_1/rotate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { code: string; message: string };
+    expect(body.code).toBe("bad_request");
+    expect(body.message).toBe("Cannot rotate a revoked virtual key");
+  });
+});
+
 describe("the gateway platform family's caller", () => {
   describe("given a scoped API key with the budget grant at the organization", () => {
     /** @scenario "A scoped API key with the budget grant at the organization creates a budget" */
@@ -591,6 +619,33 @@ describe("the gateway budget routes behind the key door", () => {
       expect(body.data.map((budget) => budget.id)).toEqual(["bgt_1"]);
     });
 
+    /** @scenario A budget listing carries each row's scope reach */
+    it("carries scope_reach from the application's per-row reach read", async () => {
+      const app = createApiFixture<GatewayApi>({
+        authorizeKeyCaller: async () => ({
+          organizationId: ORGANIZATION_ID,
+          actor: null,
+          actorUserId: "user_1",
+        }),
+        listBudgetPageWithHealth: async () => ({
+          budgets: [budgetRow()],
+          spendAvailable: true,
+          readAt,
+          scopeReach: new Map([
+            ["bgt_1", { budgetId: "bgt_1", reachable: false, reachableProjectIds: [] }],
+          ]),
+          total: 1,
+        }),
+        groupMemberCounts: async () => new Map<string, number>(),
+      });
+      const hono = mountFamily({ app, idempotency: passthroughIdempotency });
+
+      const response = await hono.request("/api/gateway/v1/budgets");
+
+      const body = (await response.json()) as { data: { scope_reach?: string }[] };
+      expect(body.data[0]?.scope_reach).toBe("unreachable");
+    });
+
     /** @scenario The budget routes take an organization key and hand its caller to the application */
     it("creates a budget after authorizing the key at the organization", async () => {
       const authorizeKeyCaller = vi.fn(async () => ({
@@ -680,6 +735,38 @@ describe("the gateway budget routes behind the key door", () => {
       expect(response.status).toBe(200);
       const body = (await response.json()) as { budget: { spent_usd: string; limit_usd: string } };
       expect(Number(body.budget.spent_usd)).toBeCloseTo(100.14);
+    });
+  });
+
+  describe("when a budget is reset", () => {
+    /** @scenario A budget reset answers with the row it moved, carrying no reach read */
+    it("does not carry scope_reach", async () => {
+      const app = createApiFixture<GatewayApi>({
+        authorizeKeyCaller: async () => ({
+          organizationId: ORGANIZATION_ID,
+          actor: null,
+          actorUserId: "user_1",
+        }),
+        resetBudget: async () => budgetRow(),
+        getBudgetWithHealth: async () => ({
+          budget: budgetRow(),
+          spendAvailable: true,
+          readAt,
+          unreachableByAnyKey: true,
+        }),
+        groupMemberCounts: async () => new Map<string, number>(),
+      });
+      const hono = mountFamily({ app, idempotency: passthroughIdempotency });
+
+      const response = await hono.request("/api/gateway/v1/budgets/bgt_1/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { budget: { scope_reach?: string } };
+      expect(body.budget.scope_reach).toBeUndefined();
     });
   });
 });

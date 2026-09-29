@@ -154,10 +154,13 @@ async function liveBudgetAnswer({
   app,
   id,
   organizationId,
+  includeReach = true,
 }: {
   app: GatewayApi;
   id: string;
   organizationId: string;
+  /** Reset answers with the row it just moved, not a fresh reach read (main's shape). */
+  includeReach?: boolean;
 }): Promise<{ budget: z.infer<typeof gatewayPlatformBudgetDtoSchema>; spend_available: boolean }> {
   const found = await app.getBudgetWithHealth({ id, organizationId });
   const memberCounts = await app.groupMemberCounts([found.budget]);
@@ -166,7 +169,7 @@ async function liveBudgetAnswer({
     budget: toBudgetDto({
       budget: found.budget,
       memberCount: memberCounts.get(found.budget.scopeId),
-      reachable: !found.unreachableByAnyKey,
+      ...(includeReach ? { reachable: !found.unreachableByAnyKey } : {}),
     }),
   };
 }
@@ -552,7 +555,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       permission: "gatewayBudgets:view",
       reach: "caller",
     });
-    const { budgets, spendAvailable } = await app.listBudgetPageWithHealth({
+    const { budgets, spendAvailable, scopeReach } = await app.listBudgetPageWithHealth({
       organizationId,
       limit: input.limit,
       cursor: input.cursor === undefined ? null : decodeCreatedAtIdCursor(input.cursor),
@@ -563,7 +566,11 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return {
       spend_available: spendAvailable,
       data: budgets.map((b) =>
-        toBudgetDto({ budget: b, memberCount: memberCounts.get(b.scopeId) }),
+        toBudgetDto({
+          budget: b,
+          memberCount: memberCounts.get(b.scopeId),
+          reachable: scopeReach.get(b.id)?.reachable,
+        }),
       ),
       next_cursor: buildNextPageCursor(budgets, input.limit, (b) => [
         b.createdAt.epochMilliseconds,
@@ -726,7 +733,12 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       endUserId: input.end_user_id ?? null,
       reason: input.reason ?? null,
     });
-    const { budget } = await liveBudgetAnswer({ app, id: row.id, organizationId });
+    const { budget } = await liveBudgetAnswer({
+      app,
+      id: row.id,
+      organizationId,
+      includeReach: false,
+    });
     return { budget };
   })
 

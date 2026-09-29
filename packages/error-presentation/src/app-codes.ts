@@ -93,6 +93,7 @@ export const APP_ERROR_CODES = [
   "avatar_image_unreadable",
   "avatar_not_found",
   "avatar_rate_limited",
+  "bad_request",
   "batch_run_not_found",
   "billing_currency_unsupported",
   "billing_customer_deleted",
