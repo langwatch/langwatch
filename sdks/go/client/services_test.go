@@ -298,6 +298,134 @@ func TestTriggersService(t *testing.T) {
 			assert.Equal(t, "send_email", triggers[0].Action)
 		})
 	})
+
+	triggerJSON := `{"id":"trig_1","name":"Errors","kind":"ALERT","active":true,"action":"SEND_SLACK_MESSAGE","actionParams":{"slackIntegrationId":"si_1"},"customGraphId":"g_1","graphAlert":{"threshold":5,"operator":"gt","timePeriod":60,"seriesName":"errors"},"report":null,"filters":{},"platformUrl":"https://x","createdAt":"","updatedAt":""}`
+
+	t.Run("given a graph alert to create", func(t *testing.T) {
+		t.Run("when creating", func(t *testing.T) {
+			var mu sync.Mutex
+			var gotBody map[string]any
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/api/triggers", r.URL.Path)
+				raw, _ := io.ReadAll(r.Body)
+				mu.Lock()
+				_ = json.Unmarshal(raw, &gotBody)
+				mu.Unlock()
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(triggerJSON))
+			})
+			tr, err := c.Triggers.Create(context.Background(), CreateTriggerParams{
+				Name:          "Errors",
+				Action:        "SEND_SLACK_MESSAGE",
+				ActionParams:  map[string]any{"slackIntegrationId": "si_1", "slackChannelId": "C1"},
+				AlertType:     "WARNING",
+				CustomGraphID: "g_1",
+				GraphAlert:    &GraphAlert{Threshold: 5, Operator: "gt", TimePeriod: 60, SeriesName: "errors"},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, "ALERT", tr.Kind)
+			require.NotNil(t, tr.GraphAlert)
+			assert.Equal(t, 60, tr.GraphAlert.TimePeriod)
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Equal(t, "g_1", gotBody["customGraphId"])
+			assert.Equal(t, "C1", gotBody["actionParams"].(map[string]any)["slackChannelId"])
+			assert.NotContains(t, gotBody, "report")
+		})
+	})
+
+	t.Run("given an existing trigger", func(t *testing.T) {
+		t.Run("when updating only the name", func(t *testing.T) {
+			var mu sync.Mutex
+			var gotBody map[string]any
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPatch, r.Method)
+				assert.Equal(t, "/api/triggers/trig_1", r.URL.Path)
+				raw, _ := io.ReadAll(r.Body)
+				mu.Lock()
+				_ = json.Unmarshal(raw, &gotBody)
+				mu.Unlock()
+				_, _ = w.Write([]byte(triggerJSON))
+			})
+			name := "Renamed"
+			_, err := c.Triggers.Update(context.Background(), "trig_1", UpdateTriggerParams{Name: &name})
+			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Equal(t, map[string]any{"name": "Renamed"}, gotBody)
+		})
+
+		t.Run("when enabling and disabling", func(t *testing.T) {
+			var mu sync.Mutex
+			var paths []string
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				mu.Lock()
+				paths = append(paths, r.URL.Path)
+				mu.Unlock()
+				_, _ = w.Write([]byte(triggerJSON))
+			})
+			_, err := c.Triggers.Enable(context.Background(), "trig_1")
+			require.NoError(t, err)
+			_, err = c.Triggers.Disable(context.Background(), "trig_1")
+			require.NoError(t, err)
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Equal(t, []string{"/api/triggers/trig_1/enable", "/api/triggers/trig_1/disable"}, paths)
+		})
+
+		t.Run("when test-firing", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Equal(t, "/api/triggers/trig_1/test-fire", r.URL.Path)
+				_, _ = w.Write([]byte(`{"channel":"webhook","recipientCount":1,"usedDefault":true,"missingVariables":[],"errors":["timeout"],"httpStatus":504}`))
+			})
+			res, err := c.Triggers.TestFire(context.Background(), "trig_1")
+			require.NoError(t, err)
+			assert.Equal(t, "webhook", res.Channel)
+			assert.Equal(t, []string{"timeout"}, res.Errors)
+			require.NotNil(t, res.HTTPStatus)
+			assert.Equal(t, 504, *res.HTTPStatus)
+		})
+
+		t.Run("when reading fires page by page", func(t *testing.T) {
+			var mu sync.Mutex
+			var queries []string
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, "/api/triggers/trig_1/fires", r.URL.Path)
+				mu.Lock()
+				queries = append(queries, r.URL.Query().Encode())
+				mu.Unlock()
+				if r.URL.Query().Get("cursor") == "" {
+					_, _ = w.Write([]byte(`{"fires":[{"id":"f_2","triggerId":"trig_1","customGraphId":null,"firedAt":"2026-09-02","resolvedAt":null}],"nextCursor":"c_2"}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"fires":[{"id":"f_1","triggerId":"trig_1","customGraphId":null,"firedAt":"2026-09-01","resolvedAt":"2026-09-01"}],"nextCursor":null}`))
+			})
+			first, err := c.Triggers.Fires(context.Background(), "trig_1", TriggerFiresParams{Limit: 1})
+			require.NoError(t, err)
+			require.NotNil(t, first.NextCursor)
+			second, err := c.Triggers.Fires(context.Background(), "trig_1", TriggerFiresParams{Limit: 1, Cursor: *first.NextCursor})
+			require.NoError(t, err)
+			assert.Nil(t, second.NextCursor)
+			assert.Equal(t, "f_1", second.Fires[0].ID)
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Equal(t, []string{"limit=1", "cursor=c_2&limit=1"}, queries)
+		})
+
+		t.Run("when it does not exist", func(t *testing.T) {
+			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"message":"not found"}`))
+			})
+			tr, err := c.Triggers.Enable(context.Background(), "trig_missing")
+			require.Error(t, err)
+			assert.Nil(t, tr)
+			assert.True(t, IsNotFound(err))
+		})
+	})
 }
 
 func TestMonitorsService(t *testing.T) {
