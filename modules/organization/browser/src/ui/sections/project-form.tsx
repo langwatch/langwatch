@@ -142,6 +142,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
               validate: validateProjectName,
             })}
             placeholder="AI Project"
+            data-testid="project-form-name"
           />
           {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
         </Field.Root>
@@ -180,7 +181,13 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
 
         <HStack width="full">
           <Spacer />
-          <Button colorPalette="orange" type="submit" loading={isLoading} disabled={isLoading}>
+          <Button
+            colorPalette="orange"
+            type="submit"
+            loading={isLoading}
+            disabled={isLoading}
+            data-testid="project-form-submit"
+          >
             Create
           </Button>
         </HStack>

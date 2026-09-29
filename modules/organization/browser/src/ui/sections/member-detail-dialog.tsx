@@ -602,6 +602,7 @@ export function MemberDetailDialog({
             </Button>
             <Button
               colorPalette="blue"
+              data-testid="members-detail-save"
               disabled={!hasChanges}
               loading={isSaving}
               onClick={() => void handleSave()}

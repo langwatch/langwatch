@@ -90,6 +90,7 @@ function ProjectComboboxTrigger({ currentProjectName }: { currentProjectName: st
         <Button
           variant="ghost"
           aria-label="Switch project"
+          data-testid="navigation-project-switcher"
           data-tour="project-switcher"
           fontSize="13px"
           fontWeight="normal"

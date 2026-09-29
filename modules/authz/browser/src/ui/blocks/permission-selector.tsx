@@ -57,6 +57,7 @@ export function PermissionSelector({
                     <Checkbox
                       key={permission}
                       value={permission}
+                      data-testid={`authz-permission-${permission}`}
                       checked={chosen || implied}
                       onChange={() =>
                         onChange(togglePermission({ selected: selectedPermissions, permission }))

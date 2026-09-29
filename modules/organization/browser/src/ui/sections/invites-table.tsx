@@ -158,7 +158,12 @@ const InviteRowActions = ({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <IconButton aria-label="Invite actions" variant="ghost" size="sm">
+        <IconButton
+          aria-label="Invite actions"
+          variant="ghost"
+          size="sm"
+          data-testid="invites-row-actions"
+        >
           <MoreVertical size={16} />
         </IconButton>
       </Menu.Trigger>
@@ -179,7 +184,12 @@ const InviteRowActions = ({
           </Menu.Item>
         )}
         {canResend && (
-          <Menu.Item value="revoke" color="red.500" onClick={() => onRevokeInvite(invite.id)}>
+          <Menu.Item
+            value="revoke"
+            color="red.500"
+            data-testid="invites-row-revoke"
+            onClick={() => onRevokeInvite(invite.id)}
+          >
             <Trash2 size={16} />
             Revoke
           </Menu.Item>

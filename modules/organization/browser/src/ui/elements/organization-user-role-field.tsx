@@ -68,12 +68,16 @@ export function OrganizationUserRoleField({
             }
           }}
         >
-          <Select.Trigger width="200px">
+          <Select.Trigger width="200px" data-testid="members-role-select">
             <Select.ValueText placeholder="Select role" />
           </Select.Trigger>
           <Select.Content width="320px" paddingY={2}>
             {roleOptions.map((option) => (
-              <Select.Item key={option.value} item={option}>
+              <Select.Item
+                key={option.value}
+                item={option}
+                data-testid={`members-role-option-${option.value}`}
+              >
                 <VStack align="start" gap={0} flex={1}>
                   <HStack gap={0}>
                     <Text>{option.label}</Text>

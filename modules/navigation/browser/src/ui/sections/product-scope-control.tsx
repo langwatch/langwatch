@@ -117,6 +117,7 @@ function ProjectMenu({
         <Button
           variant="ghost"
           aria-label="Switch project"
+          data-testid="navigation-project-switcher"
           data-tour="project-switcher"
           fontSize="13px"
           fontWeight="normal"
@@ -156,6 +157,7 @@ function ProjectMenu({
               {team.canCreateProject && (
                 <Menu.Item
                   value={`new-project-${team.teamId}`}
+                  data-testid="navigation-project-new"
                   fontSize="13px"
                   onClick={() => onCreateProjectForTeam({ teamId: team.teamId, orgId: team.orgId })}
                 >

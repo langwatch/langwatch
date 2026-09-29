@@ -287,6 +287,7 @@ function CredentialsAct({
         <Field.Label>Connection name</Field.Label>
         <Input
           placeholder="For example Okta"
+          data-testid="sso-register-name"
           value={form.providerId}
           onChange={(event) => update("providerId")(event.target.value)}
         />
@@ -322,18 +323,24 @@ function OidcFields({
         <Field.Label>Issuer address</Field.Label>
         <Input
           placeholder={preset.issuerExample}
+          data-testid="sso-register-issuer"
           value={form.issuer}
           onChange={(event) => update("issuer")(event.target.value)}
         />
       </Field.Root>
       <Field.Root>
         <Field.Label>Client id</Field.Label>
-        <Input value={form.clientId} onChange={(event) => update("clientId")(event.target.value)} />
+        <Input
+          value={form.clientId}
+          data-testid="sso-register-client-id"
+          onChange={(event) => update("clientId")(event.target.value)}
+        />
       </Field.Root>
       <Field.Root>
         <Field.Label>Client secret</Field.Label>
         <Input
           type="password"
+          data-testid="sso-register-client-secret"
           value={form.clientSecret}
           onChange={(event) => update("clientSecret")(event.target.value)}
         />

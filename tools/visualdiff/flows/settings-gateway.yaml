@@ -1,0 +1,508 @@
+# Settings, auth, gateway flows (lane vf-settings-gateway). Steps click and fill by
+# data-testid; text is only asserted. Names carry {uid}. Journeys not scripted here are
+# listed in .claude/handoffs/vf-settings-gateway.md.
+flows:
+  - id: passkey-offer-after-password-signin
+    title: A password sign-in offers a passkey once, and declining it holds after a reload
+    steps:
+      - action: signIn
+      - action: expect
+        with:
+          testId: secure-account-nudge
+      - action: expect
+        with:
+          text: Sign in faster next time
+      - action: click
+        with:
+          text: Not now
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          testId: secure-account-nudge
+          equals: "0"
+
+  - id: sign-out
+    title: Sign out from the user menu ends the session
+    steps:
+      - action: go
+        with:
+          path: /{slug}
+      - action: click
+        with:
+          testId: app-header-user-menu-trigger
+      - action: click
+        with:
+          testId: app-header-user-menu-logout
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          url: /auth/signin
+
+  - id: api-key-create-copy-revoke
+    title: Mint an API key, prove it authenticates, revoke it and see it refused
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: click
+        with:
+          testId: api-key-create
+      - action: fill
+        with:
+          testId: api-key-name
+          value: vd-key-{uid}
+      - action: click
+        with:
+          testId: api-key-create-submit
+      - action: click
+        with:
+          testId: token-created-tab-bearer
+      - action: click
+        with:
+          testId: token-created-bearer-visibility-toggle
+      - action: capture
+        with:
+          testId: token-created-bearer
+          match: "Bearer\\s+(\\S+)"
+          as: apiKeyToken
+      - action: expect
+        with:
+          api: /api/triggers
+          auth: "{apiKeyToken}"
+          status: "200"
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: click
+        with:
+          label: Revoke API key vd-key-{uid}
+      - action: click
+        with:
+          testId: api-key-revoke-confirm
+      - action: expect
+        with:
+          api: /api/triggers
+          auth: "{apiKeyToken}"
+          status: "401"
+
+  - id: invite-member-and-appears-in-members-list
+    title: Invite a member by email and see the pending invite after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/members
+      - action: click
+        with:
+          testId: members-invite-open
+      - action: fill
+        with:
+          testId: members-invite-emails
+          value: vd-{uid}@mail.langwatch.localhost
+      - action: click
+        with:
+          testId: members-invite-submit
+      - action: go
+        with:
+          path: /settings/members
+      - action: expect
+        with:
+          testId: invite-row
+          hasText: vd-{uid}@mail.langwatch.localhost
+          min: "1"
+
+  - id: invite-revoke
+    title: Revoke a pending invite and see it gone after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/members
+      - action: click
+        with:
+          testId: members-invite-open
+      - action: fill
+        with:
+          testId: members-invite-emails
+          value: vd-revoke-{uid}@mail.langwatch.localhost
+      - action: click
+        with:
+          testId: members-invite-submit
+      - action: go
+        with:
+          path: /settings/members
+      - action: click
+        with:
+          testId: invites-row-actions
+          hasText: vd-revoke-{uid}@mail.langwatch.localhost
+      - action: click
+        with:
+          testId: invites-row-revoke
+      - action: go
+        with:
+          path: /settings/members
+      - action: expect
+        with:
+          text: vd-revoke-{uid}@mail.langwatch.localhost
+          equals: "0"
+
+  - id: model-provider-add-key
+    title: Add a model provider key and see it listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          testId: model-provider-add
+      - action: click
+        with:
+          testId: model-provider-add-option-anthropic
+      - action: fill
+        with:
+          testId: model-provider-credential-ANTHROPIC_API_KEY
+          value: sk-ant-vd-{uid}
+      - action: click
+        with:
+          testId: model-provider-save
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          testId: model-provider-row-anthropic
+          min: "1"
+
+  - id: model-provider-delete
+    title: Delete a model provider from its row menu and see it gone after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          testId: model-provider-add
+      - action: click
+        with:
+          testId: model-provider-add-option-anthropic
+      - action: fill
+        with:
+          testId: model-provider-credential-ANTHROPIC_API_KEY
+          value: sk-ant-vd-{uid}
+      - action: click
+        with:
+          testId: model-provider-save
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          testId: model-provider-row-menu-anthropic
+      - action: click
+        with:
+          testId: model-provider-row-delete
+      - action: click
+        with:
+          testId: model-provider-delete-confirm
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          testId: model-provider-row-anthropic
+          equals: "0"
+
+  - id: project-create
+    title: Create a project from the switcher and see it in the switcher after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /{isolatedSlug}
+      - action: click
+        with:
+          testId: navigation-project-switcher
+      - action: click
+        with:
+          testId: navigation-project-new
+      - action: fill
+        with:
+          testId: project-form-name
+          value: vd-project-{uid}
+      - action: click
+        with:
+          testId: project-form-submit
+      - action: go
+        with:
+          path: /settings/teams
+      - action: expect
+        with:
+          text: vd-project-{uid}
+
+  - id: team-create
+    title: Create a team and see it listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/teams
+      - action: click
+        with:
+          testId: teams-team-new
+      - action: fill
+        with:
+          testId: team-form-name
+          value: vd-team-{uid}
+      - action: click
+        with:
+          testId: team-form-submit
+      - action: go
+        with:
+          path: /settings/teams
+      - action: expect
+        with:
+          text: vd-team-{uid}
+
+  - id: group-create
+    title: Create a manual group and see it listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/groups
+      - action: click
+        with:
+          testId: groups-add-manual
+      - action: fill
+        with:
+          testId: groups-create-name
+          value: vd-group-{uid}
+      - action: click
+        with:
+          testId: groups-create-submit
+      - action: go
+        with:
+          path: /settings/groups
+      - action: expect
+        with:
+          text: vd-group-{uid}
+
+  - id: custom-role-create
+    title: Create a custom role and see it listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/roles
+      - action: click
+        with:
+          testId: authz-role-create
+      - action: fill
+        with:
+          testId: authz-role-name
+          value: vd-role-{uid}
+      - action: click
+        with:
+          testIdPrefix: authz-permission-
+      - action: click
+        with:
+          testId: authz-role-submit
+      - action: go
+        with:
+          path: /settings/roles
+      - action: expect
+        with:
+          text: vd-role-{uid}
+
+  - id: secret-add-and-delete
+    title: Add a secret, never see its value, delete it
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: click
+        with:
+          testId: secret-add
+      - action: fill
+        with:
+          testId: secret-name
+          value: vdsecret{uid}
+      - action: fill
+        with:
+          testId: secret-value
+          value: sv-{uid}
+      - action: click
+        with:
+          testId: secret-save
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: expect
+        with:
+          testId: secret-row
+          hasText: /vdsecret{uid}/i
+          min: "1"
+      - action: expect
+        with:
+          text: sv-{uid}
+          equals: "0"
+      - action: click
+        with:
+          testId: secret-row-actions
+          hasText: /vdsecret{uid}/i
+      - action: click
+        with:
+          testId: secret-row-delete
+      - action: click
+        with:
+          testId: secret-delete-confirm
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: expect
+        with:
+          testId: secret-row
+          hasText: /vdsecret{uid}/i
+          equals: "0"
+
+  - id: gateway-virtual-key-create-reveal-revoke
+    title: Create a virtual key, reveal its secret once, revoke it and see its menu gone
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: click
+        with:
+          testId: gateway-virtual-key-new
+      - action: fill
+        with:
+          testId: gateway-virtual-key-name
+          value: vk-{uid}
+      - action: click
+        with:
+          testId: gateway-virtual-key-create-submit
+      - action: click
+        with:
+          testId: gateway-virtual-key-secret-reveal
+      - action: capture
+        with:
+          testId: gateway-virtual-key-secret
+          as: vkSecret
+      - action: click
+        with:
+          testId: gateway-virtual-key-secret-confirm
+      - action: click
+        with:
+          testId: gateway-virtual-key-secret-close
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys
+          contains: vk-{uid}
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: click
+        with:
+          label: Actions for vk-{uid}
+      - action: click
+        with:
+          testId: gateway-virtual-key-row-revoke
+      - action: click
+        with:
+          text: Revoke key
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: expect
+        with:
+          label: Actions for vk-{uid}
+          equals: "0"
+
+  - id: gateway-budget-create
+    title: Create a budget and see it in the budgets API and list
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: click
+        with:
+          testId: gateway-budget-new
+      - action: fill
+        with:
+          testId: gateway-budget-name
+          value: budget-{uid}
+      - action: fill
+        with:
+          testId: gateway-budget-limit
+          value: "25"
+      - action: click
+        with:
+          testId: gateway-budget-create-submit
+      - action: expect
+        with:
+          api: /api/gateway/v1/budgets
+          contains: budget-{uid}
+      - action: go
+        with:
+          path: /gateway/budgets
+      - action: expect
+        with:
+          text: budget-{uid}
+
+  - id: gateway-webhook-create
+    title: Create a webhook endpoint and see it listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: https://example.com/vd-{uid}
+      - action: click
+        with:
+          testId: webhook-save
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          text: example.com/vd-{uid}
+
+  - id: gateway-routing-policy-create
+    title: Create a routing policy and see it listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: click
+        with:
+          testId: gateway-routing-policy-new
+      - action: fill
+        with:
+          testId: gateway-routing-policy-name
+          value: policy-{uid}
+      - action: click
+        with:
+          testId: gateway-routing-policy-submit
+      - action: go
+        with:
+          path: /gateway/routing-policies
+      - action: expect
+        with:
+          text: policy-{uid}

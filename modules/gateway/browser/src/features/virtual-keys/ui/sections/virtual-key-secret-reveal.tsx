@@ -128,11 +128,18 @@ export function VirtualKeySecretReveal({
                 gap={2}
               >
                 <Box flex={1} overflowX="auto">
-                  <Code fontSize="sm" bg="transparent" paddingX={0} whiteSpace="nowrap">
+                  <Code
+                    fontSize="sm"
+                    bg="transparent"
+                    paddingX={0}
+                    whiteSpace="nowrap"
+                    data-testid="gateway-virtual-key-secret"
+                  >
                     {revealed ? secret : maskSecret(secret)}
                   </Code>
                 </Box>
                 <IconButton
+                  data-testid="gateway-virtual-key-secret-reveal"
                   aria-label={revealed ? "Hide secret" : "Reveal secret"}
                   variant="ghost"
                   size="sm"
@@ -156,6 +163,7 @@ export function VirtualKeySecretReveal({
               <input
                 type="checkbox"
                 id="vk-secret-confirm"
+                data-testid="gateway-virtual-key-secret-confirm"
                 checked={confirmed}
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
@@ -164,7 +172,12 @@ export function VirtualKeySecretReveal({
               </label>
             </HStack>
             <Box flex={1} />
-            <Button colorPalette="orange" onClick={close} disabled={!confirmed}>
+            <Button
+              colorPalette="orange"
+              data-testid="gateway-virtual-key-secret-close"
+              onClick={close}
+              disabled={!confirmed}
+            >
               Close
             </Button>
           </HStack>

@@ -69,6 +69,7 @@ export function CopyInput(
         cursor="pointer"
         type={isSecure && !visible ? "password" : "text"}
         value={props.value}
+        data-testid={`copy-input-${props.label.toLowerCase().replaceAll(" ", "-")}`}
         readOnly
         style={{ paddingRight: isSecure ? "4rem" : "2rem" }}
         _hover={{ backgroundColor: "bg.subtle" }}

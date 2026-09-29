@@ -23,13 +23,19 @@ export function RoutingPolicyRowActions({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button size="xs" variant="ghost" aria-label={`Actions for ${policyName}`}>
+        <Button
+          size="xs"
+          variant="ghost"
+          aria-label={`Actions for ${policyName}`}
+          data-testid="gateway-routing-policy-row-actions"
+        >
           <MoreVertical size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
         <Menu.Item
           value="edit"
+          data-testid="gateway-routing-policy-row-edit"
           onClick={(event) => {
             event.stopPropagation();
             onEdit();
@@ -40,6 +46,7 @@ export function RoutingPolicyRowActions({
         {!isDefault && (
           <Menu.Item
             value="set-default"
+            data-testid="gateway-routing-policy-row-default"
             onClick={(event) => {
               event.stopPropagation();
               onSetDefault();
@@ -50,6 +57,7 @@ export function RoutingPolicyRowActions({
         )}
         <Menu.Item
           value="delete"
+          data-testid="gateway-routing-policy-row-delete"
           color="red.500"
           onClick={(event) => {
             event.stopPropagation();

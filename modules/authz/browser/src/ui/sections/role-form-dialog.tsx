@@ -84,6 +84,7 @@ export function RoleFormDialog({
                 <Input
                   {...register("name", { required: "Role name is required" })}
                   placeholder="e.g., Data Analyst"
+                  data-testid="authz-role-name"
                 />
                 {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
               </Field.Root>
@@ -118,7 +119,13 @@ export function RoleFormDialog({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" form="role-form" colorPalette="orange" loading={isSubmitting}>
+          <Button
+            type="submit"
+            form="role-form"
+            colorPalette="orange"
+            loading={isSubmitting}
+            data-testid="authz-role-submit"
+          >
             {submitLabel}
           </Button>
         </Dialog.Footer>

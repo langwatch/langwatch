@@ -88,7 +88,12 @@ export function RoutingPoliciesTable({
               </VStack>
               <Spacer />
               {canManage && (
-                <Button size="sm" variant="outline" onClick={() => onNew(level)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="gateway-routing-policy-new"
+                  onClick={() => onNew(level)}
+                >
                   <Plus size={14} /> New policy
                 </Button>
               )}

@@ -394,6 +394,7 @@ function ProviderNameField({
           placeholder={provider.provider}
           width="full"
           maxLength={128}
+          data-testid="model-provider-name"
         />
       </Box>
       <Field.HelperText>
@@ -618,6 +619,7 @@ function SaveProviderButton({
           size="sm"
           colorPalette="orange"
           disabled={!canResolveTarget || !isDirty || isBusy || guided.connected}
+          data-testid="model-provider-save"
           onClick={onSave}
         >
           {guidedSaveLabel({ connected: guided.connected, isBusy, label })}
@@ -633,6 +635,7 @@ function SaveProviderButton({
         colorPalette="orange"
         loading={isBusy}
         disabled={!canResolveTarget || !isDirty}
+        data-testid="model-provider-save"
         onClick={onSave}
       >
         {label}

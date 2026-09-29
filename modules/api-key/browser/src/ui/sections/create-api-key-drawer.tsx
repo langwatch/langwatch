@@ -346,6 +346,7 @@ export function CreateApiKeyDrawer({
               </Text>
               <Input
                 placeholder="e.g., CI Pipeline, Local Dev"
+                data-testid="api-key-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -482,7 +483,12 @@ export function CreateApiKeyDrawer({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button colorPalette="blue" onClick={handleCreate} disabled={!canCreate}>
+            <Button
+              colorPalette="blue"
+              onClick={handleCreate}
+              disabled={!canCreate}
+              data-testid="api-key-create-submit"
+            >
               Create secret key
             </Button>
           </HStack>

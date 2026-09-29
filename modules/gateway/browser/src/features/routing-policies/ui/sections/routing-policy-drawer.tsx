@@ -133,7 +133,12 @@ export function RoutingPolicyDrawer({
               <SaveError isEditing={isEditing} message={saveError} onDismiss={clearSaveError} />
             )}
             <HStack justifyContent="flex-end" width="full">
-              <Button onClick={onSubmit} loading={isSaving} disabled={!canSave}>
+              <Button
+                data-testid="gateway-routing-policy-submit"
+                onClick={onSubmit}
+                loading={isSaving}
+                disabled={!canSave}
+              >
                 {isEditing ? "Save changes" : "Create policy"}
               </Button>
             </HStack>
@@ -175,7 +180,11 @@ function DrawerBody({
     <VStack align="stretch" gap={5}>
       <Field.Root required>
         <Field.Label>Name</Field.Label>
-        <Input placeholder="Developer default" {...register("name")} />
+        <Input
+          placeholder="Developer default"
+          data-testid="gateway-routing-policy-name"
+          {...register("name")}
+        />
       </Field.Root>
 
       <Field.Root>

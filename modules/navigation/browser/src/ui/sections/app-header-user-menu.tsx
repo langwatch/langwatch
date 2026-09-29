@@ -74,6 +74,7 @@ export function AppHeaderUserMenu() {
           height="auto"
           borderRadius="full"
           aria-label={userMenuLabel(user)}
+          data-testid="app-header-user-menu-trigger"
         >
           <UserAvatar
             name={user?.name ?? void 0}
@@ -159,7 +160,11 @@ export function AppHeaderUserMenu() {
                 </Menu.Root>
               )}
               {accountMenu?.trailing}
-              <Menu.Item value="logout" onSelect={() => host.signOut()}>
+              <Menu.Item
+                value="logout"
+                onSelect={() => host.signOut()}
+                data-testid="app-header-user-menu-logout"
+              >
                 Logout
               </Menu.Item>
             </Menu.ItemGroup>

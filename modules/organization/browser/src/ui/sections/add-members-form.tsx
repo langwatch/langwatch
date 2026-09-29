@@ -234,6 +234,7 @@ export function AddMembersForm({
             <Field.Label>Email addresses</Field.Label>
             <Input
               placeholder="alice@example.com, bob@example.com"
+              data-testid="members-invite-emails"
               // When the drawer was opened from the inline invite box, land focus
               // on the email field so typing continues seamlessly.
 
@@ -394,7 +395,12 @@ export function AddMembersForm({
           <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
             {onCloseText}
           </Button>
-          <Button colorPalette={isLoading ? "gray" : "orange"} type="submit" disabled={isLoading}>
+          <Button
+            colorPalette={isLoading ? "gray" : "orange"}
+            type="submit"
+            disabled={isLoading}
+            data-testid="members-invite-submit"
+          >
             <HStack>
               {isLoading ? <Spinner size="sm" /> : <Mail size={18} />}
               <Text>{hasEmailProvider ? "Send invites" : "Create invites"}</Text>

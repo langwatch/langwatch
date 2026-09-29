@@ -171,6 +171,7 @@ export default function GroupsScreen() {
                                 variant="ghost"
                                 size="xs"
                                 aria-label={`Actions for ${g.name}`}
+                                data-testid="groups-row-actions"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <MoreVertical size={16} />
@@ -216,7 +217,11 @@ export default function GroupsScreen() {
                       color="fg.muted"
                     >
                       <Table.Cell colSpan={5}>
-                        <chakra.button type="button" cursor="pointer">
+                        <chakra.button
+                          type="button"
+                          cursor="pointer"
+                          data-testid="groups-add-manual"
+                        >
                           <HStack gap={2}>
                             <Plus size={14} />
                             <Text fontSize="sm">Add manual group</Text>

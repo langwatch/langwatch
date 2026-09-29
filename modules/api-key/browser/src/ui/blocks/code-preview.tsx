@@ -27,6 +27,7 @@ interface CodePreviewProps {
    * snippet carries a secret pass the real text here.
    */
   copyText?: string;
+  testId?: string;
 }
 
 export function CodePreview({
@@ -36,6 +37,7 @@ export function CodePreview({
   sensitiveValue,
   enableVisibilityToggle,
   copyText,
+  testId,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const [isVisible, setIsVisible] = useState(false);
@@ -63,6 +65,7 @@ export function CodePreview({
             size="sm"
             colorPalette="orange"
             code={displayCode}
+            data-testid={testId}
             language={chakraLanguage}
             meta={{ colorScheme: colorMode }}
             transition="all 0.3s ease"
@@ -91,6 +94,7 @@ export function CodePreview({
                       variant="ghost"
                       onClick={() => setIsVisible((previous) => !previous)}
                       aria-label={isVisible ? "Hide sensitive values" : "Show sensitive values"}
+                      data-testid={testId ? `${testId}-visibility-toggle` : undefined}
                     >
                       {isVisible ? <EyeOff /> : <Eye />}
                     </IconButton>

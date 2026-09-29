@@ -113,6 +113,7 @@ export function CreateGroupDialog({
           <VStack gap={5} align="stretch">
             <Input
               placeholder="Group name"
+              data-testid="groups-create-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -242,6 +243,7 @@ export function CreateGroupDialog({
           </Button>
           <Button
             colorPalette="blue"
+            data-testid="groups-create-submit"
             disabled={!name.trim()}
             loading={createGroup.isPending}
             onClick={() => void handleCreate()}

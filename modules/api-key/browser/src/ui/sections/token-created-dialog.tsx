@@ -232,6 +232,7 @@ export function TokenCreatedDialog({
                       label="Bearer"
                       active={codeTab === "bearer"}
                       onClick={() => setCodeTab("bearer")}
+                      testId="token-created-tab-bearer"
                     />
                     <TabButton
                       label="Basic Auth"
@@ -294,6 +295,7 @@ export function TokenCreatedDialog({
                     codeLanguage="shellscript"
                     sensitiveValue={newToken}
                     enableVisibilityToggle
+                    testId="token-created-bearer"
                   />
                 </VStack>
               )}

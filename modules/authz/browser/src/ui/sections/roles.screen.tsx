@@ -201,7 +201,11 @@ function RolesManagement({ organizationId, host }: { organizationId: string; hos
           content="You need organization:manage permissions to create roles."
           disabled={canManage}
         >
-          <PageLayout.HeaderButton onClick={onOpen} disabled={!canManage}>
+          <PageLayout.HeaderButton
+            onClick={onOpen}
+            disabled={!canManage}
+            data-testid="authz-role-create"
+          >
             <Plus size={16} /> Create Role
           </PageLayout.HeaderButton>
         </Tooltip>

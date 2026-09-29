@@ -198,7 +198,12 @@ function BudgetsPage() {
           <PageLayout.Heading>Budgets</PageLayout.Heading>
           <Spacer />
           {canCreate && (
-            <Button colorPalette="orange" size="sm" onClick={() => setCreateOpen(true)}>
+            <Button
+              colorPalette="orange"
+              size="sm"
+              data-testid="gateway-budget-new"
+              onClick={() => setCreateOpen(true)}
+            >
               <Plus size={14} /> New budget
             </Button>
           )}

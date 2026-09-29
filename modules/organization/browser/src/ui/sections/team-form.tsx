@@ -268,6 +268,7 @@ export const TeamForm = ({
             <Input
               width="full"
               type="text"
+              data-testid="team-form-name"
               {...register("name", {
                 required: true,
                 validate: (value) => value.trim().length > 0,
@@ -382,7 +383,12 @@ export const TeamForm = ({
         {!team && (
           <HStack width="full">
             <Spacer />
-            <Button type="submit" colorPalette="orange" loading={isLoading}>
+            <Button
+              type="submit"
+              colorPalette="orange"
+              loading={isLoading}
+              data-testid="team-form-submit"
+            >
               Create
             </Button>
           </HStack>

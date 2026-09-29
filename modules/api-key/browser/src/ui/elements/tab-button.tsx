@@ -7,16 +7,19 @@ export function TabButton({
   label,
   active,
   onClick,
+  testId,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
+  testId?: string;
 }): React.ReactElement {
   return (
     <Button
       size="sm"
       variant="ghost"
       onClick={onClick}
+      data-testid={testId}
       borderRadius="lg"
       px={5}
       py={1.5}

@@ -314,7 +314,10 @@ function MembersList({
                   openDrawer("inviteMember", email ? { initialEmail: email } : undefined)
                 }
               />
-              <PageLayout.HeaderButton onClick={() => openDrawer("inviteMember")}>
+              <PageLayout.HeaderButton
+                onClick={() => openDrawer("inviteMember")}
+                data-testid="members-invite-open"
+              >
                 <Plus size={20} />
                 Invite people
               </PageLayout.HeaderButton>
@@ -505,7 +508,7 @@ function MemberRow({
   onDelete: ComponentProps<typeof MemberRowActions>["onDelete"];
 }) {
   return (
-    <Table.Row key={member.userId}>
+    <Table.Row key={member.userId} data-testid="member-row">
       <Table.Cell>
         <RandomColorAvatar size="2xs" name={member.user.name ?? ""} image={member.user.image} />
       </Table.Cell>
@@ -626,6 +629,7 @@ function MemberRowActions({
           size="xs"
           variant="ghost"
           aria-label={`Actions for ${member.user.name ?? member.user.email ?? "this member"}`}
+          data-testid="members-row-actions"
         >
           <MoreVertical size={16} />
         </Button>
@@ -633,6 +637,7 @@ function MemberRowActions({
       <Menu.Content>
         <Menu.Item
           value="edit"
+          data-testid="members-row-edit"
           onClick={() =>
             onEdit({
               userId: member.userId,
@@ -649,18 +654,31 @@ function MemberRowActions({
         </Menu.Item>
         {canDisable &&
           (member.disabledAt ? (
-            <Menu.Item value="enable" onClick={() => onSetDisabled(member.userId, false)}>
+            <Menu.Item
+              value="enable"
+              data-testid="members-row-enable"
+              onClick={() => onSetDisabled(member.userId, false)}
+            >
               <Undo2 size={16} />
               Enable
             </Menu.Item>
           ) : (
-            <Menu.Item value="disable" onClick={() => onSetDisabled(member.userId, true)}>
+            <Menu.Item
+              value="disable"
+              data-testid="members-row-disable"
+              onClick={() => onSetDisabled(member.userId, true)}
+            >
               <Ban size={16} />
               Disable
             </Menu.Item>
           ))}
         {canDelete && (
-          <Menu.Item value="delete" color="red.500" onClick={() => onDelete(member.userId)}>
+          <Menu.Item
+            value="delete"
+            color="red.500"
+            data-testid="members-row-delete"
+            onClick={() => onDelete(member.userId)}
+          >
             <Trash2 size={16} />
             Delete
           </Menu.Item>

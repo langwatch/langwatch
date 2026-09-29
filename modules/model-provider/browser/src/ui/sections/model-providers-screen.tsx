@@ -102,7 +102,7 @@ function ProviderRow({
   const isSystem = provider.isSystem === true;
 
   return (
-    <Table.Row>
+    <Table.Row data-testid={`model-provider-row-${provider.provider}`}>
       <Table.Cell>
         <HStack gap={3} align="center">
           <Box width="24px" height="24px">
@@ -130,7 +130,12 @@ function ProviderRow({
             <Tooltip content={rowActionsDisabledReason ?? ""} disabled={!rowActionsDisabledReason}>
               <TriggerAnchor>
                 <Menu.Trigger asChild>
-                  <Button variant="ghost" disabled={!!rowActionsDisabledReason}>
+                  <Button
+                    variant="ghost"
+                    disabled={!!rowActionsDisabledReason}
+                    data-testid={`model-provider-row-menu-${provider.provider}`}
+                    aria-label={`Actions for ${provider.name}`}
+                  >
                     <MoreVertical />
                   </Button>
                 </Menu.Trigger>
@@ -140,6 +145,7 @@ function ProviderRow({
               <Menu.Content>
                 <Menu.Item
                   value="edit"
+                  data-testid="model-provider-row-edit"
                   onClick={(event) => {
                     event.stopPropagation();
                     onEdit({ providerKey: provider.provider, modelProviderId: provider.id });
@@ -152,6 +158,7 @@ function ProviderRow({
                 </Menu.Item>
                 <Menu.Item
                   value="test"
+                  data-testid="model-provider-row-test"
                   disabled={!provider.id}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -167,6 +174,7 @@ function ProviderRow({
                 <Menu.Item
                   value="delete"
                   color="red"
+                  data-testid="model-provider-row-delete"
                   onClick={(event) => {
                     event.stopPropagation();
                     onDelete({
@@ -458,7 +466,10 @@ export default function ModelProvidersScreen() {
           disabledReason={addProviderDisabledReason}
           onPick={(providerKey) => openProviderEditor({ providerKey, modelProviderId: "new" })}
         >
-          <PageLayout.HeaderButton disabled={!!addProviderDisabledReason}>
+          <PageLayout.HeaderButton
+            disabled={!!addProviderDisabledReason}
+            data-testid="model-provider-add"
+          >
             <Plus /> Add Model Provider
           </PageLayout.HeaderButton>
         </AddModelProviderMenu>
@@ -518,6 +529,7 @@ export default function ModelProvidersScreen() {
             </Dialog.ActionTrigger>
             <Button
               colorPalette="red"
+              data-testid="model-provider-delete-confirm"
               loading={deleteMutation.isPending}
               onClick={async () => {
                 if (!providerToDelete) return;
@@ -625,6 +637,7 @@ function AddModelProviderMenu({
           <Menu.Item
             key={provider.provider}
             value={provider.provider}
+            data-testid={`model-provider-add-option-${provider.provider}`}
             onClick={() => onPick(provider.provider)}
           >
             <HStack gap={3}>

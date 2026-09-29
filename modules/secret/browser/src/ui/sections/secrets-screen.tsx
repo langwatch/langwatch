@@ -84,7 +84,7 @@ function SecretRow({
   onDelete: (picked: PickedSecret) => void;
 }) {
   return (
-    <Table.Row>
+    <Table.Row data-testid="secret-row">
       <Table.Cell>
         <Text fontFamily="mono">{secret.name}</Text>
       </Table.Cell>
@@ -98,13 +98,19 @@ function SecretRow({
         {canManage && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button variant="ghost" size="sm" aria-label={`Actions for ${secret.name}`}>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Actions for ${secret.name}`}
+                data-testid="secret-row-actions"
+              >
                 <MoreVertical />
               </Button>
             </Menu.Trigger>
             <Menu.Content>
               <Menu.Item
                 value="update"
+                data-testid="secret-row-update"
                 onClick={() => onUpdate({ id: secret.id, name: secret.name })}
               >
                 <Box display="flex" alignItems="center" gap={2}>
@@ -115,6 +121,7 @@ function SecretRow({
               <Menu.Item
                 value="delete"
                 color="red"
+                data-testid="secret-row-delete"
                 onClick={() => onDelete({ id: secret.id, name: secret.name })}
               >
                 <Box display="flex" alignItems="center" gap={2}>
@@ -214,7 +221,10 @@ export default function SecretsScreen() {
         {host.projectSwitcher()}
         {canManageSecrets && (
           <Tooltip content="Add a new secret for use in code blocks" disabled={false}>
-            <PageLayout.HeaderButton onClick={() => setIsAddDialogOpen(true)}>
+            <PageLayout.HeaderButton
+              onClick={() => setIsAddDialogOpen(true)}
+              data-testid="secret-add"
+            >
               <Plus /> Add Secret
             </PageLayout.HeaderButton>
           </Tooltip>
@@ -287,6 +297,7 @@ export default function SecretsScreen() {
                 <Text fontWeight="medium">Name</Text>
                 <Input
                   placeholder="e.g., OPENAI_API_KEY"
+                  data-testid="secret-name"
                   value={newSecretName}
                   onChange={(e) => setNewSecretName(normaliseSecretName(e.target.value))}
                 />
@@ -298,6 +309,7 @@ export default function SecretsScreen() {
                 <Input
                   type="password"
                   placeholder="Enter secret value"
+                  data-testid="secret-value"
                   value={newSecretValue}
                   onChange={(e) => setNewSecretValue(e.target.value)}
                 />
@@ -312,6 +324,7 @@ export default function SecretsScreen() {
               colorPalette="blue"
               loading={createMutation.isPending}
               disabled={!newSecretName || !newSecretValue}
+              data-testid="secret-save"
               onClick={() => void handleCreate()}
             >
               Save
@@ -342,6 +355,7 @@ export default function SecretsScreen() {
             <Button
               colorPalette="red"
               loading={deleteMutation.isPending}
+              data-testid="secret-delete-confirm"
               onClick={() => void handleDelete()}
             >
               Delete
@@ -371,6 +385,7 @@ export default function SecretsScreen() {
               <Input
                 type="password"
                 placeholder="Enter new secret value"
+                data-testid="secret-update-value"
                 value={updateValue}
                 onChange={(e) => setUpdateValue(e.target.value)}
               />
@@ -384,6 +399,7 @@ export default function SecretsScreen() {
               colorPalette="blue"
               loading={updateMutation.isPending}
               disabled={!updateValue}
+              data-testid="secret-update-save"
               onClick={() => void handleUpdate()}
             >
               Save

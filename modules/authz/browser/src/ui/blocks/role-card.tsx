@@ -72,6 +72,7 @@ export function RoleCard({
               variant="ghost"
               colorPalette="orange"
               aria-label={`Edit ${name}`}
+              data-testid="authz-role-edit"
               onClick={(event) => {
                 event.stopPropagation();
                 onEdit();
@@ -87,6 +88,7 @@ export function RoleCard({
               variant="ghost"
               colorPalette="red"
               aria-label={`Delete ${name}`}
+              data-testid="authz-role-delete"
               onClick={(event) => {
                 event.stopPropagation();
                 onDelete();

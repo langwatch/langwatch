@@ -71,6 +71,7 @@ const CredentialField = ({
           // The label above is a styled Text, not a real label element,
           // so the field carries its own accessible name.
           aria-label={credentialKey}
+          data-testid={`model-provider-credential-${credentialKey}`}
           autoComplete="off"
           placeholder={isOptional ? "optional" : undefined}
           width="full"

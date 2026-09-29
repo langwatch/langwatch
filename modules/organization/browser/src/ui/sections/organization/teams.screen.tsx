@@ -1053,13 +1053,19 @@ export default function TeamsScreen() {
         </Box>
         <Spacer />
         {hasPermission("project:create") && (
-          <PageLayout.HeaderButton onClick={() => openDrawer("createProject")}>
+          <PageLayout.HeaderButton
+            onClick={() => openDrawer("createProject")}
+            data-testid="teams-project-add"
+          >
             <Plus size={16} />
             Add project
           </PageLayout.HeaderButton>
         )}
         {canManage && (
-          <PageLayout.HeaderButton onClick={() => openDrawer("createTeam")}>
+          <PageLayout.HeaderButton
+            onClick={() => openDrawer("createTeam")}
+            data-testid="teams-team-new"
+          >
             <Plus size={16} />
             New team
           </PageLayout.HeaderButton>

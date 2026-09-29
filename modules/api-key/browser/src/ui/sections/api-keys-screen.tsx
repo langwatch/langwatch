@@ -328,6 +328,7 @@ function ApiKeyTableRow({
               size="xs"
               variant="ghost"
               aria-label={`Edit API key ${apiKey.name}`}
+              data-testid="api-key-edit"
               onClick={() => onEdit(apiKey)}
             >
               <Pencil size={14} />
@@ -337,6 +338,7 @@ function ApiKeyTableRow({
               variant="ghost"
               colorPalette="red"
               aria-label={`Revoke API key ${apiKey.name}`}
+              data-testid="api-key-revoke"
               onClick={() => onRevoke(apiKey.id)}
             >
               <Trash2 size={14} aria-hidden="true" />
@@ -618,7 +620,7 @@ export default function ApiKeysScreen() {
               currentTeamId={scope.teamId}
               currentProjectId={scope.projectId}
             />
-            <PageLayout.HeaderButton onClick={onCreateOpen}>
+            <PageLayout.HeaderButton onClick={onCreateOpen} data-testid="api-key-create">
               <Plus size={16} />
               Create new secret key
             </PageLayout.HeaderButton>

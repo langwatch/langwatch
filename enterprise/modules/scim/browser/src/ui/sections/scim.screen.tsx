@@ -148,7 +148,7 @@ export function ScimSettingsContent({
         <HStack width="full">
           <Heading size="md">Bearer Tokens</Heading>
           <Spacer />
-          <Button size="sm" onClick={onGenerateOpen}>
+          <Button size="sm" onClick={onGenerateOpen} data-testid="scim-generate-open">
             <Plus size={16} />
             Generate Token
           </Button>
@@ -215,6 +215,7 @@ export function ScimSettingsContent({
                         size="xs"
                         variant="ghost"
                         colorPalette="red"
+                        data-testid="scim-token-revoke"
                         onClick={() => setTokenToRevoke(token.id)}
                       >
                         <Trash2 size={14} />
@@ -269,6 +270,7 @@ export function ScimSettingsContent({
                   <NativeSelect.Root>
                     <NativeSelect.Field
                       aria-label="Connection"
+                      data-testid="scim-connection-select"
                       value={chosenConnectionId}
                       onChange={(event) => setConnectionId(event.target.value)}
                     >
@@ -303,6 +305,7 @@ export function ScimSettingsContent({
                 </Text>
                 <Input
                   placeholder="e.g., Okta SCIM integration"
+                  data-testid="scim-token-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
@@ -311,6 +314,7 @@ export function ScimSettingsContent({
                 width="full"
                 onClick={handleGenerate}
                 disabled={generateMutation.isPending || !chosenConnectionId}
+                data-testid="scim-generate-submit"
               >
                 Generate Token
               </Button>
@@ -384,6 +388,7 @@ export function ScimSettingsContent({
                   colorPalette="red"
                   onClick={() => tokenToRevoke && handleRevoke(tokenToRevoke)}
                   disabled={revokeMutation.isPending}
+                  data-testid="scim-token-revoke-confirm"
                 >
                   Revoke
                 </Button>

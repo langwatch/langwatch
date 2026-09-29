@@ -558,6 +558,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
                 />
               </Field.Label>
               <Input
+                data-testid="gateway-budget-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Engineering monthly $1k cap"
@@ -661,6 +662,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
                   />
                 </Field.Label>
                 <Input
+                  data-testid="gateway-budget-limit"
                   value={limitUsd}
                   onChange={(e) => setLimitUsd(e.target.value)}
                   placeholder="1000.00"
@@ -717,6 +719,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
             </Button>
             <Button
               colorPalette="orange"
+              data-testid="gateway-budget-create-submit"
               onClick={() => void submit()}
               loading={createMutation.isPending}
               disabled={!name || !limitUsd}

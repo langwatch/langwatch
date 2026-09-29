@@ -218,7 +218,12 @@ function VirtualKeysPage() {
           <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
           <Spacer />
           {canCreate && (
-            <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="gateway-virtual-key-new"
+              onClick={() => setCreateOpen(true)}
+            >
               <Plus size={14} /> New virtual key
             </Button>
           )}
@@ -549,7 +554,12 @@ function VirtualKeyTableRow({
         {vk.status !== "revoked" && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button variant="ghost" size="xs" aria-label="Actions">
+              <Button
+                variant="ghost"
+                size="xs"
+                aria-label={`Actions for ${vk.name}`}
+                data-testid="gateway-virtual-key-row-actions"
+              >
                 <MoreVertical size={14} />
               </Button>
             </Menu.Trigger>
@@ -575,17 +585,25 @@ function VirtualKeyTableRow({
                   key to be live. Its detail page has
                   the Enable button. */}
               {canUpdate && vk.status === "active" && (
-                <Menu.Item value="edit" onClick={onEdit}>
+                <Menu.Item value="edit" data-testid="gateway-virtual-key-row-edit" onClick={onEdit}>
                   <Pencil size={14} /> Edit
                 </Menu.Item>
               )}
               {canRotate && vk.status === "active" && (
-                <Menu.Item value="rotate" onClick={onRotate}>
+                <Menu.Item
+                  value="rotate"
+                  data-testid="gateway-virtual-key-row-rotate"
+                  onClick={onRotate}
+                >
                   <RotateCw size={14} /> Rotate secret
                 </Menu.Item>
               )}
               {canRevoke && (
-                <Menu.Item value="revoke" onClick={onRevoke}>
+                <Menu.Item
+                  value="revoke"
+                  data-testid="gateway-virtual-key-row-revoke"
+                  onClick={onRevoke}
+                >
                   <Trash2 size={14} /> Revoke
                 </Menu.Item>
               )}

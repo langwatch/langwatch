@@ -46,6 +46,7 @@ export function RevokeConfirmDialog({
                 colorPalette="red"
                 onClick={() => apiKeyId && onConfirm(apiKeyId)}
                 disabled={isRevoking}
+                data-testid="api-key-revoke-confirm"
               >
                 Revoke
               </Button>

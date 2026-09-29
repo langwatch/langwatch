@@ -384,6 +384,7 @@ export function VirtualKeyCreateDrawer({
                 />
               </Field.Label>
               <Input
+                data-testid="gateway-virtual-key-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. codex-prod"
@@ -477,6 +478,7 @@ export function VirtualKeyCreateDrawer({
             ) : (
               <Button
                 colorPalette="orange"
+                data-testid="gateway-virtual-key-create-submit"
                 onClick={handleSubmit}
                 loading={createMutation.isPending}
               >
