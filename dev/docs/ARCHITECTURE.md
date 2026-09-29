@@ -1801,6 +1801,12 @@ peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing is told through its Api, by §9's
 subscriber on the owner's pipeline (Alex, 2026-09-28).
 
+**Usage warnings: entitlement decides, billing only sends** (Alex, 2026-09-29). Entitlement counts
+the month once per project in the organization's meter and decides the crossed threshold;
+`BillingApi.sendUsageWarning` receives that decision with the per-project counts, and billing
+resolves the admins and project names, sends once per threshold a month and records it. Billing
+counts no usage and holds no `TraceApi` peer for it.
+
 **Enterprise scim owns the directory-sync state** (`ScimSyncState`, its `scim-sync` pipeline,
 guards and ledger); identity keeps none of it, and `ScimApp` builds the sync lifecycle over its
 own rows (Alex, 2026-09-28).

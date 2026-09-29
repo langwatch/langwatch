@@ -295,6 +295,19 @@ Feature: Billing a connected self-hosted customer
     When the monthly statement runs again
     Then no second statement is sent
 
+  @unit
+  Scenario: The monthly statement is mailed to the billing contact
+    Given billing is composed with the deployment's mail
+    When the monthly statement for August 2026 runs for "ACME"
+    Then the billing contact of "ACME" is mailed one statement named "August 2026"
+    And the month is recorded as sent
+
+  @unit
+  Scenario: A statement whose mail fails is not recorded as sent
+    Given the mail provider refuses the statement for "ACME"
+    When the monthly statement runs
+    Then the run counts one failure and the month is not recorded, so the next tick sends it
+
   # ============================================================================
   # Backoffice
   # ============================================================================

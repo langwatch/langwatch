@@ -33,6 +33,7 @@ import {
   type SubscriptionPlanInput,
   type BillingPricingModel,
   type USAGE_UNKNOWN,
+  type UsageWarningDecision,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
@@ -44,8 +45,7 @@ import { NotificationService as NotificationApi } from "@langwatch/notification-
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { Temporal, type Instant } from "@langwatch/time";
-import { TraceApi } from "@langwatch/trace-contract";
+import { fromDate, Temporal, type Instant } from "@langwatch/time";
 import Stripe from "stripe";
 
 import { billingSubscriptionNotifierChannels } from "../channels/billing-subscription-notifier-channels.registry.ts";
@@ -53,6 +53,7 @@ import type { BillingSubscriptionNotifier } from "../channels/billing-subscripti
 import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import { connectedInvoicingChannels } from "../channels/connected-invoicing-channels.registry.ts";
+import { connectedStatementMailChannels } from "../channels/connected-statement-mail-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
@@ -92,7 +93,6 @@ import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-que
 import { LicensePurchaseDeliveryService } from "../services/license-purchase-delivery.service.ts";
 import { LicensePurchaseService } from "../services/license-purchase.service.ts";
 import { LicensingLicenseGeneratorService } from "../services/licensing-license-generator.service.ts";
-import { MeteredUsageWarningService } from "../services/metered-usage-warning.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
@@ -112,6 +112,7 @@ import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
 } from "../services/usage-reporting.service.ts";
+import { UsageWarningService } from "../services/usage-warning.service.ts";
 import type { BillingStripeWebhookApi } from "../transport/billing-stripe-webhook.rest.ts";
 import type { BillingCurrencyApi } from "../transport/currency.trpc.ts";
 import type { BillingSubscriber, BillingSubscriptionApi } from "../transport/subscription.trpc.ts";
@@ -203,8 +204,6 @@ export class BillingApp
     auditLog: AuditLogApi,
     /** Where the usage-limit warning is written down, and read back so it goes once a month. */
     notifications: NotificationApi,
-    /** The per-project trace counts a usage-limit warning lists. */
-    traces: TraceApi,
     /** The named projects a usage-limit warning lists. */
     projects: ProjectApi,
     /** The retention window a plan change resets, as main's webhook did. */
@@ -245,6 +244,7 @@ export class BillingApp
         config: setup.config,
         peers: setup.dependencies,
         stripeSecretKey,
+        statementMail: connectedStatementMailChannels.ses.create(setup.members.mail),
         usageWarnings: BillingApp.#composeUsageWarnings(setup, notices),
         resourceLimitAlerts: BillingApp.#composeResourceLimitAlerts(setup, notices),
         webhook: {
@@ -292,24 +292,17 @@ export class BillingApp
     );
   }
 
-  /** Main's usage-limit warning, sent over the process's mail member. */
+  /** Main's usage-limit warning as entitlement decides it, sent over the process's mail member. */
   static #composeUsageWarnings(
     setup: BillingSetup,
     notices: BillingUsageNoticeService,
-  ): MeteredUsageWarningService {
-    const { notifications, traces, organizations, projects } = setup.dependencies;
-    const billableEvents = BillableEventsQueryService.create(setup.repositories.billableEvents);
-    return MeteredUsageWarningService.create({
+  ): UsageWarningService {
+    const { notifications, organizations, projects } = setup.dependencies;
+    return UsageWarningService.create({
       records: notifications,
       organizations: UsageLimitOrganizationService.create({ organizations, projects }),
       emails: notices,
       baseHost: setup.members.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
-      counters: {
-        traces: { getCountByProjects: (input) => traces.countTracesByProjects(input) },
-        events: {
-          getCountByProjects: (input) => billableEvents.countBillableEventsByProjects(input),
-        },
-      },
     });
   }
 
@@ -367,9 +360,9 @@ export class BillingApp
     config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
     peers: ConnectedBillingPeers;
     stripeSecretKey: string | undefined;
-    /** No process composes the statement mail yet; absent, statements wait. */
+    /** The monthly statement mail; absent, statements wait and nothing is recorded. */
     statementMail?: ConnectedStatementMailChannel;
-    usageWarnings: MeteredUsageWarningService;
+    usageWarnings: UsageWarningService;
     resourceLimitAlerts: ResourceLimitAlertService;
     /** The Stripe callback's signing secret and outside reach; absent, the callback answers 404. */
     webhook?: StripeWebhookComposition;
@@ -701,7 +694,7 @@ export class BillingApp
   readonly #billableEvents: BillableEventsQueryService;
   readonly #pricing: OrganizationPricingService;
   readonly #reporting: BillingReportingPipeline;
-  readonly #usageWarnings: MeteredUsageWarningService;
+  readonly #usageWarnings: UsageWarningService;
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
 
   private constructor({
@@ -732,7 +725,7 @@ export class BillingApp
     billableEvents: BillableEventsQueryService;
     pricing: OrganizationPricingService;
     reporting: BillingReportingPipeline;
-    usageWarnings: MeteredUsageWarningService;
+    usageWarnings: UsageWarningService;
     resourceLimitAlerts: ResourceLimitAlertService;
   }) {
     this.#stripeWebhook = stripeWebhook;
@@ -755,13 +748,16 @@ export class BillingApp
     return this.#resourceLimitAlerts.notifyResourceLimitReached(input);
   }
 
-  checkAndSendUsageWarning(input: {
-    organizationId: string;
-    currentMonthMessagesCount: number;
-    maxMonthlyUsageLimit: number;
-    meter: "traces" | "events";
-  }): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }> {
-    return this.#usageWarnings.checkAndSendWarning(input);
+  async sendUsageWarning(
+    input: UsageWarningDecision,
+  ): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }> {
+    const result = await this.#usageWarnings.send(input);
+    if (result.outcome === "skipped") return { sent: false };
+    return {
+      sent: true,
+      notificationId: result.notification.id,
+      sentAt: fromDate(result.notification.sentAt),
+    };
   }
 
   countBillableEventsByProjects(input: {

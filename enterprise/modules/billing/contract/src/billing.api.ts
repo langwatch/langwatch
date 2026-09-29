@@ -8,6 +8,7 @@ import type {
   BillingPricingModel,
   ResourceLimitNotifierInput,
   SubscriptionPlanInput,
+  UsageWarningDecision,
   USAGE_UNKNOWN,
 } from "./billing-types.ts";
 import type {
@@ -105,15 +106,12 @@ export interface BillingApi {
     projectIds: string[];
   }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN>;
   /**
-   * Main's `usageLimits.checkAndSendWarning`: mails the organization's admins when usage crosses a
-   * warning threshold not yet warned about this month, counting projects in the caller's meter.
+   * Mails the organization's admins the usage warning entitlement decided, once per threshold a
+   * month. Billing counts nothing: the threshold and per-project counts arrive decided.
    */
-  checkAndSendUsageWarning(input: {
-    organizationId: string;
-    currentMonthMessagesCount: number;
-    maxMonthlyUsageLimit: number;
-    meter: "traces" | "events";
-  }): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }>;
+  sendUsageWarning(
+    input: UsageWarningDecision,
+  ): Promise<{ sent: boolean; notificationId?: string; sentAt?: Instant }>;
   /**
    * Main's `usageLimits.notifyResourceLimitReached`: the ops Slack alert for a reached seat limit,
    * SaaS only, at most once a day per organization and limit. Never throws.

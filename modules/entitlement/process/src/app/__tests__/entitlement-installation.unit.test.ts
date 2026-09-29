@@ -91,7 +91,7 @@ describe("entitlement app installation", () => {
     "installs a working capability in the %s role, with no enterprise sources composed",
     async (role) => {
       const { logger } = createTestLogger();
-      const warned: Parameters<BillingApi["checkAndSendUsageWarning"]>[0][] = [];
+      const warned: Parameters<BillingApi["sendUsageWarning"]>[0][] = [];
       const runtime = await createApp({ role })
         .withModules([withMemoryRepositories(entitlementServer)])
         .withConfig({ entitlement: { requestBounds: undefined } })
@@ -104,7 +104,7 @@ describe("entitlement app installation", () => {
             getPricingModel: async () => ({ pricingModel: null }),
             countBillableEventsByProjects: async ({ projectIds }) =>
               projectIds.map((projectId) => ({ projectId, count: 11 })),
-            checkAndSendUsageWarning: async (input) => {
+            sendUsageWarning: async (input) => {
               warned.push(input);
               return { sent: true, notificationId: "notification-1" };
             },
@@ -143,7 +143,7 @@ describe("entitlement app installation", () => {
           usageUnit: "events",
         });
 
-        // Billing sends the approaching-limit mail, counted in the organization's own meter.
+        // Entitlement decides the threshold and counts in the organization's meter; billing sends.
         await expect(
           app.sendUsageLimitWarning({
             organizationId: "organization-1",
@@ -156,7 +156,8 @@ describe("entitlement app installation", () => {
             organizationId: "organization-1",
             currentMonthMessagesCount: 900,
             maxMonthlyUsageLimit: 1_000,
-            meter: "events",
+            crossedThreshold: 90,
+            projectCounts: [{ projectId: "project-1", count: 11 }],
           },
         ]);
       } finally {

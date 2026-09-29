@@ -13,9 +13,9 @@ import {
   settle,
 } from "../../services/__tests__/support/nurturing-harness.ts";
 import type { SeatRetentionRules } from "../../services/billing-subscription-lifecycle.service.ts";
-import type { MeteredUsageWarningService } from "../../services/metered-usage-warning.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
+import type { UsageWarningService } from "../../services/usage-warning.service.ts";
 import { type ConnectedBillingPeers, BillingApp } from "../billing.app.ts";
 
 const ACME = "org-acme";
@@ -85,7 +85,7 @@ function billingApp({
   const registry = licensedAt(commitUsdCents);
   const repositories = MemoryBillingRepositories.create();
   const app = BillingApp.assemble({
-    usageWarnings: createApiFixture<MeteredUsageWarningService>({}),
+    usageWarnings: createApiFixture<UsageWarningService>({}),
     resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
     members: { isSaas, nodeEnvironment: "test" },
     repositories,
