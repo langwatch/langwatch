@@ -98,6 +98,8 @@ imported the rest of the way down, never from the top.
 A package earns existence by being framework, not feature. Feature code in
 `packages/` is a defect. The boundary is prefix-checkable: nothing `browser-*`
 in a server graph; no `process*` package in a web graph.
+Trace's query parser and content dispatchers live in `modules/trace/browser-kit`, not the contract
+(Alex, 2026-09-29).
 
 ---
 
@@ -115,6 +117,8 @@ ops module that calls the owners' `*Api`s; core ops never depends on an enterpri
 Enterprise-licensed subjects moving to their owner land in that owner's enterprise module
 (`enterprise-gateway` owns routing policy and personal virtual keys), never relicensed into core (Alex, 2026-09-25).
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
+Usage limits are a module of their own: usage owns the counters and their enforcement, and every other
+module checks a limit through its `*Api` (Alex, 2026-09-29).
 
 ```
 modules/trace/
@@ -124,6 +128,10 @@ modules/trace/
 ├── browser/        @langwatch/trace-browser        PRIVATE — the half createUi installs
 └── browser-kit/    @langwatch/trace-browser-kit    the ONLY thing other browsers may import
 ```
+
+A module has one `feature.json`, at its root; none sits inside a module (governance's browser
+`features/`). A sub-feature whose module and backend already exist is split out into that module;
+the rest stays contained, flattened, in its module (Alex, 2026-09-29).
 
 **Dependency direction, no exceptions:** apps → `*-process`/`*-browser` →
 `*-contract`. Browser never imports process; process never imports browser;
@@ -199,6 +207,13 @@ fold's stored payload) and travels as its `z.infer` type after that: a service d
 its transport or a peer's typed call handed it, and a Prisma repository does not parse columns Prisma
 already types (Alex, 2026-09-28).
 
+**A public signature takes one options object** (`max-params`), kernel constructors and the Trace,
+EventStore and log-record repositories included. The one exception is `ksuid`, whose signature is a
+cross-language wire and is documented as such (Alex, 2026-09-29).
+In module code a scope travels as a named parameter, never through `AsyncLocalStorage` (framework
+trace-context propagation in `packages/observability` is the exception; identity's birth
+ceremony threads its scope explicitly) (Alex, 2026-09-29).
+
 **An implementation never sees a raw client.** No prisma, no redis, no
 clickhouse in any `*Module` class. Raw clients cross into a module in exactly
 one place — a registry or channel factory's `create(members)` — and arrive as
@@ -229,6 +244,11 @@ of:
 One unowned service has one owning module: evaluation owns the langevals boundary — its endpoint,
 the S3 staging of large payloads and their config — and topic and workflow reach langevals through
 `EvaluationApi` (Alex, 2026-09-25).
+Notification owns the mailer: a module that sends mail (automation) calls `NotificationApi.sendEmail`,
+which takes optional `bcc` and `headers` (Alex, 2026-09-29).
+Presence owns the project-event fan-out: `PresenceApi.publishProjectEvent` carries the
+`"export_progress" | "simulation_updated"` channels, scenario publishes through it and reads no Redis
+of its own, and the memory tier emits locally (Alex, 2026-09-29).
 
 The legacy `filters` grammar (a filter field to a parameterised ClickHouse condition over `trace_summaries` and
 `stored_spans`) is trace's, as the owner of the tables it reads; analytics' filter pickers ask
@@ -566,6 +586,9 @@ unmounted endpoint is honest, a mounted-but-empty one lies to a prober.
 histograms and gauges through `@langwatch/observability`'s instruments directly — no `*Api` operation,
 channel or member carries a metric. Telemetry is write-only: a decision the app makes at runtime (an
 anomaly, a limit) reads owned state, never exported metrics.
+A gauge over a costly read (storage stats) is fed by one scheduled process manager that collects the
+readings and publishes them to shared state; each process's gauge reads that state, so N replicas
+never repeat the query and every gauge agrees (Alex, 2026-09-29).
 Traces and logs compose through the `langwatch` SDK's own observability
 setup where its API fits — the platform dogfoods its SDK.
 `hostedMembers(stores)` from process-stores, `hostedRuntime({ name, runtime,
@@ -584,9 +607,10 @@ transport internals.
 implementation is a deployment choice is composed by one `.withModules`
 line, no conditional wiring. The audit log is **not** one (Alex,
 2026-09-24): every module is always installed and entitlement refuses per
-organization (§11), so audit-log's process half is core
-(`modules/audit-log/process`) and the generated list installs it in every
+organization (§11), so the generated list installs audit-log in every
 deployment, as main recorded in every deployment. No app names it.
+Audit-log is enterprise, as it was `ee` on main: it moves to `enterprise/modules/audit-log`, while
+webhook, ops admin and demo-data stay where they are (Alex, 2026-09-29).
 
 **The worker** is the same file with `role: "worker"` and `server.run()`
 instead of `serve()`. The role decides what `boot()` hosts: jobs and
@@ -1172,6 +1196,8 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
 - A path parameter is named for what it identifies (`:virtualKeyId`, never `:id`). A route main already
   publishes in `docs/api-reference/openapiLangWatch.json` keeps the names it published (Alex, 2026-09-23),
   `{id}` included: a semantic rename of a main route is drift and is reverted (Alex, 2026-09-25).
+  The rest-route rule reads that docs copy as it stands after a spec sync; drift against main is
+  apidiff's to catch, not a frozen copy's (Alex, 2026-09-29).
 - A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
   the REST runtime with `Retry-After` (2026-09-23).
 - An action that takes no body declares an empty input schema from its contract; the runtime reads an
@@ -1181,14 +1207,20 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
   declares (`withResponse("protocol", { refusal })`). A body that does not parse is the handled 400
   `malformed_request` in every family, never a 500. A JSON route never borrows the protocol kind to reach the request: the caller
   arrives as `actor`/`scope` from the runtime's credential authentication (2026-09-23).
+- SCIM takes the normal API shape: its routes declare their input schema and its operations take typed
+  input; the protocol renderer renders parse and validation refusals in main's SCIM bytes. No operation
+  takes raw text (Alex, 2026-09-29).
+- A request that cannot be parsed (broken JSON, wrong format) is the 400 `malformed_request`; one that parses but fails its
+  schema is the 422 `validation_error`. Query parameters (gateway `?limit`, the spend window), bodiless
+  POSTs, saas usage-report and the prompt routes follow the same split (Alex, 2026-09-29).
 - A key-authenticated door's actor carries the key's owner, set by the runtime's credential
   authentication, so no handler or module looks the owner up itself (Alex, 2026-09-25).
 - A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
   project on the request; no handler reads the key's headers (Alex, 2026-09-25).
 - A socket is declared like a route: a module declares its `WebSocketProtocol`, and the process opens one upgrade router
   and mounts every installed module's protocols, as it mounts REST (coordinator, 2026-09-25; main's connect gateway, pending Alex's review).
-- `publicRoute`/raw results only for genuinely non-JSON protocols (SCIM,
-  OAuth device flow, MCP streams, webhook raw bodies) and the documented
+- `publicRoute`/raw results only for genuinely non-JSON protocols
+  (OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
 - A branch living in a handler moves into the module as an `*Api` operation carrying that logic
   unchanged; such a one-to-one move is approved in advance. An operation that adds behaviour or a new
@@ -1260,6 +1292,9 @@ records the fact in the same write as the change and answers it through a `find*
 decision once keyed by the fact, and shows a fact it has not decided as awaiting. Seat changes are
 the case: licensing's `IssuedLicense.seatsRaisedFrom` and `LicensingApi.findSeatChanges`, read by
 billing's `seatInvoicing` pass every minute on `connected_billing` (Alex, 2026-09-29).
+A module reading its own event-sourced state writes optimistically or tolerates eventual consistency
+with a pending answer, never a reverse read; identity's history and proposals are read through the
+eventing member's surface (Alex, 2026-09-29).
 Enterprise `nurturing` shows the 2026-09-25 subscriber rule (Alex, 2026-09-29): each owner's subscriber calls
 `NurturingApi.recordSignal` with ids and the non-personal, point-in-time facts it must pass on. No event carries
 personal data: where a signal needs some it carries the id (and a revision), and nurturing reads the value from
@@ -1381,6 +1416,9 @@ projection by a rebuild job in the aggregate's own ordered lane, so it cannot ra
 logged and dropped (Alex, 2026-09-29). A command job
 keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
 append (Alex, 2026-09-29).
+`packages/eventing` owns the per-tenant enqueue-rate counter, taken at enqueue, and ops reads it
+through the framework; no module scans queues for it (Alex, 2026-09-29). A tenant is parked only while
+the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
 
 A fact is recorded by its owner; delivery modules are handed it; there is no relay module (Alex,
 2026-09-29). Gateway's budget crossings and virtual key lifecycle changes are the case: gateway
@@ -1824,7 +1862,8 @@ peer), so its members refused every call and `checkLimit` answered 500.
 A seat limit reached is organization's event; billing is told through its Api, by §9's
 subscriber on the owner's pipeline (Alex, 2026-09-28).
 
-**Usage warnings: entitlement decides, billing only sends** (Alex, 2026-09-29). Entitlement counts
+**Usage warnings: usage decides, billing only sends** (Alex, 2026-09-29; usage split out of
+entitlement the same day, entitlement keeps plans and features only). Usage counts
 the month once per project in the organization's meter and decides the crossed threshold;
 `BillingApi.sendUsageWarning` receives that decision with the per-project counts, and billing
 resolves the admins and project names, sends once per threshold a month and records it. Billing
@@ -1870,6 +1909,11 @@ A test proving how code handles a wrong-typed input may cast it, marked `// wron
 directly above; the marker, not the test's name, excuses that one cast (Alex, 2026-09-27).
 Production code has no marker: a cast only the compiler cannot prove is listed by file and target,
 with its reason, in the stand-in-cast rule's audited boundaries (Alex, 2026-09-28).
+A stand-in a test needs is a real fixture or builder, never a new contract type: types do not change
+for tests (Alex, 2026-09-29). A test never `vi.spyOn`s a real service; it drives memory twins and
+fixtures instead (Alex, 2026-09-29).
+A scenario bound from a package's tests counts toward feature parity like one bound from a module's
+(Alex, 2026-09-29).
 
 The installation test is the same chain as production:
 
@@ -1967,6 +2011,7 @@ chain. New code uses the left column only.
 | `TraceModule` + `.withApi(...)`               | `TraceApp` + `.withApp(...)`                                       |
 | `<f>.module.ts` / `<f>.web.ts` file stems     | `<f>.server.ts` / `<f>.web.ts`                                     |
 | `definePipeline(...).withEvents(schemas)`     | `defineAggregate({ events: defineEvents([...type strings]) })`     |
+| `enterprise/modules/audit-log` (§4)           | `modules/audit-log`                                                |
 
 `createProcessApp` stays the target shape. Its previous implementation, the
 generated `createServerApp` and its `serverModuleChunk0..9`,
@@ -2006,6 +2051,8 @@ A policy reads no baseline and reports every finding. A ruled transition may hol
 beside the enforcer's tests (`packages/architecture-enforcer/tests/baselines/`), keyed so that growth
 inside a key is refused (a count per key), with a test that also refuses a listed finding that is
 gone. Two exist: §5's peer cycles and §7's event-table access (Alex, 2026-09-29).
+The `service-ceilings` policy is ported to a custom langwatch oxlint rule with the same exact limits
+(Alex, 2026-09-29).
 
 ## 18. Running work
 
