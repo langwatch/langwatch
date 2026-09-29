@@ -106,6 +106,10 @@ function toolResultOf(span: Span): string {
   return typeof result === "string" ? result : JSON.stringify(result);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 /**
  * The value at a dotted path, read flat, then nested, then gathered from flat
  * keys under it, as span params hold any of the three.
@@ -114,10 +118,7 @@ function valueAt({ params, path }: { params: Record<string, unknown>; path: stri
   if (params[path] !== undefined) return params[path];
   let node: unknown = params;
   for (const key of path.split(".")) {
-    node =
-      typeof node === "object" && node !== null
-        ? (node as Record<string, unknown>)[key]
-        : undefined;
+    node = isRecord(node) ? node[key] : undefined;
   }
   if (node !== undefined) return node;
   const prefix = `${path}.`;
