@@ -80,7 +80,7 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
 
   @unit
   Scenario: A network failure is retried and buffered like a server error
-    Given the connection to the platform times out or is refused
+    Given the connection to the platform times out, is refused, or is dropped mid-request
     When log_step is called and the post fails after its retries
     Then the evaluation the step reports is not failed by it
     And the step stays in the buffer

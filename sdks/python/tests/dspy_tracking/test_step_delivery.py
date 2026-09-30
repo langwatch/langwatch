@@ -107,9 +107,11 @@ class TestWhenTheStepPostFails:
         "failure",
         [
             httpx.ConnectError("connection refused"),
+            httpx.ReadError("connection reset by peer"),
+            httpx.WriteError("broken pipe"),
             httpx.ReadTimeout("read operation timed out"),
         ],
-        ids=["connect-error", "timeout"],
+        ids=["connect-error", "read-error", "write-error", "timeout"],
     )
     def test_retries_a_network_failure(self, posts, caplog, failure):
         posts.statuses.extend([failure, failure, failure])

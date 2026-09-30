@@ -59,8 +59,12 @@ MAX_STEPS_BODY_BYTES = 20 * 1024 * 1024
 
 def _is_transient_error(error: BaseException) -> bool:
     """Network blips and server 5xx responses are retryable; client 4xx
-    responses are real answers and must surface immediately."""
-    if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):
+    responses are real answers and must surface immediately.
+
+    `httpx.NetworkError` covers every transport failure (connect, read,
+    write, close), so a connection reset mid-request is retried the same
+    way as a refused connection."""
+    if isinstance(error, (httpx.TimeoutException, httpx.NetworkError)):
         return True
     return (
         isinstance(error, httpx.HTTPStatusError)
