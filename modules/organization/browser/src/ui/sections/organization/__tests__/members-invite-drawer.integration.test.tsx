@@ -60,6 +60,7 @@ vi.mock("../../../../behavior/use-join-requests.ts", () => ({
     savingJoining: false,
     setJoining: vi.fn(),
     decide: vi.fn(),
+    automaticJoins: [],
   }),
 }));
 

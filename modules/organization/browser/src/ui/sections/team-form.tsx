@@ -280,7 +280,7 @@ export const TeamForm = ({
           <Heading>Members</Heading>
           <Spacer />
           {team && (
-            <Link href={`/settings/members`} asChild>
+            <Link href={`/settings/members`}>
               <Button variant="outline" size="sm">
                 Manage organization members
               </Button>

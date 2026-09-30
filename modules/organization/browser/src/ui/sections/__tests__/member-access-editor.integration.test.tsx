@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Member-detail dialog: role/binding visibility, mutations, and cancellation.
+ * The person drawer's access editor: role/assignment visibility, the staged save, and Cancel.
+ * Spec: specs/members/member-access-editing.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -20,11 +21,11 @@ const {
   mockInvalidateListForOrg,
   mockInvalidateOrgWithMembers,
   mockInvalidateGetAll,
+  mockInvalidateGetMemberById,
   mockInvalidateGetUsage,
   mockToasterCreate,
   mockListForUserData,
   mockListForMemberData,
-  mockProvenance,
 } = vi.hoisted(() => ({
   mockUpdateMemberRole: vi.fn(),
   mockApplyMemberBindings: vi.fn(),
@@ -32,6 +33,7 @@ const {
   mockInvalidateListForOrg: vi.fn().mockResolvedValue(undefined),
   mockInvalidateOrgWithMembers: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetAll: vi.fn().mockResolvedValue(undefined),
+  mockInvalidateGetMemberById: vi.fn().mockResolvedValue(undefined),
   mockInvalidateGetUsage: vi.fn().mockResolvedValue(undefined),
   mockToasterCreate: vi.fn(),
   mockListForUserData: {
@@ -48,7 +50,6 @@ const {
   mockListForMemberData: {
     current: [] as unknown[],
   },
-  mockProvenance: { current: {} as Record<string, unknown> },
 }));
 
 vi.mock("../../../behavior/organization-api.ts", () => ({
@@ -63,6 +64,7 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
           invalidate: mockInvalidateOrgWithMembers,
         },
         getAll: { invalidate: mockInvalidateGetAll },
+        getMemberById: { invalidate: mockInvalidateGetMemberById },
       },
       limits: { getUsage: { invalidate: mockInvalidateGetUsage } },
     }),
@@ -71,6 +73,8 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
         useQuery: () => ({
           data: mockListForUserData.current,
           isLoading: false,
+          isError: false,
+          error: null,
         }),
       },
       applyMemberBindings: {
@@ -82,6 +86,8 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
         useQuery: () => ({
           data: mockListForMemberData.current,
           isLoading: false,
+          isError: false,
+          error: null,
         }),
       },
     },
@@ -89,15 +95,12 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
       updateMemberRole: {
         useMutation: () => ({ mutateAsync: mockUpdateMemberRole }),
       },
-      getMemberProvenance: {
-        useQuery: () => ({ data: mockProvenance.current, isError: false }),
-      },
     },
   },
 }));
 
 // The toaster and the error toast are the host port's `succeeded`/`failed` in
-// this package, so what the dialog says is asserted where it is composed. The
+// this package, so what the editor says is asserted where it is composed. The
 // two call SHAPES are what these tests are about, and they did not change.
 vi.mock("../../../behavior/organization-feedback.ts", () => ({
   useOrganizationToaster: () => ({
@@ -156,7 +159,7 @@ vi.mock("../group-binding-input-row.tsx", async () => {
 
   // Mirrors the real row's two paths: Add commits the draft, while a filled
   // but never-added draft reports readiness and hands itself over on flush.
-  // The seat prop is surfaced as text so tests can prove the dialog passes
+  // The seat prop is surfaced as text so tests can prove the editor passes
   // the live pending seat, not the member's stored one.
   const BindingInputRow = React.forwardRef(function StubBindingInputRow(
     {
@@ -212,39 +215,31 @@ vi.mock("../group-binding-input-row.tsx", async () => {
   };
 });
 
-const { MemberDetailDialog } = await import("../member-detail-dialog.tsx");
+const { MemberAccessEditor } = await import("../member-access-editor.tsx");
 
 const Wrapper = ({ children }: { children?: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const baseMember = {
-  userId: "user-1",
-  role: OrganizationUserRole.MEMBER,
-  user: { name: "Sergio", email: "sergio@example.com" },
-};
-
-function renderDialog(overrides: Partial<React.ComponentProps<typeof MemberDetailDialog>> = {}) {
+function renderEditor(overrides: Partial<React.ComponentProps<typeof MemberAccessEditor>> = {}) {
   return render(
-    <MemberDetailDialog
-      member={baseMember}
+    <MemberAccessEditor
       organizationId="org-1"
+      userId="user-1"
+      memberRole={OrganizationUserRole.MEMBER}
       canManage={true}
       isCurrentUser={false}
-      open={true}
-      onClose={overrides.onClose ?? vi.fn()}
       {...overrides}
     />,
     { wrapper: Wrapper },
   );
 }
 
-describe("<MemberDetailDialog/>", () => {
+describe("<MemberAccessEditor/>", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockListForUserData.current = [];
     mockListForMemberData.current = [];
-    mockProvenance.current = {};
     mockUpdateMemberRole.mockResolvedValue({
       success: true,
       teamsLeftWithoutAdmin: [],
@@ -258,38 +253,19 @@ describe("<MemberDetailDialog/>", () => {
 
   describe("when the current user has organization:manage and is not viewing themselves", () => {
     it("renders the organization role field", () => {
-      renderDialog();
+      renderEditor();
       expect(screen.getByTestId("org-role-field")).toBeTruthy();
     });
 
     it("does not show the self-guard message", () => {
-      renderDialog();
+      renderEditor();
       expect(screen.queryByText(/cannot change your own organization role/i)).toBeNull();
-    });
-  });
-
-  describe("given the member was invited and accepted", () => {
-    it("says somebody here invited them", () => {
-      mockProvenance.current = { "user-1": { source: "invited" } };
-      renderDialog();
-      expect(screen.getByTestId("provenance-explanation")).toHaveTextContent(
-        "Somebody here invited them, and they accepted.",
-      );
-    });
-  });
-
-  describe("given nothing on record explains the member", () => {
-    it("says so rather than inventing a reason", () => {
-      renderDialog();
-      expect(screen.getByTestId("provenance-explanation")).toHaveTextContent(
-        "Nothing on record says how they got here.",
-      );
     });
   });
 
   describe("when the current user is viewing their own record", () => {
     it("shows the self-guard message instead of the role field", () => {
-      renderDialog({ isCurrentUser: true });
+      renderEditor({ isCurrentUser: true });
       expect(screen.getByText(/cannot change your own organization role/i)).toBeTruthy();
       expect(screen.queryByTestId("org-role-field")).toBeNull();
     });
@@ -297,20 +273,20 @@ describe("<MemberDetailDialog/>", () => {
 
   describe("when the current user lacks organization:manage", () => {
     it("hides the organization role section entirely", () => {
-      renderDialog({ canManage: false });
+      renderEditor({ canManage: false });
       expect(screen.queryByTestId("org-role-field")).toBeNull();
       expect(screen.queryByText("Organization role")).toBeNull();
     });
 
     it("does not render the footer save action", () => {
-      renderDialog({ canManage: false });
+      renderEditor({ canManage: false });
       expect(screen.queryByRole("button", { name: /^save$/i })).toBeNull();
     });
   });
 
   describe("when saving after only the organization role changed", () => {
     it("calls updateMemberRole with the new role and does not call applyMemberBindings", async () => {
-      renderDialog();
+      renderEditor();
 
       fireEvent.click(screen.getByTestId("org-role-field"));
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
@@ -338,7 +314,7 @@ describe("<MemberDetailDialog/>", () => {
 
     describe("when the organization role is saved", () => {
       it("still reports the save as done", async () => {
-        renderDialog();
+        renderEditor();
 
         fireEvent.click(screen.getByTestId("org-role-field"));
         fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
@@ -359,7 +335,7 @@ describe("<MemberDetailDialog/>", () => {
 
   describe("when saving after only bindings changed", () => {
     it("calls applyMemberBindings with the staged additions and does not call updateMemberRole", async () => {
-      renderDialog();
+      renderEditor();
 
       fireEvent.click(screen.getByTestId("stub-add-binding"));
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
@@ -396,9 +372,9 @@ describe("<MemberDetailDialog/>", () => {
         },
       ];
 
-      renderDialog();
+      renderEditor();
 
-      fireEvent.click(screen.getByRole("button", { name: /remove binding/i }));
+      fireEvent.click(screen.getByRole("button", { name: /remove assignment/i }));
       fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
       await vi.waitFor(() => {
@@ -422,7 +398,7 @@ describe("<MemberDetailDialog/>", () => {
         callOrder.push("bindings");
       });
 
-      renderDialog();
+      renderEditor();
 
       fireEvent.click(screen.getByTestId("org-role-field"));
       fireEvent.click(screen.getByTestId("stub-add-binding"));
@@ -437,7 +413,7 @@ describe("<MemberDetailDialog/>", () => {
     it("does not run the binding batch when the role update fails", async () => {
       mockUpdateMemberRole.mockRejectedValueOnce(new Error("plan limit"));
 
-      renderDialog();
+      renderEditor();
 
       fireEvent.click(screen.getByTestId("org-role-field"));
       fireEvent.click(screen.getByTestId("stub-add-binding"));
@@ -477,7 +453,7 @@ describe("<MemberDetailDialog/>", () => {
     describe("when the admin stages it again", () => {
       /** @scenario An access row the member already holds appears once */
       it("keeps a single row for that access", () => {
-        renderDialog();
+        renderEditor();
 
         fireEvent.click(screen.getByTestId("stub-add-binding"));
 
@@ -488,7 +464,7 @@ describe("<MemberDetailDialog/>", () => {
 
       /** @scenario An access row the member already holds appears once */
       it("leaves nothing to save", () => {
-        renderDialog();
+        renderEditor();
 
         fireEvent.click(screen.getByTestId("stub-add-binding"));
 
@@ -525,11 +501,11 @@ describe("<MemberDetailDialog/>", () => {
     describe("when the admin looks for a way to remove it", () => {
       /** @scenario The seat's own organization access is changed through the seat selector */
       it("offers none on the mirror row, and keeps it on other organization rows", () => {
-        renderDialog();
+        renderEditor();
 
         // Only the off-seat VIEWER row is removable; the MEMBER row mirrors
         // the member's seat and is managed by the seat selector.
-        expect(screen.getAllByRole("button", { name: /remove binding/i })).toHaveLength(1);
+        expect(screen.getAllByRole("button", { name: /remove assignment/i })).toHaveLength(1);
       });
     });
   });
@@ -537,7 +513,7 @@ describe("<MemberDetailDialog/>", () => {
   describe("when the same access row is staged twice", () => {
     /** @scenario An access row the member already holds appears once */
     it("keeps a single staged row", () => {
-      renderDialog();
+      renderEditor();
 
       fireEvent.click(screen.getByTestId("stub-add-binding"));
       fireEvent.click(screen.getByTestId("stub-add-binding"));
@@ -549,7 +525,7 @@ describe("<MemberDetailDialog/>", () => {
   describe("when a complete access row was filled in but never added", () => {
     /** @scenario A picked access row saves without pressing Add */
     it("enables Save and includes the row in the save", async () => {
-      renderDialog();
+      renderEditor();
 
       const save = screen.getByRole("button", { name: /^save$/i });
       expect(save.hasAttribute("disabled")).toBe(true);
@@ -582,7 +558,7 @@ describe("<MemberDetailDialog/>", () => {
     describe("when the admin saves both changes", () => {
       /** @scenario A failed save shows the member's access as it now is */
       it("re-reads the member's access instead of trusting the staged view", async () => {
-        renderDialog();
+        renderEditor();
 
         fireEvent.click(screen.getByTestId("org-role-field"));
         fireEvent.click(screen.getByTestId("stub-add-binding"));
@@ -596,7 +572,7 @@ describe("<MemberDetailDialog/>", () => {
             }),
           );
         });
-        // The seat change landed before the failure, so what the dialog shows
+        // The seat change landed before the failure, so what the editor shows
         // must come from the server, not from the staged rows.
         expect(mockUpdateMemberRole).toHaveBeenCalledTimes(1);
         expect(mockInvalidateListForUser).toHaveBeenCalled();
@@ -609,7 +585,7 @@ describe("<MemberDetailDialog/>", () => {
   describe("when the seat selector switches to a Lite Member seat", () => {
     /** @scenario The dialog offers only the Viewer role for a member on a Lite Member seat */
     it("hands the live seat to the access input row", () => {
-      renderDialog();
+      renderEditor();
 
       expect(screen.getByTestId("stub-organization-role").textContent).toBe(
         OrganizationUserRole.MEMBER as string,
@@ -627,7 +603,7 @@ describe("<MemberDetailDialog/>", () => {
     describe("when the admin picks a Lite Member seat and saves", () => {
       /** @scenario Staged access rows correct to Viewer when the seat switches to Lite Member */
       it("saves every staged row as Viewer with no custom role", async () => {
-        renderDialog();
+        renderEditor();
 
         fireEvent.click(screen.getByTestId("stub-add-binding"));
         fireEvent.click(screen.getByTestId("stub-add-custom-binding"));
@@ -660,7 +636,7 @@ describe("<MemberDetailDialog/>", () => {
 
       /** @scenario Staged access rows correct to Viewer when the seat switches to Lite Member */
       it("shows the staged rows as Viewer before the save", () => {
-        renderDialog();
+        renderEditor();
 
         fireEvent.click(screen.getByTestId("stub-add-custom-binding"));
         expect(screen.getByText("Data Scientist")).toBeTruthy();
@@ -696,9 +672,7 @@ describe("<MemberDetailDialog/>", () => {
 
     /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
     it("keeps the group's stored role and names the ceiling on a Lite Member seat", () => {
-      renderDialog({
-        member: { ...baseMember, role: OrganizationUserRole.EXTERNAL },
-      });
+      renderEditor({ memberRole: OrganizationUserRole.EXTERNAL });
 
       expect(screen.getByText("ADMIN")).toBeTruthy();
       expect(screen.getByText("Applies as Viewer while on a Lite Member seat")).toBeTruthy();
@@ -706,7 +680,7 @@ describe("<MemberDetailDialog/>", () => {
 
     /** @scenario Group access names the Lite Member ceiling on rows above Viewer */
     it("adds the note the moment a Lite Member seat is picked", () => {
-      renderDialog();
+      renderEditor();
 
       expect(screen.queryByText("Applies as Viewer while on a Lite Member seat")).toBeNull();
 
@@ -735,9 +709,7 @@ describe("<MemberDetailDialog/>", () => {
         },
       ];
 
-      renderDialog({
-        member: { ...baseMember, role: OrganizationUserRole.EXTERNAL },
-      });
+      renderEditor({ memberRole: OrganizationUserRole.EXTERNAL });
 
       expect(screen.getByText("Data Scientist")).toBeTruthy();
       expect(screen.queryByText("Applies as Viewer while on a Lite Member seat")).toBeNull();
@@ -745,14 +717,16 @@ describe("<MemberDetailDialog/>", () => {
   });
 
   describe("when the user clicks Cancel", () => {
-    it("closes without firing any mutations", () => {
-      const onClose = vi.fn();
-      renderDialog({ onClose });
+    it("puts the draft back without firing any mutations", () => {
+      renderEditor();
 
       fireEvent.click(screen.getByTestId("org-role-field"));
+      const save = screen.getByRole("button", { name: /^save$/i });
+      expect(save.hasAttribute("disabled")).toBe(false);
+
       fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
-      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(save.hasAttribute("disabled")).toBe(true);
       expect(mockUpdateMemberRole).not.toHaveBeenCalled();
       expect(mockApplyMemberBindings).not.toHaveBeenCalled();
     });
@@ -760,7 +734,7 @@ describe("<MemberDetailDialog/>", () => {
 
   describe("when no changes are pending", () => {
     it("leaves the Save button disabled", () => {
-      renderDialog();
+      renderEditor();
       const save = screen.getByRole("button", { name: /^save$/i });
       expect(save.hasAttribute("disabled")).toBe(true);
     });

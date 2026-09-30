@@ -1,7 +1,7 @@
 import type { DomainJoinSetting } from "@langwatch/identity-contract";
 import { useCallback, useMemo, useState } from "react";
 
-import type { PendingJoinRequest } from "../model/pending-join-request.ts";
+import type { AutomaticJoin, PendingJoinRequest } from "../model/pending-join-request.ts";
 import { api } from "./organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback.ts";
 
@@ -9,7 +9,35 @@ import { useOrganizationToaster, useShowErrorToast } from "./organization-feedba
 export function useJoinRequests(scope: { organizationId: string; canManage: boolean }) {
   const answers = usePendingJoinRequests(scope);
   const joining = useDomainJoinSetting(scope);
-  return { ...answers, ...joining };
+  const automatic = useAutomaticJoins(scope);
+  return { ...answers, ...joining, ...automatic };
+}
+
+/** Who walked in without anybody approving, lately; empty where automatic joining never ran. */
+function useAutomaticJoins({
+  organizationId,
+  canManage,
+}: {
+  organizationId: string;
+  canManage: boolean;
+}) {
+  const automaticJoins = api.joinRequests.automaticJoins.useQuery(
+    { organizationId },
+    { enabled: !!organizationId && canManage },
+  );
+
+  const joins: AutomaticJoin[] = useMemo(
+    () =>
+      (automaticJoins.data ?? []).map((join) => ({
+        joinRequestId: join.joinRequestId,
+        name: join.name,
+        domain: join.domain,
+        joinedAt: join.joinedAt,
+      })),
+    [automaticJoins.data],
+  );
+
+  return { automaticJoins: joins };
 }
 
 /**

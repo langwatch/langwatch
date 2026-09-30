@@ -57,6 +57,13 @@ describe("given a browser that installs organization", () => {
       expect(screens).not.toHaveProperty("pages/settings/teams");
     });
 
+    /** @scenario "The team settings page is declared inside the settings shell" */
+    it("places the Team Detail screen within settings, at the team address", () => {
+      const screen = organizationWeb.installation.screens["pages/settings/teams/[team]"];
+
+      expect(screen).toMatchObject({ path: "/settings/teams/:team", within: "settings" });
+    });
+
     it("answers with the Team Detail component", async () => {
       const screen = organizationWeb.installation.screens["pages/settings/teams/[team]"];
       const loaded = await screen?.load?.();

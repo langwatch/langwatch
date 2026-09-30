@@ -11,3 +11,11 @@ export interface PendingJoinRequest {
   requestedAt: string;
   expiresAt: string | null;
 }
+
+/** One person who walked in on the domain setting: the domain admitted them, so no address. */
+export interface AutomaticJoin {
+  joinRequestId: string;
+  name: string;
+  domain: string;
+  joinedAt: Date | string | null;
+}

@@ -67,6 +67,12 @@ export const organizationWeb = defineWebModule("organization")
         default: (await import("./ui/sections/invite-member-drawer.tsx")).InviteMemberDrawer,
       }),
     },
+    /** One member, from the members list: `?drawer.open=person&drawer.userId=…`. */
+    person: {
+      load: async () => ({
+        default: (await import("./ui/sections/person-drawer.tsx")).PersonDrawer,
+      }),
+    },
   })
   /**
    * The post-login join offer the shell renders over a dashboard (and the

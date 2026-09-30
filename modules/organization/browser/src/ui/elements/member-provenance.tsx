@@ -1,5 +1,7 @@
-import { Badge, Text } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react";
 import type { OrganizationMemberProvenance } from "@langwatch/organization-contract";
+
+import { IdentityChip } from "./identity-row.tsx";
 
 /**
  * Why a member is here, in one word; a member nobody can explain gets no chip
@@ -13,45 +15,37 @@ export function ProvenanceChip({
   if (!provenance || provenance.source === "unknown") return null;
   if (provenance.source === "directory") {
     return (
-      <Badge
-        colorPalette="gray"
-        size="sm"
-        data-testid="provenance-directory"
+      <IdentityChip
+        label="Directory"
         title={
           provenance.providerId
             ? `Created by ${provenance.providerId}. Your identity provider decides whether this person stays.`
             : "Created by your identity provider, which decides whether this person stays."
         }
-      >
-        Directory
-      </Badge>
+        data-testid="provenance-directory"
+      />
     );
   }
   if (provenance.source === "domain") {
     return (
-      <Badge
-        colorPalette={provenance.automatic ? "orange" : "gray"}
-        size="sm"
-        data-testid="provenance-domain"
+      <IdentityChip
+        label="Domain"
+        tone={provenance.automatic ? "warning" : "neutral"}
         title={
           provenance.automatic
             ? `Joined on ${provenance.domain} under your joining policy. Nobody approved this.`
             : `Asked to join on ${provenance.domain}, and an administrator approved it.`
         }
-      >
-        Domain
-      </Badge>
+        data-testid="provenance-domain"
+      />
     );
   }
   return (
-    <Badge
-      colorPalette="gray"
-      size="sm"
-      data-testid="provenance-invited"
+    <IdentityChip
+      label="Invited"
       title="Somebody here invited them, and they accepted."
-    >
-      Invited
-    </Badge>
+      data-testid="provenance-invited"
+    />
   );
 }
 

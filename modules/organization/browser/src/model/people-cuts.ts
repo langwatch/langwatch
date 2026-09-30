@@ -53,21 +53,3 @@ export function peopleCutShows({
 }): boolean {
   return cut === "all" || cut === list;
 }
-
-/** Whether the one list a filtered cut shows has nobody in it. */
-export function peopleCutIsEmpty({
-  cut,
-  members,
-  invites,
-  requests,
-}: {
-  cut: PeopleCut;
-  members: number;
-  invites: number;
-  requests: number;
-}): boolean {
-  if (cut === "all") return false;
-  if (cut === "members") return members === 0;
-  if (cut === "invited") return invites === 0;
-  return requests === 0;
-}

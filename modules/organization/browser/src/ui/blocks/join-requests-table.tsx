@@ -1,8 +1,8 @@
-import { Badge, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@chakra-ui/react";
 
 import { readableDate } from "../../model/display-formatters.ts";
 import type { PendingJoinRequest } from "../../model/pending-join-request.ts";
-import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
+import { IdentityChip, IdentityRow, IdentityRowList } from "../elements/identity-row.tsx";
 
 interface JoinRequestsTableProps {
   requests: PendingJoinRequest[];
@@ -13,9 +13,9 @@ interface JoinRequestsTableProps {
 }
 
 /**
- * People waiting to join, beside the invitations (D12) — one panel for "who
- * is waiting on me?" Approve has no role picker: it grants the default role,
- * a formal invitation owns roles/teams. Reject asks for no reason.
+ * People waiting to join, beside the invitations (D12). Approve has no role
+ * picker: it grants the default role, a formal invitation owns roles and
+ * teams. Reject asks for no reason.
  */
 export function JoinRequestsTable({
   requests,
@@ -24,51 +24,27 @@ export function JoinRequestsTable({
   onApprove,
   onReject,
 }: JoinRequestsTableProps) {
-  if (requests.length === 0) {
-    return null;
-  }
-
   return (
-    <VStack align="start" gap={4} paddingTop={4} width="full">
-      <Heading>Requests to join</Heading>
-      <Text color="fg.muted" fontSize="sm">
-        People with a verified address on your domain who asked to join. Approving adds them with
-        your default role.
-      </Text>
-
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0}>
-          <Table.Root variant="line" size="md" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader width="56px" />
-                <Table.ColumnHeader>Who is asking</Table.ColumnHeader>
-                <Table.ColumnHeader>Domain</Table.ColumnHeader>
-                <Table.ColumnHeader>Asked</Table.ColumnHeader>
-                <Table.ColumnHeader>Lapses</Table.ColumnHeader>
-                <Table.ColumnHeader width="180px" />
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {requests.map((request) => (
-                <JoinRequestRow
-                  key={request.joinRequestId}
-                  request={request}
-                  isAdmin={isAdmin}
-                  answering={answeringId === request.joinRequestId}
-                  onApprove={onApprove}
-                  onReject={onReject}
-                />
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Card.Body>
-      </Card.Root>
-    </VStack>
+    <IdentityRowList
+      data-testid="join-requests-list"
+      empty="Nobody is waiting to join. People with a verified address on your domain can ask, if your joining policy allows it."
+    >
+      {requests.map((request) => (
+        <JoinRequestRow
+          key={request.joinRequestId}
+          request={request}
+          isAdmin={isAdmin}
+          answering={answeringId === request.joinRequestId}
+          onApprove={onApprove}
+          onReject={onReject}
+        />
+      ))}
+    </IdentityRowList>
   );
 }
 
-function JoinRequestRow({
+/** Exported because somebody asking to join is one cut of the Directory's single list of people. */
+export function JoinRequestRow({
   request,
   isAdmin,
   answering,
@@ -82,19 +58,23 @@ function JoinRequestRow({
   onReject: (joinRequestId: string) => void;
 }) {
   return (
-    <Table.Row data-testid="join-request-row">
-      <Table.Cell>
-        <RandomColorAvatar size="2xs" name={request.name} />
-      </Table.Cell>
-      <Table.Cell>{request.name}</Table.Cell>
-      <Table.Cell>
-        <Badge>{request.domain}</Badge>
-      </Table.Cell>
-      <Table.Cell>{formatDay(request.requestedAt)}</Table.Cell>
-      <Table.Cell>{request.expiresAt ? formatDay(request.expiresAt) : "—"}</Table.Cell>
-      <Table.Cell>
-        {isAdmin ? (
-          <HStack gap={2} justifyContent="flex-end">
+    <IdentityRow
+      name={request.name}
+      // The domain is what was matched; the local part is not the organization's business yet.
+      address={null}
+      data-testid="join-request-row"
+      chips={
+        <>
+          <IdentityChip label={request.domain} title="The domain their verified address is on." />
+          <Text fontSize="xs" color="fg.muted">
+            Asked {formatDay(request.requestedAt)}
+            {request.expiresAt ? `, lapses ${formatDay(request.expiresAt)}` : ""}
+          </Text>
+        </>
+      }
+      trailing={
+        isAdmin ? (
+          <HStack gap={2}>
             <Button
               size="xs"
               variant="outline"
@@ -112,9 +92,9 @@ function JoinRequestRow({
               Approve
             </Button>
           </HStack>
-        ) : null}
-      </Table.Cell>
-    </Table.Row>
+        ) : null
+      }
+    />
   );
 }
 

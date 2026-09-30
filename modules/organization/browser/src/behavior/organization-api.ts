@@ -162,6 +162,8 @@ export type OrganizationMemberWithTeams = {
     pendingSince?: User["deactivatedAt"];
     /** When the ACCOUNT was deactivated, which outlives one organization. */
     deactivatedAt?: User["deactivatedAt"];
+    /** Whether they proved the address, which joining by domain depends on. */
+    emailVerified?: User["emailVerified"];
   };
   teamMemberships?: { teamId: string; role: TeamUserRole; team: { name: string } }[];
 };
@@ -296,6 +298,14 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       query: {
         input: { organizationId: string; includeDeactivated?: boolean };
         output: OrganizationWithMembersAndTheirTeams;
+      };
+    };
+
+    /** One member, as the person drawer opens them. */
+    getMemberById: {
+      query: {
+        input: { organizationId: string; userId: string };
+        output: OrganizationMemberWithTeams;
       };
     };
 
@@ -587,6 +597,8 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
         output: {
           id: string;
           name: string;
+          /** The directory that manages this group's membership, when one does. */
+          scimSource: string | null;
           bindings: {
             id: string;
             role: TeamRoleValue;
