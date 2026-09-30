@@ -48,7 +48,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="title"]'
-          value: 'vd-graph-{uid}'
+          value: "vd-graph-{uid}"
       - action: click
         with:
           text: /^\s*Update\s*$/
@@ -119,7 +119,7 @@ flows:
       - action: expect
         with:
           count: 'button:has(svg.lucide-ellipsis-vertical[width="24"])'
-          equals: '1'
+          equals: "1"
 
   - id: dashboard-graph-delete-reads-back
     title: A dashboard's graphs, read from the API, follow a graph being deleted from its card

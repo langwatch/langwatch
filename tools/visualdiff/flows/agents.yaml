@@ -379,7 +379,7 @@ flows:
           path: /{slug}/agents
       - action: click
         with:
-          text: '{agentName}'
+          text: "{agentName}"
       - action: expect
         with:
           testId: agent-name-input

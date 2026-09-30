@@ -129,7 +129,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -139,10 +139,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wftpl-{uid}'
+          value: "vd-wftpl-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: '.react-flow__node[data-id="llm_call"]'
@@ -152,21 +152,21 @@ flows:
           text: Sample LLM Bias Detection
       - action: expect
         with:
-          api: '/api/workflows'
-          contains: 'vd-wftpl-{uid}'
+          api: "/api/workflows"
+          contains: "vd-wftpl-{uid}"
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: expect
         with:
-          text: 'vd-wftpl-{uid}'
+          text: "vd-wftpl-{uid}"
 
   - id: workflow-rename
     title: Rename a workflow from the studio header and find only the new name after a reload
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -176,10 +176,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfrn-{uid}'
+          value: "vd-wfrn-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: .react-flow__node
@@ -187,28 +187,28 @@ flows:
           timeout: "30000"
       - action: click
         with:
-          text: 'vd-wfrn-{uid}'
+          text: "vd-wfrn-{uid}"
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfrn2-{uid}'
+          value: "vd-wfrn2-{uid}"
       - action: click
         with:
           selector: '.react-flow__node[data-id="entry"]'
       - action: expect
         with:
-          api: '/api/workflows'
-          contains: 'vd-wfrn2-{uid}'
+          api: "/api/workflows"
+          contains: "vd-wfrn2-{uid}"
           timeout: "30000"
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: expect
         with:
-          text: 'vd-wfrn2-{uid}'
+          text: "vd-wfrn2-{uid}"
       - action: expect
         with:
-          text: 'vd-wfrn-{uid}'
+          text: "vd-wfrn-{uid}"
           equals: "0"
 
   - id: workflow-add-node-connect-save
@@ -216,7 +216,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -226,10 +226,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfnode-{uid}'
+          value: "vd-wfnode-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: .react-flow__node
@@ -259,10 +259,10 @@ flows:
           text: Save new version
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
-          text: 'vd-wfnode-{uid}'
+          text: "vd-wfnode-{uid}"
       - action: expect
         with:
           count: '.react-flow__node[data-id="code"]'
@@ -277,7 +277,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -287,10 +287,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfrun-{uid}'
+          value: "vd-wfrun-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: .react-flow__node
@@ -327,7 +327,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -337,10 +337,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfev-{uid}'
+          value: "vd-wfev-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: .react-flow__node
@@ -352,14 +352,14 @@ flows:
           toSelector: .react-flow__pane
       - action: click
         with:
-          testId: 'evaluator-card-{evaluatorId}'
+          testId: "evaluator-card-{evaluatorId}"
       - action: expect
         with:
           count: '.react-flow__node[data-id="evaluator"]'
           timeout: "20000"
       - action: expect
         with:
-          text: '{evaluatorName}'
+          text: "{evaluatorName}"
       - action: drag
         with:
           fromSelector: '.react-flow__handle[data-nodeid="llm_call"][data-handleid="outputs.output"]'
@@ -374,7 +374,7 @@ flows:
       - action: fill
         with:
           field: Description
-          value: 'vd evaluator {uid}'
+          value: "vd evaluator {uid}"
       - action: click
         with:
           text: Save new version
@@ -383,10 +383,10 @@ flows:
           text: /Saved version/
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
-          text: 'vd-wfev-{uid}'
+          text: "vd-wfev-{uid}"
       - action: expect
         with:
           count: '.react-flow__node[data-id="evaluator"]'
@@ -401,7 +401,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -411,10 +411,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfend-{uid}'
+          value: "vd-wfend-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: .react-flow__node
@@ -432,7 +432,7 @@ flows:
       - action: fill
         with:
           testId: run-until-here-input-input
-          value: 'vd input {uid}'
+          value: "vd input {uid}"
       - action: click
         with:
           testId: run-until-here-run
@@ -460,7 +460,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -470,10 +470,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfeval-{uid}'
+          value: "vd-wfeval-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: '.react-flow__node[data-id="entry"]'
@@ -503,7 +503,7 @@ flows:
       - action: fill
         with:
           field: Description
-          value: 'vd eval {uid}'
+          value: "vd eval {uid}"
       - action: click
         with:
           text: Save & Run Evaluation
@@ -520,7 +520,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -530,10 +530,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfrst-{uid}'
+          value: "vd-wfrst-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: .react-flow__node
@@ -553,13 +553,13 @@ flows:
       - action: fill
         with:
           field: Description
-          value: 'vd with code {uid}'
+          value: "vd with code {uid}"
       - action: click
         with:
           text: Save new version
       - action: expect
         with:
-          text: 'vd with code {uid}'
+          text: "vd with code {uid}"
           timeout: "20000"
       - action: click
         with:
@@ -571,10 +571,10 @@ flows:
           timeout: "20000"
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
-          text: 'vd-wfrst-{uid}'
+          text: "vd-wfrst-{uid}"
       - action: expect
         with:
           count: '.react-flow__node[data-id="entry"]'
@@ -589,7 +589,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -599,10 +599,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfpub-{uid}'
+          value: "vd-wfpub-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: '.react-flow__node[data-id="entry"]'
@@ -621,10 +621,10 @@ flows:
           text: New version published
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
-          text: 'vd-wfpub-{uid}'
+          text: "vd-wfpub-{uid}"
       - action: expect
         with:
           count: '.react-flow__node[data-id="entry"]'
@@ -642,7 +642,7 @@ flows:
     steps:
       - action: go
         with:
-          path: '/{slug}/workflows'
+          path: "/{slug}/workflows"
       - action: click
         with:
           text: New Workflow
@@ -652,10 +652,10 @@ flows:
       - action: fill
         with:
           label: Name and Icon
-          value: 'vd-wfexp-{uid}'
+          value: "vd-wfexp-{uid}"
       - action: click
         with:
-          text: '/^create workflow$/i'
+          text: "/^create workflow$/i"
       - action: expect
         with:
           count: '.react-flow__node[data-id="entry"]'

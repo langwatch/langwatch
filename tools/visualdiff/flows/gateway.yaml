@@ -306,11 +306,11 @@ flows:
       - action: fill
         with:
           field: e.g. Engineering monthly $1k cap
-          value: 'budget-{uid}'
+          value: "budget-{uid}"
       - action: fill
         with:
-          field: '1000.00'
-          value: '25'
+          field: "1000.00"
+          value: "25"
       - action: click
         with:
           text: /^\s*Create budget\s*$/
@@ -327,7 +327,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("budget-{uid}")'
-          min: '1'
+          min: "1"
 
   - id: gateway-budget-org-warn-create
     title: Create an organisation budget that only warns on breach and see both in its row
@@ -342,7 +342,7 @@ flows:
       - action: fill
         with:
           field: e.g. Engineering monthly $1k cap
-          value: 'budget-org-{uid}'
+          value: "budget-org-{uid}"
       - action: click
         with:
           testId: budget-kind-organization
@@ -352,8 +352,8 @@ flows:
           option: Per day
       - action: fill
         with:
-          field: '1000.00'
-          value: '40'
+          field: "1000.00"
+          value: "40"
       - action: select
         with:
           selector: 'xpath=//label[contains(normalize-space(.),"On breach")]/following::select[1]'
@@ -367,7 +367,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("budget-org-{uid}"):has-text("organization"):has-text("day"):has-text("warn")'
-          min: '1'
+          min: "1"
 
   - id: gateway-budget-team-create
     title: Create a budget on a team and see the team as its scope after a reload
@@ -382,7 +382,7 @@ flows:
       - action: fill
         with:
           field: e.g. Engineering monthly $1k cap
-          value: 'budget-team-{uid}'
+          value: "budget-team-{uid}"
       - action: click
         with:
           testId: budget-kind-team
@@ -392,8 +392,8 @@ flows:
           option: /^(?!Pick a|Loading).+/
       - action: fill
         with:
-          field: '1000.00'
-          value: '60'
+          field: "1000.00"
+          value: "60"
       - action: click
         with:
           text: /^\s*Create budget\s*$/
@@ -403,7 +403,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("budget-team-{uid}"):has-text("team")'
-          min: '1'
+          min: "1"
 
   - id: gateway-budget-project-create
     title: Create a budget on a project and see the project as its scope after a reload
@@ -418,7 +418,7 @@ flows:
       - action: fill
         with:
           field: e.g. Engineering monthly $1k cap
-          value: 'budget-project-{uid}'
+          value: "budget-project-{uid}"
       - action: click
         with:
           testId: budget-kind-project
@@ -428,8 +428,8 @@ flows:
           option: /^(?!Pick a|Loading).+/
       - action: fill
         with:
-          field: '1000.00'
-          value: '70'
+          field: "1000.00"
+          value: "70"
       - action: click
         with:
           text: /^\s*Create budget\s*$/
@@ -439,7 +439,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("budget-project-{uid}"):has-text("project")'
-          min: '1'
+          min: "1"
 
   - id: gateway-budget-virtual-key-create
     title: Create a budget on a virtual key and see the key as its scope after a reload
@@ -460,7 +460,7 @@ flows:
       - action: fill
         with:
           field: e.g. Engineering monthly $1k cap
-          value: 'budget-key-{uid}'
+          value: "budget-key-{uid}"
       - action: click
         with:
           testId: budget-kind-virtual_key
@@ -470,8 +470,8 @@ flows:
           option: "{vkName}"
       - action: fill
         with:
-          field: '1000.00'
-          value: '15'
+          field: "1000.00"
+          value: "15"
       - action: click
         with:
           text: /^\s*Create budget\s*$/
@@ -481,7 +481,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("budget-key-{uid}"):has-text("{vkName}")'
-          min: '1'
+          min: "1"
 
   - id: gateway-budget-edit-limit-and-breach
     title: Raise a budget's limit and switch it to warn, and read both back from the API
@@ -511,7 +511,7 @@ flows:
       - action: fill
         with:
           selector: 'xpath=//label[contains(normalize-space(.),"Limit (USD)")]/following::input[1]'
-          value: '55'
+          value: "55"
       - action: select
         with:
           selector: 'xpath=//label[contains(normalize-space(.),"On breach")]/following::select[1]'
@@ -551,7 +551,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("{budgetName}")'
-          min: '1'
+          min: "1"
       - action: click
         with:
           selector: 'tr:has-text("{budgetName}") button[aria-label="Actions"]'
@@ -569,7 +569,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("{budgetName}")'
-          equals: '0'
+          equals: "0"
 
   - id: gateway-budget-detail-page
     title: A budget opens on its own page, showing its name and the scope it applies to
@@ -635,7 +635,7 @@ flows:
       - action: fill
         with:
           field: Developer default
-          value: 'policy-{uid}'
+          value: "policy-{uid}"
       - action: click
         with:
           text: Create policy
@@ -659,7 +659,7 @@ flows:
       - action: fill
         with:
           field: Developer default
-          value: 'policy-edit-{uid}'
+          value: "policy-edit-{uid}"
       - action: click
         with:
           text: Create policy
@@ -676,7 +676,7 @@ flows:
       - action: fill
         with:
           field: Developer default
-          value: 'policy-renamed-{uid}'
+          value: "policy-renamed-{uid}"
       - action: click
         with:
           text: Save changes
@@ -722,7 +722,7 @@ flows:
       - action: fill
         with:
           field: Developer default
-          value: 'policy-default-{uid}'
+          value: "policy-default-{uid}"
       - action: click
         with:
           text: Create policy
@@ -745,7 +745,7 @@ flows:
       - action: expect
         with:
           text: Make default
-          equals: '0'
+          equals: "0"
 
   # The evaluation itself runs in the gateway data plane; this proves the guardrail is
   # stored and attaches to a key. The evaluator is a monitor set to run as a guardrail.
@@ -783,11 +783,11 @@ flows:
       - action: fill
         with:
           field: e.g. block PII on requests
-          value: 'guardrail-{uid}'
+          value: "guardrail-{uid}"
       - action: select
         with:
           field: Evaluator
-          option: '{monitorName}'
+          option: "{monitorName}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -797,13 +797,13 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("guardrail-{uid}")'
-          min: '1'
+          min: "1"
       - action: go
         with:
           path: /gateway/virtual-keys/{vkId}
       - action: click
         with:
-          text: 'guardrail-{uid}'
+          text: "guardrail-{uid}"
       - action: click
         with:
           text: /^\s*Save guardrails\s*$/
@@ -840,11 +840,11 @@ flows:
       - action: fill
         with:
           field: e.g. block PII on requests
-          value: 'guardrail-archive-{uid}'
+          value: "guardrail-archive-{uid}"
       - action: select
         with:
           field: Evaluator
-          option: '{monitorName}'
+          option: "{monitorName}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -861,7 +861,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("guardrail-archive-{uid}")'
-          equals: '0'
+          equals: "0"
 
   - id: gateway-usage-screen-renders
     title: The usage screen opens with its key filter and either its charts or its empty state
