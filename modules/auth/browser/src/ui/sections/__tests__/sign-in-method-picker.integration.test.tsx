@@ -22,6 +22,7 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
 });
 
 import type * as authClientModule from "../../../behavior/auth-client.tsx";
+import { WithTestAuthHost } from "../../../testing.tsx";
 import { AlternativeMethods, SignInMethodPicker } from "../sign-in-method-picker.tsx";
 
 const METHOD_SET: readonly SignInMethod[] = [
@@ -135,5 +136,25 @@ describe("given the alternative methods rail", () => {
         expect(screen.getByRole("button", { name: /Google/i }).closest("[inert]")).not.toBeNull(),
       );
     });
+  });
+});
+
+describe("given a development deployment offering only google", () => {
+  it("offers only google", () => {
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <WithTestAuthHost publicEnvironment={{ NODE_ENV: "development" }}>
+          <AlternativeMethods
+            methodSet={METHOD_SET}
+            onFederatedMethodChosen={vi.fn()}
+            onPasskeyError={vi.fn()}
+          />
+        </WithTestAuthHost>
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: /Google/i })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Microsoft/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /GitHub/i })).toBeNull();
   });
 });

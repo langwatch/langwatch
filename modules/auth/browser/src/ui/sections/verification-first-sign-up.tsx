@@ -24,7 +24,6 @@ import { IdentifierStepForm } from "./identifier-step-form.tsx";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
-  useShowsAllSocialMethods,
   SignInMethodPicker,
 } from "./sign-in-method-picker.tsx";
 import { SignUpCredentialForm } from "./sign-up-credential-form.tsx";
@@ -64,7 +63,6 @@ export function VerificationFirstSignUp() {
   const [addressConfirmed, setAddressConfirmed] = useState(true);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
-  const showsAllSocial = useShowsAllSocialMethods();
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   // Every failure this card can have shows in one place, at the top. A
   // passkey is refused from a button part-way down the rail of methods, and
@@ -246,7 +244,7 @@ export function VerificationFirstSignUp() {
         onSubmit={({ email }) => sendTo(email)}
         footer={<LogInLink callbackUrl={callbackUrl} label="Already have an account? Log in" />}
         alternatives={
-          hasAlternativeMethods({ methodSet: instanceMethods, showsAllSocial }) ? (
+          hasAlternativeMethods({ methodSet: instanceMethods }) ? (
             <AlternativeMethods
               methodSet={instanceMethods}
               lastUsedMethodId={lastUsedMethodId}

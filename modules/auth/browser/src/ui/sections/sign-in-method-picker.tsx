@@ -4,7 +4,6 @@ import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { useOptionalAuthHost } from "../../model/auth-host.ts";
 import { MONO_FONT } from "../../model/front-door-theme.ts";
 import { signInMethodActionLabel } from "../../model/method-labels.ts";
 
@@ -13,23 +12,6 @@ import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
 import { MethodButton } from "../elements/method-button.tsx";
 import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
 import { PasskeySignInButton } from "./passkey-sign-in-button.tsx";
-
-/**
- * A dev stack rarely has social credentials mounted, hiding the social rail
- * from the people iterating on it. In dev the rail shows the cloud's full
- * social set; everywhere else it shows exactly what the decision offered.
- */
-export function useShowsAllSocialMethods(): boolean {
-  return useOptionalAuthHost()?.publicEnvironment().NODE_ENV === "development";
-}
-
-/** The cloud's social set. Ids are the real provider ids, so a click dials
- *  the real provider and the marks and labels are the real ones. */
-const SOCIAL_METHODS: readonly SignInMethod[] = [
-  { id: "google", kind: "federated", connectionId: null },
-  { id: "github", kind: "federated", connectionId: null },
-  { id: "azure-ad", kind: "federated", connectionId: null },
-];
 
 /**
  * The method picker: exactly the methods the decision named, in that order
@@ -109,15 +91,10 @@ export function SignInMethodPicker({
  */
 export function hasAlternativeMethods({
   methodSet,
-  showsAllSocial,
 }: {
   methodSet: readonly SignInMethod[];
-  showsAllSocial: boolean;
 }): boolean {
-  return (
-    showsAllSocial ||
-    methodSet.some((method) => method.kind === "federated" || method.kind === "passkey")
-  );
+  return methodSet.some((method) => method.kind === "federated" || method.kind === "passkey");
 }
 
 /**
@@ -139,12 +116,7 @@ export function AlternativeMethods({
   /** A refused ceremony, sent to the card's one alert at the top. */
   onPasskeyError: (error: unknown) => void;
 }) {
-  const showsAllSocial = useShowsAllSocialMethods();
-  const offered = methodSet.filter((method) => method.kind === "federated");
-  const offeredIds = new Set(offered.map((method) => method.id));
-  const methods = showsAllSocial
-    ? [...offered, ...SOCIAL_METHODS.filter((method) => !offeredIds.has(method.id))]
-    : offered;
+  const methods = methodSet.filter((method) => method.kind === "federated");
   // See `SignInMethodPicker`: the same local flag, so a second click here
   // cannot start a competing WebAuthn prompt while one is already running.
   const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);

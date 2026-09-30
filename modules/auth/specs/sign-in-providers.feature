@@ -69,3 +69,10 @@ Feature: The deployment's sign-in providers mount on Better Auth
     When the sign-in method policy is resolved
     Then no federated method is offered
 
+
+  @integration
+  Scenario: The sign-in screen offers only the configured providers in every environment
+    Given the deployment offers google and no other social provider
+    When the sign-in screen renders in development
+    Then google is offered
+    And no other social provider is offered
