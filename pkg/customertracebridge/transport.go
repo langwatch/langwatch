@@ -24,6 +24,9 @@ import (
 
 const defaultExporterCacheSize = 10_000
 
+// defaultMetricPrefix names the gateway's customer-trace counters.
+const defaultMetricPrefix = "langwatch.gateway"
+
 // cachedExporter records WHERE a cached exporter sends, so a later export can
 // tell whether the registry still names that destination. Caching the exporter
 // alone is what allowed a rotated token to keep shipping to a stale endpoint
@@ -55,7 +58,19 @@ type routerExporter struct {
 }
 
 func newRouterExporter(ctx context.Context, registry *Registry) *routerExporter {
+	return newRouterExporterWith(ctx, registry, routerMetrics{prefix: defaultMetricPrefix})
+}
+
+// routerMetrics names the router's counters and the provider that records
+// them (nil: the global meter provider).
+type routerMetrics struct {
+	prefix   string
+	provider metric.MeterProvider
+}
+
+func newRouterExporterWith(ctx context.Context, registry *Registry, metrics routerMetrics) *routerExporter {
 	r := &routerExporter{baseCtx: ctx, registry: registry}
+	provider := metrics.provider
 	cache, _ := lru.NewWithEvict(
 		defaultExporterCacheSize,
 		func(_ string, c cachedExporter) {
@@ -70,20 +85,25 @@ func newRouterExporter(ctx context.Context, registry *Registry) *routerExporter 
 	r.byProject = cache
 
 	const scope = "langwatch-ai-gateway"
-	meter := otel.Meter(scope)
+	if provider == nil {
+		provider = otel.GetMeterProvider()
+	}
+	meter := provider.Meter(scope)
 	fallback := noop.NewMeterProvider().Meter(scope)
+	exportedName := metrics.prefix + ".customer_trace.spans_exported"
+	droppedName := metrics.prefix + ".customer_trace.spans_dropped"
 	var err error
 	if r.spansExported, err = meter.Int64Counter(
-		"langwatch.gateway.customer_trace.spans_exported",
+		exportedName,
 		metric.WithDescription("Customer trace spans delivered to a project's OTLP ingest."),
 	); err != nil {
-		r.spansExported, _ = fallback.Int64Counter("langwatch.gateway.customer_trace.spans_exported")
+		r.spansExported, _ = fallback.Int64Counter(exportedName)
 	}
 	if r.spansDropped, err = meter.Int64Counter(
-		"langwatch.gateway.customer_trace.spans_dropped",
+		droppedName,
 		metric.WithDescription("Customer trace spans that never reached a project, tagged by reason."),
 	); err != nil {
-		r.spansDropped, _ = fallback.Int64Counter("langwatch.gateway.customer_trace.spans_dropped")
+		r.spansDropped, _ = fallback.Int64Counter(droppedName)
 	}
 	return r
 }
@@ -107,7 +127,14 @@ func (r *routerExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadO
 	buckets := make(map[string][]sdktrace.ReadOnlySpan)
 	unrouted := 0
 	for _, s := range spans {
-		pid := readAttr(s, string(attrProjectID))
+		// A route key (routed.go) wins over the bare project id, and is stripped:
+		// it is routing, not the customer's data.
+		pid := readAttr(s, string(attrRouteKey))
+		if pid != "" {
+			s = withoutAttr(s, attrRouteKey)
+		} else {
+			pid = readAttr(s, string(attrProjectID))
+		}
 		if pid == "" {
 			unrouted++
 			continue
