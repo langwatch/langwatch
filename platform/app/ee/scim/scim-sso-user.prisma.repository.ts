@@ -15,6 +15,7 @@ import {
   SsoExistingAccountUnconfirmedError,
 } from "@langwatch/identity";
 
+import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
 
 const CONTINUE = { action: "continue" } as const;
@@ -29,15 +30,22 @@ const UNCONFIRMED = {
 /** Selects existing users for admitted SAML or connection-owned SCIM assertions. */
 export class PrismaScimSsoUsers {
   readonly #transactions: AsyncLocalStorage<Prisma.TransactionClient>;
+  /** LangWatch Cloud, where anybody may register a password account. */
+  readonly #isHosted: () => boolean;
 
   private constructor(
     transactions: AsyncLocalStorage<Prisma.TransactionClient>,
+    isHosted: () => boolean,
   ) {
     this.#transactions = transactions;
+    this.#isHosted = isHosted;
   }
 
-  static create(transactions: AsyncLocalStorage<Prisma.TransactionClient>) {
-    return new PrismaScimSsoUsers(transactions);
+  static create(
+    transactions: AsyncLocalStorage<Prisma.TransactionClient>,
+    { isHosted = () => !!env.IS_SAAS }: { isHosted?: () => boolean } = {},
+  ) {
+    return new PrismaScimSsoUsers(transactions, isHosted);
   }
 
   async resolve(input: SSOUserResolutionInput): Promise<SSOUserResolution> {
@@ -175,7 +183,7 @@ export class PrismaScimSsoUsers {
     input: SSOUserResolutionInput,
     user: { id: string; emailVerified: boolean },
   ): Promise<SSOUserResolution> {
-    if (user.emailVerified) return CONTINUE;
+    if (this.#isHosted() || user.emailVerified) return CONTINUE;
     if (await this.#directoryOwns(database, input.providerId, user.id)) {
       return CONTINUE;
     }
@@ -200,6 +208,12 @@ export class PrismaScimSsoUsers {
    * A sign-up still waiting for its emailed confirmation is left to that
    * confirmation: its password was chosen by whoever filled the form, and the
    * email is what proves that was the address's owner.
+   *
+   * SELF-HOSTED ONLY. On LangWatch Cloud anybody may register a password
+   * account, so a stranger could register an address before its organization
+   * verifies the domain and then share the account its owner signs in to.
+   * Cloud keeps better-auth's own rule; one operator controls sign-ups on a
+   * self-hosted installation.
    */
   async #resolveUnconfirmedUser(
     database: Prisma.TransactionClient,
@@ -210,7 +224,7 @@ export class PrismaScimSsoUsers {
       signupConfirmationPending: boolean;
     },
   ): Promise<SSOUserResolution> {
-    if (input.protocol !== "oidc") return CONTINUE;
+    if (this.#isHosted() || input.protocol !== "oidc") return CONTINUE;
     if (user.deactivatedAt) return REFUSE;
     if (user.signupConfirmationPending) return UNCONFIRMED;
     if (!(await this.#connectionProvesDomainOf(database, input))) {

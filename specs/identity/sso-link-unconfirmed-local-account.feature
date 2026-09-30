@@ -1,4 +1,4 @@
-Feature: Single sign-on links an unconfirmed local account on a verified domain
+Feature: Single sign-on links an unconfirmed local account on a verified domain, self-hosted only
   As an administrator of a self-hosted installation that does not send email
   I need my existing password account, and my colleagues', to sign in through
   our identity provider
@@ -17,6 +17,12 @@ Feature: Single sign-on links an unconfirmed local account on a verified domain
   # vouched for by the same domain owner, so linking it does not hand one
   # person's account to another. Without both halves the link stays refused
   # (ADR-027, no single sign-on account takeover).
+  #
+  # Self-hosted only. On LangWatch Cloud anybody may register a password
+  # account, so a stranger could register victim@acme.com, never confirm it,
+  # and wait for the domain to be verified; the link would then hand the
+  # victim an account whose password the stranger knows. Cloud keeps
+  # better-auth's own rule.
 
   Background:
     Given an organization with an OIDC single sign-on connection
@@ -63,6 +69,15 @@ Feature: Single sign-on links an unconfirmed local account on a verified domain
     When the identity provider signs that address in and asserts it is verified
     Then no single sign-on binding or session is created
     And the refusal is sso_existing_account_unconfirmed
+
+  @integration @regression
+  Scenario: On LangWatch Cloud an unconfirmed password account is not linked by single sign-on
+    Given the installation is LangWatch Cloud
+    And the connection is live and has verified the account's domain
+    When the identity provider signs that address in and asserts it is verified
+    Then no single sign-on binding or session is created
+    And the account's address stays unconfirmed
+    And the refusal is better-auth's own account-not-linked refusal
 
   @integration @regression
   Scenario: The refusal reaches the sign-in screen with words the reader can act on

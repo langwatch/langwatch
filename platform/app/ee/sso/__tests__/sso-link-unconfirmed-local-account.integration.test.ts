@@ -11,12 +11,13 @@
  * `fetch` answering discovery, token and JWKS with a signed id token.
  */
 
+import { PrismaScimSsoUsers } from "@ee/scim/scim-sso-user.prisma.repository";
 import { betterAuth } from "better-auth";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
-
 import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
+import { identityStorageTransactions } from "~/server/app-layer/identity/identity-storage-transaction.adapter";
 import {
   identityStorageAdapter,
   ssoAssertion,
@@ -103,7 +104,12 @@ async function identityProviderAsserts({
   });
 }
 
-const auth = () =>
+/** The resolver as LangWatch Cloud composes it. */
+const cloudUsers = PrismaScimSsoUsers.create(identityStorageTransactions, {
+  isHosted: () => true,
+});
+
+const auth = ({ cloud = false }: { cloud?: boolean } = {}) =>
   betterAuth({
     baseURL: BASE_URL,
     secret: "test-secret-test-secret-test-secret",
@@ -115,7 +121,7 @@ const auth = () =>
       confirmSignUpAddress: async () => undefined,
       ssoAssertion,
       ssoCallbackEvidence: () => ({ recordAuthenticatedSsoAccount: () => {} }),
-      ssoProvisionedUsers,
+      ssoProvisionedUsers: cloud ? () => cloudUsers : ssoProvisionedUsers,
     }),
     ...models(),
   });
@@ -273,8 +279,11 @@ async function setUp({
   return { user, providerId };
 }
 
-async function signInThrough(providerId: string) {
-  const betterAuthInstance = auth();
+async function signInThrough(
+  providerId: string,
+  { cloud = false }: { cloud?: boolean } = {},
+) {
+  const betterAuthInstance = auth({ cloud });
   const started = await betterAuthInstance.handler(
     new Request(`${BASE_URL}/api/auth/sign-in/sso`, {
       method: "POST",
@@ -500,6 +509,29 @@ describe("given a password account whose address was never confirmed", () => {
       const result = await signInThrough(providerId);
 
       expect(result.error).toBe("sso_existing_account_unconfirmed");
+      expect(result.session).toBeNull();
+      expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+      expect(await addressConfirmed(user.id)).toBe(false);
+    });
+  });
+
+  describe("when the installation is LangWatch Cloud", () => {
+    /** @scenario "On LangWatch Cloud an unconfirmed password account is not linked by single sign-on" */
+    it("keeps better-auth's own refusal and leaves the account as it was", async () => {
+      const { user, providerId } = await setUp({
+        label: "cloud",
+        state: "ACTIVE",
+        domainVerified: true,
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `cloud-${SUITE}`,
+        emailVerified: true,
+      });
+
+      const result = await signInThrough(providerId, { cloud: true });
+
+      expect(result.error).toBe("OAuthAccountNotLinked");
       expect(result.session).toBeNull();
       expect(await linkedAccounts(user.id, providerId)).toEqual([]);
       expect(await addressConfirmed(user.id)).toBe(false);
