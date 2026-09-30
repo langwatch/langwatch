@@ -100,7 +100,7 @@ describe("the guided onboarding kickoff", () => {
       expect([...served, ...unserved].join("\n")).not.toMatch(/hosted|gateway\.langwatch/i);
     });
 
-    /** @scenario "A brief for a tour that minted no key says so" */
+    /** @scenario "The brief names the key the tour minted, by its reveal id" */
     it("says no key was minted when the tour minted none", () => {
       const brief = buildGuidedKickoffBrief({ input: KICKOFF });
 
