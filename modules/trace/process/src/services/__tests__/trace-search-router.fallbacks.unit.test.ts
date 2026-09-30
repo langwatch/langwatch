@@ -8,7 +8,7 @@ import {
   TraceSearchRouterService,
   type TraceSearchRouterDeps,
 } from "../trace-search-router.service.ts";
-import { deps, input, NoModel, RANGE } from "./trace-search-router.harness.ts";
+import { deps, input, NoModel, ProviderDisabled, RANGE } from "./trace-search-router.harness.ts";
 
 const router = (deps: TraceSearchRouterDeps) => TraceSearchRouterService.create(deps);
 
@@ -79,6 +79,27 @@ describe("given no classifier", () => {
       const d = deps({
         routeWithModel: vi.fn(async () => {
           throw new NoModel();
+        }),
+      });
+
+      const result = await router(d).route(input());
+
+      expect(result).toEqual({
+        kind: "free_text",
+        query: '"annoyed users"',
+        decidedBy: "fallback",
+        fellBackFrom: "routing",
+        modelTrouble: "no_model",
+      });
+    });
+  });
+
+  describe("when the only model belongs to a disabled provider", () => {
+    /** @scenario "A model whose provider is disabled counts as no model" */
+    it("searches the phrase and says no model is connected", async () => {
+      const d = deps({
+        routeWithModel: vi.fn(async () => {
+          throw new ProviderDisabled();
         }),
       });
 
