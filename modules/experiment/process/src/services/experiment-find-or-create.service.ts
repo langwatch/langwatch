@@ -2,6 +2,7 @@
  * The rule that turns an SDK's `experiment_slug` into an experiment row.
  */
 import type { Experiment, ExperimentType } from "@langwatch/experiment-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import originalSlugify from "slugify";
 
@@ -62,7 +63,7 @@ export class ExperimentFindOrCreateService {
     }
 
     if (!experiment && !slug) {
-      throw new Error("Either experiment_id or experiment_slug is required");
+      throw new ValidationError("Either experiment_id or experiment_slug is required");
     }
 
     if (!experiment && slug) {

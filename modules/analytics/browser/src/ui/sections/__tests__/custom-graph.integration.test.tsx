@@ -148,6 +148,21 @@ describe("the analytics chart", () => {
     });
   });
 
+  describe("given a leaderboard still loading", () => {
+    describe("when the chart renders", () => {
+      it("draws no axis or bar at a non-finite position", () => {
+        timeseries.isLoading = true;
+
+        const { container } = renderGraph(leaderboard);
+
+        const attributes = [...container.querySelectorAll("svg *")].flatMap((node) =>
+          [...node.attributes].map((attribute) => attribute.value),
+        );
+        expect(attributes.filter((value) => /NaN|Infinity/.test(value))).toEqual([]);
+      });
+    });
+  });
+
   describe("given a read the server refused", () => {
     describe("when the chart renders", () => {
       /** @scenario "A chart that could not be read says so instead of drawing nothing" */

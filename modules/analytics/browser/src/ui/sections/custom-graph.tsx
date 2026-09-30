@@ -1547,7 +1547,7 @@ function SummaryBarGraph({
   const summaryData = shapeDataForSummary({ input, seriesByKey, timeseries, nameForSeries });
   const sortedCurrentData = [...(summaryData.current ?? [])].toSorted((a, b) => b.value - a.value);
 
-  const longestName = Math.max(...summaryData.current.map((entry) => entry.name.length));
+  const longestName = Math.max(0, ...summaryData.current.map((entry) => entry.name.length));
 
   const xAxisWidth = Math.min(longestName * 8, 300);
 

@@ -80,7 +80,7 @@ describe("given an SDK naming an experiment by slug", () => {
 
       await expect(
         service.resolve({ projectId: "project-1", experimentType: "DSPY" }),
-      ).rejects.toThrow("Either experiment_id or experiment_slug is required");
+      ).rejects.toMatchObject({ code: "validation_error", httpStatus: 422 });
     });
   });
 
