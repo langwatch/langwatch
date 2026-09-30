@@ -81,6 +81,7 @@ describe("given a pass asks which tenants still have work for its migrations", (
   });
 
   /** @scenario "A pass may ask which tenants have work left across the whole installation" */
+  /** @scenario "A pass with no migrations to drive visits nobody" */
   it("asks nothing at all when the pass drives no migrations", async () => {
     const { prisma, queryRaw } = guardedPrisma([{ id: "user-1" }]);
 
