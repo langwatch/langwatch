@@ -1,0 +1,878 @@
+[
+  {
+    "entry": {
+      "output": "{\"key\": \"value\", \"number\": 42}"
+    },
+    "name": "default json valid object",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "output": "{\"key\": \"value\", number: 42}"
+    },
+    "name": "default json invalid unquoted key",
+    "result": {
+      "cost": null,
+      "details": "Invalid JSON: Expecting property name enclosed in double quotes: line 1 column 18 (char 17)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "output": "[1, 2, 3]"
+    },
+    "name": "json valid array",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "42"
+    },
+    "name": "json valid scalar",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "\"hi\""
+    },
+    "name": "json valid string scalar",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "null"
+    },
+    "name": "json null literal",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"a\": 1,}"
+    },
+    "name": "json trailing comma",
+    "result": {
+      "cost": null,
+      "details": "Invalid JSON: Expecting property name enclosed in double quotes: line 1 column 9 (char 8)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "{'a': 1}"
+    },
+    "name": "json single quotes",
+    "result": {
+      "cost": null,
+      "details": "Invalid JSON: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"a\": [1, 2"
+    },
+    "name": "json truncated",
+    "result": {
+      "cost": null,
+      "details": "Invalid JSON: Expecting ',' delimiter: line 1 column 12 (char 11)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "hello world"
+    },
+    "name": "json plain text",
+    "result": {
+      "cost": null,
+      "details": "Invalid JSON: Expecting value: line 1 column 1 (char 0)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\n  \"a\": 1,\n  \"b\": [true, false]\n}"
+    },
+    "name": "json multi-line valid",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"名前\": \"太郎\", \"emoji\": \"😀\"}"
+    },
+    "name": "json unicode valid",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"名前\": 太郎}"
+    },
+    "name": "json unicode invalid",
+    "result": {
+      "cost": null,
+      "details": "Invalid JSON: Expecting value: line 1 column 8 (char 7)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"שלום\": \"עולם\"}"
+    },
+    "name": "json RTL valid",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": "   "
+    },
+    "name": "json whitespace-only output",
+    "result": {
+      "cost": null,
+      "details": "Invalid JSON: Expecting value: line 1 column 4 (char 3)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {
+      "output": ""
+    },
+    "name": "empty output is skipped",
+    "result": {
+      "cost": null,
+      "details": "Output is empty",
+      "status": "skipped"
+    },
+    "settings": {
+      "format": "json"
+    }
+  },
+  {
+    "entry": {},
+    "name": "missing output is skipped",
+    "result": {
+      "cost": null,
+      "details": "Output is empty",
+      "status": "skipped"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"age\": 30}"
+    },
+    "name": "json schema satisfied",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"age\":{\"type\":\"integer\"}},\"required\":[\"age\"]}"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"age\": \"thirty\"}"
+    },
+    "name": "json schema wrong type",
+    "result": {
+      "cost": null,
+      "details": "JSON Schema validation failed: 'thirty' is not of type 'integer'\n\nFailed validating 'type' in schema['properties']['age']:\n    {'type': 'integer'}\n\nOn instance['age']:\n    'thirty'",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json",
+      "json_schema": "{\"type\":\"object\",\"properties\":{\"age\":{\"type\":\"integer\"}},\"required\":[\"age\"]}"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"name\": \"x\"}"
+    },
+    "name": "json schema missing required",
+    "result": {
+      "cost": null,
+      "details": "JSON Schema validation failed: 'age' is a required property\n\nFailed validating 'required' in schema:\n    {'type': 'object', 'required': ['age']}\n\nOn instance:\n    {'name': 'x'}",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json",
+      "json_schema": "{\"type\":\"object\",\"required\":[\"age\"]}"
+    }
+  },
+  {
+    "entry": {
+      "output": "[\"a\", \"c\"]"
+    },
+    "name": "json schema array items enum",
+    "result": {
+      "cost": null,
+      "details": "JSON Schema validation failed: 'c' is not one of ['a', 'b']\n\nFailed validating 'enum' in schema['items']:\n    {'enum': ['a', 'b']}\n\nOn instance[1]:\n    'c'",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json",
+      "json_schema": "{\"type\":\"array\",\"items\":{\"enum\":[\"a\",\"b\"]}}"
+    }
+  },
+  {
+    "entry": {
+      "output": "nope"
+    },
+    "name": "json schema on invalid json reports invalid json first",
+    "result": {
+      "cost": null,
+      "details": "Invalid JSON: Expecting value: line 1 column 1 (char 0)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "json",
+      "json_schema": "{\"type\":\"object\"}"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"a\": 1}"
+    },
+    "name": "json schema itself invalid json",
+    "result": {
+      "details": "Invalid JSON Schema: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)",
+      "error_type": "json_schema_error",
+      "status": "error",
+      "traceback": []
+    },
+    "settings": {
+      "format": "json",
+      "json_schema": "{not json"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"a\": 1}"
+    },
+    "name": "json schema with unknown type keyword value",
+    "result": {
+      "details": "'bogus' is not valid under any of the given schemas\n\nFailed validating 'anyOf' in metaschema['allOf'][3]['properties']['type']:\n    {'anyOf': [{'$ref': '#/$defs/simpleTypes'},\n               {'type': 'array',\n                'items': {'$ref': '#/$defs/simpleTypes'},\n                'minItems': 1,\n                'uniqueItems': True}]}\n\nOn schema['type']:\n    'bogus'",
+      "error_type": "SchemaError",
+      "status": "error",
+      "traceback": []
+    },
+    "settings": {
+      "format": "json",
+      "json_schema": "{\"type\":\"bogus\"}"
+    }
+  },
+  {
+    "entry": {
+      "output": "x = 1"
+    },
+    "name": "json_schema ignored for python",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python",
+      "json_schema": "{not json"
+    }
+  },
+  {
+    "entry": {
+      "output": "# Header\n\nThis is **bold** text"
+    },
+    "name": "markdown with header and bold",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "This is just a normal text, no markdown formatting here\n\nBut what if I break the line?"
+    },
+    "name": "markdown plain text has no elements",
+    "result": {
+      "cost": null,
+      "details": "No markdown elements found. Text should contain markdown formatting like headers (#), bold (**), lists, etc.",
+      "label": null,
+      "passed": false,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "- one\n- two\n- three"
+    },
+    "name": "markdown list",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "see [the docs](https://example.com)"
+    },
+    "name": "markdown link",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "```python\nprint(1)\n```"
+    },
+    "name": "markdown code fence",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "hello"
+    },
+    "name": "markdown single line plain",
+    "result": {
+      "cost": null,
+      "details": "No markdown elements found. Text should contain markdown formatting like headers (#), bold (**), lists, etc.",
+      "label": null,
+      "passed": false,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "a < b & c"
+    },
+    "name": "markdown html-escaped chars differ",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "*你好* 😀 world"
+    },
+    "name": "markdown unicode with emphasis",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "  \n  "
+    },
+    "name": "markdown whitespace-only",
+    "result": {
+      "cost": null,
+      "details": "No markdown elements found. Text should contain markdown formatting like headers (#), bold (**), lists, etc.",
+      "label": null,
+      "passed": false,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "markdown"
+    }
+  },
+  {
+    "entry": {
+      "output": "x = 1\nprint(x)"
+    },
+    "name": "python valid assignment",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "def f(a, b):\n    return a + b\n"
+    },
+    "name": "python valid function",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "def f(:\n  pass"
+    },
+    "name": "python invalid syntax",
+    "result": {
+      "cost": null,
+      "details": "Invalid Python: invalid syntax (<unknown>, line 1)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "def f():\nreturn 1"
+    },
+    "name": "python bad indentation",
+    "result": {
+      "cost": null,
+      "details": "Invalid Python: expected an indented block after function definition on line 1 (<unknown>, line 2)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "this is not python code"
+    },
+    "name": "python plain sentence",
+    "result": {
+      "cost": null,
+      "details": "Invalid Python: invalid syntax (<unknown>, line 1)",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "名前 = \"太郎\"\nprint(名前)"
+    },
+    "name": "python unicode identifiers",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "s = \"😀\""
+    },
+    "name": "python emoji in string",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "   \n"
+    },
+    "name": "python whitespace only is valid",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "python"
+    }
+  },
+  {
+    "entry": {
+      "output": "SELECT id, name FROM users WHERE id = 1"
+    },
+    "name": "sql select",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "SELECT 1; SELECT 2;"
+    },
+    "name": "sql multiple statements",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "INSERT INTO t (a, b) VALUES (1, 'x')"
+    },
+    "name": "sql insert",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "SELEC FROM WHERE"
+    },
+    "name": "sql invalid",
+    "result": {
+      "cost": null,
+      "details": "Invalid SQL: Invalid expression / Unexpected token. Line 1, Col: 10.\n  SELEC \u001b[4mFROM\u001b[0m WHERE",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "SELECT (1 + 2 FROM t"
+    },
+    "name": "sql unbalanced paren",
+    "result": {
+      "cost": null,
+      "details": "Invalid SQL: Expecting ). Line 1, Col: 18.\n  SELECT (1 + 2 \u001b[4mFROM\u001b[0m t",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "{\"query\": \"SELECT 1\"}"
+    },
+    "name": "sql json instead of sql",
+    "result": {
+      "cost": null,
+      "details": "Invalid SQL: Detected JSON instead of SQL string",
+      "label": null,
+      "passed": false,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "42"
+    },
+    "name": "sql number is json",
+    "result": {
+      "cost": null,
+      "details": "Invalid SQL: Detected JSON instead of SQL string",
+      "label": null,
+      "passed": false,
+      "score": null,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "please show me all the users"
+    },
+    "name": "sql plain sentence",
+    "result": {
+      "cost": null,
+      "details": "Invalid SQL: Invalid expression / Unexpected token. Line 1, Col: 14.\n  please show \u001b[4mme\u001b[0m all the users",
+      "label": null,
+      "passed": false,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "SELECT a,\n       b\nFROM t\nWHERE a > 1\nORDER BY b"
+    },
+    "name": "sql multi-line",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  },
+  {
+    "entry": {
+      "output": "SELECT * FROM t WHERE name = '太郎 😀'"
+    },
+    "name": "sql unicode literal",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "format": "sql"
+    }
+  }
+]

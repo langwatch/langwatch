@@ -1,0 +1,403 @@
+[
+  {
+    "entry": {
+      "input": "who are you",
+      "output": "We build great software"
+    },
+    "name": "default competitors, clean",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "output": "Use OpenAI instead"
+    },
+    "name": "default competitors, mentioned in output",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: OpenAI",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "input": "Is Google better?",
+      "output": "No comment"
+    },
+    "name": "default competitors, mentioned in input",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: Google",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "input": "Microsoft or Google?",
+      "output": "Both Google and Microsoft are fine"
+    },
+    "name": "mentioned in both",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: Microsoft, Google, Google, Microsoft",
+      "label": null,
+      "passed": false,
+      "score": 4.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "output": "i prefer openai and GOOGLE"
+    },
+    "name": "case insensitive",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: openai, GOOGLE",
+      "label": null,
+      "passed": false,
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {},
+    "name": "no input no output",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "input": "",
+      "output": ""
+    },
+    "name": "empty strings",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "input": "   ",
+      "output": "\n\t"
+    },
+    "name": "whitespace only",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "output": "OpenAI Google Microsoft"
+    },
+    "name": "empty competitor list",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: , , , , , , , , , , , , , , , , , , , , , , , , , ",
+      "label": null,
+      "passed": false,
+      "score": 26.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": []
+    }
+  },
+  {
+    "entry": {
+      "output": "Acme makes anvils"
+    },
+    "name": "single custom competitor",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: Acme",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "Acme"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Nobody else here"
+    },
+    "name": "custom competitor not mentioned",
+    "result": {
+      "cost": null,
+      "details": null,
+      "label": null,
+      "passed": true,
+      "score": 0.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "Acme"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "the palace is grand"
+    },
+    "name": "substring match inside a word",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: ace",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "Ace"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "I write C++ and axb and a.b"
+    },
+    "name": "regex metacharacters are escaped",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: C++, a.b",
+      "label": null,
+      "passed": false,
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "C++",
+        "a.b"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Big Corp and big corp and BIG CORP"
+    },
+    "name": "multi-word competitor",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: Big Corp, big corp, BIG CORP",
+      "label": null,
+      "passed": false,
+      "score": 3.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "Big Corp"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "input": "FOO",
+      "output": "foo foo Foo"
+    },
+    "name": "repeated mentions count",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: FOO, foo, foo, Foo",
+      "label": null,
+      "passed": false,
+      "score": 4.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "Foo"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "谷歌是一家公司"
+    },
+    "name": "unicode competitor CJK",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: 谷歌",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "谷歌"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "I like 🍎 and 🍎"
+    },
+    "name": "emoji competitor",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: 🍎, 🍎",
+      "label": null,
+      "passed": false,
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "🍎"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "גוגל היא חברה"
+    },
+    "name": "RTL competitor",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: גוגל",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "גוגל"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "ÜNÏCODE rocks"
+    },
+    "name": "accented case folding",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: ÜNÏCODE",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "Ünïcode"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "line one\nGoogle is here\nline three"
+    },
+    "name": "multi-line output",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: Google",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "output": "OpenAI is Open"
+    },
+    "name": "alternation ordering: longer after shorter",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: Open, Open",
+      "label": null,
+      "passed": false,
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        "Open",
+        "OpenAI"
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "abc"
+    },
+    "name": "empty string competitor",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: , , , , , ",
+      "label": null,
+      "passed": false,
+      "score": 6.0,
+      "status": "processed"
+    },
+    "settings": {
+      "competitors": [
+        ""
+      ]
+    }
+  },
+  {
+    "entry": {
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Google. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+    },
+    "name": "long text with one mention",
+    "result": {
+      "cost": null,
+      "details": "Competitors mentioned: Google",
+      "label": null,
+      "passed": false,
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  }
+]

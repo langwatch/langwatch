@@ -1,0 +1,928 @@
+[
+  {
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "ola como vai voce eu vou bem obrigado"
+    },
+    "name": "en input, pt output mismatch",
+    "result": {
+      "cost": null,
+      "details": "Input and output languages do not match. Input languages detected: EN. Output languages detected: PT",
+      "label": "EN",
+      "passed": false,
+      "raw_response": {
+        "input": {
+          "EN": 0.37591396587304043
+        },
+        "output": {
+          "PT": 0.5438860811112145
+        }
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "i am doing very well thank you for asking today"
+    },
+    "name": "en input, en output match",
+    "result": {
+      "cost": null,
+      "details": "Input languages detected: EN. Output languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": {
+          "EN": 0.37591396587304027
+        },
+        "output": {
+          "EN": 0.5475020411414724
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "hello how is it going my friend? testing"
+    },
+    "name": "expected EN, both EN",
+    "result": {
+      "cost": null,
+      "details": "Input languages detected: EN. Output languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": {
+          "EN": 0.3759139658730406
+        },
+        "output": {
+          "EN": 0.37591396587303993
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "input_matches_output",
+      "expected_language": "EN"
+    }
+  },
+  {
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "hello how is it going my friend? testing"
+    },
+    "name": "expected PT, output EN",
+    "result": {
+      "cost": null,
+      "details": "Input and output do not match the expected language: PT. Input languages detected: EN. Output languages detected: EN",
+      "label": "EN",
+      "passed": false,
+      "raw_response": {
+        "input": {
+          "EN": 0.3759139658730403
+        },
+        "output": {
+          "EN": 0.3759139658730403
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "input_matches_output",
+      "expected_language": "PT"
+    }
+  },
+  {
+    "entry": {
+      "input": "small text",
+      "output": "small text"
+    },
+    "name": "short input skipped",
+    "result": {
+      "cost": null,
+      "details": "Skipped because the input has less than 7 words",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "input_matches_output",
+      "expected_language": "EN"
+    }
+  },
+  {
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "hi"
+    },
+    "name": "short output skipped",
+    "result": {
+      "cost": null,
+      "details": "Skipped because the output has less than 7 words",
+      "status": "skipped"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "input": "small text",
+      "output": "hello how is it going my friend? testing"
+    },
+    "name": "output_matches_language any language",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.3759139658730402
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": null
+    }
+  },
+  {
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    },
+    "name": "output_matches_language expected EN pass",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.4114423234603733
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "EN"
+    }
+  },
+  {
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    },
+    "name": "output_matches_language expected FR fail",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN",
+      "label": "EN",
+      "passed": false,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.4114423234603738
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "FR"
+    }
+  },
+  {
+    "entry": {
+      "output": "le renard brun rapide saute par dessus le chien paresseux chaque matin"
+    },
+    "name": "output_matches_language French",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FR",
+      "label": "FR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "FR": 0.8273065149533293
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "FR"
+    }
+  },
+  {
+    "entry": {
+      "output": "der schnelle braune fuchs springt jeden morgen ueber den faulen hund"
+    },
+    "name": "output_matches_language German",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: DE",
+      "label": "DE",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "DE": 0.7859894327549456
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "DE"
+    }
+  },
+  {
+    "entry": {
+      "output": "el rapido zorro marron salta sobre el perro perezoso cada manana"
+    },
+    "name": "output_matches_language Spanish",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: ES",
+      "label": "ES",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "ES": 0.5391288488965982
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "ES"
+    }
+  },
+  {
+    "entry": {
+      "output": "la veloce volpe marrone salta sopra il cane pigro ogni mattina"
+    },
+    "name": "output_matches_language Italian",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: IT",
+      "label": "IT",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "IT": 0.7885234922925511
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "IT"
+    }
+  },
+  {
+    "entry": {
+      "output": "de snelle bruine vos springt elke ochtend over de luie hond heen"
+    },
+    "name": "output_matches_language Dutch",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: NL",
+      "label": "NL",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "NL": 0.5870118040635839
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "NL"
+    }
+  },
+  {
+    "entry": {
+      "output": "быстрая коричневая лиса прыгает через ленивую собаку каждое утро"
+    },
+    "name": "output_matches_language Russian",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: RU",
+      "label": "RU",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "RU": 0.980257511670259
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "RU"
+    }
+  },
+  {
+    "entry": {
+      "output": "الثعلب البني السريع يقفز فوق الكلب الكسول كل صباح في الحديقة"
+    },
+    "name": "output_matches_language Arabic RTL",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: AR",
+      "label": "AR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "AR": 0.9988283312453796
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "AR"
+    }
+  },
+  {
+    "entry": {
+      "output": "השועל החום המהיר קופץ מעל הכלב העצל בכל בוקר בגינה הגדולה"
+    },
+    "name": "output_matches_language Hebrew RTL",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: HE",
+      "label": "HE",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "HE": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "HE"
+    }
+  },
+  {
+    "entry": {
+      "input": "自動更新の解約の仕方を教えてください",
+      "output": "自動更新を解約するには、ユーザーのアカウントにログインして、「設定」を選択して、「自動更新」を解約してください。"
+    },
+    "name": "Japanese input and output",
+    "result": {
+      "cost": null,
+      "details": "Input languages detected: JA. Output languages detected: JA",
+      "label": "JA",
+      "passed": true,
+      "raw_response": {
+        "input": {
+          "JA": 1.0
+        },
+        "output": {
+          "JA": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "min_words": 0
+    }
+  },
+  {
+    "entry": {
+      "output": "敏捷的棕色狐狸每天早上都会跳过那只懒惰的狗狗"
+    },
+    "name": "Chinese output_matches_language",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: ZH",
+      "label": "ZH",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "ZH": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "ZH"
+    }
+  },
+  {
+    "entry": {
+      "output": "빠른 갈색 여우는 매일 아침 게으른 개를 뛰어넘습니다 정말로"
+    },
+    "name": "Korean output_matches_language",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: KO",
+      "label": "KO",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "KO": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "KO"
+    }
+  },
+  {
+    "entry": {
+      "output": "สุนัขจิ้งจอกสีน้ำตาลกระโดดข้ามสุนัขขี้เกียจทุกเช้า"
+    },
+    "name": "Thai output_matches_language",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: TH",
+      "label": "TH",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "TH": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "TH"
+    }
+  },
+  {
+    "entry": {
+      "input": "lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor",
+      "output": "cogito ergo modus operandi"
+    },
+    "name": "Latin long repeated input",
+    "result": {
+      "cost": null,
+      "details": "Input languages detected: LA. Output languages detected: LA",
+      "label": "LA",
+      "passed": true,
+      "raw_response": {
+        "input": {
+          "LA": 0.9426325856644994
+        },
+        "output": {
+          "LA": 0.25458835034554744
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "min_words": 0
+    }
+  },
+  {
+    "entry": {
+      "output": "the weather today is very nice and le temps est vraiment magnifique aujourd'hui"
+    },
+    "name": "mixed language output EN and FR",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FR",
+      "label": "FR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "FR": 0.7729416062083618
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "FR"
+    }
+  },
+  {
+    "entry": {
+      "input": "hello my friend, como estas hoy amigo mio",
+      "output": "estoy muy bien gracias por preguntar amigo"
+    },
+    "name": "mixed language input EN and ES vs ES output",
+    "result": {
+      "cost": null,
+      "details": "Input languages detected: ES. Output languages detected: ES",
+      "label": "ES",
+      "passed": true,
+      "raw_response": {
+        "input": {
+          "ES": 0.37025245960221265
+        },
+        "output": {
+          "ES": 0.9199061387954103
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "min_words": 3
+    }
+  },
+  {
+    "entry": {
+      "output": "ok"
+    },
+    "name": "very short text with min_words 0",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the output with a confidence higher than 0.25",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 0
+    }
+  },
+  {
+    "entry": {
+      "output": "bonjour"
+    },
+    "name": "very short text with min_words 1 single word",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FR",
+      "label": "FR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "FR": 0.5448040264614572
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1,
+      "threshold": 0.05
+    }
+  },
+  {
+    "entry": {
+      "input": "thank you",
+      "output": "merci beaucoup"
+    },
+    "name": "very short two words input_matches_output",
+    "result": {
+      "cost": null,
+      "details": "Input and output languages do not match. Input languages detected: EN, XH, SO. Output languages detected: FR",
+      "label": "EN",
+      "passed": false,
+      "raw_response": {
+        "input": {
+          "EN": 0.1073688328892744,
+          "SO": 0.05990045335524344,
+          "XH": 0.06470028577093141
+        },
+        "output": {
+          "FR": 0.7779402810633835
+        }
+      },
+      "score": 4.0,
+      "status": "processed"
+    },
+    "settings": {
+      "min_words": 0,
+      "threshold": 0.05
+    }
+  },
+  {
+    "entry": {
+      "output": "the weather today is very nice and le temps est vraiment magnifique aujourd'hui"
+    },
+    "name": "high threshold skips",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the output with a confidence higher than 0.99",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "threshold": 0.99
+    }
+  },
+  {
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    },
+    "name": "threshold 0 detects many languages",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN, TL, DA, CY, SV, NB, YO, NL, XH, DE, PL, SK, IS, AF, ZU, LA, CS, NN, EO, SQ, TS, ID, MS, HU, FR, MI, VI, SW, TN, ES, SN, SL, GA, HR, LT, TR, BS, LG, IT, CA, ST, RO, PT, FI, ET, EU, SO, LV, AZ",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "AF": 0.014908012744178427,
+          "AZ": 0.0006883092850851785,
+          "BS": 0.004820985735158884,
+          "CA": 0.004090285725533969,
+          "CS": 0.013537935237794627,
+          "CY": 0.03601755452926647,
+          "DA": 0.03862588499109949,
+          "DE": 0.02080635288054333,
+          "EN": 0.41144232346037324,
+          "EO": 0.012320749806558,
+          "ES": 0.006758830667893219,
+          "ET": 0.0030345336274120735,
+          "EU": 0.0028659707630545703,
+          "FI": 0.0033360446048087597,
+          "FR": 0.007940643920853923,
+          "GA": 0.005903682694846931,
+          "HR": 0.005558334915661546,
+          "HU": 0.008668780367570118,
+          "ID": 0.011767151811685327,
+          "IS": 0.016545410687969265,
+          "IT": 0.004246406773875349,
+          "LA": 0.013684851671810569,
+          "LG": 0.004775193875513178,
+          "LT": 0.0052370262572107185,
+          "LV": 0.0007655435636200648,
+          "MI": 0.007698164902068776,
+          "MS": 0.009670026830045026,
+          "NB": 0.026553369483825674,
+          "NL": 0.024671497431236703,
+          "NN": 0.012684473378438978,
+          "PL": 0.019234257470587768,
+          "PT": 0.003623187232065828,
+          "RO": 0.003690356691383057,
+          "SK": 0.016622776655168037,
+          "SL": 0.005929332544875536,
+          "SN": 0.00638894644129114,
+          "SO": 0.00202692143727399,
+          "SQ": 0.01225655668062588,
+          "ST": 0.0037499617896622067,
+          "SV": 0.03183183875769781,
+          "SW": 0.0072995867974784195,
+          "TL": 0.054110314570442,
+          "TN": 0.006794837439679458,
+          "TR": 0.005093357669683981,
+          "TS": 0.012126654981365868,
+          "VI": 0.007537347552022077,
+          "XH": 0.02110077683268043,
+          "YO": 0.026484847261369134,
+          "ZU": 0.014473808569654866
+        }
+      },
+      "score": 49.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "threshold": 0.0
+    }
+  },
+  {
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    },
+    "name": "min_words 20 skips normal sentence",
+    "result": {
+      "cost": null,
+      "details": "Skipped because the output has less than 20 words",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 20
+    }
+  },
+  {
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    },
+    "name": "empty input default with input_matches_output",
+    "result": {
+      "cost": null,
+      "details": "Skipped because the input has less than 7 words",
+      "status": "skipped"
+    },
+    "settings": {}
+  },
+  {
+    "entry": {
+      "input": "the quick brown fox jumps over the lazy dog",
+      "output": ""
+    },
+    "name": "empty output",
+    "result": {
+      "cost": null,
+      "details": "Skipped because the output has less than 7 words",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language"
+    }
+  },
+  {
+    "entry": {
+      "output": "      "
+    },
+    "name": "whitespace-only output min_words 0",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the output with a confidence higher than 0.25",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 0
+    }
+  },
+  {
+    "entry": {
+      "output": "😀😀😀😀😀😀😀😀"
+    },
+    "name": "emoji only output min_words 0",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the output with a confidence higher than 0.25",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 0
+    }
+  },
+  {
+    "entry": {
+      "output": "the quick brown fox\njumps over the lazy dog\nevery single morning"
+    },
+    "name": "multi-line output",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.47131973789768355
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "EN"
+    }
+  },
+  {
+    "entry": {
+      "output": "1234 5678 9012 3456"
+    },
+    "name": "numbers only output",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the output with a confidence higher than 0.25",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 0
+    }
+  },
+  {
+    "entry": {
+      "output": "the weather today is very nice and le temps est vraiment magnifique aujourd'hui"
+    },
+    "name": "expected language present as secondary",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FR, EN",
+      "label": "FR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.10004005658686256,
+          "FR": 0.7729416062083616
+        }
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "EN",
+      "threshold": 0.1
+    }
+  },
+  {
+    "entry": {
+      "input": "eu gostaria de comprar um livro novo hoje",
+      "output": "yo quisiera comprar un libro nuevo hoy"
+    },
+    "name": "Portuguese vs Spanish similar languages",
+    "result": {
+      "cost": null,
+      "details": "Input and output languages do not match. Input languages detected: PT. Output languages detected: ES",
+      "label": "PT",
+      "passed": false,
+      "raw_response": {
+        "input": {
+          "PT": 0.6828254152941141
+        },
+        "output": {
+          "ES": 0.6620365573792198
+        }
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "min_words": 3
+    }
+  },
+  {
+    "entry": {
+      "output": "Lorem ipsum is placeholder text, but this sentence is written in plain English so that the detector has a long run of common words to work with. The quick brown fox jumps over the lazy dog, and then it runs across the field toward the river where the children are playing in the afternoon sun. When the evening comes everyone goes home for dinner and talks about what happened during the day."
+    },
+    "name": "long text output English",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "EN"
+    }
+  },
+  {
+    "entry": {
+      "input": "         ",
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    },
+    "name": "whitespace-only input skipped",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the input with a confidence higher than 0.25",
+      "status": "skipped"
+    },
+    "settings": {}
+  }
+]
