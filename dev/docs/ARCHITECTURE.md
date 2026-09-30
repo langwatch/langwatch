@@ -1285,6 +1285,8 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
+- `GET /api/checkup` keeps the branch's `organization:view` guard; main answers any project key. The drift is
+  accepted, since the checkup reads organisation-wide state (Alex, 2026-09-30).
 - A key-authenticated door's actor carries the key's owner, set by the runtime's credential
   authentication, so no handler or module looks the owner up itself (Alex, 2026-09-25).
 - A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
