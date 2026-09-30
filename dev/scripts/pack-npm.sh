@@ -567,6 +567,24 @@ if [ -z "$tarball" ]; then
   exit 1
 fi
 
+# pnpm 12 leaves every lockfile out of a pack, at any depth and even when
+# `files` names it, so the staged app/pnpm-lock.yaml goes back in by hand.
+# Relative paths only: Windows runners may resolve `tar` to bsdtar, which
+# reads neither msys paths nor drive letters the same way GNU tar does.
+lock_listing="$(mktemp)"
+tar -tzf "$tarball" > "$lock_listing"
+if [ -f "$STAGE/app/pnpm-lock.yaml" ] && ! grep -qx "package/app/pnpm-lock.yaml" "$lock_listing"; then
+  relock="$(mktemp -d)"
+  mkdir -p "$relock/package/app"
+  cp "$STAGE/app/pnpm-lock.yaml" "$relock/package/app/pnpm-lock.yaml"
+  gzip -dc "$tarball" > "$relock/pack.tar"
+  (cd "$relock" && tar -rf pack.tar package/app/pnpm-lock.yaml)
+  gzip -9 -c "$relock/pack.tar" > "$tarball"
+  rm -rf "$relock"
+  echo "→ restored app/pnpm-lock.yaml, which pnpm pack leaves out"
+fi
+rm -f "$lock_listing"
+
 # Assert the tarball carries everything the staging tree put in it.
 #
 # Packing applies its own filtering on top of the staged allowlist, so a file
