@@ -118,6 +118,11 @@ async function teamsReceived({
     },
     permissions: createApiFixture<AuthzApi>({
       hasPermission: vi.fn(async () => false),
+      canBatchByIds: vi.fn(async () => ({
+        teams: new Map<string, boolean>(),
+        projects: new Map<string, boolean>(),
+        organizationRole: null,
+      })),
       listBindingsForSynthesis: vi.fn(async () => bindings),
     }),
     secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
