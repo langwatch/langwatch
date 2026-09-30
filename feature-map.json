@@ -1455,7 +1455,7 @@
         {
           "id": "settings.role-bindings",
           "name": "Role Bindings",
-          "description": "Grant a role to a user, a group or an API key at an organization, team or project scope",
+          "description": "Deprecated, superseded by Grants: grant a role to a user, a group or an API key at an organization, team or project scope",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1482,6 +1482,39 @@
           },
           "sync": null,
           "produces": ["role-bindings"],
+          "consumes": []
+        },
+        {
+          "id": "settings.grants",
+          "name": "Grants",
+          "description": "Grant a built-in or custom role to a user, a group or an API key at an organization, team or project scope, up to the permissions the caller holds; supersedes role bindings",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [
+                "grants list",
+                "grants get",
+                "grants create",
+                "grants change-role",
+                "grants revoke"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/roles",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/v1/grants",
+            "docs": null
+          },
+          "sync": null,
+          "produces": ["grants"],
           "consumes": []
         },
         {

@@ -89,6 +89,9 @@ export class RoleBindingsApiError extends Error {
   }
 }
 
+/**
+ * @deprecated `/api/v1/role-bindings` is superseded by `/api/v1/grants`: use `GrantsApiService`.
+ */
 export class RoleBindingsApiService {
   readonly #request: ManagementRequest;
 

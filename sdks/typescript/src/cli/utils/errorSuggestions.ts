@@ -105,6 +105,22 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
     ],
     docUrl: `${DOCS}/agent-testing/connect-your-agent`,
   },
+  // A grant, or a custom-role edit, may reach only as far as the caller's own
+  // permissions; an API key is judged by its own, never its owner's.
+  grant_exceeds_caller_permissions: {
+    suggestions: [
+      "Grant a role that carries only permissions you hold yourself; the ones you lack are listed under missingPermissions above",
+      "Or ask someone who holds those permissions at that scope to make the grant",
+    ],
+    docUrl: `${DOCS}/platform/roles-and-access`,
+  },
+  role_exceeds_caller_permissions: {
+    suggestions: [
+      "Leave out the permissions listed under missingPermissions above; you cannot add a permission you do not hold",
+      "Or ask someone who holds them to change the role",
+    ],
+    docUrl: `${DOCS}/platform/roles-and-access`,
+  },
   network_error: {
     suggestions: [
       "Check your network connection",

@@ -385,6 +385,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerGroupsCommands(program);
   registerRolesCommands(program);
   registerRoleBindingsCommands(program);
+  registerGrantsCommands(program);
   registerScimTokensCommands(program);
   registerOrganizationsCommands(program);
   registerDaemonCommands(program);
@@ -5384,11 +5385,13 @@ function registerRolesCommands(program: Command): void {
   emitsResult(
     rolesCmd
       .command("list")
-      .description("List the organization's custom roles")
+      .description("List the organization's roles: the built-in ones first, then custom")
+      .option("--built-in", "Only the built-in roles: admin, member and viewer")
+      .option("--no-built-in", "Only the custom roles")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+    async (options: { builtIn?: boolean }) => {
       const { listRolesCommand: impl } = await import("./commands/roles/list.js");
-      return impl();
+      return impl({ builtIn: options.builtIn });
     },
   );
 
@@ -5460,10 +5463,17 @@ function registerRolesCommands(program: Command): void {
   );
 }
 
+/** Alex's ruling on the superseded door: a server log plus this stderr line. */
+export const ROLE_BINDINGS_DEPRECATION =
+  "Warning: `langwatch role-bindings` is deprecated and will be removed. Use `langwatch grants` (/api/v1/grants) instead.";
+
 function registerRoleBindingsCommands(program: Command): void {
   const roleBindingsCmd = program
     .command("role-bindings")
-    .description("Grant roles to people, groups and API keys at a scope");
+    .description("Deprecated: use `langwatch grants`. Grant roles at a scope")
+    .hook("preAction", () => {
+      console.error(ROLE_BINDINGS_DEPRECATION);
+    });
 
   emitsResult(
     roleBindingsCmd
@@ -5533,6 +5543,109 @@ function registerRoleBindingsCommands(program: Command): void {
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (id: string) => {
       const { deleteRoleBindingCommand: impl } = await import("./commands/role-bindings/delete.js");
+      return impl(id);
+    },
+  );
+}
+
+function registerGrantsCommands(program: Command): void {
+  const grantsCmd = program
+    .command("grants")
+    .description("Grant roles to people, groups and API keys at a scope");
+
+  emitsResult(
+    grantsCmd
+      .command("list")
+      .description("List grants one page at a time, optionally filtered")
+      .option("--principal-type <type>", "Kind of principal: user, group or api-key")
+      .option("--principal-id <id>", "The user, group or API key id")
+      .option("--role <roleId>", "A built-in role (admin, member, viewer) or a custom role id")
+      .option("--scope-type <type>", "Filter by scope: organization, team or project")
+      .option("--scope-id <id>", "Filter by the organization, team or project id")
+      .option("--status <status>", "active or expired; both when omitted")
+      .option("--limit <n>", "Grants per page (default 50, max 200)")
+      .option("--cursor <cursor>", "The next-page cursor a previous page printed")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      principalType?: string;
+      principalId?: string;
+      role?: string;
+      scopeType?: string;
+      scopeId?: string;
+      status?: string;
+      limit?: string;
+      cursor?: string;
+    }) => {
+      const { listGrantsCommand: impl } = await import("./commands/grants/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    grantsCmd
+      .command("get <id>")
+      .description("Get one grant")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { getGrantCommand: impl } = await import("./commands/grants/get.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    grantsCmd
+      .command("create")
+      .description("Grant one role to one principal at one scope, up to what you hold yourself")
+      .requiredOption("--principal-type <type>", "Kind of principal: user, group or api-key")
+      .requiredOption("--principal-id <id>", "The user, group or API key id")
+      .requiredOption(
+        "--role <roleId>",
+        "A built-in role (admin, member, viewer) or a custom role id",
+      )
+      .requiredOption("--scope-type <type>", "Where it applies: organization, team or project")
+      .requiredOption("--scope-id <id>", "The organization, team or project id")
+      .option("--expires-at <iso>", "When the grant stops granting, as an ISO-8601 time")
+      .option(
+        "--idempotency-key <key>",
+        "Retry-safe key: a repeat with the same body makes one grant",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: {
+      principalType: string;
+      principalId: string;
+      role: string;
+      scopeType: string;
+      scopeId: string;
+      expiresAt?: string;
+      idempotencyKey?: string;
+    }) => {
+      const { createGrantCommand: impl } = await import("./commands/grants/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    grantsCmd
+      .command("change-role <id>")
+      .description("Change the role a grant carries; principal and scope stay as they are")
+      .requiredOption(
+        "--role <roleId>",
+        "A built-in role (admin, member, viewer) or a custom role id",
+      )
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { role: string }) => {
+      const { changeGrantRoleCommand: impl } = await import("./commands/grants/change-role.js");
+      return impl({ id, role: options.role });
+    },
+  );
+
+  emitsResult(
+    grantsCmd
+      .command("revoke <id>")
+      .description("Revoke a grant")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { revokeGrantCommand: impl } = await import("./commands/grants/revoke.js");
       return impl(id);
     },
   );

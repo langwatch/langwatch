@@ -505,3 +505,26 @@ describe("given a validation failure with one reason per rejected field", () => 
     });
   });
 });
+
+describe("given an escalation refusal", () => {
+  const refusal = () =>
+    handledError({
+      code: "grant_exceeds_caller_permissions",
+      message: "You cannot grant a role with permissions you do not hold yourself",
+      httpStatus: 403,
+      meta: { missingPermissions: ["secrets:manage", "project:delete"] },
+      traceId: undefined,
+    });
+
+  describe("when rendering it for a person", () => {
+    /** @scenario An escalation refusal lists the missing permissions */
+    it("lists the missing permissions as words and says what to do instead", () => {
+      const rendered = renderErrorForHumans(readCommandError(refusal()));
+
+      expect(rendered).toContain("secrets:manage, project:delete");
+      expect(rendered).not.toContain('["secrets:manage"');
+      expect(rendered).toContain("only permissions you hold yourself");
+      expect(rendered).toContain("ask someone who holds those permissions");
+    });
+  });
+});

@@ -105,6 +105,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Access Groups                |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
 | Custom Roles                 |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
 | Role Bindings                |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
+| Grants                       |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
 | SCIM Provisioning            |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  —   |
 | **Support**                  |        |        |        |     |              |     |     |                  |     |      |
 | Bug reports                  |   —    |   —    |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
@@ -119,7 +120,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 - **Prompt Playground** — Pure UI feature; no SDK/CLI/MCP planned.
 - **AI Gateway** — CLI/UI/API only (no SDK or MCP surface yet). `ingest` is read-only by design; `ingest install` is a hidden scripting primitive and deliberately not in the map.
 - **Agent Skills** — CLI-only by design: `langwatch skills list/get/install/uninstall/update` installs the bundled agent skills (compiled from `skills/` into the CLI at build time) into `~/.agents/skills`. No platform surface — the skills repo (`langwatch/skills`) and `npx skills add` remain the browser-side distribution.
-- **Organization management**: Organization, Members and Invites, Teams, Access Groups, Custom Roles, Role Bindings and SCIM Provisioning are the provisioning surface: CLI + REST + UI, no SDK or MCP. Two different gates apply, and they are not the same one:
+- **Organization management**: Organization, Members and Invites, Teams, Access Groups, Custom Roles, Grants, Role Bindings (deprecated) and SCIM Provisioning are the provisioning surface: CLI + REST + UI, no SDK or MCP. Two different gates apply, and they are not the same one:
   - The organization-scoped families (everything above except Teams) need an Enterprise plan, and answer `402 enterprise_plan_required` on any plan below it. Teams is ungated.
   - `langwatch organizations create|list|get` is a separate, plan-ungated family. It provisions organizations on a **self-hosted** instance and authenticates with the instance administrator credential (`LANGWATCH_INSTANCE_ADMIN_API_KEY`) rather than an organization API key, so it answers `404` wherever that credential is unset and on LangWatch Cloud, where the family does not exist at all. It is listed under Organization because it addresses the same resource.
 - **Skills (platform side)** — Only `analytics`, `scenarios`, and `evaluators` have dedicated platform-side skills. Most features use shared platform skill conventions through MCP tools directly.

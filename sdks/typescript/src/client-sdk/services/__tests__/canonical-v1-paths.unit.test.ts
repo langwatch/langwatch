@@ -23,7 +23,7 @@ const SDK_SRC = resolve(__dirname, "../../..");
  */
 const V1_FAMILIES = new Set(
   `agent-cache analytics annotations api-keys bug-reports coding-agent dashboards dataset dspy
-   evaluations evaluators events experiment experiments governance graphs groups guardrails langy me
+   evaluations evaluators events experiment experiments governance grants graphs groups guardrails langy me
    model-defaults model-providers monitors optimization organization organizations playground
    prompts role-bindings roles scenario-events scenarios scim-tokens simulation-runs suites
    teams trace traces trigger triggers workflows`.split(/\s+/),

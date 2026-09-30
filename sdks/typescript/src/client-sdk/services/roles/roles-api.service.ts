@@ -16,8 +16,11 @@ export interface CustomRole {
   name: string;
   description: string | null;
   permissions: string[];
-  createdAt: string;
-  updatedAt: string;
+  /** `admin`, `member` and `viewer` are built in; they cannot be changed or deleted. */
+  builtIn: boolean;
+  /** Null on a built-in role. */
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export interface CreateRoleInput {
@@ -67,10 +70,12 @@ export class RolesApiService {
     });
   }
 
-  async list(): Promise<{ roles: CustomRole[] }> {
+  /** Built-ins first, then custom; `builtIn` narrows to one or the other. */
+  async list({ builtIn }: { builtIn?: boolean } = {}): Promise<{ roles: CustomRole[] }> {
     return this.#request({
-      operation: "list custom roles",
+      operation: "list roles",
       path: managementPath("/api/v1/roles"),
+      query: { builtIn },
     });
   }
 

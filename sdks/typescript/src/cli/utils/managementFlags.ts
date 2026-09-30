@@ -12,6 +12,14 @@ import {
   type ManagementScopeType,
   type OrganizationRole,
 } from "@/client-sdk/services/_shared/management-types";
+import {
+  GRANT_SCOPE_TYPES,
+  GRANT_STATUSES,
+  type GrantPrincipalType,
+  type GrantScopeType,
+  type GrantStatus,
+  type ListGrantsOptions,
+} from "@/client-sdk/services/grants/grants-api.service";
 import type { ListRoleBindingsOptions } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
 
 /** A flag value the CLI refuses before it ever reaches the platform. */
@@ -252,4 +260,64 @@ export const parsePermissionMode = (value: string): ApiKeyPermissionModeFlag => 
     );
   }
   return mode as ApiKeyPermissionModeFlag;
+};
+
+/** The wire word each `--principal-type` spelling names on `/api/v1/grants`. */
+const GRANT_PRINCIPAL_BY_FLAG = {
+  user: "user",
+  group: "group",
+  "api-key": "apiKey",
+} as const satisfies Record<RoleBindingPrincipalFlag, GrantPrincipalType>;
+
+export const parseGrantPrincipalType = (value: string): GrantPrincipalType =>
+  GRANT_PRINCIPAL_BY_FLAG[parsePrincipalType(value)];
+
+/** Case-insensitive, sent lowercase as the grants family spells it. */
+export const parseGrantScopeType = (value: string): GrantScopeType => {
+  const scopeType = GRANT_SCOPE_TYPES.find((type) => type === value.trim().toLowerCase());
+  if (!scopeType) {
+    throw new ManagementFlagError(
+      `Invalid scope type "${value}" in --scope-type. Expected one of ${oneOf(GRANT_SCOPE_TYPES)}.`,
+    );
+  }
+  return scopeType;
+};
+
+const parseGrantStatus = (value: string): GrantStatus => {
+  const status = GRANT_STATUSES.find((candidate) => candidate === value.trim().toLowerCase());
+  if (!status) {
+    throw new ManagementFlagError(
+      `Invalid status "${value}". Expected one of ${oneOf(GRANT_STATUSES)}.`,
+    );
+  }
+  return status;
+};
+
+export interface GrantFilterFlags {
+  principalType?: string;
+  principalId?: string;
+  role?: string;
+  scopeType?: string;
+  scopeId?: string;
+  status?: string;
+  limit?: string;
+  cursor?: string;
+}
+
+/** The filters a grants listing sends; a filter not given is absent, never empty. */
+export const composeGrantFilters = (flags: GrantFilterFlags): ListGrantsOptions => {
+  const filters: ListGrantsOptions = {};
+  if (flags.principalType !== undefined) {
+    filters.principalType = parseGrantPrincipalType(flags.principalType);
+  }
+  if (flags.principalId !== undefined) filters.principalId = flags.principalId;
+  if (flags.role !== undefined) filters.roleId = flags.role;
+  if (flags.scopeType !== undefined) filters.scopeType = parseGrantScopeType(flags.scopeType);
+  if (flags.scopeId !== undefined) filters.scopeId = flags.scopeId;
+  if (flags.status !== undefined) filters.status = parseGrantStatus(flags.status);
+  if (flags.limit !== undefined) {
+    filters.limit = parseCount({ value: flags.limit, flag: "--limit" });
+  }
+  if (flags.cursor !== undefined) filters.cursor = flags.cursor;
+  return filters;
 };
