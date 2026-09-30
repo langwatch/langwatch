@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { rememberLastUsedMethod } from "../model/last-used-method.ts";
 import {
   isCeremonyAbandoned,
+  passkeyFailure,
   passkeyFailureFrom,
   readPasskeyErrorCode,
 } from "../model/passkey-failure.ts";
@@ -42,10 +43,52 @@ async function offerPasskeyFromAutofill({
 
     rememberLastUsedMethod({ id: "passkey" });
     navigate(safeRedirectTarget(callbackUrl));
-  } catch {
-    // Silent by design. Nobody started this, so nobody is owed an error.
-    return;
+  } catch (error) {
+    // A dismissed sheet throws too; only a ceremony that broke is reported.
+    if (!isLive()) return;
+    if (error instanceof DOMException && isCeremonyAbandoned({ name: error.name })) return;
+    onError(passkeyFailure(void 0));
   }
+}
+
+const isWebauthnField = (target: EventTarget | null): boolean =>
+  target instanceof HTMLInputElement && target.matches('input[autocomplete~="webauthn"]');
+
+/**
+ * Calls onReach once, on the person's first gesture toward the address field,
+ * and returns the stop. A gesture is a pointer or a key, never a focus: the
+ * entrance focuses the field itself, and that must not start a ceremony.
+ */
+function watchForReach(onReach: () => void): () => void {
+  let interacted = false;
+  const reach = () => {
+    stop();
+    onReach();
+  };
+  // Tab arriving in the field: the keydown that moved focus set `interacted`.
+  const onFocusIn = (event: FocusEvent) => {
+    if (interacted && isWebauthnField(event.target)) reach();
+  };
+  // Only a click aimed at the field: Continue runs a ceremony of its own, and
+  // two ceremonies on one challenge turn a good passkey down.
+  const onPointerDown = (event: Event) => {
+    interacted = true;
+    if (isWebauthnField(event.target)) reach();
+  };
+  // A keystroke while already in the field counts: the entrance autofocuses it.
+  const onKeyDown = (event: Event) => {
+    interacted = true;
+    if (isWebauthnField(event.target) || isWebauthnField(document.activeElement)) reach();
+  };
+  const stop = () => {
+    document.removeEventListener("focusin", onFocusIn);
+    document.removeEventListener("pointerdown", onPointerDown);
+    document.removeEventListener("keydown", onKeyDown);
+  };
+  document.addEventListener("focusin", onFocusIn);
+  document.addEventListener("pointerdown", onPointerDown);
+  document.addEventListener("keydown", onKeyDown);
+  return stop;
 }
 
 /**
@@ -74,57 +117,25 @@ export function usePasskeyAutofill({
     if (!enabled) return;
 
     // The ceremony has no abort handle through the plugin, so a screen that
-    // leaves cannot cancel the request it started. What it can do is refuse to
-    // act on it: a navigation fired from an unmounted door would take somebody
-    // somewhere they had already left.
+    // leaves cannot cancel it; it can refuse to act on it. A sign-in that
+    // worked navigates away (pagehide) before this door unmounts.
     let live = true;
-    let offered = false;
-    // A gesture is a pointer or a key, not a focus: the entrance focuses the
-    // field programmatically, and that must not start a ceremony.
-    let interacted = false;
-
-    const isWebauthnField = (target: EventTarget | null): boolean =>
-      target instanceof HTMLInputElement && target.matches('input[autocomplete~="webauthn"]');
-
-    const offerOnce = () => {
-      if (offered || !live) return;
-      offered = true;
-      remove();
+    const leave = () => {
+      live = false;
+    };
+    const stop = watchForReach(() => {
       void offerPasskeyFromAutofill({
         isLive: () => live,
         callbackUrl,
         onError: (error) => reportError.current?.(error),
       });
-    };
-
-    const onFocusIn = (event: FocusEvent) => {
-      // Tab arriving in the field: the keydown that moved focus set
-      // `interacted`, and this focus is the person landing.
-      if (interacted && isWebauthnField(event.target)) offerOnce();
-    };
-
-    const onGesture = (event: Event) => {
-      interacted = true;
-      // A click straight into the field, or a keystroke while already in it
-      // (the entrance autofocuses, so typing is often the FIRST gesture).
-      if (isWebauthnField(event.target) || isWebauthnField(document.activeElement)) {
-        offerOnce();
-      }
-    };
-
-    const remove = () => {
-      document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("pointerdown", onGesture);
-      document.removeEventListener("keydown", onGesture);
-    };
-
-    document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("pointerdown", onGesture);
-    document.addEventListener("keydown", onGesture);
+    });
+    window.addEventListener("pagehide", leave);
 
     return () => {
-      live = false;
-      remove();
+      leave();
+      stop();
+      window.removeEventListener("pagehide", leave);
     };
   }, [enabled, callbackUrl]);
 }

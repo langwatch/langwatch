@@ -26,6 +26,7 @@ function Door({ enabled, onError }: { enabled: boolean; onError?: (error: unknow
     <ChakraProvider value={defaultSystem}>
       <Input aria-label="Email" autoComplete="username webauthn" />
       <Input aria-label="Name" autoComplete="name" />
+      <button type="button">Continue</button>
     </ChakraProvider>
   );
 }
@@ -114,6 +115,19 @@ describe("given a deployment that offers passkeys", () => {
     });
   });
 
+  describe("when I click a button while the entrance holds focus in the field", () => {
+    /** @scenario Clicking a button on the card is not reaching for the address field */
+    it("starts nothing, because the pointer was not aimed at the field", async () => {
+      const { getByLabelText, getByRole } = render(<Door enabled />);
+      getByLabelText("Email").focus();
+
+      fireEvent.pointerDown(getByRole("button", { name: "Continue" }));
+      await flush();
+
+      expect(passkeyMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when my gestures land anywhere else", () => {
     /** @scenario The passkey offer waits until I reach for the address field */
     it("starts nothing", async () => {
@@ -170,6 +184,58 @@ describe("given a deployment that offers passkeys", () => {
         await waitFor(() =>
           expect(onError).toHaveBeenCalledWith({ error: "identity_passkey_not_recognized" }),
         );
+      });
+    });
+
+    describe("and the ceremony threw", () => {
+      /** @scenario "A passkey I picked that cannot be used says so" */
+      it("says the attempt did not finish", async () => {
+        passkeyMock.mockRejectedValueOnce(new Error("the authenticator gave up"));
+        const onError = vi.fn();
+        const { getByLabelText } = render(<Door enabled onError={onError} />);
+
+        fireEvent.pointerDown(getByLabelText("Email"));
+
+        await waitFor(() =>
+          expect(onError).toHaveBeenCalledWith({ error: "identity_passkey_ceremony_failed" }),
+        );
+      });
+
+      /** @scenario "Dismissing the passkey sheet is not a failure" */
+      it.each([["NotAllowedError"], ["AbortError"]])("stays silent for %s", async (name) => {
+        passkeyMock.mockRejectedValueOnce(new DOMException("declined", name));
+        const onError = vi.fn();
+        const { getByLabelText } = render(<Door enabled onError={onError} />);
+
+        fireEvent.pointerDown(getByLabelText("Email"));
+        await flush();
+
+        expect(onError).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("and the page is leaving before it settles", () => {
+      /** @scenario Leaving the sign-in screen does not read as a passkey failure */
+      it("ignores whatever the ceremony settles to", async () => {
+        let settle: (result: unknown) => void = () => undefined;
+        passkeyMock.mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              settle = resolve;
+            }),
+        );
+        const onError = vi.fn();
+        const { getByLabelText } = render(<Door enabled onError={onError} />);
+
+        fireEvent.pointerDown(getByLabelText("Email"));
+        await waitFor(() => expect(passkeyMock).toHaveBeenCalled());
+
+        window.dispatchEvent(new Event("pagehide"));
+        settle({ data: null, error: { code: "PASSKEY_NOT_FOUND", status: 401 } });
+        await flush();
+
+        expect(onError).not.toHaveBeenCalled();
+        expect(navigateMock).not.toHaveBeenCalled();
       });
     });
 
