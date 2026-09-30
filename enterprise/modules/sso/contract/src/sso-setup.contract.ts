@@ -6,6 +6,8 @@
  */
 import { z } from "zod";
 
+import { ssoSelfServeAvailabilitySchema } from "./sso-self-serve.contract.ts";
+
 /** Which connection of the caller's own organization is being read. */
 export const ssoSetupConnectionSchema = z.object({
   organizationId: z.string().min(1),
@@ -191,6 +193,8 @@ export type SsoSetupMigration = z.infer<typeof ssoSetupMigrationSchema>;
 
 export const ssoSetupPageViewSchema = z
   .object({
+    /** Whether this organization may set single sign-on up itself, and if not, why. */
+    availability: ssoSelfServeAvailabilitySchema,
     /** Null before the organization has registered its first connection. */
     connection: ssoSetupConnectionViewSchema.nullable(),
     claims: z.array(ssoSetupClaimSchema),

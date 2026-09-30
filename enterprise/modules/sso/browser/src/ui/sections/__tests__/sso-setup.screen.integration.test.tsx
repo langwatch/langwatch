@@ -152,6 +152,7 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
     },
     legacyRoute: null,
     migration: null,
+    availability: { available: true },
     serviceProvider: SERVICE_PROVIDER,
     ...overrides,
   };
@@ -258,6 +259,21 @@ describe("the single sign-on setup page", () => {
       renderWithSsoHost(<SsoSetupScreen />);
 
       expect(screen.getByTestId("sso-setup-unavailable")).toBeInTheDocument();
+    });
+  });
+
+  describe("given an organization that cannot set it up yet", () => {
+    it("says why and offers no journey it would refuse", () => {
+      state.view = setupView({
+        availability: { available: false, refusal: "license_required" },
+        connection: null,
+        goLive: null,
+      });
+
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByTestId("sso-availability-refusal")).toHaveTextContent(/active licence/);
+      expect(screen.queryByTestId("sso-setup")).toBeNull();
     });
   });
 

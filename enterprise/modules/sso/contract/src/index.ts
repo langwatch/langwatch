@@ -64,7 +64,10 @@ export {
 } from "./sso-setup.contract.ts";
 export {
   SSO_SELF_SERVE_DEPLOYMENTS,
+  SSO_SELF_SERVE_REFUSALS,
+  ssoSelfServeAvailabilitySchema,
   ssoSelfServeContextSchema,
+  type SsoSelfServeAvailability,
   type SsoSelfServeContext,
 } from "./sso-self-serve.contract.ts";
 export {

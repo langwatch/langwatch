@@ -23,7 +23,7 @@ import { updateChipFor } from "../../model/migration-route.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import { domainClaimsOf, goLiveFactsOf } from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
-import { LoadFailure } from "../elements/refusals.tsx";
+import { AvailabilityRefusalNotice, LoadFailure } from "../elements/refusals.tsx";
 import { TestSignInFailureNotice } from "../elements/test-sign-in-failure-notice.tsx";
 
 const PROVIDER_PAGE = "/settings/authentication/provider";
@@ -39,20 +39,26 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
 
   const view = setup.data;
   const connection = view?.connection ?? null;
-
-  if (view && connection?.state === "ACTIVE") {
-    return <SingleSignOnCard view={view} connection={connection} canManage={canManage} />;
-  }
+  const refusal = view && !view.availability.available ? view.availability.refusal : null;
+  // A refusal is said above the cards, and nothing is offered that it would refuse.
+  const canOffer = canManage && refusal === null;
 
   return (
-    <SingleSignOnPreviewCard
-      state={connection?.state ?? null}
-      canManage={canManage}
-      updatePhase={view?.migration?.phase ?? null}
-      goLiveBlockedBecause={
-        setupProgressFor(goLiveFactsOf(view?.goLive ?? null)).goLiveBlockedBecause
-      }
-    />
+    <>
+      {refusal && <AvailabilityRefusalNotice refusal={refusal} />}
+      {view && connection?.state === "ACTIVE" ? (
+        <SingleSignOnCard view={view} connection={connection} canManage={canOffer} />
+      ) : (
+        <SingleSignOnPreviewCard
+          state={connection?.state ?? null}
+          canManage={canOffer}
+          updatePhase={view?.migration?.phase ?? null}
+          goLiveBlockedBecause={
+            setupProgressFor(goLiveFactsOf(view?.goLive ?? null)).goLiveBlockedBecause
+          }
+        />
+      )}
+    </>
   );
 }
 

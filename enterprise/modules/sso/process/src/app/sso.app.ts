@@ -342,6 +342,7 @@ export class SsoApp implements SsoApiContract {
 
     return {
       ...journey,
+      availability: await this.#selfServeContext.availability(input),
       serviceProvider: ssoServiceProviderAddresses({
         baseUrl: this.#baseUrl,
         connectionId: journey.connection?.connectionId ?? null,

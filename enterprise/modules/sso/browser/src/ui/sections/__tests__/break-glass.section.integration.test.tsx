@@ -36,6 +36,7 @@ function renderSection(
     grants?: BreakGlassGrantView[];
     candidates?: BreakGlassCandidateView[];
     canManage?: boolean;
+    grantSettling?: boolean;
   } = {},
 ) {
   const onGrant = vi.fn();
@@ -46,6 +47,7 @@ function renderSection(
       canManage={overrides.canManage ?? true}
       grants={overrides.grants ?? []}
       candidates={overrides.candidates ?? CANDIDATES}
+      grantSettling={overrides.grantSettling}
       onGrant={onGrant}
       onRenew={onRenew}
       onRevoke={onRevoke}
@@ -186,5 +188,25 @@ describe("given a reader who may not manage single sign-on", () => {
     expect(screen.getByText("Jane Doe")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "End now" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Grant a way back in" })).toBeNull();
+  });
+});
+
+describe("given a grant the server accepted that the setup read has not shown yet", () => {
+  it("says recovery access is being updated, and says nothing once it has caught up", () => {
+    const { rerenderWithSsoHost } = renderSection({ grantSettling: true });
+
+    expect(screen.getByRole("status").textContent).toMatch(/Recovery access is being updated/);
+
+    rerenderWithSsoHost(
+      <BreakGlassSection
+        canManage
+        grants={[]}
+        candidates={CANDIDATES}
+        onGrant={vi.fn()}
+        onRenew={vi.fn()}
+        onRevoke={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

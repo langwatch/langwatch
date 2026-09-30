@@ -9,7 +9,7 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { renderWithSsoHost } from "../../../testing.tsx";
-import { InlineRefusal, LoadFailure } from "../refusals.tsx";
+import { AvailabilityRefusalNotice, InlineRefusal, LoadFailure } from "../refusals.tsx";
 
 /**
  * The wire shape a tRPC refusal arrives in — `data.error` carrying a `code`
@@ -89,5 +89,21 @@ describe("given a read that failed", () => {
 
     expect(screen.getByTestId("sso-load-failure")).toBeTruthy();
     expect(screen.getByText(/We could not load your sign-in history\./)).toBeTruthy();
+  });
+});
+
+describe("given an organization that cannot set single sign-on up yet", () => {
+  it("says why and what would change it, for each reason", () => {
+    const { rerenderWithSsoHost } = renderWithSsoHost(
+      <AvailabilityRefusalNotice refusal="not_opted_in" />,
+    );
+    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/isn't switched on/);
+    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/talk to us/i);
+
+    rerenderWithSsoHost(<AvailabilityRefusalNotice refusal="license_required" />);
+    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/active licence/);
+
+    rerenderWithSsoHost(<AvailabilityRefusalNotice refusal="license_restart_required" />);
+    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/next restart/);
   });
 });

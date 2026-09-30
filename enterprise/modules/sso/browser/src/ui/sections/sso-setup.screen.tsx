@@ -20,6 +20,7 @@ import { useArrivalPolicy } from "../../behavior/use-arrival-policy.ts";
 import { useMigrationMembers } from "../../behavior/use-migration-members.ts";
 import { useSettlingSetup } from "../../behavior/use-settling-setup.ts";
 import { arrivalAnswerLabel, SSO_ANSWER_BY_POLICY } from "../../model/arrivals.ts";
+import { liveBreakGlassGrants } from "../../model/break-glass-grants.ts";
 import { providerDisplayName } from "../../model/provider-display-name.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import {
@@ -30,8 +31,9 @@ import {
 } from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
 import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
+import { IssuerRow } from "../elements/issuer-row.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
-import { LoadFailure } from "../elements/refusals.tsx";
+import { AvailabilityRefusalNotice, LoadFailure } from "../elements/refusals.tsx";
 import { SetupStep, SetupSteps } from "../elements/setup-step.tsx";
 import { ArrivalsSection } from "./arrivals.section.tsx";
 import { BreakGlassSection } from "./break-glass.section.tsx";
@@ -106,6 +108,10 @@ function SsoSetupPage({ organizationId }: { organizationId: string }) {
   }
 
   const view = setup.data;
+
+  if (!view.availability.available) {
+    return <AvailabilityRefusalNotice refusal={view.availability.refusal} />;
+  }
 
   if (view.connection === null) {
     return view.legacyRoute ? (
@@ -474,6 +480,7 @@ function SetupJourneySteps({
               onRename={renameConnection}
             />
           </HStack>
+          {connection.issuer && <IssuerRow issuer={connection.issuer} />}
           <ServiceProviderSection
             protocol={connection.type}
             addresses={view.serviceProvider}
@@ -520,6 +527,7 @@ function SetupJourneySteps({
         <BreakGlassStep
           organizationId={organizationId}
           canManage={canManage}
+          liveCount={view.goLive?.breakGlass.liveCount ?? 0}
           onChanged={onChanged}
         />
       </SetupStep>
@@ -569,10 +577,12 @@ function SetupJourneySteps({
 function BreakGlassStep({
   organizationId,
   canManage,
+  liveCount,
   onChanged,
 }: {
   organizationId: string;
   canManage: boolean;
+  liveCount: number;
   onChanged: () => void;
 }) {
   const host = useSsoHost();
@@ -587,6 +597,14 @@ function BreakGlassStep({
   const revoke = ssoApi.ssoSetup.revokeBreakGlass.useMutation();
   // Which row is waiting, so only that row reads as busy.
   const [settlingBindingId, setSettlingBindingId] = useState<string | null>(null);
+  // The live count when a grant was accepted; the setup read shows it once it is higher.
+  const [grantedFromCount, setGrantedFromCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (grantedFromCount !== null && liveCount > grantedFromCount) setGrantedFromCount(null);
+  }, [grantedFromCount, liveCount]);
+
+  useSettlingSetup({ organizationId, waiting: grantedFromCount !== null });
 
   const settled = (title: string) => ({
     onSuccess: () => {
@@ -610,9 +628,21 @@ function BreakGlassStep({
       candidates={candidates.data ?? []}
       granting={grant.isPending}
       settlingBindingId={settlingBindingId}
-      onGrant={(command) =>
-        grant.mutate({ organizationId, ...command }, settled("Granting a way back in"))
-      }
+      grantSettling={grantedFromCount !== null}
+      onGrant={(command) => {
+        const from = liveBreakGlassGrants(grants.data ?? []).length;
+        const acknowledge = settled("Granting a way back in");
+        grant.mutate(
+          { organizationId, ...command },
+          {
+            ...acknowledge,
+            onSuccess: () => {
+              setGrantedFromCount(from);
+              acknowledge.onSuccess();
+            },
+          },
+        );
+      }}
       onRenew={(command) => {
         setSettlingBindingId(command.bindingId);
         renew.mutate({ organizationId, ...command }, settled("Extending a way back in"));

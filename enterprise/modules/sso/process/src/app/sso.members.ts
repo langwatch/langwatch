@@ -173,7 +173,7 @@ export type SsoActivityLogger = Pick<SsoGateLogger, "warn">;
  * Demanded as exactly that half, so a field identity stops answering stops
  * this from compiling rather than reaching a screen as undefined.
  */
-export type SsoSetupJourney = Omit<SsoSetupPageView, "serviceProvider">;
+export type SsoSetupJourney = Omit<SsoSetupPageView, "serviceProvider" | "availability">;
 
 export interface SsoSetupReads {
   getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupJourney>;

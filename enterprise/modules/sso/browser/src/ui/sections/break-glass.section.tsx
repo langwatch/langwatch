@@ -42,6 +42,7 @@ export function BreakGlassSection({
   candidates,
   granting = false,
   settlingBindingId = null,
+  grantSettling = false,
   onGrant,
   onRenew,
   onRevoke,
@@ -53,6 +54,8 @@ export function BreakGlassSection({
   granting?: boolean;
   /** The row whose change is in flight, so only that row reads as busy. */
   settlingBindingId?: string | null;
+  /** A grant the server accepted that the setup read has not shown yet. */
+  grantSettling?: boolean;
   onGrant: (command: { userId: string; expiresAtMs: number }) => void;
   onRenew: (command: { bindingId: string; expiresAtMs: number }) => void;
   onRevoke: (command: { bindingId: string }) => void;
@@ -101,6 +104,13 @@ export function BreakGlassSection({
             ))}
           </Table.Body>
         </SettingsTable>
+      )}
+
+      {grantSettling && (
+        <Text as="output" color="fg.muted" fontSize="sm">
+          Recovery access is being updated. This section will refresh when the new way back in is
+          available.
+        </Text>
       )}
 
       {live.length > 0 && <WhereTheyGetIn />}

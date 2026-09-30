@@ -105,9 +105,13 @@ export class SsoSelfServeContextService {
     };
   }
 
+  async availability({ organizationId }: { organizationId: string }) {
+    return ssoSelfServeAvailability(await this.resolve({ organizationId }));
+  }
+
   /** Setup is available, or refused with the one thing that would change that. */
   async assertAvailable({ organizationId }: { organizationId: string }): Promise<void> {
-    const availability = ssoSelfServeAvailability(await this.resolve({ organizationId }));
+    const availability = await this.availability({ organizationId });
     if (availability.available) return;
     if (availability.refusal === "not_opted_in") {
       throw new SsoSelfServeUnavailableError(

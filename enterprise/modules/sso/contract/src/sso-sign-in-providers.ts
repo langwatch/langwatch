@@ -67,6 +67,12 @@ const SOCIAL_PROVIDER_METHOD_IDS: readonly (readonly [ConfiguredSocialProvider["
     ["microsoft", "azure-ad"],
   ];
 
+/** Whether better-auth mounts this provider id as a NATIVE social button, one this
+ *  deployment dials itself rather than the broker or a generic-OAuth connection. */
+export function isNativeSocialProvider(providerId: string): boolean {
+  return SOCIAL_PROVIDER_METHOD_IDS.some(([betterAuthKey]) => betterAuthKey === providerId);
+}
+
 /**
  * Providers that need nothing but a client id, a secret and an OIDC issuer;
  * every endpoint comes from the issuer's discovery document. Auth0 and Okta go

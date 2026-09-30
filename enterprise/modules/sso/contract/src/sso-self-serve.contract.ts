@@ -23,3 +23,17 @@ export const ssoSelfServeContextSchema = z.object({
 });
 
 export type SsoSelfServeContext = z.infer<typeof ssoSelfServeContextSchema>;
+
+export const SSO_SELF_SERVE_REFUSALS = [
+  "license_required",
+  "license_restart_required",
+  "not_opted_in",
+] as const;
+
+/** Whether setup is open to this organization, or the one thing that would change that. */
+export const ssoSelfServeAvailabilitySchema = z.discriminatedUnion("available", [
+  z.object({ available: z.literal(true) }).strict(),
+  z.object({ available: z.literal(false), refusal: z.enum(SSO_SELF_SERVE_REFUSALS) }).strict(),
+]);
+
+export type SsoSelfServeAvailability = z.infer<typeof ssoSelfServeAvailabilitySchema>;

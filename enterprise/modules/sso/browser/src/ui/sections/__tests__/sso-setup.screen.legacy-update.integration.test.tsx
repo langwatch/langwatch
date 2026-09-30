@@ -86,6 +86,7 @@ function grandfatheredSetup(): SsoSetupPageView {
     goLive: null,
     legacyRoute: null,
     migration: null,
+    availability: { available: true },
     serviceProvider: SERVICE_PROVIDER,
   };
 }

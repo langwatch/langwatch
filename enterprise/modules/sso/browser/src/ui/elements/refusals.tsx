@@ -66,3 +66,42 @@ export function LoadFailure({ error, what }: { error: unknown; what: string }) {
     </Alert.Root>
   );
 }
+
+/** What the reader is told when setting single sign-on up is not theirs yet. */
+const AVAILABILITY_REFUSAL_COPY = {
+  license_required: {
+    title: "Single sign-on needs an active licence",
+    body: "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+  },
+  license_restart_required: {
+    title: "Restart to finish activating single sign-on",
+    body: "The licence is active. This installation decides what it federates when it starts, so single sign-on becomes available after the next restart.",
+  },
+  not_opted_in: {
+    title: "Setting single sign-on up yourself isn't switched on yet",
+    body: "Talk to us and we'll set your connection up with you, or switch this on for your organization.",
+  },
+} as const;
+
+/**
+ * Why setting single sign-on up is not available here, and what to do about
+ * it. A banner rather than the whole screen: an administrator who cannot start
+ * the journey today still came to find out how their organization signs in.
+ */
+export function AvailabilityRefusalNotice({
+  refusal,
+}: {
+  refusal: keyof typeof AVAILABILITY_REFUSAL_COPY;
+}) {
+  const copy = AVAILABILITY_REFUSAL_COPY[refusal];
+
+  return (
+    <Alert.Root status="info" data-testid="sso-availability-refusal">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{copy.title}</Alert.Title>
+        <Alert.Description>{copy.body}</Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}

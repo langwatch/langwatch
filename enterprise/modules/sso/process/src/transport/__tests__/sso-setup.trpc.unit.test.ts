@@ -446,6 +446,7 @@ describe("the organization's own single sign-on surface", () => {
 
   describe("given an organization whose plan does not carry single sign-on", () => {
     /** @scenario "Registering an identity provider needs an Enterprise plan" */
+    /** @scenario "An organization not on an Enterprise plan is told the plan is what refuses" */
     it("refuses to register, and commands identity with nothing", async () => {
       const { caller, commands } = await harness({ planType: "LAUNCH" });
 

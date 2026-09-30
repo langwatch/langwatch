@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
+  createSsoTestFeatureFlags,
   createSsoTestIdentity,
   RecordingSsoConnectionLedger,
 } from "./sso.fixture.ts";
@@ -41,10 +42,15 @@ const registered: SsoSetupView["connection"] = {
   domainProofs: [],
 };
 
-async function appReading(connection: SsoSetupView["connection"]) {
+async function appReading(
+  connection: SsoSetupView["connection"],
+  { optedIn = true }: { optedIn?: boolean } = {},
+) {
   const getSetup = vi.fn<SsoSetupApi["getSetup"]>(async () => journeyOf(connection));
   const app = await createSsoTestApp({
+    members: { isSaas: optedIn },
     dependencies: {
+      featureFlags: createSsoTestFeatureFlags(optedIn ? [ORGANIZATION] : []),
       identity: createSsoTestIdentity({
         connections: RecordingSsoConnectionLedger.create(),
         setup: createApiFixture<SsoSetupApi>({ getSetup }),
@@ -67,6 +73,7 @@ describe("reading where an organization's setup stands", () => {
       "https://acme.test/api/auth/sso/callback/connection-1",
     );
     expect(setup.serviceProvider.entityId).toBe("https://acme.test/api/auth/sso/saml2/sp");
+    expect(setup.availability).toEqual({ available: true });
   });
 
   /** @scenario "Before a connection exists the addresses show their shape" */
@@ -78,5 +85,12 @@ describe("reading where an organization's setup stands", () => {
     expect(setup.serviceProvider.redirectUrl).toBe(
       "https://acme.test/api/auth/sso/callback/{connection}",
     );
+  });
+
+  it("answers why setup is refused where the installation holds no licence", async () => {
+    const { app } = await appReading(null, { optedIn: false });
+    const setup = await app.getSetup({ organizationId: ORGANIZATION });
+
+    expect(setup.availability).toEqual({ available: false, refusal: "license_required" });
   });
 });

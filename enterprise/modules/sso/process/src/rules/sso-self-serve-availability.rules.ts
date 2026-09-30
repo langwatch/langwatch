@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { SsoSelfServeContext } from "@langwatch/enterprise-sso-contract";
-
-/** Why setup is not available, in the vocabulary the refusal codes use. */
-export type SsoSelfServeRefusal = "license_required" | "license_restart_required" | "not_opted_in";
-
-export type SsoSelfServeAvailability =
-  | { available: true }
-  | { available: false; refusal: SsoSelfServeRefusal };
+import type {
+  SsoSelfServeAvailability,
+  SsoSelfServeContext,
+} from "@langwatch/enterprise-sso-contract";
 
 /**
  * Self-hosted: the licence held at startup decides; one activated since

@@ -60,6 +60,7 @@ const viewWith = (live: Connection | null): SsoSetupPageView => ({
   goLive: null,
   legacyRoute: null,
   migration: null,
+  availability: { available: true },
   serviceProvider: {
     redirectUrl: "https://app/redirect",
     assertionConsumerServiceUrl: "https://app/acs",
@@ -121,5 +122,33 @@ describe("given no connection yet", () => {
       "href",
       "/settings/authentication/provider",
     );
+  });
+});
+
+describe("given an organization not switched on for setting it up itself", () => {
+  beforeEach(() => {
+    state.view = {
+      ...viewWith(null),
+      availability: { available: false, refusal: "not_opted_in" },
+    };
+  });
+
+  /** @scenario "The reason sits above the page rather than replacing it" */
+  it("puts the reason above a card that still says what single sign-on would do", () => {
+    renderCard();
+
+    const refusal = screen.getByTestId("sso-availability-refusal");
+    expect(refusal).toHaveTextContent(/isn't switched on yet/i);
+    expect(refusal).toHaveTextContent(/talk to us/i);
+    expect(screen.getByTestId("single-sign-on-preview-card")).toHaveTextContent(/what it does/i);
+  });
+
+  /** @scenario "Nothing is offered that would be refused" */
+  it("offers no way to register, and shows nothing for a connection that does not exist", () => {
+    renderCard();
+
+    expect(screen.queryByTestId("single-sign-on-preview-action")).toBeNull();
+    expect(screen.queryByTestId("single-sign-on-card")).toBeNull();
+    expect(screen.queryByTestId("authentication-domain-chip")).toBeNull();
   });
 });
