@@ -157,6 +157,8 @@
       expect: {"status": 200, "contains": ["mon-{uid}", "checkType"]}
     - request: "DELETE /api/v1/monitors/{monitorId}"
       expect: {"status": 200, "body": {"id": "{monitorId}", "deleted": true}}
+  teardown:
+    - request: "DELETE /api/v1/monitors/{monitorId}"
 
 # scenarios: platform_create_scenario, update, archive (reads `archived`)
 - id: "mcp-scenarios-create-update-archive"

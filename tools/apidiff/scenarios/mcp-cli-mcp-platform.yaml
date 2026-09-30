@@ -87,6 +87,8 @@
       expect: {"status": 200, "body": {"id": "{triggerId}", "deleted": true}}
     - request: "GET /api/v1/triggers/{triggerId}"
       expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/v1/triggers/{triggerId}"
 
 - id: "mcp-triggers-create-with-no-filters-is-refused"
   endpoint: "POST /api/v1/triggers"
