@@ -17,7 +17,6 @@ import {
   automationRestIdParamsSchema,
   automationRestResponseSchema,
   automationRestUpdateInputSchema,
-  InvalidActionParamsError,
   type AutomationRestResponse,
   type Trigger,
   type UpdateTriggerCommand,
@@ -191,8 +190,7 @@ async function readAutomation(args: {
 }
 
 /**
- * The edit, with the two refusals it owns: delivery settings this door
- * can't safely forward, and a condition an edit would empty -- the other
+ * The edit, with the refusal it owns: a condition an edit would empty -- the other
  * route to a match-everything automation, which is the application's rule.
  */
 async function editAutomation(args: {
@@ -202,13 +200,6 @@ async function editAutomation(args: {
   project: ProjectFacts;
 }): Promise<typeof NOT_FOUND | { status: 200; body: AutomationRestResponse }> {
   const { app, input, projectId } = args;
-
-  if (input.actionParams !== undefined) {
-    throw new InvalidActionParamsError(
-      "Delivery settings are changed in the automation editor, not through this endpoint.",
-      "actionParams",
-    );
-  }
 
   logger.info({ projectId, triggerId: input.id }, "Updating trigger");
 
@@ -241,6 +232,7 @@ function updateCommandFor(args: {
   if (input.message !== undefined) command.message = input.message;
   if (input.alertType !== undefined) command.alertType = input.alertType;
   if (input.filters !== undefined) command.filters = input.filters;
+  if (input.actionParams !== undefined) command.actionParams = input.actionParams;
 
   return command;
 }

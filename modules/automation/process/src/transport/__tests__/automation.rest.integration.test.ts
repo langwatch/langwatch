@@ -106,30 +106,18 @@ describe("the /api/triggers declaration", () => {
 
 describe("given the REST automation edit", () => {
   describe("when the edit carries delivery settings", () => {
-    /** @scenario "A REST edit cannot rewrite an automation's delivery settings" */
-    it("refuses the edit with the invalid-action-params code and writes nothing", async () => {
+    /** @scenario "A REST edit replaces an automation's delivery settings" */
+    it("forwards the action params so the update replaces them", async () => {
       const api = mount();
 
       const response = await api.patch("/api/triggers/trigger_1", {
-        actionParams: { url: "https://attacker.test/", headers: { Authorization: "secret" } },
+        actionParams: { members: ["x@example.com"] },
       });
 
-      expect(response.status).toBe(422);
-      expect(await response.json()).toEqual({ error: "invalid_action_params" });
-      expect(api.app.update).not.toHaveBeenCalled();
-    });
-
-    /** @scenario "A REST edit cannot re-attribute an automation to another user" */
-    it("refuses an edit that renames the annotation queue's creator", async () => {
-      const api = mount();
-
-      const response = await api.patch("/api/triggers/trigger_1", {
-        actionParams: { annotators: ["user_victim"], createdByUserId: "user_victim" },
-      });
-
-      expect(response.status).toBe(422);
-      expect(await response.json()).toEqual({ error: "invalid_action_params" });
-      expect(api.app.update).not.toHaveBeenCalled();
+      expect(response.status).toBe(200);
+      expect(api.updates).toEqual([
+        { id: "trigger_1", projectId: "project_1", actionParams: { members: ["x@example.com"] } },
+      ]);
     });
   });
 

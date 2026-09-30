@@ -13,11 +13,15 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { AutomationAuthoringService } from "../automation-authoring.service.ts";
+import { AutomationProviderRegistryService } from "../automation-provider-registry.service.ts";
 import { AutomationRulesService } from "../automation-rules.service.ts";
 import type { AutomationService } from "../automation.service.ts";
 
 /** The authoring service over exactly the reads and writes a case names. */
-function authoring(automation: Partial<AutomationService>) {
+function authoring(
+  automation: Partial<AutomationService>,
+  providers?: AutomationProviderRegistryService,
+) {
   const service = createApiFixture<AutomationService>(automation);
   const rules = AutomationRulesService.create({
     automation: service,
@@ -31,7 +35,7 @@ function authoring(automation: Partial<AutomationService>) {
     automation: service,
     rules,
     monitors: createApiFixture<MonitorApi>({ getAllByIds: async () => [] }),
-    providers: {
+    providers: providers ?? {
       actionParamsSchemaFor: () => ({ safeParse: (data: unknown) => ({ success: true, data }) }),
       persistActionParamsFor: async (_action, args) => args.incoming,
       redactActionParamsFor: (_action, params) => params,
@@ -134,5 +138,86 @@ function resumedTrigger(): Trigger {
     createdAt: new Date(0),
     updatedAt: new Date(0),
     lastRunAt: null,
+  };
+}
+
+/** Reversible and obviously not real, so a plaintext leak is loud. */
+const cipher = {
+  encrypt: (plain: string) => `enc(${plain})`,
+  decrypt: (c: string) => c.replace(/^enc\(/, "").replace(/\)$/, ""),
+};
+
+describe("given a stored annotation queue automation", () => {
+  describe("when a REST edit replaces its delivery settings", () => {
+    /** @scenario "A REST edit cannot re-attribute an automation to another user" */
+    it("keeps the stored creator and ignores a submitted one", async () => {
+      const update = vi
+        .fn()
+        .mockImplementation(async (command) => ({ ...queueTrigger(), ...command }));
+      const service = authoring(
+        { findById: async () => queueTrigger(), update },
+        AutomationProviderRegistryService.create(cipher),
+      );
+
+      await service.update({
+        id: "trigger-1",
+        projectId: "project-1",
+        actionParams: {
+          annotators: [{ id: "user_new", name: "New" }],
+          createdByUserId: "user_victim",
+        },
+      });
+
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actionParams: {
+            annotators: [{ id: "user_new", name: "New" }],
+            createdByUserId: "user_owner",
+          },
+        }),
+      );
+    });
+  });
+
+  describe("when a REST edit replaces a webhook's delivery settings", () => {
+    /** @scenario "A REST edit replaces an automation's delivery settings" */
+    it("stores the header values encrypted, never in plaintext", async () => {
+      const update = vi
+        .fn()
+        .mockImplementation(async (command) => ({ ...webhookTrigger(), ...command }));
+      const service = authoring(
+        { findById: async () => webhookTrigger(), update },
+        AutomationProviderRegistryService.create(cipher),
+      );
+
+      await service.update({
+        id: "trigger-1",
+        projectId: "project-1",
+        actionParams: { url: "https://acme.test/hook", headers: { Authorization: "Bearer real" } },
+      });
+
+      const written = JSON.stringify(update.mock.calls[0]?.[0].actionParams);
+      expect(written).toContain("headersEncrypted");
+      expect(written).not.toContain('Bearer real"');
+    });
+  });
+});
+
+function queueTrigger(): Trigger {
+  return {
+    ...resumedTrigger(),
+    action: "ADD_TO_ANNOTATION_QUEUE",
+    actionParams: {
+      annotators: [{ id: "user_owner", name: "Owner" }],
+      createdByUserId: "user_owner",
+    },
+  };
+}
+
+function webhookTrigger(): Trigger {
+  return {
+    ...resumedTrigger(),
+    action: "SEND_WEBHOOK",
+    actionParams: { url: "https://acme.test/hook" },
   };
 }

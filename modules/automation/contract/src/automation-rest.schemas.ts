@@ -48,11 +48,6 @@ export const automationRestCreateInputSchema = z.object({
   alertType: automationRestAlertTypeSchema.optional(),
 });
 
-/**
- * Delivery settings are declared here only so an edit carrying them is
- * REFUSED, not silently dropped: they aren't updatable through REST, since
- * the authoring surface's per-action check and secret encryption would be skipped.
- */
 export const automationRestUpdateInputSchema = z.object({
   name: z.string().min(1).optional(),
   active: z.boolean().optional(),

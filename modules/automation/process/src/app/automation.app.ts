@@ -770,9 +770,9 @@ export class AutomationApp implements AutomationApi {
     return this.#authoring.replaceFilters(input);
   }
 
-  /** Updates an automation. The service invalidates as part of the write. */
+  /** Updates an automation; delivery settings go through the save's persist hook. */
   update(command: UpdateTriggerCommand): Promise<Trigger> {
-    return this.#automation.update(command);
+    return this.#authoring.update(command);
   }
 
   /**

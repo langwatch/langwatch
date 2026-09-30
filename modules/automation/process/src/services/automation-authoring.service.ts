@@ -25,6 +25,7 @@ import {
   TestFireRateLimitedError,
   TestFireUnavailableError,
   TriggerAction,
+  type UpdateTriggerCommand,
   TriggerFiltersRequiredError,
   type AutomationApiCreateInput,
   type AutomationApiListSlackChannelsInput,
@@ -93,6 +94,8 @@ export interface AutomationAuthoringCollaborators {
   traceFilters: AutomationTraceFilterCompiler;
   limits: AutomationCallCounter;
 }
+
+const jsonObjectSchema = z.record(z.string(), z.unknown());
 
 export class AutomationAuthoringService {
   static create(collaborators: AutomationAuthoringCollaborators): AutomationAuthoringService {
@@ -295,6 +298,53 @@ export class AutomationAuthoringService {
         });
       }
     }
+
+    return this.redactForRead(trigger);
+  }
+
+  /**
+   * A REST edit. Delivery settings replace the stored ones through the same
+   * persist hook a save uses (secrets encrypted, kept sentinels resolved),
+   * and the annotation queue's creator stays what is stored.
+   */
+  async update(command: UpdateTriggerCommand): Promise<Trigger> {
+    const { actionParams } = command;
+    const existing = actionParams
+      ? await this.collaborators.automation.findById({
+          triggerId: command.id,
+          projectId: command.projectId,
+        })
+      : null;
+
+    if (!actionParams || !existing) return this.collaborators.automation.update(command);
+
+    const parsed = this.collaborators.providers
+      .actionParamsSchemaFor(existing.action)
+      .safeParse(actionParams);
+
+    if (!parsed.success) {
+      throw new InvalidActionParamsError(
+        `Invalid actionParams for ${existing.action}: ${parsed.error.issues[0]?.message ?? "validation failed"}`,
+        existing.action,
+      );
+    }
+
+    const stored = await this.collaborators.providers.persistActionParamsFor(existing.action, {
+      incoming: jsonObjectSchema.parse(parsed.data),
+      loadExisting: async () => existing.actionParams,
+    });
+    const creator = jsonObjectSchema.safeParse(existing.actionParams).data?.createdByUserId;
+    const replaced = jsonObjectSchema.parse(stored);
+
+    if (existing.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
+      delete replaced.createdByUserId;
+      if (creator !== undefined) replaced.createdByUserId = creator;
+    }
+
+    const trigger = await this.collaborators.automation.update({
+      ...command,
+      actionParams: replaced,
+    });
 
     return this.redactForRead(trigger);
   }
