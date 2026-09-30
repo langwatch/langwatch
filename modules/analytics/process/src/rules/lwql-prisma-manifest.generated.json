@@ -4,7 +4,9 @@
       "name": "Account",
       "tableName": "Account",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -150,8 +152,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -179,7 +185,9 @@
       "name": "AccountCredential",
       "tableName": "AccountCredential",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -208,8 +216,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -309,7 +321,9 @@
       "name": "Session",
       "tableName": "Session",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -356,8 +370,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -475,7 +493,9 @@
       "name": "User",
       "tableName": "User",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -1242,7 +1262,9 @@
       "name": "VerificationToken",
       "tableName": "VerificationToken",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -1304,7 +1326,9 @@
       "name": "Identifier",
       "tableName": "Identifier",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -1474,7 +1498,9 @@
       "name": "IdentifierReservation",
       "tableName": "IdentifierReservation",
       "documentation": "",
-      "primaryKey": ["normalizedValue"],
+      "primaryKey": [
+        "normalizedValue"
+      ],
       "fields": [
         {
           "name": "normalizedValue",
@@ -1527,7 +1553,9 @@
       "name": "IdentityProjectionCursor",
       "tableName": "IdentityProjectionCursor",
       "documentation": "",
-      "primaryKey": ["userId"],
+      "primaryKey": [
+        "userId"
+      ],
       "fields": [
         {
           "name": "userId",
@@ -1598,7 +1626,9 @@
       "name": "TwoFactor",
       "tableName": "TwoFactor",
       "documentation": "The two-factor plugin's own table (D06). Protocol state, and row-truth for\ngood (ADR-101 R12): the shared secret and the backup codes live here and\nin no event, ever. Nothing in this repo reads or writes these columns -\nthe plugin owns them end to end, including the lockout counters, which is\nwhy `failedVerificationCount` and `lockedUntil` are here rather than\nrebuilt on the projection.\n\n`backupCodes` holds an ENCRYPTED blob, not hashes. A backup code has to be\ncompared against what somebody types, and the plugin decrypts and compares;\nhashing them would leave it unable to verify its own codes.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -1627,8 +1657,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -1701,7 +1735,9 @@
       "name": "SignInAttemptLock",
       "tableName": "SignInAttemptLock",
       "documentation": "Consecutive failed sign-ins, and the lock they earn (GAC-09).\nSpec: specs/identity/org-account-lockout.feature.\n\nKEYED ON THE ADDRESS THAT WAS TYPED, NOT ON A USER, and that is the whole\ndesign. We already answer \"no such account\" and \"wrong password\" with one\nrefusal so that sign-in cannot be used to discover who has an account. A\nlock that existed only for real accounts would put that back: five wrong\nguesses saying \"locked\" for one address and \"incorrect\" for another tells\nan attacker which addresses are worth attacking. So an address with\nnothing behind it gets a row, a count and a lock exactly like one that\nresolves, and both answer identically.\n\n`identifierHash` is a KEYED hash of the normalised address, never the\naddress. The key is the deployment's own secret, so this table cannot be\nlifted and reversed into the list of every address anybody has ever tried\nto sign in as - which is what it would otherwise become, including every\ntypo and every address that has no account here at all.\n\nRow-truth, deliberately (ADR-101 R12): this is protocol state read and\nwritten on the sign-in path, like TwoFactor's own counters next door. The\nEVIDENCE an auditor reads is the identity event emitted when a lock is\ntaken, which is durable; these rows are reaped once they stop meaning\nanything.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -1790,7 +1826,9 @@
       "name": "Passkey",
       "tableName": "Passkey",
       "documentation": "The passkey plugin's own table (D07). Protocol state, like TwoFactor: the\npublic key and the signature counter are the plugin's to read and write.\nA passkey also becomes an `Identifier` row with provider `passkey`, which\nis what makes it a sign-in method like any other - this table is the\ncredential, that one is the identity.\n\n`aaguid` names the authenticator MODEL, never a device or a person, and is\nonly present at registration. Privacy-preserving platforms report all\nzeroes, so a label derived from it is best-effort by construction.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -1837,8 +1875,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -1920,7 +1962,9 @@
       "name": "MfaEnrollment",
       "tableName": "MfaEnrollment",
       "documentation": "The two-step verification pipeline's projection (D06 - see\nspecs/identity/mfa-and-session-shape.feature). One row per PERSON, because\none person has one setup however many organizations they belong to.\n\nA pure event-truth head like `SsoConnection`: every column is fold-written,\nrows are never deleted (DISABLED is a tombstone, so history survives being\nturned off), and a replay rebuilds it whole-row from the event log. The\ncursor columns are inline because the fold produces exactly one row per\naggregate - the `Identifier` fan-out needed its own cursor table, this\ndoes not.\n\nEvery column here is a lifecycle fact. There is deliberately nowhere in\nthis model a secret or a backup code could be put: `consumedBackupCodeIndexes`\nholds POSITIONS, which is what lets \"how many are left\" be answered\nwithout the projection ever knowing a code.",
-      "primaryKey": ["userId"],
+      "primaryKey": [
+        "userId"
+      ],
       "fields": [
         {
           "name": "userId",
@@ -2090,7 +2134,9 @@
       "name": "SsoConnection",
       "tableName": "SsoConnection",
       "documentation": "The SSO connection pipeline's projection (ADR-117 §5, D04 - see\nspecs/identity/sso-connection-lifecycle.feature). A pure event-truth head\nlike `Identifier`: every column is fold-written, rows are never deleted\n(TORN_DOWN is a tombstone), and a replay rebuilds it whole-row from the\nevent log.\n\nThe fold cursor lives on the row rather than in a sibling table, because\none row IS one aggregate here - a connection - so there is nothing for a\nseparate cursor table to key on that this row does not already key on.\n\nNo relation to Organization on purpose, matching `Identifier`: a\nprojection is rebuilt from events, and a foreign key would make a replay\ndepend on relational state the log does not carry. `idpMetadata` holds\nendpoints and credential REFERENCES; no secret is ever stored here or in\nany event.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -2400,7 +2446,10 @@
       "name": "SsoConnectionRegistrationSlot",
       "tableName": "SsoConnectionRegistrationSlot",
       "documentation": "The one-statement pre-event registration lock. `SsoConnection` remains\nevent truth; this row only decides which command may append that truth.\nA slot whose projected connection is terminal may be atomically replaced.",
-      "primaryKey": ["organizationId", "kind"],
+      "primaryKey": [
+        "organizationId",
+        "kind"
+      ],
       "fields": [
         {
           "name": "organizationId",
@@ -2471,7 +2520,9 @@
       "name": "SsoConnectionReproofCursor",
       "tableName": "SsoConnectionReproofCursor",
       "documentation": "Operational round-robin position for ADR-123's domain re-proof sweep.\n\nThis is deliberately not a column on `SsoConnection`: that row is a\nwhole-row event projection and its fold is its only writer, while a\nhealthy re-read states no fact. Keeping the scheduling cursor beside the\nprojection preserves both rules and still lets a fixed-size sweep revisit\nevery connection, including one whose proof has started wavering.",
-      "primaryKey": ["connectionId"],
+      "primaryKey": [
+        "connectionId"
+      ],
       "fields": [
         {
           "name": "connectionId",
@@ -2500,8 +2551,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["connectionId"],
-            "references": ["id"],
+            "fields": [
+              "connectionId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "SsoConnection"
           }
         }
@@ -2511,7 +2566,9 @@
       "name": "SsoCredential",
       "tableName": "SsoCredential",
       "documentation": "The values an `SsoConnection`'s credential references point AT (D09 - see\nspecs/identity/sso-idp-termination.feature).\n\nThe aggregate has always carried `clientIdRef` / `secretRef` / `certRefs`\nrather than values, because a fact may not carry a secret (ADR-101 §4).\nUntil D09 there was nothing behind the references and every writer passed\nnull. This is the thing behind them.\n\n`ciphertext` is AES-256-GCM under the deployment's `CREDENTIALS_SECRET`,\nthe same key every other credential in the product is kept under. Nothing\nreads a row except the projection that builds the engine's dialing\nconfiguration; no surface renders one back.\n\nWritten by the command path rather than the fold, and that split is\ndeliberate: the VALUE is not event truth and cannot be, so the log records\nWHEN a credential changed (a new reference in a new fact) and never what\nit was. A replay rebuilds every reference from the log and finds the value\nstill here.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -2582,7 +2639,9 @@
       "name": "SsoVerifiedDomain",
       "tableName": "SsoVerifiedDomain",
       "documentation": "better-auth's single sign-on plugin's provider table (D09), and a\nPROJECTION of the connection log rather than a second source of truth.\n\nThe plugin owns the columns and the reads: it is the only thing that\nspeaks OpenID Connect discovery or reads a SAML assertion, and it dials\nwhat it finds here. What it never does is decide that a row should exist —\nthat is folded from `SsoConnection`'s events by the same projection that\nwrites the connection head, in the same transaction, so a replay rebuilds\nboth together and a row can never outlive the connection that justified\nit. Nothing else writes here.\n\n`providerId` is the CONNECTION ID rather than the name the customer typed.\nThe plugin's column is globally unique, and two organizations both calling\ntheir provider `okta` must both be able to.\n\n`oidcConfig` and `samlConfig` are the plugin's own JSON documents, rebuilt\non every fold from `SsoCredential` — the vault is where the material\nlives, and this row is a derived copy the engine can read synchronously.\n\nSEALED AT REST, under the same key the vault uses. The document carries\nthe client secret the derivation reads OUT of the vault, so a plaintext\ncopy here would hand every customer's live identity-provider credential\nto anybody holding a database dump — the exact threat `SsoCredential`\nexists to defeat, reopened one table over. A stored value announces its\nform (`enc:v1:`), so a row written before the seal existed still opens;\nthe one reader is the identity storage adapter, on the path that dials.\nThe reader tolerates both forms, so this needs no backfill — but a pod\nwithout it cannot read a sealed row, so it must not be rolled back past.\nWHO OWNS A PROVED DOMAIN, as a row the database can refuse twice.\n\n\"First verifier owns\" was enforced by reading `findDomainOwner` and then\nwriting the fact — two different aggregates, so the per-connection queue\nnever ordered them against each other, and `SsoConnection.verifiedDomains`\nis a `String[]` with only a GIN index behind it, which enforces nothing.\nTwo organizations proving `acme.com` at the same moment both read \"nobody\nowns it\" and both committed; the sign-in router then picked between two\nlive connections by planner order, so a member of one company could be\nhanded to another company's identity provider — and with `arrivalPolicy`\non `admit`, provisioned into it.\n\nThe legacy single-domain model had this: `Organization.ssoDomain` is\n`@unique`. The multi-domain rewrite dropped the guarantee, and self-serve\nproof is what made the race reachable by customers rather than by two\noperators working at once.\n\n`domain` is the primary key, so a second organization loses on the\nconstraint rather than on a check it raced. Connection holders are\nseparate because an exact predecessor/replacement pair must coexist\nduring migration. Both are projected with the connection head.",
-      "primaryKey": ["domain"],
+      "primaryKey": [
+        "domain"
+      ],
       "fields": [
         {
           "name": "domain",
@@ -2622,7 +2681,10 @@
       "name": "SsoVerifiedDomainHolder",
       "tableName": "SsoVerifiedDomainHolder",
       "documentation": "A connection currently entitled to use an organization-owned verified\ndomain. Usually there is one holder. During an Auth0 migration there are\nexactly two: the grandfathered predecessor and its direct replacement.\n\nThe projection repository enforces that relationship before inserting a\nsecond holder. The flattened migration also installs partial unique live\nlegacy/direct slots on `SsoConnection`, closing concurrent third-writer\nraces that Prisma cannot describe declaratively.",
-      "primaryKey": ["domain", "connectionId"],
+      "primaryKey": [
+        "domain",
+        "connectionId"
+      ],
       "fields": [
         {
           "name": "domain",
@@ -2660,8 +2722,14 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["domain", "organizationId"],
-            "references": ["domain", "organizationId"],
+            "fields": [
+              "domain",
+              "organizationId"
+            ],
+            "references": [
+              "domain",
+              "organizationId"
+            ],
             "to": "SsoVerifiedDomain"
           }
         }
@@ -2671,7 +2739,9 @@
       "name": "SsoAuthenticationActivity",
       "tableName": "SsoAuthenticationActivity",
       "documentation": "A successful callback through one SSO connection. Identifier.lastUsedAt\nalso advances during routing and resolution, so it cannot prove that a\nmember actually authenticated through the replacement before cutover.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -2733,7 +2803,9 @@
       "name": "SsoProvider",
       "tableName": "SsoProvider",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -2813,7 +2885,9 @@
       "name": "SsoBreakGlassBinding",
       "tableName": "SsoBreakGlassBinding",
       "documentation": "A way back in (D05 - see specs/identity/sso-onboarding-tiers.feature).\n\nOne named person who may still sign in without the identity provider\nwhile their organization's sign-in belongs to one, and the date on which\nthat stops. Activation asks whether such a person exists, because the\nfailure it prevents is the only one that cannot be recovered from inside\nthe product: a misconfigured connection goes live, every member is handed\nto an identity provider that will not authenticate them, and nobody is\nleft who can turn it off.\n\nRows are immutable except for `supersededAt` and `warnedDays`. A renewal\nwrites a NEW row naming the one it replaced, so the date a way in\npreviously ended is still readable in the history - which is what makes a\nrenewal auditable rather than a column somebody moved.\n\nNo relation to Organization or User, matching the identity heads above:\nthe binding is the record of who could get in, and a cascade would erase\nexactly the history a lockout post-mortem reads.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -2911,7 +2985,9 @@
       "name": "SsoActivationRecoveryReservation",
       "tableName": "SsoActivationRecoveryReservation",
       "documentation": "A durable claim on one live recovery path while activation is between its\nguard and projected ACTIVE fact. It has no expiry: only projection of the\nmatching activation, or an explicit cancellation, may consume it.",
-      "primaryKey": ["commandId"],
+      "primaryKey": [
+        "commandId"
+      ],
       "fields": [
         {
           "name": "commandId",
@@ -2955,7 +3031,9 @@
       "name": "JoinRequest",
       "tableName": "JoinRequest",
       "documentation": "The join-request pipeline's projection (ADR-117, D12 - see\nspecs/identity/join-requests.feature). A pure event-truth head like\n`Identifier` and `SsoConnection`: every column is fold-written, rows are\nnever deleted (a terminal state is a tombstone the admin panel stops\nlisting, not an absence), and a replay rebuilds it whole-row from the\nevent log.\n\nThe fold cursor lives on the row rather than in a sibling table, because\none row IS one aggregate here - a request.\n\nNo relation to Organization or User on purpose, matching the two heads\nabove: a projection is rebuilt from events, and a foreign key would make a\nreplay depend on relational state the log does not carry.\n\nMembership is NOT here. An approval dispatches an attach on the grants\nledger, exactly as accepting an invitation does, and that ledger fact\ncarries `source: \"join-request\"` as its provenance - which is what puts a\njoin approval on the customer's audit page beside every other membership\nchange rather than in a history of its own.\n\nThe requester's address is not here either: the DOMAIN is the fact, and it\nis the only part of an address a join decision may depend on.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -3116,7 +3194,10 @@
       "name": "TeamUser",
       "tableName": "TeamUser",
       "documentation": "",
-      "primaryKey": ["userId", "teamId"],
+      "primaryKey": [
+        "userId",
+        "teamId"
+      ],
       "fields": [
         {
           "name": "userId",
@@ -3163,8 +3244,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["assignedRoleId"],
-            "references": ["id"],
+            "fields": [
+              "assignedRoleId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "CustomRole"
           }
         },
@@ -3177,8 +3262,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -3191,8 +3280,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["teamId"],
-            "references": ["id"],
+            "fields": [
+              "teamId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Team"
           }
         },
@@ -3220,7 +3313,10 @@
       "name": "OrganizationUser",
       "tableName": "OrganizationUser",
       "documentation": "",
-      "primaryKey": ["userId", "organizationId"],
+      "primaryKey": [
+        "userId",
+        "organizationId"
+      ],
       "fields": [
         {
           "name": "userId",
@@ -3258,8 +3354,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -3272,8 +3372,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -3337,7 +3441,9 @@
       "name": "Team",
       "tableName": "Team",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -3398,8 +3504,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -3471,8 +3581,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["ownerUserId"],
-            "references": ["id"],
+            "fields": [
+              "ownerUserId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -3519,7 +3633,9 @@
       "name": "Organization",
       "tableName": "Organization",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -4264,7 +4380,9 @@
       "name": "IssuedLicense",
       "tableName": "IssuedLicense",
       "documentation": "The registry of licenses LangWatch has issued (ADR-139). It lives on\nLangWatch Cloud; a self-hosted install has the table and no rows.\n\nThe row never holds the token an install presents. `tokenHash` is the\nSHA-256 of that token, so read access to this table is not credential\naccess. Status is derived: revoked, superseded, past `expiresAt`, else active.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -4311,8 +4429,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -4601,7 +4723,9 @@
       "name": "ActivationCode",
       "tableName": "ActivationCode",
       "documentation": "A short code a fresh install pastes instead of a license blob (ADR-139,\nsection 5). Redeeming it mints the license the code describes and returns\nit signed, which is what identifies a new customer without anybody emailing\na license key around.\n\nThe row holds a hash of the code, never the code. Every lookup hashes what\nthe caller presented first, so the stored value is a step away from anything\nthat could be presented: read access to this table is not credential access.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -4807,7 +4931,9 @@
       "name": "ConnectedBillingAccount",
       "tableName": "ConnectedBillingAccount",
       "documentation": "How a connected customer is invoiced (ADR-139, section 7): one payment\nprovider customer, one quarterly usage subscription in USD, and the\ncommercial terms the annual invoice was raised from.\n\nOne row per organization. Every write through it is addressed by a stored\nprovider id, so running onboarding or a renewal twice changes nothing.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -4836,8 +4962,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -4991,7 +5121,9 @@
       "name": "ConnectedCreditGrant",
       "tableName": "ConnectedCreditGrant",
       "documentation": "A paid credit at the payment provider, which only metered usage draws down.\nKept here so a grant is created once per reason and the backoffice can show\nwhat the customer holds without asking the provider.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -5071,7 +5203,9 @@
       "name": "ConnectedInvoice",
       "tableName": "ConnectedInvoice",
       "documentation": "An invoice LangWatch raised for a connected customer, as the backoffice\nreads it.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -5178,7 +5312,9 @@
       "name": "ScimRequestLog",
       "tableName": "ScimRequestLog",
       "documentation": "Every SCIM request we could attribute, and what we answered (ADR-126).\n\nEVIDENCE, NOT TRUTH. A request authors nothing — an HTTP round trip that\nwas refused decided nothing — so this is a table and not an event: nothing\ndownstream derives from it, rebuilding the world from the log must not\ndepend on how often a provider retried a GET, and rows age out of a\nretention window an event log would never have.\n\nNO ROW FOR A REQUEST WE CANNOT ATTRIBUTE. A token that does not verify is\nanswered 401 and recorded nowhere: we do not know whose organization to\nfile it under, and a table unauthenticated traffic can write is a table\nanybody on the internet can fill. What answers that case instead is\n`ScimToken.lastUsedAt` being null. The 403 IS recorded — a lapsed plan is\na credential we recognize.\n\nTHE PAYLOAD RULE HOLDS. A method, a resource name, a status, a reason slug\nand our own sentence. Never a token, never a header, never a provider's\nraw message — the same reason `scim_apply_failed` carries a code and not a\nmessage.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -5207,8 +5343,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -5281,7 +5421,9 @@
       "name": "ScimToken",
       "tableName": "ScimToken",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -5310,8 +5452,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -5375,7 +5521,9 @@
       "name": "ScimExternalId",
       "tableName": "ScimExternalId",
       "documentation": "D08 — who the directory means, per connection.\n\nThe identity provider's own identifier for a person, which is what\nsurvives their email changing: an address is not identity, people change\ntheirs, and the same person carries different identifiers on two different\nconnections. So the PAIR is the key and `externalId` alone never is.\n\nNo relation to `SsoConnection` (that projection carries no foreign keys);\nthe `User` relation is real, so a deleted user takes their directory\nidentities with them rather than stranding a mapping that resolves to\nnobody.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "organizationId",
@@ -5431,8 +5579,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -5460,7 +5612,10 @@
       "name": "ScimUserResource",
       "tableName": "ScimUserResource",
       "documentation": "Directory profile and lifecycle are tenant facts, independent of the shared account.",
-      "primaryKey": ["organizationId", "userId"],
+      "primaryKey": [
+        "organizationId",
+        "userId"
+      ],
       "fields": [
         {
           "name": "organizationId",
@@ -5489,8 +5644,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -5554,7 +5713,10 @@
       "name": "ScimDirectoryUser",
       "tableName": "ScimDirectoryUser",
       "documentation": "A connection's managed users, including resources without an externalId.\nScalar keys only; readers exclude users that no longer exist.",
-      "primaryKey": ["connectionId", "userId"],
+      "primaryKey": [
+        "connectionId",
+        "userId"
+      ],
       "fields": [
         {
           "name": "organizationId",
@@ -5589,7 +5751,9 @@
       "name": "ScimSyncState",
       "tableName": "ScimSyncState",
       "documentation": "D08 — one connection's directory sync, as the `scim-sync` pipeline's fold\nwrites it.\n\nPure event truth: every column is fold-written, rows are never deleted,\nand REVOKED is a tombstone rather than an absence — a dead letter that\nvanished when a connection was torn down would be a removal nobody could\ncheck afterwards.\n\nNo relation to Organization or SsoConnection, matching `SsoConnection`\nitself: a projection is rebuilt from events, and a foreign key would make\na replay depend on relational state the log does not carry.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -5723,7 +5887,9 @@
       "name": "Project",
       "tableName": "Project",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -5788,8 +5954,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["teamId"],
-            "references": ["id"],
+            "fields": [
+              "teamId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Team"
           }
         },
@@ -6417,8 +6587,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["ownerUserId"],
-            "references": ["id"],
+            "fields": [
+              "ownerUserId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -6473,7 +6647,9 @@
       "name": "Department",
       "tableName": "Department",
       "documentation": "A department is a single-valued accounting dimension, separate from\nRBAC, for rolling up AI spend by org unit (Engineering, Marketing,\n...). Assigned to OrganizationUser, Team, and Project via their\n`departmentId` column. Pure accounting: never grants or restricts\naccess. See specs/ai-gateway/governance/departments.feature.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -6535,7 +6711,9 @@
       "name": "DepartmentMembershipHistory",
       "tableName": "DepartmentMembershipHistory",
       "documentation": "One dated person → department link (ADR-128 §13, #7882).\n\n`OrganizationUser.departmentId` stays the CURRENT assignment every screen\nreads; these rows are its history, appended by the same `assignUser` write\nso the two cannot drift. They exist for the cost reads: January's spend\nstays with January's department, so a read resolves against the link that\nwas open on the cost's day, not against today's pointer. Members with no\nlink on a day resolve to \"unassigned\", never to an error.\n\nSame shape as IdentityMatch's dated links, same one-open-link guard: the\npartial unique index in the migration rejects a second open row per\n(organizationId, userId) with SQLSTATE 23505.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -6606,7 +6784,9 @@
       "name": "PlatformToolPolicy",
       "tableName": "PlatformToolPolicy",
       "documentation": "Per-(organization, tool) override for which `langwatch <tool>` paths the\nCLI may use: `allowVk` gates the gateway / virtual-key path (Path A) and\n`allowOtelDirect` gates the direct-OTLP ingestion path (Path B). A missing\nrow resolves to the hardcoded defaults (both true for claude/codex/gemini/\nopencode; cursor allows the gateway path only), so the policy is purely\nadditive: disabling a path is an explicit admin choice. The CLI caches the\nresolved map at login and gates path selection on it.\nSee specs/ai-gateway/governance/cli-tool-mode-policy.feature.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -6677,7 +6857,9 @@
       "name": "OrganizationInvite",
       "tableName": "OrganizationInvite",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -6742,8 +6924,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -6792,8 +6978,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["requestedBy"],
-            "references": ["id"],
+            "fields": [
+              "requestedBy"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -6848,7 +7038,9 @@
       "name": "Monitor",
       "tableName": "Monitor",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -6877,8 +7069,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -6900,8 +7096,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["experimentId"],
-            "references": ["id"],
+            "fields": [
+              "experimentId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Experiment"
           }
         },
@@ -6923,8 +7123,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["evaluatorId"],
-            "references": ["id"],
+            "fields": [
+              "evaluatorId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Evaluator"
           }
         },
@@ -7051,7 +7255,9 @@
       "name": "Cost",
       "tableName": "Cost",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -7080,8 +7286,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -7172,7 +7382,9 @@
       "name": "Topic",
       "tableName": "Topic",
       "documentation": "PROJECTION of the topic-clustering event stream (ADR-051): topics are\n`topics_recorded` events; this table is written ONLY by\nTopicModelFoldProjection (cursor: TopicModelProjection) and is\nrebuildable by replay. Kept named `Topic` because it is the domain\nentity every surface reads — the `*Projection` suffix is reserved for\ncursor/read-model tables.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -7201,8 +7413,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -7233,8 +7449,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["parentId"],
-            "references": ["id"],
+            "fields": [
+              "parentId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Topic"
           }
         },
@@ -7321,7 +7541,9 @@
       "name": "Dataset",
       "tableName": "Dataset",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -7350,8 +7572,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -7560,7 +7786,9 @@
       "name": "DatasetRecord",
       "tableName": "DatasetRecord",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -7589,8 +7817,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["datasetId"],
-            "references": ["id"],
+            "fields": [
+              "datasetId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Dataset"
           }
         },
@@ -7612,8 +7844,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -7650,7 +7886,9 @@
       "name": "Dashboard",
       "tableName": "Dashboard",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -7679,8 +7917,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -7740,7 +7982,9 @@
       "name": "SavedView",
       "tableName": "SavedView",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -7769,8 +8013,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -7792,8 +8040,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -7875,7 +8127,9 @@
       "name": "CustomGraph",
       "tableName": "CustomGraph",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -7904,8 +8158,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -7981,8 +8239,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["dashboardId"],
-            "references": ["id"],
+            "fields": [
+              "dashboardId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Dashboard"
           }
         },
@@ -8056,7 +8318,9 @@
       "name": "BatchEvaluation",
       "tableName": "BatchEvaluation",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -8085,8 +8349,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["experimentId"],
-            "references": ["id"],
+            "fields": [
+              "experimentId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Experiment"
           }
         },
@@ -8108,8 +8376,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -8203,8 +8475,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["datasetId"],
-            "references": ["id"],
+            "fields": [
+              "datasetId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Dataset"
           }
         },
@@ -8241,7 +8517,9 @@
       "name": "Trigger",
       "tableName": "Trigger",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -8279,8 +8557,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -8493,6 +8775,20 @@
           }
         },
         {
+          "name": "latestEvaluation",
+          "columnName": "latestEvaluation",
+          "type": "TriggerLatestEvaluation",
+          "kind": "relation",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "",
+          "relation": {
+            "fields": [],
+            "references": [],
+            "to": "TriggerLatestEvaluation"
+          }
+        },
+        {
           "name": "customGraphId",
           "columnName": "customGraphId",
           "type": "String",
@@ -8510,10 +8806,168 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["customGraphId"],
-            "references": ["id"],
+            "fields": [
+              "customGraphId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "CustomGraph"
           }
+        }
+      ]
+    },
+    {
+      "name": "SlackIntegration",
+      "tableName": "SlackIntegration",
+      "documentation": "One named Slack connection (ADR-093 §5a); an organization holds as many as\nit likes, each scoped to the organization or to one project. The secret is\nAES-256-GCM ciphertext and never returned to a client. `secretFingerprint`\nis an HMAC of the plaintext, so one secret is one connection per scope\nwithout decrypting anything. No foreign key: `scopeId` is\npolymorphic (ADR-021), as on RetentionPolicy and CustomLLMModelCost.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "SlackIntegrationKind",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "scopeType",
+          "columnName": "scopeType",
+          "type": "SlackIntegrationScopeType",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "scopeId",
+          "columnName": "scopeId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "botTokenEncrypted",
+          "columnName": "botTokenEncrypted",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "webhookUrlEncrypted",
+          "columnName": "webhookUrlEncrypted",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "secretFingerprint",
+          "columnName": "secretFingerprint",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "secretHint",
+          "columnName": "secretHint",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "slackTeamId",
+          "columnName": "slackTeamId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "slackTeamName",
+          "columnName": "slackTeamName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdById",
+          "columnName": "createdById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedById",
+          "columnName": "updatedById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         }
       ]
     },
@@ -8521,7 +8975,9 @@
       "name": "WebhookEndpoint",
       "tableName": "WebhookEndpoint",
       "documentation": "Org-anchored outbound webhook endpoint (the webhook platform, enterprise\nonly). The signing secret is AES-256-GCM encrypted at rest (shared\nencrypt/decrypt, CREDENTIALS_SECRET) and returned in plaintext exactly\nonce, at create or roll time. `enabledEvents` holds registry event types\nor family wildcards (\"gateway.*\", \"*\"). Failure-streak columns drive the\n72h auto-disable. Spec: specs/webhooks/webhook-endpoints.feature.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -8550,8 +9006,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -8782,7 +9242,9 @@
       "name": "WebhookEndpointDelivery",
       "tableName": "WebhookEndpointDelivery",
       "documentation": "The per-ATTEMPT delivery log for BOTH webhook channels: the endpoints\nplatform's batches and the automations channel's trigger fires. One row per\nHTTP attempt; `dispatchId` groups every attempt of one logical send (the\nvalue of the X-LangWatch-Delivery-Id or X-LangWatch-Event-Id header). A slim\nfacts table: outcome, status, latency, a capped error message, and a\ntruncated copy of a failure response. Our request content (URL, headers,\nbody) is never stored. Pruned after 30 days.\n\nThe two channels used to keep separate tables with the same columns and two\nprune implementations. They are one table with a discriminator now, so the\ntenancy columns of the channel that did not write a row are null.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -8829,8 +9291,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["endpointId"],
-            "references": ["id"],
+            "fields": [
+              "endpointId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "WebhookEndpoint"
           }
         },
@@ -8852,8 +9318,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -8875,8 +9345,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["triggerId"],
-            "references": ["id"],
+            "fields": [
+              "triggerId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Trigger"
           }
         },
@@ -8976,7 +9450,9 @@
       "name": "Experiment",
       "tableName": "Experiment",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -9032,8 +9508,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -9055,8 +9535,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["workflowId"],
-            "references": ["id"],
+            "fields": [
+              "workflowId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Workflow"
           }
         },
@@ -9139,7 +9623,9 @@
       "name": "ExperimentVersion",
       "tableName": "ExperimentVersion",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -9273,7 +9759,9 @@
       "name": "Annotation",
       "tableName": "Annotation",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -9302,8 +9790,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -9352,8 +9844,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -9435,7 +9931,9 @@
       "name": "ModelProvider",
       "tableName": "ModelProvider",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -9673,7 +10171,9 @@
       "name": "ModelProviderScope",
       "tableName": "ModelProviderScope",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -9702,8 +10202,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["modelProviderId"],
-            "references": ["id"],
+            "fields": [
+              "modelProviderId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "ModelProvider"
           }
         },
@@ -9740,7 +10244,9 @@
       "name": "ModelDefaultConfig",
       "tableName": "ModelDefaultConfig",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -9816,7 +10322,9 @@
       "name": "ModelDefaultConfigScope",
       "tableName": "ModelDefaultConfigScope",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -9845,8 +10353,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["configId"],
-            "references": ["id"],
+            "fields": [
+              "configId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "ModelDefaultConfig"
           }
         },
@@ -9883,7 +10395,9 @@
       "name": "GithubInstallation",
       "tableName": "GithubInstallation",
       "documentation": "The organization's GitHub connection: a GitHub App installation mapped to a\nLangWatch organization. Short-lived (1h) installation access tokens are\nminted against these rows on demand, by Langy for writes (bot-authored pull\nrequests, scoped to the installation's repositories) and by pull-request\nlinkage for reads. No user token and no secret are stored here, the crown\njewel is the App private key, held only in the control-plane env.\nSpec: specs/integrations/github-connection.feature.\n\ninstallationId is globally unique (one GitHub installation, one row); a\nsingle LangWatch organization may own MANY installations (different GitHub\naccounts), so the org to installation relationship is one-to-many.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -9921,8 +10435,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -10004,7 +10522,9 @@
       "name": "GithubPullRequest",
       "tableName": "GithubPullRequest",
       "documentation": "A pull request discovered through the organization's GitHub connection and\nmapped to the branch it was opened from, so a coding-agent session that\nknows only its branch can name the pull request it produced.\nSpec: specs/integrations/github-connection.feature.\n\nThe stored title, state, draft and timestamp columns are SNAPSHOTS taken\nwhen the mapping was last refreshed. They are fallback labels only: the\nfrontend reads live status from GitHub, so a stale row never presents\nitself as current truth.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -10033,8 +10553,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -10197,7 +10721,9 @@
       "name": "GithubBranchPullRequestCheck",
       "tableName": "GithubBranchPullRequestCheck",
       "documentation": "The per-branch bookkeeping behind pull-request mapping: when a branch was\nlast looked up on GitHub, how many pull requests it resolved to, and when it\nmay be asked about again. A branch with no pull request is the common case,\nso `notFoundAt` plus `recheckAfter` is what keeps an unmapped branch from\ncosting a GitHub call on every read.\nSpec: specs/integrations/github-connection.feature.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -10226,8 +10752,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -10336,7 +10866,9 @@
       "name": "LangyConversationProjection",
       "tableName": "LangyConversationProjection",
       "documentation": "Rebuildable operational state folded from Langy's canonical event stream.\nThe source of truth remains the ClickHouse event log.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -10569,7 +11101,9 @@
       "name": "LangyTurnRequest",
       "tableName": "LangyTurnRequest",
       "documentation": "Durable idempotency receipt for one logical Langy send. A transport retry\nreuses the same requestId and receives the original conversation/turn ids\ninstead of minting a second message or turn.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -10676,7 +11210,9 @@
       "name": "LangyActiveTurn",
       "tableName": "LangyActiveTurn",
       "documentation": "Postgres-authoritative one-turn admission for a conversation. PREPARING\nclaims are leased so a crash before the durable start event can recover;\nCOMMITTED claims are released only by the matching terminal event.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -10783,7 +11319,9 @@
       "name": "LangyConversationTurnProjection",
       "tableName": "LangyConversationTurnProjection",
       "documentation": "Rebuildable per-turn operational render document.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -10953,7 +11491,9 @@
       "name": "LangyMessageProjection",
       "tableName": "LangyMessageProjection",
       "documentation": "Rebuildable operational message fact. One source event produces one row.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -11060,7 +11600,9 @@
       "name": "ProjectSecret",
       "tableName": "ProjectSecret",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -11089,8 +11631,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -11130,8 +11676,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -11153,8 +11703,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["updatedById"],
-            "references": ["id"],
+            "fields": [
+              "updatedById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -11182,7 +11736,9 @@
       "name": "TriggerSent",
       "tableName": "TriggerSent",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -11229,8 +11785,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["customGraphId"],
-            "references": ["id"],
+            "fields": [
+              "customGraphId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "CustomGraph"
           }
         },
@@ -11252,8 +11812,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -11266,8 +11830,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["triggerId"],
-            "references": ["id"],
+            "fields": [
+              "triggerId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Trigger"
           }
         },
@@ -11310,10 +11878,130 @@
       ]
     },
     {
+      "name": "TriggerLatestEvaluation",
+      "tableName": "TriggerLatestEvaluation",
+      "documentation": "",
+      "primaryKey": [
+        "triggerId"
+      ],
+      "fields": [
+        {
+          "name": "triggerId",
+          "columnName": "triggerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "trigger",
+          "columnName": "trigger",
+          "type": "Trigger",
+          "kind": "relation",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "",
+          "relation": {
+            "fields": [
+              "triggerId"
+            ],
+            "references": [
+              "id"
+            ],
+            "to": "Trigger"
+          }
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "evaluatedAt",
+          "columnName": "evaluatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "verdict",
+          "columnName": "verdict",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "observedValue",
+          "columnName": "observedValue",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "threshold",
+          "columnName": "threshold",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "operator",
+          "columnName": "operator",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "timePeriodMinutes",
+          "columnName": "timePeriodMinutes",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "skipCode",
+          "columnName": "skipCode",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "EmailSuppression",
       "tableName": "EmailSuppression",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -11342,8 +12030,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -11389,7 +12081,9 @@
       "name": "AnnotationScore",
       "tableName": "AnnotationScore",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -11427,8 +12121,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -11533,7 +12231,9 @@
       "name": "AnnotationQueue",
       "tableName": "AnnotationQueue",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -11589,8 +12289,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -11660,7 +12364,10 @@
       "name": "AnnotationQueueMembers",
       "tableName": "AnnotationQueueMembers",
       "documentation": "",
-      "primaryKey": ["annotationQueueId", "userId"],
+      "primaryKey": [
+        "annotationQueueId",
+        "userId"
+      ],
       "fields": [
         {
           "name": "annotationQueueId",
@@ -11689,8 +12396,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -11703,8 +12414,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["annotationQueueId"],
-            "references": ["id"],
+            "fields": [
+              "annotationQueueId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "AnnotationQueue"
           }
         }
@@ -11714,7 +12429,10 @@
       "name": "AnnotationQueueScores",
       "tableName": "AnnotationQueueScores",
       "documentation": "",
-      "primaryKey": ["annotationQueueId", "annotationScoreId"],
+      "primaryKey": [
+        "annotationQueueId",
+        "annotationScoreId"
+      ],
       "fields": [
         {
           "name": "annotationQueueId",
@@ -11743,8 +12461,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["annotationScoreId"],
-            "references": ["id"],
+            "fields": [
+              "annotationScoreId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "AnnotationScore"
           }
         },
@@ -11757,8 +12479,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["annotationQueueId"],
-            "references": ["id"],
+            "fields": [
+              "annotationQueueId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "AnnotationQueue"
           }
         }
@@ -11768,7 +12494,9 @@
       "name": "AnnotationQueueItem",
       "tableName": "AnnotationQueueItem",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -11797,8 +12525,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["annotationQueueId"],
-            "references": ["id"],
+            "fields": [
+              "annotationQueueId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "AnnotationQueue"
           }
         },
@@ -11820,8 +12552,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -11861,8 +12597,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["createdByUserId"],
-            "references": ["id"],
+            "fields": [
+              "createdByUserId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -11911,8 +12651,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         }
@@ -11922,7 +12666,9 @@
       "name": "ShareLink",
       "tableName": "ShareLink",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -11987,8 +12733,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -12010,8 +12760,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -12075,7 +12829,9 @@
       "name": "PinnedTrace",
       "tableName": "PinnedTrace",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -12104,8 +12860,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -12136,8 +12896,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -12174,7 +12938,9 @@
       "name": "TraceEditOverlay",
       "tableName": "TraceEditOverlay",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -12203,8 +12969,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -12244,8 +13014,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -12267,8 +13041,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["updatedById"],
-            "references": ["id"],
+            "fields": [
+              "updatedById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -12296,7 +13074,9 @@
       "name": "RetentionPolicy",
       "tableName": "RetentionPolicy",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -12376,7 +13156,9 @@
       "name": "DataPrivacyPolicy",
       "tableName": "DataPrivacyPolicy",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -12456,7 +13238,9 @@
       "name": "CustomLLMModelCost",
       "tableName": "CustomLLMModelCost",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -12590,7 +13374,9 @@
       "name": "Workflow",
       "tableName": "Workflow",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -12619,8 +13405,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -12687,8 +13477,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["latestVersionId"],
-            "references": ["id"],
+            "fields": [
+              "latestVersionId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "WorkflowVersion"
           }
         },
@@ -12710,8 +13504,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["currentVersionId"],
-            "references": ["id"],
+            "fields": [
+              "currentVersionId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "WorkflowVersion"
           }
         },
@@ -12756,8 +13554,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["publishedById"],
-            "references": ["id"],
+            "fields": [
+              "publishedById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -12820,8 +13622,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["copiedFromWorkflowId"],
-            "references": ["id"],
+            "fields": [
+              "copiedFromWorkflowId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Workflow"
           }
         },
@@ -12873,7 +13679,9 @@
       "name": "WorkflowVersion",
       "tableName": "WorkflowVersion",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -12920,8 +13728,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["authorId"],
-            "references": ["id"],
+            "fields": [
+              "authorId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -12943,8 +13755,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -12966,8 +13782,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["workflowId"],
-            "references": ["id"],
+            "fields": [
+              "workflowId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Workflow"
           }
         },
@@ -12989,8 +13809,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["parentId"],
-            "references": ["id"],
+            "fields": [
+              "parentId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "WorkflowVersion"
           }
         },
@@ -13078,7 +13902,9 @@
       "name": "AuditLog",
       "tableName": "AuditLog",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -13230,7 +14056,9 @@
       "name": "LlmPromptConfig",
       "tableName": "LlmPromptConfig",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -13277,8 +14105,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -13345,8 +14177,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["copiedFromPromptId"],
-            "references": ["id"],
+            "fields": [
+              "copiedFromPromptId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "LlmPromptConfig"
           }
         },
@@ -13398,7 +14234,9 @@
       "name": "LlmPromptConfigVersion",
       "tableName": "LlmPromptConfigVersion",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -13445,8 +14283,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["authorId"],
-            "references": ["id"],
+            "fields": [
+              "authorId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -13468,8 +14310,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["configId"],
-            "references": ["id"],
+            "fields": [
+              "configId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "LlmPromptConfig"
           }
         },
@@ -13538,7 +14384,9 @@
       "name": "PromptTagAssignment",
       "tableName": "PromptTagAssignment",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -13567,8 +14415,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["configId"],
-            "references": ["id"],
+            "fields": [
+              "configId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "LlmPromptConfig"
           }
         },
@@ -13590,8 +14442,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["versionId"],
-            "references": ["id"],
+            "fields": [
+              "versionId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "LlmPromptConfigVersion"
           }
         },
@@ -13613,8 +14469,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["tagId"],
-            "references": ["id"],
+            "fields": [
+              "tagId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "PromptTag"
           }
         },
@@ -13663,8 +14523,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -13686,8 +14550,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["updatedById"],
-            "references": ["id"],
+            "fields": [
+              "updatedById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         }
@@ -13697,7 +14565,9 @@
       "name": "PromptTag",
       "tableName": "PromptTag",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -13726,8 +14596,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -13790,8 +14664,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -13813,8 +14691,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["updatedById"],
-            "references": ["id"],
+            "fields": [
+              "updatedById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         }
@@ -13824,7 +14706,9 @@
       "name": "Analytics",
       "tableName": "Analytics",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -13853,8 +14737,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -13918,7 +14806,9 @@
       "name": "CustomRole",
       "tableName": "CustomRole",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -13947,8 +14837,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -14040,7 +14934,9 @@
       "name": "Notification",
       "tableName": "Notification",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -14069,8 +14965,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -14092,8 +14992,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -14139,7 +15043,9 @@
       "name": "Agent",
       "tableName": "Agent",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -14168,8 +15074,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -14218,8 +15128,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["workflowId"],
-            "references": ["id"],
+            "fields": [
+              "workflowId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Workflow"
           }
         },
@@ -14241,8 +15155,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["copiedFromAgentId"],
-            "references": ["id"],
+            "fields": [
+              "copiedFromAgentId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Agent"
           }
         },
@@ -14338,7 +15256,9 @@
       "name": "Evaluator",
       "tableName": "Evaluator",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -14367,8 +15287,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -14426,8 +15350,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["workflowId"],
-            "references": ["id"],
+            "fields": [
+              "workflowId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Workflow"
           }
         },
@@ -14449,8 +15377,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["copiedFromEvaluatorId"],
-            "references": ["id"],
+            "fields": [
+              "copiedFromEvaluatorId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Evaluator"
           }
         },
@@ -14529,7 +15461,9 @@
       "name": "Scenario",
       "tableName": "Scenario",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -14558,8 +15492,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -14680,8 +15618,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["testSuiteId"],
-            "references": ["id"],
+            "fields": [
+              "testSuiteId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "SimulationSuite"
           }
         },
@@ -14726,8 +15668,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["lastUpdatedById"],
-            "references": ["id"],
+            "fields": [
+              "lastUpdatedById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -14764,7 +15710,9 @@
       "name": "ScenarioVersion",
       "tableName": "ScenarioVersion",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -14793,8 +15741,12 @@
           "isOptional": false,
           "documentation": "Deleting the case takes its history with it. Under relationMode=\"prisma\"\nthe cascade is the client's, so a raw SQL delete still has to clear these\nrows itself.",
           "relation": {
-            "fields": ["scenarioId"],
-            "references": ["id"],
+            "fields": [
+              "scenarioId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Scenario"
           }
         },
@@ -14876,7 +15828,9 @@
       "name": "SimulationSuite",
       "tableName": "SimulationSuite",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -14905,8 +15859,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -15074,7 +16032,9 @@
       "name": "Subscription",
       "tableName": "Subscription",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -15328,8 +16288,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -15353,7 +16317,9 @@
       "name": "Invoice",
       "tableName": "Invoice",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -15436,8 +16402,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["subscriptionId"],
-            "references": ["id"],
+            "fields": [
+              "subscriptionId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Subscription"
           }
         },
@@ -15461,7 +16431,9 @@
       "name": "InvoiceItem",
       "tableName": "InvoiceItem",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -15526,8 +16498,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["invoiceId"],
-            "references": ["id"],
+            "fields": [
+              "invoiceId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Invoice"
           }
         }
@@ -15537,7 +16513,9 @@
       "name": "Group",
       "tableName": "Group",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -15566,8 +16544,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -15668,7 +16650,10 @@
       "name": "GroupMembership",
       "tableName": "GroupMembership",
       "documentation": "",
-      "primaryKey": ["userId", "groupId"],
+      "primaryKey": [
+        "userId",
+        "groupId"
+      ],
       "fields": [
         {
           "name": "userId",
@@ -15697,8 +16682,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -15711,8 +16700,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["groupId"],
-            "references": ["id"],
+            "fields": [
+              "groupId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Group"
           }
         },
@@ -15731,7 +16724,9 @@
       "name": "RoleBinding",
       "tableName": "RoleBinding",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -15760,8 +16755,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -15783,8 +16782,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -15806,8 +16809,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["groupId"],
-            "references": ["id"],
+            "fields": [
+              "groupId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Group"
           }
         },
@@ -15829,8 +16836,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["apiKeyId"],
-            "references": ["id"],
+            "fields": [
+              "apiKeyId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "ApiKey"
           }
         },
@@ -15861,8 +16872,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["customRoleId"],
-            "references": ["id"],
+            "fields": [
+              "customRoleId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "CustomRole"
           }
         },
@@ -15908,7 +16923,9 @@
       "name": "Grant",
       "tableName": "Grant",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -16105,7 +17122,9 @@
       "name": "GrantUsage",
       "tableName": "GrantUsage",
       "documentation": "",
-      "primaryKey": ["grantId"],
+      "primaryKey": [
+        "grantId"
+      ],
       "fields": [
         {
           "name": "grantId",
@@ -16176,7 +17195,9 @@
       "name": "Role",
       "tableName": "Role",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -16274,7 +17295,9 @@
       "name": "ApiKey",
       "tableName": "ApiKey",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -16348,8 +17371,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["userId"],
-            "references": ["id"],
+            "fields": [
+              "userId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -16380,8 +17407,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -16495,7 +17526,9 @@
       "name": "ProjectActiveDay",
       "tableName": "ProjectActiveDay",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -16539,7 +17572,9 @@
       "name": "BillingMeterCheckpoint",
       "tableName": "BillingMeterCheckpoint",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -16619,7 +17654,9 @@
       "name": "VirtualKey",
       "tableName": "VirtualKey",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -16756,8 +17793,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["principalUserId"],
-            "references": ["id"],
+            "fields": [
+              "principalUserId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -16906,8 +17947,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["routingPolicyId"],
-            "references": ["id"],
+            "fields": [
+              "routingPolicyId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "RoutingPolicy"
           }
         },
@@ -16962,7 +18007,9 @@
       "name": "VirtualKeyScope",
       "tableName": "VirtualKeyScope",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -16991,8 +18038,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["virtualKeyId"],
-            "references": ["id"],
+            "fields": [
+              "virtualKeyId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "VirtualKey"
           }
         },
@@ -17029,7 +18080,9 @@
       "name": "RoutingPolicy",
       "tableName": "RoutingPolicy",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -17058,8 +18111,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -17162,8 +18219,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -17185,8 +18246,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["updatedById"],
-            "references": ["id"],
+            "fields": [
+              "updatedById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -17224,7 +18289,9 @@
       "name": "RoutingPolicyScope",
       "tableName": "RoutingPolicyScope",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -17253,8 +18320,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["routingPolicyId"],
-            "references": ["id"],
+            "fields": [
+              "routingPolicyId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "RoutingPolicy"
           }
         },
@@ -17291,7 +18362,9 @@
       "name": "GatewayGuardrail",
       "tableName": "GatewayGuardrail",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -17320,8 +18393,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -17361,8 +18438,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["evaluatorId"],
-            "references": ["id"],
+            "fields": [
+              "evaluatorId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Evaluator"
           }
         },
@@ -17429,8 +18510,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -17452,8 +18537,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["updatedById"],
-            "references": ["id"],
+            "fields": [
+              "updatedById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         }
@@ -17463,7 +18552,9 @@
       "name": "IngestionSource",
       "tableName": "IngestionSource",
       "documentation": "Per-platform fleet configuration that connects a closed SaaS\nproduct's audit / OTel / S3 stream to LangWatch's Activity\nMonitor (cf. specs/ai-gateway/governance/activity-monitor.feature\n+ ingestion-sources.feature, docs/ai-gateway/governance/architecture.md).\n\nOne IngestionSource = one upstream fleet (e.g. \"Miro Cowork\",\n\"Acme Workato production\"). The runtime ingests events on whatever\ncadence the source supports - push for OTel/webhook/S3 (Tier C/D),\npull for poll-based admin APIs (Tier C). Per-source-type adapters\nnormalise platform-specific shapes into OCSF + AOS before they\nland in trace_summaries with SourceType + SourceId tags.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -17492,8 +18583,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -17515,8 +18610,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["teamId"],
-            "references": ["id"],
+            "fields": [
+              "teamId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Team"
           }
         },
@@ -17718,8 +18817,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         }
@@ -17729,7 +18832,9 @@
       "name": "AnomalyRule",
       "tableName": "AnomalyRule",
       "documentation": "Admin-defined anomaly detection rule. Evaluated server-side at\ningest time (Option C - not in this slice yet) against\ngateway_activity_events. When triggered, an alert is dispatched\nto the destinations configured on the rule (Slack / SIEM / webhook\n/ PagerDuty / email).\n\nThis is a configuration entity - the actual rule evaluation +\nalert state lives in a future ClickHouse table\n(gateway_anomaly_alerts) and a server-side worker. Spec:\nspecs/ai-gateway/governance/anomaly-rules.feature\n(Alexis lane B C-UI; mocked-v0 today, real persistence is THIS slice).",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -17758,8 +18863,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -17889,8 +18998,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -17914,7 +19027,9 @@
       "name": "AnomalyAlert",
       "tableName": "AnomalyAlert",
       "documentation": "Persisted anomaly detection. Inserted by the anomaly-detection\nreactor (event-sourcing pipeline; modeled on PR #3351's\nalertTrigger pattern) when a rule's threshold trips while\nprocessing a freshly-arrived ActivityEventReceived event.\nRead by api.activityMonitor.recentAnomalies for the admin dashboard.\n\nDedup: (ruleId, triggerWindowStart) - re-evaluating the same\nwindow updates the existing row rather than creating a duplicate.\nAcknowledgement / resolution are admin actions on the row.\n\nSpec: specs/ai-gateway/governance/anomaly-detection.feature",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -17943,8 +19058,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -17966,8 +19085,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["ruleId"],
-            "references": ["id"],
+            "fields": [
+              "ruleId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "AnomalyRule"
           }
         },
@@ -18098,7 +19221,9 @@
       "name": "AiToolEntry",
       "tableName": "AiToolEntry",
       "documentation": "Org-scoped catalog of AI tools surfaced on the personal home portal\n(/me) and managed by org admins at /governance/tool-catalog.\n\nThree first-class tile types via `type` discriminator:\n- \"coding_assistant\" - click expands to setup helper (e.g. `langwatch claude`)\n- \"model_provider\"   - click expands to inline personal-VK creation\n- \"external_tool\"    - click expands to admin-attached markdown + external link\n\nScoping: organization-default entries can be OVERRIDDEN at the team\ntier (same `slug` + `scope=team` + matching `scopeId`) so admins can\nhide or re-skin a globally-listed tool for a specific team. The\nuser-facing `list` endpoint resolves this hierarchy at read time.\n\n`config` is a discriminated JSON union per `type`:\ncoding_assistant: { setupCommand, setupDocsUrl, helperText? }\nmodel_provider:   { providerKey, suggestedRoutingPolicyId?, defaultLabel?, projectSuggestionText? }\nexternal_tool:    { descriptionMarkdown, linkUrl, ctaLabel? }\n\nSpec: specs/ai-governance/personal-portal/tool-catalog-*.feature",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -18127,8 +19252,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -18301,7 +19430,9 @@
       "name": "AiToolEntryTeam",
       "tableName": "AiToolEntryTeam",
       "documentation": "@deprecated Per-team scope binding for AiToolEntry. Superseded by\nAiToolEntryDepartment; kept so the rename migration is non-destructive.\nNo new rows are written here.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -18339,8 +19470,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["entryId"],
-            "references": ["id"],
+            "fields": [
+              "entryId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "AiToolEntry"
           }
         },
@@ -18353,8 +19488,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["teamId"],
-            "references": ["id"],
+            "fields": [
+              "teamId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Team"
           }
         }
@@ -18364,7 +19503,9 @@
       "name": "AiToolEntryDepartment",
       "tableName": "AiToolEntryDepartment",
       "documentation": "Per-department scope binding for AiToolEntry. Empty set = org-wide.\nNon-empty = entry visible only to members of those departments (an\nOrganizationUser whose `departmentId` is in the set). Mirrors\nAiToolEntryTeam's shape. `departmentId` is a plain column ref\n(relationMode=\"prisma\"), matching how Department is referenced\nelsewhere; the service validates the id belongs to the org.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -18402,8 +19543,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["entryId"],
-            "references": ["id"],
+            "fields": [
+              "entryId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "AiToolEntry"
           }
         }
@@ -18413,7 +19558,9 @@
       "name": "IngestionTemplate",
       "tableName": "IngestionTemplate",
       "documentation": "Admin/platform-curated catalog row for upstream OTLP normalization.\nOwns the OTTL transform that reshapes a specific upstream tool's\nspan shape into canonical gen_ai conventions. Users connect via an\ningestion key (an ingest-only ApiKey carrying ingestionTemplateId) to\nland traces in their personal project.\n\n`organizationId` NULL = platform-published default (always-visible\nacross every org). NOT NULL = org-authored (visible only within\nthat org). v1 ships only platform-published; org-authored authoring\nUI lands v2 (the column ships now to avoid a future migration).\n\nSpec: specs/ai-gateway/governance/ingestion-templates-catalog.feature",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -18442,8 +19589,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -18579,7 +19730,9 @@
       "name": "GatewayConnectUpstream",
       "tableName": "GatewayConnectUpstream",
       "documentation": "",
-      "primaryKey": ["organizationId"],
+      "primaryKey": [
+        "organizationId"
+      ],
       "fields": [
         {
           "name": "organizationId",
@@ -18632,7 +19785,9 @@
       "name": "GatewayBudget",
       "tableName": "GatewayBudget",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -18849,8 +20004,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["createdById"],
-            "references": ["id"],
+            "fields": [
+              "createdById"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "User"
           }
         },
@@ -18897,7 +20056,9 @@
       "name": "GatewayBudgetBucketBoundary",
       "tableName": "GatewayBudgetBucketBoundary",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -18935,8 +20096,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["budgetId"],
-            "references": ["id"],
+            "fields": [
+              "budgetId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "GatewayBudget"
           }
         },
@@ -18982,7 +20147,9 @@
       "name": "GatewayBudgetLedger",
       "tableName": "GatewayBudgetLedger",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -19011,8 +20178,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["budgetId"],
-            "references": ["id"],
+            "fields": [
+              "budgetId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "GatewayBudget"
           }
         },
@@ -19034,8 +20205,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["virtualKeyId"],
-            "references": ["id"],
+            "fields": [
+              "virtualKeyId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "VirtualKey"
           }
         },
@@ -19157,7 +20332,9 @@
       "name": "GatewayChangeEvent",
       "tableName": "GatewayChangeEvent",
       "documentation": "",
-      "primaryKey": ["revision"],
+      "primaryKey": [
+        "revision"
+      ],
       "fields": [
         {
           "name": "revision",
@@ -19186,8 +20363,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["organizationId"],
-            "references": ["id"],
+            "fields": [
+              "organizationId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Organization"
           }
         },
@@ -19245,8 +20426,12 @@
           "isOptional": true,
           "documentation": "",
           "relation": {
-            "fields": ["projectId"],
-            "references": ["id"],
+            "fields": [
+              "projectId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "Project"
           }
         },
@@ -19274,7 +20459,9 @@
       "name": "GatewayCacheRule",
       "tableName": "GatewayCacheRule",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -19399,7 +20586,9 @@
       "name": "FeatureFlag",
       "tableName": "FeatureFlag",
       "documentation": "",
-      "primaryKey": ["key"],
+      "primaryKey": [
+        "key"
+      ],
       "fields": [
         {
           "name": "key",
@@ -19461,7 +20650,11 @@
       "name": "FeatureFlagExperimentSetting",
       "tableName": "FeatureFlagExperimentSetting",
       "documentation": "One experiment setting per (flag, subject). A USER row is that person's\nown opt-in; an ORGANIZATION or PROJECT row is an owner's explicit policy\nfor that exact scope. No row means inherit.",
-      "primaryKey": ["flagKey", "subjectType", "subjectId"],
+      "primaryKey": [
+        "flagKey",
+        "subjectType",
+        "subjectId"
+      ],
       "fields": [
         {
           "name": "flagKey",
@@ -19532,7 +20725,9 @@
       "name": "ProcessManagerInstance",
       "tableName": "ProcessManagerInstance",
       "documentation": "Durable state for a long-running event-sourced process.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -19630,7 +20825,9 @@
       "name": "ProcessManagerInbox",
       "tableName": "ProcessManagerInbox",
       "documentation": "Idempotency marker for a source event consumed by a process definition.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -19710,7 +20907,9 @@
       "name": "ProcessManagerOutbox",
       "tableName": "ProcessManagerOutbox",
       "documentation": "Transactional intents emitted by a durable process transition.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -19903,7 +21102,9 @@
       "name": "ProcessManagerOutboxAttempt",
       "tableName": "ProcessManagerOutboxAttempt",
       "documentation": "Why an outbox delivery failed, one row per FAILED attempt\n(specs/ops/dead-letter-recovery.feature). Successes write nothing, so the\ntable grows with trouble, not with traffic. Rows die with their message:\nthe cascade delete is the retention story, riding the existing sweep.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -19995,8 +21196,12 @@
           "isOptional": false,
           "documentation": "",
           "relation": {
-            "fields": ["outboxId"],
-            "references": ["id"],
+            "fields": [
+              "outboxId"
+            ],
+            "references": [
+              "id"
+            ],
             "to": "ProcessManagerOutbox"
           }
         }
@@ -20006,7 +21211,9 @@
       "name": "TopicClusteringRunProjection",
       "tableName": "TopicClusteringRunProjection",
       "documentation": "Per-project topic clustering run status (ADR-051): the rebuildable\noperational read model behind the settings page. One row per project;\nfolded from run_completed/run_failed events, never written directly.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -20239,7 +21446,9 @@
       "name": "TopicModelProjection",
       "tableName": "TopicModelProjection",
       "documentation": "Cursor row for the topic-model projection (ADR-051). The model itself is\nthe `Topic` table, written through by the projection; this row only\nrecords how far the fold has applied the event log.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -20319,7 +21528,9 @@
       "name": "TopicClusteringRunHistoryProjection",
       "tableName": "TopicClusteringRunHistoryProjection",
       "documentation": "Per-project topic clustering run history (audit read model, ADR-051).\nOne row per project; `runs` is the bounded newest-first entry list.\nRebuildable by replaying the event log.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -20408,7 +21619,9 @@
       "name": "IngestionPullRunProjection",
       "tableName": "IngestionPullRunProjection",
       "documentation": "Rebuildable per-source pull checkpoint and operator-facing run status.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -20713,7 +21926,9 @@
       "name": "ScheduledJob",
       "tableName": "ScheduledJob",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -20847,7 +22062,9 @@
       "name": "BugReport",
       "tableName": "BugReport",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -20972,7 +22189,9 @@
       "name": "IdempotencyReceipt",
       "tableName": "IdempotencyReceipt",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -21070,7 +22289,9 @@
       "name": "GatewayRealtimeSession",
       "tableName": "GatewayRealtimeSession",
       "documentation": "",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -21240,7 +22461,10 @@
       "name": "SystemMigrationTenantState",
       "tableName": "SystemMigrationTenantState",
       "documentation": "",
-      "primaryKey": ["migrationName", "tenantId"],
+      "primaryKey": [
+        "migrationName",
+        "tenantId"
+      ],
       "fields": [
         {
           "name": "migrationName",
@@ -21311,7 +22535,10 @@
       "name": "SystemMigrationEnrollment",
       "tableName": "SystemMigrationEnrollment",
       "documentation": "",
-      "primaryKey": ["organizationId", "migrationName"],
+      "primaryKey": [
+        "organizationId",
+        "migrationName"
+      ],
       "fields": [
         {
           "name": "organizationId",
@@ -21355,7 +22582,10 @@
       "name": "StoredObject",
       "tableName": "StoredObject",
       "documentation": "",
-      "primaryKey": ["tenantId", "id"],
+      "primaryKey": [
+        "tenantId",
+        "id"
+      ],
       "fields": [
         {
           "name": "tenantId",
@@ -21570,7 +22800,9 @@
       "name": "DiscoveredPerson",
       "tableName": "DiscoveredPerson",
       "documentation": "A name-text seen on a provider's cost or audit rows: \"the provider told us\nsomeone called m.silva exists\". One row per provider-scoped identity.\n\nThis is the unit of GDPR erasure (ADR-128 §9), and deliberately so: most of\nthese people have no LangWatch login at all - contractors, seat holders who\nnever signed in, anyone whose email a provider put on a cost row - so there\nis no platform user to key on and a user-deletion event can never fire for\nthem.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -21722,7 +22954,9 @@
       "name": "DiscoveredAgent",
       "tableName": "DiscoveredAgent",
       "documentation": "The same shape as DiscoveredPerson for non-human actors - Genie spaces,\nCopilot bots, OpenAI projects - plus whatever provider-native metadata the\nsource published. Discovering an agent grants it nothing either.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -21820,7 +23054,9 @@
       "name": "IdentityMatch",
       "tableName": "IdentityMatch",
       "documentation": "The dated match table: \"`user_abc123` on Anthropic is platform user #42,\nvalid from March 3\", closed when it stops being true.\n\nDating is what makes a re-issued email address survivable: the leaver's link\ncloses at offboarding, the new hire gets a new link, and January's spend\nstays with January's person. A correction closes the old row and opens a new\none; nothing is ever silently rewritten.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -21900,7 +23136,9 @@
       "name": "GovernanceTenantHistory",
       "tableName": "GovernanceTenantHistory",
       "documentation": "Every ClickHouse `TenantId` this organization has ever written governance\nrows under, appended on first use and never pruned.\n\nThe live `resolveGovProjectId` lookup cannot be this translation: it filters\n`archivedAt: null` and so returns null forever once someone archives the\ngovernance project, while the write path re-reads the same project by slug\nwith no such filter and keeps landing rows under the old tenant. The\norganization would map to zero tenants on read and one on write - a\npermanent split-brain in which the cost screen reports \"no governance data\"\nand an erasure job erases nothing and reports success.\n\nReads resolve against the whole history; erasure walks all of it, because\npersonal data does not stop existing in a tenant that stopped being current.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -21953,7 +23191,9 @@
       "name": "ErasedIdentifierSuppression",
       "tableName": "ErasedIdentifierSuppression",
       "documentation": "Hashes of erased identifiers - the do-not-reimport list.\n\nWithout it the erasure is undone by the pipeline that produced it: the\npullers look 30 days back, so the next day's pull re-ingests the same email\nand re-writes what we erased. Every write path carrying an identifier\nconsults this list and drops a suppressed one (ADR-128 §9 step 1).\n\nIt stores hashes and never identifiers, so it is not itself a copy of the\ndata it exists to keep out. The stored `identifierHash` and the pseudonym\nwritten in place of the erased value are the same function of the same\ninput - HMAC-SHA256(secret, identifier) - so a write path computes that digest\nonce and uses it twice: as the membership test, and, on a hit, as the\nreplacement value. That is why no original-to-pseudonym mapping table\nexists; one would hold the erased identifier in plaintext forever.\n\nScoped to the provider as well as the organization: the same string can be a\ndifferent person under a different provider.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -22006,7 +23246,9 @@
       "name": "IdentityMatchSuggestion",
       "tableName": "IdentityMatchSuggestion",
       "documentation": "Match candidates a background job computed and a human has yet to confirm\n(ADR-128 §12).\n\nStored rather than computed when the review screen asks, and the reason is\nmeasured rather than stylistic: fuzzy matching is quadratic, there is no\ndatabase route to it here, and at this document's own example size - 2,000\ndiscovered people against 500 accounts - plain edit distance over the\n1,000,000 pairs blocked the event loop for 2.9 seconds. Per page load,\nuncached, stalling every other request on the instance. A stored row also\nmakes a pending count answerable without paying for the whole sweep.\n\nRows are written only by the job, which prefilters before it scores and\nrecomputes when its inputs change. Confirming one opens an `IdentityMatch`\nand deletes the suggestion.\n\nSuspension deliberately does NOT live here - it is on `DiscoveredPerson`,\nbecause a halt on automatic linking that the next recompute clears is not a\nhalt.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -22068,7 +23310,9 @@
       "name": "ConnectedSeatChange",
       "tableName": "ConnectedSeatChange",
       "documentation": "What a mid-term seat change of one connected license owes (ADR-141,\nsection 7): the seats added on the reissued license, invoiced prorated to\nthe end of the term.\n\nThe row is written before the payment provider is called and completed\nafter it, so a call that failed halfway is retried by the next seat\ninvoicing pass without inventing a second invoice. One row per reissued license.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -22193,7 +23437,9 @@
       "name": "ConnectedStatement",
       "tableName": "ConnectedStatement",
       "documentation": "The monthly usage statement one connected customer was sent (ADR-139,\nsection 7). One row per account per month keeps the statement to one send,\nwhatever runs the tick.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -22237,7 +23483,9 @@
       "name": "InstanceIdentity",
       "tableName": "InstanceIdentity",
       "documentation": "The identity this install presents to LangWatch (ADR-139, section 2).\n\nExactly one row, minted on first use and never rewritten. It survives\nrestarts, backups and hostname changes, and an install restored into\nanother database mints another one, which is what the registry refuses as\nthe wrong instance.\n\nIt replaced an identity built from the organization name and id, which\nleaked the customer's name in cleartext, named one organization rather than\none install, and could not be joined to a license row without splitting a\nstring.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -22308,7 +23556,9 @@
       "name": "SelfHostedInstance",
       "tableName": "SelfHostedInstance",
       "documentation": "One self-hosted install, as its daily usage report describes it (ADR-139,\nsection 10). The row is created by the first report that names an instance\nid and is updated by every report after that, so the backoffice reads one\nrow per install rather than folding a history on every page load.\n\nThe report carries no credential, so it identifies an install and never a\ncustomer. `organizationId` and `issuedLicenseId` are resolved from the\nlicense bound to this instance, which the install proved by presenting its\ntoken to license sync. A field in the posted body never reaches them.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -22523,7 +23773,9 @@
       "name": "SelfHostedInstanceReport",
       "tableName": "SelfHostedInstanceReport",
       "documentation": "One usage report, exactly as it arrived. Kept so a number on an install's\nrow can be traced back to the report that set it, and so a question asked\nlater can be answered over the history rather than over the latest snapshot.",
-      "primaryKey": ["id"],
+      "primaryKey": [
+        "id"
+      ],
       "fields": [
         {
           "name": "id",
@@ -22594,39 +23846,85 @@
   "enums": [
     {
       "name": "SsoConnectionMigrationPhase",
-      "values": ["SETUP", "GRACE_LEGACY", "GRACE_DIRECT", "FINALIZING", "FINALIZED"]
+      "values": [
+        "SETUP",
+        "GRACE_LEGACY",
+        "GRACE_DIRECT",
+        "FINALIZING",
+        "FINALIZED"
+      ]
     },
     {
       "name": "TeamUserRole",
-      "values": ["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]
+      "values": [
+        "ADMIN",
+        "MEMBER",
+        "VIEWER",
+        "CUSTOM"
+      ]
     },
     {
       "name": "RoleBindingScopeType",
-      "values": ["ORGANIZATION", "TEAM", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT"
+      ]
     },
     {
       "name": "GrantScopeType",
-      "values": ["ORGANIZATION", "TEAM", "PROJECT", "RESOURCE", "PLATFORM"]
+      "values": [
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT",
+        "RESOURCE",
+        "PLATFORM"
+      ]
     },
     {
       "name": "GrantPrincipalType",
-      "values": ["USER", "API_KEY", "GROUP", "TEAM", "ORGANIZATION", "PROJECT", "ANYONE"]
+      "values": [
+        "USER",
+        "API_KEY",
+        "GROUP",
+        "TEAM",
+        "ORGANIZATION",
+        "PROJECT",
+        "ANYONE"
+      ]
     },
     {
       "name": "OrganizationUserRole",
-      "values": ["ADMIN", "MEMBER", "EXTERNAL"]
+      "values": [
+        "ADMIN",
+        "MEMBER",
+        "EXTERNAL"
+      ]
     },
     {
       "name": "IssuedLicenseSource",
-      "values": ["BACKOFFICE", "PURCHASE", "SCRIPT", "LEGACY_IMPORT"]
+      "values": [
+        "BACKOFFICE",
+        "PURCHASE",
+        "SCRIPT",
+        "LEGACY_IMPORT"
+      ]
     },
     {
       "name": "ConnectedCreditGrantKind",
-      "values": ["commit", "added", "renewal"]
+      "values": [
+        "commit",
+        "added",
+        "renewal"
+      ]
     },
     {
       "name": "ConnectedInvoiceKind",
-      "values": ["annual", "seat_change", "usage"]
+      "values": [
+        "annual",
+        "seat_change",
+        "usage"
+      ]
     },
     {
       "name": "PlanTypes",
@@ -22647,35 +23945,69 @@
     },
     {
       "name": "PricingModel",
-      "values": ["TIERED", "SEAT_EVENT"]
+      "values": [
+        "TIERED",
+        "SEAT_EVENT"
+      ]
     },
     {
       "name": "OrganizationIntent",
-      "values": ["AGENT_GOVERNANCE", "LLM_OPS"]
+      "values": [
+        "AGENT_GOVERNANCE",
+        "LLM_OPS"
+      ]
     },
     {
       "name": "SubscriptionStatus",
-      "values": ["PENDING", "FAILED", "ACTIVE", "CANCELLED"]
+      "values": [
+        "PENDING",
+        "FAILED",
+        "ACTIVE",
+        "CANCELLED"
+      ]
     },
     {
       "name": "Currency",
-      "values": ["USD", "EUR"]
+      "values": [
+        "USD",
+        "EUR"
+      ]
     },
     {
       "name": "INVITE_STATUS",
-      "values": ["PENDING", "ACCEPTED", "WAITING_APPROVAL", "PAYMENT_PENDING", "REVOKED"]
+      "values": [
+        "PENDING",
+        "ACCEPTED",
+        "WAITING_APPROVAL",
+        "PAYMENT_PENDING",
+        "REVOKED"
+      ]
     },
     {
       "name": "EvaluationExecutionMode",
-      "values": ["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"]
+      "values": [
+        "ON_MESSAGE",
+        "AS_GUARDRAIL",
+        "MANUALLY"
+      ]
     },
     {
       "name": "CostType",
-      "values": ["TRACE_CHECK", "GUARDRAIL", "CLUSTERING", "BATCH_EVALUATION"]
+      "values": [
+        "TRACE_CHECK",
+        "GUARDRAIL",
+        "CLUSTERING",
+        "BATCH_EVALUATION"
+      ]
     },
     {
       "name": "CostReferenceType",
-      "values": ["CHECK", "TRACE", "PROJECT", "BATCH"]
+      "values": [
+        "CHECK",
+        "TRACE",
+        "PROJECT",
+        "BATCH"
+      ]
     },
     {
       "name": "TriggerAction",
@@ -22689,91 +24021,191 @@
     },
     {
       "name": "TriggerKind",
-      "values": ["AUTOMATION", "ALERT", "REPORT"]
+      "values": [
+        "AUTOMATION",
+        "ALERT",
+        "REPORT"
+      ]
     },
     {
       "name": "AlertType",
-      "values": ["CRITICAL", "WARNING", "INFO"]
+      "values": [
+        "CRITICAL",
+        "WARNING",
+        "INFO"
+      ]
+    },
+    {
+      "name": "SlackIntegrationScopeType",
+      "values": [
+        "ORGANIZATION",
+        "PROJECT"
+      ]
+    },
+    {
+      "name": "SlackIntegrationKind",
+      "values": [
+        "BOT",
+        "INCOMING_WEBHOOK"
+      ]
     },
     {
       "name": "WebhookDeliveryOutcome",
-      "values": ["success", "retryable", "terminal", "pending"]
+      "values": [
+        "success",
+        "retryable",
+        "terminal",
+        "pending"
+      ]
     },
     {
       "name": "WebhookDestinationKind",
-      "values": ["http", "sqs"]
+      "values": [
+        "http",
+        "sqs"
+      ]
     },
     {
       "name": "WebhookEndpointStatus",
-      "values": ["ACTIVE", "DISABLED"]
+      "values": [
+        "ACTIVE",
+        "DISABLED"
+      ]
     },
     {
       "name": "WebhookDeliveryChannel",
-      "values": ["platform", "automations"]
+      "values": [
+        "platform",
+        "automations"
+      ]
     },
     {
       "name": "ExperimentType",
-      "values": ["DSPY", "BATCH_EVALUATION", "BATCH_EVALUATION_V2", "EVALUATIONS_V3"]
+      "values": [
+        "DSPY",
+        "BATCH_EVALUATION",
+        "BATCH_EVALUATION_V2",
+        "EVALUATIONS_V3"
+      ]
     },
     {
       "name": "ModelProviderScopeType",
-      "values": ["ORGANIZATION", "TEAM", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT"
+      ]
     },
     {
       "name": "ModelDefaultScopeType",
-      "values": ["ORGANIZATION", "TEAM", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT"
+      ]
     },
     {
       "name": "LangyProjectionTitleSource",
-      "values": ["derived", "auto", "user"]
+      "values": [
+        "derived",
+        "auto",
+        "user"
+      ]
     },
     {
       "name": "AnnotationScoreDataType",
-      "values": ["CATEGORICAL", "BOOLEAN", "LIKERT", "OPTION", "CHECKBOX"]
+      "values": [
+        "CATEGORICAL",
+        "BOOLEAN",
+        "LIKERT",
+        "OPTION",
+        "CHECKBOX"
+      ]
     },
     {
       "name": "ShareResourceType",
-      "values": ["TRACE", "THREAD"]
+      "values": [
+        "TRACE",
+        "THREAD"
+      ]
     },
     {
       "name": "ShareVisibility",
-      "values": ["PUBLIC", "ORGANIZATION", "PROJECT"]
+      "values": [
+        "PUBLIC",
+        "ORGANIZATION",
+        "PROJECT"
+      ]
     },
     {
       "name": "PinSource",
-      "values": ["manual", "share"]
+      "values": [
+        "manual",
+        "share"
+      ]
     },
     {
       "name": "RetentionPolicyScopeType",
-      "values": ["ORGANIZATION", "TEAM", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT"
+      ]
     },
     {
       "name": "DataPrivacyScopeType",
-      "values": ["ORGANIZATION", "DEPARTMENT", "TEAM", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "DEPARTMENT",
+        "TEAM",
+        "PROJECT"
+      ]
     },
     {
       "name": "CustomLLMModelCostScopeType",
-      "values": ["ORGANIZATION", "TEAM", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT"
+      ]
     },
     {
       "name": "PromptScope",
-      "values": ["ORGANIZATION", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "PROJECT"
+      ]
     },
     {
       "name": "VirtualKeyStatus",
-      "values": ["ACTIVE", "DISABLED", "REVOKED"]
+      "values": [
+        "ACTIVE",
+        "DISABLED",
+        "REVOKED"
+      ]
     },
     {
       "name": "VirtualKeyPurpose",
-      "values": ["USER", "LANGY", "CONNECT"]
+      "values": [
+        "USER",
+        "LANGY",
+        "CONNECT"
+      ]
     },
     {
       "name": "GatewayProviderRotationPolicy",
-      "values": ["MANUAL"]
+      "values": [
+        "MANUAL"
+      ]
     },
     {
       "name": "GatewayProviderHealthStatus",
-      "values": ["UNKNOWN", "HEALTHY", "DEGRADED", "CIRCUIT_OPEN"]
+      "values": [
+        "UNKNOWN",
+        "HEALTHY",
+        "DEGRADED",
+        "CIRCUIT_OPEN"
+      ]
     },
     {
       "name": "GatewayBudgetScopeType",
@@ -22789,15 +24221,31 @@
     },
     {
       "name": "GatewayBudgetWindow",
-      "values": ["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL", "MANUAL"]
+      "values": [
+        "MINUTE",
+        "HOUR",
+        "DAY",
+        "WEEK",
+        "MONTH",
+        "TOTAL",
+        "MANUAL"
+      ]
     },
     {
       "name": "GatewayBudgetBreachAction",
-      "values": ["BLOCK", "WARN"]
+      "values": [
+        "BLOCK",
+        "WARN"
+      ]
     },
     {
       "name": "GatewayBudgetLedgerStatus",
-      "values": ["SUCCESS", "PROVIDER_ERROR", "BLOCKED_BY_GUARDRAIL", "CANCELLED"]
+      "values": [
+        "SUCCESS",
+        "PROVIDER_ERROR",
+        "BLOCKED_BY_GUARDRAIL",
+        "CANCELLED"
+      ]
     },
     {
       "name": "GatewayChangeEventKind",
@@ -22821,47 +24269,92 @@
     },
     {
       "name": "GatewayCacheRuleMode",
-      "values": ["RESPECT", "FORCE", "DISABLE"]
+      "values": [
+        "RESPECT",
+        "FORCE",
+        "DISABLE"
+      ]
     },
     {
       "name": "VirtualKeyRoutingMode",
-      "values": ["NONE", "FALLBACK_ALL", "POLICY"]
+      "values": [
+        "NONE",
+        "FALLBACK_ALL",
+        "POLICY"
+      ]
     },
     {
       "name": "VirtualKeyScopeType",
-      "values": ["ORGANIZATION", "TEAM", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT"
+      ]
     },
     {
       "name": "RoutingPolicyScopeType",
-      "values": ["ORGANIZATION", "TEAM", "PROJECT"]
+      "values": [
+        "ORGANIZATION",
+        "TEAM",
+        "PROJECT"
+      ]
     },
     {
       "name": "GatewayGuardrailDirection",
-      "values": ["PRE", "POST", "STREAM_CHUNK"]
+      "values": [
+        "PRE",
+        "POST",
+        "STREAM_CHUNK"
+      ]
     },
     {
       "name": "GatewayGuardrailFailureMode",
-      "values": ["FAIL_OPEN", "FAIL_CLOSED"]
+      "values": [
+        "FAIL_OPEN",
+        "FAIL_CLOSED"
+      ]
     },
     {
       "name": "FeatureFlagExperimentSubjectType",
-      "values": ["USER", "ORGANIZATION", "PROJECT"]
+      "values": [
+        "USER",
+        "ORGANIZATION",
+        "PROJECT"
+      ]
     },
     {
       "name": "ProcessManagerOutboxStatus",
-      "values": ["pending", "dispatched", "dead", "discarded"]
+      "values": [
+        "pending",
+        "dispatched",
+        "dead",
+        "discarded"
+      ]
     },
     {
       "name": "ProcessManagerOutboxAttemptOutcome",
-      "values": ["retry_scheduled", "dead"]
+      "values": [
+        "retry_scheduled",
+        "dead"
+      ]
     },
     {
       "name": "GatewayRealtimeSessionStatus",
-      "values": ["OPEN", "CLOSED", "FAILED", "EXPIRED"]
+      "values": [
+        "OPEN",
+        "CLOSED",
+        "FAILED",
+        "EXPIRED"
+      ]
     },
     {
       "name": "ConnectedSeatChangeState",
-      "values": ["intent", "invoiced", "nothing_to_invoice", "not_onboarded"]
+      "values": [
+        "intent",
+        "invoiced",
+        "nothing_to_invoice",
+        "not_onboarded"
+      ]
     }
   ]
 }

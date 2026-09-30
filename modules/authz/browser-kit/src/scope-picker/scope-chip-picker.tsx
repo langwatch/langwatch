@@ -75,14 +75,36 @@ interface ScopeOption {
   personalOnly?: boolean;
 }
 
-const SCOPE_DESCRIPTION_SINGLE: Record<ScopeChipPickerScopeType, string> = {
-  PROJECT: "Only this project can use this configuration.",
-  TEAM: "Every project in the team inherits this configuration.",
-  ORGANIZATION: "Every project in the organization inherits this configuration.",
-  DEPARTMENT: "Every member of this department can use this configuration.",
-};
+function describeSingleScope({
+  scopeType,
+  subjectNoun,
+}: {
+  scopeType: ScopeChipPickerScopeType;
+  subjectNoun: string;
+}): string {
+  switch (scopeType) {
+    case "PROJECT":
+      return `Only this project can use this ${subjectNoun}.`;
+    case "TEAM":
+      return `Every project in the team inherits this ${subjectNoun}.`;
+    case "ORGANIZATION":
+      return `Every project in the organization inherits this ${subjectNoun}.`;
+    case "DEPARTMENT":
+      return `Every member of this department can use this ${subjectNoun}.`;
+    default: {
+      const exhaustive: never = scopeType;
+      return exhaustive;
+    }
+  }
+}
 
-function summariseSelection(scopes: ScopeChipPickerEntry[]): string {
+function summariseSelection({
+  scopes,
+  subjectNoun,
+}: {
+  scopes: ScopeChipPickerEntry[];
+  subjectNoun: string;
+}): string {
   if (scopes.length === 0) {
     return "Pick at least one scope.";
   }
@@ -90,10 +112,10 @@ function summariseSelection(scopes: ScopeChipPickerEntry[]): string {
     const only = scopes[0]!;
     if (only.personalOnly) {
       return only.scopeType === "ORGANIZATION"
-        ? "Every personal workspace in the organization inherits this configuration."
-        : "The personal workspaces of this department's members inherit this configuration.";
+        ? `Every personal workspace in the organization inherits this ${subjectNoun}.`
+        : `The personal workspaces of this department's members inherit this ${subjectNoun}.`;
     }
-    return SCOPE_DESCRIPTION_SINGLE[only.scopeType];
+    return describeSingleScope({ scopeType: only.scopeType, subjectNoun });
   }
   const personal = scopes.filter((s) => s.personalOnly);
   const plain = scopes.filter((s) => !s.personalOnly);
@@ -370,6 +392,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   availableDepartments,
   allowedScopeTypes,
   label = "Scope",
+  subjectNoun = "configuration",
   showSummary = true,
   showQuickPicks = false,
   singleSelect = false,
@@ -406,6 +429,9 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
   allowedScopeTypes?: T[];
   /** Override the field label. Defaults to "Scope". */
   label?: string;
+  /** What the summary line calls the thing being scoped ("Only this project
+   *  can use this configuration."). Defaults to "configuration". */
+  subjectNoun?: string;
   /** When false, hides the helper "Shared across …" line below the field. */
   showSummary?: boolean;
   /** Single-scope mode: a row lives at exactly one (scopeType, scopeId).
@@ -542,6 +568,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
         placeholder={placeholder ?? "Select an option"}
         search={search}
         showSummary={showSummary}
+        subjectNoun={subjectNoun}
         onChange={onChange}
       />
     );
@@ -586,7 +613,7 @@ export function ScopeChipPicker<T extends ScopeChipPickerScopeType = ScopeTriadT
           }
         />
       )}
-      {showSummary && <SelectionSummary scopes={scopes} />}
+      {showSummary && <SelectionSummary scopes={scopes} subjectNoun={subjectNoun} />}
     </VStack>
   );
 }
@@ -751,11 +778,17 @@ function entryOf(option: ScopeOption): ScopeChipPickerEntry {
   };
 }
 
-function SelectionSummary({ scopes }: { scopes: ScopeChipPickerEntry[] }) {
+function SelectionSummary({
+  scopes,
+  subjectNoun,
+}: {
+  scopes: ScopeChipPickerEntry[];
+  subjectNoun: string;
+}) {
   return (
     <Box>
       <Text fontSize="xs" color="gray.600">
-        {summariseSelection(scopes)}
+        {summariseSelection({ scopes, subjectNoun })}
       </Text>
     </Box>
   );
@@ -843,6 +876,7 @@ function SingleScopeSelect({
   placeholder,
   search,
   showSummary,
+  subjectNoun,
   onChange,
 }: {
   label: string;
@@ -854,6 +888,7 @@ function SingleScopeSelect({
   placeholder: string;
   search: ScopeSearch;
   showSummary: boolean;
+  subjectNoun: string;
   onChange: (next: ScopeChipPickerEntry[]) => void;
 }) {
   const selected = scopes[0] ?? null;
@@ -907,7 +942,7 @@ function SingleScopeSelect({
           <ProjectOptionGroups {...projectGroups} />
         </Select.Content>
       </Select.Root>
-      {showSummary && <SelectionSummary scopes={scopes} />}
+      {showSummary && <SelectionSummary scopes={scopes} subjectNoun={subjectNoun} />}
     </VStack>
   );
 }

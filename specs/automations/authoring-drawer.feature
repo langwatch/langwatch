@@ -533,6 +533,13 @@ Feature: Staged automation authoring drawer
       Then the setup warns that this installation cannot send email
       And the automation can still be saved
 
+    @integration
+    Scenario: The email channel cannot be chosen when the installation cannot send email
+      Given the installation has no email provider configured
+      When the user picks how an automation delivers
+      Then the email channel is disabled
+      And hovering it says "Email is not configured. Ask an admin to set up a mail provider."
+
     @unit
     Scenario: An email test on an installation without email says email is not set up
       Given the installation has no email provider configured

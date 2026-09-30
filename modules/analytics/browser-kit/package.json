@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",

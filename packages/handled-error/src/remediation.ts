@@ -161,7 +161,7 @@ const registry = {
   custom_graph_writes_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
-      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
     ],
   },
   saved_workbench_chart_already_exists: {
@@ -198,7 +198,7 @@ const registry = {
   saved_workbench_charts_disabled_for_playground: {
     tips: [
       "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
-      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
     ],
   },
   lwql_unknown_identifier: {

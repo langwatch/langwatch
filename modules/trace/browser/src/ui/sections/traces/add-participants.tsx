@@ -142,7 +142,10 @@ export const AddParticipants = ({
               }}
             </Select.ValueText>
           </Select.Trigger>
-          <Select.Content maxHeight="300px" portalled={false}>
+          {/* #6716: portalled (the default) so the listbox is clickable when this
+              renders in a secondary drawer stacked on the automation composer;
+              `portalled={false}` left it under the stacked drawer body. */}
+          <Select.Content maxHeight="300px">
             <Box
               maxH="250px"
               overflowY="auto"

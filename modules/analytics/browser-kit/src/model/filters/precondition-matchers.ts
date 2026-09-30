@@ -1,8 +1,6 @@
 import type { PreconditionField } from "@langwatch/analytics-contract";
+import { availableFilters, type FilterField } from "@langwatch/analytics-filters";
 import type { CheckPreconditionRule } from "@langwatch/trace-contract";
-
-import { availableFilters } from "./registry.ts";
-import type { FilterField } from "./types.ts";
 
 /**
  * Which precondition RULES a field accepts, and its screen label. The

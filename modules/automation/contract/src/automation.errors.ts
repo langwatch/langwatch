@@ -6,9 +6,16 @@ export class AutomationNotFoundError extends Error {
     this.name = "AutomationNotFoundError";
   }
 }
-export class TriggerNotFoundError extends Error {
+/** No automation with that id in this project. Also what a caller sees for an
+ *  automation belonging to another project: an id it may not read is an id
+ *  that does not exist. */
+export class TriggerNotFoundError extends HandledError {
+  declare readonly code: "trigger_not_found";
+
   constructor() {
-    super("Trigger not found");
+    super("trigger_not_found", "This automation no longer exists.", {
+      httpStatus: 404,
+    });
     this.name = "TriggerNotFoundError";
   }
 }
@@ -29,6 +36,289 @@ export class TriggerFiltersRequiredError extends HandledError {
       { meta: { field: "filters" }, httpStatus: 422 },
     );
     this.name = "TriggerFiltersRequiredError";
+  }
+}
+
+/**
+ * Every condition on the automation names a field this platform no longer
+ * filters on. Distinct from having no condition at all: the author wrote
+ * conditions, they just cannot be acted on.
+ */
+export class TriggerFiltersUnsupportedError extends HandledError {
+  declare readonly code: "trigger_filters_unsupported";
+
+  constructor(public readonly unknownFields: string[]) {
+    super(
+      "trigger_filters_unsupported",
+      "None of this automation's conditions can be used. Add at least one " +
+        "condition this platform can act on.",
+      { meta: { field: "filters", unknownFields }, httpStatus: 422 },
+    );
+    this.name = "TriggerFiltersUnsupportedError";
+  }
+}
+
+/**
+ * The channel an automation delivers on is fixed when it is created: the
+ * credential rules that let a caller write back what it read need the incoming
+ * and stored delivery configuration to share one channel. Refused, not ignored.
+ */
+export class TriggerActionImmutableError extends HandledError {
+  declare readonly code: "trigger_action_immutable";
+
+  constructor(
+    /** The channel this automation delivers on and keeps delivering on. */
+    public readonly action: string,
+  ) {
+    super(
+      "trigger_action_immutable",
+      "An automation keeps the delivery channel it was created with. " +
+        "Create a new automation on the channel you want.",
+      { meta: { field: "action", action }, httpStatus: 422 },
+    );
+    this.name = "TriggerActionImmutableError";
+  }
+}
+
+/**
+ * A trace automation, a graph alert and a scheduled report are different kinds
+ * of row: an alert owns its graph's alert slot and a report a calendar entry,
+ * so converting one is a create and a delete, never an edit.
+ */
+export class TriggerKindImmutableError extends HandledError {
+  declare readonly code: "trigger_kind_immutable";
+
+  constructor(
+    /** What this automation is: `automation`, `alert` or `report`. */
+    public readonly kind: string,
+  ) {
+    super(
+      "trigger_kind_immutable",
+      "This automation cannot be turned into a different kind of automation. " +
+        "Create the one you want and delete this one.",
+      { meta: { field: "kind", kind }, httpStatus: 422 },
+    );
+    this.name = "TriggerKindImmutableError";
+  }
+}
+
+/**
+ * The delivery configuration named fields the channel does not have. Refused,
+ * not dropped: `slackChannelID` for `slackChannelId` used to save cleanly and
+ * deliver nowhere, and an update replaces the stored configuration whole.
+ */
+export class TriggerActionParamsUnknownFieldsError extends HandledError {
+  declare readonly code: "trigger_action_params_unknown_fields";
+
+  /** The fields this channel does not have, in the order they were sent. */
+  public readonly fields: string[];
+  /** Every field it does have, so the caller can see the one it meant. */
+  public readonly accepted: string[];
+
+  constructor({ fields, accepted }: { fields: string[]; accepted: string[] }) {
+    super(
+      "trigger_action_params_unknown_fields",
+      "This delivery configuration names fields the channel does not have.",
+      { meta: { field: "actionParams", fields, accepted }, httpStatus: 422 },
+    );
+    this.fields = fields;
+    this.accepted = accepted;
+    this.name = "TriggerActionParamsUnknownFieldsError";
+  }
+}
+
+/**
+ * The rule an automation fires by was sent inside its delivery configuration.
+ * `graphAlert` and `report` are top-level wire fields; inside `actionParams`
+ * the stored rule overwrote them, so the save answered 200 and changed nothing.
+ */
+export class TriggerRuleFieldsMisplacedError extends HandledError {
+  declare readonly code: "trigger_rule_fields_misplaced";
+
+  /** The rule fields that arrived in the wrong place. */
+  public readonly fields: string[];
+  /** Where they belong: `graphAlert` or `report`. */
+  public readonly expectedField: "graphAlert" | "report";
+
+  constructor({
+    fields,
+    expectedField,
+  }: {
+    fields: string[];
+    expectedField: "graphAlert" | "report";
+  }) {
+    super(
+      "trigger_rule_fields_misplaced",
+      `The rule this automation fires by is stated in "${expectedField}", not ` +
+        "in its delivery configuration.",
+      { meta: { field: "actionParams", fields, expectedField }, httpStatus: 422 },
+    );
+    this.fields = fields;
+    this.expectedField = expectedField;
+    this.name = "TriggerRuleFieldsMisplacedError";
+  }
+}
+
+/**
+ * Too many test fires in too short a window. A test fire sends to an address
+ * the caller chose (ADR-040 §4), so uncapped it is a flood primitive driven
+ * from an API key; the cap is per project, the identity behind the call.
+ */
+export class TriggerTestFireRateLimitedError extends HandledError {
+  declare readonly code: "trigger_test_fire_rate_limited";
+
+  constructor(
+    /** Epoch ms the current window ends at. */
+    public readonly resetAt: number,
+  ) {
+    super(
+      "trigger_test_fire_rate_limited",
+      "Too many test fires for this project. Wait for the current minute to " +
+        "pass and try again.",
+      { meta: { resetAt }, httpStatus: 429 },
+    );
+    this.name = "TriggerTestFireRateLimitedError";
+  }
+}
+
+/** A graph alert was saved without something it needs to fire: the rule it
+ *  fires by, the severity it fires at, or a channel that can notify. */
+export class GraphAlertIncompleteError extends HandledError {
+  declare readonly code: "graph_alert_incomplete";
+
+  /** What is missing or wrong: `graphAlert`, `alertType`, `action`. */
+  public readonly field: string;
+  /** Which piece is missing, for whoever has to add it. Travels in `meta`
+   *  because an error's own message no longer crosses the tRPC wire (#5984). */
+  public readonly reason: string;
+
+  constructor({ field, reason }: { field: string; reason: string }) {
+    super("graph_alert_incomplete", reason, {
+      meta: { field, reason },
+      httpStatus: 422,
+    });
+    this.field = field;
+    this.reason = reason;
+    this.name = "GraphAlertIncompleteError";
+  }
+}
+
+/** The alert names a graph this project does not have. Also what a caller sees
+ *  for a graph in another project. */
+export class GraphNotFoundError extends HandledError {
+  declare readonly code: "graph_not_found";
+
+  constructor() {
+    super("graph_not_found", "This project has no graph with that id.", {
+      meta: { field: "customGraphId" },
+      httpStatus: 404,
+    });
+    this.name = "GraphNotFoundError";
+  }
+}
+
+/**
+ * A report was saved without what it renders and when it sends. Distinct from
+ * a report on a channel that cannot carry one; this also answers a stored
+ * report whose configuration can no longer be read.
+ */
+export class ReportIncompleteError extends HandledError {
+  declare readonly code: "report_incomplete";
+
+  constructor() {
+    super(
+      "report_incomplete",
+      "A report needs to say what it sends and when. State its source and " + "its schedule.",
+      { meta: { field: "report" }, httpStatus: 422 },
+    );
+    this.name = "ReportIncompleteError";
+  }
+}
+
+/** The trace query the automation is about could not be read. Rejected at the
+ *  save rather than at dispatch, where it would silently match nothing. The
+ *  parser's own account stays in the thrower's log: it can name internal
+ *  columns, and nothing on a handled error is allowed to. */
+export class TriggerFilterQueryInvalidError extends HandledError {
+  declare readonly code: "trigger_filter_query_invalid";
+
+  constructor() {
+    super(
+      "trigger_filter_query_invalid",
+      "This trace query could not be read. Check it against the query syntax " +
+        "the traces view uses.",
+      { meta: { field: "filterQuery" }, httpStatus: 422 },
+    );
+    this.name = "TriggerFilterQueryInvalidError";
+  }
+}
+
+/** A keyed condition written as a bare list, e.g. `evaluations.passed` with no
+ *  monitor. It names nothing to select by, so it would match no trace. */
+export class TriggerFilterKeyRequiredError extends HandledError {
+  declare readonly code: "trigger_filter_key_required";
+
+  constructor({ field, example }: { field: string; example: string }) {
+    super(
+      "trigger_filter_key_required",
+      `The "${field}" condition needs a key, so a bare list matches nothing. ` +
+        `Write it nested: ${example}`,
+      { meta: { field: "filters", filterField: field, example }, httpStatus: 422 },
+    );
+    this.name = "TriggerFilterKeyRequiredError";
+  }
+}
+
+/** An evaluation condition keyed by an Evaluator's id. Results carry the id of
+ *  the monitor that ran, so it would never match; the monitors using that
+ *  evaluator are named so the caller can key by one of them. */
+export class TriggerFilterMonitorRequiredError extends HandledError {
+  declare readonly code: "trigger_filter_monitor_required";
+
+  constructor({
+    field,
+    evaluatorId,
+    monitorIds,
+  }: {
+    field: string;
+    evaluatorId: string;
+    monitorIds: string[];
+  }) {
+    const remedy =
+      monitorIds.length > 0
+        ? `Key it by a monitor that runs it instead: ${monitorIds.map((id) => `"${id}"`).join(", ")}.`
+        : "No monitor in this project runs it yet; add one and key the " +
+          "condition by the monitor's id.";
+    super(
+      "trigger_filter_monitor_required",
+      `The "${field}" condition is keyed by "${evaluatorId}", which is an ` +
+        "evaluator, not a monitor. Evaluation results carry the id of the " +
+        `monitor that ran, so it would match nothing. ${remedy}`,
+      {
+        meta: { field: "filters", filterField: field, evaluatorId, monitorIds },
+        httpStatus: 422,
+      },
+    );
+    this.name = "TriggerFilterMonitorRequiredError";
+  }
+}
+
+/**
+ * A webhook automation's destination changed in the same save that kept the
+ * stored header values. Header values belong to the endpoint they authenticate
+ * against and a public-API caller never held them: send them with the new one.
+ */
+export class WebhookHeaderValuesRequiredError extends HandledError {
+  declare readonly code: "webhook_header_values_required";
+
+  constructor() {
+    super(
+      "webhook_header_values_required",
+      "Changing the destination means sending the header values with it. " +
+        "Include each header's value in the same request as the new URL.",
+      { meta: { field: "headers" }, httpStatus: 422 },
+    );
+    this.name = "WebhookHeaderValuesRequiredError";
   }
 }
 
@@ -91,6 +381,75 @@ export class InvalidEmailRecipientError extends HandledError {
       httpStatus: 422,
     });
     this.name = "InvalidEmailRecipientError";
+  }
+}
+
+/**
+ * Slack refused the bot token at setup (ADR-093 §5): setup validates against
+ * `auth.test` before anything is stored, so nothing was written. Slack's own
+ * code travels in `meta.slackError`; the presentation registry switches on it.
+ */
+export class SlackIntegrationInvalidTokenError extends HandledError {
+  declare readonly code: "slack_integration_invalid_token";
+
+  constructor(public readonly slackError: string) {
+    super("slack_integration_invalid_token", "Slack did not accept that bot token.", {
+      meta: { slackError },
+      httpStatus: 422,
+    });
+    this.name = "SlackIntegrationInvalidTokenError";
+  }
+}
+
+/**
+ * Slack delivery had nothing to deliver with: the automation's connection is
+ * gone or out of its project's reach, or it names none and stores no secret of
+ * its own (ADR-093 §5a resolution). Customer fault: pick or add a connection.
+ */
+export class SlackIntegrationMissingError extends HandledError {
+  declare readonly code: "slack_integration_missing";
+
+  constructor() {
+    super(
+      "slack_integration_missing",
+      "Connect Slack in this project's integration settings before sending this automation.",
+      { httpStatus: 422 },
+    );
+    this.name = "SlackIntegrationMissingError";
+  }
+}
+
+/**
+ * The secret being saved is already stored in the scope being written, or in
+ * the organization for a project write (ADR-093 §5a: one connection per scope).
+ * The existing connection's name travels so the customer can pick it instead.
+ */
+export class SlackConnectionExistsError extends HandledError {
+  declare readonly code: "slack_connection_exists";
+
+  constructor({ connectionId, connectionName }: { connectionId: string; connectionName: string }) {
+    super("slack_connection_exists", "This Slack secret is already saved as another connection.", {
+      meta: { connectionId, connectionName },
+      httpStatus: 409,
+    });
+    this.name = "SlackConnectionExistsError";
+  }
+}
+
+/**
+ * Deleting a connection active automations deliver through, unconfirmed. The
+ * count travels so the client can say what stops delivering; `force` deletes
+ * anyway (ADR-093 §5a).
+ */
+export class SlackConnectionInUseError extends HandledError {
+  declare readonly code: "slack_connection_in_use";
+
+  constructor({ dependentAutomations }: { dependentAutomations: number }) {
+    super("slack_connection_in_use", "Automations still deliver through this Slack connection.", {
+      meta: { dependentAutomations },
+      httpStatus: 409,
+    });
+    this.name = "SlackConnectionInUseError";
   }
 }
 
@@ -279,14 +638,16 @@ export class ReportScheduleMissingError extends HandledError {
   }
 }
 
-/** A report renders a notification, so it can only use a notification channel. */
+/** A scheduled report was saved on a channel that cannot deliver one. */
 export class ReportChannelUnsupportedError extends HandledError {
   declare readonly code: "report_channel_unsupported";
 
   constructor() {
-    super("report_channel_unsupported", "Reports can only send Email or Slack notifications.", {
-      httpStatus: 400,
-    });
+    super(
+      "report_channel_unsupported",
+      "A report is delivered by email or to Slack. Pick one of those channels.",
+      { meta: { field: "action" }, httpStatus: 422 },
+    );
     this.name = "ReportChannelUnsupportedError";
   }
 }

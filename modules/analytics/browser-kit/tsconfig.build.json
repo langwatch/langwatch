@@ -13,6 +13,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../filters/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {

@@ -16,13 +16,18 @@ describe("renderTriggerEmail", () => {
       expect(email.usedDefault).toBe(true);
     });
 
-    it("renders the default body with a link per match", async () => {
+    // #6716 P0: the default body carries the matched trace's input and output
+    // excerpt beside the link, so the notification is informative on its own.
+    /** @scenario "The default trace layout includes input and output excerpts" */
+    it("renders the default body with a link and the matched trace's input and output", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: null,
         bodyTemplate: null,
         context: makeContext(),
       });
       expect(email.html).toContain('href="https://app.langwatch.ai/acme/traces/trace_1"');
+      expect(email.html).toContain("what is the weather");
+      expect(email.html).toContain("it is sunny");
     });
 
     it("renders the chrome footer with the project + edit-automation links", async () => {

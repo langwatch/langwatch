@@ -1,0 +1,29 @@
+{
+  "name": "@langwatch/slack-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Slack connections: the slackConnection drawer.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/slack.web.ts",
+      "types": "./dist/slack.web.d.ts",
+      "default": "./src/slack.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@langwatch/ui-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

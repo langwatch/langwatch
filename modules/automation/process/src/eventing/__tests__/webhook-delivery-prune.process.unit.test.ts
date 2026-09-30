@@ -31,6 +31,7 @@ describe("webhook delivery prune process", () => {
 
   describe("given expired delivery rows", () => {
     describe("when the scheduled process wakes", () => {
+      /** @scenario "The delivery log is pruned after 30 days" */
       it("emits the prune intent, prunes the log, and prunes old intents", async () => {
         const pruneExpired = vi.fn().mockResolvedValue(12);
         const deleteDispatchedBefore = vi.fn().mockResolvedValue(1);

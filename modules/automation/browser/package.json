@@ -25,6 +25,7 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/slack-browser-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",

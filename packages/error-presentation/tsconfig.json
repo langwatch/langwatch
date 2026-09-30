@@ -23,6 +23,9 @@
     },
     {
       "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
     }
   ]
 }

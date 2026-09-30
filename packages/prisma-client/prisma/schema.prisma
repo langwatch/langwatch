@@ -2304,10 +2304,53 @@ model Trigger {
   traceDebounceMs      Int                       @default(30000)
   TriggerSent          TriggerSent[]
   webhookDeliveries    WebhookEndpointDelivery[]
+  latestEvaluation     TriggerLatestEvaluation?
   customGraphId        String?                   @unique
   customGraph          CustomGraph?              @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+/// Who can use a Slack connection (ADR-093 §5a): every project in the
+/// organization, or one project. Chosen per connection.
+enum SlackIntegrationScopeType {
+  ORGANIZATION
+  PROJECT
+}
+
+/// How a Slack connection posts: a bot token over the Web API (any channel it
+/// is invited to, every block renders) or an incoming webhook (one channel).
+enum SlackIntegrationKind {
+  BOT
+  INCOMING_WEBHOOK
+}
+
+/// One named Slack connection (ADR-093 §5a); an organization holds as many as
+/// it likes, each scoped to the organization or to one project. The secret is
+/// AES-256-GCM ciphertext and never returned to a client. `secretFingerprint`
+/// is an HMAC of the plaintext, so one secret is one connection per scope
+/// without decrypting anything. No foreign key: `scopeId` is
+/// polymorphic (ADR-021), as on RetentionPolicy and CustomLLMModelCost.
+model SlackIntegration {
+  id                  String                    @id @default(nanoid())
+  name                String
+  kind                SlackIntegrationKind
+  scopeType           SlackIntegrationScopeType
+  scopeId             String
+  organizationId      String
+  botTokenEncrypted   String?
+  webhookUrlEncrypted String?
+  secretFingerprint   String
+  secretHint          String
+  slackTeamId         String?
+  slackTeamName       String?
+  createdById         String
+  updatedById         String
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @default(now()) @updatedAt
+
+  @@unique([organizationId, scopeType, scopeId, secretFingerprint])
+  @@index([scopeType, scopeId])
 }
 
 enum WebhookDeliveryOutcome {
@@ -3082,6 +3125,49 @@ model TriggerSent {
   @@index([projectId])
   @@index([customGraphId])
   @@index([resolvedAt])
+  // Backs the fire-history keyset walk: filter on (projectId, triggerId),
+  // order by (createdAt, id) descending — served by a backward scan.
+  @@index([projectId, triggerId, createdAt, id])
+}
+
+// The most recent evaluation of one alert — what the evaluator observed, what
+// it compared that against, and what it decided. Exactly ONE row per trigger
+// (`triggerId` is the primary key, the write is an upsert), so this is a
+// bounded snapshot and never a log: storage is one row per alert and there is
+// nothing to retain or prune.
+//
+// Deliberately its own table rather than rows on `TriggerSent`: that ledger is
+// the FIRE history, arbitrated by the `openIncidentKey` claim, and every
+// "last fired" / "fires in the last 30 days" / "currently firing" read counts
+// its rows. A non-fire evaluation written there would change all of those
+// answers and sit next to the claim that guards at-most-once notification.
+// The TriggerSent reads and the fire claim never touch this table.
+model TriggerLatestEvaluation {
+  triggerId String  @id
+  trigger   Trigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  projectId String
+
+  evaluatedAt DateTime @db.Timestamptz(3)
+  // What the evaluator decided: fired | already_firing | resolved |
+  // not_breached | not_delivered | skipped. A plain string, not an enum: the
+  // set follows the evaluator's own result status, and a value this table has
+  // never seen must degrade to "checked" in the UI rather than fail a read.
+  verdict     String
+  // The metric value the evaluation observed, and the condition it was
+  // compared against. Null when the check was skipped before reading the
+  // metric — which is exactly the case the reader needs explained.
+  observedValue     Float?
+  threshold         Float?
+  operator          String?
+  timePeriodMinutes Int?
+  // Why a skipped check was skipped, as a stable code (never prose): the UI
+  // maps it to customer copy, and an unrecognised code degrades to a generic
+  // explanation.
+  skipCode String?
+
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([projectId])
 }
 
 // ADR-031: recipient unsubscribe / suppression list for trigger emails. A row

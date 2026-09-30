@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { TEST_FIRE_NOTICE } from "../banner.ts";
 import { DEFAULT_SLACK_BLOCK_KIT_TEMPLATE } from "../defaults.ts";
-import { renderTriggerSlack } from "../render-slack.ts";
+import { renderTriggerSlack, resolveSlackTemplateType } from "../render-slack.ts";
 import { makeContext, makeMatch } from "./fixtures.ts";
 
 const MRKDWN_INJECTION = "<https://evil|click> <!channel> & a < b > c";
@@ -21,7 +21,10 @@ function asBlocks(
 
 describe("renderTriggerSlack", () => {
   describe("when no custom template is provided", () => {
-    it("renders the default message as text", async () => {
+    // #6716 P0: the default message must carry what the trace actually said, not
+    // just its identifier, so a reader need not open LangWatch to make sense of it.
+    /** @scenario "Default Slack message is rendered when no Slack template is set" */
+    it("renders the default message as text with the matched trace's input and output", async () => {
       const slack = await renderTriggerSlack({
         templateType: null,
         template: null,
@@ -30,6 +33,8 @@ describe("renderTriggerSlack", () => {
       const text = asText(slack.payload);
       expect(text).toContain("High latency");
       expect(text).toContain("what is the weather");
+      expect(text).toContain("it is sunny");
+      expect(text).toContain("https://app.langwatch.ai/acme/traces/trace_1");
       expect(slack.usedDefault).toBe(true);
     });
   });
@@ -58,6 +63,19 @@ describe("renderTriggerSlack", () => {
       expect(slack.errors).toEqual([]);
       expect(blocks.length).toBeGreaterThan(0);
       expect(blocks[0]?.type).toBe("header");
+    });
+
+    // #6716 P0: the rich layout carries the same input/output excerpt the plain-text
+    // default does; a bot connection renders this one by default.
+    it("carries the matched trace's input and output, not just its id", async () => {
+      const slack = await renderTriggerSlack({
+        templateType: "block_kit",
+        template: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
+        context: makeContext(),
+      });
+      const serialized = JSON.stringify(asBlocks(slack.payload));
+      expect(serialized).toContain("what is the weather");
+      expect(serialized).toContain("it is sunny");
     });
   });
 
@@ -226,5 +244,90 @@ describe("renderTriggerSlack", () => {
       expect(serialized).toContain("&lt;https://evil|click&gt;");
       expect(serialized).toContain("&lt;!channel&gt;");
     });
+  });
+});
+
+describe("resolveSlackTemplateType", () => {
+  describe("given a bot connection", () => {
+    it("defaults to block_kit when no type is configured", () => {
+      expect(resolveSlackTemplateType({ configured: null, deliveryMethod: "bot" })).toBe(
+        "block_kit",
+      );
+    });
+
+    it("defaults to block_kit when the type is undefined", () => {
+      expect(
+        resolveSlackTemplateType({
+          configured: undefined,
+          deliveryMethod: "bot",
+        }),
+      ).toBe("block_kit");
+    });
+
+    it("honours an explicit string type", () => {
+      expect(
+        resolveSlackTemplateType({
+          configured: "string",
+          deliveryMethod: "bot",
+        }),
+      ).toBe("string");
+    });
+
+    it("honours an explicit block_kit type", () => {
+      expect(
+        resolveSlackTemplateType({
+          configured: "block_kit",
+          deliveryMethod: "bot",
+        }),
+      ).toBe("block_kit");
+    });
+  });
+
+  describe("given a webhook connection", () => {
+    it("defaults to string when no type is configured", () => {
+      expect(
+        resolveSlackTemplateType({
+          configured: null,
+          deliveryMethod: "webhook",
+        }),
+      ).toBe("string");
+    });
+
+    it("honours an explicit block_kit type", () => {
+      expect(
+        resolveSlackTemplateType({
+          configured: "block_kit",
+          deliveryMethod: "webhook",
+        }),
+      ).toBe("block_kit");
+    });
+  });
+
+  describe("given an unrecognised configured value", () => {
+    it("falls back to the delivery method's default", () => {
+      expect(
+        resolveSlackTemplateType({
+          configured: "nonsense",
+          deliveryMethod: "bot",
+        }),
+      ).toBe("block_kit");
+    });
+  });
+});
+
+describe("when a bot connection renders with the resolved template type", () => {
+  it("renders Block Kit blocks even though no template type was configured", async () => {
+    const templateType = resolveSlackTemplateType({
+      configured: null,
+      deliveryMethod: "bot",
+    });
+    const slack = await renderTriggerSlack({
+      templateType,
+      template: null,
+      context: makeContext(),
+      allowGatedBlocks: true,
+    });
+    expect("blocks" in slack.payload).toBe(true);
+    expect(slack.usedDefault).toBe(true);
   });
 });

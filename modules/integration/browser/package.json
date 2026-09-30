@@ -1,0 +1,29 @@
+{
+  "name": "@langwatch/integration-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe integrations: the /settings/integrations screen and each provider's card.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/integration.web.ts",
+      "types": "./dist/integration.web.d.ts",
+      "default": "./src/integration.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@langwatch/ui-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -146,6 +146,12 @@
       "subjects": ["instant-eval"]
     },
     {
+      "id": "integration",
+      "root": "modules/integration",
+      "classification": "core",
+      "subjects": ["integration"]
+    },
+    {
       "id": "langy",
       "root": "modules/langy",
       "classification": "core",
@@ -272,6 +278,12 @@
       "root": "modules/share",
       "classification": "core",
       "subjects": ["share"]
+    },
+    {
+      "id": "slack",
+      "root": "modules/slack",
+      "classification": "core",
+      "subjects": ["slack", "slack-integration"]
     },
     {
       "id": "stored-object",

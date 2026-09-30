@@ -102,6 +102,9 @@ Trace's query language and content dispatchers are `modules/trace/query-language
 portable and framework-free, which trace's process, the server and any browser import; they sit in
 neither the contract nor a kit (Alex, 2026-09-29). Trace and analytics read the same trace data: that
 relationship is an open design item, and neither side takes an exemption meanwhile (Alex, 2026-09-29).
+Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
+(`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
+terms; analytics' browser-kit and automation's process import it (Alex, 2026-09-30).
 
 ---
 
@@ -127,6 +130,22 @@ Usage is a module of its own and owns all counting: the counters, their enforcem
 thresholds, the billable-events meter projection and its table, and the trace count it takes itself.
 Entitlement keeps plans and features only; every other module checks a limit or reads a roll-up through
 `UsageApi`, and no trace-usage or billing-usage cycle forms (Alex, 2026-09-29).
+Slack is a module of its own (Alex, 2026-09-30; supersedes ADR-093 §5a on ownership). `modules/slack`
+owns the Slack connection subjects: the `SlackIntegration` table, its repositories and services,
+`SlackApi` (main's list, create, update and delete of a connection, plus the reads delivery needs), the
+`slackIntegration` tRPC namespace, `/api/slack-connections`, the `slackConnection` drawer and
+`slack-browser-kit`, which automation, integration and langy render. Automation reads a connection only
+through `SlackApi` and keeps its own delivery.
+A connection in use is claimed, not counted (Alex, 2026-09-30). Slack owns `slack_connection_claim`;
+automation claims a connection through `SlackApi.claimConnection` when it saves a trigger on it and
+releases it through `releaseConnection` when the trigger moves off it, pauses or is deleted.
+`deleteSlackConnection` refuses while any claim exists (409 `slack_connection_in_use`, naming the
+claimants), and the connection's dependent count is its claim count. Slack never reads automation's
+triggers.
+`modules/integration` owns `/settings/integrations` (Alex, 2026-09-30). Its browser renders both cards:
+the GitHub card, which reads github through `GithubHostApi` and a client derived from github's contract,
+and the Slack card, over `slack-browser-kit`. Github lends no card and keeps no UI on the page;
+integration has no kit, since nothing outside it would use one.
 
 ```
 modules/trace/
@@ -207,6 +226,7 @@ document, is the authority on filenames):
   classes and not in a new slot (Alex, 2026-09-28).
 - Ids: a new record's id is a KSUID with its resource prefix; ids minted before (nanoid, uuid) keep
   their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
+  The prefix is the owning subject's name without hyphens: `slackintegration` (Alex, 2026-09-30).
 - No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
   `domain/`.
 
@@ -368,6 +388,7 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    `design-system`, `browser-host` and `@langwatch/api/web` (its client's
    derivation). It may not import its own module's browser package (the rule
    that broke the nine cyclic web pairs), any other `*-browser`, or another kit.
+   It may import a module's portable library (§2), which is no kit (Alex, 2026-09-30).
 3. **A kit owns its module's client, store and UI for one concept** (Alex,
    2026-09-29). It derives its client from its own contract, and the owner's
    browser package imports that client and store from the kit rather than
@@ -1088,6 +1109,11 @@ the meta tag.
 process boots; notification answers every send by skipping it with one log line naming what was
 not sent, and the browser learns it from public config's `capabilities.email`, so a self-hosted
 install shows that email is not configured instead of silently dropping it.
+One send refuses instead of skipping: a test fire of an email automation on an install with no mail
+provider throws `EmailProviderNotConfiguredError` (`email_provider_not_configured`), and the authoring
+drawer disables the email channel with the tooltip "Email is not configured. Ask an admin to set up a
+mail provider.", read from the deployment's `hasEmailProvider`. That tooltip is the ruled exception to §3.5's "off is
+opaque" (Alex, 2026-09-30).
 Email is a capability notification answers from its own config and secrets, never a config leaf
 guess: a SendGrid-only install has it. Notification owns mail outright and there is no mail member
 (§3.3; Alex, 2026-09-29). Where it is off, password reset by email is disabled

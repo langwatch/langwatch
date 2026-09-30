@@ -77,3 +77,30 @@ export class ClickHouseUnavailableError extends HandledError {
     this.name = "ClickHouseUnavailableError";
   }
 }
+
+/**
+ * A series asked for percentage mode on a per-entity measurement (average per
+ * user, sum per thread): the filter decides which entities exist, so the two
+ * halves cannot be divided bucket by bucket. No `meta`: the evaluator logs it.
+ */
+export class SeriesPercentageUnsupportedError extends HandledError {
+  declare readonly code: "analytics_series_percentage_unsupported";
+
+  constructor() {
+    super(
+      "analytics_series_percentage_unsupported",
+      "This series cannot be shown as a percentage.",
+      { httpStatus: 400 },
+    );
+    this.name = "SeriesPercentageUnsupportedError";
+  }
+}
+
+/** Matched on `code`, not `instanceof`: the error may arrive re-hydrated from a payload. */
+export function isSeriesPercentageUnsupported(error: unknown): boolean {
+  return (
+    error instanceof Object &&
+    "code" in error &&
+    error.code === "analytics_series_percentage_unsupported"
+  );
+}

@@ -332,6 +332,7 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "DataPrivacyPolicy",
   "ModelProvider",
   "ModelDefaultConfig",
+  "SlackIntegration",
   // Enforced by guardProjectId's SCOPED_MODELS instead (org id, row id, or
   // project FK on every query); sweep/prune use the raw-SQL opt-out. The
   // delivery log is shared with the project-scoped automations channel,

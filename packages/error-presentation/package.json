@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

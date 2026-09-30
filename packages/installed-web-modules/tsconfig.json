@@ -73,6 +73,9 @@
       "path": "../../modules/github/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/integration/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/monitor/browser/tsconfig.build.json"
     },
     {
@@ -98,6 +101,9 @@
     },
     {
       "path": "../../modules/share/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/slack/browser/tsconfig.build.json"
     },
     {
       "path": "../../modules/suite/browser/tsconfig.build.json"

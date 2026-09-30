@@ -1,4 +1,5 @@
 import {
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
   WEBHOOK_HEADER_VALUE_KEPT,
   InvalidActionParamsError,
   type WebhookActionParams,
@@ -18,6 +19,7 @@ export type AutomationWebhookStoredParams = {
   url: string;
   method: WebhookActionParams["method"];
   bodyTemplate: string | null;
+  contentType?: string;
   headersEncrypted?: string;
   headers?: Record<string, string>;
   signingSecretEncrypted?: string;
@@ -55,6 +57,7 @@ const webhookStoredActionParamsSchema = z
     url: z.string().url(),
     method: webhookMethodSchema.default("POST"),
     bodyTemplate: z.string().nullable().default(null),
+    contentType: z.string().default(DEFAULT_WEBHOOK_CONTENT_TYPE),
     headersEncrypted: z.string().optional(),
     headers: z.record(z.string(), z.string()).optional(),
     signingSecretEncrypted: z.string().optional(),

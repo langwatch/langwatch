@@ -1,5 +1,6 @@
 import { Box, Button, Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import {
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
   type SavedTriggerRow,
   isReservedWebhookHeader,
   findWebhookUrlProblemMessage,
@@ -165,6 +166,7 @@ function toActionParams(slice: WebhookSlice): WebhookActionParams {
     method: slice.method,
     headers: headersRecord(slice.headers),
     bodyTemplate: bodyTemplateOf(slice),
+    contentType: DEFAULT_WEBHOOK_CONTENT_TYPE,
     signingSecret: signingSecretOf(slice),
   };
 }

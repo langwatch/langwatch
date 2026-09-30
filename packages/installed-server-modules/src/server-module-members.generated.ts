@@ -51,6 +51,7 @@ export const serverModuleMembers = {
   scenario: ["clickhouse", "encryption", "isSaas", "nlpCodeBlockTimeoutSeconds", "nlpServiceUrl", "nodeEnvironment", "publicBaseUrl", "rateLimiter", "rawSocketPort", "redis"],
   secret: ["encryption"],
   share: ["redis"],
+  slack: [],
   "stored-object": ["clickhouse", "encryption", "isSaas", "logger", "objectStorage", "publicBaseUrl", "rateLimiter"],
   suite: ["clickhouse", "publicBaseUrl", "redis"],
   topic: [],

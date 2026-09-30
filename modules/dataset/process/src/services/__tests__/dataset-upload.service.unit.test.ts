@@ -330,7 +330,7 @@ describe("DatasetUploadService", () => {
           name: "UploadValidationError",
           kind: "column_mismatch",
           code: "validation_error",
-          httpStatus: 422,
+          httpStatus: 400,
         });
         expect(inlineRecords).toHaveLength(0);
       });

@@ -49,6 +49,9 @@
       "path": "modules/analytics/contract/tsconfig.test.json"
     },
     {
+      "path": "modules/analytics/filters/tsconfig.json"
+    },
+    {
       "path": "modules/analytics/process/tsconfig.json"
     },
     {
@@ -415,6 +418,9 @@
       "path": "modules/instant-eval/process/tsconfig.json"
     },
     {
+      "path": "modules/integration/browser/tsconfig.json"
+    },
+    {
       "path": "tools/interactionsimulator/tsconfig.json"
     },
     {
@@ -653,6 +659,18 @@
     },
     {
       "path": "packages/sim-console/tsconfig.json"
+    },
+    {
+      "path": "modules/slack/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/slack/browser-kit/tsconfig.json"
+    },
+    {
+      "path": "modules/slack/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/slack/process/tsconfig.json"
     },
     {
       "path": "apps/storagesim-web/tsconfig.json"

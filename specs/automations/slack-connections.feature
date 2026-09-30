@@ -85,12 +85,18 @@ Feature: Slack connections
       Then the stored secret is kept
 
     @integration
-    Scenario: Deleting a connection in use says what stops delivering
-      Given a connection three active automations deliver through
+    Scenario: Deleting a connection in use is refused and names its automations
+      Given a connection the automations "Errors to ops" and "Daily digest" deliver through
       When the user deletes it
-      Then it is refused with the machine-readable in-use code carrying the count of three
-      And the drawer asks to confirm that three automations stop delivering
-      When the user confirms
+      Then it is refused with the machine-readable in-use code naming both automations
+      And the drawer says "Used by 2 automations: Errors to ops, Daily digest"
+      And the connection is kept
+
+    @integration
+    Scenario: A connection deletes once no automation uses it
+      Given a connection one automation delivered through
+      And that automation now delivers through another connection
+      When the user deletes the first connection and confirms
       Then the connection is removed
 
     @unit
@@ -175,6 +181,34 @@ Feature: Slack connections
       Then a channel is required, listed from that connection's workspace
       When the user picks a webhook connection
       Then no channel is asked for
+
+  Rule: An automation claims the connection it delivers through
+
+    @integration
+    Scenario: Saving an automation on a connection claims it
+      Given a connection no automation delivers through
+      When the user saves an automation that delivers through it
+      Then the connection is used by that automation
+
+    @integration
+    Scenario: Moving an automation to another connection releases the first
+      Given an automation that delivers through connection A
+      When the user changes it to deliver through connection B
+      Then connection B is used by the automation
+      And connection A is no longer used by it
+
+    @integration
+    Scenario: Pausing or deleting an automation releases its connection
+      Given two automations that deliver through one connection
+      When the user pauses one and deletes the other
+      Then no automation uses the connection
+
+    @integration
+    Scenario: Existing automations claim their connections once
+      Given automations that delivered through connections before claims existed
+      When the claim backfill runs
+      Then each connection is used by the automations that deliver through it
+      And running the backfill again changes nothing
 
   Rule: Delivery resolves through the automation's connection
 

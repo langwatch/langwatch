@@ -167,6 +167,7 @@ export type AutomationWebhookStoredParams = {
   url: string;
   method: WebhookActionParams["method"];
   bodyTemplate: string | null;
+  contentType?: string;
   headersEncrypted?: string;
   headers?: Record<string, string>;
   signingSecretEncrypted?: string;

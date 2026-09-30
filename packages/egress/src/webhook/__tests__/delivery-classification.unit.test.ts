@@ -60,6 +60,8 @@ describe("assertWebhookDelivered", () => {
 
   describe("given a retryable answer", () => {
     /** @scenario "Server errors retry, everything else that is not success is terminal" */
+    /** @scenario "A receiver's Retry-After is carried onto the failure" */
+    /** @scenario "Server errors are retried" */
     it("carries the receiver's own back-off onto the failure", () => {
       const error = capture(() =>
         assertWebhookDelivered({
@@ -75,6 +77,7 @@ describe("assertWebhookDelivered", () => {
 
   describe("given a terminal answer", () => {
     /** @scenario "Server errors retry, everything else that is not success is terminal" */
+    /** @scenario "Client errors fail terminally without retry" */
     it("drops the back-off, because there is no next attempt to space out", () => {
       const error = capture(() =>
         assertWebhookDelivered({
@@ -99,6 +102,20 @@ describe("assertWebhookDelivered", () => {
       expect(error.message).toContain('Webhook for trigger "My automation" received HTTP 422');
       expect(error.message).toContain("bad schema");
       expect(error.message.length).toBeLessThan(400);
+    });
+  });
+
+  describe("given the endpoint answers 500", () => {
+    /** @scenario "A test answered with an error status names the status" */
+    it("says the endpoint answered HTTP 500", () => {
+      const error = capture(() =>
+        assertWebhookDelivered({
+          result: { status: 500, body: "internal detail" },
+          triggerName: "Timeout watcher",
+        }),
+      );
+
+      expect(error.customerMessage).toBe("The endpoint answered HTTP 500.");
     });
   });
 });

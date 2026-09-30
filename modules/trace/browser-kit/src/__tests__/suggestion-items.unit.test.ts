@@ -55,6 +55,21 @@ describe("getFieldSuggestions", () => {
       });
     });
   });
+
+  describe("given the tokens/tokensEstimated fold", () => {
+    describe("when the field list is searched", () => {
+      /** @scenario The search bar offers tokens as one concept */
+      it("never offers tokensEstimated, and estimated surfaces tokens instead", () => {
+        const blank = getFieldSuggestions("");
+        expect(blank.some((i) => i.value === "tokensEstimated")).toBe(false);
+        expect(blank.some((i) => i.value === "tokens")).toBe(true);
+
+        const estimated = getFieldSuggestions("estimated");
+        expect(estimated.some((i) => i.value === "tokens")).toBe(true);
+        expect(estimated.some((i) => i.value === "tokensEstimated")).toBe(false);
+      });
+    });
+  });
 });
 
 describe("getValueSuggestions", () => {

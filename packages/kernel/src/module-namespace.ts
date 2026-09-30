@@ -14,6 +14,7 @@ const NAMESPACE_EXCEPTIONS = {
   governance: "governance",
   langy: "langy",
   licensing: "licensing",
+  nurturing: "nurturing",
   ops: "ops",
   "enterprise-gateway": "enterprise-gateway",
   "enterprise-ops": "enterprise-ops",
@@ -22,6 +23,7 @@ const NAMESPACE_EXCEPTIONS = {
   saas: "saas",
   "sample-agents": "sample-agents",
   scim: "scim",
+  slack: "slack",
   sso: "sso",
 } as const satisfies Partial<Record<ModuleName, string>>;
 

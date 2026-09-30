@@ -61,6 +61,19 @@ export interface HttpDestinationResponse {
 
 type FenceResponse = Awaited<ReturnType<typeof fetchValidatedDestination>>;
 
+/** Response headers that can carry the receiver's credentials. The delivery
+ *  log shows stored headers to every drawer reader, so these are redacted at
+ *  capture; the name still appears, which is the debugging signal. */
+const SENSITIVE_RESPONSE_HEADERS = new Set([
+  "set-cookie",
+  "set-cookie2", // RFC 2965: obsolete, but it carries what set-cookie carries
+  "cookie",
+  "authorization",
+  "proxy-authorization",
+  "proxy-authenticate",
+  "www-authenticate",
+]);
+
 function captureResponseHeaders(
   headers: FenceResponse["headers"] | undefined,
 ): Record<string, string> {
@@ -69,7 +82,9 @@ function captureResponseHeaders(
   let count = 0;
   for (const [name, value] of headers.entries()) {
     if (count >= RESPONSE_HEADER_MAX_COUNT) break;
-    out[name] = value.slice(0, RESPONSE_HEADER_VALUE_CHARS);
+    out[name] = SENSITIVE_RESPONSE_HEADERS.has(name.toLowerCase())
+      ? "[redacted]"
+      : value.slice(0, RESPONSE_HEADER_VALUE_CHARS);
     count++;
   }
   return out;
@@ -157,6 +172,7 @@ export async function sendHttpDestination({
     throw new DispatchError({
       message: `${contextLabel}: HTTP request failed — ${message}`,
       retryable: !FENCE_REFUSAL.test(message),
+      cause: err,
     });
   }
 

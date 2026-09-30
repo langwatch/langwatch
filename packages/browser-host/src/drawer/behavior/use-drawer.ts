@@ -292,7 +292,7 @@ export const useDrawerParams = () => {
  * orderings — needed for lens routes like `/traces#conversations`, where naive
  * concatenation parks query params after the hash, invisible to `location.search`.
  */
-function splitAsPath(asPath: string): {
+export function splitAsPath(asPath: string): {
   path: string;
   queryString: string;
   hash: string;
@@ -472,7 +472,7 @@ function warnNonSerializableProps({
   params: Record<string, unknown>;
 }): void {
   const badKeys = Object.entries(params)
-    .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
+    .filter(([, v]) => typeof v === "function" || typeof v === "symbol")
     .map(([k]) => k);
   if (badKeys.length === 0) return;
   logger.warn(
