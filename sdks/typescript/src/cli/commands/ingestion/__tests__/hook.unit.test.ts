@@ -13,6 +13,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 import {
   attributesOf,
@@ -47,16 +48,25 @@ describe("the session context hook", () => {
       expect(hook.exits).toEqual([]);
     });
 
-    it("sends the configured OTLP headers alongside a json content type", async () => {
-      await hook.runHook({
-        env: {
-          OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer ik-lw-abc_secret",
-        },
-      });
+    describe("when it sends the context record", () => {
+      it("includes the configured credentials, CLI identity, and content type", async () => {
+        await hook.runHook({
+          env: {
+            OTEL_EXPORTER_OTLP_HEADERS:
+              "Authorization=Bearer ik-lw-abc_secret",
+          },
+        });
 
-      expect(posted[0]!.headers).toEqual({
-        Authorization: "Bearer ik-lw-abc_secret",
-        "content-type": "application/json",
+        expect(posted[0]!.headers).toEqual({
+          Authorization: "Bearer ik-lw-abc_secret",
+          "content-type": "application/json",
+          "X-LangWatch-Surface": "cli",
+          "user-agent": `langwatch-sdk-node/${LANGWATCH_SDK_VERSION}`,
+          "x-langwatch-sdk-name": "langwatch-observability-sdk",
+          "x-langwatch-sdk-language": "typescript",
+          "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
+          "x-langwatch-sdk-platform": "node",
+        });
       });
     });
 

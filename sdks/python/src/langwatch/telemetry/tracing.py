@@ -8,7 +8,7 @@ from deprecated import deprecated
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from langwatch.attributes import AttributeKey
 from langwatch.http_client import create_client
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
@@ -369,7 +369,7 @@ class LangWatchTrace:
             with create_client() as client:
                 response = client.post(
                     f"{endpoint}/api/trace/{trace_id}/share",
-                    headers=build_auth_headers(get_api_key()),
+                    headers=build_request_headers(get_api_key()),
                     timeout=30,
                 )
                 better_raise_for_status(response)
@@ -391,7 +391,7 @@ class LangWatchTrace:
             with create_client() as client:
                 response = client.post(
                     f"{endpoint}/api/trace/{trace_id}/unshare",
-                    headers=build_auth_headers(get_api_key()),
+                    headers=build_request_headers(get_api_key()),
                     timeout=30,
                 )
                 better_raise_for_status(response)

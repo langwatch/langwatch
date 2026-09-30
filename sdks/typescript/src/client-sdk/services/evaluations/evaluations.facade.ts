@@ -35,8 +35,8 @@ import {
   EvaluationsApiError,
 } from "./errors";
 import type { Logger } from "@/logger";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 
 type EvaluationsFacadeConfig = {
   endpoint: string;
@@ -153,7 +153,7 @@ export class EvaluationsFacade {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey: this.#apiKey }),
+          ...buildRequestHeaders({ apiKey: this.#apiKey }),
         },
         body: JSON.stringify(requestBody),
       });
