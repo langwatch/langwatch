@@ -151,6 +151,7 @@ describe("PrismaProjectRepository.listTraceDestinations", () => {
 });
 
 describe("PrismaProjectRepository coding-agent activity", () => {
+  /** @scenario A mapped pull request stamps its own column */
   it.each([
     ["session", "lastCodingAgentSessionAt", "touchCodingAgentSessionSeen"],
     ["pull request", "lastCodingAgentPullRequestAt", "touchCodingAgentPullRequestSeen"],
@@ -180,6 +181,7 @@ describe("PrismaProjectRepository coding-agent activity", () => {
 });
 
 describe("PrismaProjectRepository.findOrganizationId", () => {
+  /** @scenario The organization is resolved through the project's team */
   it("preserves optional tenant resolution for archived and missing projects", async () => {
     const findUnique = vi
       .fn()
