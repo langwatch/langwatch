@@ -176,5 +176,22 @@
   "engines": {
     "node": ">=22",
     "pnpm": ">=8"
+  },
+  "nx": {
+    "namedInputs": {
+      "sdkBuild": [
+        "default",
+        "!{projectRoot}/**/*.test.ts",
+        "!{projectRoot}/**/*.test.tsx",
+        "!{projectRoot}/**/*.test.mts",
+        "!{projectRoot}/vitest.config.*",
+        "!{projectRoot}/vitest.integration.config.*",
+        "!{projectRoot}/__tests__/**/*"
+      ],
+      "production": [
+        "sdkBuild",
+        "!{projectRoot}/src/cli/**/*"
+      ]
+    }
   }
 }
