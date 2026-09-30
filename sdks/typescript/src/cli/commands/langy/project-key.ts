@@ -39,9 +39,7 @@ function asProjectKeyError(stage: "lookup" | "key", error: unknown): ProjectKeyE
     code?: unknown;
     message?: unknown;
   };
-  const numericStatus = [status, httpStatus].find((value) => typeof value === "number") as
-    | number
-    | undefined;
+  const numericStatus = [status, httpStatus].find((value) => typeof value === "number");
   return new ProjectKeyError(
     stage,
     numericStatus,

@@ -14,6 +14,9 @@ COPY sdks/go/go.* sdks/go/
 COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 COPY cmd/devscripts ./cmd/devscripts
 COPY tools/devscripts ./tools/devscripts
+COPY tools/cliprof ./tools/cliprof
+COPY tools/internal/collate ./tools/internal/collate
+COPY tools/internal/jsonc ./tools/internal/jsonc
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -o /out/devscripts ./cmd/devscripts

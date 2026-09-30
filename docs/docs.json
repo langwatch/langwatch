@@ -1545,7 +1545,9 @@
           },
           {
             "group": "Grants",
-            "pages": ["api-reference/grants/overview"]
+            "pages": [
+              "api-reference/grants/overview"
+            ]
           },
           {
             "group": "Role Bindings",

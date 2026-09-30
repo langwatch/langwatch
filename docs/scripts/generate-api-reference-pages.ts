@@ -480,6 +480,14 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     ],
   },
   {
+    name: "Grants",
+    dirName: "grants",
+    pathPrefixes: ["/api/grants"],
+    overviewDescription:
+      "Grant a built-in or custom role to a user, a group or an API key at the organization, a team or a project. Grants replace role bindings.",
+    extraPages: ["api-reference/grants/overview"],
+  },
+  {
     name: "Role Bindings",
     dirName: "role-bindings",
     pathPrefixes: ["/api/role-bindings"],
@@ -1031,7 +1039,8 @@ function writeGroupPages({
   fs.mkdirSync(dirPath, { recursive: true });
   const existingMdx = findExistingMdxFiles(dirPath);
   const endpoints = collectGroupEndpoints({ group, spec, owners });
-  if (endpoints.length === 0) return [];
+  // A family whose routes are not in the spec yet still keeps its hand-written pages.
+  if (endpoints.length === 0) return [...(group.extraPages ?? [])];
   sortGroupEndpoints({ group, endpoints });
   writeOverviewPage({ group, dirPath, tally });
 
