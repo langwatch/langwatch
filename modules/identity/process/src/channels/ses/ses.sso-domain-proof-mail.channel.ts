@@ -3,6 +3,7 @@ import {
   sendSsoDomainProofWaveringEmail,
   type MailSender,
 } from "@langwatch/mail";
+import { Temporal } from "@langwatch/time";
 
 import type { SsoDomainProofMail } from "../../app/identity.members.ts";
 import { SsoDomainProofMailChannel } from "../sso-domain-proof-mail.channel.ts";
@@ -34,7 +35,7 @@ export class SesSsoDomainProofMailChannel extends SsoDomainProofMailChannel {
     return sendSsoDomainProofWaveringEmail({
       ...input,
       ...record,
-      graceEndsAt: new Date(graceEndsAtMs).toISOString(),
+      graceEndsAt: Temporal.Instant.fromEpochMilliseconds(graceEndsAtMs).toString(),
       accessSettingsUrl: this.accessSettingsUrl(),
       mailer: this.mailer,
     });

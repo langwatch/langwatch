@@ -115,7 +115,7 @@ describe("given a folder that is already connected", () => {
     });
   });
 
-  describe("codeAccessOffersDescribe", () => {
+  describe("given the calls of a conversation and codeAccessOffersDescribe", () => {
     const withInput = (input: unknown, state = "input-available") => ({
       type: "tool-code_access",
       state,

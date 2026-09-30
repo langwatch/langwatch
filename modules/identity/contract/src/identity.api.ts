@@ -172,7 +172,7 @@ export interface IdentityLedgerApi {
   proposeLink(input: ProposeLinkCommandData): Promise<IdentityFact[]>;
 }
 
-/** The `Account` fields a ceremony reads. Structural: the contract does not track better-auth's row type. */
+/** The `Account` fields a ceremony reads. Structural: not better-auth's own row type. */
 export interface IdentityCeremonyAccountRow {
   id?: unknown;
   userId?: unknown;

@@ -616,7 +616,7 @@ export function buildExperimentInfrastructure(input: {
   };
 }
 
-/** Where a run that ended is announced and an unnamed workbench failure reported. Both best-effort. */
+/** Where an ended run is announced and an unnamed workbench failure reported. Both best-effort. */
 function announcingObserver(input: {
   logger: Logger;
   announce: ExperimentRanAnnouncer;

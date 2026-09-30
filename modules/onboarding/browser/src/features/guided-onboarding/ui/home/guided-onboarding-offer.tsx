@@ -1,13 +1,6 @@
 /**
- * The orange pill under the search bar of a day-zero home in the guided variant: "Start guided
- * onboarding". Each space (project, gateway, governance, /me) offers its own path. It is hidden
- * while Langy is guiding that space, once the space is done or the hosting screen says it is
- * already in use, and while any tour is on screen. `spaceInUse` is the screen's own answer, read
- * from data it already loads: null while unknown keeps the offer hidden, so a space in use never
- * flashes the pill.
- *
- * Clicking begins the path on the organization, opens the panel docked, runs the path's tour when
- * it has one and queues the kickoff that continues the conversation already attached.
+ * The "Start guided onboarding" pill on a day-zero home, one path per space. Hidden while guided,
+ * done, in use (`spaceInUse`, null while unknown) or touring. Clicking begins the path.
  *
  * @see specs/home/guided-onboarding-offer.feature
  */
@@ -49,7 +42,8 @@ function GuidedOnboardingOfferInner({ space, spaceInUse }: UiGuidedOnboardingOff
   const attachConversation = onboardingApi.onboarding.attachConversation.useMutation();
   const [busy, setBusy] = useState(false);
 
-  if (!enabled || !state || !organizationId || spaceInUse !== false || touring) return null;
+  if (!enabled || !state || !organizationId) return null;
+  if (spaceInUse !== false || touring) return null;
   const path = offeredPath({ space, state });
   if (!path) return null;
 

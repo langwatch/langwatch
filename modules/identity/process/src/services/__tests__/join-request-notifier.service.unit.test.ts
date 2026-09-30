@@ -11,14 +11,14 @@ import { JoinRequestNotifierService } from "../join-request-notifier.service.ts"
  */
 
 function recordingMail() {
-  const sendRequestArrived = vi.fn(
-    async (_: Parameters<JoinRequestNotificationMail["sendRequestArrived"]>[0]) => undefined,
+  const sendRequestArrived = vi.fn<JoinRequestNotificationMail["sendRequestArrived"]>(
+    async () => undefined,
   );
-  const sendRequestExpired = vi.fn(
-    async (_: Parameters<JoinRequestNotificationMail["sendRequestExpired"]>[0]) => undefined,
+  const sendRequestExpired = vi.fn<JoinRequestNotificationMail["sendRequestExpired"]>(
+    async () => undefined,
   );
-  const sendJoinedAutomatically = vi.fn(
-    async (_: Parameters<JoinRequestNotificationMail["sendJoinedAutomatically"]>[0]) => undefined,
+  const sendJoinedAutomatically = vi.fn<JoinRequestNotificationMail["sendJoinedAutomatically"]>(
+    async () => undefined,
   );
   class RecordingMail implements JoinRequestNotificationMail {
     sendRequestArrived = sendRequestArrived;

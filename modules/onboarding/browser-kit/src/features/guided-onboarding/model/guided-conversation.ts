@@ -1,10 +1,6 @@
 /**
- * What a guided onboarding conversation's transcript says about the path.
- *
- * A guided conversation starts with the kickoff part (a user message on the wire, the tour
- * card on screen) and ends when the skill runs `langwatch onboarding complete-path`. Everything
- * here reads the parts the transcript already carries, never the prose: the branch from the
- * checkout command, the title and address from the `gh pr create` call and its own stdout.
+ * What a guided onboarding transcript says about the path, read from the parts it carries
+ * (checkout command, `gh pr create` call and stdout), never the prose.
  *
  * @see specs/langy/langy-guided-onboarding.feature
  */
