@@ -78,8 +78,12 @@ export const SimConsole = ({
         links={chrome.links}
         actions={
           <>
-            <output>
-              <StatusDot state={DOT[status.tone]} label={status.text} />
+            {/* Healthy reads "Live" like the nav beside it; the sentence stays as the tooltip. */}
+            <output title={status.text}>
+              <StatusDot
+                state={DOT[status.tone]}
+                label={status.tone === "ok" ? undefined : status.text}
+              />
             </output>
             {actions}
           </>

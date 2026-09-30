@@ -413,6 +413,19 @@ a.ds-topbar-brand {
   flex-shrink: 0;
 }
 
+/* Whatever an app puts beside the nav takes the nav's size: small controls, muted status. */
+.ds-topbar-end .ds-button {
+  height: var(--control-sm);
+  font-size: var(--text-sm);
+  gap: var(--space-1);
+}
+
+.ds-topbar-end .ds-status {
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
 .ds-topbar-nav + .ds-topbar-end {
   margin-left: 0;
 }

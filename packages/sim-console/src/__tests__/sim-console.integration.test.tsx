@@ -39,7 +39,8 @@ describe("<SimConsole/>", () => {
 
       expect(screen.getByText("LLM simulator")).toBeTruthy();
       expect(screen.getByText("feature-one")).toBeTruthy();
-      expect(screen.getByRole("status").textContent).toBe("Serving");
+      expect(screen.getByRole("status").textContent).toBe("Live");
+      expect(screen.getByRole("status").getAttribute("title")).toBe("Serving");
       expect(screen.getByRole("button", { name: "Reset" })).toBeTruthy();
       expect(screen.getByRole("tab", { name: /Calls/u }).getAttribute("aria-selected")).toBe(
         "true",
