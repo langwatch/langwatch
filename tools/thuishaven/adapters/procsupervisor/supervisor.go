@@ -174,7 +174,7 @@ func killOnCancel(ctx context.Context, cmd *exec.Cmd, done <-chan struct{}) {
 		if cmd.Process != nil {
 			// The first Ctrl-C is a hard stop for the launcher tree. Cleanup runs
 			// after the children are gone and must never hold the terminal hostage.
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			killTree(cmd.Process.Pid)
 		}
 	}
 }
@@ -275,7 +275,7 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 		select {
 		case <-ctx.Done():
 			if cmd.Process != nil {
-				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+				killTree(cmd.Process.Pid)
 			}
 			<-done
 			return

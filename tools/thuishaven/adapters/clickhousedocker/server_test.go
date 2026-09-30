@@ -39,6 +39,16 @@ func TestWriteConfig(t *testing.T) {
 					t.Error("on-disk config differs from the rendered one")
 				}
 			})
+
+			t.Run("persists the users.d override LangWatchQL provisioning needs", func(t *testing.T) {
+				b, err := os.ReadFile(s.usersConfigPath())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(b) != domain.ClickHouseUsersConfig {
+					t.Error("on-disk users config differs from domain.ClickHouseUsersConfig")
+				}
+			})
 		})
 	})
 

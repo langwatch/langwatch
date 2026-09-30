@@ -121,7 +121,8 @@ func (s *Server) ready(ctx context.Context) bool {
 
 // ensureRole creates the shared role every stack's DATABASE_URL connects as, if
 // it does not already exist. Idempotent: `CREATE ROLE` has no IF NOT EXISTS, so
-// existence is checked first via pg_roles.
+// existence is checked first via pg_roles. CREATEROLE lets lwql-provision
+// manage LangWatchQL's reader role (lwql_ro); an older role is granted it here.
 func (s *Server) ensureRole(ctx context.Context) error {
 	exists, err := s.queryBool(ctx, "postgres",
 		fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = %s)", quoteLiteral(domain.PostgresRole)))
@@ -129,9 +130,9 @@ func (s *Server) ensureRole(ctx context.Context) error {
 		return err
 	}
 	if exists {
-		return nil
+		return s.exec(ctx, "postgres", fmt.Sprintf("ALTER ROLE %s CREATEROLE", quoteIdent(domain.PostgresRole)))
 	}
-	sql := fmt.Sprintf("CREATE ROLE %s WITH LOGIN CREATEDB PASSWORD %s",
+	sql := fmt.Sprintf("CREATE ROLE %s WITH LOGIN CREATEDB CREATEROLE PASSWORD %s",
 		quoteIdent(domain.PostgresRole), quoteLiteral(domain.PostgresRolePassword))
 	return s.exec(ctx, "postgres", sql)
 }

@@ -19,6 +19,14 @@ const DefaultLocalAPIKey = "sk-lw-local-development-key"
 // "always the same locally" contract as DefaultLocalAPIKey.
 const DefaultLangyInternalSecret = "langy-local-development-secret"
 
+// LWQLClickHousePassword and LWQLPostgresReaderPassword are LangWatchQL's
+// local-only passwords: fixed like PostgresRolePassword, since every stack on
+// the shared servers converges the same lwql_ro role.
+const (
+	LWQLClickHousePassword     = "langwatch-lwql-local"
+	LWQLPostgresReaderPassword = "langwatch-lwql-reader-local"
+)
+
 // DefaultRetentionDays is the platform retention default haven pins for a dev
 // stack: one week, so an unseeded worktree's ClickHouse stays tiny and whole
 // weekly partitions drop cleanly (the partition key is toYearWeek, so retention
@@ -224,6 +232,17 @@ func (s Stack) OverlayEnv() []string {
 	if s.PostgresPort != 0 && s.PostgresDatabase != "" {
 		env = append(env, fmt.Sprintf("DATABASE_URL=postgresql://%s:%s@127.0.0.1:%d/%s",
 			PostgresRole, PostgresRolePassword, s.PostgresPort, s.PostgresDatabase))
+	}
+	// LangWatchQL: with both passwords set, lwql-provision (start:prepare:db)
+	// provisions the restricted query identity. The ClickHouse user is per stack,
+	// because provisioning replaces it with this database's grants; lwql_ro and
+	// its password are server-wide, so the passwords are fixed, not per stack.
+	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" && s.PostgresPort != 0 && s.PostgresDatabase != "" {
+		env = append(env,
+			"LWQL_CLICKHOUSE_USER="+s.ClickHouseDatabase+"_lwql",
+			"LWQL_CLICKHOUSE_PASSWORD="+LWQLClickHousePassword,
+			"LWQL_POSTGRES_READER_PASSWORD="+LWQLPostgresReaderPassword,
+		)
 	}
 	// Redis needs no per-slug database — REDIS_DB_INDEX above already partitions
 	// worktrees by DB index on the one shared server.

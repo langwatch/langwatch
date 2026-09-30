@@ -55,8 +55,11 @@ func New(rt *colima.Runtime, havenHome, image string, limits domain.ClickHouseLi
 
 // dataDir is the legacy virtiofs bind mount, kept only as the one-time source
 // for the named volume; nothing is ever deleted from it.
-func (s *Server) dataDir() string      { return filepath.Join(s.home, "data") }
-func (s *Server) configPath() string   { return filepath.Join(s.home, domain.ClickHouseConfigFile) }
+func (s *Server) dataDir() string    { return filepath.Join(s.home, "data") }
+func (s *Server) configPath() string { return filepath.Join(s.home, domain.ClickHouseConfigFile) }
+func (s *Server) usersConfigPath() string {
+	return filepath.Join(s.home, domain.ClickHouseUsersConfigFile)
+}
 func (s *Server) endpointPath() string { return filepath.Join(s.home, "endpoint.json") }
 
 // Ensure starts the colima VM and the container if not already running, and
@@ -137,15 +140,21 @@ func (s *Server) writeConfig() (bool, error) {
 	for _, legacy := range domain.LegacyClickHouseConfigFiles {
 		_ = os.Remove(filepath.Join(s.home, legacy))
 	}
-	rendered := domain.RenderClickHouseConfig(s.limits)
-	existing, err := os.ReadFile(s.configPath())
-	if err == nil && string(existing) == rendered {
-		return false, nil
+	changed := false
+	for path, rendered := range map[string]string{
+		s.configPath():      domain.RenderClickHouseConfig(s.limits),
+		s.usersConfigPath(): domain.ClickHouseUsersConfig,
+	} {
+		existing, err := os.ReadFile(path)
+		if err == nil && string(existing) == rendered {
+			continue
+		}
+		if err := os.WriteFile(path, []byte(rendered), 0o644); err != nil { // #nosec G306 -- mounted read-only; the container's clickhouse user must read it
+			return false, err
+		}
+		changed = true
 	}
-	if err := os.WriteFile(s.configPath(), []byte(rendered), 0o644); err != nil {
-		return false, err
-	}
-	return true, nil
+	return changed, nil
 }
 
 // applySystemLogPolicy retrofits the log policy onto tables that already exist.
@@ -210,6 +219,7 @@ func (s *Server) runArgs(ep endpoint) []string {
 
 		"-v", domain.ClickHouseDataVolume + ":/var/lib/clickhouse",
 		"-v", s.configPath() + ":/etc/clickhouse-server/config.d/" + domain.ClickHouseConfigFile + ":ro",
+		"-v", s.usersConfigPath() + ":/etc/clickhouse-server/users.d/" + domain.ClickHouseUsersConfigFile + ":ro",
 
 		s.image,
 	}
