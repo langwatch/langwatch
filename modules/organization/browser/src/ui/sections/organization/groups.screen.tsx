@@ -224,7 +224,7 @@ export default function GroupsScreen() {
                         >
                           <HStack gap={2}>
                             <Plus size={14} />
-                            <Text fontSize="sm">Add manual group</Text>
+                            <Text fontSize="sm">Add a group</Text>
                           </HStack>
                         </chakra.button>
                       </Table.Cell>

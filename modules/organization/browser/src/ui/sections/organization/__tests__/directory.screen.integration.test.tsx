@@ -186,6 +186,7 @@ describe("the directory page", () => {
       expect(screen.getByRole("tab", { name: /Groups/ })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByText("Engineering")).toBeInTheDocument();
       expect(screen.getByText("Hand-made")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add a group" })).toBeInTheDocument();
     });
   });
 

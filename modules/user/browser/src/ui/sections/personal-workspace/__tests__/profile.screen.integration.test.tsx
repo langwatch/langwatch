@@ -25,6 +25,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => ({
       },
       getLinkedAccounts: { useQuery: () => ({ data: [] }) },
       hasPassword: { useQuery: () => ({ data: { hasPassword: true } }) },
+      updateName: { useMutation: () => ({ mutate: () => {}, isPending: false }) },
       setAvatar: { useMutation: () => ({ mutate: () => {}, isPending: false }) },
       removeAvatar: { useMutation: () => ({ mutate: () => {}, isPending: false }) },
     },
