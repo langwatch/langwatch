@@ -188,6 +188,7 @@ export function GuardrailAttachmentsSection({
               {dirRows.map((row) => (
                 <Checkbox
                   key={row.id}
+                  data-testid="gateway-guardrail-attach"
                   checked={checked.has(row.id)}
                   disabled={!canAttach}
                   onCheckedChange={() => toggle(row.id)}
@@ -218,6 +219,7 @@ export function GuardrailAttachmentsSection({
           <Button
             size="sm"
             colorPalette="blue"
+            data-testid="gateway-guardrail-attach-save"
             disabled={!canAttach || !dirty}
             loading={updateMutation.isPending}
             onClick={save}

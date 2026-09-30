@@ -26,6 +26,7 @@ export const SessionRowActions: React.FC<{
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button
+          data-testid="coding-agent-session-actions"
           size="xs"
           variant="ghost"
           aria-label={`Actions for ${row.title ?? "untitled session"}`}
@@ -34,11 +35,15 @@ export const SessionRowActions: React.FC<{
         </Button>
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item value="replay" onClick={onOpenReplay}>
+        <Menu.Item value="replay" data-testid="coding-agent-session-replay" onClick={onOpenReplay}>
           Open terminal replay
         </Menu.Item>
         {onOpenInExplorer ? (
-          <Menu.Item value="explorer" onClick={onOpenInExplorer}>
+          <Menu.Item
+            value="explorer"
+            data-testid="coding-agent-session-explorer"
+            onClick={onOpenInExplorer}
+          >
             View on Trace Explorer
           </Menu.Item>
         ) : null}

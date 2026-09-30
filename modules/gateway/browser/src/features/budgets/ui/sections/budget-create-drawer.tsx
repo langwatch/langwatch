@@ -640,6 +640,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
                 </Field.Label>
                 <NativeSelect.Root size="sm">
                   <NativeSelect.Field
+                    data-testid="gateway-budget-window"
                     value={window}
                     onChange={(e) => setWindow((e.target.value as Window) ?? "MONTH")}
                   >
@@ -701,6 +702,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
               </Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
+                  data-testid="gateway-budget-on-breach"
                   value={onBreach}
                   onChange={(e) => setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")}
                 >

@@ -93,7 +93,7 @@ function GithubConnectionCard({ organizationId }: { organizationId: string }) {
   const showInstallations = configured && installations.length > 0;
 
   return (
-    <Card.Root id="github">
+    <Card.Root id="github" data-testid="github-connection-card">
       <Card.Body>
         <VStack align="stretch" gap={3}>
           <HStack gap={2}>
@@ -112,12 +112,13 @@ function GithubConnectionCard({ organizationId }: { organizationId: string }) {
           </Text>
 
           {!configured && (
-            <Text fontSize="sm" color="fg.muted">
+            <Text fontSize="sm" color="fg.muted" data-testid="github-not-configured">
               The GitHub integration is not available on this instance.
             </Text>
           )}
           {showConnect && (
             <Button
+              data-testid="github-connect"
               variant="solid"
               onClick={onInstall}
               disabled={!installAddress}

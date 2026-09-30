@@ -215,6 +215,7 @@ export function NoLicenseCard({
                 value={activationCode}
                 onChange={(e) => onActivationCodeChange(e.target.value)}
                 placeholder="LW-XXXX-XXXX-XXXX-XXXX"
+                data-testid="license-activation-code"
                 fontFamily="mono"
                 maxWidth="360px"
                 disabled={isActivating}
@@ -234,6 +235,7 @@ export function NoLicenseCard({
                 value={licenseKey}
                 onChange={(e) => onLicenseKeyChange(e.target.value)}
                 placeholder="Paste your license key"
+                data-testid="license-key-input"
                 rows={4}
                 fontFamily="mono"
                 fontSize="xs"
@@ -248,6 +250,7 @@ export function NoLicenseCard({
               variant="solid"
               size="sm"
               onClick={handleActivate}
+              data-testid="license-activate"
               loading={isActivating}
               disabled={isActivateDisabled}
             >

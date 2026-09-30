@@ -548,7 +548,7 @@ const NotConnectedState: React.FC<{
     }
   >
     {canManageOrganization && installUrl ? (
-      <Button asChild size="sm">
+      <Button asChild size="sm" data-testid="coding-agent-github-connect">
         <a href={installUrl}>Connect GitHub</a>
       </Button>
     ) : null}
@@ -565,6 +565,7 @@ const PullRequestRow: React.FC<{
   onOpenDetail: (() => void) | undefined;
 }> = ({ row, status, installUrl, canManageOrganization, tokenStats, costStats, onOpenDetail }) => (
   <Table.Row
+    data-testid="coding-agent-pull-request-row"
     onClick={onOpenDetail}
     cursor={onOpenDetail ? "pointer" : undefined}
     _hover={onOpenDetail ? { bg: "bg.subtle" } : undefined}

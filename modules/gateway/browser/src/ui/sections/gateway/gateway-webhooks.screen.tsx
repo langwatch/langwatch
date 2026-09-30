@@ -198,6 +198,7 @@ function WebhookStatusMenuItem({ endpoint, organizationId, mutations }: Endpoint
     return (
       <Menu.Item
         value="disable"
+        data-testid="webhook-menu-disable"
         onClick={() => mutations.disable.mutate({ organizationId, endpointId: endpoint.id })}
       >
         <Pause size={14} /> Disable
@@ -207,6 +208,7 @@ function WebhookStatusMenuItem({ endpoint, organizationId, mutations }: Endpoint
   return (
     <Menu.Item
       value="enable"
+      data-testid="webhook-menu-enable"
       onClick={() => mutations.enable.mutate({ organizationId, endpointId: endpoint.id })}
     >
       <Play size={14} /> Enable
@@ -219,14 +221,27 @@ function WebhookManageMenuItems(props: EndpointActionProps) {
   const { endpoint, dialogs } = props;
   return (
     <>
-      <Menu.Item value="edit" onClick={() => dialogs.openEdit(endpoint)}>
+      <Menu.Item
+        value="edit"
+        data-testid="webhook-menu-edit"
+        onClick={() => dialogs.openEdit(endpoint)}
+      >
         <Pencil size={14} /> Edit
       </Menu.Item>
-      <Menu.Item value="roll-secret" onClick={() => dialogs.setRollingSecret(endpoint)}>
+      <Menu.Item
+        value="roll-secret"
+        data-testid="webhook-menu-roll-secret"
+        onClick={() => dialogs.setRollingSecret(endpoint)}
+      >
         <RotateCw size={14} /> Roll secret
       </Menu.Item>
       <WebhookStatusMenuItem {...props} />
-      <Menu.Item value="delete" color="fg.error" onClick={() => dialogs.setDeleting(endpoint)}>
+      <Menu.Item
+        value="delete"
+        color="fg.error"
+        data-testid="webhook-menu-delete"
+        onClick={() => dialogs.setDeleting(endpoint)}
+      >
         <Trash2 size={14} /> Delete
       </Menu.Item>
     </>
@@ -238,12 +253,16 @@ function WebhookRowMenu(props: EndpointActionProps) {
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button variant="ghost" size="xs" aria-label="Actions">
+        <Button variant="ghost" size="xs" aria-label="Actions" data-testid="webhook-row-actions">
           <MoreVertical size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item value="deliveries" onClick={() => dialogs.setViewingDeliveries(endpoint)}>
+        <Menu.Item
+          value="deliveries"
+          data-testid="webhook-menu-deliveries"
+          onClick={() => dialogs.setViewingDeliveries(endpoint)}
+        >
           <History size={14} /> Deliveries
         </Menu.Item>
         {canManage && <WebhookManageMenuItems {...props} />}

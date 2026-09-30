@@ -55,7 +55,7 @@ export function WebhookSecretDialog({
         <Dialog.Header>
           <Dialog.Title>Signing secret</Dialog.Title>
         </Dialog.Header>
-        <Dialog.CloseTrigger />
+        <Dialog.CloseTrigger data-testid="webhook-secret-close" />
         <Dialog.Body paddingBottom={6}>
           <VStack align="start" gap={4}>
             <Alert.Root status="warning">

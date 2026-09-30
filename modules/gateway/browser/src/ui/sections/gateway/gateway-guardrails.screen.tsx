@@ -170,6 +170,7 @@ function GuardrailsPage() {
         <Spacer />
         {canManage && (
           <PageLayout.HeaderButton
+            data-testid="gateway-guardrail-new"
             onClick={() => setCreateOpen(true)}
             disabled={guardrailEvaluators.length === 0}
           >
@@ -277,7 +278,7 @@ function GuardrailsTable({
         {rows.map((row) => {
           const evaluator = evaluatorById.get(row.evaluatorId);
           return (
-            <Table.Row key={row.id}>
+            <Table.Row key={row.id} data-testid="gateway-guardrail-row">
               <Table.Cell>
                 <VStack align="start" gap={0}>
                   <Text fontSize="sm" fontWeight="medium">
@@ -318,7 +319,12 @@ function GuardrailsTable({
               <Table.Cell>
                 <HStack justify="end" gap={1}>
                   {canManage && (
-                    <Button size="xs" variant="ghost" onClick={() => onEdit(row)}>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      data-testid="gateway-guardrail-edit"
+                      onClick={() => onEdit(row)}
+                    >
                       <Pencil size={12} /> Edit
                     </Button>
                   )}
@@ -327,6 +333,8 @@ function GuardrailsTable({
                       size="xs"
                       variant="ghost"
                       colorPalette="red"
+                      aria-label={`Archive ${row.name}`}
+                      data-testid="gateway-guardrail-archive"
                       onClick={() => onArchive(row)}
                     >
                       <Archive size={12} />
@@ -451,6 +459,7 @@ function GuardrailDrawer({
             <Field.Root required>
               <Field.Label>Name</Field.Label>
               <Input
+                data-testid="gateway-guardrail-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. block PII on requests"
@@ -471,6 +480,7 @@ function GuardrailDrawer({
               <Field.Label>Evaluator</Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
+                  data-testid="gateway-guardrail-evaluator"
                   value={evaluatorId}
                   onChange={(e) => setEvaluatorId(e.target.value)}
                 >
@@ -492,6 +502,7 @@ function GuardrailDrawer({
               <Field.Label>Direction</Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
+                  data-testid="gateway-guardrail-direction"
                   value={direction}
                   onChange={(e) => setDirection(e.target.value as GatewayGuardrailDirection)}
                 >
@@ -530,6 +541,7 @@ function GuardrailDrawer({
             </Button>
             <Button
               colorPalette="orange"
+              data-testid="gateway-guardrail-submit"
               onClick={submit}
               loading={isPending}
               disabled={submitDisabled}

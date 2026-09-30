@@ -34,7 +34,13 @@ export function GithubInstallationRow({
   onDisconnect,
 }: GithubInstallationRowProps) {
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+    <Box
+      data-testid="github-installation-row"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={3}
+    >
       <HStack justify="space-between" gap={3}>
         <VStack align="stretch" gap={0}>
           <HStack gap={2}>
@@ -66,6 +72,7 @@ export function GithubInstallationRow({
             Configure
           </Link>
           <Button
+            data-testid="github-disconnect"
             size="sm"
             variant="outline"
             loading={disconnecting}

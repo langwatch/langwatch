@@ -211,6 +211,7 @@ export function LicenseDetailsCard({
             size="sm"
             colorPalette="red"
             onClick={onRemove}
+            data-testid="license-remove"
             loading={isRemoving}
             disabled={isRemoving}
           >

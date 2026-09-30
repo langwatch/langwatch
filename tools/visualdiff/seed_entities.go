@@ -26,6 +26,7 @@ const (
 var SeededFixtureNames = []string{
 	FixtureDataset, FixtureExperiment, FixtureMonitor, FixtureGraph, FixtureVirtualKey, FixtureBudget,
 	FixtureErrorTrace, FixtureConversation, FixtureBugReport, FixtureIsolatedSlug, FixtureIsolatedKey,
+	FixtureCodingSession, FixtureCodingSessionBeta, FixtureOrgKey,
 }
 
 // entitySeed is one entity posted through a REST surface main and the branch

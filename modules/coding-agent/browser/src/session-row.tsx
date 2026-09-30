@@ -37,6 +37,7 @@ export const SessionRow: React.FC<{
   onPrefetch,
 }) => (
   <Table.Row
+    data-testid="coding-agent-session-row"
     onClick={onOpenReplay}
     onMouseEnter={onPrefetch}
     aria-busy={isOpening}

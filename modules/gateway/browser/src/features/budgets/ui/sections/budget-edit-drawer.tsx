@@ -117,7 +117,11 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
                   docHref="/ai-gateway/budgets#creating-a-budget"
                 />
               </Field.Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Input
+                data-testid="gateway-budget-edit-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </Field.Root>
             <Field.Root>
               <Field.Label>Description</Field.Label>
@@ -154,6 +158,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
                 />
               </Field.Label>
               <Input
+                data-testid="gateway-budget-edit-limit"
                 value={limitUsd}
                 onChange={(e) => {
                   setLimitUsd(e.target.value);
@@ -177,6 +182,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
               </Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
+                  data-testid="gateway-budget-edit-on-breach"
                   value={onBreach}
                   onChange={(e) => setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")}
                 >
@@ -195,6 +201,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
             </Button>
             <Button
               colorPalette="orange"
+              data-testid="gateway-budget-edit-submit"
               onClick={submit}
               loading={updateMutation.isPending}
               disabled={!name || !limitUsd}

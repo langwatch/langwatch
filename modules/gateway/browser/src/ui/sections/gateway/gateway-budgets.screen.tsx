@@ -360,7 +360,12 @@ function BudgetTableRow({
   const seatsOver = b.endUsersOver ?? 0;
   const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
   return (
-    <Table.Row cursor="pointer" _hover={{ bg: "bg.subtle" }} onClick={onOpen}>
+    <Table.Row
+      data-testid="gateway-budget-row"
+      cursor="pointer"
+      _hover={{ bg: "bg.subtle" }}
+      onClick={onOpen}
+    >
       <Table.Cell>
         <VStack align="start" gap={0}>
           <Link href={`/gateway/budgets/${b.id}`}>
@@ -429,7 +434,12 @@ function BudgetTableRow({
       <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
         <Menu.Root>
           <Menu.Trigger asChild>
-            <Button variant="ghost" size="xs" aria-label="Actions">
+            <Button
+              data-testid="gateway-budget-row-actions"
+              variant="ghost"
+              size="xs"
+              aria-label="Actions"
+            >
               <MoreVertical size={14} />
             </Button>
           </Menu.Trigger>
@@ -438,12 +448,16 @@ function BudgetTableRow({
               <Eye size={14} /> Details
             </Menu.Item>
             {canUpdate && (
-              <Menu.Item value="edit" onClick={onEdit}>
+              <Menu.Item value="edit" data-testid="gateway-budget-row-edit" onClick={onEdit}>
                 <Pencil size={14} /> Edit
               </Menu.Item>
             )}
             {canDelete && (
-              <Menu.Item value="archive" onClick={onArchive}>
+              <Menu.Item
+                value="archive"
+                data-testid="gateway-budget-row-archive"
+                onClick={onArchive}
+              >
                 <Archive size={14} /> Archive
               </Menu.Item>
             )}

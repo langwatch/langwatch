@@ -29,6 +29,7 @@ export const PullRequestsCell: React.FC<{
         <chakra.button
           key={pullRequest.number}
           type="button"
+          data-testid="coding-agent-session-pull-request"
           aria-label={`Open pull request #${pullRequest.number}`}
           onClick={(event) => {
             event.stopPropagation();

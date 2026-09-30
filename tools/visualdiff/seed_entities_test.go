@@ -59,6 +59,8 @@ func TestEachStackSeedsTheEntitiesItsDynamicRoutesOpenAndKeepsItsOwnIDs(t *testi
 		FixtureGraph: "graph_1", FixtureVirtualKey: "vk_1", FixtureBudget: "budget_1",
 		FixtureErrorTrace: SeedErrorTraceID, FixtureConversation: SeedConversationThread, FixtureBugReport: "bug_1",
 		FixtureIsolatedSlug: "isolated-1", FixtureIsolatedKey: "sk-lw-isolated",
+		FixtureCodingSession: CodingSessionAlpha, FixtureCodingSessionBeta: CodingSessionBeta,
+		FixtureOrgKey: SeededPrivateAccessToken,
 	}
 	if len(result.Warnings) != 0 || len(result.Fixtures) != len(want) {
 		t.Fatalf("fixtures %+v, warnings %v", result.Fixtures, result.Warnings)

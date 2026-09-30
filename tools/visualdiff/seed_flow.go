@@ -39,7 +39,7 @@ type flowSeedRequest struct {
 // a two-turn conversation, a bug report and the isolated flows' second project. Each
 // failure is a warning, since the run's other flows still hold without it.
 func seedForFlows(ctx context.Context, request flowSeedRequest) (map[string]string, []string) {
-	fixtures := map[string]string{FixtureErrorTrace: SeedErrorTraceID, FixtureConversation: SeedConversationThread}
+	fixtures := map[string]string{FixtureErrorTrace: SeedErrorTraceID, FixtureConversation: SeedConversationThread, FixtureOrgKey: SeededPrivateAccessToken}
 	var warnings []string
 	var mutex sync.Mutex
 	keep := func(found map[string]string, name string, err error) {
@@ -68,6 +68,10 @@ func seedForFlows(ctx context.Context, request flowSeedRequest) (map[string]stri
 			id, err = StringAt(answer, "id")
 		}
 		keep(map[string]string{FixtureBugReport: id}, FixtureBugReport, err)
+	})
+	group.Go(func() {
+		coding, err := seedCodingSessions(ctx, request)
+		keep(coding, "coding sessions", err)
 	})
 	group.Go(func() {
 		isolated, err := seedIsolatedProject(ctx, request)
