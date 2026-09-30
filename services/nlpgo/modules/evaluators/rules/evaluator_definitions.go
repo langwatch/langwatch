@@ -3,6 +3,12 @@
 // evaluator's scoring. Nothing here performs I/O.
 package rules
 
+// Settings convention (plan §7): one struct per model; `json` is the wire name
+// and order, `desc` the description, `enum:"a,b"` the literal set and
+// `required:"true"` a field without a default. Nested models are structs; a
+// list element's own defaults come from Defaults() (Defaulter). Defaults live
+// in Default<Name>Settings(); a nil pointer is an unset Optional.
+
 import (
 	"encoding/json"
 
@@ -19,21 +25,69 @@ const (
 	FieldConversation     = "conversation"
 )
 
-// Definition is one evaluator's metadata: the catalogue source (plan §7).
+// Definition is one evaluator's catalogue entry (plan §7): what
+// evaluators.generated.ts lists for it.
 type Definition struct {
 	Slug            string
+	Name            string
+	Description     string
+	Category        string
+	DocsURL         string
+	IsGuardrail     bool
 	RequiredFields  []string
+	OptionalFields  []string
+	EnvVars         []string
+	Result          ResultDescriptions
 	DefaultSettings any
 }
 
-// Definitions returns every evaluator the runtime serves, keyed by slug.
-func Definitions() map[string]Definition {
-	return map[string]Definition{
-		"langevals/exact_match": {
-			Slug:            "langevals/exact_match",
-			RequiredFields:  []string{FieldOutput, FieldExpectedOutput},
-			DefaultSettings: DefaultExactMatchSettings(),
-		},
+// ResultDescriptions describe what a result's score, passed and label mean;
+// empty when the evaluator keeps the base description.
+type ResultDescriptions struct {
+	Score  string
+	Passed string
+	Label  string
+}
+
+// Definitions lists every evaluator in the catalogue, in its order. Only
+// those services.BuiltinEvaluators pairs with a scorer are served.
+func Definitions() []Definition {
+	return []Definition{
+		openAIModerationDefinition(),
+		ragasBLEUScoreDefinition(),
+		ragasContextF1Definition(),
+		ragasContextPrecisionDefinition(),
+		ragasContextRecallDefinition(),
+		ragasFactualCorrectnessDefinition(),
+		ragasFaithfulnessDefinition(),
+		ragasResponseContextPrecisionDefinition(),
+		ragasResponseContextRecallDefinition(),
+		ragasResponseRelevancyDefinition(),
+		ragasROUGEScoreDefinition(),
+		ragasRubricsBasedScoringDefinition(),
+		ragasSQLQueryEquivalenceDefinition(),
+		ragasSummarizationScoreDefinition(),
+		presidioPIIDetectionDefinition(),
+		azureContentSafetyDefinition(),
+		azureJailbreakDefinition(),
+		azurePromptInjectionDefinition(),
+		linguaLanguageDetectionDefinition(),
+		basicDefinition(),
+		competitorBlocklistDefinition(),
+		competitorLLMDefinition(),
+		competitorLLMFunctionCallDefinition(),
+		exactMatchDefinition(),
+		llmAnswerMatchDefinition(),
+		llmBooleanDefinition(),
+		llmCategoryDefinition(),
+		llmScoreDefinition(),
+		offTopicDefinition(),
+		pairwiseCompareDefinition(),
+		queryResolutionDefinition(),
+		selectBestCompareDefinition(),
+		sentimentDefinition(),
+		similarityDefinition(),
+		validFormatDefinition(),
 	}
 }
 

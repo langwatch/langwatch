@@ -68,4 +68,7 @@ type Result struct {
 	Cost      *Money   `json:"cost,omitempty"`
 	ErrorType string   `json:"error_type,omitempty"`
 	Traceback []string `json:"traceback,omitempty"`
+	// RawResponse is the evaluator's own output (lingua's confidences,
+	// PII findings), read by TS as `raw_response`.
+	RawResponse json.RawMessage `json:"raw_response,omitempty"`
 }

@@ -9,31 +9,6 @@ import (
 	"unicode"
 )
 
-// ExactMatchSettings are langevals' ExactMatchSettings.
-type ExactMatchSettings struct {
-	CaseSensitive     bool `json:"case_sensitive"`
-	TrimWhitespace    bool `json:"trim_whitespace"`
-	RemovePunctuation bool `json:"remove_punctuation"`
-}
-
-// DefaultExactMatchSettings are the Python defaults.
-func DefaultExactMatchSettings() ExactMatchSettings {
-	return ExactMatchSettings{CaseSensitive: false, TrimWhitespace: true, RemovePunctuation: true}
-}
-
-// ParseExactMatchSettings overlays raw settings on the defaults. Absent or
-// null settings are the defaults; a non-boolean value is refused.
-func ParseExactMatchSettings(raw json.RawMessage) (ExactMatchSettings, error) {
-	settings := DefaultExactMatchSettings()
-	if len(raw) == 0 || string(raw) == "null" {
-		return settings, nil
-	}
-	if err := json.Unmarshal(raw, &settings); err != nil {
-		return settings, errors.New("exact_match settings must be an object of booleans")
-	}
-	return settings, nil
-}
-
 // ExactMatch ports langevals_langevals/exact_match.py: the float
 // short-circuit, then JavaScript loose equality, then the transform chain.
 // Details are the Python evaluator's, verbatim.
