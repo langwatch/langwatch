@@ -66,15 +66,28 @@ The existing root scripts are unchanged. `test`, `typecheck`, `lint`, `build`
 and every `dev:*` entry keep the exact filter sets that CI, haven and the
 documentation already invoke. Nx is added beside them as `test:all`,
 `test:affected`, `typecheck:all`, `typecheck:affected`, `build:affected`,
-`lint:affected` and `graph`.
+`lint:changed` and `graph`.
 
-Type-aware oxlint is a per-project `lint:types` target (amended 2026-09-30).
-`dev/nx/lint-types-plugin.mjs` infers it for every TypeScript workspace member,
-so no package.json carries it; it takes `["default", "^production", "lintGlobals"]`
-and no `dependsOn`, because workspace imports resolve to source through `exports`
-and tsgolint reads no emitted `.d.ts`. The whole-tree root `lint` is not
-type-aware. The architecture enforcer's `lint` reads the whole tree, so it is
-never cached: its own project's files cannot describe its result.
+Oxlint is a per-project `lint` target and type-aware oxlint a `lint:types` one
+(amended 2026-09-30). `dev/nx/lint-plugin.mjs` infers `lint` for every workspace
+member and `lint:types` for every TypeScript one;
+`lint` takes `["default", "^production", "lintGlobals"]`, where `lintGlobals` also names
+what the cross-file rules read outside a project (`modules/catalogue.json`, module
+`package.json` files, the published OpenAPI document, the plugin config), so editing
+one of them re-lints every project and editing a file re-lints its project and dependents.
+The root `pnpm lint` is `dev/nx/lint.mjs`: `nx run-many -t lint` plus one oxlint run over
+the files outside every project. A project with a `lint` script of its own (the
+architecture enforcer, the SDK's eslint) keeps it, because Nx lets a package.json script
+outrank a plugin; the runner excludes those two from the target and the outside-files run
+covers them. `lint:changed` and CI's PR step run `nx affected` (`--files` from the
+working copy and branch, or `--base`); a changed-only run misses a finding that
+only appears when an unrelated file changes and no input above names it.
+
+`lint:types` takes the same inputs and no `dependsOn`, because workspace imports
+resolve to source through `exports` and tsgolint reads no emitted `.d.ts`. The
+root `lint` is not type-aware. The architecture enforcer's own `lint` script reads
+the whole tree, so it is never cached: its own project's files cannot describe
+its result.
 
 ## Rationale / Trade-offs
 

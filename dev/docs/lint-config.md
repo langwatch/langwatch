@@ -30,7 +30,11 @@ per rule).
   registry does not hold.
 - **No baseline, no per-file exemption.** A rule the repository does not enforce
   is off by name. An override names a category of path, never a list of files.
-- **`pnpm lint` is the fast oxlint layer.** The rules too slow for every edit
+- **`pnpm lint` is the fast oxlint layer, cached per project.** It is `nx run-many -t lint`
+  (the `lint` target `dev/nx/lint-plugin.mjs` infers, inputs in `nx.json`) plus one run over
+  the files outside every project; `pnpm lint:changed` lints what changed with its
+  dependents, and `pnpm lint:oxlint` is the plain whole-tree run. A file a cross-file
+  rule reads from outside its project belongs in `lintGlobals`. The rest of the layer: The rules too slow for every edit
   are `off` in `.oxlintrc.jsonc` and `error` in `.oxlintrc.architecture.jsonc`, so
   each finding comes from exactly one config. `pnpm lint:architecture` runs that
   config, then architecture-enforcer; CI blocks on the oxlint half plus the

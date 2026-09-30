@@ -53,8 +53,11 @@ Each layer is slower and sees more than the one before, so the cheap ones run
 first.
 
 ```
-  pnpm lint                 whole tree, no type info,      the fast rules
-     |                      every edit
+  pnpm lint                 per project, no type info,     the fast rules, cached
+     |                      + files outside projects     per project
+  pnpm lint:changed         only what you changed and      seconds after the first
+     |                      its dependents
+
   nx affected -t lint:types type-aware, per project,       cached per project
      |                      only what the change reached
   pnpm lint:architecture    the slow oxlint rules          CI blocks on it; run it
@@ -65,11 +68,18 @@ first.
 
 A rule joins the architecture layer by measured cost, not by kind: at least 5%
 of the plugin's time in one whole-tree run (each rule's `create` and visitors
-timed with `process.hrtime`), and dropping it cuts the fast run by 10% or more. Today that is `langwatch/comment-block-size` alone.
+timed with `process.hrtime`), and dropping it cuts the fast run by 10% or more.
+Today that is `langwatch/comment-block-size` alone.
 
-`lint:types` isn't written in any `package.json`. A small plugin,
-`dev/nx/lint-types-plugin.mjs`, adds it to every workspace package, so the
-target can't drift or go missing on a new package.
+`lint` and `lint:types` aren't written in any `package.json`. A small plugin,
+`dev/nx/lint-plugin.mjs`, adds them to every workspace package, so the targets
+can't drift or go missing on a new package. `pnpm lint` (`dev/nx/lint.mjs`) runs
+`lint` for every project, then oxlint once over the files no project owns.
+`pnpm lint:changed` runs both for the uncommitted working copy plus the branch
+since its merge base, with dependents of every changed project. It can miss a
+finding that appears in an untouched file when the cause is something no Nx input
+names, and it never runs the enforcer, so `pnpm lint:architecture` stays the
+check before push. `pnpm lint:oxlint` is the plain whole-tree run, uncached.
 
 ## How the Nx cache knows it's stale
 
@@ -153,7 +163,8 @@ make herrgen lint-rules test-scripts        # each calls its cached Nx target
 pnpm typecheck:affected      # typecheck only what your change reached
 pnpm test:affected           # same for tests
 pnpm lint:types:affected     # same for type-aware lint
-pnpm lint                    # fast whole-tree lint
+pnpm lint                    # fast lint, cached per project
+pnpm lint:changed            # the same for what you changed and its dependents
 pnpm lint:architecture       # whole-tree policies
 pnpm typecheck               # the whole lot, cold. Slow, and queues for a slot
 ```

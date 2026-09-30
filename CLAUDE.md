@@ -79,6 +79,7 @@ After each change, scoped to the paths you touched:
 pnpm exec oxfmt --write --disable-nested-config <paths>
 pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc <paths>
 pnpm exec oxlint --quiet --config .oxlintrc.architecture.jsonc <paths>   # slow rules (comment size)
+pnpm lint:changed                                             # or: your changes and dependents, cached
 VITEST_MAX_WORKERS=2 pnpm --filter <package> test <paths>   # never npx vitest; no `--`
 tsc --noEmit --ignoreConfig <file>                            # one file while iterating
 ```

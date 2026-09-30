@@ -2199,7 +2199,7 @@ a function of datastore state that no input declaration describes.
 The root scripts are unchanged. `test`, `typecheck`, `lint` and `build` keep
 the filter sets CI, haven and this documentation already invoke; Nx is
 available beside them as `test:all`, `test:affected`, `typecheck:all`,
-`typecheck:affected`, `build:affected`, `lint:affected` and `graph`. Repointing
+`typecheck:affected`, `build:affected`, `lint:changed` and `graph`. Repointing
 the root scripts at Nx is a separate decision — the current root `test` covers
 `packages/`, `modules/` and the enterprise packages and deliberately excludes
 the applications, the SDK and the e2e suites, so the two are not the same set.
