@@ -167,12 +167,12 @@ helm upgrade langwatch langwatch/langwatch \
 
 ### PostgreSQL
 
-Prisma migrations run automatically when the app pod starts. To disable this (e.g., if you run migrations separately):
+On a Helm upgrade, a pre-upgrade Job runs the migrations on the new image before any pod rolls; the app and worker containers also run them on start, where they are a no-op. `app.features.skipEnvValidation` is inert: no process reads `SKIP_ENV_VALIDATION` any more. For the split into api, worker and tasks applications, see [the chart's upgrade notes](https://github.com/langwatch/langwatch/tree/main/charts/langwatch#upgrading-to-the-split-api-worker-and-tasks-applications).
+
+To disable the Prisma step (e.g., if you run migrations separately):
 
 ```yaml
 app:
-  features:
-    skipEnvValidation: false
   extraEnvs:
     - name: SKIP_PRISMA_MIGRATE
       value: "true"

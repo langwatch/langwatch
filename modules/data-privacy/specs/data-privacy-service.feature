@@ -88,3 +88,55 @@ Feature: Data Privacy service
       When a peer asks data privacy to build something from it
       Then the peer receives what it built from the credential
       And a deployment with no credential lends undefined instead of refusing
+
+  Rule: A project's PII redaction level reads and writes by its public name
+
+    The management API and the MCP and CLI tools name one level per project:
+    STRICT, ESSENTIAL or DISABLED. The level is the project's own scoped rule,
+    the nearest scope, so it is what the project's traces are redacted at.
+
+    @unit
+    Scenario: A project with no rule reads the platform default level
+      Given a project with no data privacy rules
+      When its PII redaction level is read
+      Then the level is ESSENTIAL
+
+    @unit
+    Scenario: A custom entity list reads as STRICT
+      Given a project whose own rule redacts a custom list of PII entities
+      When its PII redaction level is read
+      Then the level is STRICT
+
+    @unit
+    Scenario: Writing the level keeps every other field of the project's rule
+      Given a project whose own rule drops input and carries a PII exception pattern
+      When its PII redaction level is set to STRICT
+      Then the project's rule redacts PII at the strict level
+      And the rule still drops input and keeps the exception pattern
+      And reading the level answers STRICT
+
+    @unit
+    Scenario: Writing the level for a project with no rule creates its rule
+      Given a project with no data privacy rules
+      When its PII redaction level is set to DISABLED
+      Then the project has one rule, redacting no PII
+
+    @unit
+    Scenario: Leaving the custom level drops the entity list
+      Given a project whose own rule redacts a custom list of PII entities
+      When its PII redaction level is set to ESSENTIAL
+      Then the project's rule redacts PII at the essential level with no entity list
+
+    @unit
+    Scenario: Disabling PII redaction drops the exception patterns
+      Given a project whose own rule drops input and carries a PII exception pattern
+      When its PII redaction level is set to DISABLED
+      Then the project's rule redacts no PII and carries no exception pattern
+      And the rule still drops input
+
+    @unit
+    Scenario: A level written for a project that is gone is refused by name
+      Given the project has been removed
+      When its PII redaction level is set
+      Then the write is refused as a missing project
+      And no policy row is written

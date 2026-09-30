@@ -83,6 +83,49 @@ describe("Dashboard saved-chart execution", () => {
     });
   });
 
+  /** @scenario "A chart declaring the granularity parameter runs at the step the surface supplies" */
+  it("executes the stored statement at the offered step and says it follows granularity", async () => {
+    const { charts, executor } = await serviceWithSavedChart();
+
+    const result = await charts.run({
+      projectId: PROJECT.id,
+      chartId: "chart_1",
+      execution: {
+        project: PROJECT,
+        protections: FULLY_PERMITTED,
+        timeWindow: WEEK,
+        granularitySeconds: 3_600,
+      },
+    });
+
+    expect(result.followsGranularity).toBe(true);
+    expect(executor.calls[0]!.parameters).toMatchObject({
+      dashboard_context_granularity_seconds: 3_600,
+    });
+  });
+
+  /** @scenario "A declared granularity with no step supplied refuses to run naming the parameter" */
+  it("refuses to run without a step and names the parameter it is missing", async () => {
+    const { charts, executor } = await serviceWithSavedChart();
+
+    await expect(
+      charts.run({
+        projectId: PROJECT.id,
+        chartId: "chart_1",
+        execution: { project: PROJECT, protections: FULLY_PERMITTED, timeWindow: WEEK },
+      }),
+    ).rejects.toThrowError(
+      expect.objectContaining({
+        code: "lwql_parameter_missing",
+        meta: expect.objectContaining({
+          parameters: expect.arrayContaining(["dashboard_context_granularity_seconds"]),
+        }),
+      }),
+    );
+
+    expect(executor.calls).toHaveLength(0);
+  });
+
   /**
    * A direct chart run is caller-owned, so it refuses where a dashboard widget
    * passes `onBudgetOverflow: "coarsen"` and reads `coarsenedFromSeconds` off

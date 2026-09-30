@@ -73,12 +73,12 @@ function statusBadge(vk: { status: string; expiresAt?: string | null }): {
   label: string;
   colorPalette: string;
 } {
-  if (vk.status === "revoked") return { label: "revoked", colorPalette: "red" };
-  if (vk.status === "disabled") return { label: "disabled", colorPalette: "yellow" };
+  if (vk.status === "revoked") return { label: "Revoked", colorPalette: "red" };
+  if (vk.status === "disabled") return { label: "Disabled", colorPalette: "yellow" };
   if (isExpired(vk.expiresAt)) {
-    return { label: "expired", colorPalette: "orange" };
+    return { label: "Expired", colorPalette: "orange" };
   }
-  return { label: "active", colorPalette: "green" };
+  return { label: "Active", colorPalette: "green" };
 }
 
 type ScopeEntry = {
@@ -117,12 +117,7 @@ function VirtualKeysHeader({
         <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
         <Spacer />
         {canCreate && (
-          <PageLayout.HeaderButton
-            variant="solid"
-            colorPalette="orange"
-            data-testid="gateway-virtual-key-new"
-            onClick={onCreate}
-          >
+          <PageLayout.HeaderButton data-testid="gateway-virtual-key-new" onClick={onCreate}>
             <Plus size={14} /> New virtual key
           </PageLayout.HeaderButton>
         )}
@@ -706,12 +701,7 @@ function VirtualKeysEmptyState({
         icon={<KeyRound size={32} />}
       >
         {canCreate && (
-          <PageLayout.HeaderButton
-            variant="solid"
-            colorPalette="orange"
-            onClick={onCreate}
-            marginTop={4}
-          >
+          <PageLayout.HeaderButton onClick={onCreate} marginTop={4}>
             <Plus size={14} /> New virtual key
           </PageLayout.HeaderButton>
         )}

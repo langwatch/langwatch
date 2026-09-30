@@ -3,6 +3,7 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
+import type * as Grants from "./authz-grants-rest.schemas.ts";
 import type { RoleBindingRest } from "./authz-rest.schemas.ts";
 import type * as authzScopeLineageModule from "./authz-scope-lineage.ts";
 import type {
@@ -139,6 +140,8 @@ export interface AuthzApi {
   ): Promise<Binding.AuthzAccessBreakdownOutput>;
   isOnEngine(args: Queries.AuthzListOrganizationBindingsInput): Promise<boolean>;
   findEngineCutoverAt(args: Queries.AuthzListOrganizationBindingsInput): Promise<Instant | null>;
+  /** The caller's session version (ADR-164): 0 until first bumped; throws when unreadable. */
+  getSessionVersion(input: { userId: string }): Promise<number>;
   attach(args: Commands.AuthzAttachGrantInput): Promise<Commands.AuthzBindingOutput>;
   update(args: Commands.AuthzUpdateGrantInput): Promise<void>;
   revoke(args: Commands.AuthzRevokeGrantInput): Promise<void>;
@@ -190,6 +193,19 @@ export interface AuthzApi {
   deleteBinding(
     args: Binding.AuthzDeleteBindingInput,
   ): Promise<Binding.AuthzBindingMutationSuccess>;
+  /** `GET /api/grants`: filtered, one cursor page at a time. */
+  listGrants(args: Grants.AuthzListGrantsInput): Promise<Grants.GrantPage>;
+  /** One grant; another organization's id is `grant_not_found`. */
+  getGrant(args: Grants.AuthzGetGrantInput): Promise<Grants.Grant>;
+  /** Grants a role, never beyond what the caller holds at that scope. */
+  createGrant(args: Grants.AuthzCreateGrantInput): Promise<Grants.Grant>;
+  /** Changes only the role, under the same ceiling as a create. */
+  changeGrantRole(args: Grants.AuthzChangeGrantRoleInput): Promise<Grants.Grant>;
+  revokeGrant(args: Grants.AuthzRevokeGrantByIdInput): Promise<Grants.GrantRevoked>;
+  /** The escalation rule every door shares: what of these the caller lacks at that scope. */
+  findPermissionsBeyondCaller(
+    args: Grants.AuthzFindPermissionsBeyondCallerInput,
+  ): Promise<string[]>;
   applyMemberBindings(
     args: Binding.AuthzApplyMemberBindingsInput,
   ): Promise<Binding.AuthzBindingMutationSuccess>;

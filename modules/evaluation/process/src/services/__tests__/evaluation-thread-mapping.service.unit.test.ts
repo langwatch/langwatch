@@ -13,7 +13,9 @@ import {
 } from "../../rules/evaluation-thread-mapping-service.rules.ts";
 
 const spanDigest: EvaluationSpanDigest = {
-  format: vi.fn(async (spans: Span[]) => spans.map((span) => span.name ?? "span").join(" ")),
+  format: vi.fn(async ({ trace }: { trace: Trace }) =>
+    (trace.spans ?? []).map((span: Span) => span.name ?? "span").join(" "),
+  ),
   formatThread: vi.fn(
     async ({ threadKey, traces }: { threadKey: string; traces: readonly Trace[] }) =>
       [threadKey, ...traces.map((t) => t.trace_id)].join(" "),
@@ -91,6 +93,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
         },
         getThreadTraces,
         spanDigest,
+        maxTokens: 64_000,
       });
 
       expect(getThreadTraces).toHaveBeenCalledWith("abc");
@@ -114,6 +117,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
         mappings: mixedMappings,
         getThreadTraces: async () => threadTraces(),
         spanDigest,
+        maxTokens: 64_000,
       });
 
       expect(data.input).toBe("Hello");
@@ -133,6 +137,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
         mappings: mixedMappings,
         getThreadTraces,
         spanDigest,
+        maxTokens: 64_000,
       });
 
       expect(data.conversation).toBe("");

@@ -301,11 +301,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           currentProjectId={projectId}
         />
         {canWrite && (
-          <PageLayout.HeaderButton
-            variant="solid"
-            colorPalette="blue"
-            onClick={() => setDrawerOpen(true)}
-          >
+          <PageLayout.HeaderButton onClick={() => setDrawerOpen(true)}>
             Add retention policy
           </PageLayout.HeaderButton>
         )}

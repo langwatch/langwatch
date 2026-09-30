@@ -13,14 +13,18 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
-      # The shutdown budget is the one place where a code constant and a
-      # chart value must agree: the pod's terminationGracePeriodSeconds is
-      # sized from the same numbers the two process configs derive. Without
-      # these paths a change to those constants never runs the
-      # workers-shutdown job, and the chart would keep asserting a margin the
-      # code no longer uses.
-      - "apps/api/src/platform/config/**"
-      - "apps/worker/src/platform/config/**"
+      # Where the processes declare what they read. The shutdown deadline must
+      # agree with the pod's grace period (workers-shutdown.sh), and every
+      # variable the chart sets must still be declared somewhere
+      # (env-contract.mjs); without these paths a code change breaks either
+      # while the chart CI never runs.
+      - "packages/process-server/src/**"
+      - "packages/process-stores/src/config-owner.ts"
+      - "packages/secrets/src/shared-secrets.ts"
+      - "packages/config/src/**"
+      - "modules/*/contract/src/*.config.ts"
+      - "enterprise/modules/*/contract/src/*.config.ts"
+      - "apps/tasks/src/config.ts"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -44,14 +48,18 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
-      # The shutdown budget is the one place where a code constant and a
-      # chart value must agree: the pod's terminationGracePeriodSeconds is
-      # sized from the same numbers the two process configs derive. Without
-      # these paths a change to those constants never runs the
-      # workers-shutdown job, and the chart would keep asserting a margin the
-      # code no longer uses.
-      - "apps/api/src/platform/config/**"
-      - "apps/worker/src/platform/config/**"
+      # Where the processes declare what they read. The shutdown deadline must
+      # agree with the pod's grace period (workers-shutdown.sh), and every
+      # variable the chart sets must still be declared somewhere
+      # (env-contract.mjs); without these paths a code change breaks either
+      # while the chart CI never runs.
+      - "packages/process-server/src/**"
+      - "packages/process-stores/src/config-owner.ts"
+      - "packages/secrets/src/shared-secrets.ts"
+      - "packages/config/src/**"
+      - "modules/*/contract/src/*.config.ts"
+      - "enterprise/modules/*/contract/src/*.config.ts"
+      - "apps/tasks/src/config.ts"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -246,6 +254,13 @@ jobs:
       - name: "assert Connect emits nothing by default and reaches both workloads when on"
         if: "!cancelled()"
         run: ./tests/connect-env.sh
+
+      # apps/api and apps/worker parse one config at each owner (ADR-132), so a
+      # variable nothing declares is dead and a missing store URL refuses the
+      # boot. Both are only visible by setting the render beside the source.
+      - name: "assert every process env var is read, and the required ones are set"
+        if: "!cancelled()"
+        run: node tests/env-contract.mjs
 
   # The render job above proves the chart PARSES; these vitest suites
   # assert on what it EMITS (env selection per provider, identity guards,

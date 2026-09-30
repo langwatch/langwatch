@@ -13,6 +13,9 @@ import (
 // is unset — 10 MiB, generous for a verification email with an attachment.
 const defaultMaxMessageBytes = 10 * 1024 * 1024
 
+// defaultMaxMessages bounds the inbox when MAILSIM_MAX_MESSAGES is unset.
+const defaultMaxMessages = 10000
+
 // Config is mailsim's environment-derived configuration.
 type Config struct {
 	// HTTPAddr is the HTTP API and browser inbox listen address
@@ -29,6 +32,11 @@ type Config struct {
 	// MaxMessageBytes is the size cap a single message may not exceed
 	// (MAILSIM_MAX_MESSAGE_BYTES, default 10485760).
 	MaxMessageBytes int64
+	// MaxMessages is how many messages the inbox keeps; the oldest is evicted
+	// first (MAILSIM_MAX_MESSAGES, default 10000).
+	MaxMessages int
+	// Seed delivers a few sample messages at start (MAILSIM_SEED=1).
+	Seed bool
 }
 
 // LoadConfig reads mailsim's configuration from the environment.
@@ -48,6 +56,15 @@ func LoadConfig() (Config, error) {
 		}
 		cfg.MaxMessageBytes = n
 	}
+	cfg.MaxMessages = defaultMaxMessages
+	if raw := os.Getenv("MAILSIM_MAX_MESSAGES"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return Config{}, fmt.Errorf("MAILSIM_MAX_MESSAGES must be a positive integer, got %q", raw)
+		}
+		cfg.MaxMessages = n
+	}
+	cfg.Seed = os.Getenv("MAILSIM_SEED") == "1"
 	return cfg, nil
 }
 

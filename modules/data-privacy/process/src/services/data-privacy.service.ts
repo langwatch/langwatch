@@ -4,6 +4,7 @@ import {
   InvalidDataPrivacyConfigError,
   ScopeTargetNotFoundError,
   type DataPrivacyConfig,
+  type DataPrivacyPiiRedactionLevel,
   type DataPrivacyPolicy,
   type DataPrivacyScope,
   type ResolvedDataPrivacy,
@@ -14,6 +15,10 @@ import { overBroadSecretPatternProbe } from "@langwatch/redaction";
 import safe from "safe-regex2";
 
 import type { DataPrivacyPolicyRepository } from "../repositories/data-privacy.repository.ts";
+import {
+  publicPiiRedactionLevel,
+  withPiiRedactionLevel,
+} from "../rules/pii-redaction-level.rules.ts";
 import { DataPrivacyPolicyCacheService } from "./data-privacy-cache.service.ts";
 import { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";
 
@@ -84,24 +89,38 @@ export class DataPrivacyService {
     personalOnly: boolean;
     config: DataPrivacyConfig;
   }): Promise<DataPrivacyPolicy> {
-    const parsed = dataPrivacyConfigSchema.safeParse(input.config);
-    if (!parsed.success) {
-      throw new InvalidDataPrivacyConfigError(
-        `Invalid data-privacy config: ${parsed.error.message}`,
-      );
-    }
-
-    this.validatePatterns(parsed.data);
+    const config = this.validated(input.config);
     const organizationId = await this.resolveOrganizationId(input);
     const row = await this.repository.upsertForScope({
       organizationId,
       scope: input.scope,
       personalOnly: input.personalOnly,
-      config: parsed.data,
+      config,
     });
     this.cache.clear();
 
     return row;
+  }
+
+  async getPiiRedactionLevel(input: { projectId: string }): Promise<DataPrivacyPiiRedactionLevel> {
+    const resolved = await this.resolution.getResolvedForProject(input);
+
+    return publicPiiRedactionLevel(resolved.pii.level);
+  }
+
+  /** The project's own rule is the nearest scope, so the level written is the level resolved. */
+  async setPiiRedactionLevel(input: {
+    projectId: string;
+    level: DataPrivacyPiiRedactionLevel;
+  }): Promise<void> {
+    const project = await this.projects.getWithTeam(input.projectId);
+    await this.repository.mergeConfigForScope({
+      organizationId: project.team.organizationId,
+      scope: { scopeType: "PROJECT", scopeId: project.id },
+      personalOnly: false,
+      merge: (config) => this.validated(withPiiRedactionLevel({ config, level: input.level })),
+    });
+    this.cache.clear();
   }
 
   async removeForScope(input: {
@@ -145,6 +164,19 @@ export class DataPrivacyService {
     }
 
     throw new DepartmentScopeOwnershipUnavailableError();
+  }
+
+  private validated(config: DataPrivacyConfig): DataPrivacyConfig {
+    const parsed = dataPrivacyConfigSchema.safeParse(config);
+    if (!parsed.success) {
+      throw new InvalidDataPrivacyConfigError(
+        `Invalid data-privacy config: ${parsed.error.message}`,
+      );
+    }
+
+    this.validatePatterns(parsed.data);
+
+    return parsed.data;
   }
 
   private validatePatterns(config: DataPrivacyConfig): void {

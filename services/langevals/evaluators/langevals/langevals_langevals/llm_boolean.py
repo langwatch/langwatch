@@ -36,13 +36,16 @@ RESULT_FRAMING = (
     "in every other case. `result` is not a rating of the output, never invert it."
 )
 
+# `reasoning` keeps its name for the result schema, but the wording asks for a
+# justification from the evidence: asking a model to write out its reasoning
+# trips reasoning-extraction safeguards on some Claude routes.
 EVALUATION_TOOL = {
     "type": "function",
     "function": {
         "name": "evaluation",
         "description": (
-            "Record the true or false value the instructions ask for. Write a "
-            "short reasoning first, then the result."
+            "Record the true or false value the instructions ask for, with a "
+            "short justification that cites the evidence in the content."
         ),
         "parameters": {
             "type": "object",
@@ -50,10 +53,10 @@ EVALUATION_TOOL = {
                 "reasoning": {
                     "type": "string",
                     "description": (
-                        "A short reasoning, written before the result: name the "
-                        "condition the instructions give and the value they ask for "
-                        "when it holds, say whether it holds for this content, then "
-                        "state the value that follows."
+                        "A short justification, written before the result: the "
+                        "condition the instructions give, the evidence in the content "
+                        "that settles it (quote the values or name the tool result), "
+                        "and the value that follows."
                     ),
                 },
                 "result": {

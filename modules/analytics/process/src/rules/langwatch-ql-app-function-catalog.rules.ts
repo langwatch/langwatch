@@ -115,7 +115,7 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
   {
     name: "llm_readable_trace",
     description:
-      "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the model calls, then the slowest.",
+      "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the tool calls, then the model calls, then the slowest.",
     parameters: [
       LWQL_TRACE_KEY_PARAMETER,
       {

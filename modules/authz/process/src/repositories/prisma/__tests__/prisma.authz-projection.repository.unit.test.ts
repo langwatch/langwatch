@@ -59,7 +59,10 @@ function build() {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUnique: vi.fn().mockResolvedValue(storedGrantRow()),
     },
-    role: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    role: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     roleBinding: {
       upsert: vi.fn().mockResolvedValue(undefined),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -97,8 +100,113 @@ function sqlFrom(executeRaw: Mock<ExecuteRaw>): string {
   return strings.join("?").replace(/\s+/g, " ");
 }
 
+const ROLE_OCCURRED_AT = Temporal.Instant.fromEpochMilliseconds(1_700_000_000_000);
+
+const roleDefinition: GrantProjectionWrite = {
+  kind: "role.upsert",
+  row: {
+    id: "customrole_2",
+    organizationId: ORG,
+    name: "Reviewer",
+    description: null,
+    permissions: ["traces:view"],
+    kind: "custom",
+    occurredAt: ROLE_OCCURRED_AT,
+  },
+};
+
 describe("PrismaAuthzProjectionRepository", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  describe("given a role definition whose name another live role holds", () => {
+    /** @scenario "A role definition whose name another live role holds cannot stall the fold" */
+    /** @scenario "A deleted role's name can be taken by a new role" */
+    it("guards the insert on the name so the statement skips instead of failing", async () => {
+      const { repository, executeRaw } = build();
+      executeRaw.mockResolvedValue(0);
+
+      await repository.append(roleDefinition);
+
+      const sql = sqlFrom(executeRaw);
+      expect(sql).toContain('WHERE NOT EXISTS ( SELECT 1 FROM "Role"');
+      expect(sql).toContain('AND "id" <> ? AND "deletedAt" IS NULL');
+    });
+
+    /** @scenario "A role definition whose name another live role holds cannot stall the fold" */
+    it("writes no compatibility role row for the skipped definition", async () => {
+      const { repository, executeRaw, prisma } = build();
+      executeRaw.mockResolvedValue(0);
+
+      await repository.append(roleDefinition);
+
+      expect(prisma.customRole.upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a role deletion while compat bindings still name the role", () => {
+    /** @scenario "A role deletion drops the compatibility bindings that still name it" */
+    it("removes those bindings before the compat role row", async () => {
+      const { repository, prisma } = build();
+
+      await repository.append({
+        kind: "role.delete",
+        roleId: "customrole_2",
+        occurredAt: ROLE_OCCURRED_AT,
+      });
+
+      expect(prisma.roleBinding.deleteMany).toHaveBeenCalledWith({
+        where: { customRoleId: "customrole_2" },
+      });
+      expect(prisma.customRole.deleteMany).toHaveBeenCalledWith({
+        where: { id: "customrole_2" },
+      });
+      const [bindingsFirst] = prisma.roleBinding.deleteMany.mock.invocationCallOrder;
+      const [roleAfter] = prisma.customRole.deleteMany.mock.invocationCallOrder;
+      expect(bindingsFirst).toBeLessThan(roleAfter ?? 0);
+    });
+  });
+
+  describe("given a role definition the guard admitted", () => {
+    it("writes the compatibility role row from the event", async () => {
+      const { repository, prisma } = build();
+
+      await repository.append(roleDefinition);
+
+      expect(prisma.role.findUnique).not.toHaveBeenCalled();
+      expect(prisma.customRole.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId: ORG, id: "customrole_2" } }),
+      );
+    });
+  });
+
+  describe("given a role definition delivered again", () => {
+    it("rewrites the compatibility row when the definition is still the live head", async () => {
+      const { repository, executeRaw, prisma } = build();
+      executeRaw.mockResolvedValue(0);
+      prisma.role.findUnique.mockResolvedValue({
+        occurredAt: new Date(1_700_000_000_000),
+        deletedAt: null,
+      });
+
+      await repository.append(roleDefinition);
+
+      expect(prisma.customRole.upsert).toHaveBeenCalled();
+    });
+
+    /** @scenario "A redelivered role definition does not bring back a deleted role" */
+    it("writes no compatibility row once the role head is deleted", async () => {
+      const { repository, executeRaw, prisma } = build();
+      executeRaw.mockResolvedValue(0);
+      prisma.role.findUnique.mockResolvedValue({
+        occurredAt: new Date(1_700_000_000_500),
+        deletedAt: new Date(1_700_000_000_500),
+      });
+
+      await repository.append(roleDefinition);
+
+      expect(prisma.customRole.upsert).not.toHaveBeenCalled();
+    });
+  });
 
   describe("given a write that states the whole row", () => {
     // Two writes can share a millisecond — a whole attach batch is stamped

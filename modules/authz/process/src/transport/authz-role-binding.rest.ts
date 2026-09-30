@@ -7,6 +7,7 @@ import {
 } from "@langwatch/api/rest";
 import {
   AuthzApi,
+  authzPrincipalRefSchema,
   grantsLedgerActorSchema,
   roleBindingRestCreateSchema,
   roleBindingRestDeletedSchema,
@@ -27,7 +28,11 @@ import { bindingWire, optimisticBindingWire } from "../rules/role-binding-read-b
 /** What the organization credential resolved, as this family reads it. */
 export const roleBindingRestFacts = defineRestMiddleware(
   "roleBindingRestFacts",
-  z.object({ organizationId: z.string(), actor: grantsLedgerActorSchema }),
+  z.object({
+    organizationId: z.string(),
+    actor: grantsLedgerActorSchema,
+    caller: authzPrincipalRefSchema,
+  }),
 );
 
 const matchesFilters = (
@@ -70,6 +75,10 @@ export const authzRoleBindingRest: Readonly<{
   // organizationCredentialOfRequest), so it must answer behind that door —
   // on the default project door the fact throws where the door should 401.
   .withCredential("organization")
+  .withDeprecated({
+    successor: "/api/grants",
+    notice: "superseded by /api/grants, which answers the same rows as grants",
+  })
 
   .get("/", "listRoleBindings")
   .withQuery(roleBindingRestListQuerySchema)
@@ -103,7 +112,7 @@ export const authzRoleBindingRest: Readonly<{
   .withDocs({
     tags: ["Role Bindings"],
     description:
-      "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization, and an identical binding answers 409 role_binding_already_exists. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
+      "Create a role binding for exactly one principal: a user, a group, or an API key. Every reference is checked against the caller's organization; an identical binding is written again, because bindings are never unique. Pass expiresAt to time-box the access: it stops granting at that moment on its own, without being revoked, and a date that has already passed answers 422 grant_expiry_in_past. The response always carries the new binding's id; the names of its principal, role and scope may be absent on this response alone, and a follow-up read carries them.",
   })
   .withMiddleware(roleBindingRestFacts)
   .handle(async ({ app, input }, organization) => {
@@ -113,6 +122,7 @@ export const authzRoleBindingRest: Readonly<{
       organizationId,
       ...input,
       actor: organization.actor,
+      caller: organization.caller,
     });
 
     // The write landed; the projection may not have. Answer with what was
@@ -155,6 +165,7 @@ export const authzRoleBindingRest: Readonly<{
       role: input.role,
       ...(input.customRoleId !== undefined ? { customRoleId: input.customRoleId } : {}),
       actor: organization.actor,
+      caller: organization.caller,
     });
   })
 

@@ -170,8 +170,6 @@ function GuardrailsPage() {
         <Spacer />
         {canManage && (
           <PageLayout.HeaderButton
-            variant="solid"
-            colorPalette="orange"
             data-testid="gateway-guardrail-new"
             onClick={() => setCreateOpen(true)}
             disabled={guardrailEvaluators.length === 0}
@@ -315,7 +313,7 @@ function GuardrailsTable({
                   variant="surface"
                   colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
                 >
-                  {row.failureMode === "FAIL_CLOSED" ? "fail closed" : "fail open"}
+                  {row.failureMode === "FAIL_CLOSED" ? "Fail closed" : "Fail open"}
                 </Badge>
               </Table.Cell>
               <Table.Cell>

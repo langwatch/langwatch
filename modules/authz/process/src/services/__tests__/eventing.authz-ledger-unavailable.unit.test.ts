@@ -41,7 +41,7 @@ describe("EventingAuthzLedgerAdapter unavailable dispatcher", () => {
       organizationId: ORG_ID,
       bindings: [binding],
       actor: ACTOR,
-      onDuplicate: "reject" as const,
+      onDuplicate: "attach" as const,
     };
 
     await expect(writer.attachBindings(input)).rejects.toMatchObject({

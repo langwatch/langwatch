@@ -340,6 +340,8 @@ describe("BrowserSessionService", () => {
     });
 
     /** @scenario "A person reads the browsers they are signed in on" */
+    /** @scenario The session list says how each session signed in */
+    /** @scenario The browser I am reading this in says so */
     it("names the method in words, what it proved, and which one is theirs", async () => {
       const sessions = new Sessions();
       sessions.records = [
@@ -384,6 +386,9 @@ describe("BrowserSessionService", () => {
     });
 
     /** @scenario "A person ends one of the browsers they are signed in on" */
+    /** @scenario Signing a browser out ends that one and no others */
+    /** @scenario Ending the session doing the asking is refused at the boundary */
+    /** @scenario Naming somebody else's session ends nothing */
     it("ends one they own, refuses the one they are reading from, and ignores a stranger's", async () => {
       const sessions = new Sessions();
       sessions.records = [record(), record({ id: "session-2" })];
@@ -428,6 +433,7 @@ describe("BrowserSessionService", () => {
     };
 
     /** @scenario "Ending the sessions one sign-in method minted leaves the others alone" */
+    /** @scenario A session can be ended for one sign-in method alone */
     it("ends the sessions one identifier minted and keeps the rest", async () => {
       const sessions = mintedByTwoMethods();
       const { service: subject } = service({ sessions });
@@ -439,6 +445,33 @@ describe("BrowserSessionService", () => {
         [{ id: "session-1" }],
         [{ id: "session-3" }],
       ]);
+    });
+
+    /** @scenario Selected session revocation deletes rows before invalidating cached sessions */
+    it("invalidates the cache only after the rows are gone, and leaves the other method's row", async () => {
+      const order: string[] = [];
+      const cache = new Cache();
+      cache.values.set(
+        "better-auth:active-sessions-user-1",
+        JSON.stringify([{ token: "token-1", expiresAt: 1 }]),
+      );
+      cache.deleted.mockImplementation(() => order.push("cache"));
+      const sessions = mintedByTwoMethods();
+      sessions.deletedById.mockImplementation(async ({ id }: { id: string }) => {
+        order.push(`row:${id}`);
+        return 1;
+      });
+      const { service: subject } = service({ sessions, cache });
+
+      await subject.endBrowserSessionsForIdentifier({
+        userId: "user-1",
+        identifierId: "identifier-1",
+      });
+
+      expect(order.slice(0, 2)).toEqual(["row:session-1", "row:session-3"]);
+      expect(order.length).toBeGreaterThan(2);
+      expect(order.slice(2).every((step) => step === "cache")).toBe(true);
+      expect(sessions.deletedById).not.toHaveBeenCalledWith({ id: "session-2" });
     });
 
     /** @scenario "Ending sessions for a sign-in method that is not yours ends nothing" */

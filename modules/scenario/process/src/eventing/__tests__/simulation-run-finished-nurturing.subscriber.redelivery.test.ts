@@ -48,7 +48,7 @@ describe("the simulation-run-finished nurturing subscriber on redelivery", () =>
         }),
         listIdsByOrganization: async () => ["project-1"],
       },
-      simulations: { countUsage: async () => 3 },
+      simulations: { countOrganizationRuns: async () => 3 },
       nurturing: target,
     });
 

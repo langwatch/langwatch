@@ -204,10 +204,10 @@ Feature: Teams REST API
     Then the request is refused with code user_not_in_organization and status 422
 
   @integration
-  Scenario: Granting a role a member already holds names the code
+  Scenario: Granting a role a member already holds is written again
     Given a member holds Member on a team
     When I POST /api/teams/:id/members granting them Member again
-    Then the request is refused with code team_member_already_added and status 409
+    Then the request succeeds, because a binding is never unique
 
   @integration
   Scenario: Removing somebody who holds no role on the team names the code

@@ -5,8 +5,12 @@
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
+import { userTrpc } from "@langwatch/user-contract";
+
+import { personalWorkspaceApi } from "./behavior/personal-workspace-api.ts";
 
 export const userWeb = defineWebModule("user")
+  .withApi(personalWorkspaceApi, { contracts: [userTrpc] })
   .withHosts({
     requires: ["PersonalWorkspaceHostApi"],
     mounts: {

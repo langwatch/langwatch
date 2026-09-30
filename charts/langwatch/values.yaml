@@ -286,11 +286,11 @@ app:
 
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
-  ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
+  ## @param app.features.skipEnvValidation [default: false] Deprecated and inert: no process reads SKIP_ENV_VALIDATION any more.
   ## @param app.features.disableStrictPiiRedaction [default: false] Skip the strict PII redaction pass (Presidio analysis service). Native secrets and essential PII redaction still run.
   ## @param app.features.topicClustering [default: true] Enable automatic topic clustering.
   features:
-    # Skip environment variable validation (useful for development)
+    # Deprecated and inert. Kept so existing values files still render.
     skipEnvValidation: false
     # Skip the strict PII redaction pass (Presidio analysis service) to shed
     # analysis-service load. Native secrets and essential PII redaction still

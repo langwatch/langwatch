@@ -4049,7 +4049,9 @@
   request: {"path": "/api/organization"}
   expect: {"status": [401, 403]}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-support-contact"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4061,7 +4063,9 @@
     - request: "GET /api/organization"
       expect: {"status": 200, "body": {"supportContact": "vd-{uid}@example.com"}}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-clears-support-contact"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4074,7 +4078,9 @@
     - request: "GET /api/organization"
       expect: {"status": 200, "body": {"supportContact": null}}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-presence-toggle"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4084,7 +4090,9 @@
     - request: "GET /api/organization"
       expect: {"status": 200, "body": {"presenceEnabled": false}}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-trace-sharing-toggle"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4094,7 +4102,9 @@
     - request: "GET /api/organization"
       expect: {"status": 200, "body": {"traceSharingEnabled": false}}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-renames"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4104,7 +4114,9 @@
     - request: "GET /api/organization"
       expect: {"status": 200, "body": {"name": "vd-org-{uid}"}}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-primary-intent"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4114,7 +4126,9 @@
     - request: "GET /api/organization"
       expect: {"status": 200, "body": {"primaryIntent": null}}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-storage-fields"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4135,7 +4149,9 @@
           s3Bucket: "vd-bucket-{uid}"
         notContains: "vd-secret-{uid}"
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-empty-body-changes-nothing"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4145,7 +4161,9 @@
     - request: "GET /api/organization"
       expect: {"status": 200, "body": {"id": "{orgId}"}}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-update-rejects-empty-name"
+  selfHosted: true
   endpoint: "PATCH /api/organization"
   auth: "org"
   shard: "org"
@@ -4735,7 +4753,9 @@
   request: {"path": "/api/organization/members/nope-{uid}"}
   expect: {"status": 403}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-create-sends-mail"
+  selfHosted: true
   endpoint: "POST /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -4754,7 +4774,9 @@
     - mail: {"to": "vd-{uid}@example.com"}
       eventually: "15s"
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-create-batch"
+  selfHosted: true
   endpoint: "POST /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -4775,7 +4797,9 @@
     - mail: {"to": "vd-a-{uid}@example.com"}
       eventually: "15s"
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-create-rejects-invalid-email"
+  selfHosted: true
   endpoint: "POST /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -4805,7 +4829,9 @@
   request: {"path": "/api/organization/invites", "body": {}}
   expect: {"status": [400, 422]}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-create-rejects-missing-teams"
+  selfHosted: true
   endpoint: "POST /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -5007,7 +5033,9 @@
           teams: [{"teamId": "{teamId}", "role": "MEMBER"}]
   expect: {"status": [400, 422]}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-create-unknown-team-refuses-batch"
+  selfHosted: true
   endpoint: "POST /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -5023,7 +5051,9 @@
     - request: "GET /api/organization/invites"
       expect: {"status": 200, "notContains": "{uid}"}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-create-unknown-custom-role-refuses-batch"
+  selfHosted: true
   endpoint: "POST /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -5039,7 +5069,9 @@
               customRoleId: "nope-{uid}"
   expect: {"status": [400, 404, 422]}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-create-repeat-email"
+  selfHosted: true
   endpoint: "POST /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -5111,7 +5143,9 @@
           teams: [{"teamId": "{teamId}", "role": "MEMBER"}]
   expect: {"status": 403}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-list-shows-created"
+  selfHosted: true
   endpoint: "GET /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -5128,7 +5162,9 @@
     body: {"invites": "<any>"}
     contains: "vd-{uid}@example.com"
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invites-list-carries-link"
+  selfHosted: true
   endpoint: "GET /api/organization/invites"
   auth: "org"
   shard: "org"
@@ -5166,7 +5202,9 @@
   request: {"path": "/api/organization/invites"}
   expect: {"status": 403}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invite-revoke-happy"
+  selfHosted: true
   endpoint: "DELETE /api/organization/invites/{inviteId}"
   auth: "org"
   shard: "org"
@@ -5184,14 +5222,18 @@
     - request: "GET /api/organization/invites"
       expect: {"status": 200, "notContains": "vd-{uid}@example.com"}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invite-revoke-not-found"
+  selfHosted: true
   endpoint: "DELETE /api/organization/invites/{inviteId}"
   auth: "org"
   shard: "org"
   request: {"path": "/api/organization/invites/nope-{uid}"}
   expect: {"status": 404}
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: "organization-invite-revoke-twice"
+  selfHosted: true
   endpoint: "DELETE /api/organization/invites/{inviteId}"
   auth: "org"
   shard: "org"

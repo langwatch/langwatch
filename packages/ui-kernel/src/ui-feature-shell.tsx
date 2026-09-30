@@ -4,6 +4,11 @@
 
 import { BrowserUiRpc } from "@langwatch/browser-host/browser-rpc";
 import {
+  cachePlanFor,
+  invalidateSessionTier,
+  unbatchedCachePaths,
+} from "@langwatch/browser-host/cache-tiers";
+import {
   BrowserUiDocumentTitle,
   resolveUiCapabilities,
   UiCapabilityContextProvider,
@@ -18,6 +23,12 @@ import {
 import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
 import { createUiQueryClient } from "@langwatch/browser-host/query-client";
+import {
+  currentUiBuildId,
+  persistUiQueries,
+  type UiQueryStore,
+} from "@langwatch/browser-host/query-persistence";
+import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
@@ -27,8 +38,15 @@ import {
   type UiFeatureApiTransport,
 } from "@langwatch/browser-host/transport";
 import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-team-project";
-import { QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
-import { useContext, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { QueryClientContext, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import {
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 
 import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
 import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature-install.ts";
@@ -51,6 +69,10 @@ export type UiFeatureShellInstall = {
   moduleHosts?: ComponentType<{ children?: ReactNode }>;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
+  /** The watch the supplied transport's fetch reports session versions to (ADR-164). */
+  sessionVersions?: SessionVersionWatch;
+  /** Where the marked reads persist; IndexedDB when absent. */
+  queryStore?: UiQueryStore;
   /**
    * Every feature's reader of a failed mutation, in install order. A failure a
    * feature answers application-wide is reported here once, rather than by
@@ -89,6 +111,8 @@ export function createUiFeatureShell({
   drawers = {},
   moduleHosts: ModuleHosts = UiNoModuleHosts,
   transport,
+  sessionVersions,
+  queryStore,
   failures = [],
   session,
   isDevelopment = false,
@@ -97,6 +121,8 @@ export function createUiFeatureShell({
   // Chosen once per shell, never per render, so the hook it calls is the same
   // hook on every pass.
   const useSessionCapability = session ?? useUnavailableUiSession;
+  // Every installed module's declared cache tiers, as one plan (ADR-164).
+  const cachePlan = cachePlanFor({ contracts: apis.flatMap((api) => api.contracts ?? []) });
 
   function UiCapabilities({
     transport: sessionTransport,
@@ -117,6 +143,21 @@ export function createUiFeatureShell({
       transport: sessionTransport,
       feedback: capabilities.feedback ?? UNAVAILABLE_UI_FEEDBACK,
     });
+    const queryClient = useQueryClient();
+    const userId =
+      live.session === UNAVAILABLE_UI_SESSION ? void 0 : live.session.currentUser()?.id;
+    // The marked reads are kept per user: a switch restores only this user's.
+    useEffect(() => {
+      if (!userId || cachePlan.persisted.size === 0) return;
+      const { unsubscribe } = persistUiQueries({
+        queryClient,
+        plan: cachePlan,
+        userId,
+        buildId: currentUiBuildId(),
+        ...(queryStore ? { store: queryStore } : {}),
+      });
+      return unsubscribe;
+    }, [queryClient, userId]);
     const resolved = useMemo(
       () =>
         resolveUiCapabilities({
@@ -174,10 +215,24 @@ export function createUiFeatureShell({
     const [ownQueryClient] = useState(() =>
       createUiQueryClient({
         onMutationError: (error) => reportFailure({ error, failures, host: failureHost.current }),
+        cachePlan,
       }),
     );
-    const [ownTransport] = useState(() => transport ?? createUiFeatureApiClient());
     const queryClient = hostQueryClient ?? ownQueryClient;
+    const [watch] = useState(() => sessionVersions ?? SessionVersionWatch.create());
+    const [ownTransport] = useState(
+      () =>
+        transport ??
+        createUiFeatureApiClient({
+          fetch: sessionVersionFetch({ watch }),
+          unbatchedPaths: unbatchedCachePaths({ plan: cachePlan }),
+        }),
+    );
+    // A newer session version marks the session tier stale in whichever cache is serving.
+    useEffect(
+      () => watch.onNewer(() => void invalidateSessionTier({ queryClient, plan: cachePlan })),
+      [watch, queryClient],
+    );
 
     // The by-path dispatcher a screen too wide for a procedure map asks for.
     // Built here because this is where both halves of it are: the transport and

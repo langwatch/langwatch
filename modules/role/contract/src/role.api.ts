@@ -26,6 +26,8 @@ import type { Role, RoleCreate, RoleUpdate, RoleWriteAcknowledged } from "./role
  */
 export interface RoleCaller {
   readonly id: string | null;
+  /** The key a REST write arrived on: its own permissions, not its owner's, bound the write. */
+  readonly apiKeyId?: string;
 }
 
 /** A signed-in person, for the reads that answer about the caller themselves. */
@@ -34,15 +36,18 @@ export interface RoleUserCaller {
 }
 
 export interface RoleApi {
-  /** Every custom role the organization defines. */
-  listRoles(input: { organizationId: string }): Promise<Role[]>;
+  /**
+   * The organization's roles: the built-in ones first, then its custom ones.
+   * `builtIn` true keeps only the built-ins, false only the custom roles.
+   */
+  listRoles(input: { organizationId: string; builtIn?: boolean }): Promise<Role[]>;
   /**
    * One custom role, for a caller whose standing at the role's organization is
    * established here: the organization is a row loaded by the role id, so no
    * declaration on the request can name it.
    */
   getRole(input: { roleId: string }, by: RoleUserCaller): Promise<Role>;
-  /** One custom role inside an organization the credential already resolved. */
+  /** A built-in id, or a custom role inside an organization the credential already resolved. */
   getRoleInOrganization(input: { roleId: string; organizationId: string }): Promise<Role>;
   createRole(input: { role: RoleCreate }, by: RoleCaller): Promise<Role>;
   updateRole(input: { roleId: string; changes: RoleUpdate }, by: RoleUserCaller): Promise<Role>;
@@ -82,11 +87,11 @@ export interface RoleApi {
     by: RoleUserCaller,
   ): Promise<AuthzAccessBreakdownOutput>;
   createBinding(
-    input: Omit<AuthzCreateBindingInput, "actor">,
+    input: Omit<AuthzCreateBindingInput, "actor" | "caller">,
     by: RoleCaller,
   ): Promise<AuthzCreateBindingOutput>;
   updateBinding(
-    input: Omit<AuthzUpdateBindingInput, "actor">,
+    input: Omit<AuthzUpdateBindingInput, "actor" | "caller">,
     by: RoleCaller,
   ): Promise<AuthzCreateBindingOutput>;
   deleteBinding(
@@ -94,7 +99,7 @@ export interface RoleApi {
     by: RoleCaller,
   ): Promise<AuthzBindingMutationSuccess>;
   applyMemberBindings(
-    input: Omit<AuthzApplyMemberBindingsInput, "actor">,
+    input: Omit<AuthzApplyMemberBindingsInput, "actor" | "caller">,
     by: RoleCaller,
   ): Promise<AuthzBindingMutationSuccess>;
 }

@@ -119,6 +119,11 @@ jobs:
       # candidate twice.
       - uses: ./.github/actions/setup-pnpm-node
 
+      # apidiff runs both installs itself, so setup-pnpm-node's node-gyp step
+      # (gated on its own install) never runs; node-pty's Linux build needs it.
+      - name: Install node-gyp
+        run: npm install -g node-gyp@12.3.0
+
       # Both sides' clickhouse-migrate runs goose, which the runner lacks.
       - name: Install goose
         run: bash .github/scripts/install-goose.sh

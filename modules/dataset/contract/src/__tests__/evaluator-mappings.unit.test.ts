@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_MAPPINGS,
+  defaultEvaluatorMappings,
+  hasMappingEntries,
   mappingsReadEvaluationsSource,
   migrateLegacyMappings,
 } from "../evaluator-mappings.ts";
@@ -37,5 +39,33 @@ describe("evaluator input mappings", () => {
         expansions: [],
       }),
     ).toBe(true);
+  });
+
+  describe("when no mapping was saved", () => {
+    /** @scenario "An LLM judge with no saved mapping reads the whole trace" */
+    it("gives a whole-trace judge the AI-readable trace and the thread's steps view", () => {
+      expect(defaultEvaluatorMappings({ level: "trace", readsWholeTrace: true }).mapping).toEqual({
+        ...DEFAULT_MAPPINGS.mapping,
+        input: { source: "formatted_trace" },
+      });
+      expect(defaultEvaluatorMappings({ level: "thread", readsWholeTrace: true }).mapping).toEqual({
+        input: { type: "thread", source: "formatted_traces" },
+      });
+    });
+
+    it("keeps other evaluators on the trace's own fields and the thread's traces", () => {
+      expect(defaultEvaluatorMappings({ level: "trace", readsWholeTrace: false })).toBe(
+        DEFAULT_MAPPINGS,
+      );
+      expect(defaultEvaluatorMappings({ level: "thread", readsWholeTrace: false }).mapping).toEqual(
+        { input: { type: "thread", source: "traces" } },
+      );
+    });
+
+    it("reads an empty stored mapping as no mapping", () => {
+      expect(hasMappingEntries(null)).toBe(false);
+      expect(hasMappingEntries({ mapping: {}, expansions: [] })).toBe(false);
+      expect(hasMappingEntries(DEFAULT_MAPPINGS)).toBe(true);
+    });
   });
 });

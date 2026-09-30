@@ -31,6 +31,8 @@ func Root(ctx context.Context, _ []string) error {
 		zap.String("smtpAddr", cfg.SMTPAddr),
 		zap.String("baseUrl", cfg.BaseURL),
 		zap.Int64("maxMessageBytes", cfg.MaxMessageBytes),
+		zap.Int("maxMessages", cfg.MaxMessages),
+		zap.Bool("seed", cfg.Seed),
 	)
 	return server.Serve(ctx)
 }

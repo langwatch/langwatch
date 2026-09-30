@@ -144,6 +144,18 @@ describe("given the app-function catalog", () => {
       }
     });
 
+    /** @scenario "The eval function examples judge the thread's steps view" */
+    it("judges the steps view in every eval example, so tool results reach the judge", () => {
+      const evals = LWQL_APP_FUNCTION_CATALOG.filter((d) => d.name.startsWith("eval"));
+
+      expect(evals.length).toBeGreaterThan(0);
+      for (const definition of evals) {
+        const example = definition.example(DATABASE);
+        expect(example, definition.name).toContain(`${definition.name}(llm_readable_thread(`);
+        expect(example, definition.name).not.toMatch(/\bconversation(_bounded)?\(/);
+      }
+    });
+
     it("qualifies its dataset with the deployment's own database", () => {
       for (const definition of LWQL_APP_FUNCTION_CATALOG) {
         expect(definition.example("elsewhere"), definition.name).toContain("FROM elsewhere.");

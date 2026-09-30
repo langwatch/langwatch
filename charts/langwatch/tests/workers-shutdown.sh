@@ -198,8 +198,8 @@ test_short_grace_period_refuses_to_render() {
     "workers.terminationGracePeriodSeconds is 30"
 }
 
-# A value Helm keeps as a string renders `int` 0 — a zero drain the app rejects
-# at boot, while the required grace period collapses to the bare margin so the
+# A value Helm keeps as a string renders `int` 0 — a deadline with no drain in it,
+# while the required grace period collapses to the bare margin so the
 # guard passes. The render must refuse instead of shipping a crashloop.
 # @scenario "A drain budget that is not a positive whole number refuses to render"
 test_junk_drain_refuses_to_render() {

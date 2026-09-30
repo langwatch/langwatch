@@ -89,6 +89,7 @@ afterEach(cleanup);
 
 describe("a kickoff message", () => {
   /** @scenario A kickoff message renders as the tour card */
+  /** @scenario "A reloaded conversation renders the same card" */
   it("renders as the tour card and never as a bubble", () => {
     renderMessage(kickoffMessage());
 

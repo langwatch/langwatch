@@ -28,24 +28,24 @@ export const experimentsOutputSchema = z
 export const experimentWriteOutputSchema = z.object({ ok: z.literal(true) }).strict();
 
 export const featureFlagTrpc = defineTrpcContract("featureFlag")
-  .query("isEnabled")
+  .query("isEnabled", { cache: { tier: "session" } })
   .withInput(featureFlagReadInputSchema)
   .withOutput(enabledOutputSchema)
 
   /** True when the flag is on for any organization the caller belongs to. */
-  .query("isEnabledForAnyOrganization")
+  .query("isEnabledForAnyOrganization", { cache: { tier: "session" } })
   .withInput(organizationFeatureFlagsInputSchema)
   .withOutput(enabledOutputSchema)
 
-  .query("isEnabledForEachOrganization")
+  .query("isEnabledForEachOrganization", { cache: { tier: "session" } })
   .withInput(organizationFeatureFlagsInputSchema)
   .withOutput(enabledByOrganizationOutputSchema)
 
-  .query("resolve")
+  .query("resolve", { cache: { tier: "session" } })
   .withInput(featureFlagTargetRequestSchema)
   .withOutput(resolvedFlagsOutputSchema)
 
-  .query("experiments")
+  .query("experiments", { cache: { tier: "session" } })
   .withInput(featureFlagTargetRequestSchema)
   .withOutput(experimentsOutputSchema)
 

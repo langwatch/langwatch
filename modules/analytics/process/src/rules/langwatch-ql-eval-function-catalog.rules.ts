@@ -32,7 +32,12 @@ const INSTRUCTIONS: LangWatchQLAppFunctionParameter = {
   description: "The question, in your own words, as you would write it for a human reader.",
 };
 
-const EXAMPLE_TEXT = "conversation_bounded(ConversationId, 8000, '')";
+/**
+ * The steps view, not the chat view: a question about what the agent did is
+ * decided by a tool result, and the steps view holds it where `conversation`
+ * names only the tool.
+ */
+const EXAMPLE_TEXT = "llm_readable_thread(ConversationId, 8000)";
 
 function evalExample({
   database,

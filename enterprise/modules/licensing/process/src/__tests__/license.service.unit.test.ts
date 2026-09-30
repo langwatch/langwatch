@@ -291,6 +291,20 @@ describe("LicenseService", () => {
       await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
     });
 
+    /** @scenario "The license gate still freezes at startup" */
+    it("keeps answering unlicensed after a license is stored mid-process", async () => {
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+
+      repository.stored.set(ORGANIZATION_ID, {
+        licenseKey: VALID_LICENSE_KEY,
+        expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
+        validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
+      });
+
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+      expect(repository.listCalls).toBe(1);
+    });
+
     it("counts the deployment's own instance license without scanning", async () => {
       await expect(
         serviceWithInstanceKey(VALID_LICENSE_KEY).isPlatformSsoLicensed({ isSaas: false }),

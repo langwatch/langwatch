@@ -65,7 +65,7 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withOutput(organizationWriteAckSchema)
 
   /** Every organization the caller can reach, fully loaded and redacted. */
-  .query("getAll")
+  .query("getAll", { cache: { tier: "session", persist: true } })
   .withInput(organizationApiGetAllInputSchema)
   .withOutput(organizationFullyLoadedListSchema)
 

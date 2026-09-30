@@ -1,9 +1,9 @@
-import { DuplicateBindingError } from "@langwatch/authz-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
 import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
 import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service.ts";
+import { permissiveGrantGuards, TEST_CALLER } from "./support/grant-guards.stub.ts";
 
 const actor = { type: "user" as const, id: "admin-1" };
 const scope = {
@@ -46,6 +46,7 @@ function setup() {
   bindings.isApiKeyInOrganization.mockResolvedValue(true);
   const writes = ledger();
   const writer = AuthzBindingWriterService.create({
+    permissions: permissiveGrantGuards,
     bindings,
     ledger: writes.ledger,
     newBindingId: () => "binding-new",
@@ -60,6 +61,7 @@ const createInput = {
   scopeType: "TEAM" as const,
   scopeId: "team-1",
   actor,
+  caller: TEST_CALLER,
 };
 
 beforeEach(() => {
@@ -190,8 +192,8 @@ describe("Authz binding management writes", () => {
   });
 
   /** @scenario "Every write goes through the group queue" */
-  /** @scenario "A duplicate binding is reported as already existing" */
-  it("emits one ledger attach and maps duplicate storage signals", async () => {
+  /** @scenario "An identical binding is written again" */
+  it("emits one ledger attach that writes an identical binding too", async () => {
     const { writes, writer } = setup();
 
     await expect(writer.create(createInput)).resolves.toEqual({ id: "binding-new" });
@@ -208,14 +210,7 @@ describe("Authz binding management writes", () => {
         },
       ],
       actor,
-      onDuplicate: "reject",
-    });
-
-    writes.attachBindings.mockRejectedValue(new DuplicateBindingError());
-    await expect(writer.create(createInput)).rejects.toMatchObject({
-      code: "role_binding_already_exists",
-      httpStatus: 409,
-      meta: { scopeType: "TEAM", scopeId: "team-1" },
+      onDuplicate: "attach",
     });
   });
 
@@ -229,6 +224,7 @@ describe("Authz binding management writes", () => {
         bindingId: "binding-foreign",
         role: "VIEWER",
         actor,
+        caller: TEST_CALLER,
       }),
     ).rejects.toMatchObject({ code: "role_binding_not_found", httpStatus: 404 });
     expect(writes.changeBindingRole).not.toHaveBeenCalled();
@@ -262,6 +258,7 @@ describe("Authz binding management writes", () => {
         },
       ],
       actor,
+      caller: TEST_CALLER,
     });
 
     expect(writes.revokeBindings).toHaveBeenCalledWith({
@@ -292,6 +289,7 @@ describe("Authz binding management writes", () => {
         bindingIdsToDelete: ["binding-old"],
         bindingsToCreate: [{ role: "VIEWER", scopeType: "TEAM", scopeId: "team-1" }],
         actor,
+        caller: TEST_CALLER,
       }),
     ).rejects.toMatchObject({ code: "user_not_in_organization" });
     expect(writes.revokeBindings).not.toHaveBeenCalled();

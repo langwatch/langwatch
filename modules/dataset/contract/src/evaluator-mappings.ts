@@ -23,6 +23,38 @@ export const DEFAULT_MAPPINGS: MappingState = {
 };
 
 /**
+ * The mappings an evaluator runs with when none were saved. A judge that
+ * reads the whole trace gets the AI-readable trace, or the thread's steps
+ * view, as its input: tool calls and results included.
+ * @see specs/evaluators/judges-read-tool-evidence.feature
+ */
+export function defaultEvaluatorMappings({
+  level,
+  readsWholeTrace,
+}: {
+  level: "trace" | "thread";
+  readsWholeTrace: boolean;
+}): MappingState {
+  if (level === "thread") {
+    return {
+      mapping: {
+        input: { type: "thread", source: readsWholeTrace ? "formatted_traces" : "traces" },
+      },
+      expansions: [],
+    };
+  }
+  if (!readsWholeTrace) return DEFAULT_MAPPINGS;
+  return {
+    mapping: { ...DEFAULT_MAPPINGS.mapping, input: { source: "formatted_trace" } },
+    expansions: [],
+  };
+}
+
+/** Whether a saved mapping maps anything: `{}` is what a create with no mappings stores. */
+export const hasMappingEntries = (mappings: MappingState | null): mappings is MappingState =>
+  mappings !== null && Object.keys(mappings.mapping).length > 0;
+
+/**
  * Whether any mapping entry reads the `evaluations` source, gating the
  * prior-evaluations enrichment fetch (a heavy ClickHouse read) on need.
  * Legacy (pre-migration) mappings can't reference it, so this is false.

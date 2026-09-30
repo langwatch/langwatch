@@ -484,39 +484,43 @@ describe("POST /api/experiments/:slug/run", () => {
       ]);
     });
 
-    /** @scenario "A polled saved run answers once its poller can read it" */
-    it("answers only once the run is readable, so a poll right after it finds the run", async () => {
-      const { request } = await harness({
+    /** @scenario "A polled saved run answers as soon as its start command is written" */
+    it("answers at once, and a poll before the worker folds the run reads main's started body", async () => {
+      const { request, starts } = await harness({
         experiments: { ...found(savedState()), isActive: async () => true },
         redis: true,
+        registers: false,
+      });
+
+      const response = await request("/checkout-eval/run", runOf(""));
+
+      expect(response.status).toBe(200);
+      const { runId } = await response.json();
+      expect(starts).toHaveLength(1);
+      const poll = await request(`/runs/${runId}`);
+      expect(poll.status).toBe(200);
+      expect(await poll.json()).toEqual({
+        runId,
+        status: "running",
+        progress: 0,
+        total: 0,
+        startedAt: expect.any(Number),
+      });
+    });
+
+    /** @scenario "A started run the worker has since folded is polled from its fold" */
+    it("polls the fold once the worker has folded the run", async () => {
+      const { request, folds } = await harness({
+        experiments: { ...found(savedState()), isActive: async () => true },
+        redis: true,
+        registers: false,
       });
 
       const { runId } = await (await request("/checkout-eval/run", runOf(""))).json();
+      await folds.writeProgress({ state: folded({ runId, status: "running", progress: 1 }) });
       const poll = await request(`/runs/${runId}`);
 
-      expect(poll.status).toBe(200);
-      expect(await poll.json()).toMatchObject({ runId, status: "running" });
-    });
-
-    /** @scenario "A started run the worker does not register in time is refused as unavailable" */
-    it("answers 503 once the bounded wait for the worker runs out", async () => {
-      vi.useFakeTimers();
-      try {
-        const { request, starts } = await harness({
-          experiments: found(savedState()),
-          redis: true,
-          registers: false,
-        });
-
-        const answered = request("/checkout-eval/run", runOf(""));
-        await vi.advanceTimersByTimeAsync(5_000);
-        const response = await answered;
-
-        expect(response.status).toBe(503);
-        expect(starts).toHaveLength(1);
-      } finally {
-        vi.useRealTimers();
-      }
+      expect(await poll.json()).toMatchObject({ runId, status: "running", progress: 1, total: 2 });
     });
 
     it("refuses with the run-loop refusal where no run loop was composed", async () => {
@@ -877,6 +881,42 @@ describe("POST /api/experiments/abort", () => {
     expect(await abort.isAborted("run-1")).toBe(true);
     expect(aborts).toMatchObject([
       { tenantId: PROJECT, runId: "run-1", experimentId: "experiment-1", requestedBy: "user-1" },
+    ]);
+  });
+});
+
+describe("a started run the worker has not folded", () => {
+  const started = { runId: "run-1", experimentId: "experiment-1", total: 2, startedAt: 10 };
+
+  /** @scenario "A started run the worker has not folded is not readable by another project" */
+  it("answers run_not_found to another project's poll and abort, and stops nothing", async () => {
+    const { request, abortRun, abort, aborts, folds } = await harness({
+      experiments: { isActive: async () => true },
+      redis: true,
+    });
+    await folds.recordRunStart({ start: { ...started, projectId: "other" } });
+
+    const poll = await request("/runs/run-1");
+    const stop = await abortRun({ projectId: PROJECT, runId: "run-1" });
+
+    expect(poll.status).toBe(404);
+    expect(await poll.json()).toMatchObject({ code: "run_not_found" });
+    expect(stop.status).toBe(404);
+    expect(await abort.isAborted("run-1")).toBe(false);
+    expect(aborts).toEqual([]);
+  });
+
+  /** @scenario "A started run the worker has not folded can be aborted by its own project" */
+  it("sets the run's stop flag and sends the abort under the started run's experiment", async () => {
+    const { abortRun, abort, aborts, folds } = await harness({ redis: true });
+    await folds.recordRunStart({ start: { ...started, projectId: PROJECT } });
+
+    const response = await abortRun({ projectId: PROJECT, runId: "run-1" });
+
+    expect(response.status).toBe(200);
+    expect(await abort.isAborted("run-1")).toBe(true);
+    expect(aborts).toMatchObject([
+      { tenantId: PROJECT, runId: "run-1", experimentId: "experiment-1" },
     ]);
   });
 });

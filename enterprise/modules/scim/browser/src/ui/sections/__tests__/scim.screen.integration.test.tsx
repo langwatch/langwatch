@@ -20,9 +20,15 @@ const { state, calls } = vi.hoisted(() => ({
     minted: { token: "scim_live_secret_value" },
     members: [] as Record<string, unknown>[],
     provenance: {} as Record<string, { source: string }>,
+    membersError: null as Error | null,
     /** Recorded requests, keyed by the tenant AND connection they were asked
      *  for: a feed answered for any other key is a feed nobody may read. */
     requests: {} as Record<string, Record<string, unknown>[]>,
+    panel: { connections: [], recentChanges: [] } as {
+      connections: Record<string, unknown>[];
+      recentChanges: Record<string, unknown>[];
+    },
+    activity: [] as Record<string, unknown>[],
   },
   calls: { generate: vi.fn(), revoke: vi.fn(), invalidate: vi.fn(), getRequests: vi.fn() },
 }));
@@ -31,10 +37,20 @@ vi.mock("../../../behavior/scim-api.ts", () => ({
   directoryMembershipApi: {
     organization: {
       getAllOrganizationMembers: {
-        useQuery: () => ({ data: state.members, isLoading: false, error: null }),
+        useQuery: () => ({
+          data: state.members,
+          isLoading: false,
+          error: state.membersError,
+          refetch: vi.fn(),
+        }),
       },
       getMemberProvenance: {
-        useQuery: () => ({ data: state.provenance, isLoading: false, error: null }),
+        useQuery: () => ({
+          data: state.provenance,
+          isLoading: false,
+          error: null,
+          refetch: vi.fn(),
+        }),
       },
     },
   },
@@ -71,9 +87,19 @@ vi.mock("../../../behavior/scim-api.ts", () => ({
     scimReconciliation: {
       getAll: {
         useQuery: () => ({
-          data: { connections: [], recentChanges: [] },
+          data: state.panel,
           isLoading: false,
           isError: false,
+        }),
+      },
+      getActivity: {
+        useQuery: () => ({
+          data: state.activity,
+          isLoading: false,
+          isError: false,
+          error: null,
+          isFetching: false,
+          refetch: vi.fn(),
         }),
       },
       getRequests: {
@@ -132,8 +158,11 @@ beforeEach(() => {
   state.connections = [connection()];
   state.minted = { token: "scim_live_secret_value" };
   state.requests = {};
+  state.panel = { connections: [], recentChanges: [] };
+  state.activity = [];
   state.members = [];
   state.provenance = {};
+  state.membersError = null;
 });
 
 afterEach(cleanup);
@@ -401,6 +430,62 @@ describe("given no identity provider is connected", () => {
   });
 });
 
+describe("given a reader who may see single sign-on but not manage it", () => {
+  const withheld = new FakeScimHost({ withheld: ["sso:manage"] });
+
+  beforeEach(() => {
+    state.rows = [token()];
+    state.panel = {
+      connections: [
+        {
+          connectionId: "ssoconn_1",
+          providerId: "Okta",
+          verifiedDomains: [],
+          connectionState: "ACTIVE",
+          state: "SYNCING",
+          status: { headline: "Syncing", waitingFor: "", tone: "working" },
+          lastPushedAtMs: Date.UTC(2026, 8, 16, 17, 57, 0),
+          managedPeople: 498,
+          failures: [],
+          remediation: "",
+        },
+      ],
+      recentChanges: [],
+    };
+    state.activity = [
+      {
+        eventId: "evt_1",
+        summary: "Your directory added a person",
+        occurredAtMs: Date.UTC(2026, 8, 16, 17, 57, 0),
+        outcome: "ok",
+      },
+    ];
+  });
+
+  /** @scenario "Seeing the sequence takes the same permission as seeing the state" */
+  it("reads what the directory has been doing, is offered nothing that writes, and sees no error", async () => {
+    renderWithScimHost(<ScimScreen />, withheld);
+
+    fireEvent.click(screen.getByRole("button", { name: "Recent directory activity" }));
+
+    expect(await screen.findByText("Your directory added a person")).toBeTruthy();
+    expect(screen.queryByTestId("scim-generate-open")).toBeNull();
+    expect(screen.queryByTestId("scim-token-revoke")).toBeNull();
+    expect(screen.queryByText("Access Restricted")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  /** @scenario "Seeing sync status and managing tokens are two different permissions" */
+  it("reads the reconciliation panel normally and offers no minting or revoking", () => {
+    renderWithScimHost(<ScimScreen />, withheld);
+
+    expect(screen.getAllByTestId("directory-connection")).toHaveLength(1);
+    expect(screen.getByTestId("directory-connection").textContent).toContain("Okta");
+    expect(screen.queryByTestId("scim-generate-open")).toBeNull();
+    expect(screen.queryByTestId("scim-token-revoke")).toBeNull();
+  });
+});
+
 describe("given a reader without sso:view", () => {
   it("says which permission the page needs and shows none of it", () => {
     renderWithScimHost(<ScimScreen />, new FakeScimHost({ withheld: ["sso:view"] }));
@@ -418,6 +503,7 @@ describe("given the directory has provisioned people", () => {
     deactivatedAt: null,
   });
 
+  /** @scenario The people who arrived another way are not in that list */
   it("names only the ones it manages", () => {
     state.members = [member("u1", "Sam Directory"), member("u2", "Ana Invited")];
     state.provenance = { u1: { source: "directory" }, u2: { source: "invited" } };
@@ -429,6 +515,62 @@ describe("given the directory has provisioned people", () => {
     expect(within(list).queryByText("Ana Invited")).toBeNull();
   });
 
+  /** @scenario The list shows enough to see the sync is real, then hands over */
+  it("shows the first eight and hands over to the page that lists everybody", () => {
+    const people = Array.from({ length: 9 }, (_, index) => member(`u${index}`, `Person ${index}`));
+    state.members = people;
+    state.provenance = Object.fromEntries(people.map(({ id }) => [id, { source: "directory" }]));
+
+    renderWithScimHost(<ScimScreen />);
+
+    expect(screen.getAllByTestId("directory-managed-member")).toHaveLength(8);
+    expect(screen.getByTestId("directory-managed-more")).toHaveTextContent("Showing 8 of 9");
+    expect(screen.getByRole("link", { name: "See everyone in your directory" })).toBeTruthy();
+  });
+
+  /** @scenario Somebody managed whose access is switched off is still listed */
+  it("keeps a deactivated person as a row, marked, and marks an ordinary one nothing", () => {
+    state.members = [
+      { ...member("u1", "Sam Directory"), deactivatedAt: "2026-01-02T00:00:00.000Z" },
+      member("u2", "Ana Directory"),
+    ];
+    state.provenance = { u1: { source: "directory" }, u2: { source: "directory" } };
+
+    renderWithScimHost(<ScimScreen />);
+
+    const rows = screen.getAllByTestId("directory-managed-member");
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]!).getByTestId("member-deactivated")).toBeTruthy();
+    expect(within(rows[1]!).queryByTestId("member-deactivated")).toBeNull();
+  });
+
+  /** @scenario A directory that has provisioned nobody says so honestly */
+  it("says nobody was provisioned and that the members arrived another way", () => {
+    state.members = [member("u1", "Sam Invited"), member("u2", "Ana Invited")];
+    state.provenance = { u1: { source: "invited" }, u2: { source: "invited" } };
+
+    renderWithScimHost(<ScimScreen />);
+
+    expect(screen.getByTestId("directory-managed-empty")).toHaveTextContent(
+      "has not provisioned anyone yet",
+    );
+    expect(screen.getByTestId("directory-managed-empty")).toHaveTextContent("arrived another way");
+  });
+
+  /** @scenario A roster that could not be read is not drawn as an empty one */
+  it("says what could not be read and lists nobody as managed", () => {
+    state.members = [member("u1", "Sam Directory")];
+    state.provenance = { u1: { source: "directory" } };
+    state.membersError = new Error("the roster read failed");
+
+    renderWithScimHost(<ScimScreen />);
+
+    expect(screen.getByText(/Couldn't read the people your directory manages/)).toBeTruthy();
+    expect(screen.queryByTestId("directory-managed-members")).toBeNull();
+    expect(screen.queryByTestId("directory-managed-empty")).toBeNull();
+  });
+
+  /** @scenario A reader who may not read membership is not shown a roster */
   it("is absent for a reader who may not read the roster", () => {
     renderWithScimHost(<ScimScreen />, new FakeScimHost({ withheld: ["organization:manage"] }));
 

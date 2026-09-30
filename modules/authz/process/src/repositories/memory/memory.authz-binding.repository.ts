@@ -4,6 +4,7 @@ import {
   type AuthzAssignableRoleRow,
   type AuthzBindingScopeRow,
   AuthzBindingRepository,
+  type AuthzGrantPrincipalRow,
   type AuthzManagedBindingRow,
   type AuthzUserGroupRow,
 } from "../authz-binding.repository.ts";
@@ -57,6 +58,32 @@ export class MemoryAuthzBindingRepository extends AuthzBindingRepository {
           row.organizationId === input.organizationId && input.groupIds.includes(row.groupId),
       )
       .map((row) => ({ groupId: row.groupId, userId: row.userId }));
+  }
+
+  async findOrganizationUserIds(input: { organizationId: string }): Promise<string[]> {
+    const prefix = `${input.organizationId}:`;
+    return [...this.memory.organizationRoles.keys()]
+      .filter((key) => key.startsWith(prefix))
+      .map((key) => key.slice(prefix.length));
+  }
+
+  async findGrantPrincipals(input: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<AuthzGrantPrincipalRow[]> {
+    return this.memory.bindings
+      .filter(
+        (row) => row.organizationId === input.organizationId && input.grantIds.includes(row.id),
+      )
+      .flatMap((row): AuthzGrantPrincipalRow[] => {
+        if (row.userId) return [{ grantId: row.id, principal: { type: "user", id: row.userId } }];
+        if (row.groupId)
+          return [{ grantId: row.id, principal: { type: "group", id: row.groupId } }];
+        if (row.apiKeyId) {
+          return [{ grantId: row.id, principal: { type: "apiKey", id: row.apiKeyId } }];
+        }
+        return [];
+      });
   }
 
   async findUserGroups(input: {

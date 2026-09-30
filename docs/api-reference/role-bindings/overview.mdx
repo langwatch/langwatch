@@ -1,6 +1,7 @@
 ---
 title: "Overview"
-description: "Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project."
+tag: "Deprecated"
+description: "Deprecated: use the Grants API. Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project."
 ---
 
 <Note>
@@ -9,6 +10,13 @@ description: "Grant a role to one principal, a user, a group or an API key, at o
   license for the same endpoints. To enable it, reach out to
   [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
+
+<Warning>
+  **Deprecated.** The Role Bindings API is superseded by the [Grants API](/api-reference/grants/overview).
+  It keeps working, but every answer carries `Deprecation: true` and a `Link` header naming
+  `/api/grants` as its successor. New integrations should use grants; see [Migrating to
+  grants](#migrating-to-grants).
+</Warning>
 
 ## Intro
 
@@ -53,9 +61,11 @@ The roles are `ADMIN`, `MEMBER`, `VIEWER`, and `CUSTOM`. `CUSTOM` carries a `cus
 
 Some permissions only mean something for the organization as a whole, membership and billing among them. Granting one through a team- or project-scoped binding is refused at write time with `org_exclusive_permission_scope`, rather than being accepted and quietly having no effect.
 
-## Creating is idempotent-friendly
+## Creating twice makes two bindings
 
-A binding is identified by its principal, its role, and its scope. Creating the same combination twice answers 409 `role_binding_already_exists`, which a provisioning tool can read as "already done" instead of a failure. A `PATCH` changes the role; the principal and the scope stay as they are, so moving a grant somewhere else means a new binding.
+Each create makes its own binding with its own id, even when the same principal already holds the same role at the same scope. A provisioning tool that must not duplicate should list first, or move to the [Grants API](/api-reference/grants/overview), whose create takes an `Idempotency-Key`. A `PATCH` changes the role; the principal and the scope stay as they are, so moving a grant somewhere else means a new binding.
+
+You cannot bind a role carrying a permission you do not hold yourself at that scope, and a request made with an API key is judged by the key's own permissions. The refusal is 403 `grant_exceeds_caller_permissions`, with the permissions you lack in `meta.missingPermissions`. See [Roles & access](/platform/roles-and-access#you-cannot-grant-more-than-you-hold).
 
 ```bash
 # A group of engineers gets MEMBER on one team
@@ -98,5 +108,26 @@ A create response can carry `hasLegacyAccessNotice: true`. It means this is the 
 | `custom_role_id_required`        | 422    | Role is `CUSTOM` with no `customRoleId`                                            |
 | `custom_role_not_assignable`     | 422    | That custom role cannot be granted here                                            |
 | `org_exclusive_permission_scope` | 422    | The role carries organization-only permissions, and the scope is a team or project |
-| `role_binding_already_exists`    | 409    | That principal already has that role at that scope                                 |
+| `grant_exceeds_caller_permissions` | 403  | The role carries permissions you do not hold at that scope                         |
+| `grant_limit_reached`            | 409    | The organization holds as many grants as it may                                    |
+| `cannot_remove_last_admin`       | 400    | The binding is the organization's last administrator                               |
+| `cannot_demote_last_admin`       | 400    | The change would leave the organization without an administrator                   |
 | `role_binding_not_found`         | 404    | No such binding in this organization                                               |
+
+## Migrating to grants
+
+Grants and role bindings are the same records, so existing bindings appear in `GET /api/v1/grants` straight away and nothing needs copying. Change the calls:
+
+| Role bindings                                              | Grants                                                         |
+| ---------------------------------------------------------- | -------------------------------------------------------------- |
+| `GET /api/v1/role-bindings?userId=u1`                      | `GET /api/v1/grants?principalType=user&principalId=u1`         |
+| `offset` and `limit`, with `totalCount`                    | `cursor` and `limit`, with `nextCursor`                        |
+| `{ "userId": "u1" }`, `groupId` or `apiKeyId`              | `{ "principal": { "type": "user", "id": "u1" } }`              |
+| `"role": "MEMBER"`                                         | `"roleId": "member"`                                           |
+| `"role": "CUSTOM", "customRoleId": "r1"`                   | `"roleId": "r1"`                                               |
+| `"scopeType": "TEAM", "scopeId": "t1"`                     | `"scope": { "type": "team", "id": "t1" }`                      |
+| `PATCH /api/v1/role-bindings/{id}` with `role`             | `PATCH /api/v1/grants/{grantId}` with `roleId`                 |
+| `DELETE /api/v1/role-bindings/{id}`                        | `DELETE /api/v1/grants/{grantId}`                              |
+| `langwatch role-bindings ...`                              | `langwatch grants list, get, create, change-role, revoke`     |
+
+Grants also add an optional `expiresAt`, a `status` filter, and an `Idempotency-Key` on create.

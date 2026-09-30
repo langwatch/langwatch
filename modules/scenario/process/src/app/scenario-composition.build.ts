@@ -87,9 +87,11 @@ class ScenarioClickHouseSession {
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
+    tenantIds?: readonly string[];
   }): Promise<{ json<Result>(): Promise<Result[]> }> {
     const { rows } = await this.clickhouse.query<unknown>({
       tenantId: this.tenantId,
+      ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
       sql: input.query,
       params: input.query_params,
     });

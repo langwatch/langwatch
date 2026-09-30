@@ -10,6 +10,7 @@ import (
 // The gate's own line above a tool call. It used to print "haven: admitted"
 // above every gated command a session ran, which is the one decision that
 // changed nothing about the run.
+// @scenario "A run that finds a free slot is silent"
 func TestTheGateIsSilentWhenItChangedNothing(t *testing.T) {
 	t.Run("given a run the gate admitted unchanged", func(t *testing.T) {
 		got := predictiveMessage(predictionRequest{decision: domain.Admit})

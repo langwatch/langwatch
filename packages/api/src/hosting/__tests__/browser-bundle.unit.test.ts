@@ -74,3 +74,94 @@ describe("given a browser bundle sharing API sessions", () => {
     expect((await mux.fetch(new Request("http://localhost/assets/app.js"))).status).toBe(200);
   });
 });
+
+describe("the browser application on the door", () => {
+  function bundleOver(dist: string | undefined, security = SecurityHeaders.strict()) {
+    return BrowserBundle.create({
+      dist,
+      publicConfig: () => '<meta name="public-config">',
+      sessionReader: SessionReader.unverified(),
+      security,
+    });
+  }
+
+  /** @scenario "The browser application answers an unclaimed address" */
+  it("serves the shell at an address no transport claimed, for the single page application to route", async () => {
+    const response = await bundleOver(await fixture()).fetch(
+      new Request("http://localhost/projects/one/settings"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/html");
+    expect(await response.text()).toContain("<body>app</body>");
+  });
+
+  /** @scenario "A built asset is missing" */
+  it("answers 404 for a content-hashed asset that is gone, never the shell", async () => {
+    const response = await bundleOver(await fixture()).fetch(
+      new Request("http://localhost/assets/gone.js"),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).not.toContain("<body>");
+  });
+
+  /** @scenario "A built asset is served" */
+  it("serves a content-hashed asset with an immutable cache", async () => {
+    const response = await bundleOver(await fixture()).fetch(
+      new Request("http://localhost/assets/app.js"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("window.booted = true;");
+    expect(response.headers.get("cache-control")).toContain("immutable");
+  });
+
+  /** @scenario "A write is never answered by the browser application" */
+  it("declines a write at an unclaimed address instead of answering it with the shell", async () => {
+    const response = await bundleOver(await fixture()).fetch(
+      new Request("http://localhost/projects/one", { method: "POST", body: "{}" }),
+    );
+
+    expect(response.status).toBe(405);
+    expect(await response.text()).not.toContain("<body>");
+  });
+
+  /** @scenario "The deployment carries no browser build" */
+  it("answers 404 to a page request when no build is present", async () => {
+    const bundle = bundleOver(void 0);
+
+    expect(bundle.serves).toBe(false);
+    expect((await bundle.fetch(new Request("http://localhost/projects/one"))).status).toBe(404);
+  });
+
+  /** @scenario "The served page carries this deployment's configuration" */
+  it("injects the public configuration at the start of the head, before the bundle's scripts", async () => {
+    const dist = await fixture();
+    await writeFile(
+      path.join(dist, "index.html"),
+      '<html><head><script src="/assets/app.js"></script></head><body>app</body></html>',
+    );
+
+    const html = await (await bundleOver(dist).fetch(new Request("http://localhost/"))).text();
+
+    expect(html.indexOf('<meta name="public-config">')).toBeGreaterThan(-1);
+    expect(html.indexOf('<meta name="public-config">')).toBeLessThan(
+      html.indexOf('<script src="/assets/app.js">'),
+    );
+    expect(html).toContain('<head><meta name="public-config">');
+  });
+
+  /** @scenario "The served page carries this deployment's security headers" */
+  it("sends the deployment's own security headers with the document", async () => {
+    const security = SecurityHeaders.strict().with("Permissions-Policy", "camera=()");
+
+    const response = await bundleOver(await fixture(), security).fetch(
+      new Request("http://localhost/"),
+    );
+
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("permissions-policy")).toBe("camera=()");
+  });
+});

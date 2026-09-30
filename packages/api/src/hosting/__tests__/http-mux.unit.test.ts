@@ -73,6 +73,7 @@ describe("given API and browser routes", () => {
   });
 
   /** @scenario "Untrusted forwarding headers cannot replace the socket address" */
+  /** @scenario A forwarding header from an untrusted peer is ignored */
   it("passes the actual socket address into the trusted-proxy resolver", async () => {
     const mux = HttpMux.create()
       .use(ClientAddress.fromTrustedProxies({ addresses: [] }))

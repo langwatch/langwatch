@@ -61,6 +61,7 @@ import {
   type PublicRouteAccess,
 } from "../access/access.ts";
 import type { TrpcContract, TrpcContractMember } from "../contract/trpc-contract.ts";
+import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
 import {
   auditScopeIds,
@@ -1518,9 +1519,9 @@ function requestLog<TContext extends TrpcRuntimeContext & object>(
 }
 
 /**
- * Converts handled errors thrown in handlers to properly coded TRPCErrors — without this
- * they fall through as INTERNAL_SERVER_ERROR. A bare Zod failure is promoted the same way
- * the REST door promotes it, so one throw isn't a 422 through Hono and a 500 through tRPC.
+ * Converts handled errors thrown in handlers to coded TRPCErrors, else INTERNAL_SERVER_ERROR.
+ * A bare Zod failure and a busy database are promoted as the REST door promotes them, so one
+ * throw isn't a 422 or 503 through Hono and a 500 through tRPC.
  */
 function handledErrors<TContext extends object>(members: TrpcRuntimeMembers<TContext>) {
   return async ({
@@ -1532,7 +1533,7 @@ function handledErrors<TContext extends object>(members: TrpcRuntimeMembers<TCon
 
     if (result.ok) return result;
 
-    const cause = result.error.cause;
+    const cause = isDatabaseBusy(result.error.cause) ? new DatabaseBusyError() : result.error.cause;
 
     if (HandledError.isHandled(cause)) {
       throw new TRPCError({ code: trpcCodeOf(cause), message: cause.message, cause });

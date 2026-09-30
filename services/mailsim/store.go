@@ -1,11 +1,13 @@
 package mailsim
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -78,20 +80,40 @@ type waiter struct {
 	ch     chan *Message
 }
 
-// Store holds every caught message, in arrival order, with an optional file
-// backing so an agent restarting the backend mid-test does not lose the
-// email it was about to assert on.
-type Store struct {
-	mu       sync.Mutex
-	messages []*Message
-	waiters  []*waiter
-	dataDir  string
+// entry is a stored message with its match keys lowercased once, at arrival,
+// so a scan never allocates.
+type entry struct {
+	msg     *Message
+	seq     uint64
+	to      []string
+	subject string
 }
 
-// NewStore builds a store, loading any messages already on disk when dataDir
-// is set.
+// Store holds the newest caught messages, in arrival order, bounded at
+// maxMessages (the oldest is evicted first), with an optional file backing
+// so an agent restarting the backend mid-test does not lose the email it was
+// about to assert on. Messages are indexed by id and by recipient address.
+type Store struct {
+	mu          sync.Mutex
+	entries     []*entry // arrival order, oldest first
+	byID        map[string]*entry
+	byRecipient map[string][]*entry // lowercased address -> entries, oldest first
+	waiters     []*waiter
+	dataDir     string
+	maxMessages int
+	seq         uint64
+}
+
+// NewStore builds a store with the default cap; see NewBoundedStore.
 func NewStore(dataDir string) (*Store, error) {
-	st := &Store{dataDir: dataDir}
+	return NewBoundedStore(dataDir, defaultMaxMessages)
+}
+
+// NewBoundedStore builds a store holding at most maxMessages, loading the
+// newest already on disk when dataDir is set.
+func NewBoundedStore(dataDir string, maxMessages int) (*Store, error) {
+	st := &Store{dataDir: dataDir, maxMessages: maxMessages}
+	st.reset()
 	if dataDir == "" {
 		return st, nil
 	}
@@ -102,12 +124,95 @@ func NewStore(dataDir string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading mailsim data dir %s: %w", dataDir, err)
 	}
-	st.messages = loadMessages(dataDir, entries)
+	for _, msg := range loadMessages(dataDir, entries, maxMessages) {
+		st.insert(msg)
+	}
 	return st, nil
 }
 
-// loadMessages reads every persisted message back, in arrival order.
-func loadMessages(dataDir string, entries []os.DirEntry) []*Message {
+func (st *Store) reset() {
+	st.entries = nil
+	st.byID = map[string]*entry{}
+	st.byRecipient = map[string][]*entry{}
+}
+
+// insert indexes msg and returns the evicted message's id, or "" when nothing was.
+func (st *Store) insert(msg *Message) (evicted string) {
+	st.seq++
+	e := &entry{msg: msg, seq: st.seq, subject: strings.ToLower(msg.Subject)}
+	for _, addr := range msg.To {
+		lower := strings.ToLower(addr)
+		e.to = append(e.to, lower)
+		st.byRecipient[lower] = append(st.byRecipient[lower], e)
+	}
+	st.entries = append(st.entries, e)
+	st.byID[msg.ID] = e
+	if len(st.entries) > st.maxMessages {
+		oldest := st.entries[0]
+		st.entries[0] = nil
+		st.entries = st.entries[1:]
+		st.unindex(oldest)
+		return oldest.msg.ID
+	}
+	return ""
+}
+
+func (st *Store) unindex(e *entry) {
+	delete(st.byID, e.msg.ID)
+	for _, addr := range e.to {
+		list := st.byRecipient[addr]
+		if list[0] == e { // eviction takes the oldest, which heads its lists
+			list[0], list = nil, list[1:]
+		} else {
+			list = slices.DeleteFunc(list, func(o *entry) bool { return o == e })
+		}
+		if len(list) == 0 {
+			delete(st.byRecipient, addr)
+		} else {
+			st.byRecipient[addr] = list
+		}
+	}
+}
+
+// matches reports whether the entry satisfies the filters: an empty one always
+// matches, a non-empty one is a case-insensitive substring match.
+func (e *entry) matches(to, subject string) bool {
+	if subject != "" && !strings.Contains(e.subject, subject) {
+		return false
+	}
+	return to == "" || slices.ContainsFunc(e.to, func(a string) bool { return strings.Contains(a, to) })
+}
+
+// scan calls fn on every entry matching the filters, newest first, until fn
+// returns false. A recipient filter walks the recipient index, not the inbox.
+// Callers hold st.mu.
+func (st *Store) scan(to, subject string, fn func(*entry) bool) {
+	to, subject = strings.ToLower(to), strings.ToLower(subject)
+	if to == "" {
+		for i := len(st.entries) - 1; i >= 0; i-- {
+			if e := st.entries[i]; e.matches("", subject) && !fn(e) {
+				return
+			}
+		}
+		return
+	}
+	var hits []*entry
+	for addr, list := range st.byRecipient {
+		if strings.Contains(addr, to) {
+			hits = append(hits, list...)
+		}
+	}
+	slices.SortFunc(hits, func(a, b *entry) int { return cmp.Compare(b.seq, a.seq) })
+	hits = slices.CompactFunc(hits, func(a, b *entry) bool { return a == b })
+	for _, e := range hits {
+		if e.matches("", subject) && !fn(e) {
+			return
+		}
+	}
+}
+
+// loadMessages reads the newest keep persisted messages back, in arrival order.
+func loadMessages(dataDir string, entries []os.DirEntry, keep int) []*Message {
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
@@ -115,6 +220,7 @@ func loadMessages(dataDir string, entries []os.DirEntry) []*Message {
 		}
 	}
 	sort.Strings(names) // ULID filenames sort in arrival order.
+	names = names[max(0, len(names)-keep):]
 	messages := make([]*Message, 0, len(names))
 	for _, name := range names {
 		raw, err := os.ReadFile(filepath.Join(dataDir, name))
@@ -142,7 +248,7 @@ func (st *Store) Deliver(msg *Message) error {
 		msg.ID = newID()
 	}
 	st.mu.Lock()
-	st.messages = append(st.messages, msg)
+	evicted := st.insert(msg)
 	var matched []*waiter
 	remaining := make([]*waiter, 0, len(st.waiters))
 	for _, w := range st.waiters {
@@ -155,6 +261,9 @@ func (st *Store) Deliver(msg *Message) error {
 	st.waiters = remaining
 	st.mu.Unlock()
 
+	if evicted != "" {
+		st.removeFile(evicted)
+	}
 	for _, w := range matched {
 		w.ch <- msg
 	}
@@ -181,12 +290,11 @@ func (st *Store) persist(msg *Message) error {
 func (st *Store) List(to, subject string) []Summary {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	out := make([]Summary, 0, len(st.messages))
-	for i := len(st.messages) - 1; i >= 0; i-- {
-		if st.messages[i].matches(to, subject) {
-			out = append(out, st.messages[i].Summary)
-		}
-	}
+	out := []Summary{}
+	st.scan(to, subject, func(e *entry) bool {
+		out = append(out, e.msg.Summary)
+		return true
+	})
 	return out
 }
 
@@ -194,10 +302,8 @@ func (st *Store) List(to, subject string) []Summary {
 func (st *Store) Get(id string) (*Message, bool) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	for _, m := range st.messages {
-		if m.ID == id {
-			return m, true
-		}
+	if e, ok := st.byID[id]; ok {
+		return e.msg, true
 	}
 	return nil, false
 }
@@ -205,25 +311,31 @@ func (st *Store) Get(id string) (*Message, bool) {
 // Delete removes one message by id, from disk too when persistence is on.
 func (st *Store) Delete(id string) bool {
 	st.mu.Lock()
-	defer st.mu.Unlock()
-	for i, m := range st.messages {
-		if m.ID == id {
-			st.messages = append(st.messages[:i], st.messages[i+1:]...)
-			if st.dataDir != "" {
-				// m.ID, not the caller's id: the store only ever unlinks a
-				// name it minted itself, so a hostile id cannot traverse.
-				_ = os.Remove(filepath.Join(st.dataDir, m.ID+".json"))
-			}
-			return true
-		}
+	e, ok := st.byID[id]
+	if ok {
+		st.entries = slices.DeleteFunc(st.entries, func(o *entry) bool { return o == e })
+		st.unindex(e)
 	}
-	return false
+	st.mu.Unlock()
+	if ok {
+		st.removeFile(e.msg.ID)
+	}
+	return ok
+}
+
+// removeFile unlinks a persisted message. It takes the stored id, never the
+// caller's, so the store only removes a name it minted and a hostile id
+// cannot traverse.
+func (st *Store) removeFile(id string) {
+	if st.dataDir != "" {
+		_ = os.Remove(filepath.Join(st.dataDir, id+".json"))
+	}
 }
 
 // Clear empties the inbox.
 func (st *Store) Clear() {
 	st.mu.Lock()
-	st.messages = nil
+	st.reset()
 	st.mu.Unlock()
 	if st.dataDir == "" {
 		return
@@ -243,12 +355,17 @@ func (st *Store) Clear() {
 // caught, or the next one to arrive — or ctx ends first.
 func (st *Store) Wait(ctx context.Context, filter WaitFilter) (*Message, bool) {
 	st.mu.Lock()
-	for i := len(st.messages) - 1; i >= 0; i-- {
-		if filter.matches(st.messages[i]) {
-			m := st.messages[i]
-			st.mu.Unlock()
-			return m, true
+	var found *Message
+	st.scan(filter.To, filter.Subject, func(e *entry) bool {
+		if filter.After != "" && e.msg.ID <= filter.After {
+			return false // ids sort in arrival order: nothing older can match
 		}
+		found = e.msg
+		return false
+	})
+	if found != nil {
+		st.mu.Unlock()
+		return found, true
 	}
 	w := &waiter{filter: filter, ch: make(chan *Message, 1)}
 	st.waiters = append(st.waiters, w)
@@ -266,10 +383,5 @@ func (st *Store) Wait(ctx context.Context, filter WaitFilter) (*Message, bool) {
 func (st *Store) removeWaiter(target *waiter) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	for i, w := range st.waiters {
-		if w == target {
-			st.waiters = append(st.waiters[:i], st.waiters[i+1:]...)
-			return
-		}
-	}
+	st.waiters = slices.DeleteFunc(st.waiters, func(w *waiter) bool { return w == target })
 }

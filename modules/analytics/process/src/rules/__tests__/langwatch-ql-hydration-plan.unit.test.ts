@@ -15,6 +15,7 @@ const conversationCall: LangWatchQLAppFunctionCall = {
 };
 
 describe("langWatchQLExtractionPlan", () => {
+  /** @scenario "An eval written over an extraction is read as that extraction" */
   it("replaces an eval call with the extraction it was written over, in the same column", () => {
     const plan = langWatchQLExtractionPlan([
       {
@@ -28,6 +29,7 @@ describe("langWatchQLExtractionPlan", () => {
     expect(plan).toEqual([{ column: "verdict", function: "conversation", options: [] }]);
   });
 
+  /** @scenario "An eval written over a plain expression is left to the column" */
   it("drops an eval call written over a plain expression: the column already holds the text", () => {
     const plan = langWatchQLExtractionPlan([
       { column: "verdict", function: "eval", options: ["is it polite?"] },

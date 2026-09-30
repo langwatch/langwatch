@@ -44,22 +44,31 @@ func (runner *scenarioRunner) probeAdminKey() {
 	fmt.Fprintf(runner.options.Progress, "scenarios: instance-admin routes answer 404 on %s (SaaS): running without the admin key; scenarios needing it are deferred to the self-hosted pass\n", strings.Join(absent, " and "))
 	runner.options.Keys.AdminKey = ""
 	runner.adminAbsent = true
+	runner.sessionSeeding = true
 	for _, side := range runner.sides {
 		side.shared.keys.AdminKey = ""
+		if side.creds[credSessionCookie] == "" && !runner.engine.signInAdmin(side.baseURL, side.creds) {
+			runner.sessionSeeding = false
+		}
+	}
+	if runner.sessionSeeding {
+		fmt.Fprintln(runner.options.Progress, "scenarios: seeding second organizations through the seeded admin's session")
 	}
 }
 
 // needsInstanceAdmin is true for a scenario that can only run where the
-// instance-admin key works: an admin-auth request, or an organization it
-// makes for itself or for a foreign tenant.
-func needsInstanceAdmin(item *scenario, keys Keys) bool {
-	if item.Shard == shardOrg {
+// instance-admin key works: an admin-auth request or one marked selfHosted.
+// Without a session to seed with, so is one that makes an organization for
+// itself or for a foreign tenant.
+func needsInstanceAdmin(item *scenario, keys Keys, sessionSeeding bool) bool {
+	if item.SelfHosted || usesAuth(item, authAdmin) {
 		return true
 	}
-	for _, kind := range []string{authAdmin, authOrgC, authOrgCOrg} {
-		if usesAuth(item, kind) {
-			return true
-		}
+	if sessionSeeding {
+		return false
+	}
+	if item.Shard == shardOrg || usesAuth(item, authOrgC) || usesAuth(item, authOrgCOrg) {
+		return true
 	}
 	return keys.ProjectKeyC == "" && usesAuth(item, authProjectC)
 }
@@ -71,7 +80,7 @@ func (runner *scenarioRunner) deferAdminScenarios(items []scenario) (kept []scen
 		return items, nil
 	}
 	for index := range items {
-		if needsInstanceAdmin(&items[index], runner.options.Keys) {
+		if needsInstanceAdmin(&items[index], runner.options.Keys, runner.sessionSeeding) {
 			deferred = append(deferred, items[index].ID)
 		} else {
 			kept = append(kept, items[index])
@@ -81,13 +90,25 @@ func (runner *scenarioRunner) deferAdminScenarios(items []scenario) (kept []scen
 	return kept, deferred
 }
 
+// countSaaSDeferred is how many of items a SaaS run defers when the seeded
+// admin's session can make the second organizations.
+func countSaaSDeferred(items []scenario, keys Keys) int {
+	count := 0
+	for index := range items {
+		if needsInstanceAdmin(&items[index], keys, true) {
+			count++
+		}
+	}
+	return count
+}
+
 // writeDeferred lists the scenarios left for the self-hosted pass. They are
 // neither passes nor failures, and the tally line does not count them.
 func writeDeferred(out io.Writer, deferred []string) {
 	if len(deferred) == 0 {
 		return
 	}
-	fmt.Fprintf(out, "scenarios: %d deferred: self-hosted pass (instance-admin key unusable under SaaS): %s\n", len(deferred), strings.Join(deferred, ", "))
+	fmt.Fprintf(out, "scenarios: %d deferred: self-hosted pass (needs the instance-admin key or an Enterprise organization, which SaaS lacks): %s\n", len(deferred), strings.Join(deferred, ", "))
 }
 
 // deferredFile is where a run keeps its deferred ids, one per line, for the

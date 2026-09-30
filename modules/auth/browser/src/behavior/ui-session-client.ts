@@ -5,6 +5,7 @@
  */
 
 import type { UiActor } from "@langwatch/browser-host/capabilities";
+import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
 import { HandledError } from "@langwatch/handled-error";
 import { createAuthClient } from "better-auth/react";
 
@@ -78,7 +79,7 @@ export function toUiActor(payload: unknown): UiActor | null {
  * leaves them signed in, which the next session read reports on its own.
  */
 export async function signOutUi(client: UiAuthClient = uiAuthClient()): Promise<void> {
-  await client.signOut();
+  await Promise.all([client.signOut(), clearPersistedUiQueries()]);
 }
 
 /**

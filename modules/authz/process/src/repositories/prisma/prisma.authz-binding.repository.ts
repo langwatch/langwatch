@@ -1,5 +1,7 @@
 import {
   organizationRoleSchema,
+  PRINCIPAL_KIND_FROM_STORED,
+  storedPrincipalKindSchema,
   roleBindingScopeTypeSchema,
   teamUserRoleSchema,
   type OrganizationRole,
@@ -10,6 +12,7 @@ import { z } from "zod";
 import {
   AuthzBindingRepository,
   type AuthzBindingScopeRow,
+  type AuthzGrantPrincipalRow,
   type AuthzManagedBindingRow,
   type AuthzUserGroupRow,
 } from "../authz-binding.repository.ts";
@@ -41,6 +44,16 @@ const userGroupRowSchema = z
       .strict(),
   })
   .strict();
+const organizationUserIdRowsSchema = z.array(z.object({ userId: z.string() }).strict());
+const grantPrincipalRowsSchema = z.array(
+  z
+    .object({
+      id: z.string(),
+      principalType: storedPrincipalKindSchema,
+      principalId: z.string().nullable(),
+    })
+    .strict(),
+);
 const organizationRoleRowSchema = z.object({ role: organizationRoleSchema }).strict();
 const managedBindingRowSchema = z
   .object({
@@ -227,6 +240,32 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
     });
 
     return userGroupRowsSchema.parse(rows);
+  }
+
+  async findOrganizationUserIds({ organizationId }: { organizationId: string }): Promise<string[]> {
+    const rows = await this.database.organizationUser.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+    return organizationUserIdRowsSchema.parse(rows).map((row) => row.userId);
+  }
+
+  async findGrantPrincipals({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<AuthzGrantPrincipalRow[]> {
+    if (grantIds.length === 0) return [];
+    const rows = await this.database.grant.findMany({
+      where: { organizationId, id: { in: [...grantIds] } },
+      select: { id: true, principalType: true, principalId: true },
+    });
+    return grantPrincipalRowsSchema.parse(rows).map((row) => ({
+      grantId: row.id,
+      principal: { type: PRINCIPAL_KIND_FROM_STORED[row.principalType], id: row.principalId },
+    }));
   }
 
   async findOrganizationRole({

@@ -135,6 +135,11 @@ func checkExpect(expect scenarioExpect, result SideResult) string {
 	if len(expect.Status) > 0 && !slices.Contains(expect.Status, result.Status) {
 		return fmt.Sprintf("status %d, expected %s: %s", result.Status, joinInts(expect.Status), excerpt(result.Body))
 	}
+	for _, name := range sortedStringKeys(expect.Headers) {
+		if got := result.Headers.Get(name); !strings.Contains(got, expect.Headers[name]) {
+			return fmt.Sprintf("header %s is %q, expected it to contain %q", name, got, expect.Headers[name])
+		}
+	}
 	for _, text := range expect.Contains {
 		if !strings.Contains(result.Body, text) {
 			return fmt.Sprintf("body does not contain %q", text)

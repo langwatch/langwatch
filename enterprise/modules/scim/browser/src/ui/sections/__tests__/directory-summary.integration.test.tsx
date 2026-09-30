@@ -93,6 +93,7 @@ describe("the directory's status band", () => {
   });
 
   describe("given no identity provider is connected", () => {
+    /** @scenario An organization with no connection is offered the way to set one up */
     it("says nobody arrives on their own, and where to connect one", () => {
       state.connections = [];
       renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);

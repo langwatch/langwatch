@@ -140,10 +140,10 @@ Feature: Expiring grants
   # ═══ The end date is not the grant's identity ═════════════════════════
 
   @unit
-  Scenario: Re-granting the same access with a different end date is a duplicate
+  Scenario: Re-granting the same access with a different end date is a second grant
     Given "dana" already holds a grant at a project
     When an administrator grants the same access again, ending next Friday
-    Then it is keyed as the same binding, which answers role_binding_already_exists
+    Then a second binding is written with its own end date, because bindings are never unique
     And the existing grant's end date is unchanged
 
   # ═══ The management API ═══════════════════════════════════════════════

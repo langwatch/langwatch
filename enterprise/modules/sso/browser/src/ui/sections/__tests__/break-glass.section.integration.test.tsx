@@ -173,11 +173,13 @@ describe("when an administrator grants a way back in", () => {
     );
   });
 
+  /** @scenario "The people offered a way back in are the ones who could use it" */
   it("shows somebody who holds no password, and why they cannot be chosen", () => {
     renderSection();
     const option = screen.getByRole("option", { name: "Grace Hopper (set a password first)" });
 
     expect(option).toHaveProperty("disabled", true);
+    expect(screen.getByRole("option", { name: "Ada Lovelace" })).toHaveProperty("disabled", false);
   });
 });
 

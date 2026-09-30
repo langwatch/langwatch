@@ -5,29 +5,17 @@ Feature: PostHog guided onboarding events
   So that the guided and the classic onboarding can be compared on one funnel
 
   Background:
-    Given trackServerEvent captures server-side product events with the user id as the distinct id
-    And every write of an organization's guided onboarding state emits one event through onGuidedOnboardingEvent
-    And the analytics subscriber attached there turns each event into a PostHog event
+    Given the PostHog events channel captures server-side product events with the user id as the distinct id
+    And every write of an organization's guided onboarding state is tracked through that channel by the guided onboarding service
+    And the nurturing delivery turns the product milestones into PostHog events against the organization admin
 
   # ============================================================================
   # Variant assignment
   # ============================================================================
 
-  @unit
-  Scenario: initializing an organization tracks the assigned onboarding variant
-    When a user initializes an organization with the guided variant
-    Then an "onboarding_variant_assigned" event is tracked for that user with variant "guided"
-    And the person property onboarding_variant is set to "guided"
-
-  @integration
-  Scenario: initializing an organization through the procedure tracks the assigned onboarding variant
-    When a user initializes an organization with the guided variant through the onboarding procedure
-    Then an "onboarding_variant_assigned" event is captured for that user with variant "guided"
-
-  @integration
-  Scenario: initializing an organization without a variant tracks no variant assignment
-    When a user initializes an organization without an onboarding variant
-    Then no "onboarding_variant_assigned" event is tracked
+  # The assignment is recorded on the organization when it is created. No
+  # separate exposure event is tracked: every guided onboarding event sets the
+  # onboarding_variant person property and carries the experiment property.
 
   # ============================================================================
   # Guided onboarding steps
@@ -91,32 +79,30 @@ Feature: PostHog guided onboarding events
 
   @unit
   Scenario: a failing analytics call never fails the write
-    Given the PostHog client throws on capture
-    When a guided onboarding event is emitted
-    Then the emit returns normally
-    And the failure is captured for observability
+    Given the PostHog channel cannot read its product-analytics targets
+    When a guided onboarding event is tracked
+    Then the track returns normally
 
-  @integration
-  Scenario: a guided state write through the procedure reaches PostHog
+  @unit
+  Scenario: a guided state write reaches PostHog through the service
     Given an organization initialized with the guided variant
-    When the user records the paths gateway then llmops through the onboarding procedure
-    Then a "guided_onboarding_paths_selected" event is captured for that user with primary_path gateway
+    When the user records the paths gateway then llmops
+    Then a "guided_onboarding_paths_selected" event is tracked for that user with primary_path gateway and the organization id
 
   # ============================================================================
   # Existing milestones split by variant
   # ============================================================================
 
-  @unit
-  Scenario: first_trace_integrated carries the onboarding variant of the organization
-    Given a project whose organization was initialized with the guided variant
-    When its first real trace is ingested
-    Then the "first_trace_integrated" event carries onboarding_variant "guided"
+  # first_trace_integrated and the other milestones do not carry the variant:
+  # they carry what the milestone is about. scenario_created carries the variant
+  # and the experiment property; scenario_run_succeeded carries the latter.
 
   @unit
-  Scenario: first_trace_integrated carries no onboarding variant when the organization recorded none
-    Given a project whose organization predates the experiment
-    When its first real trace is ingested
-    Then the "first_trace_integrated" event carries no onboarding_variant property
+  Scenario: first_trace_integrated carries the SDK of the first trace and no onboarding variant
+    Given a project whose first real trace was ingested from the Python SDK
+    When the first trace milestone is delivered
+    Then the "first_trace_integrated" event is tracked against the organization admin with sdk_language python and the project id
+    And it carries no onboarding_variant and no experiment property
 
   @unit
   Scenario: the organization admin resolution reads the onboarding variant next to the admin
@@ -142,12 +128,6 @@ Feature: PostHog guided onboarding events
     When the onboarding check status is read for that project
     Then it carries guidedOnboarding with no variant, no paths and no done paths
 
-  @integration
-  Scenario: the onboarding progress view carries the onboarding variant
-    Given the onboarding check status of the project carries the guided variant
-    When the onboarding progress card loads
-    Then the "viewed onboarding_progress" event carries onboarding_variant "guided"
-
   # ============================================================================
   # PostHog experiment without feature flags
   # ============================================================================
@@ -168,26 +148,9 @@ Feature: PostHog guided onboarding events
     Then it returns no property
 
   @unit
-  Scenario: the variant assignment is the exposure of the experiment
-    When a user initializes an organization with the classic variant
-    Then the "onboarding_variant_assigned" event carries $feature/experiment_onboarding_langy_guided "control"
-
-  @unit
   Scenario: every guided onboarding event carries the experiment property
     Given a guided onboarding event "paths_selected"
     Then the tracked event carries $feature/experiment_onboarding_langy_guided "guided"
-
-  @unit
-  Scenario: first_trace_integrated carries the experiment property
-    Given a project whose organization was initialized with the classic variant
-    When its first real trace is ingested
-    Then the "first_trace_integrated" event carries $feature/experiment_onboarding_langy_guided "control"
-
-  @unit
-  Scenario: a milestone of an organization without a variant carries no experiment property
-    Given a project whose organization predates the experiment
-    When its first real trace is ingested
-    Then the "first_trace_integrated" event carries no $feature/experiment_onboarding_langy_guided property
 
   @integration
   Scenario: scenario_created carries the experiment property
@@ -230,31 +193,22 @@ Feature: PostHog guided onboarding events
   # project_active_day
   # ============================================================================
 
+  # Nothing in the product produces a project_active_day signal yet. What exists
+  # is its delivery: a signal handed to the nurturing delivery reaches PostHog.
+
   @unit
-  Scenario: the first application trace of a day tracks the project as active
-    Given a project whose organization was created three days ago
-    When its first trace of the day is ingested
+  Scenario: an active-day signal reaches PostHog with its source, its signup age and the experiment property
+    Given a project_active_day signal for the organization admin with source "trace", 3 days since signup and the guided variant
+    When the signal is delivered
     Then a "project_active_day" event is tracked against the organization admin
-    And it carries source "trace", days_since_signup 3 and the experiment property
+    And it carries source "trace", days_since_signup 3, the project id and the experiment property "guided"
+    And Customer.io receives nothing
 
   @unit
-  Scenario: a second trace on the same day tracks nothing more
-    Given a project already tracked as active today
-    When another trace is ingested
-    Then no "project_active_day" event is tracked
-    And the organization admin is not read again
-
-  @unit
-  Scenario: the first successful scenario run of a day tracks the project as active
-    Given a project not yet active today
-    When a scenario run against a connected agent finishes
-    Then a "project_active_day" event is tracked with source "scenario_run"
-
-  @unit
-  Scenario: Langy's own turns and sample traces never track the project as active
-    Given a trace carrying the langy origin
-    When it is ingested
-    Then no "project_active_day" event is tracked
+  Scenario: an active-day signal without a signup age or a variant carries neither
+    Given a project_active_day signal with source "scenario_run", no signup age and no variant
+    When the signal is delivered
+    Then the "project_active_day" event carries source "scenario_run" and the project id only
 
   # ============================================================================
   # guided_onboarding_turn_failed

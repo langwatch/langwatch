@@ -395,6 +395,7 @@ describe("the LangWatchQL request machine", () => {
   describe("given a draft whose SQL the backend would reject", () => {
     describe("when the member runs the query", () => {
       /** @scenario "The browser submits exact SQL and does not validate a second language" */
+      /** @scenario "The frontend does not implement a second SQL validator" */
       it("submits the statement unmodified and surfaces the backend's refusal", async () => {
         const rejected = "  DROP TABLE traces;;  SELECT 1 -- trailing\n";
         const { calls, controller } = controllerWith({ sql: rejected });

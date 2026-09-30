@@ -3,11 +3,7 @@
  * attached. Every write goes through the authz grants ledger; a change
  * leaving a team with no administrator is refused before it is written.
  */
-import {
-  DuplicateBindingError,
-  type AuthzAccessBinding,
-  type AuthzApi,
-} from "@langwatch/authz-contract";
+import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 import {
   CannotRemoveSelfAsLastAdminError,
   PersonalTeamProtectedError,
@@ -15,7 +11,6 @@ import {
   TeamCustomRoleNotAssignableError,
   TeamCustomRoleRequiredError,
   TeamLastAdminRequiredError,
-  TeamMemberAlreadyAddedError,
   TeamNotFoundError,
   PersonalWorkspaceNotManagedHereError,
   TeamMembershipNotFoundError,
@@ -78,29 +73,21 @@ export class OrganizationTeamMembersService {
       organizationId: parsed.organizationId,
       userIds: [parsed.userId],
     });
-    try {
-      await this.deps.grants.attachBindings({
-        organizationId: parsed.organizationId,
-        bindings: [
-          {
-            bindingId: this.deps.teamIdentities.createBindingId(),
-            principal: { userId: parsed.userId },
-            role: parsed.role,
-            customRoleId: null,
-            scopeType: "TEAM",
-            scopeId: parsed.teamId,
-          },
-        ],
-        actor: parsed.actor,
-        onDuplicate: "reject",
-      });
-    } catch (error) {
-      if (error instanceof DuplicateBindingError) {
-        throw new TeamMemberAlreadyAddedError(parsed.userId);
-      }
-
-      throw error;
-    }
+    await this.deps.grants.attachBindings({
+      organizationId: parsed.organizationId,
+      bindings: [
+        {
+          bindingId: this.deps.teamIdentities.createBindingId(),
+          principal: { userId: parsed.userId },
+          role: parsed.role,
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: parsed.teamId,
+        },
+      ],
+      actor: parsed.actor,
+      onDuplicate: "attach",
+    });
   }
 
   async removeTeamMember(input: RemoveOrganizationTeamMemberInput): Promise<void> {

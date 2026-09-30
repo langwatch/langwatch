@@ -5,7 +5,6 @@
  */
 import {
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-  DuplicateBindingError,
   GRANT_ATTACHED_EVENT_TYPE,
   grantAttachedPayloadSchema,
   type CollectedBinding,
@@ -32,6 +31,10 @@ import {
   grantRowToFact,
 } from "../repositories/prisma/prisma.authz-grant.mapper.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
+import {
+  permissiveGrantGuards,
+  TEST_CALLER,
+} from "../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzBindingWriterService } from "../services/authz-binding-writer.service.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
@@ -95,6 +98,7 @@ function grantsService() {
   const epoch = new StubAuthzEpoch();
   const ledger = compatibilityLedger();
   const service = AuthzGrantsService.create({
+    permissions: permissiveGrantGuards,
     repository,
     ledger,
     epoch,
@@ -128,6 +132,7 @@ function bindingWriter() {
   bindings.findOrganizationRole.mockResolvedValue("MEMBER");
   const ledger = compatibilityLedger();
   const writer = AuthzBindingWriterService.create({
+    permissions: permissiveGrantGuards,
     bindings,
     ledger,
     newBindingId: () => "rb_new",
@@ -140,6 +145,7 @@ function bindingWriter() {
       scopeType: "TEAM",
       scopeId: TEAM,
       actor: { type: "user", id: "admin_1" },
+      caller: TEST_CALLER,
       ...(expiresAt ? { expiresAt } : {}),
     });
   return { create, ledger };
@@ -261,7 +267,7 @@ describe("when an end date is not in the future", () => {
         organizationId: ORG,
         bindings: [binding],
         actor: { type: "user", id: "admin_1" },
-        onDuplicate: "reject",
+        onDuplicate: "attach",
       }),
     ).rejects.toMatchObject({ code: "grant_expiry_in_past" });
     expect(ledger.attachBindings).not.toHaveBeenCalled();
@@ -307,8 +313,8 @@ describe("given a grant that ends next Friday", () => {
     );
   });
 
-  /** @scenario "Re-granting the same access with a different end date is a duplicate" */
-  it("keys the binding's identity without its end date, and answers the duplicate", async () => {
+  /** @scenario "Re-granting the same access with a different end date is a second grant" */
+  it("writes a second binding carrying its own end date", async () => {
     const identity = {
       principal: { userId: "dana" },
       scopeType: "PROJECT",
@@ -322,16 +328,16 @@ describe("given a grant that ends next Friday", () => {
     expect(bindingIdentityKey(expiring)).toBe(bindingIdentityKey(identity));
 
     const { service, repository } = grantsService();
-    repository.createBinding.mockRejectedValue(new DuplicateBindingError());
-    await expect(
-      service.attach({
-        actor,
-        who: dana,
-        role: { builtin: "VIEWER" },
-        where: projectScope,
-        expiresAtMs: FRIDAY,
-      }),
-    ).rejects.toMatchObject({ code: "role_binding_already_exists", httpStatus: 409 });
+    await service.attach({
+      actor,
+      who: dana,
+      role: { builtin: "VIEWER" },
+      where: projectScope,
+      expiresAtMs: FRIDAY,
+    });
+    expect(repository.createBinding).toHaveBeenCalledWith(
+      expect.objectContaining({ row: expect.objectContaining({ expiresAtMs: FRIDAY }) }),
+    );
   });
 });
 

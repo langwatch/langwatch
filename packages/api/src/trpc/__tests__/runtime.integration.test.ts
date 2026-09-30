@@ -217,3 +217,31 @@ describe("a bare ZodError raised inside a service", () => {
     });
   });
 });
+
+describe("a database with no connection to give, behind the process policy", () => {
+  const busy = () =>
+    Object.assign(
+      new Error("Transaction API error: Unable to start a transaction in the given time"),
+      {
+        code: "P2028",
+      },
+    );
+
+  /** @scenario "The process policy logs and spans a busy database as a handled 503" */
+  it("is answered as the handled 503 and not reported as an unhandled fault", async () => {
+    const answer = await callTrpcDoor(busy());
+
+    expect(answer.status).toBe(503);
+    expect(answer.transportCode).toBe("SERVICE_UNAVAILABLE");
+    expect(answer.handled).toMatchObject({ code: "service_unavailable", httpStatus: 503 });
+    expect(answer.captured).toEqual([]);
+  });
+
+  /** @scenario "The process policy logs and spans a busy database as a handled 503" */
+  it("answers the same status through the REST door", async () => {
+    const [viaTrpc, viaRest] = await Promise.all([callTrpcDoor(busy()), callRestDoor(busy())]);
+
+    expect(viaRest.status).toBe(503);
+    expect(viaTrpc.status).toBe(viaRest.status);
+  });
+});

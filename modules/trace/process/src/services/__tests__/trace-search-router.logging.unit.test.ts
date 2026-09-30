@@ -46,6 +46,7 @@ beforeEach(() => {
 describe("given a route that degraded", () => {
   describe("when the failure is a handled error carrying meta", () => {
     /** @scenario "A judge question no model could write is judged as typed" */
+    /** @scenario "A provider failure is logged curated, never raw" */
     it("names the code, the model, the provider and the status in the message", async () => {
       const d = deps({
         classifier: answering("instant_eval"),
@@ -59,6 +60,7 @@ describe("given a route that degraded", () => {
       ]);
     });
 
+    /** @scenario "A provider failure is logged curated, never raw" */
     it("carries nothing the provider itself wrote", async () => {
       const d = deps({
         classifier: answering("filter"),

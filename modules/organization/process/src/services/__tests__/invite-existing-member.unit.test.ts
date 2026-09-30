@@ -29,6 +29,7 @@ function serviceSeeing(memberEmail: string | null): InviteService {
 describe("given a batch of addresses to invite", () => {
   describe("when one of them already belongs to a member", () => {
     /** @scenario "Inviting an existing member is refused with a reason" */
+    /** @scenario "Inviting an existing member is refused" */
     it("refuses the batch and names the address", async () => {
       await expect(
         serviceSeeing("already@example.com").assertNotAlreadyMembers({

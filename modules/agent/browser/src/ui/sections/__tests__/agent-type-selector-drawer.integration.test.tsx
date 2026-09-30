@@ -109,6 +109,7 @@ describe("AgentTypeSelectorDrawer", () => {
     });
 
     /** @scenario "The new agent flow hides the Voice Agent while the flag is off" */
+    /** @scenario "The Voice Agent option is hidden while the project's flag is off" */
     it("hides the Voice Agent card while it is off", () => {
       voiceState.flagOn = false;
       renderDrawer();

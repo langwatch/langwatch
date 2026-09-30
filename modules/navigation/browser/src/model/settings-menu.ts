@@ -205,7 +205,7 @@ function enterpriseAccessItems(): SettingsMenuItem[] {
   return [
     {
       // Definitions and their assignments are two tabs of one page.
-      label: "Roles",
+      label: "Roles & access",
       href: "/settings/roles",
       icon: ShieldCheck,
       alsoActiveAt: ["/settings/role-bindings"],

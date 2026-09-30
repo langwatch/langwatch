@@ -1,5 +1,11 @@
 import { UiScope, UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
-import type { UiFeatureApiBinding, UiFeatureApiTransport } from "@langwatch/browser-host/transport";
+import type { UiQueryStore } from "@langwatch/browser-host/query-persistence";
+import { SessionVersionWatch } from "@langwatch/browser-host/session-version";
+import {
+  createUiFeatureApiClient,
+  type UiFeatureApiBinding,
+  type UiFeatureApiTransport,
+} from "@langwatch/browser-host/transport";
 import {
   createUiScopeHost,
   useOrganizationTeamProject,
@@ -298,6 +304,93 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       const view = renderShell(shell, <Page />);
 
       expect(view.getByTestId("scope").textContent).toBe("false|undefined|false");
+    });
+  });
+
+  describe("when installed reads declare a cache tier (ADR-164)", () => {
+    const orgGraph = [["organization", "getAll"], { input: {}, type: "query" }];
+    const member = [["organization", "getMemberById"], { input: { id: "u" }, type: "query" }];
+    const providers = [["modelProvider", "getAllForProject"], { input: {}, type: "query" }];
+
+    function tieredBinding(): UiFeatureApiBinding {
+      return {
+        name: "organization",
+        Provider: ({ children }: { children: ReactNode }) => <>{children}</>,
+        contracts: [
+          {
+            namespace: "organization",
+            members: { getAll: { cache: { tier: "session", persist: true } }, getMemberById: {} },
+          },
+          {
+            namespace: "modelProvider",
+            members: { getAllForProject: { cache: { tier: "reference" } } },
+          },
+        ],
+      };
+    }
+
+    function memoryStore(): UiQueryStore & { entries: Map<string, string> } {
+      const entries = new Map<string, string>();
+      return {
+        entries,
+        getItem: async (key) => entries.get(key),
+        setItem: async (key, value) => entries.set(key, value),
+        removeItem: async (key) => void entries.delete(key),
+        keys: async () => [...entries.keys()],
+      };
+    }
+
+    describe("given a newer session version reaches the watch", () => {
+      /** @scenario "A newer session version invalidates the session tier" */
+      it("marks the session tier stale in the serving cache and leaves the rest", async () => {
+        const host = new QueryClient();
+        host.setQueryData(orgGraph, ["org"]);
+        host.setQueryData(providers, ["provider"]);
+        const sessionVersions = SessionVersionWatch.create();
+        const shell = createUiFeatureShell({
+          sessionQueryKey: TEST_SESSION_QUERY_KEY,
+          apis: [tieredBinding()],
+          capabilities: {},
+          transport: createUiFeatureApiClient(),
+          sessionVersions,
+        });
+
+        renderShell(shell, <div />, host);
+        sessionVersions.observe("7");
+        sessionVersions.observe("8");
+
+        await waitFor(() => expect(host.getQueryState(orgGraph)?.isInvalidated).toBe(true));
+        expect(host.getQueryState(providers)?.isInvalidated).toBe(false);
+      });
+    });
+
+    describe("given a signed-in user and another user's cache on this device", () => {
+      /** @scenario "A user switch never shows another user's cache" */
+      it("saves only the marked read, under this user's entry, and removes the other", async () => {
+        const store = memoryStore();
+        store.entries.set("lw-query-cache:user_0", "{}");
+        const host = new QueryClient();
+        const shell = createUiFeatureShell({
+          sessionQueryKey: TEST_SESSION_QUERY_KEY,
+          apis: [tieredBinding()],
+          capabilities: {},
+          transport: createUiFeatureApiClient(),
+          session: () => ({ session: new StubSession(), scope: new StubScope() }),
+          queryStore: store,
+        });
+
+        renderShell(shell, <div />, host);
+        await waitFor(() => expect(store.entries.has("lw-query-cache:user_0")).toBe(false));
+        host.setQueryData(orgGraph, ["org"]);
+        host.setQueryData(member, { id: "u" });
+
+        await waitFor(
+          () => expect(store.entries.get("lw-query-cache:user_1")).toContain("getAll"),
+          { timeout: 3_000 },
+        );
+        expect([...store.entries.keys()]).toEqual(["lw-query-cache:user_1"]);
+        expect(store.entries.get("lw-query-cache:user_1")).not.toContain("getMemberById");
+      });
     });
   });
 });

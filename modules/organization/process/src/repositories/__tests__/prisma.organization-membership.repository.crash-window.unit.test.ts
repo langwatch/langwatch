@@ -150,6 +150,7 @@ describe("given a member whose removal is under way", () => {
   });
 
   describe("when the member is the last active admin", () => {
+    /** @scenario "Removing the last active admin is refused" */
     it("refuses without revoking anything", async () => {
       memberFindUnique.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,
@@ -171,6 +172,7 @@ describe("given a member whose removal is under way", () => {
   });
 
   describe("when the transaction's locked re-check refuses a removal the advisory pre-check let through", () => {
+    /** @scenario "Two admins removed at the same time cannot both succeed" */
     it("refuses before revoking anything, so the survivor keeps their access", async () => {
       memberFindUnique.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,

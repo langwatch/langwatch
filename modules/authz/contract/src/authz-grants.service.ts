@@ -1,4 +1,14 @@
 import type {
+  AuthzChangeGrantRoleInput,
+  AuthzCreateGrantInput,
+  AuthzGetGrantInput,
+  AuthzListGrantsInput,
+  AuthzRevokeGrantByIdInput,
+  Grant,
+  GrantPage,
+  GrantRevoked,
+} from "./authz-grants-rest.schemas.ts";
+import type {
   AuthzApplyMemberBindingsInput,
   AuthzBindingMutationSuccess,
   AuthzCreateBindingInput,
@@ -92,6 +102,16 @@ export abstract class AuthzGrantsService {
   abstract defineRole(args: AuthzDefineRoleInput): Promise<AuthzDefineRoleOutput>;
 
   abstract deleteRole(args: AuthzDeleteRoleInput): Promise<AuthzDeleteRoleOutput>;
+
+  abstract listGrants(args: AuthzListGrantsInput): Promise<GrantPage>;
+
+  abstract getGrant(args: AuthzGetGrantInput): Promise<Grant>;
+
+  abstract createGrant(args: AuthzCreateGrantInput): Promise<Grant>;
+
+  abstract changeGrantRole(args: AuthzChangeGrantRoleInput): Promise<Grant>;
+
+  abstract revokeGrant(args: AuthzRevokeGrantByIdInput): Promise<GrantRevoked>;
 
   abstract createBinding(args: AuthzCreateBindingInput): Promise<AuthzCreateBindingOutput>;
 

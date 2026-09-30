@@ -95,6 +95,7 @@ describe("SignIn after signing out", () => {
 
   afterEach(() => cleanup());
 
+  /** @scenario Signing out does not start another provider sign-in */
   it("says so and offers the way back in, asking the router nothing", () => {
     renderPage();
 

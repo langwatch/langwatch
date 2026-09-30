@@ -8,25 +8,14 @@
 # lite allowance under 50, and an organization already past its full seats refuses first as
 # members, so limitType is asserted present, not by value.
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: lim-invites-beyond-lite-seats-is-refused
+  selfHosted: true
   endpoint: POST /api/organization/invites
   auth: org
-  # One real lite member first, so the 50-invite batch overflows a 50-seat allowance whatever
-  # the org held before; a 403 here means the allowance was already spent, which also holds.
-  setup:
-    - request: "POST /api/scim/v2/Users"
-      body:
-        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"]
-        userName: "vd-lite-{uid}@example.com"
-        name: {"givenName": "Vd", "familyName": "Person"}
-        emails: [{"primary": true, "value": "vd-lite-{uid}@example.com", "type": "work"}]
-        active: true
-      auth: "scim"
-      capture: {"scimUserId": "id"}
-    - request: "PATCH /api/organization/members/{scimUserId}"
-      auth: "org"
-      body: {"role": "EXTERNAL"}
-      expect: {"status": [200, 403]}
+  # An organization of its own, so no other scenario's members or invites are in the count.
+  shard: org
+  serial: true
   request:
     path: /api/organization/invites
     body:
@@ -189,7 +178,3 @@
   verify:
     - request: GET /api/organization/invites
       expect: { status: 200, notContains: "vd-00-{uid}@example.com" }
-  teardown:
-    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
-      auth: "scim"
-      expect: {"status": [204, 404]}

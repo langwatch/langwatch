@@ -230,6 +230,17 @@ export class DataPrivacyApp implements DataPrivacyApi {
     return this.#privacy.removeForScope(input);
   }
 
+  getPiiRedactionLevel(input: { projectId: string }): Promise<DataPrivacyPiiRedactionLevel> {
+    return this.#privacy.getPiiRedactionLevel(input);
+  }
+
+  setPiiRedactionLevel(input: {
+    projectId: string;
+    level: DataPrivacyPiiRedactionLevel;
+  }): Promise<void> {
+    return this.#privacy.setPiiRedactionLevel(input);
+  }
+
   getSnapshot(input: { projectId: string } & DataPrivacyCallerInput): Promise<DataPrivacySnapshot> {
     return this.#snapshots.getSnapshot({ userId: input.userId, projectId: input.projectId });
   }

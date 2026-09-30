@@ -17,6 +17,8 @@ export type EvaluationClickHouseQuery = {
   query_params: Record<string, unknown>;
   format: "JSONEachRow";
   clickhouse_settings?: ClickHouseSettings;
+  /** A declared tenant set: one organization's projects, bound by `TenantId IN (...)`. */
+  tenantIds?: readonly string[];
 };
 
 export type EvaluationClickHouseClient = {
@@ -41,6 +43,7 @@ export class ClickHouseEvaluationSession implements EvaluationClickHouseClient {
   async query(input: EvaluationClickHouseQuery): Promise<EvaluationClickHouseResult> {
     const request = {
       tenantId: this.tenantId,
+      ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
       sql: input.query,
       params: input.query_params,
       ...(input.clickhouse_settings ? { settings: settingsOf(input.clickhouse_settings) } : {}),

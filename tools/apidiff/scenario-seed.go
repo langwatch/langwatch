@@ -40,7 +40,7 @@ func (side *scenarioSide) authHeaders(shard *shardContext, kind string) (map[str
 	case authProjectB:
 		return projectBHeaders(side, shard)
 	case authProjectC:
-		return projectCHeaders(shard)
+		return projectCHeaders(side, shard)
 	case authOrgC:
 		return side.foreignHeaders(kind, func(keys Keys) string { return keys.ProjectKey }, projectKeyHeader)
 	case authOrgCOrg:
@@ -77,9 +77,12 @@ func projectBHeaders(side *scenarioSide, shard *shardContext) (map[string]string
 	return nil, fmt.Errorf("auth \"project-b\" needs a second project in the same organization: pass -project-key-b, or run with -scenario-shards 2 or more")
 }
 
-// projectCHeaders is a project of another organization, which only a key
-// flag or an organization the admin key can provision supplies.
-func projectCHeaders(shard *shardContext) (map[string]string, error) {
+// projectCHeaders is a project of another organization: the key flag's, else
+// the foreign organization's project.
+func projectCHeaders(side *scenarioSide, shard *shardContext) (map[string]string, error) {
+	if shard.keys.ProjectKeyC == "" && side.foreign != nil && side.foreign.err == "" {
+		return projectKeyHeader(side.foreign.keys.ProjectKey), nil
+	}
 	if shard.keys.ProjectKeyC == "" {
 		return nil, fmt.Errorf("auth \"project-c\" needs a project in another organization: pass -project-key-c, or -admin-key (LANGWATCH_INSTANCE_ADMIN_API_KEY on the stack) so one can be provisioned")
 	}
@@ -148,7 +151,7 @@ func needsOf(items []scenario, shards int) scenarioNeeds {
 			needs.orgs++
 		}
 		needs.siblings = needs.siblings || usesAuth(item, authProjectB)
-		needs.foreign = needs.foreign || usesAuth(item, authOrgC) || usesAuth(item, authOrgCOrg)
+		needs.foreign = needs.foreign || usesAuth(item, authOrgC) || usesAuth(item, authOrgCOrg) || usesAuth(item, authProjectC)
 		needs.restricted = needs.restricted || usesAuth(item, authRestricted)
 		needs.sessionLogin = needs.sessionLogin || usesAuth(item, authSession) || usesAuth(item, authCLI)
 	}
@@ -184,6 +187,9 @@ func (runner *scenarioRunner) seed(needs scenarioNeeds) {
 			session.Add(1)
 			go func() { defer session.Done(); runner.engine.mintCLISession(side.baseURL, side.creds) }()
 		}
+	}
+	if runner.sessionSeeding {
+		session.Wait() // seedOrg reads the credentials the sign-in writes
 	}
 	if runner.options.SeedDir != "" && len(runner.sides) == 1 {
 		runner.seedShared(needs)
@@ -345,8 +351,7 @@ func (runner *scenarioRunner) foreignOrgName() string {
 func (runner *scenarioRunner) seedOrg(side *scenarioSide, name string) *shardContext {
 	shard := &shardContext{keys: runner.options.Keys, vars: map[string]string{}}
 	if runner.options.Keys.AdminKey == "" {
-		shard.err = "org-sharded scenarios need the instance admin key: pass -admin-key"
-		return shard
+		return runner.seedOrgBySession(side, name, shard)
 	}
 	created := runner.call(side, http.MethodPost, "/api/organizations", runner.options.Keys.AdminKey, map[string]any{"name": name, "slug": name})
 	organization, _ := created.body["organization"].(map[string]any)
@@ -363,6 +368,47 @@ func (runner *scenarioRunner) seedOrg(side *scenarioSide, name string) *shardCon
 	shard.vars["orgId"], shard.vars["orgKey"], shard.vars["teamId"] = orgID, token, teamID
 	runner.fileProject(shard, runner.call(side, http.MethodPost, "/api/projects", token, projectBody(name, teamID)))
 	return shard
+}
+
+// seedOrgBySession is seedOrg where the instance-admin routes are absent
+// (SaaS): the seeded admin creates the organization through the dashboard's
+// tRPC and mints an organization admin key for it the same way.
+func (runner *scenarioRunner) seedOrgBySession(side *scenarioSide, name string, shard *shardContext) *shardContext {
+	if side.creds[credSessionCookie] == "" {
+		shard.err = "org-sharded scenarios need the instance admin key (pass -admin-key) or the seeded admin's session"
+		return shard
+	}
+	created := runner.sessionTRPC(side, "organization.createAndAssign", map[string]any{"orgName": name})
+	orgID, _ := fieldString(created.body, "result.data.organization.id")
+	teamID, _ := fieldString(created.body, "result.data.team.id")
+	if !succeeded(created) || orgID == "" {
+		shard.err = seedFailure("seed organization", created)
+		return shard
+	}
+	minted := runner.sessionTRPC(side, "apiKey.create", map[string]any{
+		"organizationId": orgID, "name": "apidiff-" + name, "keyType": "service", "permissionMode": "all",
+		"bindings": []map[string]any{{"role": "ADMIN", "scopeType": "ORGANIZATION", "scopeId": orgID}},
+	})
+	token, _ := fieldString(minted.body, "result.data.token")
+	if !succeeded(minted) || token == "" {
+		shard.err = seedFailure("mint organization key", minted)
+		return shard
+	}
+	shard.keys.OrgKey = token
+	shard.vars["orgId"], shard.vars["orgKey"], shard.vars["teamId"] = orgID, token, teamID
+	runner.fileProject(shard, runner.call(side, http.MethodPost, "/api/projects", token, projectBody(name, teamID)))
+	return shard
+}
+
+// sessionTRPC calls one tRPC mutation as the seeded admin, in the envelope the
+// side reads, and answers with the input's `result.data` lifted as scenarios read it.
+func (runner *scenarioRunner) sessionTRPC(side *scenarioSide, procedure string, input map[string]any) rawResult {
+	result := runner.engine.fixtureRequest(fixtureCall{method: http.MethodPost, url: side.baseURL + trpcPrefix + procedure,
+		headers: sessionHeaders(side.creds, side.baseURL, nil), body: wrapTRPCBody(side.trpc, input)})
+	if body, ok := unwrapTRPCData(side.trpc, result.body).(map[string]any); ok {
+		result.body = body
+	}
+	return result
 }
 
 // mintRestricted makes a read-only key bound to the shard's project, the

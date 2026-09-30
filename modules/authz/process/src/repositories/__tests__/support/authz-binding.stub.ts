@@ -11,6 +11,12 @@ export class StubAuthzBindingRepository extends AuthzBindingRepository {
   >(async () => false);
   readonly findScopeRows = vi.fn<AuthzBindingRepository["findScopeRows"]>(async () => []);
   readonly findGroupMembers = vi.fn<AuthzBindingRepository["findGroupMembers"]>(async () => []);
+  readonly findOrganizationUserIds = vi.fn<AuthzBindingRepository["findOrganizationUserIds"]>(
+    async () => [],
+  );
+  readonly findGrantPrincipals = vi.fn<AuthzBindingRepository["findGrantPrincipals"]>(
+    async () => [],
+  );
   readonly findUserGroups = vi.fn<AuthzBindingRepository["findUserGroups"]>(async () => []);
   readonly findOrganizationRole = vi.fn<AuthzBindingRepository["findOrganizationRole"]>(
     async () => null,

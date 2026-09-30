@@ -81,6 +81,11 @@ class StubAuthzGrantsService extends AuthzGrantsService {
   applyMemberBindings = vi.fn((_args: AuthzApplyMemberBindingsInput) =>
     Promise.reject(new Error("unused")),
   );
+  listGrants = vi.fn(() => Promise.reject(new Error("unused")));
+  getGrant = vi.fn(() => Promise.reject(new Error("unused")));
+  createGrant = vi.fn(() => Promise.reject(new Error("unused")));
+  changeGrantRole = vi.fn(() => Promise.reject(new Error("unused")));
+  revokeGrant = vi.fn(() => Promise.reject(new Error("unused")));
 }
 
 class StubFederation implements BetterAuthFederation {

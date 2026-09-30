@@ -73,7 +73,11 @@ export function createRoleTestApp(
   const app = RoleApp.create({
     repositories: { roles },
     dependencies: {
-      permissions: createApiFixture<AuthzApi>(input.permissions ?? {}, "AuthzApi"),
+      // A caller holds every permission unless a test says otherwise (the escalation rule).
+      permissions: createApiFixture<AuthzApi>(
+        { findPermissionsBeyondCaller: async () => [], ...input.permissions },
+        "AuthzApi",
+      ),
       organizations: createApiFixture<OrganizationApi>(
         input.organizations ?? {},
         "OrganizationApi",

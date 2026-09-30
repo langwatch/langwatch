@@ -13,6 +13,8 @@ import {
   experimentRunPlanFoldStateSchema,
   type ExperimentRunProgressState,
   experimentRunProgressStateSchema,
+  type ExperimentRunStartRecord,
+  experimentRunStartRecordSchema,
 } from "../experiment-run-fold.repository.ts";
 
 const logger = createLogger("langwatch:experiment:run-fold");
@@ -22,6 +24,7 @@ const RUN_TTL_SECONDS = 86_400;
 
 const progressKey = (runId: string): string => `${RUN_KEY_PREFIX}${runId}`;
 const planKey = (runKey: string): string => `${RUN_KEY_PREFIX}${runKey}:plan`;
+const startKey = (runId: string): string => `${RUN_KEY_PREFIX}${runId}:start`;
 
 export class RedisExperimentRunFoldRepository extends ExperimentRunFoldRepository {
   static create(options: { redis: ProcessMembers["redis"] }): RedisExperimentRunFoldRepository {
@@ -56,6 +59,16 @@ export class RedisExperimentRunFoldRepository extends ExperimentRunFoldRepositor
 
   async writeProgress({ state }: { state: ExperimentRunProgressState }): Promise<void> {
     await this.redis.set(progressKey(state.runId), JSON.stringify(state), "EX", RUN_TTL_SECONDS);
+  }
+
+  async recordRunStart({ start }: { start: ExperimentRunStartRecord }): Promise<void> {
+    await this.redis.set(startKey(start.runId), JSON.stringify(start), "EX", RUN_TTL_SECONDS);
+  }
+
+  async findRunStart({ runId }: { runId: string }): Promise<ExperimentRunStartRecord[]> {
+    const read = await this.read({ key: startKey(runId), schema: experimentRunStartRecordSchema });
+
+    return read.kind === "folded" ? [read.state] : [];
   }
 
   /** A value that no longer parses reads as empty, so the fold starts over rather than wedging. */

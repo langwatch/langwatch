@@ -35,6 +35,7 @@ function recorder<Payload>(sent: Payload[]): EventingCommandSender<Payload> {
 
 function serviceOver(input: { admin: string | null; counts: Record<string, number> }) {
   const completed: RecordEvaluationLifecycleCompletedCommandData[] = [];
+  const counted: (readonly string[])[] = [];
   const service = EvaluationLifecycleService.create({
     projects: createApiFixture<ProjectApi>({
       resolveOrgAdmin: async () => ({
@@ -46,13 +47,18 @@ function serviceOver(input: { admin: string | null; counts: Record<string, numbe
       }),
       listIdsByOrganization: async () => Object.keys(input.counts),
     }),
-    runs: { countRuns: async ({ tenantId }) => input.counts[tenantId] ?? 0 },
+    runs: {
+      countOrganizationRuns: async ({ tenantIds }) => {
+        counted.push(tenantIds);
+        return tenantIds.reduce((total, tenantId) => total + (input.counts[tenantId] ?? 0), 0);
+      },
+    },
   });
   service.connect({
     recordEvaluationRan: recorder<RecordEvaluationRanCommandData>([]),
     recordEvaluationLifecycleCompleted: recorder(completed),
   });
-  return { service, completed };
+  return { service, completed, counted };
 }
 
 describe("EvaluationLifecycleService.completed", () => {
@@ -78,6 +84,18 @@ describe("EvaluationLifecycleService.completed", () => {
         ...run,
       },
     ]);
+  });
+
+  /** @scenario "An evaluation's organization count is read once, not once per project" */
+  it("asks for the organization's count in one read naming every project", async () => {
+    const { service, counted } = serviceOver({
+      admin: "admin-1",
+      counts: { "project-1": 2, "project-2": 3, "project-3": 0 },
+    });
+
+    await service.completed({ projectId: "project-1", run, occurredAt: 1 });
+
+    expect(counted).toEqual([["project-1", "project-2", "project-3"]]);
   });
 
   it("records nothing for an organization with no admin", async () => {
