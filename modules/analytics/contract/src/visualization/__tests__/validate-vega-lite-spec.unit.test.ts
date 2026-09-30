@@ -36,6 +36,7 @@ describe("validateVegaLiteSpec", () => {
   describe("given a candidate specification", () => {
     describe("when it is validated", () => {
       /** @scenario "Only supported parsed specifications are admitted" */
+      /** @scenario "A spec validates against the bundled official Vega-Lite v6 schema" */
       it("lets the bundled v6 schema decide validity without fetching anything", () => {
         const reachedTheNetwork = vi.fn(() => {
           throw new Error("the validator must not fetch a schema");
@@ -80,6 +81,7 @@ describe("validateVegaLiteSpec", () => {
   describe("given a value that is not a parsed specification object", () => {
     describe("when it is offered for validation", () => {
       /** @scenario "Only supported parsed specifications are admitted" */
+      /** @scenario "Only a parsed JSON object of the supported version is accepted" */
       it("refuses URLs, scalars, arrays, and unsupported schema versions without converting them", () => {
         const notSpecs = [
           "https://vega.github.io/vega-lite/examples/bar.vl.json",
@@ -137,6 +139,7 @@ describe("validateVegaLiteSpec", () => {
   describe("given several registered named datasets and their columns", () => {
     describe("when a spec reads more than one of them", () => {
       /** @scenario "The adversarial corpus and multi-dataset renderer contract stay covered" */
+      /** @scenario "The renderer contract accepts multiple registered named views" */
       it("resolves each branch against the dataset that feeds it", () => {
         const layeredOverTwoDatasets = {
           $schema: VEGA_LITE_SCHEMA_URL,

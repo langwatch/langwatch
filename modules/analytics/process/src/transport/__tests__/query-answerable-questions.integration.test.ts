@@ -6,12 +6,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { langWatchQLKeyReach, MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
-import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { LocalFeatureApis } from "@langwatch/kernel";
 import { Temporal } from "@langwatch/time";
-import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
-import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -23,24 +18,16 @@ import {
   startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
-import { LWQL_EXAMPLE_DATABASE } from "../../rules/langwatch-ql-examples.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
-import { buildQueryReference } from "../../rules/query-reference.rules.ts";
 import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
-import { AnalyticsQueryApi, queryRest } from "../query.rest.ts";
+import { mountQueryDoor, type QueryTenant } from "./query-door.harness.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 
 const lwqlCapability = LangWatchQLCapabilityService.create();
-
-/** A tenant the door authenticates as, in the shape the credential resolves to. */
-interface QueryTenant {
-  id: string;
-  lwqlKey: string;
-}
 
 // ---------------------------------------------------------------------------
 // The windows. One day per question, so no fixture is part of another answer.
@@ -1356,95 +1343,116 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       expect(codes(bounded)).toEqual([]);
     });
   });
-});
 
-/**
- * The query family, mounted the way the API process mounts it, over a credential resolution
- * that authenticates one tenant. Only the credential chain is faked.
- */
-function mountQueryDoor({
-  tenant,
-  service,
-}: {
-  tenant: () => QueryTenant;
-  service: () => LangWatchQLService;
-}): { fetch: (path: string, init?: RequestInit) => Promise<Response> } {
-  // An API key resolves its organization; the key-reach fact below fans it out to the tenant.
-  const keyScope = () => ({ tier: "organization" as const, id: `org-of-${tenant().id}` });
+  /** A statement posted with whatever else the request carries, answered as status and body. */
+  const post = async (body: Record<string, unknown>) => {
+    const response = await door.fetch(runPath, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
 
-  const runtime = createRestRuntime({
-    // The whole of the credential chain this test fakes: one authenticated key.
-    identity: {
-      authenticate: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: keyScope() }),
-      identify: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: keyScope() }),
-    },
+    return { status: response.status, text: await response.text() };
+  };
+
+  const json = (answer: { text: string }) => JSON.parse(answer.text);
+
+  describe("when a parameterized query is re-run", () => {
+    /** @scenario "Parameterized queries re-run deterministically through the REST API" */
+    it("answers the same rows for the same bound values over unchanged data", async () => {
+      const sql =
+        `SELECT arrayJoin(Models) AS model, count() AS traces FROM ${database}.traces ` +
+        `WHERE ${within("OccurredAt", DAY.latency)} AND TotalDurationMs >= {minMs:UInt32} ` +
+        `GROUP BY model ORDER BY model`;
+
+      const first = json(await post({ sql, parameters: { minMs: 150 } }));
+      const second = json(await post({ sql, parameters: { minMs: 150 } }));
+      const none = json(await post({ sql, parameters: { minMs: 1_000_000 } }));
+
+      expect(first.rows.length).toBeGreaterThan(0);
+      expect(second.rows).toEqual(first.rows);
+      expect(none.rows).toEqual([]);
+    });
   });
 
-  // The scope a key resolves to, faked: the one authenticated tenant, fully permitted.
-  const protections = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
-  const queryApi: AnalyticsQueryApi = {
-    runLangWatchQLForKey: ({ sql, parameters, timeWindow, granularitySeconds }) =>
-      service().executeForProjects({
-        projects: [tenant()],
-        protections,
-        sql,
-        ...(parameters ? { parameters } : {}),
-        ...(timeWindow ? { timeWindow } : {}),
-        ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
-      }),
-    describeLangWatchQLSchemaForKey: async () => service().describeSchema({ protections }),
-    describeQueryReferenceForKey: async () =>
-      buildQueryReference({
-        protections,
-        lwqlEnabled: true,
-        database: LWQL_EXAMPLE_DATABASE,
-        schema: service().describeSchema({ protections }),
-        limits: {
-          maxStatementLength: MAX_LWQL_LENGTH,
-          maxRowsReturned: 10_000,
-          maxResultBytes: 8_000_000,
-          maxExecutionTimeSeconds: 10,
-        },
-        traceFilterExamples: TRACE_FILTER_EXAMPLES,
-      }),
-  };
+  describe("when a caller tries to widen or steer its tenant scope", () => {
+    /** @scenario "Tenant scope derives exclusively from authenticated server context" */
+    it("reads only the authenticated tenant, however the request names another", async () => {
+      expect(await foreignRowCount("trace_summaries", "OccurredAt", DAY.latency)).toBeGreaterThan(0);
+      const tenantsOf = (answer: { status: number; text: string }) => {
+        expect(answer.status, answer.text).toBeLessThan(500);
+        return answer.status === 200 ? json(answer).rows.map((row: any) => row.TenantId) : [];
+      };
+      const window = within("OccurredAt", DAY.latency);
 
-  // Reached through the operations-only feature-API proxy, the way the
-  // composition hands an application to a door: a route naming an operation
-  // the application does not serve must fail here rather than in production.
-  const apis = new LocalFeatureApis();
-  apis.declare(AnalyticsQueryApi);
-  apis.bind(AnalyticsQueryApi, queryApi);
-  apis.ready();
+      const named = await post({
+        sql: `SELECT DISTINCT TenantId FROM ${database}.traces WHERE ${window} AND TenantId = '${other.id}'`,
+      });
+      const bound = await post({
+        sql: `SELECT DISTINCT TenantId FROM ${database}.traces WHERE ${window} AND TenantId = {tenant:String}`,
+        parameters: { tenant: other.id },
+      });
+      const smuggled = await post({
+        sql: `SELECT DISTINCT TenantId FROM ${database}.traces WHERE ${window}`,
+        tenantId: other.id,
+        projectId: other.id,
+        parameters: { tenantId: other.id },
+      });
+      const own = await post({
+        sql: `SELECT DISTINCT TenantId FROM ${database}.traces WHERE ${window}`,
+      });
 
-  const app = new Hono().route(
-    "/",
-    runtime.mount(queryRest.router(), {
-      app: () => apis.reference(AnalyticsQueryApi),
-      onError: renderHandled,
-      facts: [
-        bindRestMiddleware(langWatchQLKeyReach, () => ({
-          kind: "project" as const,
-          projectId: tenant().id,
-        })),
-      ],
-    }),
-  );
+      expect(tenantsOf(named)).toEqual([]);
+      expect(tenantsOf(bound)).toEqual([]);
+      expect(tenantsOf(smuggled).filter((tenant: string) => tenant !== asking.id)).toEqual([]);
+      expect(tenantsOf(own)).toEqual([asking.id]);
+    });
 
-  return {
-    fetch: async (path: string, init?: RequestInit) =>
-      app.fetch(new Request(`http://api.test${path}`, init)),
-  };
-}
+    it("refuses a SETTINGS clause, the key map and the system tables outright", async () => {
+      const window = within("OccurredAt", DAY.latency);
 
-/** A handled refusal must reach the caller at its own status with its own code. */
-const renderHandled: RestErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: { code: handled.code ?? "error", message: handled.message ?? "" } },
-      handled.httpStatus as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};
+      for (const sql of [
+        `SELECT TenantId FROM ${database}.traces WHERE ${window} SETTINGS ${harness.names.tenantSetting} = '${other.lwqlKey}'`,
+        `SELECT * FROM ${facts}.${harness.names.keyMapTable}`,
+        `SELECT * FROM system.settings`,
+      ]) {
+        const answer = await post({ sql });
+
+        expect(answer.status, sql).toBe(400);
+        expect(json(answer).error.code, sql).toBe("lwql_not_permitted");
+      }
+    });
+  });
+
+  describe("when a query succeeds or fails", () => {
+    /** @scenario "Query database credentials never reach the caller" */
+    it("never puts credentials, settings, physical names or another tenant in the response", async () => {
+      const connection = harness.restrictedConnection();
+      const secrets = [
+        connection.password,
+        connection.username,
+        harness.names.tenantSetting,
+        harness.names.keyMapTable,
+        facts,
+        asking.lwqlKey,
+        other.lwqlKey,
+        other.id,
+      ];
+      const window = within("OccurredAt", DAY.latency);
+
+      const answers = [
+        await post({ sql: `SELECT TraceId FROM ${database}.traces WHERE ${window} LIMIT 3` }),
+        await post({ sql: `SELECT NoSuchColumn FROM ${database}.traces WHERE ${window}` }),
+        await post({ sql: `SELECT 1 FROM` }),
+      ];
+
+      expect(answers.map((answer) => answer.status)).toContain(200);
+      expect(answers.some((answer) => answer.status >= 400)).toBe(true);
+      for (const answer of answers) {
+        for (const secret of secrets) {
+          expect(answer.text, `a response carried ${secret}`).not.toContain(secret);
+        }
+      }
+    });
+  });
+});

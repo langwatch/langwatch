@@ -159,6 +159,7 @@ describe("given a run's event stream", () => {
       });
     });
 
+    /** @scenario "A run's tokens are the sum of what its pages reported" */
     it("sums the tokens its pages reported", () => {
       const state = fold([
         page({ page: 1, rows: 10, inputTokens: 800, hasNextPage: true }),
@@ -176,6 +177,7 @@ describe("given a run's event stream", () => {
   });
 
   describe("when the run has finished", () => {
+    /** @scenario "The cost and the price stay on the run's row" */
     it("reports the outcome, the spend and when it ended", () => {
       const state = fold([
         page({ page: 1, rows: 10, inputTokens: 500 }),

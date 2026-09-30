@@ -69,6 +69,7 @@ describe("the Vega-Lite validator and policy modules", () => {
   describe("given the modules are imported outside a browser", () => {
     describe("when the policy runs", () => {
       /** @scenario "Vega dependencies and browser runtime stay behind the lazy boundary" */
+      /** @scenario "Policy modules stay pure and server-import-safe" */
       it("evaluates no React, DOM, or browser-only Vega module", () => {
         expect(typeof window).toBe("undefined");
         expect(typeof document).toBe("undefined");

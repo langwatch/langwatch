@@ -46,6 +46,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a spec that names a data source", () => {
     describe("when the name is not registered", () => {
       /** @scenario "Policy validates names, fields, transforms, and complexity" */
+      /** @scenario "Every data source must resolve to a registered named view" */
       it("names the unknown dataset and the registered ones", () => {
         const errors = refusals({
           $schema: S,
@@ -82,6 +83,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a spec that carries its own data", () => {
     describe("when it is validated", () => {
       /** @scenario "Data and runtime escape hatches are rejected" */
+      /** @scenario "Caller-supplied views and inline values are rejected" */
       it("refuses a top-level datasets property and inline values before Vega sees them", () => {
         expect(refusalRules(bar({ datasets: { smuggled: [{ model: "a" }] } }))).toContain(
           "data.caller-datasets",
@@ -101,6 +103,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a spec carrying a resource-loading path", () => {
     describe("when the path is buried in the composition tree", () => {
       /** @scenario "Data and runtime escape hatches are rejected" */
+      /** @scenario "Every resource-loading path is rejected recursively" */
       it("refuses URL data, URL lookups, image marks, and URL encodings at any depth", () => {
         const nested = (leaf: Record<string, unknown>) => ({
           $schema: S,
@@ -182,6 +185,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a spec that reaches for the chart runtime's own options", () => {
     describe("when it is validated", () => {
       /** @scenario "Data and runtime escape hatches are rejected" */
+      /** @scenario "Spec-controlled runtime options are rejected" */
       it("refuses usermeta embed options while leaving other usermeta alone", () => {
         const errors = refusals(
           bar({
@@ -204,6 +208,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a lookup transform", () => {
     describe("when it names another dataset", () => {
       /** @scenario "Policy validates names, fields, transforms, and complexity" */
+      /** @scenario "Lookup is admitted only between registered views within limits" */
       it("admits a registered source within limits and refuses every other source", () => {
         expect(validate(lookupBetweenRegisteredDatasets).ok).toBe(true);
 
@@ -249,6 +254,7 @@ describe("the LangWatchQL Vega-Lite policy", () => {
   describe("given a transform or expression outside the allowlist", () => {
     describe("when it is validated", () => {
       /** @scenario "Policy validates names, fields, transforms, and complexity" */
+      /** @scenario "Unknown transforms and expression features fail closed" */
       it("refuses unreviewed transforms and unreviewed expression identifiers", () => {
         for (const unreviewed of [
           { sample: 500 },

@@ -63,6 +63,7 @@ describe("the LangWatchQL Vega-Lite fixture corpus", () => {
   describe("given fixtures for every rejection path", () => {
     describe("when each fixture is validated", () => {
       /** @scenario "The adversarial corpus and multi-dataset renderer contract stay covered" */
+      /** @scenario "The adversarial corpus is refused" */
       it("refuses every one with a structured error naming the path it attacks", () => {
         expect(ADVERSARIAL_VEGA_FIXTURES.length).toBeGreaterThan(20);
 

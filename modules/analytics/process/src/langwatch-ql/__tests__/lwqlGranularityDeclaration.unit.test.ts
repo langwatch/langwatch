@@ -84,6 +84,7 @@ describe("assertLangWatchQLGranularityDeclaration (save-time rules)", () => {
     }
   });
 
+  /** @scenario "A saved chart declaring granularity without both period parameters is refused at save" */
   it("refuses granularity declared without either period bound", () => {
     expect(() =>
       timeWindows.assertGranularityDeclaration([

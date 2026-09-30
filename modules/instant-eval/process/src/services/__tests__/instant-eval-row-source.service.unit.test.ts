@@ -78,6 +78,28 @@ describe("given a statement a run is about to read", () => {
   });
 });
 
+describe("given a statement projecting a judged column", () => {
+  describe("when the passes before the first page run", () => {
+    /** @scenario "Pass one makes no judgement" */
+    it("asks only for passes that never hydrate a judged column", async () => {
+      const { source, analytics } = sourceOver(result({ rows: [{ TraceId: "t1", total: 1 }] }));
+      const read = { caller: CALLER, protections: PROTECTIONS, sql: SQL };
+
+      await source.probe(read);
+      await source.count({ ...read, limit: 10_001 });
+      await source.keys({ ...read, keyColumns: [], limit: 500 });
+      await source.sampleKeys({ ...read, keyColumns: [], limit: 50, total: 100 });
+
+      expect(analytics.asked.map((asked) => asked.pass.kind)).toEqual([
+        "probe",
+        "count",
+        "keys",
+        "sample",
+      ]);
+    });
+  });
+});
+
 describe("given a read that came back longer than the pass bounded it to", () => {
   describe("when the count pass reads it", () => {
     /** @scenario "A read that came back truncated fails the step" */

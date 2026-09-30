@@ -5,8 +5,14 @@
  * @see specs/instant-evals/instant-eval-api.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import {
+  bindRestMiddleware,
+  canonicalErrorResponse,
+  createRestRuntime,
+  ForbiddenError,
+} from "@langwatch/api/rest";
+import {
+  InstantEvalFreeBudgetExhaustedError,
   InstantEvalQueryInvalidError,
   InstantEvalRunNotFoundError,
   instantEvalRestCredential,
@@ -69,14 +75,21 @@ function judgment(overrides: Partial<InstantEvalJudgmentWire> = {}): InstantEval
   };
 }
 
-function mount(api: Partial<InstantEvalApi>) {
+function mount(
+  api: Partial<InstantEvalApi>,
+  holds: (permission: string) => boolean = () => true,
+) {
   const stub = createApiFixture<InstantEvalApi>(api);
   const hono = createRestRuntime({
     identity: {
-      authenticate: () => ({
-        actor: { type: "user" as const, id: "user-1" },
-        scope: { tier: "project" as const, id: PROJECT_ID },
-      }),
+      authenticate: ({ permission }) => {
+        if (!holds(permission)) throw new ForbiddenError();
+
+        return {
+          actor: { type: "user" as const, id: "user-1" },
+          scope: { tier: "project" as const, id: PROJECT_ID },
+        };
+      },
     },
   }).mount(instantEvalRest.router(), {
     app: () => stub,
@@ -122,6 +135,27 @@ describe("Feature: The Instant Eval run over REST", () => {
           expect.objectContaining({ projectId: PROJECT_ID, input: { sql: SQL } }),
         );
         expect(createRun).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a key carrying analytics:view only", () => {
+    describe("when a run is requested, cancelled and listed", () => {
+      /** @scenario "A read-only key cannot create or cancel a run" */
+      it("refuses the create and the cancel with 403, and lists runs", async () => {
+        const createRun = vi.fn<InstantEvalApi["createRun"]>();
+        const cancelRun = vi.fn<InstantEvalApi["cancelRun"]>();
+        const api = mount({ createRun, cancelRun, findRuns: async () => [] }, (permission) =>
+          permission === "analytics:view",
+        );
+
+        const created = await api.post("", { sql: SQL });
+        const cancelled = await api.post("/instant_eval_abc/cancel", {});
+        const listed = await api.get("");
+
+        expect([created.status, cancelled.status, listed.status]).toEqual([403, 403, 200]);
+        expect(createRun).not.toHaveBeenCalled();
+        expect(cancelRun).not.toHaveBeenCalled();
       });
     });
   });
@@ -367,6 +401,26 @@ describe("Feature: The Instant Eval shorthand", () => {
         expect(res.status).toBe(422);
         expect(body.code).toBe("instant_eval_query_invalid");
         expect(body.meta.fields).toEqual(["sql", "target"]);
+      });
+    });
+  });
+
+  describe("given a free organization past the budget", () => {
+    describe("when a run is requested over REST", () => {
+      /** @scenario "The refusal reaches a REST caller as a 402 with its meta" */
+      it("answers 402 with the spend and the budget in meta", async () => {
+        const api = mount({
+          createRun: async () => {
+            throw new InstantEvalFreeBudgetExhaustedError({ spentUsd: 1.02, budgetUsd: 1 });
+          },
+        });
+
+        const res = await api.post("", { sql: SQL });
+        const body = (await res.json()) as { code: string; meta: Record<string, number> };
+
+        expect(res.status).toBe(402);
+        expect(body.code).toBe("instant_eval_free_budget_exhausted");
+        expect(body.meta).toMatchObject({ spentUsd: 1.02, budgetUsd: 1 });
       });
     });
   });

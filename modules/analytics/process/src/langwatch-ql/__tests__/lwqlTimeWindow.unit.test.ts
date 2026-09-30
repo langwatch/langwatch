@@ -59,6 +59,7 @@ describe("given an instant to hand the database", () => {
 
   describe("when it is formatted as a bound parameter", () => {
     /** @scenario "Reserved period parameters are filled only when declared" */
+    /** @scenario "The injected window is a UTC ClickHouse date-time, not an ISO-8601 instant" */
     it("spells it as a space-separated UTC date-time with no zone designator", () => {
       expect(formatLangWatchQLDateTimeParameter("2026-02-20T12:34:56.000Z")).toBe(
         "2026-02-20 12:34:56",
@@ -128,6 +129,7 @@ describe("given a declared parameter type", () => {
 describe("given a statement and the window a surface is showing", () => {
   describe("when the statement declares both reserved names", () => {
     /** @scenario "Reserved period parameters are filled only when declared" */
+    /** @scenario "A statement declaring the reserved period parameters is given the surface's window" */
     it("binds each to its end of the window, and says the statement follows it", () => {
       const resolved = timeWindows.resolveTimeWindow({
         declared: PERIOD,
@@ -159,6 +161,7 @@ describe("given a statement and the window a surface is showing", () => {
 
   describe("when the statement declares only one of them", () => {
     /** @scenario "Reserved period parameters are filled only when declared" */
+    /** @scenario "A statement declaring only one reserved period parameter is given that one" */
     it("binds the one it declared and sends no value for the other", () => {
       const resolved = timeWindows.resolveTimeWindow({
         declared: [{ name: "dashboard_context_period_start", type: "DateTime" }],
@@ -174,6 +177,7 @@ describe("given a statement and the window a surface is showing", () => {
 
   describe("when the statement declares neither", () => {
     /** @scenario "A statement without a period reports that fact" */
+    /** @scenario "A statement with no period parameters runs, and says so" */
     it("injects nothing and reports that it does not follow the period", () => {
       const resolved = timeWindows.resolveTimeWindow({
         declared: [{ name: "name", type: "String" }],
@@ -246,6 +250,7 @@ describe("given a statement and the window a surface is showing", () => {
 describe("given a request that reaches for a name the surface owns", () => {
   describe("when it carries a value for a reserved name", () => {
     /** @scenario "Reserved parameter misuse is refused before execution" */
+    /** @scenario "A caller that supplies a reserved period parameter itself is refused" */
     it("refuses, naming what it may not set", () => {
       const run = () =>
         timeWindows.resolveTimeWindow({
@@ -273,6 +278,7 @@ describe("given a request that reaches for a name the surface owns", () => {
 
   describe("when a reserved name is declared as something other than a date-time", () => {
     /** @scenario "Reserved parameter misuse is refused before execution" */
+    /** @scenario "A reserved period parameter declared as anything but a date-time is refused" */
     it("refuses, naming the declaration to rewrite", () => {
       const run = () =>
         timeWindows.resolveTimeWindow({

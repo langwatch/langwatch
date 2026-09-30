@@ -3,6 +3,7 @@
  * REST family publishes at `/api/v1/query`.
  * @vitest-environment node
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -132,6 +133,37 @@ describe("given the query REST family", () => {
       expect(runDescription).not.toContain("RESULT_TRUNCATED");
       expect(published.properties).toBeDefined();
       expect(published.properties).not.toHaveProperty("truncated");
+    });
+  });
+
+  describe("when the public surface of the family is enumerated", () => {
+    /** @scenario "No PostgreSQL native-SQL execution endpoint exists" */
+    it("serves the one ClickHouse run door and no PostgreSQL query endpoint", () => {
+      const surface = declaration.routes.map((route) => `${route.method} ${route.path}`);
+
+      expect(surface.toSorted()).toEqual(["get /reference", "get /schema", "post /"]);
+      for (const route of declaration.routes) {
+        expect(`${route.path} ${route.operation}`, route.operation).not.toMatch(
+          /postgres|\bpg\b|native/i,
+        );
+      }
+    });
+  });
+
+  describe("when the query overview page is read", () => {
+    const overview = readFileSync(
+      new URL("../../../../../../docs/api-reference/query/overview.mdx", import.meta.url),
+      "utf8",
+    );
+    const authentication = /## Authentication([\s\S]*?)\n## /.exec(overview)?.[1] ?? "";
+
+    /** @scenario "The query docs describe the any-key scope rule and how to narrow to one project" */
+    it("states the any-key scope rule and narrows to one project inside the statement", () => {
+      expect(authentication).toContain("`analytics:view`");
+      expect(authentication).toContain("WHERE TenantId = '<project id>'");
+      expect(authentication).toContain("MULTI_PROJECT_RESULT");
+      expect(overview).not.toContain("X-Project-Id");
+      expect(overview).not.toContain("project_scope_required");
     });
   });
 });

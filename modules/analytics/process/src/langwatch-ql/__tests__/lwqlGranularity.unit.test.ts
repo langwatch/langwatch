@@ -94,6 +94,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
   describe("given the parameter declared as UInt32 with a surface step", () => {
     /** @scenario "A statement declaring the granularity parameter runs at the step the workbench supplies" */
+    /** @scenario "A statement declaring the granularity parameter runs at the step the surface supplies" */
     it("follows granularity at the supplied step", () => {
       // An hour over a week: 168 buckets, comfortably inside the ceiling.
       const resolution = timeWindows.resolveGranularity({
@@ -162,6 +163,7 @@ describe("resolveLangWatchQLGranularity", () => {
       });
 
     /** @scenario "Reserved parameter misuse is refused before execution" */
+    /** @scenario "A caller that supplies dashboard_context_granularity_seconds itself is refused" */
     it("is refused by this resolver even when called on its own", () => {
       expect(codeOf(suppliesGranularity)).toBe("lwql_reserved_parameter_supplied");
     });
@@ -255,6 +257,7 @@ describe("resolveLangWatchQLGranularity", () => {
 
   describe("given the bucket budget overflows", () => {
     // A week at one-second steps: 604,800 buckets, far past the ceiling.
+    /** @scenario "A window that would produce more buckets than the ceiling refuses on caller-owned surfaces" */
     it("refuses on a caller-owned surface", () => {
       expect(() =>
         timeWindows.resolveGranularity({

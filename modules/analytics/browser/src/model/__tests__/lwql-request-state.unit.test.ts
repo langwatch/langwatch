@@ -71,6 +71,7 @@ describe("the LangWatchQL request machine", () => {
   describe("given a draft statement and parameters", () => {
     describe("when the member runs the query and it succeeds", () => {
       /** @scenario "Run and Reload preserve the intended snapshot" */
+      /** @scenario "A run submits the draft exactly and the answer reads as current" */
       it("submits that exact draft and the action then reads Reload", async () => {
         const { calls, controller } = controllerWith({
           sql: "SELECT trace_id FROM analytics.traces_daily",
@@ -103,6 +104,7 @@ describe("the LangWatchQL request machine", () => {
 
     describe("when the member edits the SQL after a successful result", () => {
       /** @scenario "Run and Reload preserve the intended snapshot" */
+      /** @scenario "Editing the statement or its parameters marks the result stale" */
       it("marks the visible result stale and the action reads Run query again", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -122,6 +124,7 @@ describe("the LangWatchQL request machine", () => {
 
     describe("when the member edits the parameters after a successful result", () => {
       /** @scenario "Run and Reload preserve the intended snapshot" */
+      /** @scenario "Editing the statement or its parameters marks the result stale" */
       it("marks the visible result stale and the action reads Run query again", async () => {
         const { calls, controller } = controllerWith({
           sql: "SELECT 1",
@@ -142,6 +145,7 @@ describe("the LangWatchQL request machine", () => {
 
     describe("when the member changes the granularity step", () => {
       /** @scenario "Choosing a step sends it beside the query rather than among its parameters" */
+      /** @scenario "A chosen step travels beside the query rather than among its parameters" */
       it("carries the step in its own field, not among the parameters", () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -155,6 +159,7 @@ describe("the LangWatchQL request machine", () => {
       });
 
       /** @scenario "Changing the granularity step marks the result stale and restores Run query" */
+      /** @scenario "Changing the step marks the result stale, since it answers a different question" */
       it("marks the visible result stale, since it answers a different question", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -188,6 +193,7 @@ describe("the LangWatchQL request machine", () => {
 
     describe("when the workbench is disposed before the second submission answers", () => {
       /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
+      /** @scenario "A stale result stays labelled as belonging to the previous submission" */
       it("leaves the earlier result stale rather than crediting it to the abandoned request", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -217,6 +223,7 @@ describe("the LangWatchQL request machine", () => {
 
     describe("when a later submission fails after an earlier one succeeded", () => {
       /** @scenario "Run and Reload preserve the intended snapshot" */
+      /** @scenario "A later failure replaces the visible result, credited to the request that failed" */
       it("replaces the visible result with the failure, credited to the request that failed", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -251,6 +258,7 @@ describe("the LangWatchQL request machine", () => {
   describe("given a submitted snapshot the draft has moved away from", () => {
     describe("when the member reloads", () => {
       /** @scenario "Run and Reload preserve the intended snapshot" */
+      /** @scenario "Reload reruns the submitted snapshot exactly" */
       it("sends the submitted SQL and parameters, not the draft", async () => {
         const { calls, controller } = controllerWith({
           sql: "SELECT trace_id FROM analytics.traces_daily",
@@ -283,6 +291,7 @@ describe("the LangWatchQL request machine", () => {
   describe("given a LangWatchQL query already in flight", () => {
     describe("when the member tries to run or reload again", () => {
       /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
+      /** @scenario "Duplicate submissions are prevented while a request is in flight" */
       it("issues no second request until the first settles", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -306,6 +315,7 @@ describe("the LangWatchQL request machine", () => {
 
     describe("when the member leaves the workbench", () => {
       /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
+      /** @scenario "An aborted request never updates the visible result" */
       it("aborts the request and drops an answer that arrives afterwards", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -325,6 +335,7 @@ describe("the LangWatchQL request machine", () => {
 
     describe("when the member cancels the run", () => {
       /** @scenario "Requests are manual, single-flight, and cancellation-safe" */
+      /** @scenario "Cancelling an in-flight run keeps the previous result" */
       it("abandons the request and keeps the previous result on screen", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 

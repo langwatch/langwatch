@@ -23,6 +23,7 @@ describe("getInstantEvalQueryCapability", () => {
     });
 
     describe("when the deployment has no LangWatchQL identity", () => {
+      /** @scenario "A deployment with no query identity answers as not enabled" */
       it("refuses as not enabled, rather than failing later in the row source", () => {
         expect(() =>
           getInstantEvalQueryCapability({ project, hasDeploymentIdentity: false }),

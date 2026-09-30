@@ -361,3 +361,17 @@ describe("given the LangWatchQL schema catalog when a dataset is outside the cal
     }
   });
 });
+
+describe("given the schema for a fully permitted caller", () => {
+  /** @scenario "Every view publishes a project identifier column to filter on" */
+  it("lists an ungated, available TenantId column and join key on every view", () => {
+    for (const dataset of schemaFor(FULLY_PERMITTED).views) {
+      const column = dataset.columns.find((candidate) => candidate.name === "TenantId");
+
+      expect(column, `${dataset.name} lists no TenantId column`).toBeDefined();
+      expect(column?.gates, dataset.name).toEqual([]);
+      expect(column?.available, dataset.name).toBe(true);
+      expect(dataset.joinKeys, dataset.name).toContain("TenantId");
+    }
+  });
+});

@@ -208,12 +208,14 @@ describe("given a selection of long texts", () => {
   });
 
   describe("when the sample is read", () => {
+    /** @scenario "The page size is measured from the same spread of rows" */
     it("spreads the sample across the selection rather than taking its head", async () => {
-      const { service, rowSource } = await planning({ total: 5_000 });
+      const { service, rowSource, texts } = await planning({ total: 10_000 });
 
       await service.plan({ projectId: PROJECT_ID, runId: RUN_ID });
 
-      expect(rowSource.sampled).toEqual([{ limit: 50, total: 5_000 }]);
+      expect(rowSource.sampled).toEqual([{ limit: 50, total: 10_000 }]);
+      expect(texts.asked).toEqual([{ traceIds: ["t1", "t2"] }]);
     });
   });
 });

@@ -52,6 +52,7 @@ describe("the no-network Vega loader", () => {
 
   describe("given a spec that slipped past static validation with a loadable resource", () => {
     describe("when the view asks the loader for it", () => {
+      /** @scenario "A repository-owned loader refuses all network and file loading" */
       it("refuses every method, names the blocked resource, and issues no request", async () => {
         const loader = createNoNetworkVegaLoader();
 

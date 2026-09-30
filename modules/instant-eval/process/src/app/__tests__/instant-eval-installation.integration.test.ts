@@ -146,6 +146,7 @@ function installation({
   gateway = {},
   isConnectOn = false,
   nodeEnvironment = "test",
+  analytics = {},
 }: {
   isReleased?: boolean;
   isFreePlan?: boolean;
@@ -158,6 +159,8 @@ function installation({
   /** Whether the organization switched hosted judging on, as licensing answers. */
   isConnectOn?: boolean;
   nodeEnvironment?: string;
+  /** Analytics operations a test answers itself, over the defaults below. */
+  analytics?: Partial<AnalyticsApi>;
 } = {}) {
   return (
     createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
@@ -198,6 +201,7 @@ function installation({
           validateLangWatchQL: () => ({ parameters: [], appFunctions: [] }),
           describeLangWatchQLJudgements: () => [JUDGEMENT],
           executeLangWatchQLPass: async () => execution([]),
+          ...analytics,
         }),
         project: createApiFixture<ProjectApi>({
           findOrganizationId: async () => ORGANIZATION,
@@ -364,6 +368,63 @@ describe("given a process that installs Instant Evals over the memory tier", () 
         expect(run.sql).toContain("traces");
         expect(run.questions.map((question) => question.id)).toEqual(["polite"]);
       });
+    });
+
+    /** @scenario "The run hands the expanded statement back" */
+    it("reads back the expanded statement and the window it bound", async () => {
+      await withInstallation({}, async (api) => {
+        const created = await api.createRun({
+          projectId: PROJECT,
+          actor: ACTOR,
+          input: {
+            shorthand: {
+              target: "traces",
+              questions: [{ kind: "boolean", instructions: "is it polite?" }],
+            },
+          },
+        });
+
+        const read = await api.getRun({ projectId: PROJECT, runId: created.id });
+
+        expect(read.sql).toBe(created.sql);
+        expect(read.sql).toContain("{start_at:DateTime64(3, 'UTC')}");
+        expect(Object.keys(read.parameters)).toEqual(expect.arrayContaining(["start_at", "end_at"]));
+      });
+    });
+
+    /** @scenario "An expanded statement passes the statement gate unchanged" */
+    it("hands the gate each target's statement with every parameter it declares bound", async () => {
+      const gated: { sql: string; parameters: Record<string, unknown> }[] = [];
+      const analytics: Partial<AnalyticsApi> = {
+        validateLangWatchQL: ({ sql, parameters = {} }) => {
+          const declared = [...sql.matchAll(/\{(\w+):/g)].map((match) => match[1] ?? "");
+          const unbound = declared.filter((name) => !(name in parameters));
+          if (unbound.length > 0) throw new Error(`unbound parameters: ${unbound.join(", ")}`);
+          gated.push({ sql, parameters });
+
+          return { parameters: declared.map((name) => ({ name, type: "String" })), appFunctions: [] };
+        },
+      };
+
+      await withInstallation({ analytics }, async (api) => {
+        for (const target of ["traces", "threads", "llm_spans"] as const) {
+          const run = await api.createRun({
+            projectId: PROJECT,
+            actor: ACTOR,
+            input: {
+              shorthand: {
+                target,
+                questions: [{ kind: "boolean", instructions: "is it polite?" }],
+              },
+            },
+          });
+
+          expect(gated.at(-1)?.sql).toBe(run.sql);
+        }
+      });
+
+      expect(gated).toHaveLength(3);
+      expect(gated.every((call) => "start_at" in call.parameters)).toBe(true);
     });
   });
 });

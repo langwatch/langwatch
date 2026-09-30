@@ -87,4 +87,34 @@ describe("LangWatchQL feature access", () => {
       });
     });
   });
+
+  describe("given a rule granting the switch to one organization only", () => {
+    const grantedTo = "organization_1";
+    const ruleFlags = () =>
+      createApiFixture<FeatureFlagApi>(
+        {
+          isEnabled: async (_flag, context) =>
+            context.kind === "project" && context.organizationId === grantedTo,
+        },
+        "lwql organization rule",
+      );
+    const ask = (input: { projectId: string; organizationId: string }) =>
+      lwqlEnabled({
+        featureFlags: ruleFlags(),
+        projectId: input.projectId,
+        projects: projectsIn(input.organizationId),
+      });
+
+    /** @scenario "The API's switch is decided for the project's organization" */
+    it("answers for the project of the granted organization and refuses one outside it", async () => {
+      expect(await ask({ projectId: "project_1", organizationId: grantedTo })).toBe(true);
+      expect(await ask({ projectId: "project_2", organizationId: "organization_2" })).toBe(false);
+    });
+
+    /** @scenario "An organization-scoped rule can switch the chart surfaces on" */
+    it("is on for a project in that organization and off for a project outside it", async () => {
+      expect(await ask({ projectId: "project_3", organizationId: grantedTo })).toBe(true);
+      expect(await ask({ projectId: "project_3", organizationId: "organization_9" })).toBe(false);
+    });
+  });
 });
