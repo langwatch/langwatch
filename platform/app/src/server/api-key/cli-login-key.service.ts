@@ -293,13 +293,26 @@ export class CliLoginKeyService {
     userId: string;
     organizationId: string;
   }): Promise<string[]> {
+    // ADR-143: a Developer seat holds its own personal team and nothing
+    // shared, so that team is the only candidate. The grants engine would
+    // drop every other team anyway; narrowing here keeps the key's scope
+    // list from ever naming a shared team for a Developer.
+    const membership = await this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId, disabledAt: null },
+      select: { role: true },
+    });
+    const personalOnly = membership?.role === "DEVELOPER";
     const teams = await this.prisma.team.findMany({
       where: {
         organizationId,
         archivedAt: null,
-        // Another member's personal workspace is never a scope for this
-        // user's key, whatever membership rows exist.
-        NOT: { isPersonal: true, ownerUserId: { not: userId } },
+        ...(personalOnly
+          ? { isPersonal: true, ownerUserId: userId }
+          : {
+              // Another member's personal workspace is never a scope for
+              // this user's key, whatever membership rows exist.
+              NOT: { isPersonal: true, ownerUserId: { not: userId } },
+            }),
       },
       select: { id: true },
     });

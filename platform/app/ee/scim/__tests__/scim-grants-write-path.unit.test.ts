@@ -732,6 +732,27 @@ describe("ScimService, with the grants flag off", () => {
     });
   });
 
+  /** @scenario Directory sync leaves a Developer alone */
+  it("asserts no organization grant for somebody on a Developer seat, and leaves the row as it is", async () => {
+    prisma.organizationUser.findUnique = vi
+      .fn()
+      .mockResolvedValue({ userId: USER, role: "DEVELOPER" });
+
+    await service.createUser({
+      organizationId: ORGANIZATION,
+      connectionId: CONNECTION,
+      request: {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        userName: "alice@acme.com",
+      },
+    });
+
+    // No grant, and no rewrite of the row either: the service has no code
+    // path that changes an existing member's role on a sync, which is what
+    // "leaves the row as it is" rests on.
+    expect(ledger.attachBindings).not.toHaveBeenCalled();
+  });
+
   it("still asserts an unconditional MEMBER grant, as it did before", async () => {
     prisma.user.findUnique = vi.fn().mockResolvedValue(null);
     prisma.organizationUser.findUnique = vi.fn().mockResolvedValue(null);

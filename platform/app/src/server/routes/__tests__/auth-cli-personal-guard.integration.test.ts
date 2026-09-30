@@ -22,6 +22,7 @@
  */
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -505,6 +506,52 @@ describe("CLI login personal-project guards", () => {
         expect(status).toBe(403);
         expect(error.error).toBe("forbidden");
         expect(JSON.stringify(error)).not.toContain(PERSONAL_API_KEY);
+      });
+    });
+
+    describe("when the caller holds a Developer seat (ADR-143)", () => {
+      beforeEach(() =>
+        prisma.organizationUser.update({
+          where: {
+            userId_organizationId: { userId: USER_ID, organizationId: ORG_ID },
+          },
+          data: { role: "DEVELOPER" },
+        }),
+      );
+      afterEach(() =>
+        prisma.organizationUser.update({
+          where: {
+            userId_organizationId: { userId: USER_ID, organizationId: ORG_ID },
+          },
+          data: { role: "ADMIN" },
+        }),
+      );
+
+      /** @scenario CLI login refuses a shared project for a Developer */
+      it("refuses a shared project, naming the seat", async () => {
+        const userCode = await mintDeviceCode("project_api_key");
+
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: SHARED_PROJECT_ID,
+        });
+
+        expect(status).toBe(400);
+        expect(json.error).toBe("developer_seat_personal_only");
+        expect(JSON.stringify(json)).not.toContain(SHARED_API_KEY);
+      });
+
+      /** @scenario A Developer works inside their own project */
+      it("still honours their own personal project", async () => {
+        const userCode = await mintDeviceCode("project_api_key");
+
+        const { status, json } = await approve({
+          user_code: userCode,
+          project_id: PERSONAL_PROJECT_ID,
+        });
+
+        expect(status).toBe(200);
+        expect((json.project as { id: string }).id).toBe(PERSONAL_PROJECT_ID);
       });
     });
 
