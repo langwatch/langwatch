@@ -505,9 +505,7 @@ describe("Invite router integration", () => {
           actorUserId: adminUserId,
           metadata: { seat: "DEVELOPER", via: "invite", inviteId: invite.id },
         });
-        await prisma.auditLog.deleteMany({
-          where: { organizationId, userId: user.id },
-        });
+        await prisma.auditLog.delete({ where: { id: audit!.id } });
       });
     });
 
