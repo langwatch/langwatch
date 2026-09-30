@@ -232,15 +232,16 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		PublicURL:                app.PublicURLFromEnv(),
 		// Observability shares CH's colima VM, so it defaults ON now — the VM is
 		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
-		ShouldStartObservability:  devEnv("LANGWATCH_HAVEN_OBS") != "0",
-		LocalAPIKey:               envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
-		RepoRoot:                  worktree,
-		ObservabilityConsoleLevel: obsConsoleLevel,
-		ShouldDisableGoogleDLP:    shouldDisableGoogleDLP(disableDLP, disableDLPSet),
-		JobsRoot:                  jobsRoot(),
-		ClaudeHome:                claudeHome(),
-		ClaudeTmp:                 claudeTmpRoot(),
-		OwnJobDirs:                ownJobDirs(),
+		ShouldStartObservability:   devEnv("LANGWATCH_HAVEN_OBS") != "0",
+		LocalAPIKey:                envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
+		RepoRoot:                   worktree,
+		ObservabilityConsoleLevel:  obsConsoleLevel,
+		ShouldDisableGoogleDLP:     shouldDisableGoogleDLP(disableDLP, disableDLPSet),
+		ShouldMockInstantEvalJudge: devEnv(domain.InstantEvalMockJudgeEnv) == "1",
+		JobsRoot:                   jobsRoot(),
+		ClaudeHome:                 claudeHome(),
+		ClaudeTmp:                  claudeTmpRoot(),
+		OwnJobDirs:                 ownJobDirs(),
 	}
 
 	orch := app.New(app.Deps{

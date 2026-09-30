@@ -20,6 +20,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   InstantEvalApi,
   type InstantEvalActor,
+  InstantEvalMemoryJudgeInProductionError,
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
 import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/kernel";
@@ -144,10 +145,11 @@ function installation({
   isBounded = false,
   gateway = {},
   isConnectOn = false,
+  nodeEnvironment = "test",
 }: {
   isReleased?: boolean;
   isFreePlan?: boolean;
-  classifier?: "jev" | "null" | undefined;
+  classifier?: "jev" | "null" | "memory" | undefined;
   /** `null` is an install that configured no key of its own. */
   judgeKey?: string | null;
   isBounded?: boolean;
@@ -155,6 +157,7 @@ function installation({
   gateway?: Partial<GatewayApi>;
   /** Whether the organization switched hosted judging on, as licensing answers. */
   isConnectOn?: boolean;
+  nodeEnvironment?: string;
 } = {}) {
   return (
     createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
@@ -171,6 +174,7 @@ function installation({
         },
       })
       .withStores(memoryStores())
+      .withMember("nodeEnvironment", nodeEnvironment)
       // The api role sends commands; what drains them is the worker's, and the
       // pipeline has its own tests.
       .withEventing(
@@ -379,6 +383,22 @@ describe("given a deployment choosing which judge answers", () => {
           await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
         },
       );
+    });
+  });
+
+  describe("when the operator names the memory classifier", () => {
+    /** @scenario "A deployment that names the memory classifier judges with the deterministic stand-in" */
+    it("publishes the eval functions with no key and no hosted judging", async () => {
+      await withInstallation({ classifier: "memory", judgeKey: null }, async (api) => {
+        await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
+      });
+    });
+
+    /** @scenario "A production process refuses to boot on the memory judge" */
+    it("refuses to boot in production", async () => {
+      await expect(
+        installation({ classifier: "memory", nodeEnvironment: "production" }).boot(),
+      ).rejects.toThrow(InstantEvalMemoryJudgeInProductionError);
     });
   });
 });

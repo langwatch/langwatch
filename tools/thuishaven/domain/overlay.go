@@ -170,6 +170,11 @@ func (s Stack) OverlayEnv() []string {
 	if s.DisableGoogleDLP {
 		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
 	}
+	// The monolith's env parse knows no "memory" classifier and would refuse to
+	// boot on it, so only a modular checkout is given the stand-in judge.
+	if s.MockInstantEvalJudge && !s.Layout.IsMonolith() {
+		env = append(env, "INSTANT_EVAL_CLASSIFIER=memory")
+	}
 	// An untrusted checkout gets a private Nx cache and no daemon, so nothing it
 	// computes reaches the cache trusted worktrees share (see Stack.NxPrivateDir).
 	if s.NxPrivateDir != "" {

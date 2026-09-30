@@ -263,3 +263,27 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     When it is judged
     Then the whole conversation is sent
     And the row is not marked truncated
+
+  # ---------------------------------------------------------------------------
+  # The memory judge: a development stand-in chosen by configuration
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A deployment that names the memory classifier judges with the deterministic stand-in
+    Given INSTANT_EVAL_CLASSIFIER is "memory" outside production
+    When the judge is chosen
+    Then the memory judge is chosen, whether or not the deployment holds a key
+
+  @unit
+  Scenario: The memory judge answers every question the same way for the same text
+    Given a boolean, a score and a category question over one text
+    When the memory judge answers them twice
+    Then each question gets one verdict of its own kind, inside its range or options
+    And both answers are identical
+    And the input tokens are the request's estimate, so the run's spend is recorded
+
+  @unit
+  Scenario: A production process refuses to boot on the memory judge
+    Given INSTANT_EVAL_CLASSIFIER is "memory" and NODE_ENV is "production"
+    When the judge is chosen
+    Then it is refused with instant_eval_memory_judge_in_production

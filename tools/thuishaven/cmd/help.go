@@ -211,6 +211,9 @@ var envHelpText = `Environment variables.
     HAVEN_COLIMA_CPUS            CPUs of a colima VM haven creates (never resizes one).
     HAVEN_COLIMA_MEMORY_GIB      Memory of a colima VM haven creates, in GiB.
     HAVEN_TEST_WORKERS=N         Machine-wide cap on unit test workers.
+    HAVEN_INSTANT_EVAL_MOCK_JUDGE=1  Judge Instant Evals with the app's deterministic
+                                 memory judge (INSTANT_EVAL_CLASSIFIER=memory); modular
+                                 checkouts only, from the next haven up. Default 0.
     (also LANGWATCH_HAVEN_CH_MEMORY_MB and HAVEN_REDIS_MAXMEMORY_MB, above.)
 
   Containers, langy and observability

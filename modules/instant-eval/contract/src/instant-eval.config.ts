@@ -8,8 +8,11 @@ import { z } from "zod";
  * with no key judges nothing, which the null judge answers by name.
  */
 export const instantEvalConfig = Config.define((c) => ({
-  /** "jev" or "null"; "null" switches judging off outright. */
-  classifier: c.env("INSTANT_EVAL_CLASSIFIER", z.enum(["jev", "null", "connect"]).optional()),
+  /** "jev", "connect" or "null" (judging off); "memory" is a stand-in refused in production. */
+  classifier: c.env(
+    "INSTANT_EVAL_CLASSIFIER",
+    z.enum(["jev", "null", "connect", "memory"]).optional(),
+  ),
   /** HTTPS only: the judge key travels in a header, so plaintext would send it in the clear. */
   classifierBaseUrl: c.env(
     "JEV_BASE_URL",

@@ -35,3 +35,10 @@ Feature: Machine resource limits are settable from the CLI and the hub
     Then the limit is reset
     And a refused value answers 400 with the reason
     And a request from another origin is refused with 403
+
+  Scenario: The instant-eval mock judge is a setting that reaches the stack's environment
+    Given the instant-eval-mock-judge setting is 1, from the CLI, the hub, the environment or .env
+    When a modular checkout's stack is brought up
+    Then its overlay sets INSTANT_EVAL_CLASSIFIER to "memory"
+    And a monolith checkout's stack gets nothing, because its parse does not know the value
+    And the setting is 0 by default, which emits nothing

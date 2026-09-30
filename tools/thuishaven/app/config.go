@@ -88,6 +88,10 @@ type Config struct {
 	// in: haven emits nothing and .env governs, so DLP can be exercised against
 	// real credentials.
 	ShouldDisableGoogleDLP bool
+	// ShouldMockInstantEvalJudge judges Instant Evals with the app's memory
+	// stand-in (INSTANT_EVAL_CLASSIFIER=memory). Off by default; resolved from
+	// HAVEN_INSTANT_EVAL_MOCK_JUDGE, which `haven limits` and the hub also set.
+	ShouldMockInstantEvalJudge bool
 	// ObservabilityConsoleLevel is the console log floor haven injects (as
 	// LOG_CONSOLE_LEVEL) while the observability stack is up — default "warn", so the
 	// terminal is quiet and the full detail lives in Grafana. "" opts out and leaves

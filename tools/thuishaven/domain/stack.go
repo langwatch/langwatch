@@ -105,6 +105,10 @@ type Stack struct {
 	// in to running DLP: nothing is emitted, so .env governs the check — for the
 	// rare case of exercising DLP locally against real credentials.
 	DisableGoogleDLP bool `json:"disableGoogleDlp,omitempty"`
+	// MockInstantEvalJudge injects INSTANT_EVAL_CLASSIFIER=memory, so Instant
+	// Evals judge with the app's deterministic stand-in and need no classifier
+	// key or license. Off by default; the instant-eval-mock-judge setting.
+	MockInstantEvalJudge bool `json:"mockInstantEvalJudge,omitempty"`
 	// PublicURL is the external origin a tunnel (tailscale serve, cloudflared)
 	// presents to browsers. When set, OverlayEnv carries it in BASE_HOST and
 	// NEXTAUTH_URL instead of the local app URL, so sign-in from the tunnel

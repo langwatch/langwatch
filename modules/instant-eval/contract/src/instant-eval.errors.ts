@@ -134,6 +134,20 @@ export class InstantEvalClassifierNotConfiguredError extends HandledError {
   }
 }
 
+/** The memory judge answers from a hash, not the text, so a production process refuses it. */
+export class InstantEvalMemoryJudgeInProductionError extends HandledError {
+  declare readonly code: "instant_eval_memory_judge_in_production";
+
+  constructor() {
+    super(
+      "instant_eval_memory_judge_in_production",
+      "The memory Instant Evals judge is a development stand-in and cannot run in production.",
+      { httpStatus: 500, fault: "platform" },
+    );
+    this.name = "InstantEvalMemoryJudgeInProductionError";
+  }
+}
+
 /** No run of this project has that id. */
 export class InstantEvalRunNotFoundError extends HandledError {
   declare readonly code: "instant_eval_not_found";

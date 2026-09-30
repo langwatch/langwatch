@@ -119,7 +119,9 @@ describe("the Connect judge", () => {
   it("is what an install with no key and no settings judges with, and sends nothing unlicensed", async () => {
     const { judge, calls } = harness({ enabled: false });
 
-    expect(instantEvalJudgeKind({ classifier: undefined, hasOwnKey: false })).toBe("connect");
+    expect(
+      instantEvalJudgeKind({ classifier: undefined, hasOwnKey: false, isProduction: false }),
+    ).toBe("connect");
     await expect(judge.classify(REQUEST)).resolves.toMatchObject({
       skippedReason: "classifier_not_configured",
     });

@@ -33,7 +33,10 @@ import type { InstantEvalCancellationChannel } from "../channels/instant-eval-ca
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judge.channel.ts";
 import { MemoryInstantEvalBudgetReservationsChannel } from "../channels/memory/memory.instant-eval-budget-reservations.channel.ts";
 import { MemoryInstantEvalCancellationChannel } from "../channels/memory/memory.instant-eval-cancellation.channel.ts";
-import { MemoryInstantEvalJudgeChannel } from "../channels/memory/memory.instant-eval-judge.channel.ts";
+import {
+  DeterministicInstantEvalJudgeChannel,
+  MemoryInstantEvalJudgeChannel,
+} from "../channels/memory/memory.instant-eval-judge.channel.ts";
 import { RedisInstantEvalBudgetReservationsChannel } from "../channels/redis/redis.instant-eval-budget-reservations.channel.ts";
 import { RedisInstantEvalCancellationChannel } from "../channels/redis/redis.instant-eval-cancellation.channel.ts";
 import {
@@ -109,6 +112,8 @@ type InstantEvalRedis = InstantEvalRateLimiterRedis & {
 type InstantEvalMembers = Readonly<{
   /** The shared bucket, holds and cancel hints; absent in a memory process. */
   redis: InstantEvalRedis | null;
+  /** The raw NODE_ENV; "production" refuses the memory judge. */
+  nodeEnvironment: string | undefined;
 }>;
 
 type InstantEvalDependencies = Readonly<{
@@ -150,7 +155,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
   } as const;
   /** `redis` is the shared token bucket that paces the judge across every pod. */
-  static readonly reads = ["redis"] as const;
+  static readonly reads = ["redis", "nodeEnvironment"] as const;
 
   private readonly access: InstantEvalAccessService;
   private readonly classifications: InstantEvalClassifyService;
@@ -425,8 +430,10 @@ export class InstantEvalApp implements InstantEvalApiContract {
     const kind = instantEvalJudgeKind({
       classifier: setup.config.classifier,
       hasOwnKey: Boolean(apiKey),
+      isProduction: setup.members.nodeEnvironment === "production",
     });
     if (kind === "none") return MemoryInstantEvalJudgeChannel.create();
+    if (kind === "memory") return DeterministicInstantEvalJudgeChannel.create();
     if (kind === "connect" || !apiKey) {
       return InstantEvalConnectJudgeService.create({
         licensing: setup.dependencies.licensing,

@@ -202,11 +202,12 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		Layout:      detectLayout(p.WorktreeDir),
 		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], VoiceSocketPort: ports[nSvc+4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
-		PublicURL:        o.cfg.PublicURL,
-		LangyTier:        opts.LangyTier,
-		LangyImage:       opts.langyImageTag,
-		DisableGoogleDLP: o.cfg.ShouldDisableGoogleDLP,
-		PortlessDisabled: o.cfg.PortlessDisabled,
+		PublicURL:            o.cfg.PublicURL,
+		LangyTier:            opts.LangyTier,
+		LangyImage:           opts.langyImageTag,
+		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
+		MockInstantEvalJudge: o.cfg.ShouldMockInstantEvalJudge,
+		PortlessDisabled:     o.cfg.PortlessDisabled,
 	}
 	if p.UntrustedCheckout {
 		st.NxPrivateDir = o.nxPrivateDir(slug)

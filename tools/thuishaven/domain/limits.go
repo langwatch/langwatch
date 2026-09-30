@@ -35,6 +35,9 @@ const (
 	LimitColimaCPUs       = "colima-cpus"
 	LimitColimaMemory     = "colima-memory-gib"
 	LimitTestWorkers      = "test-workers"
+	// LimitInstantEvalMockJudge is a switch, not a cap: 1 judges Instant Evals
+	// with the app's deterministic memory judge instead of a real classifier.
+	LimitInstantEvalMockJudge = "instant-eval-mock-judge"
 )
 
 // Limits is the catalog, in the order `haven limits` prints it.
@@ -69,7 +72,15 @@ var Limits = []Limit{
 		def: func(m LimitMachine) int { w, _ := UnitTestFullWidth(m.TotalRAMBytes, m.NumCPU, ""); return w },
 		max: func(m LimitMachine) int { return m.NumCPU },
 	},
+	{
+		Name: LimitInstantEvalMockJudge, Env: InstantEvalMockJudgeEnv, Unit: "on", Min: 0,
+		def: func(LimitMachine) int { return 0 },
+		max: func(LimitMachine) int { return 1 },
+	},
 }
+
+// InstantEvalMockJudgeEnv is the mock judge switch's knob; "1" turns it on.
+const InstantEvalMockJudgeEnv = "HAVEN_INSTANT_EVAL_MOCK_JUDGE"
 
 // FindLimit answers the catalog entry for a kebab name.
 func FindLimit(name string) (Limit, error) {
@@ -173,6 +184,8 @@ func limitApplies(name, profile string, values map[string]int) string {
 		return "when the observability container is next recreated (an image bump, or remove it and run `haven up`)"
 	case LimitRedisMaxMemory:
 		return "next `haven up`, which runs `config set maxmemory`"
+	case LimitInstantEvalMockJudge:
+		return "when the stack is next brought up (haven down, then haven up), on a modular checkout only"
 	case LimitColimaCPUs, LimitColimaMemory:
 		return "when the VM is recreated or restarted with `" +
 			ColimaRestartCommand(profile, values[LimitColimaCPUs], values[LimitColimaMemory]) + "`"

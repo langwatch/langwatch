@@ -30,4 +30,10 @@ describe("instant eval server configuration", () => {
       expect(() => read({ JEV_BASE_URL: "http://judge.example.com" })).toThrow(/JEV_BASE_URL/);
     });
   });
+
+  describe("given a deployment names the memory classifier", () => {
+    it("carries it, leaving the production refusal to the judge choice", () => {
+      expect(read({ INSTANT_EVAL_CLASSIFIER: "memory" }).classifier).toBe("memory");
+    });
+  });
 });
