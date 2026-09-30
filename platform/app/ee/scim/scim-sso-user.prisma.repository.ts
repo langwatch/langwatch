@@ -12,18 +12,33 @@ import {
   normalizeDomain,
   normalizeIdentifierValue,
   qualifySsoDomainOwnership,
-  SSO_EXISTING_ACCOUNT_UNCONFIRMED,
+  SsoExistingAccountUnconfirmedError,
 } from "@langwatch/identity";
+import { createLogger } from "@langwatch/observability";
 
 import { env } from "~/env.mjs";
 import type { Prisma } from "~/generated/prisma/client";
 
 const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
-const UNCONFIRMED = {
-  action: "reject",
-  code: SSO_EXISTING_ACCOUNT_UNCONFIRMED,
-} as const;
+const logger = createLogger("langwatch:identity:sso-user-resolution");
+
+/** The refusal for an unconfirmed account this sign-in cannot vouch for,
+ *  logged with its cause because the plugin only carries the code onward. */
+function refuseUnconfirmed({
+  providerId,
+  detail,
+}: {
+  providerId: string;
+  detail: string;
+}): SSOUserResolution {
+  const error = new SsoExistingAccountUnconfirmedError(detail);
+  logger.info(
+    { code: error.code, providerId },
+    `single sign-on link refused: ${detail}`,
+  );
+  return { action: "reject", code: error.code };
+}
 
 /**
  * Selects existing users for admitted SAML or connection-owned SCIM
@@ -194,7 +209,11 @@ export class PrismaScimSsoUsers {
     if (await this.#holdsThisBinding(database, input, user.id)) {
       return CONTINUE;
     }
-    return UNCONFIRMED;
+    return refuseUnconfirmed({
+      providerId: input.providerId,
+      detail:
+        "the provider did not assert the address is verified and the account's address is unconfirmed",
+    });
   }
 
   /** Whether the account already holds this connection's exact subject. */
@@ -250,7 +269,11 @@ export class PrismaScimSsoUsers {
       return CONTINUE;
     }
     if (!(await this.#connectionProvesDomainOf(database, input))) {
-      return UNCONFIRMED;
+      return refuseUnconfirmed({
+        providerId: input.providerId,
+        detail:
+          "the connection has no qualified proof for the unconfirmed account's domain",
+      });
     }
 
     const email = normalizeIdentifierValue(input.providerUser.email);
