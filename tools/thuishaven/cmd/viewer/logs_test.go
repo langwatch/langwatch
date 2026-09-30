@@ -89,6 +89,11 @@ func TestGoLinesSplitByServiceName(t *testing.T) {
 	}{
 		{service: "langwatch-service-nlpgo", want: "nlp"},
 		{service: "langwatch-service-aigateway", want: "gateway"},
+		{service: "langwatch-service-idpsim", want: "idp"},
+		{service: "langwatch-service-mailsim", want: "mail"},
+		{service: "langwatch-service-storagesim", want: "storage"},
+		{service: "langwatch-service-voicesim", want: "voice"},
+		{service: "langwatch-service-llmsim", want: "llm"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.service, func(t *testing.T) {

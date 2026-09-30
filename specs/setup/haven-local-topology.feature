@@ -18,7 +18,9 @@ Feature: The local development topology
   #
   #   ui       apps/ui             Vite, on PORT
   #   backend  tools/dev-runtime   the api AND the worker application, one process
-  #   go       cmd/service         aigateway AND nlpgo, one process
+  #   go       cmd/service         aigateway AND nlpgo, one process; a dev build
+  #                                (-tags dev) hosts the five simulators there too:
+  #                                idpsim, mailsim, storagesim, voicesim, llmsim
   #   langy    services/langyagent its own lane, optional
   #
   # Ports are unchanged: ui on PORT, api on PORT + 1000, worker metrics on
@@ -75,6 +77,21 @@ Feature: The local development topology
     When "service combined" starts
     Then it hosts the AI Gateway and the NLP engine
     And "combined" is a dispatchable subcommand of the mono-binary
+
+  # The simulators are development tools: a dev build links them, the release
+  # images (built untagged) cannot even select them.
+  @unit
+  Scenario: A dev build hosts the simulators in the combined process
+    Given the mono-binary built with the dev tag
+    When "service combined" resolves what it can host
+    Then it hosts idpsim, mailsim, storagesim, voicesim and llmsim beside the data-plane services
+    And each simulator is still its own subcommand
+
+  @unit
+  Scenario: A release build links no simulator
+    Given the mono-binary built without the dev tag
+    When a caller names idpsim, mailsim, storagesim, voicesim or llmsim
+    Then neither is a dispatchable subcommand
 
   @unit
   Scenario: The combined Go process keeps each service's telemetry identity
@@ -139,6 +156,15 @@ Feature: The local development topology
     Then the go lane hosts only the gateway
     And it carries no address for the service that was not selected
 
+  # A checkout without cmd/service/combined_dev.go, or a monolith one, keeps
+  # Haven's bundled simulator lanes (haven-bundled-simulators.feature).
+  @unit
+  Scenario: A dev checkout's go lane hosts the simulators
+    Given a checkout whose dev build links the simulators
+    When haven plans a stack selecting every simulator
+    Then the go lane hosts idpsim, mailsim, storagesim, voicesim and llmsim with the env their own lanes carried
+    And no "idp", "mail", "storage", "voice" or "llm" lane is planned
+
   # --- Restarting a lane ---
 
   @unit
@@ -156,6 +182,7 @@ Feature: The local development topology
     When a developer names "gateway" or "nlp" to restart
     Then the command is refused with the restartable list
     And "go" is the name that bounces them
+    And "idp", "mail", "storage", "voice" and "llm" are offered only as "go" where the go lane hosts them
 
   # --- The api.<slug> hostname ---
 

@@ -152,7 +152,8 @@ jobs:
           uv venv "$RUNNER_TEMP/codeblock-venv"
           uv pip install --python "$RUNNER_TEMP/codeblock-venv" requests ./sdks/python
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
-      - run: go test -count=1 -race ./services/aigateway/... ./services/analyticssim/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/... ./tools/openapidiff/... ./tools/apidiff/... ./cmd/linkcheck/... ./cmd/openapidiff/...
+      - run: go test -count=1 -race ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/... ./tools/openapidiff/... ./tools/apidiff/... ./cmd/linkcheck/... ./cmd/openapidiff/...
+      - run: go test -count=1 -tags dev ./cmd/service/...
 
   lint:
     needs: changes
@@ -263,7 +264,8 @@ jobs:
       # pinning that to what `go vet` runs, so "already covered" is likely but
       # not guaranteed. A cheap job is the wrong thing to bet coverage on.
       - uses: ./.github/actions/go-build-cache
-      - run: go vet ./services/aigateway/... ./services/analyticssim/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/... ./tools/openapidiff/... ./tools/apidiff/...
+      - run: go vet ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/... ./tools/openapidiff/... ./tools/apidiff/...
+      - run: go vet -tags dev ./cmd/service/...
 
   # packages/handled-error/src/codes.generated.ts mirrors the services' herr
   # codes; the TypeScript presentation registry is keyed off it, so a Go code

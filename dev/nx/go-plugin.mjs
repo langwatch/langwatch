@@ -33,9 +33,13 @@ const goModule = (root) => ({
   },
 });
 
+// .bin/service is the local dev binary: tagged dev, it links the simulators
+// (cmd/service/combined_dev.go). Release images build ./cmd/service untagged.
+const buildTags = { service: "-tags dev " };
+
 const binary = (root) => {
   const name = basename(root);
-  const build = { command: `go build -o .bin/${name}/${name} ./${root}` };
+  const build = { command: `go build ${buildTags[name] ?? ""}-o .bin/${name}/${name} ./${root}` };
   return {
     name,
     tags: ["go"],

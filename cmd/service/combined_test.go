@@ -15,8 +15,8 @@ func TestCombinedHostsEveryDataPlaneServiceByDefault(t *testing.T) {
 	for _, svc := range selected {
 		names = append(names, svc.Name)
 	}
-	if strings.Join(names, ",") != "aigateway,nlpgo" {
-		t.Fatalf("combined hosts %v, want aigateway and nlpgo", names)
+	if strings.Join(names, ",") != wantCombined {
+		t.Fatalf("combined hosts %v, want %s", names, wantCombined)
 	}
 	if _, ok := services[combinedCommand]; !ok {
 		t.Fatal("`service combined` is not a dispatchable subcommand")

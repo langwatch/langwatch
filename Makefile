@@ -135,10 +135,16 @@ setup-hooks:
 # gateway still proxies LLM traffic and returns 200, it just ships spend,
 # budget and auth traffic to whichever control plane that port belongs to.
 DEV_ENV_FILE ?= .env
+# Both targets build with -tags dev, which links the simulators (cmd/service/
+# combined_dev.go); release images build untagged. SIM_CONSOLES are the consoles
+# the run embeds (ADR-160): a simulator's own, or those `combined` hosts.
+SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim
+SIM_CONSOLES = $(if $(filter combined,$(svc)),$(if $(args),$(filter $(SIMULATORS),$(args)),$(SIMULATORS)),$(filter $(SIMULATORS),$(svc)))
+BUILD_SIM_CONSOLES = for sim in $(SIM_CONSOLES); do test -f services/$$sim/web/dist/index.html \
+	|| pnpm exec nx run @langwatch/$$sim-web:build --outputStyle=static || echo "$$sim-web did not build; its console names the fix"; done
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
-	@case "$(svc)" in mailsim|idpsim|storagesim|voicesim|llmsim|analyticssim) test -f services/$(svc)/web/dist/index.html \
-		|| pnpm exec nx run @langwatch/$(svc)-web:build --outputStyle=static || echo "$(svc)-web did not build; its console names the fix" ;; esac
+	@$(BUILD_SIM_CONSOLES)
 	@_snap=$$(export -p) && \
 		{ test -f $(DEV_ENV_FILE) \
 			&& set -a && . $(DEV_ENV_FILE) && set +a \
@@ -146,9 +152,9 @@ service:
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
-		if [ -n "$$LANGWATCH_LANE" ]; then mkdir -p .bin/$(svc) && go build -o .bin/$(svc)/$(svc) ./cmd/service \
+		if [ -n "$$LANGWATCH_LANE" ]; then mkdir -p .bin/$(svc) && go build -tags dev -o .bin/$(svc)/$(svc) ./cmd/service \
 			&& exec .bin/$(svc)/$(svc) $(svc) $(args); else \
-			set -o pipefail; go run ./cmd/service $(svc) $(args) 2>&1 \
+			set -o pipefail; go run -tags dev ./cmd/service $(svc) $(args) 2>&1 \
 				| node dev/scripts/log-render.mjs $(svc) --color; fi
 
 # Run a Go service with live reload on file changes. A rebuild that fails
@@ -164,12 +170,13 @@ service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
 	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
+	@$(BUILD_SIM_CONSOLES)
 	@_snap=$$(export -p) && \
 		set -a && . $(DEV_ENV_FILE) && set +a && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
 		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
-		air --build.cmd "mkdir -p .bin/$(svc) && go build -o .bin/$(svc)/$(svc) ./cmd/service" \
+		air --build.cmd "mkdir -p .bin/$(svc) && go build -tags dev -o .bin/$(svc)/$(svc) ./cmd/service" \
 			--build.full_bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
 			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \

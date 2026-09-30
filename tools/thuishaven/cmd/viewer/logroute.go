@@ -123,6 +123,16 @@ func appFromServiceName(service string) (string, bool) {
 		return "gateway", true
 	case strings.Contains(service, "langyagent"):
 		return "langy", true
+	case strings.Contains(service, "idpsim"):
+		return "idp", true
+	case strings.Contains(service, "mailsim"):
+		return "mail", true
+	case strings.Contains(service, "storagesim"):
+		return "storage", true
+	case strings.Contains(service, "voicesim"):
+		return "voice", true
+	case strings.Contains(service, "llmsim"):
+		return "llm", true
 	}
 	return "", false
 }

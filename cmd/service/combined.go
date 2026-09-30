@@ -41,10 +41,11 @@ type combinedService struct {
 	Run func(ctx context.Context, addr string) error
 }
 
-// combinedServices is what `service combined` can host, in start order.
+// combinedServices is what `service combined` can host, in start order; a dev
+// build appends the simulators (combined_dev.go).
 //
 // langyagent is deliberately absent. It is not a request/response server the
-// way these two are: it spawns one sandboxed worker subprocess per
+// way these are: it spawns one sandboxed worker subprocess per
 // conversation and owns their lifetimes, so a restart of the combined process
 // on a source change would take live conversations with it. It keeps its own
 // lane, started and stopped on its own schedule.
