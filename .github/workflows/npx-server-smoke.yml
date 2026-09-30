@@ -105,14 +105,15 @@ jobs:
           node --version || true
           go version || true
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
-        with:
-          node-version: "24"
-
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
+        with:
+          node-version: "24"
+          cache: pnpm
 
       # No Go setup. The npx flow ships only the prebuilt aigateway monobinary
       # download path; LANGWATCH_AIGATEWAY_DEV_BUILD is intentionally unset

@@ -31,6 +31,22 @@ description: >-
 runs:
   using: composite
   steps:
+    # Every job that prepares files also runs nx (ensure:built, lint:types), so
+    # the Nx cache rides here. Pinned inside the workspace so actions/cache can
+    # carry it; locally Nx shares ~/.nx between worktrees (ADR-150).
+    - name: Point Nx at a cacheable directory
+      shell: bash
+      run: echo "NX_CACHE_DIRECTORY=$GITHUB_WORKSPACE/.nx/cache" >> "$GITHUB_ENV"
+
+    - name: Restore the Nx cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .nx/cache
+        key: ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-
+          ${{ runner.os }}-nx-
+
     - name: Restore generated files
       id: cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
