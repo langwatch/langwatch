@@ -6,9 +6,12 @@ import { HubApp, type Navigate } from "./hub/hub-app.tsx";
 import { readRoute } from "./shared/route.ts";
 
 const isHubPath = ({ pathname }: { pathname: string }) =>
-  pathname === "/" || pathname === "/logs" || pathname.startsWith("/logs/");
+  pathname === "/" ||
+  pathname === "/settings" ||
+  pathname === "/logs" ||
+  pathname.startsWith("/logs/");
 
-/** The hub's two pages are one document: a same-origin link between them is a route change. */
+/** The hub's pages are one document: a same-origin link between them is a route change. */
 const followsInApp = ({ event }: { event: MouseEvent }) => {
   if (event.defaultPrevented || event.button !== 0) return undefined;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return undefined;

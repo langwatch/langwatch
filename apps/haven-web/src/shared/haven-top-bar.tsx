@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { Surface } from "./contract.ts";
 import { consolesOf } from "./surfaces.ts";
 
-export type HavenPlace = "hub" | "logs" | "home";
+export type HavenPlace = "hub" | "logs" | "settings" | "home";
 
 export type HavenTopBarProps = {
   current: HavenPlace;
@@ -56,12 +56,17 @@ export const HavenTopBar = ({ current, hubHref, home, actions }: HavenTopBarProp
     home === undefined
       ? links.filter((link) => link.href === homeHref || link.href === kitHub)
       : answering({ links, surfaces: home.surfaces });
-  const kit = current === "logs" ? found.map(({ label, href }) => ({ label, href })) : found;
+  const offKit = current === "logs" || current === "settings";
+  const kit = offKit ? found.map(({ label, href }) => ({ label, href })) : found;
   const logs: ConsoleLink = {
     label: "Logs",
     href: home === undefined ? `${hub}/logs` : `${hub}/logs/${encodeURIComponent(home.slug)}`,
     current: current === "logs",
   };
+  const settings: ConsoleLink[] =
+    home === undefined
+      ? [{ label: "Settings", href: `${hub}/settings`, current: current === "settings" }]
+      : [];
   const hosts = new Set(kit.map((link) => hostOf({ href: link.href })));
   const extras =
     home === undefined
@@ -74,7 +79,12 @@ export const HavenTopBar = ({ current, hubHref, home, actions }: HavenTopBarProp
       name="haven"
       slug={home?.slug ?? slug}
       homeHref={home === undefined ? "/" : home.href}
-      links={[...(kit.length === 0 ? fallback({ hub, home, current }) : kit), logs, ...extras]}
+      links={[
+        ...(kit.length === 0 ? fallback({ hub, home, current }) : kit),
+        logs,
+        ...settings,
+        ...extras,
+      ]}
       actions={actions}
     />
   );

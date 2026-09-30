@@ -102,6 +102,12 @@ export const revealApiKey = async ({ path }: { path: string }): Promise<string> 
 export const restartPath = ({ slug }: { slug: string }) =>
   `/api/stacks/${encodeURIComponent(slug)}/restart`;
 
+export const downPath = ({ slug }: { slug: string }) =>
+  `/api/stacks/${encodeURIComponent(slug)}/down`;
+
+export const destroyPath = ({ slug }: { slug: string }) =>
+  `/api/stacks/${encodeURIComponent(slug)}/destroy`;
+
 export const LIMITS_PATH = "/api/limits";
 
 export const limitPath = ({ name }: { name: string }) =>

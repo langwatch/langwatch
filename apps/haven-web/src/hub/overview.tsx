@@ -9,7 +9,7 @@ import {
   Stack,
 } from "@langwatch/design-system-internal";
 
-import { START_PATH, restartPath } from "../shared/api.ts";
+import { START_PATH, destroyPath, downPath, restartPath } from "../shared/api.ts";
 import { nowMs } from "../shared/clock.ts";
 import { Connection } from "../shared/connection.tsx";
 import type { Hub } from "../shared/contract.ts";
@@ -94,12 +94,27 @@ export const Overview = ({ poll }: { poll: Poll<Hub> }) => {
                     key={stack.slug}
                     stack={stack}
                     now={now}
-                    restarting={busy === stack.slug}
+                    busy={busy === stack.slug}
                     onRestart={() =>
                       void act({
                         key: stack.slug,
                         path: restartPath({ slug: stack.slug }),
                         doing: `restart ${stack.slug}`,
+                      })
+                    }
+                    onDown={() =>
+                      void act({
+                        key: stack.slug,
+                        path: downPath({ slug: stack.slug }),
+                        doing: `stop ${stack.slug}`,
+                      })
+                    }
+                    onDestroy={() =>
+                      void act({
+                        key: stack.slug,
+                        path: destroyPath({ slug: stack.slug }),
+                        body: { confirm: stack.slug },
+                        doing: `destroy ${stack.slug}`,
                       })
                     }
                   />

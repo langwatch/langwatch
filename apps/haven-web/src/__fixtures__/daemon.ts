@@ -161,6 +161,8 @@ const hubStack = ({ home, appUrl }: { home: StackHome; appUrl: string }): HubSta
   facts: home.facts,
   surfaces: home.surfaces,
   canRestart: home.actions.canRestart,
+  canDown: true,
+  canDestroy: true,
 });
 
 export const hub = ({ now }: { now: number }): Hub => {

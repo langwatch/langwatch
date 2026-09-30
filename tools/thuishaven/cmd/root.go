@@ -270,12 +270,15 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				return naming.URL(svc, slug, scheme, port)
 			},
 			IdPTenants: dashboard.FetchIdPTenants,
-			// The same two lifecycle actions the hub offers, over HTTP. Restart
-			// bounces a live stack's children; Start brings up a worktree that has
-			// none — and refuses any directory git does not list as one.
+			// The lifecycle actions the hub offers, over HTTP. Restart bounces a
+			// live stack's children; Start brings up a worktree that has none (and
+			// refuses any directory git does not list as one); Down and Destroy
+			// are `haven down` and `haven destroy <slug>` for one stack.
 			Actions: dashboard.Actions{
 				Restart: orch.RestartStackQuiet,
 				Start:   orch.StartWorktreeStack,
+				Down:    orch.DownStack,
+				Destroy: orch.DestroyStack,
 			},
 			Limits: dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
 		}),
@@ -879,8 +882,17 @@ func stripFlag(args []string, flag string) ([]string, bool) {
 	return out, found
 }
 
-// runUpgrade reinstalls the haven binary from this checkout via go install.
+// runUpgrade reinstalls the haven binary from this checkout via go install,
+// after building the consoles it embeds (the hub, stack home and the sim
+// consoles). A console that fails to build only warns: the binary serves a
+// page naming `make haven-web` in its place.
 func runUpgrade(ctx context.Context, d deps, _ invocation) error {
+	web := exec.CommandContext(ctx, "make", "--no-print-directory", "haven-web")
+	web.Dir = d.worktree
+	web.Stdout, web.Stderr = os.Stdout, os.Stderr
+	if err := web.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "haven-web did not build (%v); run `make haven-web` to see why\n", err)
+	}
 	cmd := exec.CommandContext(ctx, "go", "install", "./cmd/haven")
 	cmd.Dir = d.worktree
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr

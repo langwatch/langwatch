@@ -48,6 +48,8 @@ type hubStackJSON struct {
 	Facts      factsJSON     `json:"facts"`
 	Surfaces   []surfaceJSON `json:"surfaces"`
 	CanRestart bool          `json:"canRestart"`
+	CanDown    bool          `json:"canDown"`
+	CanDestroy bool          `json:"canDestroy"`
 }
 
 type hubWorktreeJSON struct {
@@ -111,6 +113,8 @@ func (s *Server) hubStacks(extras Extras) []hubStackJSON {
 			Facts:      s.facts(h, extras),
 			Surfaces:   s.surfaces(h),
 			CanRestart: h.live && s.config.Actions.Restart != nil,
+			CanDown:    s.config.Actions.Down != nil,
+			CanDestroy: s.config.Actions.Destroy != nil,
 		})
 	}
 	return out

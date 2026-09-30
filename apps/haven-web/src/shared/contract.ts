@@ -87,6 +87,8 @@ export const hubStackSchema = z.object({
   facts: factsSchema,
   surfaces: z.array(surfaceSchema),
   canRestart: z.boolean(),
+  canDown: z.boolean(),
+  canDestroy: z.boolean(),
 });
 export type HubStack = z.infer<typeof hubStackSchema>;
 

@@ -7,11 +7,13 @@ import {
   Table,
   type TableColumn,
 } from "@langwatch/design-system-internal";
+import { useState } from "react";
 
 import type { HubStack, Surface } from "../shared/contract.ts";
 import { formatAge, formatBytes } from "../shared/format.ts";
 import { logsPath } from "../shared/route.ts";
 import { ownSurfaces, surfaceState } from "../shared/surfaces.ts";
+import { DestroyDialog } from "./destroy-dialog.tsx";
 
 const columns: TableColumn<Surface>[] = [
   {
@@ -65,12 +67,16 @@ const summaryOf = ({ stack, now }: { stack: HubStack; now: number }) => {
 export type StackCardProps = {
   stack: HubStack;
   now: number;
-  restarting: boolean;
+  /** An action on this stack is in flight. */
+  busy: boolean;
   onRestart: () => void;
+  onDown: () => void;
+  onDestroy: () => void;
 };
 
-export const StackCard = ({ stack, now, restarting, onRestart }: StackCardProps) => {
+export const StackCard = ({ stack, now, busy, onRestart, onDown, onDestroy }: StackCardProps) => {
   const summary = summaryOf({ stack, now });
+  const [destroying, setDestroying] = useState(false);
   return (
     <Panel
       title={stack.homeUrl === "" ? stack.slug : <Link href={stack.homeUrl}>{stack.slug}</Link>}
@@ -89,11 +95,40 @@ export const StackCard = ({ stack, now, restarting, onRestart }: StackCardProps)
             <ConfirmButton
               size="sm"
               variant="secondary"
-              label={restarting ? "Restarting" : "Restart"}
+              label="Restart"
               confirmLabel="Restart?"
-              disabled={restarting}
+              disabled={busy}
               onConfirm={onRestart}
             />
+          )}
+          {stack.canDown && (
+            <ConfirmButton
+              size="sm"
+              variant="secondary"
+              label="Down"
+              confirmLabel="Down?"
+              disabled={busy}
+              onConfirm={onDown}
+            />
+          )}
+          {stack.canDestroy && (
+            <>
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={busy}
+                title="Stop the stack and drop its databases"
+                onClick={() => setDestroying(true)}
+              >
+                Destroy
+              </Button>
+              <DestroyDialog
+                slug={stack.slug}
+                open={destroying}
+                onClose={() => setDestroying(false)}
+                onConfirm={onDestroy}
+              />
+            </>
           )}
           {stack.appUrl !== "" && (
             <Button size="sm" href={stack.appUrl}>

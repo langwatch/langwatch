@@ -33,7 +33,7 @@ func TestHubJSONFieldNames(t *testing.T) {
 	pinKeys(t, "shared", body["shared"], "hubUrl", "observabilityUrl", "telemetryUrl")
 	pinKeys(t, "machine", body["machine"], "totalRamBytes", "devRssBytes", "stacksRssBytes", "serverRssBytes",
 		"agentRssBytes", "agentCount", "toolingRssBytes", "otherRssBytes", "pressure")
-	pinKeys(t, "hub stack", body["stacks"].([]any)[0], "slug", "live", "homeUrl", "appUrl", "facts", "surfaces", "canRestart")
+	pinKeys(t, "hub stack", body["stacks"].([]any)[0], "slug", "live", "homeUrl", "appUrl", "facts", "surfaces", "canRestart", "canDown", "canDestroy")
 	pinKeys(t, "worktree", body["worktrees"].([]any)[0], "name", "slug", "branch", "dir", "isPrimary", "isCurrent", "homeUrl", "canStart")
 	pinKeys(t, "event", body["events"].([]any)[0], "at", "kind", "target", "reason")
 	pinKeys(t, "actions", body["actions"], "canRestart", "canStart")

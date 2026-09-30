@@ -6,3 +6,25 @@
   padding: 0;
   border: 0;
 }
+
+.haven-unit-field {
+  position: relative;
+  display: inline-block;
+}
+
+.haven-unit-field .ds-input {
+  width: 100%;
+  padding-inline-end: calc(var(--space-8) + var(--space-2));
+}
+
+.haven-unit-field-unit {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: var(--space-3);
+  display: flex;
+  align-items: center;
+  height: var(--control-sm);
+  color: var(--ink-500);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}

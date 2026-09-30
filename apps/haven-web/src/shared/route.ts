@@ -2,6 +2,7 @@
 export type Route =
   | { kind: "hub"; page: "overview" }
   | { kind: "hub"; page: "logs"; stack: string; lane: string }
+  | { kind: "hub"; page: "settings" }
   | { kind: "home"; slug: string };
 
 type Where = { hostname: string; pathname: string };
@@ -39,8 +40,11 @@ export const readRoute = ({ hostname, pathname }: Where): Route => {
     .filter((segment) => segment.length > 0)
     .map((segment) => decode({ segment }));
   if (page === "logs") return { kind: "hub", page: "logs", stack, lane };
+  if (page === "settings") return { kind: "hub", page: "settings" };
   return { kind: "hub", page: "overview" };
 };
+
+export const SETTINGS_PATH = "/settings";
 
 /** The hub's log view for one stack and, optionally, one lane: the path logsUrl names. */
 export const logsPath = ({ stack = "", lane = "" }: { stack?: string; lane?: string }) =>

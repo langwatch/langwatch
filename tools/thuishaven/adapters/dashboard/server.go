@@ -84,6 +84,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/stacks/{slug}", s.handleStackHome)
 	mux.HandleFunc("POST /api/stacks/{slug}/api-key", s.handleRevealAPIKey)
 	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
+	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)
+	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
 	mux.HandleFunc("/api/worktrees/start", s.handleStart)
 	mux.HandleFunc("GET /api/limits", s.handleLimits)
 	mux.HandleFunc("PUT /api/limits/{name}", s.handleSetLimit)

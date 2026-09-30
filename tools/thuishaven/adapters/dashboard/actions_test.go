@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -195,4 +196,29 @@ func TestButtonsAppearOnlyWhenWired(t *testing.T) {
 			t.Error("bouncing a stack with no launcher would find nothing to signal; that one is started, not restarted")
 		}
 	})
+}
+
+// TestDownAndDestroyFromTheBrowser pins the stack card's Down and Destroy routes.
+func TestDownAndDestroyFromTheBrowser(t *testing.T) {
+	var downed, destroyed string
+	s := actionServer(Actions{
+		Down:    func(_ context.Context, slug string) error { downed = slug; return nil },
+		Destroy: func(_ context.Context, slug string) error { destroyed = slug; return nil },
+	})
+
+	if rec := post(s, "/api/stacks/portless/down", ""); rec.Code != http.StatusOK || downed != "portless" {
+		t.Errorf("down: status %d, downed %q", rec.Code, downed)
+	}
+	if rec := post(s, "/api/stacks/portless/destroy", `{"confirm":"other"}`); rec.Code != http.StatusBadRequest || destroyed != "" {
+		t.Errorf("destroy without the typed slug: status %d, destroyed %q", rec.Code, destroyed)
+	}
+	if rec := post(s, "/api/stacks/portless/destroy", `{"confirm":"portless"}`); rec.Code != http.StatusOK || destroyed != "portless" {
+		t.Errorf("destroy with the typed slug: status %d, destroyed %q", rec.Code, destroyed)
+	}
+	if rec := post(s, "/api/stacks/nosuch/destroy", `{"confirm":"nosuch"}`); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stack: status %d, want 404", rec.Code)
+	}
+	if rec := post(actionServer(Actions{}), "/api/stacks/portless/down", ""); rec.Code != http.StatusNotImplemented {
+		t.Errorf("unwired down: status %d, want 501", rec.Code)
+	}
 }

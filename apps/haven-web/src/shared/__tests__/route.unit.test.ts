@@ -13,6 +13,7 @@ describe("readRoute", () => {
       "/logs/feat-x/api",
       { kind: "hub", page: "logs", stack: "feat-x", lane: "api" },
     ],
+    ["hub.langwatch.localhost", "/settings", { kind: "hub", page: "settings" }],
     ["hub.langwatch.localhost", "/logs", { kind: "hub", page: "logs", stack: "", lane: "" }],
     ["feat-x.langwatch.localhost", "/", { kind: "home", slug: "feat-x" }],
     ["Feat-X.langwatch.localhost", "/anything", { kind: "home", slug: "feat-x" }],

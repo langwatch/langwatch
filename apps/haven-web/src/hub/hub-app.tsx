@@ -6,6 +6,7 @@ import { logsPath, type Route } from "../shared/route.ts";
 import { usePoll } from "../shared/use-poll.ts";
 import { LogsPage } from "./logs-page.tsx";
 import { Overview } from "./overview.tsx";
+import { SettingsPage } from "./settings-page.tsx";
 
 export type HubRoute = Extract<Route, { kind: "hub" }>;
 export type Navigate = (input: { path: string; replace?: boolean }) => void;
@@ -47,6 +48,7 @@ export const HubApp = ({ route, navigate }: { route: HubRoute; navigate: Navigat
   useSlashShortcut({ onSlash });
 
   if (route.page === "overview") return <Overview poll={poll} />;
+  if (route.page === "settings") return <SettingsPage />;
   const stacks = (poll.data?.stacks ?? []).map((stack) => stack.slug);
   const [only] = stacks;
   const stack =

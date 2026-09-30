@@ -99,7 +99,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	if opts.Selection.Storage {
 		for _, svc := range st.Services {
 			if svc.Name == domain.StorageService && svc.Port != 0 {
-				base = append(base, domain.StorageS3Env(resolvedDevEnv(repoDir), svc.Port)...)
+				base = append(base, domain.StorageS3Env(resolvedDevEnv(repoDir), svc.URL)...)
 			}
 		}
 	}

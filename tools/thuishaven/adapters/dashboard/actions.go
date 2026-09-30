@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,6 +18,9 @@ type Actions struct {
 	// Start brings up a worktree that has no stack. It returns as soon as the
 	// launcher is spawned; the registry is where progress is read.
 	Start func(dir string) error
+	// Down stops a stack and keeps its databases; Destroy also drops them.
+	Down    func(ctx context.Context, slug string) error
+	Destroy func(ctx context.Context, slug string) error
 }
 
 // maxActionBody caps a request body that is only ever a small JSON object, so a
@@ -111,4 +115,52 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeActionResult(w, "starting a stack — it appears here as its services come up", s.config.Actions.Start(req.Dir))
+}
+
+// handleDown stops a stack and keeps its data: `haven down` for one slug.
+func (s *Server) handleDown(w http.ResponseWriter, r *http.Request) {
+	if !guardAction(w, r) {
+		return
+	}
+	if s.config.Actions.Down == nil {
+		http.Error(w, "this haven cannot stop a stack", http.StatusNotImplemented)
+		return
+	}
+	slug := r.PathValue("slug")
+	if !s.knownLogStack(slug) {
+		http.Error(w, "unknown stack", http.StatusNotFound)
+		return
+	}
+	writeActionResult(w, "stopped "+slug, s.config.Actions.Down(r.Context(), slug))
+}
+
+// handleDestroy stops a stack and drops its databases: `haven destroy <slug>`.
+// The body must repeat the slug, the same typed confirmation the hub asks for,
+// so a stray POST at the route cannot take data away.
+func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
+	if !guardAction(w, r) {
+		return
+	}
+	if s.config.Actions.Destroy == nil {
+		http.Error(w, "this haven cannot destroy a stack", http.StatusNotImplemented)
+		return
+	}
+	slug := r.PathValue("slug")
+	if !s.knownLogStack(slug) {
+		http.Error(w, "unknown stack", http.StatusNotFound)
+		return
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxActionBody))
+	if err != nil {
+		http.Error(w, "could not read the request", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Confirm string `json:"confirm"`
+	}
+	if jerr := json.Unmarshal(body, &req); jerr != nil || req.Confirm != slug {
+		http.Error(w, "type the stack's slug to confirm destroying it", http.StatusBadRequest)
+		return
+	}
+	writeActionResult(w, "destroyed "+slug+" and dropped its databases", s.config.Actions.Destroy(r.Context(), slug))
 }

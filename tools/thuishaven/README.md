@@ -200,7 +200,9 @@ calls the product makes (path-style PUT/GET/HEAD/DELETE object, HEAD bucket),
 checks SigV4 signatures against haven's dev key as S3 does, answers `NoSuchKey` on a missing
 GET and a bare 404 on a missing HEAD, and allows CORS from the stack's app
 origin. The overlay sets `STORED_OBJECTS_BACKEND=s3`, `S3_BUCKET_NAME`,
-`S3_ENDPOINT` (its loopback port) and dummy S3 credentials, unless the
+`S3_ENDPOINT` (its haven route, `https://storage.<slug>.langwatch.localhost`,
+trusted through `NODE_EXTRA_CA_CERTS` like the NLP route; the proxy forwards the
+Host header, so presigned URLs verify) and dummy S3 credentials, unless the
 environment already names `STORED_OBJECTS_BACKEND`, `S3_BUCKET_NAME`,
 `S3_ENDPOINT` or `LANGWATCH_LOCAL_STORAGE_PATH`: the root `.env` beats the
 overlay, so haven stays out of a storage choice rather than half-overriding it.
@@ -363,7 +365,7 @@ Redis memory caps, the colima VM's CPUs and memory, and the unit test worker
 count, each with its effective value and source (default, settings, .env or
 env). `haven limits set <name> <value>` / `unset <name>` (for example
 `clickhouse-memory-mb`, `colima-cpus`) edit `limits.json` in haven's home, and
-the hub's "Machine limits" panel does the same over `GET /api/limits` and
+the hub's Settings page (`/settings`) does the same over `GET /api/limits` and
 `PUT`/`DELETE /api/limits/<name>`. Precedence is environment, then `.env`, then
 that file, then the computed default. ClickHouse and Redis pick a change up on
 the next `haven up`, the observability container when it is next recreated;
@@ -560,6 +562,8 @@ The daemon's JSON, which the console reads:
 | `GET /api/logs?stack=&service=`   | the log view's captured lines                         |
 | `POST /api/stacks/<slug>/api-key` | reveals the local API key (same-origin only)          |
 | `POST /api/stacks/<slug>/restart` | bounces a live stack                                  |
+| `POST /api/stacks/<slug>/down`    | stops a stack and keeps its databases                 |
+| `POST /api/stacks/<slug>/destroy` | stops a stack and drops its databases; body `{"confirm":"<slug>"}` |
 | `POST /api/worktrees/start`       | brings a stopped worktree up                          |
 
 ## More of what haven does

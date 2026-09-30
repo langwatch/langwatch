@@ -401,10 +401,11 @@ var StorageProviderEnvVars = []string{
 	"STORED_OBJECTS_BACKEND", "S3_BUCKET_NAME", "S3_ENDPOINT", "LANGWATCH_LOCAL_STORAGE_PATH",
 }
 
-// StorageS3Env points the product's S3 object storage at storagesim on port,
-// path-style (the product's default with an endpoint) under dummy credentials,
-// or nil when the developer already chose object storage.
-func StorageS3Env(resolved map[string]string, port int) []string {
+// StorageS3Env points the product's S3 object storage at storagesim's haven
+// route (endpoint), path-style (the product's default with an endpoint) under dummy
+// credentials, or nil when the developer already chose object storage. The
+// proxy forwards the Host header untouched, so presigned URLs verify.
+func StorageS3Env(resolved map[string]string, endpoint string) []string {
 	for _, key := range StorageProviderEnvVars {
 		if resolved[key] != "" {
 			return nil
@@ -413,7 +414,7 @@ func StorageS3Env(resolved map[string]string, port int) []string {
 	return []string{
 		"STORED_OBJECTS_BACKEND=s3",
 		"S3_BUCKET_NAME=langwatch",
-		fmt.Sprintf("S3_ENDPOINT=http://127.0.0.1:%d", port),
+		"S3_ENDPOINT=" + endpoint,
 		"S3_ACCESS_KEY_ID=storagesim",
 		"S3_SECRET_ACCESS_KEY=storagesim",
 	}
