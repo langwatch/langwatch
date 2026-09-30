@@ -16,6 +16,7 @@
   expect:
     status: 202
     body: { conversationId: "<any>", turnId: "<any>" }
+  # No conversationId check: until the first turn projects, a continue mints a fresh id, as main does.
   verify:
     - request: POST /api/langy/conversations/{conversationId}/messages
       eventually: 30s
