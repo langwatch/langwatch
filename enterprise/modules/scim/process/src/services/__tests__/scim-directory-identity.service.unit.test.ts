@@ -215,6 +215,7 @@ describe("ScimDirectoryIdentityService", () => {
   });
 
   describe("when a person leaves a directory", () => {
+    /** @scenario Deleting a directory person forgets ownership without reclaiming it */
     it("forgets that connection's identity and no other's", async () => {
       await service.remember({
         connectionId: OKTA,
@@ -235,6 +236,9 @@ describe("ScimDirectoryIdentityService", () => {
       await expect(service.findUserId({ connectionId: ENTRA, externalId: "c-99" })).resolves.toBe(
         "user_sam",
       );
+      await expect(
+        service.assertWritable({ connectionId: OKTA, userId: "user_sam" }),
+      ).rejects.toMatchObject({ code: "scim_write_outside_connection" });
     });
   });
 });
