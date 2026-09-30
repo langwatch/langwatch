@@ -201,10 +201,10 @@ and every file under the Go trees (`cmd`, `pkg`, `services`, `tools`,
 `infra/clickhouse-serverless`, `sdks/go`), so a `//go:embed` file is always
 hashed; plus `go version` and the `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`
 and `GOEXPERIMENT` env. A miss costs one incremental `go build`, so breadth is
-cheap and a missing input is not. Each binary implicitly depends on `go`,
-which owns every Go file no other project owns, so `nx affected` reaches every
-binary on any Go change. `haven` and `service` also depend on the consoles
-they embed, build them first and hash their output. A new binary that embeds
+cheap and a missing input is not. `nx affected` reaches every binary on any
+Go change through those inputs (see "no project owns the root"). `haven` and
+`service` also depend on the consoles they embed, build them first and hash
+their output. A new binary that embeds
 a console must be added to the plugin's `consoles` map. `@nx-go/nx-go` and
 `@naxodev/gonx` model one module per project; this repository is one module
 with many mains, so a twenty-line plugin fits better.
@@ -256,8 +256,7 @@ evaluators) each declare exact inputs and outputs in `nx.json`.
 (never cached: secrets, and a Go run that is already fast) followed by one
 `nx run-many` over them and `prisma:generate`.
 
-**Repo-wide builds live on `workspace`** (`dev/nx/workspace-plugin.mjs`, since
-`go` owns the root): `build:types` is `tsc -b tsconfig.build.json`, its inputs
+**Repo-wide builds live on `workspace`** (`dev/nx/workspace-plugin.mjs`): `build:types` is `tsc -b tsconfig.build.json`, its inputs
 and outputs read from the solution's references so `sync:references` keeps
 them true; it depends on the SDK build because the referenced packages import
 its declarations. `lint:rules` (semgrep) and `test:scripts` (bats) run the
@@ -279,6 +278,20 @@ filtered entries naming each target's files.
 every workspace dependency, devDependencies too, and refuses a task graph with a
 cycle. The `cycles` policy counts devDependencies for the same reason, so the
 cycle that once made `^typecheck` unusable fails lint rather than Nx.
+
+## Amendment, 2026-09-30: no project owns the root
+
+**Affected follows inputs, not the root.** Project `go` was rooted at `.`, so
+it owned every root file nothing else did (the lockfile, `README.md`,
+`.github/`) and, through each binary's implicit dependency on it, marked all
+the Go projects affected on any of them. `go` is now rooted at `pkg/` and the
+binaries no longer depend on it. Nx marks a project touched when a changed file
+matches a `{workspaceRoot}` input of any of its targets, so every `build`,
+`lint:go` and `herrgen` that hashes the `go` named input is reached by exactly
+the files it hashes: a Go change still reaches `go` and every binary, while the
+`Makefile`, `.golangci.yml` or a `handled-error` source reach only `go`.
+`workspace` stays at `dev/nx`; its `lint:rules` hashes the whole tree, so any
+change reaches it, and nothing depends on it. The root carries no project.
 
 ## References
 

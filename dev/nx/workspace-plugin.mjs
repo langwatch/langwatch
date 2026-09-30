@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 
-// Project `workspace` (the root is taken by `go`) holds the repo-wide builds: `build:types`
+// Project `workspace` (at dev/nx: no project owns the root) holds the repo-wide builds: `build:types`
 // (`tsc -b`, declarations into the dist of every project the solution references,
 // read from those references) plus `lint:rules` and `test:scripts`, which run the
 // Makefile recipes as `lint:go` does. ADR-150 records why.
