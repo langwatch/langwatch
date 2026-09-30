@@ -5,10 +5,16 @@
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  createBackendFilter,
   createDebouncer,
+  createReloadQueue,
+  holdRemainingMs,
   resolveBundleConfig,
   resolveWatchConfig,
   shouldIgnoreWatchPath,
@@ -137,10 +143,10 @@ void describe("resolveWatchConfig", () => {
   // The modules and enterprise trees joined the set in d194dc1a37: before that
   // a week of module edits never restarted the backend and every fix read as
   // unfixed. This assertion was left behind by that change.
-  void it("defaults to the package, module and enterprise trees with a 750ms window", () => {
+  void it("defaults to the package, module and enterprise trees with a 2s window", () => {
     const config = resolveWatchConfig({});
     assert.deepEqual(config.dirs, ["src", "../../packages", "../../modules", "../../enterprise"]);
-    assert.equal(config.debounceMs, 750);
+    assert.equal(config.debounceMs, 2000);
   });
 
   void it("reads an override for both the dirs and the debounce window", () => {
@@ -161,7 +167,7 @@ void describe("resolveWatchConfig", () => {
 
   void it("falls back to the default debounce for a non-numeric override", () => {
     const config = resolveWatchConfig({ LANGWATCH_DEV_WATCH_DEBOUNCE_MS: "not-a-number" });
-    assert.equal(config.debounceMs, 750);
+    assert.equal(config.debounceMs, 2000);
   });
 });
 
@@ -305,5 +311,167 @@ void describe("stackControls", () => {
     assert.equal(clean, true);
     // Had to wait out the grace window before SIGKILL landed.
     assert.ok(elapsedMs >= 200, `expected at least the 200ms grace window, took ${elapsedMs}ms`);
+  });
+});
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+void describe("files the backend never loads", () => {
+  /** @scenario "Prose, specs and tool config leave the backend lane alone" */
+  void it("ignores prose, feature files and tool config json", () => {
+    assert.equal(shouldIgnoreWatchPath("../../modules/x/process/README.md"), true);
+    assert.equal(shouldIgnoreWatchPath("../../modules/x/specs/a.feature"), true);
+    assert.equal(shouldIgnoreWatchPath("../../packages/kernel/tsconfig.json"), true);
+    assert.equal(shouldIgnoreWatchPath("../../modules/catalogue.json"), true);
+  });
+
+  void it("keeps package.json and json that lives in a src tree", () => {
+    assert.equal(shouldIgnoreWatchPath("../../packages/kernel/package.json"), false);
+    assert.equal(shouldIgnoreWatchPath("../../packages/kernel/src/table.json"), false);
+  });
+});
+
+void describe("createBackendFilter", () => {
+  function workspace() {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "backend-filter-"));
+    const write = (dir, pkg) => {
+      fs.mkdirSync(path.join(root, dir), { recursive: true });
+      fs.writeFileSync(path.join(root, dir, "package.json"), JSON.stringify(pkg));
+    };
+    write("apps/api", { name: "api", dependencies: { kernel: "workspace:*" } });
+    write("packages/kernel", { name: "kernel", dependencies: { leaf: "workspace:*" } });
+    write("packages/leaf", { name: "leaf" });
+    write("packages/design-system", {
+      name: "design-system",
+      dependencies: { kernel: "workspace:*" },
+    });
+    return root;
+  }
+
+  /** @scenario "A browser-only package leaves the backend lane alone" */
+  void it("ignores a package no backend dependency reaches, keeps the ones it does", () => {
+    const root = workspace();
+    const filter = createBackendFilter({
+      cwd: path.join(root, "apps/api"),
+      roots: [path.join(root, "packages")],
+    });
+    assert.equal(
+      filter.isOutsideBackend(path.join(root, "packages/design-system/src/a.tsx")),
+      true,
+    );
+    assert.equal(filter.isOutsideBackend(path.join(root, "packages/kernel/src/a.ts")), false);
+    assert.equal(filter.isOutsideBackend(path.join(root, "packages/leaf/src/a.ts")), false);
+    assert.equal(filter.isOutsideBackend(path.join(root, "packages/unknown/src/a.ts")), false);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  void it("filters nothing when the command has no package.json", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "backend-filter-"));
+    const filter = createBackendFilter({ cwd: root, roots: [root] });
+    assert.equal(filter.isOutsideBackend(path.join(root, "a.ts")), false);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+});
+
+/** @scenario "Changes during a reload queue exactly one follow-up" */
+void describe("createReloadQueue", () => {
+  void it("runs one reload at a time and answers a pile of requests with one follow-up", async () => {
+    const runs = [];
+    let active = 0;
+    let maxActive = 0;
+    const queue = createReloadQueue({
+      run: async (files) => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        runs.push(files);
+        await sleep(40);
+        active -= 1;
+      },
+    });
+    const first = queue.request(["a.ts"]);
+    await sleep(5);
+    assert.equal(queue.isBusy(), true);
+    void queue.request(["b.ts"]);
+    void queue.request(["c.ts", "b.ts"]);
+    await first;
+    assert.deepEqual(runs, [["a.ts"], ["b.ts", "c.ts"]]);
+    assert.equal(maxActive, 1);
+    assert.equal(queue.isBusy(), false);
+  });
+
+  void it("does not run a follow-up when nothing arrived during the reload", async () => {
+    let count = 0;
+    const queue = createReloadQueue({ run: async () => void (count += 1) });
+    await queue.request(["a.ts"]);
+    assert.equal(count, 1);
+  });
+});
+
+void describe("createDebouncer quiet window, max wait and hold", () => {
+  /** @scenario "A steady trickle of edits still restarts within the max wait" */
+  void it("fires at the max wait when writes never go quiet", async () => {
+    const fired = [];
+    const debouncer = createDebouncer({
+      debounceMs: 60,
+      maxWaitMs: 200,
+      onFire: (files) => fired.push(files.length),
+    });
+    const start = Date.now();
+    let n = 0;
+    while (Date.now() - start < 300) {
+      debouncer.note(`f${n++}.ts`);
+      await sleep(20);
+    }
+    debouncer.cancel();
+    assert.equal(fired.length, 1);
+    assert.ok(fired[0] >= 8, `the max-wait fire carries the burst, got ${fired[0]}`);
+  });
+
+  /** @scenario "An agent mid-turn holds the restart until it is released" */
+  void it("defers while the hold is active, then fires once it is released", async () => {
+    let held = true;
+    const fired = [];
+    const debouncer = createDebouncer({
+      debounceMs: 20,
+      holdMs: () => (held ? 100 : 0),
+      holdPollMs: 20,
+      onFire: (files) => fired.push(files),
+    });
+    debouncer.note("a.ts");
+    await sleep(150);
+    assert.deepEqual(fired, []);
+    held = false;
+    await sleep(60);
+    assert.deepEqual(fired, [["a.ts"]]);
+  });
+
+  void it("does not hold past the cap", async () => {
+    const fired = [];
+    const debouncer = createDebouncer({
+      debounceMs: 10,
+      holdMs: () => 10_000,
+      holdCapMs: 80,
+      holdPollMs: 20,
+      onFire: (files) => fired.push(files),
+    });
+    debouncer.note("a.ts");
+    await sleep(200);
+    assert.deepEqual(fired, [["a.ts"]]);
+  });
+});
+
+void describe("holdRemainingMs", () => {
+  void it("reads the expiry the marker carries, capped, and 0 for absent or stale", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hold-"));
+    const marker = path.join(dir, ".haven-hmr-gate");
+    assert.equal(holdRemainingMs({ marker }), 0);
+    fs.writeFileSync(marker, "5000\n");
+    assert.equal(holdRemainingMs({ marker, now: 4000 }), 1000);
+    assert.equal(holdRemainingMs({ marker, now: 6000 }), 0);
+    fs.writeFileSync(marker, String(10 * 60_000));
+    assert.equal(holdRemainingMs({ marker, now: 0 }), 60_000);
+    fs.writeFileSync(marker, "garbage");
+    assert.equal(holdRemainingMs({ marker }), 0);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

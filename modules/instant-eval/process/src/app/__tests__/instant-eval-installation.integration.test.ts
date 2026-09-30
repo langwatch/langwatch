@@ -388,7 +388,9 @@ describe("given a process that installs Instant Evals over the memory tier", () 
 
         expect(read.sql).toBe(created.sql);
         expect(read.sql).toContain("{start_at:DateTime64(3, 'UTC')}");
-        expect(Object.keys(read.parameters)).toEqual(expect.arrayContaining(["start_at", "end_at"]));
+        expect(Object.keys(read.parameters)).toEqual(
+          expect.arrayContaining(["start_at", "end_at"]),
+        );
       });
     });
 
@@ -402,7 +404,10 @@ describe("given a process that installs Instant Evals over the memory tier", () 
           if (unbound.length > 0) throw new Error(`unbound parameters: ${unbound.join(", ")}`);
           gated.push({ sql, parameters });
 
-          return { parameters: declared.map((name) => ({ name, type: "String" })), appFunctions: [] };
+          return {
+            parameters: declared.map((name) => ({ name, type: "String" })),
+            appFunctions: [],
+          };
         },
       };
 

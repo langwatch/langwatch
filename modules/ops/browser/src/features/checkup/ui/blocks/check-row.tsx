@@ -45,7 +45,7 @@ export function CheckRow({ row }: { row: CheckRowData }) {
             target="_blank"
             rel="noopener noreferrer"
             fontSize="sm"
-            color="blue.600"
+            color="orange.fg"
           >
             Read more <ExternalLink size={12} />
           </Link>

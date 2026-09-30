@@ -1,5 +1,6 @@
-import { Card, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { HStack, Spinner, Text } from "@chakra-ui/react";
 import { retentionCategories, type RetentionCategory } from "@langwatch/data-retention-contract";
+import { OverviewCard, SettingRow } from "@langwatch/design-system/settings-card";
 
 import { CATEGORY_LABELS } from "../../model/retention-constants.ts";
 import { formatBytes, formatDays } from "../../model/retention-format.ts";
@@ -21,61 +22,38 @@ export function RetentionAndUsageCard({
 }) {
   const summary = renderPolicySummary(effective);
   return (
-    <Card.Root width="full">
-      <Card.Header>
-        <HStack width="full" justify="space-between" align="start">
-          <VStack align="start" gap={0}>
-            <Heading as="h3" fontSize="sm" fontWeight="semibold">
-              Data Retention
-            </Heading>
-            <Text fontSize="xs" color="fg.muted">
-              How long this project's data is kept before deletion.
+    <OverviewCard
+      title="Data retention"
+      hint="How long this project's data is kept before deletion, and how much space it uses."
+    >
+      <SettingRow label="Retention">
+        <Text fontSize="13px" fontWeight="500">
+          {summary}
+        </Text>
+      </SettingRow>
+      {summary === "Mixed" &&
+        retentionCategories.map((category) => (
+          <SettingRow key={category} label={CATEGORY_LABELS[category]}>
+            <Text fontSize="13px" color="fg.muted">
+              {effective[category] !== undefined ? formatDays(effective[category]!) : "—"}
             </Text>
-          </VStack>
-          <Text fontSize="sm" fontWeight="semibold" flexShrink={0}>
-            {summary}
-          </Text>
-        </HStack>
-      </Card.Header>
-      <Card.Body>
-        <VStack gap={5} align="stretch">
-          {summary === "Mixed" && (
-            <VStack gap={2} align="stretch">
-              {retentionCategories.map((category) => (
-                <HStack key={category} justifyContent="space-between">
-                  <Text color="fg.muted">{CATEGORY_LABELS[category]}</Text>
-                  <Text>
-                    {effective[category] !== undefined ? formatDays(effective[category]!) : "—"}
-                  </Text>
-                </HStack>
-              ))}
-            </VStack>
-          )}
-          <HStack width="full" justify="space-between" align="start">
-            <VStack align="start" gap={0}>
-              <Heading as="h3" fontSize="sm" fontWeight="semibold">
-                Data Storage
-              </Heading>
+          </SettingRow>
+        ))}
+      <SettingRow label="Data storage" hint={storageDescription}>
+        {isLoading && <Spinner size="sm" />}
+        {!isLoading && data && (
+          <HStack gap={1.5} align="baseline">
+            <Text fontSize="13px" fontWeight="500">
+              {formatBytes(data.totalBytes)}
+            </Text>
+            {data.projectCount !== undefined && data.projectCount > 1 && (
               <Text fontSize="xs" color="fg.muted">
-                {storageDescription}
+                · {data.projectCount} projects
               </Text>
-            </VStack>
-            {isLoading && <Spinner size="sm" />}
-            {!isLoading && data && (
-              <HStack gap={1.5} flexShrink={0} align="baseline">
-                <Text fontSize="sm" fontWeight="semibold">
-                  {formatBytes(data.totalBytes)}
-                </Text>
-                {data.projectCount !== undefined && data.projectCount > 1 && (
-                  <Text fontSize="xs" color="fg.muted">
-                    · {data.projectCount} projects
-                  </Text>
-                )}
-              </HStack>
             )}
           </HStack>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+        )}
+      </SettingRow>
+    </OverviewCard>
   );
 }

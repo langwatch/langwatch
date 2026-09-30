@@ -513,7 +513,7 @@ flows:
           label: Langy assistant
       - action: expect
         with:
-          count: '[data-langy-composer] textarea'
+          count: "[data-langy-composer] textarea"
       - action: expect
         with:
           text: /^\s*Deploy\s*$/

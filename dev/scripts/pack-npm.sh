@@ -567,6 +567,28 @@ if [ -z "$tarball" ]; then
   exit 1
 fi
 
+# pnpm 12 leaves every lockfile out of a pack, at any depth and even when
+# `files` names it, so each staged lockfile under app/ goes back in by hand.
+# Relative paths only: Windows runners may resolve `tar` to bsdtar, which
+# reads neither msys paths nor drive letters the same way GNU tar does.
+lock_listing="$(mktemp)"
+tar -tzf "$tarball" | sed 's|^package/||' | sort > "$lock_listing"
+missing_locks="$( (cd "$STAGE" && find app -type f \( -name pnpm-lock.yaml -o -name package-lock.json \
+  -o -name npm-shrinkwrap.json -o -name yarn.lock -o -name 'bun.lock*' \)) | sort | comm -23 - "$lock_listing")"
+rm -f "$lock_listing"
+if [ -n "$missing_locks" ]; then
+  relock="$(mktemp -d)"
+  gzip -dc "$tarball" > "$relock/pack.tar"
+  while IFS= read -r lock; do
+    mkdir -p "$relock/package/$(dirname "$lock")"
+    cp "$STAGE/$lock" "$relock/package/$lock"
+    (cd "$relock" && tar -rf pack.tar "package/$lock")
+    echo "→ restored $lock, which pnpm pack leaves out"
+  done <<< "$missing_locks"
+  gzip -9 -c "$relock/pack.tar" > "$tarball"
+  rm -rf "$relock"
+fi
+
 # Assert the tarball carries everything the staging tree put in it.
 #
 # Packing applies its own filtering on top of the staged allowlist, so a file
@@ -581,14 +603,16 @@ fi
 # the filters keep the right things", and a single check that answered both
 # reported a deliberate strip as a too-broad exclude pattern.
 #
-# `$STAGE/node_modules` and `$STAGE/pnpm-workspace.yaml` are the exception:
-# they are the `workspace:` and `catalog:` resolution shims above, not part of
-# the package (`files` names only `app`), so they are excluded here.
+# `$STAGE/node_modules`, `$STAGE/pnpm-workspace.yaml` and the root
+# `pnpm-lock.yaml` pnpm pack writes beside them are the exception: they come
+# from the `workspace:` and `catalog:` resolution shims above, not part of the
+# package (`files` names only `app`), so they are excluded here.
 staged_all="$(mktemp)"
 in_tar="$(mktemp)"
 (cd "$STAGE" && find . \( -type f -o -type l \)) \
   | sed 's|^\./||' | grep -v '\.tgz$' \
-  | grep -v '^node_modules/' | grep -vx 'pnpm-workspace.yaml' | sort > "$staged_all"
+  | grep -v '^node_modules/' | grep -vx 'pnpm-workspace.yaml' | grep -vx 'pnpm-lock.yaml' \
+  | sort > "$staged_all"
 # List once into a file rather than piping into `grep -q`. grep -q exits at the
 # first match, which SIGPIPEs tar; under `pipefail` that non-zero tar fails the
 # pipeline even though the match succeeded. It fires on linux and not macos,

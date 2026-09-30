@@ -1,16 +1,15 @@
 // Granting a role to a member or a group somewhere, or changing the role of a grant.
-// The server refuses anything beyond the reader's own access; the dialog only greys
-// out the roles it can already tell are. specs/rbac/roles-and-access-ui.feature
+// It fetches nothing: the choices and the reader's standing arrive as props, and the saving is
+// handed back. The dialog only greys out roles it can tell are beyond the reader.
+// specs/rbac/roles-and-access-ui.feature
 
 import { Button, Field, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import type { GrantScopeType } from "@langwatch/authz-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { toDate } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import { useState } from "react";
 
-import { authzApi } from "../../behavior/authz-api.ts";
-import { useAuthzHost } from "../../model/authz-host.ts";
+import { ScopeChipPicker, type ScopeTriadEntry } from "../scope-picker/index.ts";
 import {
   expiryFromDay,
   grantPrincipalText,
@@ -19,22 +18,58 @@ import {
   type GrantRow,
   permissionsBeyondReader,
   rolePermissionsAt,
-} from "../../model/grants.ts";
+} from "./grants.ts";
 
 const SCOPE_OF_TIER = { ORGANIZATION: "organization", TEAM: "team", PROJECT: "project" } as const;
 
-/** Mounted only while open, so each opening starts from the grant it is about. */
-type GrantDialogProps = {
+export type GrantScope = { type: GrantScopeType; id: string };
+
+/** A new grant, as the dialog collects it. */
+export type GrantDraft = {
+  principal: { type: "user" | "group"; id: string };
+  roleId: string;
+  scope: GrantScope;
+  expiresAt?: Instant;
+};
+
+export type GrantDialogProps = {
   organizationId: string;
   /** The grant whose role changes, or null when a new grant is being made. */
   editing: GrantRow | null;
+  /** The organization's own roles; the built-in ones are always offered. */
+  roles: readonly { id: string; name: string; permissions: readonly string[] }[];
+  members: readonly { id: string; name?: string | null; email?: string | null }[];
+  groups: readonly { id: string; name: string }[];
+  structure: {
+    organizationName?: string | undefined;
+    teams: readonly { id: string; name: string }[];
+    projects: readonly { id: string; name: string; teamId: string }[];
+  };
+  /** What the reader holds at the chosen scope; undefined until known, so no role is greyed out. */
+  heldPermissions: readonly string[] | undefined;
+  isSaving: boolean;
+  /** Fired when the reader picks another scope, so the consumer can fetch their standing there. */
+  onScopeChange: (scope: GrantScope) => void;
+  onCreate: (draft: GrantDraft) => void;
+  onChangeRole: (change: { grantId: string; roleId: string }) => void;
   onClose: () => void;
 };
 
-export function GrantDialog({ organizationId, editing, onClose }: GrantDialogProps) {
-  const host = useAuthzHost();
-  const structure = host.organizationStructure();
-  const utils = authzApi.useUtils();
+/** Mounted only while open, so each opening starts from the grant it is about. */
+export function GrantDialog({
+  organizationId,
+  editing,
+  roles,
+  members,
+  groups,
+  structure,
+  heldPermissions,
+  isSaving,
+  onScopeChange,
+  onCreate,
+  onChangeRole,
+  onClose,
+}: GrantDialogProps) {
   const [principal, setPrincipal] = useState("");
   const [roleId, setRoleId] = useState(editing?.role.id ?? "");
   const [scope, setScope] = useState<ScopeTriadEntry[]>([
@@ -44,55 +79,26 @@ export function GrantDialog({ organizationId, editing, onClose }: GrantDialogPro
 
   const scopeType: GrantScopeType = editing?.scope.type ?? SCOPE_OF_TIER[scope[0]!.scopeType];
   const scopeId = editing?.scope.id ?? scope[0]!.scopeId;
-  const roles = authzApi.role.getAll.useQuery({ organizationId });
-  const members = authzApi.organization.getAllOrganizationMembers.useQuery(
-    { organizationId },
-    { enabled: !editing },
-  );
-  const groups = authzApi.group.listAll.useQuery({ organizationId }, { enabled: !editing });
+
   // A team's standing cannot be asked for, so no role is greyed out there.
-  const standing = authzApi.authz.effectivePermissions.useQuery(
-    scopeType === "project" ? { projectId: scopeId } : { organizationId },
-    { enabled: scopeType !== "team" },
-  );
-
-  const customRoles = roles.data ?? [];
   const isBeyondReader = (candidate: string) => {
-    const requested = rolePermissionsAt({ roleId: candidate, scopeType, customRoles });
-    if (!requested || !standing.data || scopeType === "team") return false;
-    return permissionsBeyondReader({ requested, held: standing.data.permissions }).length > 0;
+    const requested = rolePermissionsAt({ roleId: candidate, scopeType, customRoles: roles });
+    if (!requested || !heldPermissions || scopeType === "team") return false;
+    return permissionsBeyondReader({ requested, held: heldPermissions }).length > 0;
   };
-
-  const onSaved = (title: string) => {
-    void utils.authz.listGrants.invalidate();
-    void utils.roleBinding.listForOrg.invalidate();
-    host.succeeded({ title });
-    onClose();
-  };
-  const createGrant = authzApi.authz.createGrant.useMutation({
-    onSuccess: () => onSaved("Role granted"),
-    onError: (error) => host.failed({ error, fallbackTitle: "Couldn't grant this role" }),
-  });
-  const changeGrantRole = authzApi.authz.changeGrantRole.useMutation({
-    onSuccess: () => onSaved("Role changed"),
-    onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change this role" }),
-  });
 
   const submit = () => {
     if (editing) {
-      changeGrantRole.mutate({ organizationId, grantId: editing.id, roleId });
+      onChangeRole({ grantId: editing.id, roleId });
       return;
     }
     const [type, id] = principal.split(":");
     const expiresAt = expiryFromDay(day);
-    createGrant.mutate({
-      organizationId,
-      grant: {
-        principal: { type: type === "group" ? "group" : "user", id: id ?? "" },
-        roleId,
-        scope: { type: scopeType, id: scopeId },
-        ...(expiresAt ? { expiresAt: toDate(expiresAt) } : {}),
-      },
+    onCreate({
+      principal: { type: type === "group" ? "group" : "user", id: id ?? "" },
+      roleId,
+      scope: { type: scopeType, id: scopeId },
+      ...(expiresAt ? { expiresAt } : {}),
     });
   };
   const canSubmit = !!roleId && (!!editing || !!principal);
@@ -121,14 +127,14 @@ export function GrantDialog({ organizationId, editing, onClose }: GrantDialogPro
                   >
                     <option value="">Choose a member or a group</option>
                     <optgroup label="Members">
-                      {(members.data ?? []).map((member) => (
+                      {members.map((member) => (
                         <option key={member.id} value={`user:${member.id}`}>
                           {member.name ?? member.email ?? member.id}
                         </option>
                       ))}
                     </optgroup>
                     <optgroup label="Groups">
-                      {(groups.data ?? []).map((group) => (
+                      {groups.map((group) => (
                         <option key={group.id} value={`group:${group.id}`}>
                           {group.name}
                         </option>
@@ -150,7 +156,7 @@ export function GrantDialog({ organizationId, editing, onClose }: GrantDialogPro
                   onChange={(event) => setRoleId(event.currentTarget.value)}
                 >
                   <option value="">Choose a role</option>
-                  {grantRoleOptions({ customRoles }).map((role) => {
+                  {grantRoleOptions({ customRoles: roles }).map((role) => {
                     const beyond = isBeyondReader(role.id);
                     return (
                       <option key={role.id} value={role.id} disabled={beyond}>
@@ -167,7 +173,12 @@ export function GrantDialog({ organizationId, editing, onClose }: GrantDialogPro
               <>
                 <ScopeChipPicker
                   value={scope}
-                  onChange={(next) => next.length > 0 && setScope(next)}
+                  onChange={(next) => {
+                    const [first] = next;
+                    if (!first) return;
+                    setScope(next);
+                    onScopeChange({ type: SCOPE_OF_TIER[first.scopeType], id: first.scopeId });
+                  }}
                   organizationId={organizationId}
                   {...(structure.organizationName
                     ? { organizationName: structure.organizationName }
@@ -200,7 +211,7 @@ export function GrantDialog({ organizationId, editing, onClose }: GrantDialogPro
             colorPalette="blue"
             disabled={!canSubmit}
             data-testid="grant-submit"
-            loading={createGrant.isPending || changeGrantRole.isPending}
+            loading={isSaving}
             onClick={submit}
           >
             {editing ? "Change role" : "Grant role"}

@@ -29,29 +29,35 @@ describe("given the saved workbench chart REST family", () => {
 
   describe("when the API document is read for the chart paths", () => {
     /** @scenario "Every chart endpoint is published in the API document" */
-    it.each(CHART_OPERATIONS)("describes %s %s with a summary, a tag and a response", (method, path) => {
-      const route = publishedAs(method, path);
+    it.each(CHART_OPERATIONS)(
+      "describes %s %s with a summary, a tag and a response",
+      (method, path) => {
+        const route = publishedAs(method, path);
 
-      expect(route, `${method} ${path} is not declared`).toBeDefined();
-      expect(route?.docs?.summary).toBeTruthy();
-      expect(route?.docs?.tags?.length).toBeGreaterThan(0);
-      expect(Object.keys(route?.docs?.responses ?? {}).some((status) => status.startsWith("2"))).toBe(
-        true,
-      );
-    });
+        expect(route, `${method} ${path} is not declared`).toBeDefined();
+        expect(route?.docs?.summary).toBeTruthy();
+        expect(route?.docs?.tags?.length).toBeGreaterThan(0);
+        expect(
+          Object.keys(route?.docs?.responses ?? {}).some((status) => status.startsWith("2")),
+        ).toBe(true);
+      },
+    );
   });
 
   describe("when the API document is read for the placement paths", () => {
     /** @scenario "The placement endpoints are published in the API document" */
-    it.each(PLACEMENT_OPERATIONS)("describes %s %s with a summary, a tag and a response", (method, path) => {
-      const route = publishedAs(method, path);
+    it.each(PLACEMENT_OPERATIONS)(
+      "describes %s %s with a summary, a tag and a response",
+      (method, path) => {
+        const route = publishedAs(method, path);
 
-      expect(route, `${method} ${path} is not declared`).toBeDefined();
-      expect(route?.docs?.summary).toBeTruthy();
-      expect(route?.docs?.tags?.length).toBeGreaterThan(0);
-      expect(Object.keys(route?.docs?.responses ?? {}).some((status) => status.startsWith("2"))).toBe(
-        true,
-      );
-    });
+        expect(route, `${method} ${path} is not declared`).toBeDefined();
+        expect(route?.docs?.summary).toBeTruthy();
+        expect(route?.docs?.tags?.length).toBeGreaterThan(0);
+        expect(
+          Object.keys(route?.docs?.responses ?? {}).some((status) => status.startsWith("2")),
+        ).toBe(true);
+      },
+    );
   });
 });

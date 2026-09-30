@@ -139,7 +139,7 @@ flows:
       - action: fill
         with:
           label: Criteria
-          value: '|-'
+          value: "|-"
       - action: click
         with:
           testId: case-modal-save

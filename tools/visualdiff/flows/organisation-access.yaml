@@ -51,8 +51,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-mem-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-mem-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -126,7 +126,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-team-{uid}'
+          value: "vd-team-{uid}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -174,8 +174,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-tm-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-tm-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -202,7 +202,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-team-{uid}'
+          value: "vd-team-{uid}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -254,7 +254,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-team-{uid}'
+          value: "vd-team-{uid}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -297,7 +297,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-team-{uid}'
+          value: "vd-team-{uid}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -313,7 +313,7 @@ flows:
       - action: fill
         with:
           field: AI Project
-          value: 'vd-proj-{uid}'
+          value: "vd-proj-{uid}"
       - action: select
         with:
           field: Team
@@ -385,7 +385,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-role-{uid}'
+          value: "vd-role-{uid}"
       - action: fill
         with:
           label: Search permissions
@@ -435,7 +435,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-role-{uid}'
+          value: "vd-role-{uid}"
       - action: fill
         with:
           label: Search permissions
@@ -460,8 +460,8 @@ flows:
           text: Invite people
       - action: fill
         with:
-          field: 'alice@example.com, bob@example.com'
-          value: 'vd-rl-{uid}@mail.langwatch.localhost'
+          field: "alice@example.com, bob@example.com"
+          value: "vd-rl-{uid}@mail.langwatch.localhost"
       - action: click
         with:
           text: /^\s*(Send|Create) invites\s*$/
@@ -488,7 +488,7 @@ flows:
       - action: fill
         with:
           selector: 'input[name="name"]'
-          value: 'vd-team-{uid}'
+          value: "vd-team-{uid}"
       - action: click
         with:
           text: /^\s*Create\s*$/
@@ -550,14 +550,14 @@ flows:
           selector: 'xpath=//p[normalize-space()="Traces"]/following-sibling::div[1]'
       - action: click
         with:
-          selector: '[role=menuitem]'
+          selector: "[role=menuitem]"
           hasText: /^Read$/
       - action: click
         with:
           selector: 'xpath=//p[normalize-space()="Annotations"]/following-sibling::div[1]'
       - action: click
         with:
-          selector: '[role=menuitem]'
+          selector: "[role=menuitem]"
           hasText: /^Write$/
       - action: click
         with:

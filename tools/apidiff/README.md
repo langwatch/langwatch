@@ -608,6 +608,7 @@ something else. Every boundary is logged as `timing +<elapsed>: <phase>`.
    that never reads the trace back is logged as a `WARNING`. The collection
    checks and the permission probes run in a pool of six and are filed in
    probe order afterwards.
+
 6. Teardown, once, whichever of the parity cleanup and the boot's teardown
    runs first. It kills the instances, drops the run's databases and hands
    the persistent worktrees back; nothing in it waits on a slow step.
@@ -689,9 +690,9 @@ mode). Under diffsuite, `-a`/`-mail-a` default to its branch stack and
   complete (default 50, `0` disables), scenarios in flight are cancelled and
   left out, the rest are not started, the partial results and
   `scenarios.jsonl` are written, and it prints `apidiff: stopping: N consecutive
-  errors, most common cause: <cause> (xK)` and exits 3. A setup that leaves
+errors, most common cause: <cause> (xK)` and exits 3. A setup that leaves
   nothing usable stops before any scenario with `apidiff: stopping: setup
-  failed: <cause>` (exit 2): the shared or run organization could not be made
+failed: <cause>` (exit 2): the shared or run organization could not be made
   (with `-admin-key`; without it the seeded organization is still used), or
   every isolated project, organization and sign-in the scenarios asked for
   failed on a side.
@@ -764,6 +765,9 @@ mode). Under diffsuite, `-a`/`-mail-a` default to its branch stack and
 - **`-repeat N`** repeats every selected scenario N times under suffixed ids,
   to measure throughput. YAML: quote any flow-mapping value that contains a
   `{placeholder}`.
+
+Scenario files keep one scenario per line in flow style, with authored comments, so
+`.oxfmtrc.json` leaves `tools/apidiff/scenarios/` out of formatting.
 
 ## Persistent worktrees and caches
 

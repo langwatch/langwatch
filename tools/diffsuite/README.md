@@ -55,13 +55,13 @@ IS_SAAS=false LANGWATCH_SLUG=visualdiff-selfhosted haven up --agent --detach   #
 
 Every tool gets its stacks in its environment, and reads them when no flag names one:
 
-| variable | value |
-|---|---|
-| `DIFFSUITE_BRANCH_STACK`, `DIFFSUITE_MAIN_STACK` | the haven slug |
-| `DIFFSUITE_BRANCH_URL`, `DIFFSUITE_MAIN_URL` | the app origin |
-| `DIFFSUITE_BRANCH_API_URL`, `DIFFSUITE_MAIN_API_URL` | where `/api` answers without the proxy (the backend's loopback port, or the app origin on a monolith) |
-| `DIFFSUITE_BRANCH_MAIL_URL`, `DIFFSUITE_MAIN_MAIL_URL` | the mail sink |
-| `DIFFSUITE_OUT` | the suite's `-out`, absolute |
+| variable                                               | value                                                                                                 |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `DIFFSUITE_BRANCH_STACK`, `DIFFSUITE_MAIN_STACK`       | the haven slug                                                                                        |
+| `DIFFSUITE_BRANCH_URL`, `DIFFSUITE_MAIN_URL`           | the app origin                                                                                        |
+| `DIFFSUITE_BRANCH_API_URL`, `DIFFSUITE_MAIN_API_URL`   | where `/api` answers without the proxy (the backend's loopback port, or the app origin on a monolith) |
+| `DIFFSUITE_BRANCH_MAIL_URL`, `DIFFSUITE_MAIN_MAIL_URL` | the mail sink                                                                                         |
+| `DIFFSUITE_OUT`                                        | the suite's `-out`, absolute                                                                          |
 
 The `MAIN` ones are set only when there is a main stack (`diffkit.SuiteEnv`, `diffkit.SuiteStack`).
 
@@ -75,13 +75,13 @@ The `MAIN` ones are set only when there is a main stack (`diffkit.SuiteEnv`, `di
 
 With no `name=` after `--`, `-tools` (default `api,visual,fuzzapi,fuzzui`) picks from:
 
-| name | command |
-|---|---|
-| api | `apidiff scenarios -scenario-concurrency 16 -final -run-dir "$DIFFSUITE_OUT/apidiff"` |
-| visual | `visualdiff check -routes -all` (every flow and route) |
-| fuzzapi | `fuzz api -duration 20m` |
-| fuzzui | `fuzz ui -duration 20m -workers 3 -actions 10` |
-| worker | `workerrun -run-dir "$DIFFSUITE_OUT/worker"` (opt-in: only when `-tools` names it; `tools/workerrun/README.md`) |
+| name    | command                                                                                                         |
+| ------- | --------------------------------------------------------------------------------------------------------------- |
+| api     | `apidiff scenarios -scenario-concurrency 16 -final -run-dir "$DIFFSUITE_OUT/apidiff"`                           |
+| visual  | `visualdiff check -routes -all` (every flow and route)                                                          |
+| fuzzapi | `fuzz api -duration 20m`                                                                                        |
+| fuzzui  | `fuzz ui -duration 20m -workers 3 -actions 10`                                                                  |
+| worker  | `workerrun -run-dir "$DIFFSUITE_OUT/worker"` (opt-in: only when `-tools` names it; `tools/workerrun/README.md`) |
 
 Each runs `.bin/<tool>/<tool>`, built with `go build` before the suite starts. After `--`,
 `name+='<flags>'` appends flags to a tool in the suite, and `name='<command>'` replaces one

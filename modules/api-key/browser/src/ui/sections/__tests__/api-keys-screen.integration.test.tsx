@@ -237,7 +237,7 @@ describe("given the organization has an ingestion key and a regular key", () => 
       state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
       renderWithApiKeyHost(<ApiKeysScreen />);
       expect(
-        screen.getByRole("button", { name: "Revoke ingestion key claude wrapper" }),
+        screen.getByRole("button", { name: "Actions for ingestion key claude wrapper" }),
       ).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit API key claude wrapper" })).toBeNull();
     });

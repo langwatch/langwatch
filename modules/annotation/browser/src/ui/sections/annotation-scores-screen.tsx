@@ -254,9 +254,9 @@ export default function AnnotationScoresScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Annotation Scoring</PageLayout.Heading>
+        <PageLayout.Heading>Annotation Scores</PageLayout.Heading>
         <Spacer />
-        {canManage && (
+        {canManage && getAllAnnotationScores.data?.length !== 0 && (
           <PageLayout.HeaderButton
             onClick={() => host.openEditor()}
             data-testid="annotation-score-add"
@@ -265,7 +265,10 @@ export default function AnnotationScoresScreen() {
           </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingX={6} paddingTop={4}>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text color="fg.muted">
+          The score metrics reviewers fill in when they annotate a trace.
+        </Text>
         {getAllAnnotationScores.data?.length === 0 ? (
           <Box width="full">
             <NoDataInfoBlock

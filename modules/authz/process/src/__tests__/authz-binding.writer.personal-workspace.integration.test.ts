@@ -135,11 +135,26 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
       },
     });
     ownerBindingId = ownerBinding.id;
+    // The writer finds a binding through its live Grant, so the owner's needs one.
+    await prisma.grant.create({
+      data: {
+        id: ownerBindingId,
+        organizationId,
+        principalType: "USER",
+        principalId: ownerUserId,
+        roleKey: "admin",
+        source: "grants-service",
+        scopeType: "TEAM",
+        scopeId: personalTeamId,
+        occurredAt: new Date(),
+      },
+    });
   });
 
   afterAll(async () => {
     if (!organizationId) return;
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["project", { team: { organizationId } }],
       ["roleBinding", { organizationId }],
       ["groupMembership", { groupId }],

@@ -1,10 +1,9 @@
 /**
- * How the Access tab reads a grant and which roles the grant dialog offers.
+ * How a grant list reads a grant and which roles the grant dialog offers.
  * The server's escalation guard is the authority; the hints here only grey out
  * a role the reader plainly cannot hand on. specs/rbac/roles-and-access-ui.feature
  */
 
-import type { WireOf } from "@langwatch/api/web";
 import {
   builtinRolePermissions,
   type BuiltInRoleId,
@@ -15,7 +14,10 @@ import {
 import { currentTimeZone, type Instant, Temporal } from "@langwatch/time";
 
 /** A grant as the browser holds one: the wire carries its dates as strings. */
-export type GrantRow = WireOf<Grant>;
+export type GrantRow = Omit<Grant, "expiresAt" | "createdAt"> & {
+  expiresAt: string | null;
+  createdAt: string;
+};
 
 export type GrantRoleOption = { id: string; name: string; builtIn: boolean };
 

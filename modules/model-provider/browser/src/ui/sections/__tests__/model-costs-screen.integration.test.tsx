@@ -126,7 +126,7 @@ describe("given the LLM Model Costs screen", () => {
     it("renders every row and counts them all, as main did", () => {
       renderScreen();
 
-      expect(screen.getByText("2 models")).toBeTruthy();
+      expect(screen.getByText("What each of the 2 models costs per token.")).toBeTruthy();
       expect(screen.getByText("anthropic/claude-sonnet-4-6")).toBeTruthy();
       expect(screen.getByText("openai/gpt-5.5")).toBeTruthy();
       expect(screen.getByText("^openai/gpt-5\\.5$")).toBeTruthy();

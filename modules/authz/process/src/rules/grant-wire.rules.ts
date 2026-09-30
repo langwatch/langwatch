@@ -107,11 +107,11 @@ function positionOf(grant: Grant): Position {
   return { createdAtMs: grant.createdAt.getTime(), id: grant.id };
 }
 
-function isAfter({ grant, position }: { grant: Grant; position: Position }): boolean {
-  const createdAtMs = grant.createdAt.getTime();
-  if (createdAtMs !== position.createdAtMs) return createdAtMs > position.createdAtMs;
+function compareAscending(a: Position, b: Position): number {
+  if (a.createdAtMs !== b.createdAtMs) return a.createdAtMs - b.createdAtMs;
+  if (a.id === b.id) return 0;
 
-  return grant.id > position.id;
+  return a.id > b.id ? 1 : -1;
 }
 
 export function encodeGrantCursor(position: Position): string {
@@ -128,7 +128,7 @@ export function findCursorPosition(cursor: string): Position[] {
   ];
 }
 
-/** Oldest first, ties by id, so a page boundary never moves under a later write. */
+/** Oldest first unless `order` says newest; ties by id, so a page boundary never moves. */
 export function pageGrants({
   grants,
   query,
@@ -138,14 +138,13 @@ export function pageGrants({
   query: GrantListQuery;
   after: Position | undefined;
 }): GrantPage {
+  const direction = query.order === "newest" ? -1 : 1;
   const ordered = grants
     .filter((grant) => matchesGrantQuery({ grant, query }))
-    .filter((grant) => after === undefined || isAfter({ grant, position: after }))
-    .toSorted((a, b) => {
-      if (isAfter({ grant: a, position: positionOf(b) })) return 1;
-
-      return a.id === b.id ? 0 : -1;
-    });
+    .filter(
+      (grant) => after === undefined || direction * compareAscending(positionOf(grant), after) > 0,
+    )
+    .toSorted((a, b) => direction * compareAscending(positionOf(a), positionOf(b)));
   const page = ordered.slice(0, query.limit);
   const last = page.at(-1);
 

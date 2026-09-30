@@ -19,7 +19,7 @@ flows:
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: 'csk-vd-{uid}'
+          value: "csk-vd-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -29,7 +29,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("Cerebras")'
-          min: '1'
+          min: "1"
       - action: click
         with:
           selector: 'tr:has-text("Cerebras") button'
@@ -40,15 +40,15 @@ flows:
       - action: expect
         with:
           count: 'input[type="password"][value^="HAS_KEY"]'
-          min: '1'
+          min: "1"
       - action: expect
         with:
           count: 'input[value*="csk-vd-{uid}"]'
-          equals: '0'
+          equals: "0"
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: 'csk-vd-new-{uid}'
+          value: "csk-vd-new-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -65,11 +65,11 @@ flows:
       - action: expect
         with:
           count: 'input[type="password"][value^="HAS_KEY"]'
-          min: '1'
+          min: "1"
       - action: expect
         with:
           count: 'input[value*="csk-vd-"]'
-          equals: '0'
+          equals: "0"
 
   - id: model-provider-enabled-then-disabled-by-delete
     title: A provider added shows as enabled in the list API, and deleting it removes its row after a reload
@@ -88,7 +88,7 @@ flows:
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: 'dsk-vd-{uid}'
+          value: "dsk-vd-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -98,12 +98,12 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("DeepSeek")'
-          min: '1'
+          min: "1"
       - action: expect
         with:
           api: /api/model-providers
           field: deepseek.enabled
-          equals: 'true'
+          equals: "true"
       - action: click
         with:
           selector: 'tr:has-text("DeepSeek") button'
@@ -120,7 +120,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("DeepSeek")'
-          equals: '0'
+          equals: "0"
 
   - id: model-provider-scope-fixed-and-filterable
     title: A provider added at the default scope shows under the project filter and its drawer says the scope is fixed
@@ -142,7 +142,7 @@ flows:
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: 'xai-vd-{uid}'
+          value: "xai-vd-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -152,7 +152,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("xAI")'
-          min: '1'
+          min: "1"
       - action: click
         with:
           testId: scope-filter
@@ -162,7 +162,7 @@ flows:
       - action: expect
         with:
           count: 'tr:has-text("xAI")'
-          min: '1'
+          min: "1"
       - action: click
         with:
           selector: 'tr:has-text("xAI") button'
@@ -191,7 +191,7 @@ flows:
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: 'gem-vd-{uid}'
+          value: "gem-vd-{uid}"
       - action: click
         with:
           text: /^\s*Save\s*$/
@@ -229,7 +229,7 @@ flows:
         with:
           testIdPrefix: config-row-
           hasText: /embedding/i
-          min: '1'
+          min: "1"
       - action: click
         with:
           selector: '[data-testid^="config-row-"][data-testid$="-actions"]'

@@ -56,6 +56,7 @@ seed both import, so the seed signs exactly what the verifier checks.
    The private key may live in 1Password instead: the `LangWatch` item of your
    `Private` vault, field `LANGWATCH_LICENSE_PRIVATE_KEY`, with
    `LANGWATCH_OP_ACCOUNT` set.
+
 3. `haven down` and `haven up` (a restart does not reload the environment),
    or `haven db seed` on a running stack. The seed logs which licence it
    stored.
