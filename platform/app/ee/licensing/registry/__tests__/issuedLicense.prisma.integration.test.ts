@@ -65,6 +65,7 @@ describe("the license registry on Postgres", () => {
   });
 
   describe("when an operator issues a license for a new customer", () => {
+    /** @scenario A customer organization gets the same kind of id as any other organization */
     it("creates the customer organization marked as a self-hosted customer, with an organization_ id and a unique slug", async () => {
       const first = await issue("ACME");
       const second = await issue("ACME");

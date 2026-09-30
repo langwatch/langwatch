@@ -99,6 +99,7 @@ func TestStartLLMSpan_ModelID(t *testing.T) {
 			spans := rec.Ended()
 			require.Len(t, spans, 1)
 			assert.Equal(t, tc.want, attrMap(spans[0].Attributes())["gen_ai.request.model"])
+			assert.Equal(t, tc.want, spans[0].Name(), "the span name spells the model the same way")
 		})
 	}
 }

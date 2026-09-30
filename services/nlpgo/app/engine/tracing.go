@@ -179,10 +179,7 @@ func encodeJSONAttr(v any) (string, bool) {
 // + output JSON.
 func startLLMSpan(ctx context.Context, model, provider string, messages []app.ChatMessage) (context.Context, trace.Span) {
 	tracer := otelapi.Tracer(tracerName)
-	displayModel := model
-	if provider != "" && model != "" {
-		displayModel = provider + "/" + model
-	}
+	displayModel := modelID(model, provider)
 	attrs := []attribute.KeyValue{
 		attribute.String("langwatch.span.type", llmSpanType),
 	}
@@ -208,7 +205,7 @@ func startLLMSpan(ctx context.Context, model, provider string, messages []app.Ch
 // engine splits the prefix off for routing; this puts it back. A model with
 // no known provider, or one that already has a path segment, is kept as is.
 func modelID(model, provider string) string {
-	if provider == "" || strings.Contains(model, "/") {
+	if model == "" || provider == "" || strings.Contains(model, "/") {
 		return model
 	}
 	return provider + "/" + model
