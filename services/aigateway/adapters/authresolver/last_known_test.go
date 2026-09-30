@@ -217,7 +217,7 @@ func TestServeLastKnown_EntryThatLapsedDuringTheFetch_IsNotServed(t *testing.T) 
 	e.configConfirmedAt = time.Now().Add(-DefaultLastKnownConfigMaxAge - time.Second)
 	e.mu.Unlock()
 
-	assert.Nil(t, svc.serveLastKnown(h, e, nil, context.DeadlineExceeded))
+	assert.Nil(t, svc.serveLastKnown(h, lastKnownServe{old: e, cause: context.DeadlineExceeded}))
 	_, inL1 := svc.l1.Peek(h)
 	assert.False(t, inL1)
 }
@@ -265,4 +265,34 @@ func TestResolve_LastKnown_WindowMeasuredFromLatest304(t *testing.T) {
 	cur, ok := svc.l1.Peek(h)
 	require.True(t, ok)
 	assert.WithinDuration(t, confirmedAt.Add(DefaultLastKnownConfigMaxAge), cur.hardExpiresAt, time.Second)
+}
+
+// @scenario "a definitive rejection from the control plane is never overridden by the fallback"
+func TestRefresh_ConfigFetchFindsKeyDeleted_EvictsAtOnce(t *testing.T) {
+	invalid := herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
+	t.Run("foreground refresh of a stale entry", func(t *testing.T) {
+		fetcher := &fakeConfigFetcher{cfgErr: invalid}
+		fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_gone", time.Now().Add(10*time.Minute))}}
+		svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+		rawKey := "vk-lw-gone-fg"
+		svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundleWithCreds("vk_gone", time.Now().Add(-30*time.Second), "cred-old"), "")
+
+		_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+
+		require.ErrorIs(t, err, domain.ErrInvalidAPIKey)
+		assert.Zero(t, svc.l1.Len(), "a deleted key gets no soft bump")
+	})
+	t.Run("proactive background refresh", func(t *testing.T) {
+		fetcher := &fakeConfigFetcher{cfgErr: invalid}
+		fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_gone", time.Now().Add(10*time.Minute))}}
+		svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+		rawKey := "vk-lw-gone-bg"
+		h := hashKey(domain.PresentedKey{Token: rawKey})
+		svc.storeL1(h, bundleWithCreds("vk_gone", time.Now().Add(2*time.Minute), "cred-old"), "")
+
+		svc.refreshBackground(domain.PresentedKey{Token: rawKey}, h)
+
+		_, ok := svc.l1.Peek(h)
+		assert.False(t, ok, "a deleted key is evicted by the background refresh too")
+	})
 }

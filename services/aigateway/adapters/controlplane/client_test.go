@@ -331,6 +331,8 @@ func TestFetchConfig_UnreadableBody_IsAnError(t *testing.T) {
 	})
 }
 
+// TestFetchConfig_NotFound_IsTheKeysOwnRejection pins a config 404 as the
+// key's own rejection rather than a transport failure.
 // @scenario "a definitive rejection from the control plane is never overridden by the fallback"
 func TestFetchConfig_NotFound_IsTheKeysOwnRejection(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

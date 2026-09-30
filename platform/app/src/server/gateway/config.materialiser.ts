@@ -23,10 +23,7 @@ import {
   resolveLangyMirrorTier,
 } from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
-import {
-  type GatewayBudgetClickHouseRepository,
-  settleBefore,
-} from "./budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";
 import {
   type ResolvedBudget,
@@ -42,6 +39,7 @@ import {
   scopeReachableModelProvidersForVk,
   traceProjectFor,
 } from "./scopeResolver";
+import { settleBefore } from "./settleBefore";
 import { organizationSpendTenantIds } from "./spendTenants";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";

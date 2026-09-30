@@ -21,6 +21,7 @@
  * none of it can throw into the caller's path — is ./statementReporting.ts.
  */
 
+import type { AbortSignalLike } from "./query";
 import { runWithRetry } from "./retry";
 import {
   StatementReporter,
@@ -237,7 +238,7 @@ export class VendorClientResilience {
   }: {
     run: () => Promise<R>;
     operation: StatementOperation;
-    signal?: AbortSignal | undefined;
+    signal?: AbortSignalLike | undefined;
   }): Promise<R> {
     return runWithRetry(run, {
       isAborted: () => signal?.aborted === true,
@@ -331,8 +332,16 @@ export class VendorClientResilience {
 }
 
 /** The caller's `abort_signal`, so an abandoned statement is not retried. */
-function abortSignalOf(params: unknown): AbortSignal | undefined {
+function abortSignalOf(params: unknown): AbortSignalLike | undefined {
   if (!params || typeof params !== "object") return undefined;
   const signal = (params as { abort_signal?: unknown }).abort_signal;
-  return signal instanceof AbortSignal ? signal : undefined;
+  return isAbortSignalLike(signal) ? signal : undefined;
+}
+
+function isAbortSignalLike(value: unknown): value is AbortSignalLike {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { aborted?: unknown }).aborted === "boolean"
+  );
 }

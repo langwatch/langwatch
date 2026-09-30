@@ -683,7 +683,7 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 	bundle, err := s.resolver.ResolveKey(fetchCtx, key)
 	if err != nil {
 		if fallback != nil && classifyRefreshError(err) == classTransportFailure {
-			if served := s.serveLastKnown(h, fallback, nil, err); served != nil {
+			if served := s.serveLastKnown(h, lastKnownServe{old: fallback, cause: err}); served != nil {
 				return served, nil
 			}
 		}
@@ -702,7 +702,7 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 		return nil, cfgErr
 	}
 	if fallback != nil {
-		if served := s.serveLastKnown(h, fallback, bundle, cfgErr); served != nil {
+		if served := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, cause: cfgErr}); served != nil {
 			return served, nil
 		}
 		if bundle.KeyExpired(time.Now()) {
@@ -739,6 +739,15 @@ func (s *Service) lastKnownUsable(e *entry, now time.Time) bool {
 		!now.After(hard) && now.Sub(confirmedAt) <= s.lastKnownMaxAge
 }
 
+// lastKnownServe is what serveLastKnown restores: the evicted entry, the
+// fresh resolve-key answer when there was one, and the failure that stopped
+// the refetch.
+type lastKnownServe struct {
+	old   *entry
+	fresh *domain.Bundle
+	cause error
+}
+
 // serveLastKnown puts an evicted entry back in L1 after a failed refetch and
 // returns its bundle, or nil when the entry stopped being servable while the
 // refetch ran. When resolve-key answered (fresh non-nil), the fresh token and
@@ -746,7 +755,8 @@ func (s *Service) lastKnownUsable(e *entry, now time.Time) bool {
 // new entry carries no ETag, so the next refresh asks for the config
 // outright, and its hard cap never passes lastKnownMaxAge after the last
 // confirmation.
-func (s *Service) serveLastKnown(h [64]byte, old *entry, fresh *domain.Bundle, cause error) *domain.Bundle {
+func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *domain.Bundle {
+	old, fresh, cause := in.old, in.fresh, in.cause
 	now := time.Now()
 	if !s.lastKnownUsable(old, now) {
 		s.lastKnown.Remove(h)
@@ -808,6 +818,9 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 	switch cls {
 	case classNone:
 		etag, cfgErr := s.populateConfig(ctx, bundle)
+		if classifyRefreshError(cfgErr) == classAuthRejection {
+			return nil, s.evictOnConfigRejection(h, vkID, cfgErr)
+		}
 		if cfgErr != nil {
 			// The control plane authenticated the key but could not hand
 			// over its provider config. Serving the fresh, config-less
@@ -832,6 +845,19 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 	default:
 		return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, err)
 	}
+}
+
+// evictOnConfigRejection drops a key the config endpoint says no longer
+// exists, with no grace window and no fallback, and returns the rejection.
+func (s *Service) evictOnConfigRejection(h [64]byte, vkID string, err error) error {
+	s.l1.Remove(h)
+	s.lastKnown.Remove(h)
+	s.logger.Error("auth_cache_hard_evict",
+		zap.String("vk_id", vkID),
+		zap.String("reason", "config_rejection"),
+		zap.Error(err),
+	)
+	return err
 }
 
 // serveStaleAfterFailure is the transport-failure tail of refreshOrServeStale:
@@ -1166,26 +1192,18 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, keepLastKnown bool
 	evicted := 0
 	for _, h := range s.l1.Keys() {
 		e, ok := s.l1.Peek(h)
-		if !ok {
-			continue
-		}
-		if !match(e.bundle) {
+		if !ok || !match(e.bundle) {
 			continue
 		}
 		s.l1.Remove(h)
+		s.lastKnown.Remove(h)
 		if keepLastKnown {
 			s.lastKnown.Add(h, e)
-		} else {
-			s.lastKnown.Remove(h)
 		}
 		evicted++
 	}
 	if !keepLastKnown {
-		for _, h := range s.lastKnown.Keys() {
-			if e, ok := s.lastKnown.Peek(h); ok && match(e.bundle) {
-				s.lastKnown.Remove(h)
-			}
-		}
+		s.dropLastKnownWhere(match)
 	}
 	if evicted == 0 {
 		return
@@ -1195,6 +1213,15 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, keepLastKnown bool
 		zap.String("target", target),
 		zap.Int("evicted", evicted),
 	)
+}
+
+// dropLastKnownWhere discards every outage fallback whose bundle matches.
+func (s *Service) dropLastKnownWhere(match func(*domain.Bundle) bool) {
+	for _, h := range s.lastKnown.Keys() {
+		if e, ok := s.lastKnown.Peek(h); ok && match(e.bundle) {
+			s.lastKnown.Remove(h)
+		}
+	}
 }
 
 // refreshBackground is the near-soft-expiry proactive refresh: fires
@@ -1210,6 +1237,10 @@ func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte) {
 	switch cls {
 	case classNone:
 		etag, cfgErr := s.populateConfig(ctx, bundle)
+		if classifyRefreshError(cfgErr) == classAuthRejection {
+			_ = s.evictOnConfigRejection(h, bundle.VirtualKeyID, cfgErr)
+			return
+		}
 		if cfgErr != nil {
 			// Keep the existing entry serving its known-good credentials.
 			// Replacing it with a config-less bundle would proactively
