@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { DomainJoinSetting } from "@langwatch/identity";
+import type { DomainJoinSetting, JoinerRole } from "@langwatch/identity";
 import { Lock } from "lucide-react";
 import { useState } from "react";
 import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
@@ -142,17 +142,47 @@ function JoinPolicyOptions({
   );
 }
 
+/**
+ * The seat a newcomer lands on (ADR-143). Two choices, said in the reader's
+ * terms: a full member sees the shared projects, a Developer gets a project
+ * of their own and nothing shared. Applies to everybody admitted without an
+ * invitation, whichever door they came through.
+ */
+const JOINER_SEAT_OPTIONS: Array<{
+  value: JoinerRole;
+  label: string;
+  help: string;
+}> = [
+  {
+    value: "MEMBER",
+    label: "Member",
+    help: "Sees the shared projects and can work in them. Uses a member seat.",
+  },
+  {
+    value: "DEVELOPER",
+    label: "Developer",
+    help: "Gets a project of their own and nothing shared. Never counted against your seats.",
+  },
+];
+
 export function JoinPolicyCard({
   domainJoin,
   joinDomains,
+  joinerRole = "MEMBER",
   saving,
   onSave,
   ssoLive = false,
 }: {
   domainJoin: DomainJoinSetting;
   joinDomains: string[];
+  /** The seat people who join without an invitation receive (ADR-143). */
+  joinerRole?: JoinerRole;
   saving: boolean;
-  onSave: (next: { domainJoin: DomainJoinSetting; domains: string[] }) => void;
+  onSave: (next: {
+    domainJoin: DomainJoinSetting;
+    domains: string[];
+    joinerRole: JoinerRole;
+  }) => void;
   /** A connection is routing sign-ins, so the SSO door has its own answer to
    *  this question — the card points at it rather than letting a reader set
    *  it here twice. */
@@ -160,6 +190,7 @@ export function JoinPolicyCard({
 }) {
   const [selected, setSelected] = useState<DomainJoinSetting>(domainJoin);
   const [domains, setDomains] = useState(joinDomains.join(", "));
+  const [seat, setSeat] = useState<JoinerRole>(joinerRole);
   const lock = useJoinPolicyLock(domainJoin);
 
   /**
@@ -173,7 +204,8 @@ export function JoinPolicyCard({
   const parsedDomains = splitDomains(domains);
   const unchanged =
     selected === domainJoin &&
-    parsedDomains.join(",") === joinDomains.join(",");
+    parsedDomains.join(",") === joinDomains.join(",") &&
+    seat === joinerRole;
 
   return (
     <SettingsCard
@@ -196,7 +228,11 @@ export function JoinPolicyCard({
           loading={saving}
           disabled={unchanged || isLocked(selected)}
           onClick={() =>
-            onSave({ domainJoin: selected, domains: parsedDomains })
+            onSave({
+              domainJoin: selected,
+              domains: parsedDomains,
+              joinerRole: seat,
+            })
           }
         >
           Save
@@ -233,6 +269,60 @@ export function JoinPolicyCard({
             Separate domains with commas. Each domain must be verified by your
             organization.
           </Text>
+        </VStack>
+      )}
+
+      {/* WHICH SEAT THEY LAND ON. Shown whenever anybody can get in without
+          an invitation: with the door shut there is nobody to seat. The
+          setting also answers for SSO-admitted arrivals, which is why it
+          sits here and not on the identity provider page. */}
+      {selected !== "off" && (
+        <VStack align="stretch" gap={2}>
+          <Text fontSize="13px" fontWeight="500">
+            Seat for people who join
+          </Text>
+          <RadioGroup.Root
+            value={seat}
+            colorPalette="orange"
+            onValueChange={(event) =>
+              setSeat((event.value ?? "MEMBER") as JoinerRole)
+            }
+          >
+            <VStack align="stretch" gap={2}>
+              {JOINER_SEAT_OPTIONS.map((option) => (
+                <RadioGroup.Item
+                  key={option.value}
+                  value={option.value}
+                  disabled={saving}
+                  paddingX={2.5}
+                  paddingY={2}
+                  borderWidth="1px"
+                  borderColor="border.muted"
+                  borderRadius="md"
+                  background="bg.panel"
+                  _checked={{
+                    borderColor: "colorPalette.solid",
+                    background: "colorPalette.subtle",
+                  }}
+                >
+                  <RadioGroup.ItemHiddenInput
+                    data-testid={`joiner-seat-${option.value}`}
+                  />
+                  <RadioGroup.ItemIndicator />
+                  <RadioGroup.ItemText>
+                    <VStack align="start" gap={0}>
+                      <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
+                        {option.label}
+                      </Text>
+                      <Text color="fg.muted" fontSize="11.5px" lineHeight="1.5">
+                        {option.help}
+                      </Text>
+                    </VStack>
+                  </RadioGroup.ItemText>
+                </RadioGroup.Item>
+              ))}
+            </VStack>
+          </RadioGroup.Root>
         </VStack>
       )}
 

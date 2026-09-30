@@ -431,7 +431,7 @@ export class SsoArrivalService {
       { userId: user.id, organizationId: org.id, inviteId },
       inviteId
         ? "Applied pending invite on SSO signup"
-        : "Auto-added new user to SSO organization (default MEMBER)",
+        : "Auto-added new user to SSO organization on its joiner seat",
     );
 
     this.deps.notifications.announceSignup({

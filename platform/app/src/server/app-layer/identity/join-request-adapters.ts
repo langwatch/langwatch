@@ -1,7 +1,10 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   DEFAULT_DOMAIN_JOIN_SETTING,
+  DEFAULT_JOINER_ROLE,
   type DomainJoinSetting,
+  JOINER_ROLES,
+  type JoinerRole,
   JoinRequestNotFoundError,
 } from "@langwatch/identity";
 import { newJoinRequestCommandId } from "@langwatch/identity-server";
@@ -100,12 +103,27 @@ export class PrismaJoinMembership implements JoinMembershipPort {
   }): Promise<void> {
     const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
     const now = Date.now();
+    // The seat the organisation hands to people who join without an
+    // invitation (ADR-143). Read before the transaction: it is configuration,
+    // not part of the admission's own consistency.
+    const joinerRole = readJoinerRole(
+      (
+        await this.prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: { joinerRole: true },
+        })
+      )?.joinerRole,
+    );
     const intentPayload = await this.prisma.$transaction(async (tx) => {
       const membership = await tx.organizationUser.createMany({
-        data: [{ userId, organizationId, role: OrganizationUserRole.MEMBER }],
+        data: [{ userId, organizationId, role: joinerRole }],
         skipDuplicates: true,
       });
       if (membership.count !== 1) return void 0;
+      // A Developer holds their personal team and nothing shared, so the
+      // organisation-wide grant a Full member receives below is never
+      // written for one; the membership row alone is the admission.
+      if (joinerRole === OrganizationUserRole.DEVELOPER) return void 0;
 
       const insertedMembership = await tx.organizationUser.findUniqueOrThrow({
         where: { userId_organizationId: { userId, organizationId } },
@@ -204,16 +222,18 @@ export class PrismaJoinSettings implements JoinSettingPort {
   async read({ organizationId }: { organizationId: string }): Promise<{
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }> {
     const row = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { domainJoin: true, joinDomains: true },
+      select: { domainJoin: true, joinDomains: true, joinerRole: true },
     });
     return {
       domainJoin: row
         ? readDomainJoin(row.domainJoin)
         : DEFAULT_DOMAIN_JOIN_SETTING,
       joinDomains: row?.joinDomains ?? [],
+      joinerRole: readJoinerRole(row?.joinerRole),
     };
   }
 
@@ -221,16 +241,29 @@ export class PrismaJoinSettings implements JoinSettingPort {
     organizationId,
     domainJoin,
     joinDomains,
+    joinerRole,
   }: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }): Promise<void> {
     await this.prisma.organization.update({
       where: { id: organizationId },
-      data: { domainJoin, joinDomains },
+      data: { domainJoin, joinDomains, joinerRole },
     });
   }
+}
+
+/**
+ * The stored joiner seat, narrowed to the two values the setting allows. The
+ * column is the whole organisation role enum, but a joiner is only ever a
+ * Full member or a Developer (ADR-143); anything else reads as the default.
+ */
+export function readJoinerRole(stored: string | null | undefined): JoinerRole {
+  return (JOINER_ROLES as readonly string[]).includes(stored ?? "")
+    ? (stored as JoinerRole)
+    : DEFAULT_JOINER_ROLE;
 }
 
 /**

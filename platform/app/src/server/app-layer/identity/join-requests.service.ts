@@ -3,6 +3,7 @@ import {
   DOMAIN_AUTO_JOIN_POLICY_ID,
   type DomainJoinSetting,
   isPublicEmailDomain,
+  type JoinerRole,
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
@@ -102,21 +103,32 @@ export interface JoinOfferDismissalPort {
   dismiss(args: { userId: string; domain: string }): Promise<void>;
 }
 
-/** Whether this organization may change its joining setting, and to what. */
+/**
+ * Whether this organization may change its joining setting, and to what.
+ *
+ * `joinerRole` (ADR-143) is the seat a person admitted WITHOUT an invitation
+ * receives: a domain join here, or an SSO-admitted login. `MEMBER` (a Full
+ * seat) by default; `DEVELOPER` for an organization whose newcomers should
+ * land with a personal project and nothing shared. An invitation always
+ * names its own role and never reads this.
+ */
 export interface JoinSettingPort {
-  read(args: {
-    organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  read(args: { organizationId: string }): Promise<{
+    domainJoin: DomainJoinSetting;
+    joinDomains: string[];
+    joinerRole: JoinerRole;
+  }>;
   write(args: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
+    joinerRole: JoinerRole;
   }): Promise<void>;
 }
 
 /**
  * What changed when an administrator saved the joining setting: both values,
- * and both domain lists.
+ * both domain lists, and both joiner seats.
  *
  * Both halves are returned rather than just the new one because the audit row
  * the caller writes has to say what it was as well as what it became — "ana
@@ -128,6 +140,8 @@ export interface JoinSettingChange {
   next: DomainJoinSetting;
   previousDomains: readonly string[];
   nextDomains: readonly string[];
+  previousJoinerRole: JoinerRole;
+  nextJoinerRole: JoinerRole;
 }
 
 export interface JoinRequestsServiceDeps {
@@ -611,13 +625,17 @@ export class JoinRequestsService {
     organizationId,
     domainJoin,
     domains,
+    joinerRole,
   }: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
+    /** The seat newcomers receive (ADR-143). Left out, the saved one stands. */
+    joinerRole?: JoinerRole;
   }): Promise<JoinSettingChange> {
     const current = await this.deps.settings.read({ organizationId });
     const normalized = domains.map(normalizeDomain).filter(Boolean);
+    const nextJoinerRole = joinerRole ?? current.joinerRole;
 
     if (
       opensTheDoorWider({
@@ -655,12 +673,15 @@ export class JoinRequestsService {
       organizationId,
       domainJoin,
       joinDomains: nextDomains,
+      joinerRole: nextJoinerRole,
     });
     return {
       previous: current.domainJoin,
       next: domainJoin,
       previousDomains: current.joinDomains,
       nextDomains,
+      previousJoinerRole: current.joinerRole,
+      nextJoinerRole,
     };
   }
 
@@ -669,7 +690,11 @@ export class JoinRequestsService {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }> {
+  }): Promise<{
+    domainJoin: DomainJoinSetting;
+    joinDomains: string[];
+    joinerRole: JoinerRole;
+  }> {
     return this.deps.settings.read({ organizationId });
   }
 

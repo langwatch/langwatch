@@ -53,9 +53,11 @@ const ORGANIZATION_ID = "org_acme";
 
 /** Just the reads these two adapters make, and nothing else. */
 function fakePrisma({
+  joinerRole = "MEMBER",
   membershipInserted = 1,
 }: {
   membershipInserted?: number;
+  joinerRole?: "MEMBER" | "DEVELOPER";
 } = {}) {
   const processManagerOutbox = {
     createMany: vi.fn(
@@ -78,7 +80,7 @@ function fakePrisma({
       callback({ organizationUser, processManagerOutbox }),
     ),
     organization: {
-      findUnique: vi.fn(async () => ({ name: "Acme" })),
+      findUnique: vi.fn(async () => ({ name: "Acme", joinerRole })),
     },
     organizationUser,
     processManagerOutbox,
@@ -281,6 +283,69 @@ describe("given a colleague who walked in on the domain setting", () => {
       expect(policyRow.action).toBe(adminRow.action);
       expect(policyRow.userId).toBeNull();
       expect(adminRow.userId).toBe("user_ana");
+    });
+  });
+});
+
+describe("given an organization whose joiner seat is Developer (ADR-143)", () => {
+  describe("when a colleague walks in on the domain setting", () => {
+    /** @scenario The joiner seat setting lands email joiners as Developers */
+    it("admits them as a Developer with no organization-wide grant and no intent", async () => {
+      const prisma = fakePrisma({ joinerRole: "DEVELOPER" });
+      const attachBindings = vi.fn();
+      const membership = new PrismaJoinMembership(
+        prisma as never,
+        { attachBindings } as never,
+      );
+
+      await membership.attachDefaultMembership({
+        userId: "user_sam",
+        organizationId: ORGANIZATION_ID,
+        joinRequestId: "jreq_dev",
+        commandId: "join-approve:jreq_dev:policy:domain-auto",
+        approvedByUserId: null,
+      });
+
+      expect(prisma.organizationUser.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [
+            {
+              userId: "user_sam",
+              organizationId: ORGANIZATION_ID,
+              role: "DEVELOPER",
+            },
+          ],
+        }),
+      );
+      expect(prisma.processManagerOutbox.createMany).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the organization never changed the setting", () => {
+    /** @scenario The joiner seat setting is Full by default */
+    it("still admits a Full member with the organization-wide grant", async () => {
+      const prisma = fakePrisma();
+      const attachBindings = vi.fn(async () => undefined);
+      const membership = new PrismaJoinMembership(
+        prisma as never,
+        { attachBindings } as never,
+      );
+
+      await membership.attachDefaultMembership({
+        userId: "user_sam",
+        organizationId: ORGANIZATION_ID,
+        joinRequestId: "jreq_full",
+        commandId: "join-approve:jreq_full:policy:domain-auto",
+        approvedByUserId: null,
+      });
+
+      expect(prisma.organizationUser.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [expect.objectContaining({ role: "MEMBER" })],
+        }),
+      );
+      expect(attachBindings).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -175,7 +175,14 @@ export class PrismaSsoMembershipRepository {
   }
 
   /**
-   * Makes somebody a MEMBER of an organization.
+   * Makes somebody a member of an organization, on the seat the organization
+   * hands to people who arrive without an invitation (`joinerRole`,
+   * ADR-143): a Full member by default, or a Developer.
+   *
+   * A Full member carries a pending organization-wide grant that the arrival
+   * service then attaches. A Developer holds their personal team and nothing
+   * shared, so no grant is pending for one: the membership row alone is the
+   * admission, and `findPendingAdmission` finds nothing to attach.
    *
    * P2002 (unique constraint) on THIS insert means another concurrent OAuth
    * callback or a retry already created this membership, so it is answered as
@@ -190,13 +197,24 @@ export class PrismaSsoMembershipRepository {
     userId: string;
     organizationId: string;
   }): Promise<"created" | "already-present"> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { joinerRole: true },
+    });
+    const role =
+      organization?.joinerRole === OrganizationUserRole.DEVELOPER
+        ? OrganizationUserRole.DEVELOPER
+        : OrganizationUserRole.MEMBER;
     try {
       await this.prisma.organizationUser.create({
         data: {
           userId,
           organizationId,
-          role: "MEMBER",
-          pendingSsoGrantId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          role,
+          pendingSsoGrantId:
+            role === OrganizationUserRole.MEMBER
+              ? generate(KSUID_RESOURCES.ROLE_BINDING).toString()
+              : null,
         },
       });
       return "created";
