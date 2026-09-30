@@ -7,7 +7,6 @@ import type { Trigger } from "@langwatch/automation-contract";
  * application's now, so REST reaches the same answers.
  * @see specs/automations/runaway-automation-containment.feature
  */
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -33,7 +32,6 @@ function authoring(
     projects: createApiFixture<ProjectApi>({
       findSummaryById: async () => ({ name: "Test", slug: "test" }),
     }),
-    featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),
   });
 
   return AutomationAuthoringService.create({

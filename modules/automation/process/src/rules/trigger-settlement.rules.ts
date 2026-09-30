@@ -1,12 +1,10 @@
 import { createHash } from "node:crypto";
 
 import {
-  CADENCE_WINDOW_MS,
-  type NotificationCadence,
-  type TriggerAction,
+  computeScheduledFor,
   type TriggerMatchRecordedEventData,
 } from "@langwatch/automation-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 
 import {
   MAX_PENDING_MATCHES,
@@ -15,32 +13,6 @@ import {
   type PersistPage,
   type SettlementState,
 } from "../eventing/trigger-settlement.process.ts";
-
-const PERSIST_TRIGGER_ACTIONS = new Set<TriggerAction>([
-  "ADD_TO_DATASET",
-  "ADD_TO_ANNOTATION_QUEUE",
-]);
-
-// When trigger matches settle; holds pending set and drain boundary to cap
-// reads and notifications.
-function computeScheduledFor({
-  action,
-  cadence,
-  now,
-}: {
-  action: TriggerAction;
-  cadence: NotificationCadence;
-  now: Instant;
-}): Instant {
-  if (PERSIST_TRIGGER_ACTIONS.has(action) || cadence === "immediate") {
-    return now;
-  }
-
-  const windowMs = CADENCE_WINDOW_MS[cadence];
-  return Temporal.Instant.fromEpochMilliseconds(
-    (Math.floor(now.epochMilliseconds / windowMs) + 1) * windowMs,
-  );
-}
 
 function pendingDueTimes(state: SettlementState): number[] {
   return Object.values(state.pendingMatches).map((match) => match.dispatchDueAt);

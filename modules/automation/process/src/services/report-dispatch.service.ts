@@ -2,7 +2,7 @@ import {
   REPORT_TRIGGER_DEFAULTS,
   renderTriggerEmail,
   renderTriggerSlack,
-  type SlackTemplateType,
+  resolveSlackTemplateType,
   buildReportTemplateContext,
   type ReportChart,
   type ReportTraceRow,
@@ -107,9 +107,10 @@ function viewUrl(source: ReportSource, baseHost: string, slug: string): string {
     case "traceQuery":
       return `${base}/traces`;
     case "customGraph":
-      return `${base}/analytics/custom/${source.customGraphId}`;
+      return `${base}/analytics/custom/${encodeURIComponent(source.customGraphId)}`;
     case "dashboard":
-      return `${base}/analytics`;
+      // The deep link the dashboard page itself uses; the bare /analytics dropped it (#6716).
+      return `${base}/analytics/reports?dashboard=${encodeURIComponent(source.dashboardId)}`;
   }
 }
 
@@ -171,10 +172,7 @@ export class ReportDispatchService {
 
     const { trigger, report, project } = loaded;
 
-    const params = trigger.actionParams as {
-      members?: string[];
-      slackWebhook?: string;
-    };
+    const params = trigger.actionParams as { members?: string[] };
 
     // Every report carries its DATA, not just a link to it, over the window
     // `[previous slot, this slot]` — exactly the period this fire is responsible
@@ -245,7 +243,7 @@ async function deliverReport({
   deps: ReportDispatchDeps;
   trigger: Trigger;
   project: ReportProject;
-  params: { members?: string[]; slackWebhook?: string };
+  params: { members?: string[] };
   context: ReportTemplateContext;
 }): Promise<boolean> {
   if (trigger.action === "SEND_EMAIL") {
@@ -322,9 +320,6 @@ async function deliverReportSlack({
   trigger: Trigger;
   context: ReportTemplateContext;
 }): Promise<boolean> {
-  const templateType: SlackTemplateType | null =
-    trigger.templates.slackTemplateType === "block_kit" ? "block_kit" : "string";
-
   const logContext = { projectId: trigger.projectId, triggerId: trigger.id };
 
   // A report's connection, else its own legacy secret (ARCHITECTURE.md §3).
@@ -350,7 +345,10 @@ async function deliverReportSlack({
     }
     // ADR-041: a bot connection posts via the Web API with the gate open.
     const rendered = await renderTriggerSlack({
-      templateType,
+      templateType: resolveSlackTemplateType({
+        configured: trigger.templates.slackTemplateType,
+        deliveryMethod: "bot",
+      }),
       template: trigger.templates.slackTemplate,
       context,
       defaults: REPORT_TRIGGER_DEFAULTS,
@@ -366,7 +364,10 @@ async function deliverReportSlack({
   }
 
   const rendered = await renderTriggerSlack({
-    templateType,
+    templateType: resolveSlackTemplateType({
+      configured: trigger.templates.slackTemplateType,
+      deliveryMethod: "webhook",
+    }),
     template: trigger.templates.slackTemplate,
     context,
     defaults: REPORT_TRIGGER_DEFAULTS,

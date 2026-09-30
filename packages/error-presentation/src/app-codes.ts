@@ -86,7 +86,6 @@ export const APP_ERROR_CODES = [
   "automation_filters_unsupported",
   "automation_not_found",
   "automation_trace_filter_invalid",
-  "automation_webhook_not_enabled",
   "automation_webhook_upsert_required",
   "avatar_image_processing_failed",
   "avatar_image_too_large",

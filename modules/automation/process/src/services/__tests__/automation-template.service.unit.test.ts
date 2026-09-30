@@ -44,6 +44,7 @@ function makeNotifier() {
     method: string;
     headers: Record<string, string>;
     body: string;
+    contentType?: string;
   }[] = [];
   // The endpoint's answer a webhook test fire surfaces to the author; tests
   // override to exercise a non-2xx failure.
@@ -140,6 +141,34 @@ describe("validateTemplateDraft", () => {
 });
 
 describe("testFireTrigger", () => {
+  describe("given a webhook destination declaring text/plain", () => {
+    /** @scenario "A plain-text body is sent exactly as it renders" */
+    it("sends the rendered text verbatim, announced as the declared type", async () => {
+      const { notifier, sentWebhooks } = makeNotifier();
+
+      await makeService(notifier).testFire({
+        channel: "webhook",
+        trigger: TRIGGER,
+        project: PROJECT,
+        draft: {},
+        recipients: [],
+        webhook: null,
+        webhookDestination: {
+          url: "https://example.com/hook",
+          method: "POST",
+          headers: {},
+          bodyTemplate: "fired: {{ trigger.name }}",
+          contentType: "text/plain",
+        },
+      });
+
+      expect(sentWebhooks[0]).toMatchObject({
+        body: `fired: ${TRIGGER.name}`,
+        contentType: "text/plain",
+      });
+    });
+  });
+
   describe("given a webhook destination", () => {
     it("sends the rendered JSON body and returns the endpoint's HTTP status", async () => {
       const { notifier, sentWebhooks } = makeNotifier();
@@ -251,6 +280,27 @@ describe("testFireTrigger", () => {
       });
       // The gated block survived — proof the gate was opened for bot delivery.
       expect(JSON.stringify(sentSlackBot[0]?.payload)).toContain("data_table");
+    });
+
+    /** @scenario "A bot-token delivery posts Block Kit" */
+    it("posts the framework default as Block Kit when no template is configured", async () => {
+      const { notifier, sentSlackBot } = makeNotifier();
+
+      const result = await makeService(notifier).testFire({
+        channel: "slack",
+        trigger: TRIGGER,
+        project: PROJECT,
+        draft: {},
+        recipients: [],
+        webhook: null,
+        botDestination: { token: "xoxb-live", channel: "C1" },
+      });
+
+      expect(result.errors).toEqual([]);
+      // A bot connection never falls back to the plain-text builder (ADR-041).
+      expect(sentSlackBot[0]?.payload).toMatchObject({
+        blocks: expect.arrayContaining([expect.any(Object)]),
+      });
     });
   });
 

@@ -61,7 +61,6 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
 import {
   MonitorApi,
@@ -256,7 +255,6 @@ type AutomationDependencies = Readonly<{
   monitors: typeof MonitorApi;
   /** Whether an id a condition keys by is an evaluator's, which a condition cannot select by. */
   evaluators: typeof EvaluatorApi;
-  featureFlags: typeof FeatureFlagApi;
   entitlement: typeof EntitlementApi;
   projects: typeof ProjectApi;
   /** The SAME trail every other completed mutation on this process is recorded on. */
@@ -320,7 +318,6 @@ export class AutomationApp implements AutomationApi {
     analytics: AnalyticsApi,
     monitors: MonitorApi,
     evaluators: EvaluatorApi,
-    featureFlags: FeatureFlagApi,
     entitlement: EntitlementApi,
     projects: ProjectApi,
     auditLog: AuditLogApi,
@@ -525,7 +522,6 @@ export class AutomationApp implements AutomationApi {
     const rules = AutomationRulesService.create({
       automation,
       projects: dependencies.projects,
-      featureFlags: dependencies.featureFlags,
     });
 
     const triggerMatches = AutomationTriggerMatchDispatcherService.create();
@@ -996,11 +992,6 @@ export class AutomationApp implements AutomationApi {
   /** The template draft an author is about to save. Throws on a bad template. */
   validateTemplateDraft(draft: TestFireTemplateDraft): void {
     this.#automation.validateTemplateDraft(draft);
-  }
-
-  /** Refuses the webhook delivery channel unless the project has it (ADR-040 §7). */
-  assertWebhookChannelEnabled(input: { projectId: string; userId: string }): Promise<void> {
-    return this.#rules.assertWebhookChannelEnabled(input);
   }
 
   // -- the project an automation belongs to ----------------------------------

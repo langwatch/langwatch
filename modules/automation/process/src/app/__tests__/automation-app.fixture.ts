@@ -3,7 +3,6 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
@@ -156,18 +155,6 @@ export function createCanonicalAutomationApp(): {
     replicate: vi.fn(),
     performanceForProject: vi.fn(),
   });
-  const featureFlags = createApiFixture<FeatureFlagApi>({
-    isEnabled: vi.fn(),
-    resolveFrontendFlags: vi.fn(),
-    resolvePublicAnonymousFlags: vi.fn(),
-    resolveExperimentCatalogue: vi.fn(),
-    setUserExperimentEnrolment: vi.fn(),
-    setExperimentTenantPolicy: vi.fn(),
-    listOperatorCatalogue: vi.fn(),
-    setEnabled: vi.fn(),
-    setRules: vi.fn(),
-    clearStoredFlag: vi.fn(),
-  });
   const members: AutomationInfrastructure = {
     verifier,
     clock,
@@ -211,7 +198,6 @@ export function createCanonicalAutomationApp(): {
         analytics,
         monitors,
         evaluators: createApiFixture<EvaluatorApi>({ findById: vi.fn(async () => undefined) }),
-        featureFlags,
         projects,
         entitlement: {
           getActivePlan: vi.fn<EntitlementApiContract["getActivePlan"]>(),

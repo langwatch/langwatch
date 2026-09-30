@@ -234,6 +234,7 @@ describe("ReportChartService.loadReportCharts", () => {
   describe("given a dashboard with a panel whose stored graph does not parse", () => {
     beforeEach(() => loggerWarn.mockClear());
 
+    /** @scenario "A panel whose configuration cannot be evaluated is left out; the report still delivers" */
     it("leaves that panel out, names it in a warning, and renders the rest", async () => {
       const deps = makeDeps({
         graphs: [
@@ -256,6 +257,42 @@ describe("ReportChartService.loadReportCharts", () => {
         expect.objectContaining({ customGraphId: "graph-broken" }),
         expect.any(String),
       );
+    });
+  });
+
+  describe("given every panel's stored configuration is unusable", () => {
+    /** @scenario "All panels failing retries rather than delivering a false empty report" */
+    it("rejects rather than deliver a false 'nothing to show'", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({ id: "graph-a", graph: { graphType: "line" } }),
+          makeGraph({ id: "graph-b", graph: { graphType: "line" } }),
+        ],
+        timeseries: { previousPeriod: [], currentPeriod: [] },
+      });
+
+      await expect(
+        run({ deps, source: { kind: "dashboard", dashboardId: "dash-1" } }),
+      ).rejects.toMatchObject({ code: "report_incomplete" });
+    });
+  });
+
+  describe("given one panel's query fails with an unknown, non-config error", () => {
+    /** @scenario "An unknown panel failure retries the whole report" */
+    it("rejects rather than deliver a report with the panel silently missing", async () => {
+      const deps = {
+        ...makeDeps({
+          graphs: [makeGraph({ id: "graph-1" }), makeGraph({ id: "graph-2" })],
+          timeseries: { previousPeriod: [], currentPeriod: [] },
+        }),
+        getTimeseries: vi.fn(async () => {
+          throw new Error("ClickHouse timed out");
+        }),
+      };
+
+      await expect(
+        run({ deps, source: { kind: "dashboard", dashboardId: "dash-1" } }),
+      ).rejects.toThrow("ClickHouse timed out");
     });
   });
 

@@ -41,6 +41,9 @@ export interface TestFireWebhookDestination {
   headers: Record<string, string>;
   signingSecrets?: readonly string[];
   bodyTemplate: string | null;
+  /** The Content-Type the test fire announces, which also decides the body's treatment
+   *  (JSON checked, anything else verbatim). Absent means JSON. */
+  contentType?: string;
 }
 
 export interface TestFireInput {

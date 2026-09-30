@@ -2,7 +2,12 @@ import type {
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
-import type { CustomGraph, ReportChart, ReportSource } from "@langwatch/automation-contract";
+import {
+  ReportIncompleteError,
+  type CustomGraph,
+  type ReportChart,
+  type ReportSource,
+} from "@langwatch/automation-contract";
 import { customGraphInputSchema, type CustomGraphInput } from "@langwatch/dashboard-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
@@ -121,7 +126,12 @@ export class ReportChartService {
     const charts = await mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
       buildChart({ deps, graph, projectId, from, to }),
     );
-    return charts.flat();
+    const delivered = charts.flat();
+    // Graphs existed but none could be read: a report that could not be built, not an empty
+    // period. Throwing sends the fire through the scheduler's bounded retry (ADR-044).
+    if (graphs.length > 0 && delivered.length === 0) throw new ReportIncompleteError();
+
+    return delivered;
   }
 }
 

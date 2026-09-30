@@ -353,6 +353,32 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
     });
   });
 
+  describe("given a delivered dashboard report", () => {
+    /** @scenario "The delivered report links to its own dashboard" */
+    it("links to its own dashboard, not the generic analytics page", async () => {
+      const mail = new FakeMailGateway();
+      const trigger = makeTrigger({ source: { kind: "dashboard", dashboardId: "dash one" } });
+
+      await ReportDispatchService.create(
+        makeDeps({
+          trigger,
+          mail,
+          loadReportCharts: chartReader({
+            graphs: [graphRow({ id: "graph-1", name: "Traces per hour" })],
+            timeseries: {
+              previousPeriod: [],
+              currentPeriod: [{ date: "2026-07-15T08:00:00Z", [COUNT_KEY]: 2 }],
+            },
+          }),
+        }),
+      ).dispatchScheduledReport(FIRE);
+
+      expect(mail.emails[0]?.html).toContain(
+        `${BASE_HOST}/checkout/analytics/reports?dashboard=dash%20one`,
+      );
+    });
+  });
+
   describe("given a dashboard report with a panel whose stored graph does not parse", () => {
     it("still sends the report with the panels that do", async () => {
       const mail = new FakeMailGateway();

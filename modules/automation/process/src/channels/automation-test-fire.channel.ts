@@ -29,6 +29,8 @@ export interface TestFireWebhook {
   headers: Record<string, string>;
   signingSecrets?: readonly string[];
   body: string;
+  /** What the body is, sent as `Content-Type`. Absent means JSON. */
+  contentType?: string;
   triggerName: string;
 }
 

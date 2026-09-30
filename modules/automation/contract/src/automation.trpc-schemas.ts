@@ -3,6 +3,7 @@ import { z } from "zod";
 import { automationFilterValueSchema, automationFiltersSchema } from "./automation-filters.ts";
 import { MAX_TRACE_DEBOUNCE_MS, MIN_TRACE_DEBOUNCE_MS } from "./cadences.ts";
 import { graphAlertActionParamsSchema } from "./graph-alert.ts";
+import { DEFAULT_WEBHOOK_CONTENT_TYPE } from "./providers/webhook.ts";
 import { reportActionParamsSchema } from "./report.ts";
 import { triggerFireRowSchema } from "./trigger.queries.ts";
 import {
@@ -79,6 +80,7 @@ export const automationApiActionParamsSchema = z.object({
   method: z.enum(["POST", "PUT", "PATCH"]).optional(),
   headers: z.record(z.string(), z.string()).optional(),
   bodyTemplate: z.string().nullable().optional(),
+  contentType: z.string().optional(),
 });
 export type AutomationApiActionParams = z.infer<typeof automationApiActionParamsSchema>;
 
@@ -184,6 +186,14 @@ export const automationApiTestFireInputSchema = z.object({
       method: z.enum(["POST", "PUT", "PATCH"]).default("POST"),
       headers: z.record(z.string(), z.string()).default({}),
       bodyTemplate: z.string().nullable().default(null),
+      /** Stripped of CR/LF so a typed value cannot smuggle a second header; stripping can
+       *  empty it, and an empty value would ship a blank header, so that reads as JSON. */
+      contentType: z
+        .string()
+        .default(DEFAULT_WEBHOOK_CONTENT_TYPE)
+        .transform(
+          (value) => value.replace(/[\r\n\0]+/g, " ").trim() || DEFAULT_WEBHOOK_CONTENT_TYPE,
+        ),
     })
     .nullable()
     .default(null),

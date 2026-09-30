@@ -190,7 +190,6 @@ export interface AutomationApi {
     filters: Record<string, unknown> | undefined;
   }): void;
   validateTemplateDraft(input: TestFireTemplateDraft): void;
-  assertWebhookChannelEnabled(input: { projectId: string; userId: string }): Promise<void>;
   getProjectIdentity(projectId: string): Promise<{ name: string; slug: string }>;
   testFire(input: TestFireInput): Promise<TestFireResult>;
   /** The authoring drawer's test-fire button, throttled and self-addressed. */

@@ -20,7 +20,12 @@ const CONTEXT = buildGraphAlertTemplateContext({
   baseHost: "https://app.langwatch.ai",
 });
 
-type Recorded = { claimed: string[]; emailed: string[][] };
+type Recorded = {
+  claimed: string[];
+  emailed: string[][];
+  webhooks: { body: string; contentType?: string }[];
+  slackBot: { payload: unknown }[];
+};
 
 function dispatcherWith(
   options: {
@@ -30,7 +35,7 @@ function dispatcherWith(
     dailyAllowed?: boolean;
   } = {},
 ) {
-  const recorded: Recorded = { claimed: [], emailed: [] };
+  const recorded: Recorded = { claimed: [], emailed: [], webhooks: [], slackBot: [] };
   const capCalls: Record<string, unknown>[] = [];
 
   const service = GraphAlertDispatchService.create({
@@ -71,8 +76,19 @@ function dispatcherWith(
         }
         recorded.emailed.push(sent);
       },
+      sendWebhook: async (request: { body: string; contentType?: string }) => {
+        recorded.webhooks.push(request);
+        return { status: 200, body: "", eventId: "evt" };
+      },
+      sendSlackBot: async (request: { payload: unknown }) => {
+        recorded.slackBot.push(request);
+      },
     },
-    webhooks: {},
+    webhooks: {
+      parseStored: (value: unknown) => value,
+      decryptHeaders: () => ({}),
+      decryptSigningSecrets: () => [],
+    },
     clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00.000Z") },
     emailHourlyCap: 10,
     tenantDailyCap: 100,
@@ -224,6 +240,70 @@ describe("GraphAlertDispatchService.dispatch", () => {
       await service.dispatch(input());
 
       expect(capCalls.find((call) => call.which === "daily")?.recipientCount).toBe(2);
+    });
+  });
+});
+
+describe("GraphAlertDispatchService.dispatch over a webhook", () => {
+  const webhookAlert = (actionParams: Record<string, unknown>) =>
+    input({
+      trigger: { id: "trigger-1", name: "High latency", action: "SEND_WEBHOOK", actionParams },
+      recipients: [],
+    });
+
+  describe("when the alert keeps the JSON Content-Type", () => {
+    /** @scenario "A JSON body is checked and sent as JSON" */
+    it("sends valid JSON announced as application/json", async () => {
+      const { recorded, service } = dispatcherWith();
+
+      await service.dispatch(webhookAlert({ url: "https://hook.test", bodyTemplate: null }));
+
+      expect(recorded.webhooks[0]?.contentType).toBe("application/json");
+      expect(() => JSON.parse(recorded.webhooks[0]?.body ?? "")).not.toThrow();
+    });
+  });
+
+  describe("when the alert declares a plain-text Content-Type", () => {
+    /** @scenario "A plain-text body is sent exactly as it renders" */
+    it("sends the rendered template verbatim, announced as text", async () => {
+      const { recorded, service } = dispatcherWith();
+
+      await service.dispatch(
+        webhookAlert({
+          url: "https://hook.test",
+          bodyTemplate: "breached: {{ trigger.name }}",
+          contentType: "text/plain",
+        }),
+      );
+
+      expect(recorded.webhooks[0]).toMatchObject({
+        body: "breached: High latency",
+        contentType: "text/plain",
+      });
+    });
+  });
+});
+
+describe("GraphAlertDispatchService.dispatch over a Slack bot", () => {
+  /** @scenario "A bot-token delivery posts Block Kit" */
+  it("renders Block Kit blocks when no template type is configured", async () => {
+    const { recorded, service } = dispatcherWith();
+
+    await service.dispatch(
+      input({
+        trigger: {
+          id: "trigger-1",
+          name: "High latency",
+          action: "SEND_SLACK_MESSAGE",
+          templates: { slackTemplateType: null, slackTemplate: null },
+        },
+        recipients: [],
+        botDestination: { token: "xoxb-live", channel: "C1" },
+      }),
+    );
+
+    expect(recorded.slackBot[0]?.payload).toMatchObject({
+      blocks: expect.arrayContaining([expect.any(Object)]),
     });
   });
 });

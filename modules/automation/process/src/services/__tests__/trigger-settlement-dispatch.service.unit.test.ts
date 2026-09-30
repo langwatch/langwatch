@@ -394,6 +394,7 @@ describe("AutomationSettlementDispatchService", () => {
     expect(fixture.automation.claims.at(-1)?.traceId).toBe("trace-2");
   });
 
+  /** @scenario "Every attempt of one fire carries the same event id" */
   it("keeps webhook event ids stable across retries of the same outbox message", async () => {
     const trigger = settlementTrigger("SEND_WEBHOOK", {
       actionParams: {

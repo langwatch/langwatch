@@ -2,8 +2,10 @@ import { createHash } from "node:crypto";
 
 import {
   buildTemplateContext,
+  DEFAULT_WEBHOOK_CONTENT_TYPE,
   renderTriggerSlack,
   renderWebhookBody,
+  resolveSlackTemplateType,
   type TemplateMatchInput,
   type TemplateContext,
   type TriggerSummary,
@@ -362,13 +364,17 @@ export class TriggerSettlementNotificationService {
       if (!channel) {
         throw new DispatchError({
           message: `Slack bot connection for trigger "${input.trigger.name}" is missing its channel`,
+          customerMessage:
+            "This automation has no Slack channel to post in. Pick a channel in its delivery settings.",
           retryable: false,
         });
       }
 
       const rendered = await renderTriggerSlack({
-        templateType:
-          input.trigger.templates.slackTemplateType === "block_kit" ? "block_kit" : "string",
+        templateType: resolveSlackTemplateType({
+          configured: input.trigger.templates.slackTemplateType,
+          deliveryMethod: "bot",
+        }),
         template: input.trigger.templates.slackTemplate,
         context: input.context(),
         allowGatedBlocks: true,
@@ -385,8 +391,10 @@ export class TriggerSettlementNotificationService {
 
     if (input.trigger.templates.slackTemplate !== null) {
       const rendered = await renderTriggerSlack({
-        templateType:
-          input.trigger.templates.slackTemplateType === "block_kit" ? "block_kit" : "string",
+        templateType: resolveSlackTemplateType({
+          configured: input.trigger.templates.slackTemplateType,
+          deliveryMethod: "webhook",
+        }),
         template: input.trigger.templates.slackTemplate,
         context: input.context(),
       });
@@ -423,9 +431,13 @@ export class TriggerSettlementNotificationService {
       throw actionParamsError(input.trigger);
     }
 
+    // A JSON content type is checked and falls back to the default envelope; any other is sent
+    // exactly as it renders (ADR-040 §2).
+    const contentType = params.contentType ?? DEFAULT_WEBHOOK_CONTENT_TYPE;
     const rendered = await renderWebhookBody({
       template: params.bodyTemplate,
       context: input.context(),
+      contentType,
     });
     const eventId = `evt_${createHash("sha256").update(input.messageKey).digest("hex").slice(0, 32)}`;
     await this.composition.delivery.sendWebhook({
@@ -441,6 +453,7 @@ export class TriggerSettlementNotificationService {
         this.composition.clock.now(),
       ),
       body: rendered.body,
+      contentType,
       triggerName: input.trigger.name,
     });
   }

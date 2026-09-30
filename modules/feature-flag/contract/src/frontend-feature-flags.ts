@@ -29,7 +29,6 @@ export const FRONTEND_FEATURE_FLAGS = [
   // launcher orb. Swaps only the CLOSED-state affordance; opening, the
   // panel and Cmd/Ctrl+I are identical either way.
   "release_ui_langy_peek_dock_enabled",
-  "release_webhook_automations",
   // Bradley-Terry leaderboard chart on the experiments-v3 results page
   // (issue #5103, specs/experiments/comparison-leaderboard.feature). Off by
   // default — power-user surface, additive to the existing win-rate chart.

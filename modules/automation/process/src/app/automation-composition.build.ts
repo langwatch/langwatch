@@ -20,11 +20,14 @@ import {
   type DatasetApi,
   type DatasetRecordEntry,
 } from "@langwatch/dataset-contract";
-import { WebhookEgressService } from "@langwatch/egress";
+import { assertWebhookDelivered, WebhookEgressService } from "@langwatch/egress";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
-import type { NotificationService } from "@langwatch/notification-contract";
+import {
+  EmailProviderNotConfiguredError,
+  type NotificationService,
+} from "@langwatch/notification-contract";
 import type { Logger } from "@langwatch/observability";
 import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -34,7 +37,13 @@ import { traceSchema, type TraceApi, type TraceRecord } from "@langwatch/trace-c
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
-import { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import {
+  AutomationTestFire,
+  type TestFireEmail,
+  type TestFireSlackBot,
+  type TestFireSlackWebhook,
+  type TestFireWebhook,
+} from "../channels/automation-test-fire.channel.ts";
 import { EgressWebhookDeliveryTransport } from "../channels/http/http.webhook-egress.channel.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
 import { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
@@ -108,7 +117,7 @@ type AutomationInfrastructureInput = Readonly<{
   slackDestinations: SlackDestinationService;
   slackConnections: AutomationSlackConnectionService;
   /** Every mail automation sends goes out through notification, which writes the envelope. */
-  notifications: Pick<NotificationService, "sendEmail">;
+  notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
   auditLog: AuditLogApi;
   verifier: AutomationInfrastructure["verifier"];
   /** The key the verifier checks with, so every link this process mails verifies. */
@@ -137,7 +146,11 @@ export function buildAutomationInfrastructure(
   const { members } = input;
   const providers = AutomationProviderRegistryService.create(members.encryption);
   const clock = new ApiAutomationClock();
-  const delivery = buildNotificationDelivery(input);
+  const egress = WebhookEgressService.create({
+    rateLimiter: input.repositories.webhookRateLimits,
+    tls: { rejectUnauthorized: members.isSaas },
+  });
+  const delivery = buildNotificationDelivery({ ...input, egress });
   const emailCaps = AutomationEmailCapService.create({
     store: input.repositories.emailCaps,
     fallback: MemoryAutomationEmailCapRepository.create(),
@@ -155,7 +168,7 @@ export function buildAutomationInfrastructure(
     dispatchErrors: new ApiAutomationDispatchErrors(),
     heartbeat: new UnmeasuredApiAutomationHeartbeat(),
     runaway: new UncontainedApiAutomationRunaway(members.logger),
-    testFire: new UndeliverableApiTestFire(),
+    testFire: ApiAutomationTestFire.create({ mail: input.notifications, delivery, egress }),
     persistCaps: input.repositories.persistCaps,
     providers,
     slackChannels: new UnavailableAutomationSlackDirectory(),
@@ -207,16 +220,13 @@ export function buildGraphAlertNotifier(
 function buildNotificationDelivery(
   input: Pick<
     AutomationInfrastructureInput,
-    "members" | "notifications" | "unsubscribeSigningSecret" | "repositories"
-  >,
+    "members" | "notifications" | "unsubscribeSigningSecret"
+  > &
+    Readonly<{ egress: WebhookEgressService }>,
 ): AutomationNotificationDelivery {
-  const { members } = input;
+  const { members, egress } = input;
   if (!members.publicBaseUrl) return new UnavailableNotificationDelivery();
 
-  const egress = WebhookEgressService.create({
-    rateLimiter: input.repositories.webhookRateLimits,
-    tls: { rejectUnauthorized: members.isSaas },
-  });
   return AutomationNotificationDeliveryService.create({
     mailer: input.notifications,
     renderer: ReactEmailMailRenderer.create(),
@@ -378,22 +388,47 @@ class UncontainedApiAutomationRunaway
   }
 }
 
-/** A test fire goes out over the worker's transports, never this process's. */
-class UndeliverableApiTestFire extends AutomationTestFire {
-  sendEmail(): Promise<void> {
-    return Promise.reject(new ApiAutomationUnavailableError("send a test email"));
+/** A test fire takes the real fire's transports: notification's mail, Slack, the fenced sender. */
+export class ApiAutomationTestFire extends AutomationTestFire {
+  static create(input: {
+    mail: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
+    delivery: Pick<AutomationNotificationDelivery, "sendSlackWebhook" | "sendSlackBot">;
+    egress: Pick<WebhookEgressService, "send">;
+  }): ApiAutomationTestFire {
+    return new ApiAutomationTestFire(input.mail, input.delivery, input.egress);
   }
 
-  sendSlack(): Promise<void> {
-    return Promise.reject(new ApiAutomationUnavailableError("send a test Slack message"));
+  private constructor(
+    private readonly mail: Pick<NotificationService, "sendEmail" | "getMailDelivery">,
+    private readonly delivery: Pick<
+      AutomationNotificationDelivery,
+      "sendSlackWebhook" | "sendSlackBot"
+    >,
+    private readonly egress: Pick<WebhookEgressService, "send">,
+  ) {
+    super();
   }
 
-  sendSlackBot(): Promise<void> {
-    return Promise.reject(new ApiAutomationUnavailableError("send a test Slack message"));
+  /** Refuses with no mail provider (ARCHITECTURE.md §6), where a real send skips quietly. */
+  async sendEmail(input: TestFireEmail): Promise<void> {
+    const { provider } = await this.mail.getMailDelivery();
+    if (provider === undefined) throw new EmailProviderNotConfiguredError();
+    await this.mail.sendEmail({ to: input.recipients, subject: input.subject, html: input.html });
   }
 
-  sendWebhook(): Promise<{ status: number }> {
-    return Promise.reject(new ApiAutomationUnavailableError("send a test webhook"));
+  sendSlack(input: TestFireSlackWebhook): Promise<void> {
+    return this.delivery.sendSlackWebhook({ ...input, triggerName: "test fire" });
+  }
+
+  sendSlackBot(input: TestFireSlackBot): Promise<void> {
+    return this.delivery.sendSlackBot({ ...input, triggerName: "test fire" });
+  }
+
+  /** Marked as a test fire (ADR-040 §1); a non-2xx throws the classified DispatchError. */
+  async sendWebhook(input: TestFireWebhook): Promise<{ status: number }> {
+    const result = await this.egress.send({ ...input, testFire: true });
+    assertWebhookDelivered({ result, triggerName: input.triggerName });
+    return { status: result.status };
   }
 }
 

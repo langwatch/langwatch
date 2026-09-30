@@ -3731,11 +3731,6 @@ const presentations = {
     describe: () =>
       "Set this one up on the automations page, where the destination is checked before it's saved.",
   },
-  automation_webhook_not_enabled: {
-    title: "Webhook automations aren't turned on for this project",
-    describe: () =>
-      "Send this one to email or Slack instead, or ask your account team to turn on webhooks.",
-  },
   automation_filters_unsupported: {
     // `meta.fields` holds the field names that no longer match anything. They
     // are our vocabulary, not the author's, so the copy says the shape of the

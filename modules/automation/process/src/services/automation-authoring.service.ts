@@ -144,9 +144,11 @@ export class AutomationAuthoringService {
   /** One automation as the browser reads it, or null when the project has none. */
   async findRedactedById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     const trigger = await this.collaborators.automation.findById(input);
+    // A deleted automation reads as missing, as it does in the list.
+    if (!trigger || trigger.deleted) return null;
 
     // Never return the encrypted bot token to the browser (ADR-041).
-    return trigger ? this.redactForRead(trigger) : null;
+    return this.redactForRead(trigger);
   }
 
   /**
@@ -422,16 +424,6 @@ export class AutomationAuthoringService {
     const { input, author } = args;
 
     try {
-      // The webhook channel ships dark (ADR-040 §7): the type picker is
-      // flag-gated client-side, and the server refuses the channel too so the
-      // flag cannot be bypassed by calling the API directly.
-      if (input.channel === "webhook") {
-        await this.collaborators.rules.assertWebhookChannelEnabled({
-          projectId: input.projectId,
-          userId: author.id,
-        });
-      }
-
       await this.countTestFire({ channel: input.channel, author });
 
       const recipients = this.testFireRecipients({ channel: input.channel, author });
@@ -468,7 +460,7 @@ export class AutomationAuthoringService {
     const { input, author } = args;
     const isGraphAlert = !!input.customGraphId;
     const isReport = !isGraphAlert && !!input.report;
-    const parsedActionParams = await this.validateDraft({ input, author, isGraphAlert, isReport });
+    const parsedActionParams = await this.validateDraft({ input, isGraphAlert, isReport });
     const filterQuery = this.normalizeFilterQuery(input);
 
     // A trace automation must say which traces it is about. Checked after the
@@ -550,21 +542,13 @@ export class AutomationAuthoringService {
   /** Everything a save is refused for before a single secret is encrypted. */
   private async validateDraft(args: {
     input: AutomationApiUpsertInput;
-    author: AutomationAuthor;
     isGraphAlert: boolean;
     isReport: boolean;
   }): Promise<Record<string, unknown>> {
-    const { input, author, isGraphAlert, isReport } = args;
+    const { input, isGraphAlert, isReport } = args;
 
     try {
       this.collaborators.automation.validateTemplateDraft(input.templates);
-
-      if (input.action === TriggerAction.SEND_WEBHOOK) {
-        await this.collaborators.rules.assertWebhookChannelEnabled({
-          projectId: input.projectId,
-          userId: author.id,
-        });
-      }
 
       if (isGraphAlert) {
         await assertGraphAlertDraft({ input, rules: this.collaborators.rules });
@@ -969,11 +953,21 @@ export class AutomationAuthoringService {
       triggerId: input.automationId,
       projectId: input.projectId,
     });
-    const signingSecrets = this.collaborators.providers.decryptWebhookSigningSecrets(
-      (row?.actionParams ?? {}) as AutomationWebhookStoredParams,
-    );
+    const stored = (row?.actionParams ?? {}) as AutomationWebhookStoredParams;
+    const signingSecrets = this.collaborators.providers.decryptWebhookSigningSecrets(stored);
+    if (signingSecrets.length === 0) return destination;
 
-    return signingSecrets.length > 0 ? { ...destination, signingSecrets } : destination;
+    // A secret belongs to the saved endpoint: signing for a draft pointed elsewhere
+    // would hand valid signatures to whoever controls the new URL.
+    if (stored.url !== destination.url) {
+      throw new TestFireUnavailableError(
+        "webhook",
+        "Save the new destination URL before sending a signed test fire. " +
+          "The signing secret is only used with the saved URL.",
+      );
+    }
+
+    return { ...destination, signingSecrets };
   }
 }
 

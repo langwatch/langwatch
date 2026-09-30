@@ -510,20 +510,6 @@ export class AutomationWebhookUpsertRequiredError extends HandledError {
   }
 }
 
-/** The webhook delivery channel is not switched on for this project (ADR-040 §7). */
-export class AutomationWebhookNotEnabledError extends HandledError {
-  declare readonly code: "automation_webhook_not_enabled";
-
-  constructor(projectId: string) {
-    super(
-      "automation_webhook_not_enabled",
-      "Webhook automations are not enabled for this project.",
-      { httpStatus: 403, meta: { projectId } },
-    );
-    this.name = "AutomationWebhookNotEnabledError";
-  }
-}
-
 /**
  * Every condition on the saved automation names a field this platform no
  * longer supports, so saving it would leave the automation matching nothing an
