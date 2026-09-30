@@ -130,10 +130,17 @@ Feature: Telemetry — every span carries the correct origin
     Given a signature node calls openai/gpt-5-mini through the gateway
     When the response returns
     Then the gateway-call span has attribute "gen_ai.system" = "openai"
-    And the span has attribute "gen_ai.request.model" = "gpt-5-mini"
+    And the span has attribute "gen_ai.request.model" = "openai/gpt-5-mini"
     And the span has attribute "gen_ai.usage.input_tokens" set
     And the span has attribute "gen_ai.usage.output_tokens" set
     And the span duration matches the wall-clock time from the request to the gateway's response
+
+  @unit
+  Scenario: A Studio or playground model call names the model with its provider
+    Given a signature node calls gpt-5.6-terra through the openai provider
+    When its model call is recorded
+    Then the trace lists the model as "openai/gpt-5.6-terra"
+    And grouping traces by model shows it in the same row as SDK traces of that model
 
   # ============================================================================
   # Cost attribution — origin tag flows to billing-relevant traces

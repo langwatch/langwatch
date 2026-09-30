@@ -2958,8 +2958,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--end-date <date>", "End date (ISO string, default: now)")
       .option("--group-by <field>", "Group by field (e.g. metadata.model)")
       .option("--time-scale <scale>", "Time scale: 'full' for aggregate, or interval in seconds")
+      .option("--include-langy", "Count Langy's own turns too (left out by default, as in the Trace Explorer)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (options: { metric?: string; aggregation?: string; startDate?: string; endDate?: string; groupBy?: string; timeScale?: string }) => {
+    async (options: { metric?: string; aggregation?: string; startDate?: string; endDate?: string; groupBy?: string; timeScale?: string; includeLangy?: boolean }) => {
       const { queryAnalyticsCommand: impl } = await import("./commands/analytics/query.js");
       return impl(options);
     },

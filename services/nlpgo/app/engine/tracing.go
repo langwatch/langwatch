@@ -32,6 +32,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -189,7 +190,7 @@ func startLLMSpan(ctx context.Context, model, provider string, messages []app.Ch
 		attrs = append(attrs, attribute.String("gen_ai.system", provider))
 	}
 	if model != "" {
-		attrs = append(attrs, attribute.String("gen_ai.request.model", model))
+		attrs = append(attrs, attribute.String("gen_ai.request.model", modelID(model, provider)))
 	}
 	if v, ok := encodeJSONAttr(messages); ok {
 		attrs = append(attrs, attribute.String("langwatch.input", v))
@@ -199,6 +200,18 @@ func startLLMSpan(ctx context.Context, model, provider string, messages []app.Ch
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(attrs...),
 	)
+}
+
+// modelID reports the model under the platform's provider-prefixed spelling
+// ("openai/gpt-5-mini"), the id SDK and gateway spans carry, so a trace's
+// Models column names one model the same way whichever surface ran it. The
+// engine splits the prefix off for routing; this puts it back. A model with
+// no known provider, or one that already has a path segment, is kept as is.
+func modelID(model, provider string) string {
+	if provider == "" || strings.Contains(model, "/") {
+		return model
+	}
+	return provider + "/" + model
 }
 
 // endLLMSpan stamps the LLM response shape onto the span and closes it.
