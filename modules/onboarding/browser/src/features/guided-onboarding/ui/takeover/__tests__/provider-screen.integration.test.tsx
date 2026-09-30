@@ -75,8 +75,9 @@ describe("ProviderScreen", () => {
 
   it("offers the marks as one radio group with the first provider checked", () => {
     renderScreen();
-    const group = screen.getByRole("radiogroup", { name: "AI provider" });
-    const marks = within(group).getAllByRole("radio");
+    // The connect area stays aria-hidden until the line finishes typing.
+    const group = screen.getByRole("radiogroup", { name: "AI provider", hidden: true });
+    const marks = within(group).getAllByRole("radio", { hidden: true });
     expect(marks[0]).toHaveAttribute("aria-checked", "true");
     expect(marks[1]).toHaveAttribute("aria-checked", "false");
   });
