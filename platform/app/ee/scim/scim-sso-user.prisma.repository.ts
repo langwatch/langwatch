@@ -12,7 +12,7 @@ import {
   normalizeDomain,
   normalizeIdentifierValue,
   qualifySsoDomainOwnership,
-  SsoExistingAccountUnconfirmedError,
+  SSO_EXISTING_ACCOUNT_UNCONFIRMED,
 } from "@langwatch/identity";
 
 import { env } from "~/env.mjs";
@@ -22,12 +22,14 @@ const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 const UNCONFIRMED = {
   action: "reject",
-  code: new SsoExistingAccountUnconfirmedError(
-    "an unconfirmed account exists and this sign-in cannot vouch for it",
-  ).code,
+  code: SSO_EXISTING_ACCOUNT_UNCONFIRMED,
 } as const;
 
-/** Selects existing users for admitted SAML or connection-owned SCIM assertions. */
+/**
+ * Selects existing users for admitted SAML or connection-owned SCIM
+ * assertions, and, on self-hosted installations, links an OIDC assertion onto
+ * an unconfirmed local account on a domain the connection proved.
+ */
 export class PrismaScimSsoUsers {
   readonly #transactions: AsyncLocalStorage<Prisma.TransactionClient>;
   /** LangWatch Cloud, where anybody may register a password account. */
@@ -65,7 +67,6 @@ export class PrismaScimSsoUsers {
         id: true,
         emailVerified: true,
         deactivatedAt: true,
-        signupConfirmationPending: true,
       },
       take: 2,
     });
@@ -187,7 +188,31 @@ export class PrismaScimSsoUsers {
     if (await this.#directoryOwns(database, input.providerId, user.id)) {
       return CONTINUE;
     }
+    // A returning person: better-auth signs an existing binding in without
+    // asking whether the address was verified, which is what a provider that
+    // omits `email_verified` relies on after the first sign-in.
+    if (await this.#holdsThisBinding(database, input, user.id)) {
+      return CONTINUE;
+    }
     return UNCONFIRMED;
+  }
+
+  /** Whether the account already holds this connection's exact subject. */
+  async #holdsThisBinding(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+    userId: string,
+  ): Promise<boolean> {
+    const binding = await database.account.findFirst({
+      where: {
+        userId,
+        provider: input.providerId,
+        issuer: input.accountKey.issuer,
+        providerAccountId: input.accountKey.accountId,
+      },
+      select: { id: true },
+    });
+    return binding !== null;
   }
 
   /**
@@ -205,9 +230,8 @@ export class PrismaScimSsoUsers {
    * account to anybody else. Without the proof, or without the provider's
    * word, the link stays refused (ADR-027).
    *
-   * A sign-up still waiting for its emailed confirmation is left to that
-   * confirmation: its password was chosen by whoever filled the form, and the
-   * email is what proves that was the address's owner.
+   * An account that already holds this connection's subject is signed in
+   * by better-auth as it always was, whatever the proof now says.
    *
    * SELF-HOSTED ONLY. On LangWatch Cloud anybody may register a password
    * account, so a stranger could register an address before its organization
@@ -218,15 +242,13 @@ export class PrismaScimSsoUsers {
   async #resolveUnconfirmedUser(
     database: Prisma.TransactionClient,
     input: SSOUserResolutionInput,
-    user: {
-      id: string;
-      deactivatedAt: Date | null;
-      signupConfirmationPending: boolean;
-    },
+    user: { id: string; deactivatedAt: Date | null },
   ): Promise<SSOUserResolution> {
     if (this.#isHosted() || input.protocol !== "oidc") return CONTINUE;
     if (user.deactivatedAt) return REFUSE;
-    if (user.signupConfirmationPending) return UNCONFIRMED;
+    if (await this.#holdsThisBinding(database, input, user.id)) {
+      return CONTINUE;
+    }
     if (!(await this.#connectionProvesDomainOf(database, input))) {
       return UNCONFIRMED;
     }

@@ -63,12 +63,12 @@ Feature: Single sign-on links an unconfirmed local account on a verified domain,
     And the refusal is sso_existing_account_unconfirmed
 
   @integration @regression
-  Scenario: A sign-up still waiting for its emailed confirmation is not linked
-    Given the connection is live and has verified the account's domain
-    And the account is a sign-up still waiting for its emailed confirmation
-    When the identity provider signs that address in and asserts it is verified
-    Then no single sign-on binding or session is created
-    And the refusal is sso_existing_account_unconfirmed
+  Scenario: A person already bound to the connection keeps signing in with an unconfirmed address
+    Given the account already holds this connection's single sign-on binding
+    And its address is still unconfirmed
+    When the identity provider signs them in again without asserting the address is verified, or before the domain is verified
+    Then the session belongs to the existing account
+    And no second binding is created
 
   @integration @regression
   Scenario: On LangWatch Cloud an unconfirmed password account is not linked by single sign-on

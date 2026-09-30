@@ -142,11 +142,9 @@ const requestUrl = (input: RequestInfo | URL): string => {
 async function unconfirmedPasswordAccount({
   label,
   organizationId,
-  confirmationPending,
 }: {
   label: string;
   organizationId: string;
-  confirmationPending: boolean;
 }) {
   const email = `${label}-${SUITE}@${DOMAIN}`;
   const user = await prisma.user.create({
@@ -154,7 +152,6 @@ async function unconfirmedPasswordAccount({
       email,
       name: "Password profile",
       emailVerified: false,
-      signupConfirmationPending: confirmationPending,
     },
   });
   userIds.push(user.id);
@@ -253,23 +250,17 @@ async function setUp({
   label,
   state,
   domainVerified,
-  confirmationPending = false,
 }: {
   label: string;
   state: "ACTIVE" | "DRAFT";
   domainVerified: boolean;
-  confirmationPending?: boolean;
 }) {
   const organizationId = `unconfirmed-link-${label}-${SUITE}`;
   organizationIds.push(organizationId);
   await prisma.organization.create({
     data: { id: organizationId, name: label, slug: organizationId },
   });
-  const user = await unconfirmedPasswordAccount({
-    label,
-    organizationId,
-    confirmationPending,
-  });
+  const user = await unconfirmedPasswordAccount({ label, organizationId });
   const providerId = await connection({
     organizationId,
     state,
@@ -491,27 +482,52 @@ describe("given a password account whose address was never confirmed", () => {
     });
   });
 
-  describe("when the account is a sign-up still waiting for its emailed confirmation", () => {
-    /** @scenario "A sign-up still waiting for its emailed confirmation is not linked" */
-    it("refuses with the named code and leaves the account as it was", async () => {
-      const { user, providerId } = await setUp({
-        label: "pending",
-        state: "ACTIVE",
+  describe("when a person already bound to the connection signs in again", () => {
+    /** @scenario "A person already bound to the connection keeps signing in with an unconfirmed address" */
+    it.each([
+      {
+        label: "returning-unvouched",
+        state: "ACTIVE" as const,
         domainVerified: true,
-        confirmationPending: true,
+        emailVerified: false,
+      },
+      {
+        label: "returning-unproved",
+        state: "DRAFT" as const,
+        domainVerified: false,
+        emailVerified: true,
+      },
+    ])("signs $label in to the same account through the binding it already holds", async ({
+      label,
+      state,
+      domainVerified,
+      emailVerified,
+    }) => {
+      const { user, providerId } = await setUp({
+        label,
+        state,
+        domainVerified,
+      });
+      const subject = `${label}-${SUITE}`;
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          provider: providerId,
+          issuer: IDP,
+          providerAccountId: subject,
+        },
       });
       await identityProviderAsserts({
         email: user.email,
-        subject: `pending-${SUITE}`,
-        emailVerified: true,
+        subject,
+        emailVerified,
       });
 
       const result = await signInThrough(providerId);
 
-      expect(result.error).toBe("sso_existing_account_unconfirmed");
-      expect(result.session).toBeNull();
-      expect(await linkedAccounts(user.id, providerId)).toEqual([]);
-      expect(await addressConfirmed(user.id)).toBe(false);
+      expect(result.error).toBeNull();
+      expect(result.session?.user.id).toBe(user.id);
+      expect(await linkedAccounts(user.id, providerId)).toHaveLength(1);
     });
   });
 

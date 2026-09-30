@@ -898,6 +898,9 @@ export class SsoDomainProofLapsedError extends SsoAssertionRefusedError {
  * which of the two to fix, instead of better-auth's "account not linked".
  * It names nothing about the account beyond what the reader asserted.
  */
+export const SSO_EXISTING_ACCOUNT_UNCONFIRMED =
+  "sso_existing_account_unconfirmed";
+
 export class SsoExistingAccountUnconfirmedError extends SsoAssertionRefusedError {
   constructor(detail: string) {
     super(
