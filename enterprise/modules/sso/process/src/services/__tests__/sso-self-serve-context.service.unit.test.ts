@@ -72,6 +72,23 @@ describe("which tier an organization's own single sign-on setup runs under", () 
     });
   });
 
+  /** @scenario "A licence activated while the installation is running takes effect at the next restart" */
+  it("keeps setup unavailable until restart, and refuses by the restart reason", async () => {
+    const { resolver } = resolverOver({
+      hosted: false,
+      licensedAtStartup: false,
+      licensedNow: true,
+    });
+
+    await expect(resolver.availability({ organizationId: ORGANIZATION_ID })).resolves.toEqual({
+      available: false,
+      refusal: "license_restart_required",
+    });
+    await expect(
+      resolver.assertAvailable({ organizationId: ORGANIZATION_ID }),
+    ).rejects.toMatchObject({ code: "sso_license_required" });
+  });
+
   it("leaves an unlicensed installation unlicensed", async () => {
     const { resolver } = resolverOver({
       hosted: false,
