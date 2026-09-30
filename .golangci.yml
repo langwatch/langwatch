@@ -140,6 +140,8 @@ linters:
       require-specific: true
 
   exclusions:
+    paths:
+      - third_party # vendored upstream code, kept as released
     presets:
       - common-false-positives
       - std-error-handling
@@ -251,6 +253,7 @@ formatters:
   exclusions:
     paths:
       - vendor
+      - third_party
       - node_modules
       - \.claude
       - \.worktrees

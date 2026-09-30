@@ -203,6 +203,8 @@ jobs:
       # Memory ceilings skip under -race (it multiplies memory and time), so
       # they run here in a plain build.
       - run: go test -count=1 -run 'TestLargePlanWalkStaysUnder256MB' ./tools/seedgen/
+      - name: Language detection replays langevals with the embedded models
+        run: make lingua-models && go test -count=1 -tags lingua_models ./services/nlpgo/modules/evaluators/...
 
   lint:
     needs: changes
