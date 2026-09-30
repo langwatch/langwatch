@@ -15,8 +15,8 @@ export type GrantsTableProps = {
   grants: readonly GrantRow[];
   isLoading: boolean;
   isError: boolean;
-  /** Set when changing grants is refused (no permission, or the plan): row actions are hidden. */
-  refusal?: string | null;
+  /** Without it the rows carry no actions. */
+  canManage: boolean;
   onChangeRole: (grant: GrantRow) => void;
   onRevoke: (grant: GrantRow) => void;
 };
@@ -26,7 +26,7 @@ export function GrantsTable({
   grants,
   isLoading,
   isError,
-  refusal,
+  canManage,
   onChangeRole,
   onRevoke,
 }: GrantsTableProps) {
@@ -96,7 +96,7 @@ export function GrantsTable({
               )}
             </Table.Cell>
             <Table.Cell>
-              {!refusal && (
+              {canManage && (
                 <Menu.Root>
                   <Menu.Trigger asChild>
                     <Button

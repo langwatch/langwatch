@@ -33,23 +33,17 @@ const STATUS_FILTERS: readonly { label: string; value: GrantStatus | undefined }
 
 type OpenDialog = { kind: "none" } | { kind: "grant" } | { kind: "change"; grant: GrantRow };
 
-const NEEDS_MANAGE = "You need permission to manage this organization to grant a role.";
-
 export function AccessPanel({
   organizationId,
   canManage,
-  refusal,
 }: {
   organizationId: string;
   canManage: boolean;
-  /** Why granting is refused beyond the reader's permission, such as the plan; wins over it. */
-  refusal?: string | null;
 }) {
   const list = useGrantList({ organizationId });
   const revoke = useGrantRevoke({ organizationId });
   const [dialog, setDialog] = useState<OpenDialog>({ kind: "none" });
   const [grantToRevoke, setGrantToRevoke] = useState<GrantRow | null>(null);
-  const refused = refusal ?? (canManage ? null : NEEDS_MANAGE);
 
   return (
     <VStack align="start" gap={6} width="full">
@@ -61,7 +55,7 @@ export function AccessPanel({
         />
         <FilterGroup filters={STATUS_FILTERS} selected={list.status} onSelect={list.selectStatus} />
         <Spacer />
-        <GrantRoleButton refusal={refused} onClick={() => setDialog({ kind: "grant" })} />
+        <GrantRoleButton canManage={canManage} onClick={() => setDialog({ kind: "grant" })} />
       </HStack>
 
       <Card.Root width="full" overflow="hidden">
@@ -70,7 +64,7 @@ export function AccessPanel({
             isLoading={list.isLoading}
             isError={list.isError}
             grants={list.grants}
-            refusal={refused}
+            canManage={canManage}
             onChangeRole={(grant) => setDialog({ kind: "change", grant })}
             onRevoke={setGrantToRevoke}
           />

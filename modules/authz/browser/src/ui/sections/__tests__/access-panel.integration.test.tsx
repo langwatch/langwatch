@@ -123,6 +123,7 @@ describe("the Access tab", () => {
         organizationId: "org-1",
         query: {
           limit: 50,
+          order: "newest",
           scopeType: "team",
           status: "expired",
           cursor: "1700000000000.Z3ItMQ",
@@ -226,18 +227,6 @@ describe("the Access tab", () => {
       renderWithAuthzHost(
         <AccessPanel organizationId="org-1" canManage={false} />,
         new FakeAuthzHost({ grants: new Set() }),
-      );
-
-      expect(screen.getByRole("button", { name: "Grant role" })).toBeDisabled();
-      expect(screen.queryByRole("button", { name: "Actions for Sam" })).not.toBeInTheDocument();
-    });
-  });
-
-  describe("given a refusal from the plan", () => {
-    it("disables granting and offers no row actions though the reader may manage", () => {
-      state.grants = [grant({})];
-      renderWithAuthzHost(
-        <AccessPanel organizationId="org-1" canManage refusal="Enterprise only." />,
       );
 
       expect(screen.getByRole("button", { name: "Grant role" })).toBeDisabled();

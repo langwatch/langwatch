@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-// The grants table renders the rows it is given and offers row actions unless refused.
+// The grants table renders the rows it is given and offers row actions to a manager.
 // Spec: specs/rbac/roles-and-access-ui.feature
 
 import { fireEvent, screen, within } from "@testing-library/react";
@@ -19,6 +19,7 @@ describe("GrantsTable", () => {
         <GrantsTable
           isLoading={false}
           isError={false}
+          canManage
           onChangeRole={noop}
           onRevoke={noop}
           grants={[
@@ -58,6 +59,7 @@ describe("GrantsTable", () => {
         <GrantsTable
           isLoading={false}
           isError={false}
+          canManage
           grants={[grantRow({})]}
           onChangeRole={onChangeRole}
           onRevoke={onRevoke}
@@ -80,6 +82,7 @@ describe("GrantsTable", () => {
         <GrantsTable
           isLoading={false}
           isError={false}
+          canManage
           grants={[]}
           onChangeRole={noop}
           onRevoke={noop}
@@ -91,21 +94,28 @@ describe("GrantsTable", () => {
 
     it("says so when the read failed", () => {
       renderInChakra(
-        <GrantsTable isLoading={false} isError grants={[]} onChangeRole={noop} onRevoke={noop} />,
+        <GrantsTable
+          isLoading={false}
+          isError
+          canManage
+          grants={[]}
+          onChangeRole={noop}
+          onRevoke={noop}
+        />,
       );
 
       expect(screen.getByText("Couldn't load who has access.")).toBeInTheDocument();
     });
   });
 
-  describe("given a refusal", () => {
+  describe("given a reader who may not manage", () => {
     it("offers no row actions", () => {
       renderInChakra(
         <GrantsTable
           isLoading={false}
           isError={false}
+          canManage={false}
           grants={[grantRow({})]}
-          refusal="Enterprise only."
           onChangeRole={noop}
           onRevoke={noop}
         />,

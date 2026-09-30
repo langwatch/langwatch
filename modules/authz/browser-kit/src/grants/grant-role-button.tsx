@@ -1,22 +1,23 @@
-// The "Grant role" button; a refusal greys it out and says why in its tooltip.
+// The "Grant role" button; a reader who may not manage sees it greyed out and why.
 
 import { Button } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Plus } from "lucide-react";
 
+const NEEDS_MANAGE = "You need permission to manage this organization to grant a role.";
+
 export type GrantRoleButtonProps = {
   onClick: () => void;
-  /** Set when granting is refused (no permission, or the plan): the text is the tooltip. */
-  refusal?: string | null;
+  canManage: boolean;
 };
 
-export function GrantRoleButton({ onClick, refusal }: GrantRoleButtonProps) {
+export function GrantRoleButton({ onClick, canManage }: GrantRoleButtonProps) {
   return (
-    <Tooltip content={refusal ?? ""} disabled={!refusal}>
+    <Tooltip content={NEEDS_MANAGE} disabled={canManage}>
       <Button
         size="sm"
         colorPalette="blue"
-        disabled={!!refusal}
+        disabled={!canManage}
         onClick={onClick}
         data-testid="grant-role-open"
       >
