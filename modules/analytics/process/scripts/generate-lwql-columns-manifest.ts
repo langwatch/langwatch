@@ -1,6 +1,6 @@
 /**
  * Regenerates `lwql-columns-manifest.generated.json`, the checked-in dump of every ClickHouse
- * table's columns after the shipped migrations have run.
+ * table's columns after the shipped migrations have run, and its row types beside it.
  */
 
 import { writeFileSync } from "node:fs";
@@ -10,6 +10,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { migrateUp } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer } from "@testcontainers/clickhouse";
 
+import { renderClickHouseRows } from "../src/rules/lwql-catalogue.rules.ts";
 import type {
   ColumnsManifest,
   ColumnsManifestColumn,
@@ -23,6 +24,10 @@ const ADMIN_PASSWORD = "manifest";
 
 const OUTPUT_PATH = fileURLToPath(
   new URL("../src/rules/lwql-columns-manifest.generated.json", import.meta.url),
+);
+
+const ROWS_PATH = fileURLToPath(
+  new URL("../src/rules/lwql-columns-manifest.generated.ts", import.meta.url),
 );
 
 interface DumpServer {
@@ -146,6 +151,7 @@ async function main(): Promise<void> {
     });
     const manifest = await buildColumnsManifest({ client, database: MANIFEST_DATABASE });
     writeFileSync(OUTPUT_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
+    writeFileSync(ROWS_PATH, renderClickHouseRows({ manifest }));
     console.log(`wrote ${manifest.tables.length} tables to ${OUTPUT_PATH}`);
   } finally {
     if (previousCluster !== undefined) {
