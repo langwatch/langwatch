@@ -3,7 +3,9 @@
  * Namespace, dated version, resource paths, operation ids and permissions, pinned.
  * @see modules/stored-object/specs/stored-objects.feature
  */
-import { describe, expect, it } from "vitest";
+import { ForbiddenError } from "@langwatch/api/rest";
+import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
+import { describe, expect, it, vi } from "vitest";
 
 import { storedObjectRest } from "../stored-object.rest.ts";
 
@@ -40,12 +42,40 @@ describe("the stored-objects REST family", () => {
       ]);
     });
 
-    it("asks every project permission at the project the request names, not the key's own", () => {
-      const scoped = declaration.routes.filter((route) => route.permission !== undefined);
-
-      expect(scoped.map((route) => [route.operation, route.permissionTarget])).toEqual(
-        scoped.map((route) => [route.operation, { at: "route", param: "projectId" }]),
-      );
+    it("refuses a project the key does not reach before the app is asked", async () => {
+      const app = {
+        createUpload: vi.fn(),
+        confirmUpload: vi.fn(),
+        resolveDelivery: vi.fn(),
+        delete: vi.fn(),
+      };
+      const scope: AuthzDeclaredScopeId = { tier: "project", id: "project-own" };
+      const input = {
+        projectId: "project-other",
+        storedObjectId: "obj-1",
+        audience: "datasets:view",
+      };
+      for (const operation of [
+        "createStoredObjectUpload",
+        "confirmStoredObjectUpload",
+        "getStoredObject",
+        "deleteStoredObject",
+      ]) {
+        const route = declaration.routes.find((candidate) => candidate.operation === operation);
+        if (!route) throw new Error(`no route declares "${operation}"`);
+        await expect(
+          Promise.resolve(
+            route.handler(
+              { app, input, scope, actor: null, signal: undefined } as never,
+              {} as never,
+            ),
+          ),
+        ).rejects.toThrow(ForbiddenError);
+      }
+      expect(app.createUpload).not.toHaveBeenCalled();
+      expect(app.confirmUpload).not.toHaveBeenCalled();
+      expect(app.resolveDelivery).not.toHaveBeenCalled();
+      expect(app.delete).not.toHaveBeenCalled();
     });
 
     it("declares an input and an answer for every route", () => {
