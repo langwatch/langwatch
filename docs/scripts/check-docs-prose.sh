@@ -104,8 +104,10 @@ for file in "${FILES[@]}"; do
   [[ -f "$file" ]] || continue
   rel="${file#"$REPO_ROOT"/}"
 
-  # Blank out code fences (including indented ones, up to 3 spaces per the
-  # CommonMark spec) and founder-decision exemptions. Print blank lines for
+  # Blank out code fences and founder-decision exemptions. A fence is
+  # recognised at any indentation: MDX nests fences inside JSX components such
+  # as <Tab>, where four or more leading spaces are ordinary formatting rather
+  # than the CommonMark indented-code-block they would be in plain Markdown. Print blank lines for
   # skipped records so grep -n reports the real source line number.
   #
   # A block opened with N fence characters closes only on a line of at least N
@@ -114,9 +116,9 @@ for file in "${FILES[@]}"; do
   # for the rest of a page that nests fences, and everything after it reads as
   # prose.
   cleaned=$(awk '
-    /^ {0,3}(`{3,}|~{3,})/ {
+    /^[[:space:]]*(`{3,}|~{3,})/ {
       line = $0
-      sub(/^ {0,3}/, "", line)
+      sub(/^[[:space:]]*/, "", line)
       char = substr(line, 1, 1)
       length_ = 0
       while (substr(line, length_ + 1, 1) == char) length_++

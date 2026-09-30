@@ -1,6 +1,6 @@
 import { Badge, Text } from "@chakra-ui/react";
 import type React from "react";
-import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
+import { useExplorerStore } from "~/features/traces-v2/stores/explorerStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { TraceListItem } from "../../../../../types/trace";
@@ -54,7 +54,7 @@ const PromptCellView: React.FC<{ row: TraceListItem; density: Density }> = ({
   return (
     <FilterChip
       onFilter={() =>
-        useFilterStore.getState().toggleFacet("lastUsedPrompt", promptId)
+        useExplorerStore.getState().toggleFacet("lastUsedPrompt", promptId)
       }
       filterLabel={`Filter by prompt "${name}"`}
       {...openProps}

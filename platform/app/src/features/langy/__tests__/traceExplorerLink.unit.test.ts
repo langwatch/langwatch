@@ -636,3 +636,71 @@ describe("buildAutomationHref", () => {
     });
   });
 });
+
+// specs/langy/langy-trace-explorer-actions.feature ("Langy's search and the
+// Explorer count the same traces").
+describe("the Explorer link for a search in the trace filter language", () => {
+  describe("given a search with a filter", () => {
+    /** @scenario "The Explorer link carries the search's filter" */
+    it("carries the filter as itself, unquoted", () => {
+      const search = parseTraceSearchCommand(
+        "langwatch trace search --filter 'event:thumbs_up_down AND event.attribute.event.metrics.vote:-1' --format json",
+      );
+      const params = fragmentParams(
+        buildTraceExplorerHref({ projectSlug: "acme", search })!,
+      );
+      expect(params.get("q")).toBe(
+        "event:thumbs_up_down AND event.attribute.event.metrics.vote:-1",
+      );
+      // The Explorer reads it back as the filter it was, not as a phrase.
+      expect(() => parse(params.get("q")!)).not.toThrow();
+    });
+
+    it("parenthesises the filter when it is joined to free text", () => {
+      expect(
+        buildExplorerQuery({
+          query: "refund",
+          filter: "status:error OR status:warning",
+        }),
+      ).toBe('"refund" AND (status:error OR status:warning)');
+    });
+  });
+
+  describe("given a search for errors only", () => {
+    /** @scenario "The Explorer link carries errors only as a status filter" */
+    it("carries status:error", () => {
+      const search = parseTraceSearchCommand(
+        "langwatch trace search --errors-only --limit 25 --format json",
+      );
+      expect(search).toEqual({ errorsOnly: true, limit: 25 });
+      expect(buildExplorerQuery(search)).toBe("status:error");
+    });
+
+    it("does not read the next flag as the switch's value", () => {
+      const search = parseTraceSearchCommand(
+        "langwatch trace search --errors-only -q timeout",
+      );
+      expect(search).toEqual({ errorsOnly: true, query: "timeout" });
+    });
+  });
+
+  describe("given the caller names the lens the user is on", () => {
+    /** @scenario "The Explorer link keeps the lens the caller names" */
+    it("opens that lens instead of the default", () => {
+      const href = buildTraceExplorerHref({
+        projectSlug: "acme",
+        search: { filter: "status:error" },
+        lensId: "my saved view",
+      })!;
+      expect(href).toContain("#my%20saved%20view?");
+    });
+
+    it("opens the default lens when none is named", () => {
+      const href = buildTraceExplorerHref({
+        projectSlug: "acme",
+        search: { filter: "status:error" },
+      })!;
+      expect(href).toContain("#all-traces?");
+    });
+  });
+});

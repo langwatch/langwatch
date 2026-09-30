@@ -200,3 +200,17 @@ Feature: Unified Audit Log
     When she queries `/settings/audit-log` filtered by project
     Then she sees only "demo" rows (gateway and platform)
     And no rows from "secret-project" appear
+
+  # --- The trail is not a place anybody can write to at will ----------------
+  #
+  # A refused call by a signed-in caller is recorded, which is the right
+  # instinct and also a write anybody holding a session can repeat. A
+  # validation error is free to provoke on purpose, so the record has a budget.
+
+  @unit
+  Scenario: One caller cannot fill the audit trail with refusals
+    Given somebody signed in who keeps provoking the same refusal
+    When they have done it far more times than a person would
+    Then the first of those refusals are recorded
+    And the rest are refused exactly as before without adding to the trail
+    And the flood is still visible to whoever reads the logs

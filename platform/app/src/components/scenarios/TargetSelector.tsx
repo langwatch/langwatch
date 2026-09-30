@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Code,
   Globe,
+  Mic,
   Plug,
   Plus,
   Workflow,
@@ -27,7 +28,7 @@ import {
 } from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
-  type: "prompt" | "http" | "code" | "workflow" | "connected";
+  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
   id: string;
 } | null;
 
@@ -171,6 +172,7 @@ export function TargetSelector({
         <HStack gap={2}>
           {value?.type === "prompt" && <BookText size={14} />}
           {value?.type === "http" && <Globe size={14} />}
+          {value?.type === "voice" && <Mic size={14} />}
           {value?.type === "code" && <Code size={14} />}
           {value?.type === "workflow" && <Workflow size={14} />}
           {value?.type === "connected" && <Plug size={14} />}
@@ -356,6 +358,9 @@ function AgentOptionMark({ agent }: { agent: ScenarioAgent }) {
   }
   if (agent.type === "code") {
     return <Code size={14} color="var(--chakra-colors-gray-500)" />;
+  }
+  if (agent.type === "voice") {
+    return <Mic size={14} color="var(--chakra-colors-gray-500)" />;
   }
   return <Globe size={14} color="var(--chakra-colors-gray-500)" />;
 }

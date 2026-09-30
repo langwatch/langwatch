@@ -36,7 +36,11 @@ beforeEach(() => {
   vi.doMock("~/server/app-layer/app", () => ({
     getApp: () => ({
       governance: {
-        ocsfEvents: { insertEvent: async (row: unknown) => ocsfInsert(row) },
+        ocsfEvents: {
+          insertEvents: async (rows: unknown[]) => {
+            for (const row of rows) ocsfInsert(row);
+          },
+        },
       },
     }),
   }));

@@ -1,7 +1,6 @@
 import { useMemo } from "react";
-import type { TimeRange } from "../../traces-v2/stores/filterStore";
-import { useFilterStore } from "../../traces-v2/stores/filterStore";
-import { useViewStore } from "../../traces-v2/stores/viewStore";
+import { useExplorerStore } from "../../traces-v2/stores/explorerStore";
+import type { TimeRange } from "../../traces-v2/stores/querySlice";
 import type { LangyContextChip } from "../stores/langyStore";
 
 export type ObservabilitySource = "traces" | "events" | "logs" | "metrics";
@@ -12,17 +11,17 @@ export type ObservabilitySource = "traces" | "events" | "logs" | "metrics";
  * this says what "these traces" means before the user has selected anything.
  */
 export function useLangyTraceViewContext(): LangyContextChip {
-  const queryText = useFilterStore((state) => state.queryText);
-  const timeRange = useFilterStore((state) => state.timeRange);
-  const activeLensId = useViewStore((state) => state.activeLensId);
-  const activeLens = useViewStore((state) =>
+  const queryText = useExplorerStore((state) => state.queryText);
+  const timeRange = useExplorerStore((state) => state.timeRange);
+  const activeLensId = useExplorerStore((state) => state.activeLensId);
+  const activeLens = useExplorerStore((state) =>
     state.allLenses.find((lens) => lens.id === state.activeLensId),
   );
-  const hasLocalChanges = useViewStore((state) =>
+  const hasLocalChanges = useExplorerStore((state) =>
     state.draftState.has(state.activeLensId),
   );
-  const grouping = useViewStore((state) => state.grouping);
-  const sort = useViewStore((state) => state.sort);
+  const grouping = useExplorerStore((state) => state.grouping);
+  const sort = useExplorerStore((state) => state.sort);
 
   return useMemo(
     () =>

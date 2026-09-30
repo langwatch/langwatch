@@ -77,7 +77,7 @@ func TestResolveKey_ForbiddenBodyDecidesTheCode(t *testing.T) {
 				HTTPClient: srv.Client(),
 			})
 
-			_, err := cp.ResolveKey(context.Background(), "vk-lw-whatever")
+			_, err := cp.ResolveKey(context.Background(), domain.PresentedKey{Token: "vk-lw-whatever"})
 			require.Error(t, err)
 			assert.ErrorIs(t, err, tc.want)
 		})
@@ -158,7 +158,7 @@ func TestResolveKey_UnauthorizedIsAnInvalidKey(t *testing.T) {
 		HTTPClient: srv.Client(),
 	})
 
-	_, err := cp.ResolveKey(context.Background(), "vk-lw-whatever")
+	_, err := cp.ResolveKey(context.Background(), domain.PresentedKey{Token: "vk-lw-whatever"})
 	require.Error(t, err)
 	require.NotErrorIs(t, err, domain.ErrKeyExpired)
 	require.ErrorIs(t, err, domain.ErrInvalidAPIKey)

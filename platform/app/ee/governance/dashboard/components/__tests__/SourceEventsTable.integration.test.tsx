@@ -81,6 +81,7 @@ function Harness({
     <SourceEventsTable
       pager={pager}
       emptyState={<div>walkthrough: push your first event</div>}
+      headerAside={<button type="button">setup instructions</button>}
     />
   );
 }
@@ -396,10 +397,46 @@ describe("given the events request fails", () => {
 });
 
 describe("given a source that has ingested nothing", () => {
-  it("shows the setup walkthrough and no pagination bar", async () => {
+  it("shows the empty pane and no pagination bar", async () => {
     renderTable({ fetchPage: fakeServer([]), pageSize: 10 });
     await screen.findByText("walkthrough: push your first event");
     expect(screen.queryByTestId("pagination")).toBeNull();
+  });
+
+  /**
+   * The description sentence promises rows to click. With no rows it is a
+   * false promise, and the empty pane below it is already saying its piece.
+   */
+  /** @scenario "An idle source explains itself in a pane, not in a wall of setup text" */
+  it("drops the table description, which describes rows that are not there", async () => {
+    renderTable({ fetchPage: fakeServer([]), pageSize: 10 });
+    await screen.findByText("walkthrough: push your first event");
+    expect(screen.queryByText(/Every OCSF-normalised event/)).toBeNull();
+  });
+
+  /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
+  it("still hangs the setup instructions on the heading", async () => {
+    renderTable({ fetchPage: fakeServer([]), pageSize: 10 });
+    await screen.findByText("walkthrough: push your first event");
+    expect(screen.getByText("setup instructions")).toBeTruthy();
+  });
+});
+
+describe("given a source that is delivering events", () => {
+  /**
+   * The (i) is not an empty-state ornament. "Which endpoint was this?" is a
+   * question a WORKING source raises just as often as an idle one, and the
+   * old prose answered it only while the table was empty.
+   */
+  /** @scenario "Setup instructions sit behind the heading, whatever the source is doing" */
+  it("hangs the same setup instructions on the heading", async () => {
+    renderTable({
+      fetchPage: fakeServer([makeEvent({ id: "e1", ts: BASE_TS })]),
+      pageSize: 10,
+    });
+    await screen.findByRole("table");
+    expect(screen.getByText("setup instructions")).toBeTruthy();
+    expect(screen.getByText(/Every OCSF-normalised event/)).toBeTruthy();
   });
 });
 

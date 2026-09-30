@@ -21,12 +21,14 @@ import { app as scimTokensApp } from "~/app/api/scim-tokens/[[...route]]/app";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -49,8 +51,10 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
 
   beforeAll(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     mockGetActivePlan = vi.fn().mockResolvedValue({ ...FREE_PLAN });
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -92,6 +96,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       // report with a TypeError.
       if (seeded?.organization?.id) {
         await cleanupTestRows(prisma, [
+          ["grant", { organizationId: seeded.organization.id }],
           ["roleBinding", { organizationId: seeded.organization.id }],
           ["apiKey", { organizationId: seeded.organization.id }],
           ["organizationUser", { organizationId: seeded.organization.id }],
@@ -101,6 +106,7 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       }
     } finally {
       await resetApp();
+      resetAuthzGrantsCommandsForTests();
     }
   });
 

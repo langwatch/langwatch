@@ -35,6 +35,7 @@ import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { useExplorerLinkLensId } from "~/features/traces-v2/hooks/useExplorerLinkLensId";
 import {
   type CapabilityData,
   useCapabilityData,
@@ -83,12 +84,14 @@ export function LangyTraceSampleCard({
 }: CapabilityCardInput) {
   const parsed = parseTraceSearch(output);
   const search = readTraceSearchQuery(input);
+  const lensId = useExplorerLinkLensId();
   const explorerHref = buildTraceExplorerHref({
     projectSlug,
     search,
     // This card renders a `langwatch trace search` result, so a search that
     // named no window really did cover the CLI's last-24h default.
     unstatedWindow: "cli-last-24h",
+    lensId,
   });
 
   // Hydrate the result's REFERENCES through the product's own API with the
@@ -446,6 +449,11 @@ function parseTraceSearch(output: unknown): {
       ...(outputText ? { output: truncate(outputText, PREVIEW_MAX) } : {}),
     });
   }
+
+  // Rows came back and none of them can be named: the document was cut down
+  // past its ids. That is unreadable output, not a search that matched nothing.
+  const hasRows = rows.some((row) => !!row && typeof row === "object");
+  if (hasRows && traces.length === 0) return null;
 
   // `totalHits` is the honest count — the array is only what `--limit` let
   // through. Falling back to the array length is a last resort, not the default.

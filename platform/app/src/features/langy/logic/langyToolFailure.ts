@@ -321,9 +321,13 @@ function describeFailure(domain: CliHandledError): {
 }
 
 /**
- * Tools that run in the folder the developer shared from their own machine
- * (ADR-129), with their own git identity and their own `gh` login. The same
- * carve-out the manager's GitHub gate makes.
+ * Tools whose NAME says they run in the folder the developer shared from their
+ * own machine (ADR-129), with their own git identity and their own `gh` login.
+ * The same carve-out the manager's GitHub gate makes.
+ *
+ * The name is only half the answer: the shell that delegates a command to that
+ * folder is registered as plain `bash`, so a delegated run is named like a
+ * sandbox one. The settled call carries a `local` marker for exactly that case.
  */
 const LOCAL_TOOL_PREFIX = "local_";
 
@@ -342,17 +346,22 @@ const LOCAL_TOOL_PREFIX = "local_";
  * already on screen by the time the turn stops. This is that card.
  *
  * On the LOCAL path gh's own instruction is exactly right: that is the
- * developer's gh, in their folder, on their machine. Local tools are left
- * alone.
+ * developer's gh, in their folder, on their machine. A call is on that path
+ * when its name says so (`local_*`) or when the settled call carries the
+ * `local` marker. The delegating shell is named `bash`, so that marker is the
+ * only thing that can tell a delegated run apart. Either way it is left alone.
  */
 function githubAppNotInstalled({
   toolName,
   raw,
+  local,
 }: {
   toolName: string | undefined;
   raw: string | undefined;
+  local: boolean | undefined;
 }): LangyToolErrorPresentation | null {
   if (!raw) return null;
+  if (local === true) return null;
   if (toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
   if (!/\bgh auth login\b/i.test(raw)) return null;
 
@@ -386,6 +395,7 @@ export function presentLangyToolError({
   title,
   errorText,
   toolName,
+  local,
 }: {
   title: string;
   errorText: unknown;
@@ -394,11 +404,17 @@ export function presentLangyToolError({
    * developer's own — see {@link githubAppNotInstalled}.
    */
   toolName?: string;
+  /**
+   * The call ran in the developer's shared folder rather than the sandbox, as
+   * the settled call reported it. Says what the name cannot for the shell that
+   * delegates there, which is registered as `bash`.
+   */
+  local?: boolean;
 }): LangyToolErrorPresentation {
   const raw = rawFailureText(errorText);
   const domain = readStructuredError(errorText);
 
-  const notInstalled = githubAppNotInstalled({ toolName, raw });
+  const notInstalled = githubAppNotInstalled({ toolName, raw, local });
   if (notInstalled) return notInstalled;
 
   // Level 3. No document, so no code — but there is usually TEXT, and the text

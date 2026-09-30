@@ -61,3 +61,11 @@ All three print the platform's answer as JSON already, so parse what they print.
 `workbench.duplicateTarget`, `workbench.setTargetPrompt`, `workbench.updateTargetModel`, `workbench.setMapping`, `workbench.setEvaluatorMapping`, `workbench.addEvaluator`, `workbench.addTarget`, `workbench.setCellValue`, `workbench.addColumn`, `workbench.addRows`, `workbench.removeTarget`, `workbench.getState`, `workbench.run`.
 
 For the prompt improvement loop that uses these, follow the prompt-optimization skill.
+
+## Trace Explorer action kinds
+
+`explorer.setFilter`, `explorer.setTimeRange`, `explorer.setLens`, `explorer.setSort`, `explorer.setPage`, `explorer.select`, `explorer.getState`, `explorer.runInstantEval`.
+
+With no Explorer open, `explorer.setFilter`, `explorer.setTimeRange` and `explorer.setLens` answer `executedVia: "backend"` with an `href` to the Explorer in that state, and the card links there as "View in Trace Explorer". `explorer.getState` answers `source: "saved"` with the defaults and no count. The other kinds need an open page and are refused with `langy_ui_no_browser`.
+
+For choosing between driving the Explorer and answering with cards, follow the find-traces skill.

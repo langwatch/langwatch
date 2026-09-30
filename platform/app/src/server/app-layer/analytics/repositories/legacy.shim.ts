@@ -89,6 +89,7 @@ export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
       timeZone: input.timeZone,
       traceIds: input.traceIds,
       negateFilters: input.negateFilters,
+      excludeOrigins: input.excludeOrigins,
     });
 
     try {

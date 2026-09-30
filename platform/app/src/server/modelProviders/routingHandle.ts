@@ -32,8 +32,10 @@ export const ROUTING_HANDLE_RULE = `A routing handle starts with a letter or a n
  *
  * Every provider family key in the registry, plus the alternative spellings the
  * gateway accepts for the same families (SDKs emit "vertex_ai" and
- * "azure_openai", and the gateway normalises them), plus "mp", which prefixes
- * the application's own model wire format.
+ * "azure_openai", and the gateway normalises them), plus "langwatch", the
+ * family a connected self-hosted install routes managed models through (it has
+ * no registry entry because no customer configures it), plus "mp", which
+ * prefixes the application's own model wire format.
  *
  * Kept in step with the gateway's own closed family vocabulary in
  * services/aigateway/domain/provider.go. A name in one list and not the other
@@ -47,6 +49,7 @@ export const RESERVED_ROUTING_HANDLES: ReadonlySet<string> = new Set([
   "google_vertex",
   "google_gemini",
   "cloudflare",
+  "langwatch",
   "mp",
 ]);
 

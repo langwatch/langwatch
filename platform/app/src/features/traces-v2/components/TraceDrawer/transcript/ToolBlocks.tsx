@@ -6,14 +6,17 @@ import {
   LuSparkles,
   LuWrench,
 } from "react-icons/lu";
+import {
+  toolResultBodyToString,
+  tryPrettyJson,
+} from "~/shared/traces/transcript/parsing";
+import type { ChatMessage } from "~/shared/traces/transcript/types";
 import { hasAnsi } from "../../../utils/ansi/ansi";
 // Direct file import (not the barrel) so we don't pull TerminalView -> transcript
 // back into transcript and form an import cycle. TerminalOutput has no
 // transcript dependency of its own.
 import { TerminalOutput } from "../terminalView/TerminalOutput";
-import { toolResultBodyToString, tryPrettyJson } from "./parsing";
 import { skillInvocationFromToolUse } from "./skillInvocation";
-import type { ChatMessage } from "./types";
 
 /**
  * OpenAI-shape tool_calls (lives on the message, not in content). These don't

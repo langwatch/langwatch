@@ -138,7 +138,7 @@ event: warning
 data: {"warning":"provider_did_not_report_usage_on_stream"}
 ```
 
-That stream debits zero tokens, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#streaming).
+That stream debits zero tokens, so it passes budget enforcement without being counted. The `gateway_streaming_usage_missing_total` metric counts these per provider and model. Alert on any positive rate. See [Observability](/ai-gateway/observability#traffic-and-lifecycle).
 
 ## Requests without `stream`
 

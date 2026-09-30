@@ -541,7 +541,11 @@ describe("headById", () => {
         id: "obj-1",
       });
 
-      expect(result).toEqual({ status: "available", mediaType: "audio/mp3" });
+      expect(result).toEqual({
+        status: "available",
+        mediaType: "audio/mp3",
+        purpose: row.purpose,
+      });
     });
   });
 
@@ -556,7 +560,11 @@ describe("headById", () => {
         id: "obj-1",
       });
 
-      expect(result).toEqual({ status: "missing", mediaType: "audio/mp3" });
+      expect(result).toEqual({
+        status: "missing",
+        mediaType: "audio/mp3",
+        purpose: row.purpose,
+      });
     });
   });
 

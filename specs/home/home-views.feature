@@ -40,6 +40,16 @@ Feature: Adaptive home views
     Then the page shows the onboarding checklist and the banners
     And no stat row or recent-items section is shown
 
+  # Langy's own turns trace into the project (ADR-061) with origin "langy".
+  # The customer never sent them, so the traces, users, tokens and cost
+  # figures on the home leave them out: a fresh project with one kickoff
+  # behind it still reads Traces 0, Users 0.
+  @unit
+  Scenario: The home figures leave out Langy's own turns
+    Given a project whose only traces are Langy's own turns
+    When the traces overview renders its figures
+    Then the figures are counted without the "langy" origin
+
   Scenario: The first-run view keeps the Langy home's lit block
     Given the project has never received a trace
     And the Langy home renders (see specs/home/langy-home.feature)

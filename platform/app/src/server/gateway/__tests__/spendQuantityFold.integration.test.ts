@@ -256,7 +256,7 @@ describe("gateway spend quantities through the fold store (real CH)", () => {
                 67_330_000,
               ),
               model: "openai/gpt-image-2",
-              requestType: "image.edit",
+              requestType: "image_edit",
             },
           },
         ]);

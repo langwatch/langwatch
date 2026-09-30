@@ -22,6 +22,37 @@ export type AnyEventSchema = z.ZodObject<
 >;
 
 // ---------------------------------------------------------------------------
+// Schema tuple → union coverage
+// ---------------------------------------------------------------------------
+
+/**
+ * Compile-time proof that a projection's subscription list covers a wire
+ * union. The executor DROPS any event outside `projection.eventTypes` —
+ * silently, because subscribing to a subset is legitimate for derived
+ * projections — so for a whole-row operational head, where every column is
+ * fold-written and the row IS the truth, a union member missing from the
+ * list is stored and never folded, and nothing anywhere errors. A customer
+ * meets that as a save that reads back unchanged.
+ *
+ * Declare it beside the list:
+ * ```
+ * const _folds: FoldsWholeUnion<MyEvent, typeof myEvents> = true;
+ * ```
+ * A missing member turns the type into a tuple NAMING the missing event
+ * types, so the compile error says which ones. Subset projections simply
+ * don't declare it.
+ */
+export type FoldsWholeUnion<
+  UnionEvent extends { type: string },
+  Schemas extends readonly AnyEventSchema[],
+> = [Exclude<UnionEvent["type"], EventTypeOf<Schemas[number]>>] extends [never]
+  ? true
+  : [
+      "projection does not fold",
+      Exclude<UnionEvent["type"], EventTypeOf<Schemas[number]>>,
+    ];
+
+// ---------------------------------------------------------------------------
 // Schema tuple → handler interface
 // ---------------------------------------------------------------------------
 

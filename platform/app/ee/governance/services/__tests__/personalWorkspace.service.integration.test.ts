@@ -29,8 +29,11 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 import { PersonalWorkspaceService } from "../personalWorkspace.service";
+
+wireDefaultTestApp();
 
 const suffix = nanoid(8);
 const ORG_ID = `org-pw-${suffix}`;
@@ -81,6 +84,7 @@ describe("PersonalWorkspaceService — auto-create personal team + project", () 
       where: { organizationId: ORG_ID },
     });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: { team: { organizationId: ORG_ID } },
     });

@@ -30,6 +30,64 @@ Feature: The organization identity surface - how everybody here signs in
   # Approving somebody's request to join arrives with D12 and lands on this
   # surface. Nothing here anticipates it beyond leaving the room.
 
+  # BUILD STATUS, AS OF 2026-09-14 — READ BEFORE TAGGING ANYTHING HERE.
+  # Every scenario below is @unimplemented because THIS SURFACE DOES NOT EXIST
+  # YET. The header talks as if the organization identity page were live; it is
+  # not. Tagging a scenario @unit/@integration now would report a binding with
+  # no code behind it, so the file stays on `LEGACY_INERT` until the surface is
+  # built. The audit that pointed here (B15) is right that the file reads green
+  # while binding nothing — that is because there is nothing to bind, not
+  # because a built behaviour was left untested.
+  #
+  # WHAT IS BUILT — and it is only the "shared command handlers" of line 11:
+  #   - LinkProposalGuards (packages/identity-server/src/link-proposal-guards.ts):
+  #     confirm/reject a link proposal, and the "already decided" refusal with
+  #     code `identity_link_proposal_resolved`. Scoped by userId + proposalId.
+  #   - The operator surface that CALLS it: identityLookup router
+  #     (platform/app/src/server/api/routers/identityLookup.ts) over
+  #     identity-lookup.service.ts. That surface crosses every organization on
+  #     the installation by design and is gated on the ADMIN_EMAILS staff list,
+  #     not on organization RBAC. Its scenarios ARE bound — in the sibling file
+  #     specs/identity/platform-ops-identity-lookup.feature. Scenario :62 here
+  #     ("a decision cannot be taken twice") is the same guard already bound
+  #     there as ":174"; it is not re-bindable here without an org-admin caller
+  #     to reach the guard through.
+  #
+  # WHAT IS NOT BUILT — the whole organization-scoped surface these scenarios
+  # describe:
+  #   - No "Organization settings -> Identity" page. Organization settings has
+  #     members/authentication/scim/security pages and nothing named identity;
+  #     the only identity page anywhere is the operator one at
+  #     platform/app/src/pages/ops/backoffice/identity-lookup.tsx.
+  #   - No organization-scoped router or service. identity.ts (the tRPC identity
+  #     router) is the D01 CALLER'S-OWN-identity surface, not an admin one.
+  #   - No organization-scoped waiting-sign-in (link proposal) listing query.
+  #     `waitingFor` in identity-lookup.service.ts is per-person and operator-
+  #     scoped; nothing lists proposals by organization. So :41, :69, :78 have
+  #     no query to test.
+  #   - No organization-scoped confirm/reject of a waiting sign-in. The only
+  #     confirmProposedSignIn/rejectProposedSignIn are the operator ones. So
+  #     :48, :55, :85 have no entry point to test.
+  #   - No single-sign-on RBAC permission. rbac.ts has organization:view,
+  #     organization:manage and organization:delete only — org SSO management
+  #     rides on organization:manage, and the SSO connection surface itself is
+  #     back-office (ADMIN_EMAILS), not organization RBAC. There is no
+  #     "may see SSO but not manage it" split. So :157 and :164 describe a
+  #     permission that does not exist.
+  #
+  # A NOTE FOR WHOEVER BUILDS THIS (scenario :92). The organization must come
+  # from the reader's scope, never from a value the reader sends. The operator
+  # procedures in identityLookup.ts DO take `organizationId` from client input —
+  # correct there, because that surface is cross-organization and staff-gated —
+  # but the organization-admin surface must NOT copy that shape. If the built
+  # code lets the caller name the organization, :92 is a live tenancy bug, not
+  # a passing test.
+  #
+  # Each scenario names the tag it becomes; the implementation that builds the
+  # surface swaps the tag, adds the `@scenario "<title>"` annotation, and
+  # DELETES THE `LEGACY_INERT` ENTRY for this file in the same change. Priority
+  # order when that happens: the four tenancy guards — :78, :85, :92, :164.
+
   Background:
     Given an organization "acme" whose administrator "ana" may manage single sign-on
     And a second organization "globex" with its own administrator and its own members

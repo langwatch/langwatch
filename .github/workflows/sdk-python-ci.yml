@@ -131,6 +131,54 @@ jobs:
           make cli-examples
           make test-examples
 
+  # The ends of the interpreter range declared by requires-python. `test`
+  # above covers the middle on the repo's own pinned version.
+  #
+  # Installs the package and its own dependencies only. The dev and examples
+  # groups pull packages that have no wheels for the newest interpreter
+  # (tiktoken, onnxruntime), and none of them are what a user installs, so
+  # syncing them here would report a failure the published package does not
+  # have.
+  interpreters:
+    needs: changes
+    if: >
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
+      && (github.event_name != 'pull_request_target'
+          || github.event.label.name == 'approved-ci')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.14"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: "sdks/python/uv.lock"
+
+      - name: Install the package on Python ${{ matrix.python-version }}
+        working-directory: sdks/python
+        run: uv sync --no-default-groups --extra tests --python ${{ matrix.python-version }}
+
+      - name: Check the declared range covers this interpreter
+        working-directory: sdks/python
+        run: >
+          uv run --no-sync --python ${{ matrix.python-version }}
+          pytest -q tests/test_supported_python_versions.py
+
+      - name: Import the package
+        working-directory: sdks/python
+        run: >
+          uv run --no-sync --python ${{ matrix.python-version }}
+          python -c "import langwatch; langwatch.setup; langwatch.connect_agent"
+
   build:
     needs: changes
     if: >
@@ -165,11 +213,11 @@ jobs:
   # because GitHub's default `needs:` semantics treat skipped needs as
   # satisfied — that's the silent-success footgun we want to avoid.
   sdk-python-complete:
-    needs: [changes, test, build]
+    needs: [changes, test, interpreters, build]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: test, build
+          allowed-skips: test, interpreters, build

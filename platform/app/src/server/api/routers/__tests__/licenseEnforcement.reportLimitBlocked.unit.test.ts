@@ -98,13 +98,19 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
 }));
 
 // Mock RBAC to allow all permission checks (unit test, not testing auth)
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: vi.fn().mockResolvedValue(true),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasOrganizationPermission: vi.fn().mockResolvedValue(true),
+    };
+  },
+);
 
 // Dynamically import the router after mocks are in place
 const { licenseEnforcementRouter } = await import("../licenseEnforcement");

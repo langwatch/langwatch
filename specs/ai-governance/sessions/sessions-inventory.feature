@@ -53,7 +53,11 @@ Feature: AI Governance — CLI sessions inventory + revoke
     When alice clicks "Revoke" on the laptop session
     Then the laptop session disappears from the inventory
     And the next CLI call from the laptop hits 401 invalid_token
+    And the laptop's CLI login key and its ingest keys are revoked
     And the desktop session is unaffected
+    # The server side is bound in ingest-api-key-lifecycle.feature
+    # ("Revoking a device from the devices tab retires its login key and its
+    # ingest keys").
 
   @bdd @phase-8 @sessions @revoke
   Scenario: Revoke-all logs every device out
@@ -61,6 +65,7 @@ Feature: AI Governance — CLI sessions inventory + revoke
     When alice clicks "Sign out of all devices"
     Then the inventory becomes empty
     And every device's next CLI call hits 401 invalid_token
+    And every device's CLI login key and ingest keys are revoked
     And alice must run `langwatch login` on each machine to come back online
 
   # ============================================================================

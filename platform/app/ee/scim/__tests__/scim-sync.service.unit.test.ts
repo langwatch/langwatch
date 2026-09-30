@@ -9,9 +9,9 @@
  * used as an actor.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { ScimSyncGuards } from "@langwatch/identity-server";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ScimSyncLifecycle } from "../scim-sync.service";
+import { ScimSyncGuards } from "../scim-sync-guards";
 
 const ORGANIZATION = "org_acme";
 const OKTA = "conn_okta_primary";

@@ -49,7 +49,7 @@ export const AMR_VALUES = [
   /** The provider states it ran multi-factor authentication of its own. */
   "mfa",
 ] as const;
-export const amrSchema = z.enum(AMR_VALUES);
+const amrSchema = z.enum(AMR_VALUES);
 export type Amr = (typeof AMR_VALUES)[number];
 
 /**
