@@ -96,6 +96,21 @@ import { useOptimizationExecution } from "./use-optimization-execution.ts";
 import { PostEventProvider, usePostEvent } from "./use-post-event.tsx";
 import { useWorkflowExecution } from "./use-workflow-execution.ts";
 
+function useEntryDatasetTotal(dataset: Entry["dataset"]) {
+  return useGetDatasetData({ dataset, preview: true }).total;
+}
+
+/** Provided once around the whole studio: canvas, node panel, drag preview and drawers. */
+const studioNodeHost = {
+  ComponentIcon,
+  HoverableBigText,
+  LLMModelDisplay,
+  useColorModeValue,
+  useComponentExecution,
+  useComponentVersion,
+  useEntryDatasetTotal,
+};
+
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
     accept: "node",
@@ -213,179 +228,181 @@ export default function OptimizationStudio() {
   useAskBeforeLeaving();
 
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
-      <Head>
-        <title>LangWatch - Optimization Studio - {name}</title>
-      </Head>
-      <ReactFlowProvider>
-        <DndProvider backend={HTML5Backend}>
-          <PostEventProvider>
-            <WorkflowDragPreview />
-            <VStack width="full" height="full" gap={0}>
-              <HStack
-                width="full"
-                background="bg"
-                padding={2}
-                borderBottom="1px solid"
-                borderColor="border.emphasized"
-              >
-                <HStack width="full">
-                  <Link href={`/${project?.slug}/workflows`}>
-                    <LogoIcon width={24} height={24} />
-                  </Link>
-                  <StudioWorkflowRunningStatus />
-                  {!["waiting", "running"].includes(executionStatus ?? "") && (
-                    <StudioWorkflowAutosave />
-                  )}
-                </HStack>
-                <HStack width="full" justify="center">
-                  <StudioWorkflowNamePopover />
-                  <StatusCircle
-                    status={socketStatus}
-                    tooltip={<SocketStatusTooltip socketStatus={socketStatus} />}
-                  />
-                </HStack>
-                <HStack width="full" justify="end">
-                  <StudioWorkflowUndoRedo />
-                  <History />
-                  <Box />
-                  <Evaluate />
+    <WorkflowNodeHostProvider value={studioNodeHost}>
+      <div style={{ width: "100vw", height: "100vh" }}>
+        <Head>
+          <title>LangWatch - Optimization Studio - {name}</title>
+        </Head>
+        <ReactFlowProvider>
+          <DndProvider backend={HTML5Backend}>
+            <PostEventProvider>
+              <WorkflowDragPreview />
+              <VStack width="full" height="full" gap={0}>
+                <HStack
+                  width="full"
+                  background="bg"
+                  padding={2}
+                  borderBottom="1px solid"
+                  borderColor="border.emphasized"
+                >
+                  <HStack width="full">
+                    <Link href={`/${project?.slug}/workflows`}>
+                      <LogoIcon width={24} height={24} />
+                    </Link>
+                    <StudioWorkflowRunningStatus />
+                    {!["waiting", "running"].includes(executionStatus ?? "") && (
+                      <StudioWorkflowAutosave />
+                    )}
+                  </HStack>
+                  <HStack width="full" justify="center">
+                    <StudioWorkflowNamePopover />
+                    <StatusCircle
+                      status={socketStatus}
+                      tooltip={<SocketStatusTooltip socketStatus={socketStatus} />}
+                    />
+                  </HStack>
+                  <HStack width="full" justify="end">
+                    <StudioWorkflowUndoRedo />
+                    <History />
+                    <Box />
+                    <Evaluate />
 
-                  <Optimize />
-                  <Publish isDisabled={socketStatus !== "connected"} />
+                    <Optimize />
+                    <Publish isDisabled={socketStatus !== "connected"} />
+                  </HStack>
                 </HStack>
-              </HStack>
-              <Box width="full" height="full" position="relative">
-                <Flex width="full" height="full">
-                  <StudioWorkflowNodeSelectionPanel
-                    isOpen={nodeSelectionPanelIsOpen}
-                    setIsOpen={setNodeSelectionPanelIsOpen}
-                  />
-                  <PanelGroup direction="vertical">
-                    <Panel style={{ position: "relative" }}>
-                      <HStack position="absolute" bottom={3} left={3} zIndex={100}>
-                        <StudioWorkflowNodeSelectionPanelButton
-                          isOpen={nodeSelectionPanelIsOpen}
-                          setIsOpen={setNodeSelectionPanelIsOpen}
-                        />
-                        <Button
-                          size="sm"
-                          display={isResultsPanelCollapsed ? "block" : "none"}
-                          background="bg"
-                          borderRadius={4}
-                          borderColor="border.emphasized"
-                          variant="outline"
-                          onClick={() => {
-                            panelRef.current?.expand(70);
-                          }}
-                        >
-                          <HStack>
-                            <BarChart2 size={14} />
-                            <Text>Results</Text>
-                          </HStack>
-                        </Button>
-                      </HStack>
-                      {isResultsPanelCollapsed && <StudioWorkflowProgressToast />}
-                      <DragDropArea>
-                        <OptimizationStudioCanvas
-                          nodes={nodes}
-                          edges={edges}
-                          onNodesChange={onNodesChange}
-                          onEdgesChange={onEdgesChange}
-                          onNodesDelete={() => setTimeout(onNodesDelete, 0)}
-                          onConnect={(connection) => {
-                            const result = onConnect(connection);
-                            if (result?.error) {
-                              toaster.create({
-                                title: "Error",
-                                description: result.error,
-                                type: "error",
-                                duration: 5000,
-                              });
-                            }
-                          }}
-                          onConnectStart={(_event, params) =>
-                            onConnectStart({
-                              nodeId: params.nodeId,
-                              handleId: params.handleId,
-                            })
-                          }
-                          onConnectEnd={() => onConnectEnd()}
-                          isValidConnection={(connection) =>
-                            isConnectionAllowed({ nodes, connection })
-                          }
-                          selectNodesOnDrag={false}
-                          onNodeDragStart={() => {
-                            setIsDraggingNode(true);
-                          }}
-                          onNodeDragStop={() => {
-                            setIsDraggingNode(false);
-                          }}
-                          onPaneClick={() => {
-                            if (currentDrawer) closeDrawer();
-                          }}
-                          onNodeClick={(_event, node) => {
-                            if (currentDrawer) closeDrawer();
-                            setClickedNodeId(node.id);
-                          }}
-                          fitView
-                          fitViewOptions={{
-                            maxZoom: 1.2,
-                          }}
-                        >
-                          <Controls
-                            position="bottom-left"
-                            orientation="horizontal"
-                            style={{
-                              marginLeft: controlsMarginLeft({
-                                nodeSelectionPanelIsOpen,
-                                isResultsPanelCollapsed,
-                              }),
-                              marginBottom: "15px",
-                            }}
+                <Box width="full" height="full" position="relative">
+                  <Flex width="full" height="full">
+                    <StudioWorkflowNodeSelectionPanel
+                      isOpen={nodeSelectionPanelIsOpen}
+                      setIsOpen={setNodeSelectionPanelIsOpen}
+                    />
+                    <PanelGroup direction="vertical">
+                      <Panel style={{ position: "relative" }}>
+                        <HStack position="absolute" bottom={3} left={3} zIndex={100}>
+                          <StudioWorkflowNodeSelectionPanelButton
+                            isOpen={nodeSelectionPanelIsOpen}
+                            setIsOpen={setNodeSelectionPanelIsOpen}
                           />
-                        </OptimizationStudioCanvas>
-                      </DragDropArea>
-                    </Panel>
-                    <PanelResizeHandle style={{ position: "relative", marginTop: "-20px" }}>
-                      <Center paddingY={2}>
-                        <Box
-                          width="30px"
-                          height="3px"
-                          borderRadius="full"
-                          background="bg.emphasized"
+                          <Button
+                            size="sm"
+                            display={isResultsPanelCollapsed ? "block" : "none"}
+                            background="bg"
+                            borderRadius={4}
+                            borderColor="border.emphasized"
+                            variant="outline"
+                            onClick={() => {
+                              panelRef.current?.expand(70);
+                            }}
+                          >
+                            <HStack>
+                              <BarChart2 size={14} />
+                              <Text>Results</Text>
+                            </HStack>
+                          </Button>
+                        </HStack>
+                        {isResultsPanelCollapsed && <StudioWorkflowProgressToast />}
+                        <DragDropArea>
+                          <OptimizationStudioCanvas
+                            nodes={nodes}
+                            edges={edges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onNodesDelete={() => setTimeout(onNodesDelete, 0)}
+                            onConnect={(connection) => {
+                              const result = onConnect(connection);
+                              if (result?.error) {
+                                toaster.create({
+                                  title: "Error",
+                                  description: result.error,
+                                  type: "error",
+                                  duration: 5000,
+                                });
+                              }
+                            }}
+                            onConnectStart={(_event, params) =>
+                              onConnectStart({
+                                nodeId: params.nodeId,
+                                handleId: params.handleId,
+                              })
+                            }
+                            onConnectEnd={() => onConnectEnd()}
+                            isValidConnection={(connection) =>
+                              isConnectionAllowed({ nodes, connection })
+                            }
+                            selectNodesOnDrag={false}
+                            onNodeDragStart={() => {
+                              setIsDraggingNode(true);
+                            }}
+                            onNodeDragStop={() => {
+                              setIsDraggingNode(false);
+                            }}
+                            onPaneClick={() => {
+                              if (currentDrawer) closeDrawer();
+                            }}
+                            onNodeClick={(_event, node) => {
+                              if (currentDrawer) closeDrawer();
+                              setClickedNodeId(node.id);
+                            }}
+                            fitView
+                            fitViewOptions={{
+                              maxZoom: 1.2,
+                            }}
+                          >
+                            <Controls
+                              position="bottom-left"
+                              orientation="horizontal"
+                              style={{
+                                marginLeft: controlsMarginLeft({
+                                  nodeSelectionPanelIsOpen,
+                                  isResultsPanelCollapsed,
+                                }),
+                                marginBottom: "15px",
+                              }}
+                            />
+                          </OptimizationStudioCanvas>
+                        </DragDropArea>
+                      </Panel>
+                      <PanelResizeHandle style={{ position: "relative", marginTop: "-20px" }}>
+                        <Center paddingY={2}>
+                          <Box
+                            width="30px"
+                            height="3px"
+                            borderRadius="full"
+                            background="bg.emphasized"
+                          />
+                        </Center>
+                      </PanelResizeHandle>
+                      <Panel
+                        collapsible
+                        minSize={6}
+                        ref={panelRef}
+                        onCollapse={() => setIsResultsPanelCollapsed(true)}
+                        onExpand={() => setIsResultsPanelCollapsed(false)}
+                        defaultSize={0}
+                      >
+                        <ResultsPanel
+                          isCollapsed={isResultsPanelCollapsed}
+                          collapsePanel={collapsePanel}
                         />
-                      </Center>
-                    </PanelResizeHandle>
-                    <Panel
-                      collapsible
-                      minSize={6}
-                      ref={panelRef}
-                      onCollapse={() => setIsResultsPanelCollapsed(true)}
-                      onExpand={() => setIsResultsPanelCollapsed(false)}
-                      defaultSize={0}
-                    >
-                      <ResultsPanel
-                        isCollapsed={isResultsPanelCollapsed}
-                        collapsePanel={collapsePanel}
-                      />
-                    </Panel>
-                  </PanelGroup>
-                  <StudioNodeDrawer />
-                </Flex>
-              </Box>
-            </VStack>
-          </PostEventProvider>
-        </DndProvider>
-      </ReactFlowProvider>
+                      </Panel>
+                    </PanelGroup>
+                    <StudioNodeDrawer />
+                  </Flex>
+                </Box>
+              </VStack>
+            </PostEventProvider>
+          </DndProvider>
+        </ReactFlowProvider>
 
-      <StudioWorkflowRunUntilHereDialog />
-      {/*
+        <StudioWorkflowRunUntilHereDialog />
+        {/*
         Global mounts (CurrentDrawer, GlobalTraceV2DrawerMount, GlobalUpgradeModal) not ported:
         studio has no layout/overlay slot. Breaks drawers, traces, and upgrade dialog.
         Pending app-level overlay slot in apps/ui.
       */}
-    </div>
+      </div>
+    </WorkflowNodeHostProvider>
   );
 }
 
@@ -461,41 +478,28 @@ export function OptimizationStudioCanvas({
   const nodeTypes = useMemo(() => workflowNodeComponents, []);
   const edgeTypes = useMemo(() => ({ default: WorkflowEdge }), []);
   const { colorMode } = useColorMode();
-  const useEntryDatasetTotal = (dataset: Entry["dataset"]) =>
-    useGetDatasetData({ dataset, preview: true }).total;
-  const nodeHost = {
-    ComponentIcon,
-    HoverableBigText,
-    LLMModelDisplay,
-    useColorModeValue,
-    useComponentExecution,
-    useComponentVersion,
-    useEntryDatasetTotal,
-  };
 
   return (
-    <WorkflowNodeHostProvider value={nodeHost}>
-      <ReactFlow
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        colorMode={colorMode}
-        // ReactFlow defaults deleteKeyCode to "Backspace" only; also bind Delete
-        // so a selected node or connection is removable with either key.
-        deleteKeyCode={["Backspace", "Delete"]}
-        defaultViewport={{
-          zoom: defaultZoom,
-          x: 100,
-          y: Math.round(
-            ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) || 300) / 2,
-          ),
-        }}
-        proOptions={{ hideAttribution: true }}
-        {...props}
-      >
-        <ReactFlowBackground />
-        {children}
-      </ReactFlow>
-    </WorkflowNodeHostProvider>
+    <ReactFlow
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      colorMode={colorMode}
+      // ReactFlow defaults deleteKeyCode to "Backspace" only; also bind Delete
+      // so a selected node or connection is removable with either key.
+      deleteKeyCode={["Backspace", "Delete"]}
+      defaultViewport={{
+        zoom: defaultZoom,
+        x: 100,
+        y: Math.round(
+          ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) || 300) / 2,
+        ),
+      }}
+      proOptions={{ hideAttribution: true }}
+      {...props}
+    >
+      <ReactFlowBackground />
+      {children}
+    </ReactFlow>
   );
 }
 
