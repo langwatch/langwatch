@@ -73,6 +73,7 @@ const serviceOver = ({
   pendingInvite = null,
   membership = async () => "created",
   joinerSeat = "MEMBER",
+  existingSeat,
   pendingAdmission = null,
 }: {
   row: SignInConnection | null;
@@ -81,6 +82,8 @@ const serviceOver = ({
   membership?: MembershipWrite;
   /** The seat the organization hands to joiners (ADR-143). */
   joinerSeat?: JoinerSeat;
+  /** The seat a row that was already there holds, when the write collides. */
+  existingSeat?: JoinerSeat;
   pendingAdmission?: PendingSsoAdmission | null;
 }) => {
   const migrations = createIdentityMigrationFixture();
@@ -99,7 +102,13 @@ const serviceOver = ({
         };
       }
     }
-    return { outcome, seat: joinerSeat };
+    return {
+      outcome,
+      seat:
+        outcome === "already-present"
+          ? (existingSeat ?? joinerSeat)
+          : joinerSeat,
+    };
   });
   const findPendingAdmission = vi.fn(async () => pending && { ...pending });
   const completeAdmission = vi.fn(async () => {
@@ -539,6 +548,31 @@ describe("given a domain-matched organization to join", () => {
         organizationName: "Acme",
       });
       expect(parts.startNurturing).toHaveBeenCalledTimes(1);
+    });
+
+    it("still resumes a Full member's pending grant when their row was already there", async () => {
+      const parts = serviceOver({
+        row: connection(),
+        joinerSeat: "DEVELOPER",
+        existingSeat: "MEMBER",
+        membership: async () => "already-present",
+        pendingAdmission: {
+          grantId: "rb_admission",
+          occurredAtMs: 1_756_000_000_000,
+          state: "pending",
+        },
+      });
+
+      await parts.service.joinOrganization({
+        user: USER,
+        org: ORG,
+        domain: "acme.com",
+      });
+
+      expect(parts.attachBindings).toHaveBeenCalledTimes(1);
+      expect(parts.joinedAutomatically).toHaveBeenCalledWith(
+        expect.objectContaining({ admissionId: "rb_admission" }),
+      );
     });
 
     it("announces nothing when a concurrent callback already created the row", async () => {

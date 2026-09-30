@@ -10,6 +10,7 @@ import {
   DEVELOPER_ADMISSION_AUDIT_ACTION,
   type DeveloperAdmissionVia,
 } from "~/server/app-layer/identity/admission-audit";
+import { readJoinerRole } from "~/server/app-layer/identity/join-request-adapters";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   PendingSsoAdmission,
@@ -208,10 +209,7 @@ export class PrismaSsoMembershipRepository {
       where: { id: organizationId },
       select: { joinerRole: true },
     });
-    const seat =
-      organization?.joinerRole === OrganizationUserRole.DEVELOPER
-        ? OrganizationUserRole.DEVELOPER
-        : OrganizationUserRole.MEMBER;
+    const seat = readJoinerRole(organization?.joinerRole);
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.organizationUser.create({
@@ -247,7 +245,20 @@ export class PrismaSsoMembershipRepository {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
-        return { outcome: "already-present", seat };
+        // The row that is there decides, not the setting: a Full member's
+        // row created by a concurrent callback still has its grant to attach,
+        // whatever seat the organisation hands to newcomers today.
+        const existing = await this.prisma.organizationUser.findUnique({
+          where: { userId_organizationId: { userId, organizationId } },
+          select: { role: true },
+        });
+        return {
+          outcome: "already-present",
+          seat:
+            existing?.role === OrganizationUserRole.DEVELOPER
+              ? OrganizationUserRole.DEVELOPER
+              : OrganizationUserRole.MEMBER,
+        };
       }
       throw err;
     }

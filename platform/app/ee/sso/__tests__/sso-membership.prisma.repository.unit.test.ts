@@ -6,11 +6,31 @@
  * Spec: specs/members/developer-seat.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { OrganizationUserRole } from "~/generated/prisma/client";
+import { OrganizationUserRole, Prisma } from "~/generated/prisma/client";
 import { PrismaSsoMembershipRepository } from "../sso-membership.prisma.repository";
 
-function fakePrisma({ joinerRole }: { joinerRole: OrganizationUserRole }) {
-  const organizationUser = { create: vi.fn(async () => ({})) };
+function fakePrisma({
+  joinerRole,
+  existingRole = null,
+}: {
+  joinerRole: OrganizationUserRole;
+  /** A row already there, which makes the create collide. */
+  existingRole?: OrganizationUserRole | null;
+}) {
+  const organizationUser = {
+    create: vi.fn(async () => {
+      if (existingRole) {
+        throw new Prisma.PrismaClientKnownRequestError("duplicate", {
+          code: "P2002",
+          clientVersion: "test",
+        });
+      }
+      return {};
+    }),
+    findUnique: vi.fn(async () =>
+      existingRole ? { role: existingRole } : null,
+    ),
+  };
   const auditLog = { create: vi.fn(async () => ({})) };
   return {
     organization: { findUnique: vi.fn(async () => ({ joinerRole })) },
@@ -63,6 +83,26 @@ describe("given an organization whose joiner seat is Developer", () => {
           metadata: { seat: "DEVELOPER", via: "sso" },
         },
       });
+    });
+  });
+});
+
+describe("given a Developer-joiner organization where a Full member's row already exists", () => {
+  describe("when a concurrent sign-in tries to create the row again", () => {
+    it("answers the seat the existing row holds, not the setting", async () => {
+      const prisma = fakePrisma({
+        joinerRole: OrganizationUserRole.DEVELOPER,
+        existingRole: OrganizationUserRole.MEMBER,
+      });
+      const repository = new PrismaSsoMembershipRepository(prisma as never);
+
+      await expect(
+        repository.createMembership({
+          userId: "user_sam",
+          organizationId: "org_acme",
+        }),
+      ).resolves.toEqual({ outcome: "already-present", seat: "MEMBER" });
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
   });
 });
