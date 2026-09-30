@@ -63,6 +63,24 @@ describe("given the avatar route", () => {
     });
   });
 
+  describe("when the request carries no credential at all", () => {
+    /** @scenario An unauthenticated request cannot load an avatar image */
+    it("answers 401 and looks nothing up", async () => {
+      let looked = false;
+      const api = mountAvatars({
+        read: async () => {
+          looked = true;
+          return available();
+        },
+      });
+
+      const response = await api.fetch("/api/user-avatar/project-9/object-1", {});
+
+      expect(response.status).toBe(401);
+      expect(looked).toBe(false);
+    });
+  });
+
   describe("when the key belongs to another project than the one the address names", () => {
     it("answers 403, since the runtime pins a key to its own project", async () => {
       const api = mountAvatars({ read: async () => available() });

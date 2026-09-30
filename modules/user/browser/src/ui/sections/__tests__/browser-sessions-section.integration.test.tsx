@@ -78,6 +78,7 @@ afterEach(() => cleanup());
 describe("given the browsers somebody is signed in on", () => {
   describe("when the list has arrived", () => {
     /** @scenario "The account surface serves the browsers somebody is signed in on" */
+    /** @scenario The browser I am reading this in says so */
     it("names the browser and its sign-in method, and marks the one being read from", () => {
       state.sessions = [session(), session({ sessionId: "session-2", current: true })];
       renderWithPersonalWorkspaceHost(<BrowserSessionsSection />, {
@@ -91,6 +92,7 @@ describe("given the browsers somebody is signed in on", () => {
     });
 
     /** @scenario "The account surface serves the browsers somebody is signed in on" */
+    /** @scenario A browser nothing has happened on for a fortnight is pointed at */
     it("points at a browser nobody has used for a fortnight", () => {
       vi.setSystemTime(new Date("2026-02-01T00:00:00.000Z"));
       state.sessions = [session({ lastActiveAt: "2026-01-01T00:00:00.000Z" })];
@@ -105,6 +107,8 @@ describe("given the browsers somebody is signed in on", () => {
 
   describe("when somebody ends one of them", () => {
     /** @scenario "Ending one browser session is a mutation on the caller's own account" */
+    /** @scenario Signing a browser out ends that one and no others */
+    /** @scenario The browser I am reading this in is not offered a sign-out */
     it("sends only that session's id and re-reads the list", async () => {
       state.sessions = [session(), session({ sessionId: "session-2", current: true })];
       renderWithPersonalWorkspaceHost(<BrowserSessionsSection />, {
@@ -120,6 +124,25 @@ describe("given the browsers somebody is signed in on", () => {
         expect(calls.endBrowserSession).toHaveBeenCalledWith({ sessionId: "session-1" });
       });
       expect(calls.invalidate).toHaveBeenCalled();
+    });
+
+    /** @scenario A sign-out that failed says so */
+    it("says it did not happen and keeps the browser on the list", async () => {
+      state.sessions = [session(), session({ sessionId: "session-2", current: true })];
+      calls.endBrowserSession.mockRejectedValue(new Error("store down"));
+      const host = fakePersonalWorkspaceHost();
+      renderWithPersonalWorkspaceHost(<BrowserSessionsSection />, { host });
+
+      const band = within(screen.getByTestId("browser-sessions-settings-section"));
+      await userEvent.click(band.getByRole("button", { name: /^Sign out/ }));
+
+      await waitFor(() =>
+        expect(host.recording.failures).toContainEqual(
+          expect.objectContaining({ fallbackTitle: "Couldn't sign that browser out" }),
+        ),
+      );
+      expect(calls.invalidate).not.toHaveBeenCalled();
+      expect(band.getAllByText(/Chrome on macOS/).length).toBe(2);
     });
   });
 });
