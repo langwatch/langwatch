@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.19.2](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.1...langwatch@v3.19.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* **chart:** stop committing charts/langwatch/Chart.lock so releases cannot publish with a stale lock ([#8386](https://github.com/langwatch/langwatch/issues/8386)) ([36cb176](https://github.com/langwatch/langwatch/commit/36cb176db151a5d20d87345d2c5e3391969d4c0f))
+* **chart:** sync Chart.lock to the 3.19.1 gateway and langyagent subcharts ([5c1687f](https://github.com/langwatch/langwatch/commit/5c1687f46e7e6b9071574b01f3560dd08052954a))
+* **chart:** sync Chart.lock to the 3.19.1 subcharts ([#8382](https://github.com/langwatch/langwatch/issues/8382)) ([5c1687f](https://github.com/langwatch/langwatch/commit/5c1687f46e7e6b9071574b01f3560dd08052954a))
+* **gateway:** prefix a model with slashes of its own on customer spans ([#8376](https://github.com/langwatch/langwatch/issues/8376)) ([d74ebca](https://github.com/langwatch/langwatch/commit/d74ebcaa342f58ed16e7ac7d0d0d2ff8cad24739))
+* **gateway:** prefix a model with slashes of its own on customer spans, as nlpgo does ([d74ebca](https://github.com/langwatch/langwatch/commit/d74ebcaa342f58ed16e7ac7d0d0d2ff8cad24739))
+* **sso:** link an unconfirmed password account when the connection verified its domain ([#8387](https://github.com/langwatch/langwatch/issues/8387)) ([cd7630e](https://github.com/langwatch/langwatch/commit/cd7630e0a734274cfd53ef933e4f35a15a85e2f2))
+
 ## [3.19.1](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.0...langwatch@v3.19.1) (2026-09-30)
 
 
