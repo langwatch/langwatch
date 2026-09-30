@@ -3,6 +3,19 @@ import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.js";
+import {
+  actionParamsSchema,
+  alertTypeSchema,
+  graphAlertSchema,
+  notificationCadenceSchema,
+  reportSchema,
+  SLACK_DELIVERY_NOTE,
+  templatesSchema,
+  TRIGGER_FILTER_QUERY_DESCRIPTION,
+  TRIGGER_FILTERS_DESCRIPTION,
+  triggerActionSchema,
+  validateActionParamsForAction,
+} from "./schemas/triggers.js";
 import { fetchDocumentation } from "./documentation-fetch.js";
 import {
   createDatasetSchema,
@@ -1575,71 +1588,131 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_list_triggers", async (params) => {
       requireApiKey();
-      const { listTriggers } = await import("./langwatch-api-triggers.js");
-      const triggers = await listTriggers();
-      if (params.format === "json") {
-        return { content: [{ type: "text", text: JSON.stringify(triggers, null, 2) }] };
-      }
-      if (triggers.length === 0) {
-        return { content: [{ type: "text", text: "No triggers found. Use `platform_create_trigger` to create one." }] };
-      }
-      const lines = [`# Triggers (${triggers.length} total)\n`];
-      for (const t of triggers) {
-        lines.push(`## ${t.name}`);
-        lines.push(`**ID**: ${t.id}`);
-        lines.push(`**Action**: ${t.action}`);
-        lines.push(`**Status**: ${t.active ? "active" : "inactive"}`);
-        if (t.alertType) lines.push(`**Alert**: ${t.alertType}`);
-        lines.push("");
-      }
-      return { content: [{ type: "text", text: lines.join("\n") }] };
+      const { handleListTriggers } = await import("./tools/list-triggers.js");
+      return { content: [{ type: "text", text: await handleListTriggers(params) }] };
+    })
+  );
+
+  server.tool(
+    "platform_get_trigger",
+    "Read one trigger (automation) by its ID, including its delivery configuration. Credential values come back as [redacted]; sending them back unchanged on an update keeps the stored values.",
+    {
+      id: z.string().describe("The trigger ID"),
+    },
+    withToolLogging("platform_get_trigger", async (params) => {
+      requireApiKey();
+      const { getTrigger } = await import("./langwatch-api-triggers.js");
+      const trigger = await getTrigger(params.id);
+      return { content: [{ type: "text", text: JSON.stringify(trigger, null, 2) }] };
     })
   );
 
   server.tool(
     "platform_create_trigger",
-    "Create a new trigger (automation) that fires when conditions are met.",
+    [
+      "Create a trigger (automation).",
+      "",
+      "It is about one of three things: matching traces (send `filters` or `filterQuery`), a metric crossing a threshold on a graph (an Alert: send `customGraphId`, `graphAlert` and `alertType`), or a schedule (a Report: send `report`, on an email or Slack channel).",
+      "`actionParams` is the delivery configuration for the channel named in `action` — recipients for SEND_EMAIL, a destination for SEND_SLACK_MESSAGE, a URL for SEND_WEBHOOK, a dataset and mapping for ADD_TO_DATASET, annotators for ADD_TO_ANNOTATION_QUEUE. Omitted, it is sent as {} and the server refuses a channel that cannot deliver without one.",
+      SLACK_DELIVERY_NOTE,
+      `filters: ${TRIGGER_FILTERS_DESCRIPTION}`,
+      "The delivery channel cannot be changed afterwards.",
+    ].join("\n"),
     {
       name: z.string().describe("Trigger name"),
-      action: z.enum(["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"]).describe("Action to take when triggered"),
-      filters: z.string().optional().describe("Filter conditions as JSON string"),
+      action: triggerActionSchema.describe("Which channel it delivers on"),
+      actionParams: actionParamsSchema.optional().describe("The delivery configuration the channel named in `action` reads. Defaults to {}"),
+      filters: z.string().optional().describe(TRIGGER_FILTERS_DESCRIPTION),
+      filterQuery: z.string().optional().describe(TRIGGER_FILTER_QUERY_DESCRIPTION),
+      customGraphId: z.string().optional().describe("Set to make this an alert on that graph"),
+      graphAlert: graphAlertSchema.optional(),
+      report: reportSchema.optional().describe("Set to make this a scheduled report"),
+      templates: templatesSchema.optional(),
+      notificationCadence: notificationCadenceSchema.optional(),
       message: z.string().optional().describe("Custom alert message"),
-      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("Alert severity"),
+      alertType: alertTypeSchema.optional().describe("Alert severity. Required for a graph alert."),
     },
     withToolLogging("platform_create_trigger", async (params) => {
       requireApiKey();
-      const { createTrigger } = await import("./langwatch-api-triggers.js");
-      let filters: Record<string, unknown> = {};
-      if (params.filters) {
-        try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
-        catch { return { content: [{ type: "text", text: "Error: filters must be valid JSON" }] }; }
-      }
-      const trigger = await createTrigger({
-        name: params.name,
-        action: params.action,
-        filters,
-        message: params.message,
-        alertType: params.alertType,
-      });
-      return { content: [{ type: "text", text: `Trigger "${trigger.name}" created (ID: ${trigger.id}, Action: ${trigger.action}).` }] };
+      const { handleCreateTrigger } = await import("./tools/create-trigger.js");
+      return await handleCreateTrigger(params);
     })
   );
 
   server.tool(
     "platform_update_trigger",
-    "Update a trigger (name, active state, message, alert type).",
+    [
+      "Update a trigger (automation). Anything left out is left alone.",
+      "",
+      "`actionParams` replaces the delivery configuration as a whole, so send every field it should have from now on. A credential the read hid comes back as [redacted]; send that back to keep the stored value. Changing a webhook's `url` means sending its header values in the same call.",
+      "The delivery channel and the kind of automation cannot be changed.",
+    ].join("\n"),
     {
       id: z.string().describe("The trigger ID"),
       name: z.string().optional().describe("New name"),
-      active: z.boolean().optional().describe("Enable or disable"),
-      message: z.string().optional().describe("New alert message"),
-      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("New alert severity"),
+      active: z.boolean().optional().describe("Resume or pause it"),
+      actionParams: actionParamsSchema.optional().describe("The delivery configuration this automation should have from now on"),
+      filters: z.string().optional().describe(TRIGGER_FILTERS_DESCRIPTION),
+      filterQuery: z.string().nullable().optional().describe(`${TRIGGER_FILTER_QUERY_DESCRIPTION} null clears the saved query.`),
+      graphAlert: graphAlertSchema.optional().describe("Only for an automation that is already a graph alert"),
+      report: reportSchema.optional().describe("Only for an automation that is already a scheduled report"),
+      templates: templatesSchema.optional(),
+      notificationCadence: notificationCadenceSchema.optional(),
+      message: z.string().nullable().optional().describe("New alert message. null removes the custom message"),
+      alertType: alertTypeSchema.nullable().optional().describe("New alert severity. null clears it"),
     },
     withToolLogging("platform_update_trigger", async (params) => {
       requireApiKey();
-      const { updateTrigger } = await import("./langwatch-api-triggers.js");
-      const trigger = await updateTrigger(params);
+      const { getTrigger, updateTrigger } = await import("./langwatch-api-triggers.js");
+      if (params.actionParams !== undefined) {
+        // The channel cannot change on update, so the SAVED action decides
+        // which shape the replacement configuration must fit.
+        const saved = await getTrigger(params.id);
+        const boundParams = validateActionParamsForAction({
+          action: saved.action,
+          actionParams: params.actionParams,
+        });
+        if (!boundParams.ok) {
+          const { toolError } = await import("./tools/create-trigger.js");
+          return toolError(boundParams.message);
+        }
+      }
+      const { parseJsonObject, toolError } = await import("./tools/create-trigger.js");
+      const filters = params.filters ? parseJsonObject(params.filters) : undefined;
+      if (params.filters && !filters) {
+        return toolError("filters must be a JSON object");
+      }
+      const trigger = await updateTrigger({ ...params, filters });
       return { content: [{ type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` }] };
+    })
+  );
+
+  server.tool(
+    "platform_test_fire_trigger",
+    "Send a trigger's message to the destination it is configured with, to confirm it arrives. Nothing is recorded as a fire.",
+    {
+      id: z.string().describe("The trigger ID"),
+    },
+    withToolLogging("platform_test_fire_trigger", async (params) => {
+      requireApiKey();
+      const { testFireTrigger } = await import("./langwatch-api-triggers.js");
+      const result = await testFireTrigger(params.id);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    })
+  );
+
+  server.tool(
+    "platform_list_trigger_fires",
+    "What an automation has done, newest first. Metadata only — no message content. Answers with `nextCursor`; pass it back as `cursor` for the next page (null means there is none).",
+    {
+      id: z.string().describe("The trigger ID"),
+      limit: z.number().int().positive().optional().describe("How many fires to return"),
+      cursor: z.string().optional().describe("The `nextCursor` a previous call answered with"),
+    },
+    withToolLogging("platform_list_trigger_fires", async (params) => {
+      requireApiKey();
+      const { handleListTriggerFires } = await import("./tools/list-trigger-fires.js");
+      return { content: [{ type: "text", text: await handleListTriggerFires(params) }] };
     })
   );
 
