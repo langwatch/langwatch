@@ -12,7 +12,7 @@ import {
   type RawEvent,
 } from "./oracles.ts";
 import { pickAction, trailStep, type Action, type TrailStep } from "./picker.ts";
-import type { FuzzPlan } from "./protocol.ts";
+import type { FuzzPlan, Navigation, Oracle } from "./protocol.ts";
 import { oracleOf, routeLabel, signatureOf, trailLine } from "./report.ts";
 import { hashSeed, mulberry32, type Rng } from "./rng.ts";
 import type { FindingSink } from "./sink.ts";
@@ -61,6 +61,13 @@ export class Collector {
 
 /** STUCK_OVERLAY_ACTIONS is how long the monkey tries to close an overlay before it reloads. */
 const STUCK_OVERLAY_ACTIONS = 4;
+/** BROKEN_ORACLES are findings that leave the page unusable: the next visit loads afresh. */
+const BROKEN_ORACLES: ReadonlySet<Oracle> = new Set([
+  "page-error",
+  "error-boundary",
+  "blank",
+  "hang",
+]);
 const BLANK_RECHECK_MILLIS = 2000;
 const ACTION_TIMEOUT_MILLIS = 3000;
 const READ_TIMEOUT_MILLIS = 5000;
@@ -105,6 +112,8 @@ export interface Visit {
   route: string;
   path: string;
   visit: number;
+  /** navigation is how the lane wants to reach the route; a failed in-app move loads instead. */
+  navigation: Navigation;
   avoid: readonly RegExp[];
   now: () => number;
   deadline: number;
@@ -115,6 +124,10 @@ export interface VisitResult {
   findings: number;
   paths: string[];
   moduleFailures: number;
+  /** navigation is how the route was actually reached; broken says the page was left unusable. */
+  navigation: Navigation;
+  fellBack: boolean;
+  broken: boolean;
 }
 
 export class SessionLost extends Error {}
@@ -130,8 +143,12 @@ class RouteWalk {
   private actions = 0;
   private stuck = 0;
   private moduleFailures = 0;
+  private navigation: Navigation;
+  private fellBack = false;
+  private broken = false;
 
   constructor(private readonly visit: Visit) {
+    this.navigation = visit.navigation;
     this.origin = new URL(visit.plan.url).origin;
     this.rng = mulberry32(hashSeed([visit.plan.seed, visit.route, visit.visit]));
   }
@@ -154,10 +171,33 @@ class RouteWalk {
       findings: this.findings,
       paths: [...this.paths],
       moduleFailures: this.moduleFailures,
+      navigation: this.navigation,
+      fellBack: this.fellBack,
+      broken: this.broken,
     };
   }
 
+  /** moveInApp asks the router to go to the path, with no document load, and checks it did. */
+  private async moveInApp(): Promise<boolean> {
+    const { path } = this.visit;
+    const moved = await this.page
+      .evaluate((target) => {
+        window.history.pushState(null, "", target);
+        window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+      }, path)
+      .then(() => true)
+      .catch(() => false);
+    if (!moved) return false;
+    await this.settle();
+    return new URL(this.page.url(), this.origin).pathname === new URL(path, this.origin).pathname;
+  }
+
   private async open(): Promise<void> {
+    if (this.navigation === "in-app") {
+      if (await this.moveInApp()) return this.inspect();
+      this.navigation = "reload";
+      this.fellBack = true;
+    }
     await this.visit.side.goto(this.visit.path).catch((thrown: unknown) => {
       note({
         text: `goto ${this.visit.path}: ${String(thrown).slice(0, 200)}`,
@@ -283,6 +323,7 @@ class RouteWalk {
   ): Promise<void> {
     for (const draft of drafts) {
       const signature = signatureOf(draft);
+      if (BROKEN_ORACLES.has(oracleOf(draft.kind))) this.broken = true;
       if (this.seen.has(signature)) continue;
       this.seen.add(signature);
       const { plan, route, sink } = this.visit;
@@ -302,6 +343,7 @@ class RouteWalk {
         capturedAt: new Date().toISOString(),
         seed: plan.seed,
         visit: this.visit.visit,
+        navigation: this.navigation,
       });
       this.findings += 1;
     }
@@ -317,7 +359,7 @@ class RouteWalk {
       fallback: undefined,
     });
     if (bytes === undefined) return undefined;
-    const shot = sink.nextShot();
+    const shot = sink.nextShot(this.navigation);
     sink.save({ file: shot.file, bytes });
     return shot.relative;
   }

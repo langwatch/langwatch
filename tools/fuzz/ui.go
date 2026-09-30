@@ -15,6 +15,12 @@ import (
 // DefaultUIWorkers is how many pages the UI monkey drives at once.
 const DefaultUIWorkers = 16
 
+// DefaultReloadEvery is the UI runner's full-load cadence: one load, then four in-app visits.
+const DefaultReloadEvery = 5
+
+// DefaultActionsPerRoute is how long the UI runner stays on one route.
+const DefaultActionsPerRoute = 40
+
 // uiPlan is what the Go side writes to plan.json for the TypeScript runner; the
 // two halves agree on this shape by file (README.md "UI protocol").
 type uiPlan struct {
@@ -24,6 +30,7 @@ type uiPlan struct {
 	Workers         int             `json:"workers"`
 	DurationMs      int64           `json:"durationMs"`
 	ActionsPerRoute int             `json:"actionsPerRoute"`
+	ReloadEvery     int             `json:"reloadEvery"`
 	Only            string          `json:"only"`
 	Org             diffkit.ToolOrg `json:"org"`
 	Credential      uiCredential    `json:"credential"`
@@ -41,6 +48,12 @@ type uiCredential struct {
 func runUI(ctx context.Context, streams Streams, options Options) error {
 	if options.Workers <= 0 {
 		options.Workers = DefaultUIWorkers
+	}
+	if options.ActionsPerRoute <= 0 {
+		options.ActionsPerRoute = DefaultActionsPerRoute
+	}
+	if options.ReloadEvery <= 0 {
+		options.ReloadEvery = DefaultReloadEvery
 	}
 	appURL := options.URL
 	if appURL == "" {
@@ -64,7 +77,7 @@ func runUI(ctx context.Context, streams Streams, options Options) error {
 	}
 	plan := uiPlan{
 		RunID: runID, URL: appURL, Seed: options.Seed, Workers: options.Workers,
-		DurationMs: options.Duration.Milliseconds(), ActionsPerRoute: 40, Only: options.Only, Org: org,
+		DurationMs: options.Duration.Milliseconds(), ActionsPerRoute: options.ActionsPerRoute, ReloadEvery: options.ReloadEvery, Only: options.Only, Org: org,
 		Credential: uiCredential{Email: diffkit.CeremonyEmail("fuzzer"), Password: diffkit.CeremonyPassword},
 	}
 	planPath := filepath.Join(runDir, "plan.json")

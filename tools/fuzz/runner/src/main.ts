@@ -11,9 +11,10 @@ import { note, type Plan as CapturePlan } from "@langwatch/visual-diff-runner/pr
 import { signInSide } from "@langwatch/visual-diff-runner/sign-in";
 
 import { Collector, SessionLost, walkRoute } from "./monkey.ts";
-import { planSchema, type Coverage, type FuzzPlan } from "./protocol.ts";
+import { planSchema, type Coverage, type FuzzPlan, type Navigation } from "./protocol.ts";
 import { hashSeed, mulberry32, shuffled } from "./rng.ts";
 import { expandRoute, registeredRoutes, type Expanded } from "./routes.ts";
+import { ReloadSchedule } from "./schedule.ts";
 import { FindingSink } from "./sink.ts";
 
 const out = process.stdout;
@@ -122,10 +123,11 @@ const projectSlug = async (side: Side): Promise<string> => {
 
 /** visitsLine is visits/total on a pass-bounded run; a timed run's total is only a queue bound. */
 const visitsLine = ({ run, deadline }: { run: Run; deadline: number }): string => {
-  if (!Number.isFinite(deadline)) return `visits ${run.visits}/${run.total}`;
+  const kinds = `(${run.reloads} reload, ${run.inAppVisits} in-app)`;
+  if (!Number.isFinite(deadline)) return `visits ${run.visits}/${run.total} ${kinds}`;
   const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
   const clock = `${Math.floor(left / 60)}m${String(left % 60).padStart(2, "0")}s`;
-  return `visits ${run.visits} routes ${run.routesVisited}/${run.order.length} left ${clock}`;
+  return `visits ${run.visits} ${kinds} routes ${run.routesVisited}/${run.order.length} left ${clock}`;
 };
 
 /** Run is the state the lanes share: the queue of visits and what they have done so far. */
@@ -135,6 +137,9 @@ class Run {
   visits = 0;
   actions = 0;
   moduleFailures = 0;
+  reloads = 0;
+  inAppVisits = 0;
+  navigationFallbacks = 0;
   sessionLost: SessionLost | undefined;
   private next = 0;
 
@@ -180,8 +185,11 @@ class Run {
 
   async lane(side: Side): Promise<void> {
     const collector = new Collector(side.page);
+    const schedule = new ReloadSchedule(this.plan.reloadEvery);
     for (let job = this.take(); job !== undefined; job = this.take()) {
-      await this.visit({ side, collector, ...job });
+      const navigation = schedule.next();
+      const outcome = await this.visit({ side, collector, navigation, ...job });
+      schedule.done(outcome);
       this.visits += 1;
     }
   }
@@ -191,12 +199,14 @@ class Run {
     collector,
     entry,
     visit,
+    navigation,
   }: {
     side: Side;
     collector: Collector;
     entry: Expanded;
     visit: number;
-  }): Promise<void> {
+    navigation: Navigation;
+  }): Promise<{ navigation: Navigation; broken: boolean }> {
     const stats = (this.perRoute[entry.route] ??= { visits: 0, actions: 0, findings: 0 });
     try {
       const result = await walkRoute({
@@ -207,6 +217,7 @@ class Run {
         route: entry.route,
         path: entry.path as string,
         visit,
+        navigation,
         avoid: this.avoid,
         now: Date.now,
         deadline: this.deadline,
@@ -217,10 +228,15 @@ class Run {
       this.actions += result.actions;
       this.moduleFailures += result.moduleFailures;
       for (const seen of result.paths) this.paths.add(seen);
+      if (result.navigation === "reload") this.reloads += 1;
+      else this.inAppVisits += 1;
+      if (result.fellBack) this.navigationFallbacks += 1;
+      return result;
     } catch (thrown) {
       if (thrown instanceof SessionLost) this.sessionLost = thrown;
       else stamp(`fuzz: visit ${entry.route} #${visit} failed: ${String(thrown).slice(0, 200)}`);
     }
+    return { navigation, broken: true };
   }
 }
 
@@ -242,6 +258,9 @@ const coverageOf = ({
   visits: run.visits,
   actions: run.actions,
   moduleFailures: run.moduleFailures,
+  reloads: run.reloads,
+  inAppVisits: run.inAppVisits,
+  navigationFallbacks: run.navigationFallbacks,
   pathsSeen: [...run.paths].toSorted(),
   perRoute: run.perRoute,
 });
@@ -306,7 +325,7 @@ const walk = async ({
   sink.complete({ routesExercised: coverage.routesVisited, routesTotal: coverage.routesTotal });
   await sink.flush();
   stamp(
-    `fuzz: done in ${timing.walkMillis}ms: ${coverage.routesVisited}/${coverage.routesTotal} routes, ${run.actions} actions, ${sink.findings} findings (${sink.distinct} distinct)`,
+    `fuzz: done in ${timing.walkMillis}ms: ${coverage.routesVisited}/${coverage.routesTotal} routes, ${run.reloads} reloads, ${run.inAppVisits} in-app (${run.navigationFallbacks} fell back), ${run.actions} actions, ${sink.findings} findings (${sink.distinct} distinct)`,
   );
   if (run.sessionLost !== undefined) throw run.sessionLost;
 };

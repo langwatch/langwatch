@@ -6,7 +6,7 @@ organisation through the public API (diffkit's org-per-tool helper), and never
 restarts the stack or lowers a global limit.
 
 ```
-go run ./cmd/fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only <area>] [-url URL]
+go run ./cmd/fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only <area>] [-reload-every N] [-url URL]
 ```
 
 - `api` (Go, this package): every operation in the branch OpenAPI document,
@@ -44,6 +44,7 @@ The two halves agree by file, in the run directory `.fuzz/<run>/`:
   "workers": 16,
   "durationMs": 120000,
   "actionsPerRoute": 40,
+  "reloadEvery": 5,
   "only": "",
   "org": {
     "name": "fuzzer",
@@ -70,6 +71,7 @@ The two halves agree by file, in the run directory `.fuzz/<run>/`:
   "message": "TypeError: x is not a function",
   "trail": ["goto /messages", "click button 'New'", "fill input#name 'fuzzer'"],
   "evidence": { "screenshot": "ui/0007.png", "url": "https://.../messages", "console": ["..."], "requests": ["GET /api/x 500"] },
+  "navigation": "reload|in-app",
   "capturedAt": "2026-09-30T12:00:07Z"
 }
 ```

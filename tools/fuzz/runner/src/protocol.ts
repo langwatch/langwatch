@@ -11,6 +11,8 @@ export const planSchema = z.object({
   workers: z.number().int().positive().default(16),
   durationMs: z.number().int().nonnegative().default(0),
   actionsPerRoute: z.number().int().positive().default(40),
+  /** reloadEvery: every Nth visit a lane loads the page afresh; the others navigate in-app. */
+  reloadEvery: z.number().int().positive().default(5),
   only: z.string().optional(),
   credential: z.object({
     email: z.string(),
@@ -66,7 +68,10 @@ export const findingSchema = z.object({
   /** seed and visit replay the trail: the same seed on the same route makes the same choices. */
   seed: z.number().int(),
   visit: z.number().int(),
+  /** navigation says how the visit reached its route: a full page load or an in-app move. */
+  navigation: z.enum(["reload", "in-app"]),
 });
+export type Navigation = Finding["navigation"];
 export type Finding = z.infer<typeof findingSchema>;
 
 /** runCompleteSchema is the last line of the file. */
@@ -87,6 +92,9 @@ export const coverageSchema = z.object({
   visits: z.number().int(),
   actions: z.number().int(),
   moduleFailures: z.number().int(),
+  reloads: z.number().int(),
+  inAppVisits: z.number().int(),
+  navigationFallbacks: z.number().int(),
   pathsSeen: z.array(z.string()),
   perRoute: z.record(
     z.string(),

@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { appendFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { Finding, RunComplete } from "./protocol.ts";
+import type { Finding, Navigation, RunComplete } from "./protocol.ts";
 
 /** SHOTS_PER_SIGNATURE bounds screenshots: ten thousand hits of one cause need three pictures. */
 export const SHOTS_PER_SIGNATURE = 3;
@@ -29,8 +29,8 @@ export class FindingSink {
   }
 
   /** nextShot names the next screenshot: its file, and its path relative to the run directory. */
-  nextShot(): { file: string; relative: string } {
-    const name = `${String(++this.shots).padStart(4, "0")}.png`;
+  nextShot(navigation: Navigation): { file: string; relative: string } {
+    const name = `${String(++this.shots).padStart(4, "0")}-${navigation}.png`;
     return { file: join(this.runDir, "ui", name), relative: `ui/${name}` };
   }
 

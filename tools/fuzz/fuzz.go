@@ -23,14 +23,18 @@ type Options struct {
 	Workers  int
 	Duration time.Duration
 	Only     string
-	URL      string // app origin; empty resolves the shared stack via haven
-	Root     string // repository root, for .fuzz output and the UI runner
+	// ReloadEvery makes every Nth UI visit a full page load; the rest navigate in-app.
+	ReloadEvery int
+	// ActionsPerRoute is how many random actions a UI visit makes before moving on.
+	ActionsPerRoute int
+	URL             string // app origin; empty resolves the shared stack via haven
+	Root            string // repository root, for .fuzz output and the UI runner
 }
 
 // Main parses args and runs the fuzzer, returning a process exit code.
 func Main(ctx context.Context, args []string, streams Streams, root string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(streams.Err, "usage: fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only AREA] [-url URL]")
+		fmt.Fprintln(streams.Err, "usage: fuzz api|ui|all [-seed N] [-workers N] [-duration D] [-only AREA] [-reload-every N] [-actions N] [-url URL]")
 		return 2
 	}
 	options := Options{Mode: args[0], Root: root}
@@ -40,6 +44,8 @@ func Main(ctx context.Context, args []string, streams Streams, root string) int 
 	flags.IntVar(&options.Workers, "workers", 0, "worker count (default 64 api, 16 ui)")
 	flags.DurationVar(&options.Duration, "duration", 2*time.Minute, "wall-clock budget")
 	flags.StringVar(&options.Only, "only", "", "restrict to operations/routes whose path contains this")
+	flags.IntVar(&options.ReloadEvery, "reload-every", DefaultReloadEvery, "ui: full page load every Nth visit, in-app navigation between (1 = always load)")
+	flags.IntVar(&options.ActionsPerRoute, "actions", DefaultActionsPerRoute, "ui: random actions per visited route")
 	flags.StringVar(&options.URL, "url", "", "app origin; default resolves the shared stack")
 	if err := flags.Parse(args[1:]); err != nil {
 		return 2

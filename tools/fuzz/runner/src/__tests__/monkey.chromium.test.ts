@@ -76,6 +76,7 @@ describe.skipIf(!installed)("the monkey against a fixture page", () => {
       route: "/",
       path: "/",
       visit: 0,
+      navigation: "reload",
       avoid: [],
       now: Date.now,
       deadline: Number.POSITIVE_INFINITY,
