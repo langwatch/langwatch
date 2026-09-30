@@ -25,6 +25,8 @@ from langevals.utils import get_evaluator_definitions  # noqa: E402
 HERE = Path(__file__).resolve().parent
 CORPUS = HERE / "corpus"
 FIXTURES = HERE.parent / "fixtures"
+# Corpus stems recorded by another evaluator than the stem names.
+EVALUATOR_OF_STEM = {"presidio__pii_detection_ner": "presidio__pii_detection"}
 
 
 def load_evaluator(family: str, name: str):
@@ -50,7 +52,7 @@ def wire(result) -> dict:
 
 
 def record(path: Path) -> int:
-    family, name = path.stem.split("__", 1)
+    family, name = EVALUATOR_OF_STEM.get(path.stem, path.stem).split("__", 1)
     evaluator_cls = load_evaluator(family, name)
     defs = get_evaluator_definitions(evaluator_cls)
     cases = json.loads(path.read_text(encoding="utf-8"))

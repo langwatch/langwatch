@@ -376,6 +376,8 @@ type AnalyzeResult struct {
 ```
 
 - **Default is simple** (Alex, 2026-09-30): nlpgo ships patterns only; any model is a `remote` analyser, never embedded.
+- **Remote wire**: Presidio's REST shape: `POST <base>/v1/analyze` `{text, language, entities}` answering `[{entity_type, start, end, score}]`, so a plain presidio-analyzer or any model service speaking it plugs in.
+- **Found in the port**: Presidio 2.2.364 ships the SG, AU and IN recognisers disabled for English; those settings never find anything today, and asking for only them errors. Go keeps that behaviour.
 - **Who owns what**: data-privacy (TS) keeps the policy and the method choice, including Google
   DLP and `connect` (it has licensing and the org opt-in). nlpgo owns detection: patterns plus a
   configured analyser for what patterns cannot find.
