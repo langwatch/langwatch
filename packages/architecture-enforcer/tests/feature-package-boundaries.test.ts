@@ -420,7 +420,7 @@ describe("feature package boundary lint", () => {
 
     const refused = lintWorkspace({ root, declarations: false })
       .filter(({ policy, file }) => policy === "package-role" && file.includes("query-language"))
-      .map(({ specifier }) => specifier)
+      .flatMap(({ specifier }) => (specifier === undefined ? [] : [specifier]))
       .toSorted((a, b) => a.localeCompare(b));
     expect(refused).toEqual(["@langwatch/agent-process", "@langwatch/workflow-contract", "react"]);
   });

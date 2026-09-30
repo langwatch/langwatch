@@ -369,9 +369,8 @@ export function lintBrowserKitExports(snapshot: WorkspaceSnapshot): Architecture
 }
 
 /**
- * Kit law rule 2: a kit is a leaf — it may depend on any module's contract, the Design
- * System, and `browser-host`, nothing else in the `@langwatch/*` family. Vendor deps
- * (React, Chakra, icons) are what rendering needs and are not what this rule guards.
+ * Kit law rule 2: a kit may depend on any module's contract or portable library, the Design
+ * System and `browser-host`, nothing else in `@langwatch/*`. Vendor deps are not guarded.
  */
 export function lintBrowserKitDependencies(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const modulePackages = discoverModulePackages(snapshot.resolver, snapshot.root);
@@ -379,6 +378,9 @@ export function lintBrowserKitDependencies(snapshot: WorkspaceSnapshot): Archite
   // An edge onto a browser package is the manifest closure's to report.
   const browserPackageNames = new Set(
     modulePackages.filter((pkg) => pkg.role === "browser").map((pkg) => pkg.name),
+  );
+  const libraryNames = new Set(
+    snapshot.packages.filter((pkg) => pkg.kind === "library").map((pkg) => pkg.name),
   );
 
   for (const pkg of modulePackages) {
@@ -392,6 +394,7 @@ export function lintBrowserKitDependencies(snapshot: WorkspaceSnapshot): Archite
 
       const allowed =
         name.endsWith("-contract") ||
+        libraryNames.has(name) ||
         name === "@langwatch/design-system" ||
         name === "@langwatch/browser-host";
 
@@ -401,7 +404,7 @@ export function lintBrowserKitDependencies(snapshot: WorkspaceSnapshot): Archite
         policy: "browser-kit-dependencies",
         file: pkg.manifestPath,
         specifier: name,
-        message: `A kit may depend only on contracts, the Design System, and browser-host (ARCHITECTURE.md §3.4 kit law 2); ${JSON.stringify(name)} is none of those.`,
+        message: `A kit may depend only on contracts, portable libraries, the Design System, and browser-host (ARCHITECTURE.md §3.4 kit law 2); ${JSON.stringify(name)} is none of those.`,
         allowed: "Depend on the owning module's contract instead, or drop the dependency.",
       });
     }
