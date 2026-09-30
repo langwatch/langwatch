@@ -19,7 +19,7 @@ const { api, state } = vi.hoisted(() => {
   const api = {
     useUtils: () => ({
       role: { getAll: { invalidate: () => void 0 } },
-      roleBinding: { listForOrg: { invalidate: () => void 0 } },
+      authz: { listManagedGrants: { invalidate: () => void 0 } },
     }),
     role: {
       getAll: {
@@ -34,8 +34,8 @@ const { api, state } = vi.hoisted(() => {
       update: { useMutation: mutation },
       delete: { useMutation: mutation },
     },
-    roleBinding: {
-      listForOrg: {
+    authz: {
+      listManagedGrants: {
         useQuery: () => ({
           data: state.assignmentsError ? undefined : state.assignments,
           isLoading: false,

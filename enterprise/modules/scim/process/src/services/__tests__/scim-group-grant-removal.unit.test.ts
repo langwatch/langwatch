@@ -12,7 +12,7 @@ import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import type {
   ScimGrantBindingScope,
   ScimGroupRecord,
-  ScimRoleBindingRecord,
+  ScimGrantRecord,
 } from "../../repositories/scim.repository.ts";
 import { ScimDirectoryService, type ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
@@ -38,7 +38,7 @@ const administrators: ScimGroupRecord = {
   updatedAt: fromDate(new Date("2024-01-02T00:00:00Z")),
 };
 
-const groupBinding: ScimRoleBindingRecord = {
+const groupBinding: ScimGrantRecord = {
   id: GROUP_BINDING,
   userId: null,
   groupId: GROUP,
@@ -49,7 +49,7 @@ const groupBinding: ScimRoleBindingRecord = {
   customRoleId: null,
 };
 
-const manualBinding: ScimRoleBindingRecord = {
+const manualBinding: ScimGrantRecord = {
   id: MANUAL_BINDING,
   userId: MEMBER,
   groupId: null,
@@ -91,7 +91,7 @@ function directoryOver(provenOffboarding = false) {
       for (const userId of input.userIds) members.delete(userId);
     }),
     groupSlugExists: vi.fn(async () => false),
-    findRoleBindings: vi.fn(async (scope: ScimGrantBindingScope) =>
+    findGrantRows: vi.fn(async (scope: ScimGrantBindingScope) =>
       scope.kind === "group" ? [groupBinding] : [manualBinding],
     ),
   };

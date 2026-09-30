@@ -1,6 +1,6 @@
 import {
   AuthzCommandDispatcherService,
-  AuthzBindingIdService,
+  AuthzGrantIdService,
   PostgresAuthzAdapter,
 } from "@langwatch/authz-process";
 import {
@@ -49,7 +49,7 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
     migrations.push(...IdentityOrganizationMigrations.create({ database }).build());
     if (eventing) {
       const dispatcher = AuthzCommandDispatcherService.create();
-      const bindingIds = AuthzBindingIdService.create();
+      const bindingIds = AuthzGrantIdService.create();
       const authz = PostgresAuthzAdapter.create({
         database,
         redis,

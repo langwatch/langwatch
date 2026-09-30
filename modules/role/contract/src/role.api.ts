@@ -3,17 +3,6 @@
  * catalog a definition is written from. A caller arrives as an argument, never
  * read from a session, so one operation serves every door.
  */
-import type {
-  AuthzAccessBreakdownOutput,
-  AuthzApplyMemberBindingsInput,
-  AuthzBindingMutationSuccess,
-  AuthzCreateBindingInput,
-  AuthzCreateBindingOutput,
-  AuthzDeleteBindingInput,
-  AuthzListManagedBindingsForOrganizationOutput,
-  AuthzListManagedBindingsForUserOutput,
-  AuthzUpdateBindingInput,
-} from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { RolePermissionCatalog } from "./role-rest.schemas.ts";
@@ -74,34 +63,6 @@ export interface RoleApi {
   filterAssignableRoles(input: { roleIds: string[]; organizationId: string }): Promise<string[]>;
   /** Every resource with its actions, and whether it binds at organization scope only. */
   getPermissionCatalog(): Promise<RolePermissionCatalog>;
-  listBindingsForOrganization(input: {
-    organizationId: string;
-  }): Promise<AuthzListManagedBindingsForOrganizationOutput>;
-  listBindingsForUser(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<AuthzListManagedBindingsForUserOutput>;
-  /** The caller's own standing: organization role, groups, direct bindings. */
-  getCallerAccessBreakdown(
-    input: { organizationId: string },
-    by: RoleUserCaller,
-  ): Promise<AuthzAccessBreakdownOutput>;
-  createBinding(
-    input: Omit<AuthzCreateBindingInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzCreateBindingOutput>;
-  updateBinding(
-    input: Omit<AuthzUpdateBindingInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzCreateBindingOutput>;
-  deleteBinding(
-    input: Omit<AuthzDeleteBindingInput, "actor">,
-    by: RoleCaller,
-  ): Promise<AuthzBindingMutationSuccess>;
-  applyMemberBindings(
-    input: Omit<AuthzApplyMemberBindingsInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzBindingMutationSuccess>;
 }
 
 export const RoleApi = moduleApi<RoleApi>()("role");

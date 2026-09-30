@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos are intentional no-ops.
 
-import type { AuthzCustomRole } from "@langwatch/authz-contract";
+import type { AuthzCustomRole, GrantScopeTier } from "@langwatch/authz-contract";
 import type {
   CustomRole,
   EnrichedAuditLog as ContractEnrichedAuditLog,
@@ -11,7 +11,6 @@ import type {
   OrganizationUserRole,
   PricingModel,
   ProjectRow as Project,
-  RoleBindingScopeType,
   Team,
   TeamUser,
   TeamUserRole,
@@ -440,7 +439,7 @@ export abstract class OrganizationMembershipRepository {
    * PROJECT scopes resolve to the same private space.
    */
   abstract findPersonalTeamsInScopes: (params: {
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[];
   }) => Promise<{ name: string }[]>;
 
   /**
@@ -450,7 +449,7 @@ export abstract class OrganizationMembershipRepository {
   abstract findSharedTeamIds: (params: { organizationId: string }) => Promise<string[]>;
 
   /** One member's team-scoped role bindings, restricted to the named teams. */
-  abstract findTeamRoleBindings: (params: {
+  abstract findTeamGrants: (params: {
     organizationId: string;
     userId: string;
     teamIds: string[];

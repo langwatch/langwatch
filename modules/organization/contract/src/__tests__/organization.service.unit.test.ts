@@ -7,7 +7,7 @@ import {
   createOrganizationTeamInputSchema,
   getOldestTeamInputSchema,
   createOrganizationGroupInputSchema,
-  organizationGroupBindingInputSchema,
+  organizationGroupGrantInputSchema,
   organizationBillingProfileSchema,
   type OrganizationService,
 } from "../index.ts";
@@ -76,7 +76,7 @@ describe("OrganizationService contract", () => {
         organizationId: "org",
         name: "Reviewers",
         memberIds: ["user"],
-        bindings: [
+        grants: [
           {
             role: "CUSTOM",
             customRoleId: "role",
@@ -88,7 +88,7 @@ describe("OrganizationService contract", () => {
       }),
     ).toMatchObject({ name: "Reviewers" });
     expect(() =>
-      organizationGroupBindingInputSchema.parse({
+      organizationGroupGrantInputSchema.parse({
         role: "OWNER",
         scopeType: "PROJECT",
         scopeId: "project",

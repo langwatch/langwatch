@@ -9,7 +9,7 @@ import {
   permissionSatisfiedBy,
   roleKeyForTeamRole,
   type AuthzManagedOrganizationBinding,
-  type RoleBindingScopeType,
+  type GrantScopeTier,
   type TeamUserRole,
 } from "@langwatch/authz-contract";
 
@@ -20,7 +20,7 @@ export function permissionsConferred({
   customPermissions,
 }: {
   role: TeamUserRole;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   customPermissions: readonly string[];
 }): readonly string[] {
   if (role === "CUSTOM") return customPermissions;

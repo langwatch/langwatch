@@ -33,7 +33,7 @@ describe("OrganizationMembershipService", () => {
     createMembership: vi.fn(),
     findPersonalTeamsInScopes: vi.fn(),
     findSharedTeamIds: vi.fn(),
-    findTeamRoleBindings: vi.fn(),
+    findTeamGrants: vi.fn(),
     findCustomRolePermissions: vi.fn(),
     findUserOrgRoleByTeamId: vi.fn(),
     getOrganizationIntent: vi.fn(),
@@ -108,7 +108,7 @@ describe("OrganizationMembershipService", () => {
     // test states otherwise.
     vi.mocked(mockRepo.findPersonalTeamsInScopes).mockResolvedValue([]);
     vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue([]);
-    vi.mocked(mockRepo.findTeamRoleBindings).mockResolvedValue([]);
+    vi.mocked(mockRepo.findTeamGrants).mockResolvedValue([]);
     vi.mocked(mockRepo.findCustomRolePermissions).mockResolvedValue([]);
     service = OrganizationMembershipService.create({
       repository: mockRepo,

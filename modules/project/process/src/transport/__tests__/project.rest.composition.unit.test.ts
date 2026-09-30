@@ -196,7 +196,7 @@ const MINTED_KEY_ROW = {
   ingestionTemplateId: null,
   createdAt: NOW,
   updatedAt: NOW,
-  roleBindings: [],
+  grants: [],
 };
 
 describe("the projects REST family over the application the composition builds", () => {

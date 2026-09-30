@@ -9,19 +9,11 @@ import {
   bindingScopeCanGrantPermission,
   builtInRoleIdSchema,
   builtinRolePermissions,
-  newAuthzBindingId,
+  newAuthzGrantId,
   PermissionDeniedError,
-  type AuthzAccessBreakdownOutput,
-  type AuthzApplyMemberBindingsInput,
-  type AuthzBindingMutationSuccess,
-  type AuthzCreateBindingInput,
-  type AuthzCreateBindingOutput,
-  type AuthzDeleteBindingInput,
-  type AuthzListManagedBindingsForOrganizationOutput,
-  type AuthzListManagedBindingsForUserOutput,
   type AuthzPrincipalRef,
-  type AuthzUpdateBindingInput,
   type BuiltInRoleId,
+  type GrantScopeTier,
 } from "@langwatch/authz-contract";
 import {
   assertEnterprisePlanType,
@@ -52,7 +44,6 @@ import {
   ROLE_PERMISSION_RESOURCES,
   roleResourceIsOrganizationExclusive,
   type Role,
-  type RoleBindingScopeType,
   type RoleCaller,
   type RoleCreate,
   type RolePermissionCatalog,
@@ -61,7 +52,6 @@ import {
   type RoleWriteAcknowledged,
 } from "@langwatch/role-contract";
 import { nowInstant, toDate } from "@langwatch/time";
-import { UserApi } from "@langwatch/user-contract";
 
 import type { RoleRepositories } from "../repositories/role.repositories.ts";
 import { RoleService } from "../services/role.service.ts";
@@ -80,7 +70,6 @@ export class RoleApp implements RoleApi {
   static readonly dependencies = {
     permissions: AuthzApi,
     organizations: OrganizationApi,
-    users: UserApi,
     entitlement: EntitlementApi,
   };
   static readonly reads = reads("prisma");
@@ -88,7 +77,6 @@ export class RoleApp implements RoleApi {
   #roles: RoleService;
   #permissions: AuthzApi;
   #organizations: OrganizationApi;
-  #users: UserApi;
   #entitlement: EntitlementApi;
   #prisma: RoleSetup["members"]["prisma"];
 
@@ -100,7 +88,6 @@ export class RoleApp implements RoleApi {
     this.#roles = RoleService.create({ repository: repositories.roles });
     this.#permissions = dependencies.permissions;
     this.#organizations = dependencies.organizations;
-    this.#users = dependencies.users;
     this.#entitlement = dependencies.entitlement;
     this.#prisma = members.prisma;
   }
@@ -328,86 +315,11 @@ export class RoleApp implements RoleApi {
     };
   }
 
-  // ── role bindings ──────────────────────────────────────────────────────────
-
-  /** Every role binding in the organization, for the members administration screen. */
-  listBindingsForOrganization(input: {
-    organizationId: string;
-  }): Promise<AuthzListManagedBindingsForOrganizationOutput> {
-    return this.#permissions.listManagedBindingsForOrganization(input);
-  }
-
-  /** One user's role bindings, for the member detail dialog. */
-  listBindingsForUser(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<AuthzListManagedBindingsForUserOutput> {
-    return this.#permissions.listManagedBindingsForUser(input);
-  }
-
-  /**
-   * The caller's own standing. The display identity is read through the user
-   * directory rather than off a session, because a handler is handed a caller
-   * id and nothing else.
-   */
-  async getCallerAccessBreakdown(
-    input: { organizationId: string },
-    by: RoleUserCaller,
-  ): Promise<AuthzAccessBreakdownOutput> {
-    const profile = await this.#users.findById({ id: by.id });
-
-    return this.#permissions.getAccessBreakdown({
-      organizationId: input.organizationId,
-      userId: by.id,
-      userName: profile?.name ?? null,
-      userEmail: profile?.email ?? null,
-    });
-  }
-
-  /** Binds a user or a group to a role at one scope. */
-  createBinding(
-    input: Omit<AuthzCreateBindingInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzCreateBindingOutput> {
-    return this.#permissions.createBinding({ ...input, actor: actorOf(by), caller: callerOf(by) });
-  }
-
-  /** Changes the role an existing binding grants. */
-  updateBinding(
-    input: Omit<AuthzUpdateBindingInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzCreateBindingOutput> {
-    return this.#permissions.updateBinding({ ...input, actor: actorOf(by), caller: callerOf(by) });
-  }
-
-  /** Removes one binding by id. */
-  deleteBinding(
-    input: Omit<AuthzDeleteBindingInput, "actor">,
-    by: RoleCaller,
-  ): Promise<AuthzBindingMutationSuccess> {
-    return this.#permissions.deleteBinding({ ...input, actor: actorOf(by) });
-  }
-
-  /**
-   * Applies one member's deletes and creates together, so a partial failure
-   * cannot leave them holding some of the old bindings and none of the new.
-   */
-  applyMemberBindings(
-    input: Omit<AuthzApplyMemberBindingsInput, "actor" | "caller">,
-    by: RoleCaller,
-  ): Promise<AuthzBindingMutationSuccess> {
-    return this.#permissions.applyMemberBindings({
-      ...input,
-      actor: actorOf(by),
-      caller: callerOf(by),
-    });
-  }
-
   // ── the checks and writes the operations above share ───────────────────────
 
   /** The personal-workspace fence a team or project binding is refused at. */
   async #assertNoPersonalTeamScope(
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[],
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[],
   ): Promise<void> {
     const teamIds = scopes
       .filter((scope) => scope.scopeType === "TEAM")
@@ -606,7 +518,7 @@ export class RoleApp implements RoleApi {
       organizationId: input.organizationId,
       bindings: [
         {
-          bindingId: newAuthzBindingId(),
+          bindingId: newAuthzGrantId(),
           principal: { userId: input.userId },
           role,
           customRoleId: input.customRoleId,

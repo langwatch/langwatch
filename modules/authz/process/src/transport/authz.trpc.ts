@@ -5,9 +5,15 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
   AuthzApi,
+  authzApplyMemberBindingsInputSchema,
+  authzBindingMutationSuccessSchema,
   authzChangeGrantRoleInputSchema,
   authzCreateGrantInputSchema,
   authzListGrantsInputSchema,
+  authzListManagedBindingsForOrganizationInputSchema,
+  authzListManagedBindingsForOrganizationOutputSchema,
+  authzListManagedBindingsForUserInputSchema,
+  authzListManagedBindingsForUserOutputSchema,
   authzOwnStandingInputSchema,
   authzOwnStandingSchema,
   authzRevokeGrantByIdInputSchema,
@@ -40,6 +46,18 @@ export const authzTrpc = defineTrpcContract("authz")
   .mutation("revokeGrant")
   .withInput(authzRevokeGrantByIdInputSchema.omit({ actor: true }))
   .withOutput(grantRevokedSchema)
+
+  .query("listManagedGrants")
+  .withInput(authzListManagedBindingsForOrganizationInputSchema)
+  .withOutput(authzListManagedBindingsForOrganizationOutputSchema)
+
+  .query("listMemberGrants")
+  .withInput(authzListManagedBindingsForUserInputSchema)
+  .withOutput(authzListManagedBindingsForUserOutputSchema)
+
+  .mutation("applyMemberGrants")
+  .withInput(authzApplyMemberBindingsInputSchema.omit(IMPLIED_BY_SESSION))
+  .withOutput(authzBindingMutationSuccessSchema)
   .build();
 
 /** The session as the escalation ceiling: a person, or the key a CLI session arrived on. */
@@ -85,5 +103,22 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) =>
       app.revokeGrant({ ...input, actor: toLedgerActor(actor) }),
+    )
+
+    /** Every grant in the organization with its principal and scope named. */
+    .procedure("listManagedGrants")
+    .withPermission("organization:manage")
+    .handle(async ({ app, input }) => app.listManagedBindingsForOrganization(input))
+
+    /** One member's grants, cheaper than listing the organization and filtering. */
+    .procedure("listMemberGrants")
+    .withPermission("organization:manage")
+    .handle(async ({ app, input }) => app.listManagedBindingsForUser(input))
+
+    /** One member's revokes and creates together, so the sheet cannot half-apply. */
+    .procedure("applyMemberGrants")
+    .withPermission("organization:manage")
+    .handle(async ({ app, input, actor }) =>
+      app.applyMemberBindings({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
     .build();

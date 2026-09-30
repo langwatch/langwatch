@@ -126,6 +126,9 @@ describe("the application's AuthZ tRPC adapter", () => {
         "createGrant",
         "changeGrantRole",
         "revokeGrant",
+        "listManagedGrants",
+        "listMemberGrants",
+        "applyMemberGrants",
       ];
 
       expect(Object.keys(authzTrpc.members)).toEqual(declared);
@@ -141,7 +144,7 @@ describe("the application's AuthZ tRPC adapter", () => {
       const { accesses } = harness();
 
       // The grant procedures beside it sit at organization:manage.
-      expect(accesses).toEqual(["service-authorized", ...Array(4).fill("permission")]);
+      expect(accesses).toEqual(["service-authorized", ...Array(7).fill("permission")]);
     });
   });
 });

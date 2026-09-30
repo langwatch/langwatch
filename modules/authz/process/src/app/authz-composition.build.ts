@@ -30,14 +30,14 @@ import { MemoryAuthzSessionVersionRepository } from "../repositories/memory/memo
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import {
-  type AuthzBindingDatabase,
-  PrismaAuthzBindingRepository,
-} from "../repositories/prisma/prisma.authz-binding.repository.ts";
-import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,
 } from "../repositories/prisma/prisma.authz-cutover.repository.ts";
 import type { PrismaAuthzGrantDatabase } from "../repositories/prisma/prisma.authz-grant.repository.ts";
+import {
+  type AuthzManagedGrantDatabase,
+  PrismaAuthzManagedGrantRepository,
+} from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
 import {
   type AuthzMembershipStampDatabase,
   PrismaAuthzMembershipStampRepository,
@@ -72,7 +72,7 @@ export type PostgresAuthzDatabase = AuthzLedgerDatabase &
   AuthzMigrationDatabase &
   AuthzCutoverDatabase &
   AuthzAuditDatabase &
-  AuthzBindingDatabase &
+  AuthzManagedGrantDatabase &
   AuthzMembershipStampDatabase &
   AuthzProjectionDatabase;
 
@@ -221,7 +221,7 @@ export class PostgresAuthzAdapter {
     const ledger = EventingAuthzLedgerAdapter.create(ledgerOptions);
     const grantRepository = EventingAuthzGrantRepository.create({ database, writer: ledger });
     const bindingRepository =
-      this.options.repositories?.bindings ?? PrismaAuthzBindingRepository.create({ database });
+      this.options.repositories?.bindings ?? PrismaAuthzManagedGrantRepository.create({ database });
 
     const authzOptions: AuthzServiceOptions = {
       repository: EventingAuthzReadRepository.create(database),

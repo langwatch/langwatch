@@ -33,9 +33,7 @@ const { api, state } = vi.hoisted(() => {
         },
       },
       revokeGrant: { useMutation: mutation },
-    },
-    roleBinding: {
-      listForOrg: {
+      listManagedGrants: {
         useQuery: (_input: unknown, options: { enabled?: boolean }) => {
           if (options.enabled) state.bindingReads += 1;
           return { data: state.bindings, isLoading: false };

@@ -6,7 +6,6 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
-import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
 import { RoleApp } from "../role.app.ts";
@@ -63,7 +62,6 @@ export function createRoleTestApp(
     roles?: MemoryRoleRepository;
     permissions?: Partial<AuthzApi>;
     organizations?: Partial<OrganizationApi>;
-    users?: Partial<UserApi>;
     entitlement?: Partial<EntitlementApi>;
     prisma?: PrismaClient;
   }> = {},
@@ -82,7 +80,6 @@ export function createRoleTestApp(
         input.organizations ?? {},
         "OrganizationApi",
       ),
-      users: createApiFixture<UserApi>(input.users ?? {}, "UserApi"),
       entitlement: createApiFixture<EntitlementApi>(
         input.entitlement ?? { getActivePlan: async () => testPlan() },
         "EntitlementApi",

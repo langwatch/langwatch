@@ -6,7 +6,7 @@ import type {
   AuthzBindingScopeRow,
   AuthzManagedBindingRow,
   AuthzUserGroupRow,
-} from "../authz-binding.repository.ts";
+} from "../authz-managed-grant.repository.ts";
 
 /** One membership's unfinished admission marker. */
 export type AuthzMemoryAdmissionRow = {

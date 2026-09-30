@@ -1,7 +1,7 @@
 import type {
   OrganizationRole,
   PrincipalKind,
-  RoleBindingScopeType,
+  GrantScopeTier,
   TeamUserRole,
 } from "@langwatch/authz-contract";
 
@@ -27,7 +27,7 @@ export type AuthzManagedBindingRow = {
   apiKeyId: string | null;
   role: TeamUserRole;
   customRoleId: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
 };
 
@@ -53,7 +53,7 @@ export type AuthzUserGroupRow = {
 };
 
 /** Private persistence facts needed by the binding-management methods. */
-export abstract class AuthzBindingRepository {
+export abstract class AuthzManagedGrantRepository {
   abstract hasBindingsForUser(input: { organizationId: string; userId: string }): Promise<boolean>;
 
   abstract hasLegacySharedTeamMembership(input: {
@@ -64,7 +64,7 @@ export abstract class AuthzBindingRepository {
   abstract findScopeRows(input: {
     organizationId: string;
     scopes: readonly {
-      scopeType: RoleBindingScopeType;
+      scopeType: GrantScopeTier;
       scopeId: string;
     }[];
   }): Promise<AuthzBindingScopeRow[]>;

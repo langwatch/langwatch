@@ -10,10 +10,23 @@ import {
   type ModuleApi,
   type OutputsFromMap,
 } from "@langwatch/api/web";
+import type {
+  AuthzApplyMemberBindingsInput,
+  AuthzChangeGrantRoleInput,
+  AuthzCreateGrantInput,
+  AuthzListManagedBindingsForOrganizationInput,
+  AuthzListManagedBindingsForOrganizationOutput,
+  AuthzListManagedBindingsForUserInput,
+  AuthzListManagedBindingsForUserOutput,
+  AuthzRevokeGrantByIdInput,
+  Grant,
+  GrantRevoked,
+} from "@langwatch/authz-contract";
 import type { Plan } from "@langwatch/entitlement-contract";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import type {
   EnrichedAuditLog,
+  groupTrpc,
   licenseEnforcementTrpc,
   JoinRequestAutomaticJoins,
   JoinRequestMine,
@@ -25,11 +38,7 @@ import type {
 } from "@langwatch/organization-contract";
 
 import type { TeamRoleValue } from "../model/member-role-constraints.ts";
-import type {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "../model/prisma-types.ts";
+import type { OrganizationUserRole, TeamUserRole } from "../model/prisma-types.ts";
 
 /**
  * The export must send this exact shape: a pre-filtered deep-link that
@@ -132,7 +141,7 @@ export type ProjectAccessRow = TeamAccessRow & {
   bindingId?: string | null;
 };
 
-export type TeamWithRoleBindings = TeamWithProjects & {
+export type TeamWithGrants = TeamWithProjects & {
   /**
    * Shown under the team, not the project, because that's where a reader
    * looks for "who can see this"; names the project each one reaches.
@@ -191,25 +200,6 @@ export type OrganizationInviteReading = {
   teamIds: string;
 };
 
-/** An access rule: a role held at a scope, by a person or through a group. */
-export type RoleBindingReading = {
-  id: string;
-  userId: string;
-  role: TeamRoleValue;
-  customRoleId?: string | null;
-  customRoleName?: string | null;
-  scopeType: RoleBindingScopeType;
-  scopeId: string;
-  scopeName?: string | null;
-  groupId?: string | null;
-  groupName?: string | null;
-  /**
-   * A group binding grants to every member of it; the row carries the
-   * member ids rather than the table joining for them.
-   */
-  memberUserIds: string[];
-};
-
 /** A custom role, as the role pickers offer one. */
 export type CustomRoleReading = {
   id: string;
@@ -252,536 +242,392 @@ export type JoinRequestReading = {
   expiresAt: NonNullable<JoinRequestPending[number]["expiresAt"]>;
 };
 
-/** `licenseEnforcement.*` is organization's own contract; the rest is still hand-written. */
-export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> & {
-  organization: {
-    /**
-     * `pageOffset`/`pageSize` are real offset paging — a Prisma `skip` read,
-     * not a keyset walk — which is why the footer drives its own offsets
-     * rather than carrying a cursor.
-     */
-    getAuditLogs: {
-      query: {
-        input: AuditLogFilters & { pageOffset: number; pageSize: number };
-        output: AuditLogPage;
+/** `licenseEnforcement.*` and `group.*` derive from organization contracts; the rest is here. */
+export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
+  ContractApiMap<typeof groupTrpc> & {
+    organization: {
+      /**
+       * `pageOffset`/`pageSize` are real offset paging — a Prisma `skip` read,
+       * not a keyset walk — which is why the footer drives its own offsets
+       * rather than carrying a cursor.
+       */
+      getAuditLogs: {
+        query: {
+          input: AuditLogFilters & { pageOffset: number; pageSize: number };
+          output: AuditLogPage;
+        };
       };
-    };
 
-    /**
-     * The organization graph the application shell already holds. Asked by
-     * the frontend feature (not the screen, which gets it via host port),
-     * with the shell's same input, so it shares one cache entry per document.
-     */
-    getAll: {
-      query: {
-        input: { isDemo: boolean };
-        output: {
-          id: string;
-          name: string;
-          slug: string;
-          teams: {
+      /**
+       * The organization graph the application shell already holds. Asked by
+       * the frontend feature (not the screen, which gets it via host port),
+       * with the shell's same input, so it shares one cache entry per document.
+       */
+      getAll: {
+        query: {
+          input: { isDemo: boolean };
+          output: {
             id: string;
             name: string;
             slug: string;
-            projects: { id: string; name: string; slug: string }[];
-          }[];
-        }[];
-      };
-    };
-
-    /**
-     * One procedure, two readers: the audit page's user search and the
-     * members table. `OrganizationMemberMatch` stays exported as the audit
-     * page's narrower view (`members[].user`) of the same row.
-     */
-    getOrganizationWithMembersAndTheirTeams: {
-      query: {
-        input: { organizationId: string; includeDeactivated?: boolean };
-        output: OrganizationWithMembersAndTheirTeams;
-      };
-    };
-
-    /** One member, as the person drawer opens them. */
-    getMemberById: {
-      query: {
-        input: { organizationId: string; userId: string };
-        output: OrganizationMemberWithTeams;
-      };
-    };
-
-    /** Why each member is here, keyed by user id; asked apart so failing costs only the chips. */
-    getMemberProvenance: {
-      query: {
-        input: { organizationId: string };
-        output: Record<string, OrganizationMemberProvenance>;
-      };
-    };
-
-    /** The same list, flat, for the pickers that only need names. */
-    getAllOrganizationMembers: {
-      query: {
-        input: { organizationId: string };
-        output: OrganizationMemberWithTeams[];
-      };
-    };
-
-    /** Removes a seat outright. */
-    deleteMember: {
-      mutation: { input: { organizationId: string; userId: string }; output: unknown };
-    };
-
-    /** Frees a seat reversibly, which is what a licence counts. */
-    setMemberDisabled: {
-      mutation: {
-        input: { organizationId: string; userId: string; disabled: boolean };
-        output: unknown;
-      };
-    };
-
-    updateMemberRole: {
-      mutation: {
-        input: {
-          organizationId: string;
-          userId: string;
-          role: OrganizationUserRole;
-          customRoleId?: string | null;
-        };
-        /**
-         * Named rather than counted: the dialog lists them, and a warning
-         * saying "three teams" without which three is one an administrator
-         * cannot act on.
-         */
-        output: { teamsLeftWithoutAdmin?: { id: string; name: string }[] };
-      };
-    };
-  };
-
-  invite: {
-    getOrganizationPendingInvites: {
-      query: { input: { organizationId: string }; output: OrganizationInviteReading[] };
-    };
-
-    /**
-     * ONE RESULT PER INVITE: `emailNotSent` is set when there's no mail
-     * provider, since the invite is still CREATED and a link is handed back
-     * to send by hand — a per-row flag, not a failure.
-     */
-    createInvites: {
-      mutation: {
-        input: {
-          organizationId: string;
-          invites: {
-            email: string;
-            role: OrganizationUserRole;
-            teams?: { teamId: string; role: TeamRoleValue; customRoleId?: string | null }[];
+            teams: {
+              id: string;
+              name: string;
+              slug: string;
+              projects: { id: string; name: string; slug: string }[];
+            }[];
           }[];
         };
-        output: ({
-          invite: OrganizationInviteReading;
-          emailNotSent?: boolean;
-        } | null)[];
       };
-    };
 
-    deleteInvite: {
-      mutation: { input: { organizationId: string; inviteId: string }; output: unknown };
-    };
-
-    resendInvite: {
-      mutation: {
-        input: { organizationId: string; inviteId: string };
-        output: { invite: OrganizationInviteReading; emailNotSent?: boolean };
-      };
-    };
-  };
-
-  limits: {
-    /**
-     * TWO READERS, ONE ENTRY: the audit page's Enterprise gate reads
-     * `activePlan.type`, and the seat meter reads the two counts — same
-     * procedure, same cache key, one round trip.
-     */
-    getUsage: {
-      query: {
-        input: { organizationId: string };
-        output: {
-          activePlan: { type: string };
-          membersCount: number;
-          membersLiteCount: number;
+      /**
+       * One procedure, two readers: the audit page's user search and the
+       * members table. `OrganizationMemberMatch` stays exported as the audit
+       * page's narrower view (`members[].user`) of the same row.
+       */
+      getOrganizationWithMembersAndTheirTeams: {
+        query: {
+          input: { organizationId: string; includeDeactivated?: boolean };
+          output: OrganizationWithMembersAndTheirTeams;
         };
       };
-    };
-  };
 
-  team: {
-    getTeamWithMembers: {
-      query: { input: { organizationId: string; slug: string }; output: TeamWithMembers };
-    };
-
-    getTeamsWithMembers: {
-      query: { input: { organizationId: string }; output: TeamWithMembers[] };
-    };
-
-    /** The teams list, with the people bound directly to each. */
-    getTeamsWithRoleBindings: {
-      query: { input: { organizationId: string }; output: TeamWithRoleBindings[] };
-    };
-
-    createTeamWithMembers: {
-      mutation: {
-        input: {
-          organizationId: string;
-          name: string;
-          members: { userId: string; role: TeamRoleValue }[];
+      /** One member, as the person drawer opens them. */
+      getMemberById: {
+        query: {
+          input: { organizationId: string; userId: string };
+          output: OrganizationMemberWithTeams;
         };
-        output: TeamReading;
       };
-    };
 
-    update: {
-      mutation: {
-        input: {
-          teamId: string;
-          name: string;
-          members: { userId: string; role: TeamRoleValue }[];
+      /** Why each member is here, keyed by user id; asked apart so failing costs only the chips. */
+      getMemberProvenance: {
+        query: {
+          input: { organizationId: string };
+          output: Record<string, OrganizationMemberProvenance>;
         };
-        output: TeamReading;
       };
-    };
 
-    archiveById: {
-      mutation: { input: { teamId: string }; output: unknown };
-    };
-  };
-
-  project: {
-    /**
-     * `teamId`/`newTeamName` are one choice — the server refuses a call
-     * that names neither. The answer carries the SLUG, not the id: that is
-     * the new project's address.
-     */
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          name: string;
-          teamId?: string;
-          newTeamName?: string;
-          language: string;
-          framework: string;
+      /** The same list, flat, for the pickers that only need names. */
+      getAllOrganizationMembers: {
+        query: {
+          input: { organizationId: string };
+          output: OrganizationMemberWithTeams[];
         };
-        output: { success: boolean; projectSlug: string };
       };
-    };
 
-    /**
-     * Every field but `projectId` is optional: this procedure saves the
-     * whole project-settings page, and a drawer posting untouched fields
-     * back would overwrite settings it never showed the reader.
-     */
-    update: {
-      mutation: {
-        input: { projectId: string; name?: string; teamId?: string };
-        output: { success: boolean; projectSlug: string };
+      /** Removes a seat outright. */
+      deleteMember: {
+        mutation: { input: { organizationId: string; userId: string }; output: unknown };
       };
-    };
 
-    archiveById: {
-      mutation: { input: { projectId: string; projectToArchiveId?: string }; output: unknown };
-    };
-  };
-
-  plan: {
-    /**
-     * `Plan` is the producer's own type (`@langwatch/entitlement-contract`),
-     * not a restatement — a field the seat banner reads is a field the
-     * producer promises.
-     */
-    getActivePlan: {
-      query: { input: { organizationId: string }; output: Plan };
-    };
-  };
-
-  role: {
-    getAll: { query: { input: { organizationId: string }; output: CustomRoleReading[] } };
-  };
-
-  roleBinding: {
-    listForOrg: {
-      query: { input: { organizationId: string }; output: RoleBindingReading[] };
-    };
-    listForUser: {
-      query: {
-        input: { organizationId: string; userId: string };
-        output: RoleBindingReading[];
-      };
-    };
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          userId: string;
-          role: TeamRoleValue;
-          customRoleId?: string | null;
-          scopeType: RoleBindingScopeType;
-          scopeId: string;
+      /** Frees a seat reversibly, which is what a licence counts. */
+      setMemberDisabled: {
+        mutation: {
+          input: { organizationId: string; userId: string; disabled: boolean };
+          output: unknown;
         };
-        output: unknown;
       };
-    };
-    update: {
-      mutation: {
-        input: {
-          organizationId: string;
-          bindingId: string;
-          role: TeamRoleValue;
-          customRoleId?: string | null;
-        };
-        output: unknown;
-      };
-    };
-    delete: {
-      mutation: { input: { organizationId: string; bindingId: string }; output: unknown };
-    };
-    /** One save for a member's whole access sheet, so it cannot half-apply. */
-    applyMemberBindings: {
-      mutation: {
-        input: {
-          organizationId: string;
-          userId: string;
-          /** The rows that stay, with whatever role they now hold. */
-          bindings?: {
-            id?: string;
-            role: TeamRoleValue;
-            customRoleId?: string | null;
-            scopeType: RoleBindingScopeType;
-            scopeId: string;
-          }[];
-          /** The rows the sheet added, which have no id yet. */
-          bindingsToCreate?: {
-            role: TeamRoleValue;
-            customRoleId?: string | null;
-            scopeType: RoleBindingScopeType;
-            scopeId: string;
-          }[];
-          bindingIdsToDelete?: string[];
-        };
-        output: unknown;
-      };
-    };
-  };
 
-  group: {
-    listAll: {
-      query: {
-        input: { organizationId: string };
-        output: {
-          id: string;
-          name: string;
-          scimSource: string | null;
-          memberCount: number;
-          bindings: {
-            role: TeamRoleValue;
-            customRoleName?: string | null;
-            scopeType: RoleBindingScopeType;
-            scopeId: string;
-            scopeName?: string | null;
-          }[];
-        }[];
-      };
-    };
-    /** The groups one person is in, and what each of them grants. */
-    listForMember: {
-      query: {
-        input: { organizationId: string; userId: string };
-        output: {
-          id: string;
-          name: string;
-          /** The directory that manages this group's membership, when one does. */
-          scimSource: string | null;
-          bindings: {
-            id: string;
-            role: TeamRoleValue;
-            customRoleName?: string | null;
-            scopeType: RoleBindingScopeType;
-            scopeId: string;
-            scopeName?: string | null;
-          }[];
-        }[];
-      };
-    };
-    getById: {
-      query: {
-        input: { organizationId: string; groupId: string };
-        output: {
-          id: string;
-          name: string;
-          scimSource: string | null;
-          members: {
+      updateMemberRole: {
+        mutation: {
+          input: {
+            organizationId: string;
             userId: string;
-            name: string | null;
-            email: string | null;
-            image?: string | null;
-          }[];
-          bindings: {
-            id: string;
-            role: TeamRoleValue;
+            role: OrganizationUserRole;
             customRoleId?: string | null;
-            customRoleName?: string | null;
-            scopeType: RoleBindingScopeType;
-            scopeId: string;
-            scopeName?: string | null;
-          }[];
+          };
+          /**
+           * Named rather than counted: the dialog lists them, and a warning
+           * saying "three teams" without which three is one an administrator
+           * cannot act on.
+           */
+          output: { teamsLeftWithoutAdmin?: { id: string; name: string }[] };
         };
       };
     };
-    /** A new group, with whatever access rules were sketched in the dialog. */
-    create: {
-      mutation: {
-        input: {
-          organizationId: string;
-          name: string;
-          memberIds?: string[];
-          bindings?: {
-            role: TeamRoleValue;
-            customRoleId?: string | null;
-            scopeType: RoleBindingScopeType;
-            scopeId: string;
-          }[];
-        };
-        output: { id: string };
-      };
-    };
-    delete: {
-      mutation: { input: { organizationId: string; groupId: string }; output: unknown };
-    };
-    addBinding: {
-      mutation: {
-        input: {
-          organizationId: string;
-          groupId: string;
-          role: TeamRoleValue;
-          customRoleId?: string | null;
-          scopeType: RoleBindingScopeType;
-          scopeId: string;
-        };
-        output: unknown;
-      };
-    };
-    /** One save for a group's whole sheet — name, members and bindings. */
-    applyEdits: {
-      mutation: {
-        input: {
-          organizationId: string;
-          groupId: string;
-          /** Null when the name was not touched, which is not the same as "". */
-          rename?: { name: string } | null;
-          bindingIdsToDelete: string[];
-          /** The rows the sheet added, which have no id yet. */
-          bindingsToCreate: {
-            role: TeamRoleValue;
-            customRoleId?: string | null;
-            scopeType: RoleBindingScopeType;
-            scopeId: string;
-          }[];
-          memberUserIdsToAdd: string[];
-          memberUserIdsToRemove: string[];
-        };
-        output: unknown;
-      };
-    };
-  };
 
-  departments: {
-    list: { query: { input: { organizationId: string }; output: DepartmentReading[] } };
-    assignments: {
-      query: { input: { organizationId: string }; output: DepartmentAssignments };
-    };
-    assignUser: {
-      mutation: {
-        input: { organizationId: string; userId: string; departmentId: string | null };
-        output: unknown;
+    invite: {
+      getOrganizationPendingInvites: {
+        query: { input: { organizationId: string }; output: OrganizationInviteReading[] };
       };
-    };
-    assignTeam: {
-      mutation: {
-        input: { organizationId: string; teamId: string; departmentId: string | null };
-        output: unknown;
-      };
-    };
-    assignProject: {
-      mutation: {
-        input: { organizationId: string; projectId: string; departmentId: string | null };
-        output: unknown;
-      };
-    };
-  };
 
-  joinRequests: {
-    /** The post-login offer: the lookup minus the domains this person dismissed. */
-    offer: { query: { input: void; output: JoinLookupDecision } };
-    /** Everything this person is waiting on. */
-    mine: { query: { input: void; output: JoinRequestMine } };
-    dismissOffer: {
-      mutation: { input: Record<string, never>; output: { success: true } };
-    };
-    request: {
-      mutation: {
-        input: { organizationId: string };
-        output: { joinRequestId: string; state: "PENDING" | "APPROVED" };
-      };
-    };
-    automaticJoins: {
-      query: { input: { organizationId: string }; output: JoinRequestAutomaticJoins };
-    };
-    /**
-     * Three settings, not a boolean: `off` refuses, `request` queues for an
-     * administrator, `auto` lets them in. The domains travel with it, since
-     * an organization can verify more than one.
-     */
-    joining: {
-      query: {
-        input: { organizationId: string };
-        output: { domainJoin: DomainJoinSetting; joinDomains: string[] };
-      };
-    };
-    setJoining: {
-      mutation: {
-        input: {
-          organizationId: string;
-          domainJoin: DomainJoinSetting;
-          domains: string[];
+      /**
+       * ONE RESULT PER INVITE: `emailNotSent` is set when there's no mail
+       * provider, since the invite is still CREATED and a link is handed back
+       * to send by hand — a per-row flag, not a failure.
+       */
+      createInvites: {
+        mutation: {
+          input: {
+            organizationId: string;
+            invites: {
+              email: string;
+              role: OrganizationUserRole;
+              teams?: { teamId: string; role: TeamRoleValue; customRoleId?: string | null }[];
+            }[];
+          };
+          output: ({
+            invite: OrganizationInviteReading;
+            emailNotSent?: boolean;
+          } | null)[];
         };
-        output: { next: DomainJoinSetting };
+      };
+
+      deleteInvite: {
+        mutation: { input: { organizationId: string; inviteId: string }; output: unknown };
+      };
+
+      resendInvite: {
+        mutation: {
+          input: { organizationId: string; inviteId: string };
+          output: { invite: OrganizationInviteReading; emailNotSent?: boolean };
+        };
       };
     };
-    pending: {
-      query: { input: { organizationId: string }; output: JoinRequestReading[] };
+
+    limits: {
+      /**
+       * TWO READERS, ONE ENTRY: the audit page's Enterprise gate reads
+       * `activePlan.type`, and the seat meter reads the two counts — same
+       * procedure, same cache key, one round trip.
+       */
+      getUsage: {
+        query: {
+          input: { organizationId: string };
+          output: {
+            activePlan: { type: string };
+            membersCount: number;
+            membersLiteCount: number;
+          };
+        };
+      };
     };
-    approve: {
-      mutation: { input: { organizationId: string; joinRequestId: string }; output: unknown };
+
+    team: {
+      getTeamWithMembers: {
+        query: { input: { organizationId: string; slug: string }; output: TeamWithMembers };
+      };
+
+      getTeamsWithMembers: {
+        query: { input: { organizationId: string }; output: TeamWithMembers[] };
+      };
+
+      /** The teams list, with the people bound directly to each. */
+      getTeamsWithGrants: {
+        query: { input: { organizationId: string }; output: TeamWithGrants[] };
+      };
+
+      createTeamWithMembers: {
+        mutation: {
+          input: {
+            organizationId: string;
+            name: string;
+            members: { userId: string; role: TeamRoleValue }[];
+          };
+          output: TeamReading;
+        };
+      };
+
+      update: {
+        mutation: {
+          input: {
+            teamId: string;
+            name: string;
+            members: { userId: string; role: TeamRoleValue }[];
+          };
+          output: TeamReading;
+        };
+      };
+
+      archiveById: {
+        mutation: { input: { teamId: string }; output: unknown };
+      };
     };
-    reject: {
-      mutation: { input: { organizationId: string; joinRequestId: string }; output: unknown };
+
+    project: {
+      /**
+       * `teamId`/`newTeamName` are one choice — the server refuses a call
+       * that names neither. The answer carries the SLUG, not the id: that is
+       * the new project's address.
+       */
+      create: {
+        mutation: {
+          input: {
+            organizationId: string;
+            name: string;
+            teamId?: string;
+            newTeamName?: string;
+            language: string;
+            framework: string;
+          };
+          output: { success: boolean; projectSlug: string };
+        };
+      };
+
+      /**
+       * Every field but `projectId` is optional: this procedure saves the
+       * whole project-settings page, and a drawer posting untouched fields
+       * back would overwrite settings it never showed the reader.
+       */
+      update: {
+        mutation: {
+          input: { projectId: string; name?: string; teamId?: string };
+          output: { success: boolean; projectSlug: string };
+        };
+      };
+
+      archiveById: {
+        mutation: { input: { projectId: string; projectToArchiveId?: string }; output: unknown };
+      };
+    };
+
+    plan: {
+      /**
+       * `Plan` is the producer's own type (`@langwatch/entitlement-contract`),
+       * not a restatement — a field the seat banner reads is a field the
+       * producer promises.
+       */
+      getActivePlan: {
+        query: { input: { organizationId: string }; output: Plan };
+      };
+    };
+
+    role: {
+      getAll: { query: { input: { organizationId: string }; output: CustomRoleReading[] } };
+    };
+
+    /** The grant procedures live in the authz process; the map states them from its contract. */
+    authz: {
+      listManagedGrants: {
+        query: {
+          input: AuthzListManagedBindingsForOrganizationInput;
+          output: AuthzListManagedBindingsForOrganizationOutput;
+        };
+      };
+      listMemberGrants: {
+        query: {
+          input: AuthzListManagedBindingsForUserInput;
+          output: AuthzListManagedBindingsForUserOutput;
+        };
+      };
+      createGrant: {
+        mutation: {
+          input: Omit<AuthzCreateGrantInput, "caller" | "actor">;
+          output: Grant;
+        };
+      };
+      changeGrantRole: {
+        mutation: {
+          input: Omit<AuthzChangeGrantRoleInput, "caller" | "actor">;
+          output: Grant;
+        };
+      };
+      revokeGrant: {
+        mutation: {
+          input: Omit<AuthzRevokeGrantByIdInput, "actor">;
+          output: GrantRevoked;
+        };
+      };
+      /** One save for a member's whole access sheet, so it cannot half-apply. */
+      applyMemberGrants: {
+        mutation: {
+          input: Omit<AuthzApplyMemberBindingsInput, "caller" | "actor">;
+          output: { success: true };
+        };
+      };
+    };
+
+    departments: {
+      list: { query: { input: { organizationId: string }; output: DepartmentReading[] } };
+      assignments: {
+        query: { input: { organizationId: string }; output: DepartmentAssignments };
+      };
+      assignUser: {
+        mutation: {
+          input: { organizationId: string; userId: string; departmentId: string | null };
+          output: unknown;
+        };
+      };
+      assignTeam: {
+        mutation: {
+          input: { organizationId: string; teamId: string; departmentId: string | null };
+          output: unknown;
+        };
+      };
+      assignProject: {
+        mutation: {
+          input: { organizationId: string; projectId: string; departmentId: string | null };
+          output: unknown;
+        };
+      };
+    };
+
+    joinRequests: {
+      /** The post-login offer: the lookup minus the domains this person dismissed. */
+      offer: { query: { input: void; output: JoinLookupDecision } };
+      /** Everything this person is waiting on. */
+      mine: { query: { input: void; output: JoinRequestMine } };
+      dismissOffer: {
+        mutation: { input: Record<string, never>; output: { success: true } };
+      };
+      request: {
+        mutation: {
+          input: { organizationId: string };
+          output: { joinRequestId: string; state: "PENDING" | "APPROVED" };
+        };
+      };
+      automaticJoins: {
+        query: { input: { organizationId: string }; output: JoinRequestAutomaticJoins };
+      };
+      /**
+       * Three settings, not a boolean: `off` refuses, `request` queues for an
+       * administrator, `auto` lets them in. The domains travel with it, since
+       * an organization can verify more than one.
+       */
+      joining: {
+        query: {
+          input: { organizationId: string };
+          output: { domainJoin: DomainJoinSetting; joinDomains: string[] };
+        };
+      };
+      setJoining: {
+        mutation: {
+          input: {
+            organizationId: string;
+            domainJoin: DomainJoinSetting;
+            domains: string[];
+          };
+          output: { next: DomainJoinSetting };
+        };
+      };
+      pending: {
+        query: { input: { organizationId: string }; output: JoinRequestReading[] };
+      };
+      approve: {
+        mutation: { input: { organizationId: string; joinRequestId: string }; output: unknown };
+      };
+      reject: {
+        mutation: { input: { organizationId: string; joinRequestId: string }; output: unknown };
+      };
+    };
+    /** Billing's seat expansion, borrowed until a capability offers it; mounted on SaaS. */
+    subscription: {
+      addTeamMemberOrEvents: {
+        mutation: {
+          input: {
+            organizationId: string;
+            plan: string;
+            upgradeMembers: boolean;
+            upgradeTraces: boolean;
+            totalMembers: number;
+            totalTraces: number;
+          };
+          output: unknown;
+        };
+      };
     };
   };
-  /** Billing's seat expansion, borrowed until a capability offers it; mounted on SaaS. */
-  subscription: {
-    addTeamMemberOrEvents: {
-      mutation: {
-        input: {
-          organizationId: string;
-          plan: string;
-          upgradeMembers: boolean;
-          upgradeTraces: boolean;
-          totalMembers: number;
-          totalTraces: number;
-        };
-        output: unknown;
-      };
-    };
-  };
-};
 
 /**
  * The organization family's typed tRPC hooks. Same machinery, same transport

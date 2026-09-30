@@ -2,20 +2,20 @@ import {
   organizationRoleSchema,
   PRINCIPAL_KIND_FROM_STORED,
   storedPrincipalKindSchema,
-  roleBindingScopeTypeSchema,
+  grantScopeTierSchema,
   teamUserRoleSchema,
   type OrganizationRole,
-  type RoleBindingScopeType,
+  type GrantScopeTier,
 } from "@langwatch/authz-contract";
 import { z } from "zod";
 
 import {
-  AuthzBindingRepository,
+  AuthzManagedGrantRepository,
   type AuthzBindingScopeRow,
   type AuthzGrantPrincipalRow,
   type AuthzManagedBindingRow,
   type AuthzUserGroupRow,
-} from "../authz-binding.repository.ts";
+} from "../authz-managed-grant.repository.ts";
 
 type Delegate = {
   count(args: unknown): Promise<number>;
@@ -64,7 +64,7 @@ const managedBindingRowSchema = z
     apiKeyId: z.string().nullable(),
     role: teamUserRoleSchema,
     customRoleId: z.string().nullable(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
   })
   .strict();
@@ -79,7 +79,7 @@ const nullableManagedBindingRowSchema = managedBindingRowSchema.nullable();
 const managedBindingRowsSchema = z.array(managedBindingRowSchema);
 const assignableRoleRowsSchema = z.array(assignableRoleRowSchema);
 
-export type AuthzBindingDatabase = {
+export type AuthzManagedGrantDatabase = {
   apiKey: Delegate;
   customRole: Delegate;
   grant: Delegate;
@@ -93,12 +93,14 @@ export type AuthzBindingDatabase = {
   teamUser: Delegate;
 };
 
-export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
-  static create(options: { database: AuthzBindingDatabase }): PrismaAuthzBindingRepository {
-    return new PrismaAuthzBindingRepository(options.database);
+export class PrismaAuthzManagedGrantRepository extends AuthzManagedGrantRepository {
+  static create(options: {
+    database: AuthzManagedGrantDatabase;
+  }): PrismaAuthzManagedGrantRepository {
+    return new PrismaAuthzManagedGrantRepository(options.database);
   }
 
-  private constructor(private readonly database: AuthzBindingDatabase) {
+  private constructor(private readonly database: AuthzManagedGrantDatabase) {
     super();
   }
 
@@ -134,11 +136,11 @@ export class PrismaAuthzBindingRepository extends AuthzBindingRepository {
   }: {
     organizationId: string;
     scopes: readonly {
-      scopeType: RoleBindingScopeType;
+      scopeType: GrantScopeTier;
       scopeId: string;
     }[];
   }): Promise<AuthzBindingScopeRow[]> {
-    const idsOfType = (scopeType: RoleBindingScopeType) => [
+    const idsOfType = (scopeType: GrantScopeTier) => [
       ...new Set(
         scopes.filter((scope) => scope.scopeType === scopeType).map((scope) => scope.scopeId),
       ),

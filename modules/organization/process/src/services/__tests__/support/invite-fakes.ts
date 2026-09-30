@@ -12,6 +12,7 @@ import type {
   AuthzAttachBindingsOutput,
   AuthzRevokeBindingsWhereInput,
   AuthzRevokeBindingsWhereOutput,
+  GrantScopeTier,
 } from "@langwatch/authz-contract";
 import type { PlanProvider, Plan } from "@langwatch/entitlement-contract";
 import {
@@ -21,7 +22,6 @@ import {
   type OrganizationInvite,
   type OrganizationUser,
   type OrganizationUserRole,
-  type RoleBindingScopeType,
 } from "@langwatch/organization-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -51,7 +51,7 @@ export type FakeBinding = {
   userId: string;
   role: string;
   customRoleId: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   actor: LedgerActor;
 };

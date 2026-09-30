@@ -33,7 +33,7 @@ export const teamTrpc = defineTrpcContract("team")
   .withOutput(teamWithProjectsSchema.array())
 
   /** The access matrix an administrator edits: who holds what, and through what. */
-  .query("getTeamsWithRoleBindings")
+  .query("getTeamsWithGrants")
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationTeamAccessSchema.array())
 

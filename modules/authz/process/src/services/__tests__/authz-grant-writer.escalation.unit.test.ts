@@ -10,12 +10,12 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { GRANT_LIMIT_PER_ORGANIZATION } from "../../rules/grant-escalation.rules.ts";
 import {
-  AuthzBindingWriterService,
-  type AuthzBindingWriterPermissions,
-} from "../authz-binding-writer.service.ts";
+  AuthzGrantWriterService,
+  type AuthzGrantWriterPermissions,
+} from "../authz-grant-writer.service.ts";
 
 const ORG = "org-1";
 const actor = { type: "user" as const, id: "caller-1" };
@@ -61,7 +61,7 @@ function setup({
   rows?: AuthzManagedOrganizationBinding[];
   existing?: ExistingBinding;
 } = {}) {
-  const bindings = new StubAuthzBindingRepository();
+  const bindings = new StubAuthzManagedGrantRepository();
   bindings.findScopeRows.mockResolvedValue([
     { type: "TEAM", id: "team-1", name: "Team", personalWorkspaceName: null },
     { type: "ORGANIZATION", id: ORG, name: "Org", personalWorkspaceName: null },
@@ -93,9 +93,9 @@ function setup({
     .fn<AuthzCompatibilityLedger["revokeBindings"]>()
     .mockResolvedValue(void 0);
   const findPermissionsBeyondCaller = vi.fn<
-    AuthzBindingWriterPermissions["findPermissionsBeyondCaller"]
+    AuthzGrantWriterPermissions["findPermissionsBeyondCaller"]
   >(async (input) => input.permissions.filter((permission) => lacks.includes(permission)));
-  const writer = AuthzBindingWriterService.create({
+  const writer = AuthzGrantWriterService.create({
     bindings,
     ledger: {
       attachBindings,

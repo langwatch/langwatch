@@ -7,7 +7,7 @@ import type {
   AuthzBindingForSynthesis,
   AuthzCustomRole,
   AuthzTeamMemberBinding,
-  RoleBindingScopeType,
+  GrantScopeTier,
   TeamUserRole,
 } from "@langwatch/authz-contract";
 import { type Instant, fromDate, toDate } from "@langwatch/time";
@@ -80,7 +80,7 @@ type ListableGrant = {
   row: GrantListRow;
   role: TeamUserRole;
   customRoleId: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
 };
 
 export class EventingAuthzListingRepository extends AuthzListingRepository {
@@ -154,7 +154,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     scopeIds,
   }: {
     organizationId: string;
-    scopeType: RoleBindingScopeType;
+    scopeType: GrantScopeTier;
     scopeIds: readonly string[];
   }): Promise<AuthzAccessBinding[]> => {
     if (scopeIds.length === 0) return [];
@@ -596,7 +596,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       : null;
   }
 
-  private isBindingScope(scopeType: string): scopeType is RoleBindingScopeType {
+  private isBindingScope(scopeType: string): scopeType is GrantScopeTier {
     return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
   }
 

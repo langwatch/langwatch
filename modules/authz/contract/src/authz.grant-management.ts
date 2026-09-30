@@ -4,7 +4,7 @@ import { grantsLedgerActorSchema } from "./authz-grant.events.ts";
 import {
   authzPrincipalRefSchema,
   organizationRoleSchema,
-  roleBindingScopeTypeSchema,
+  grantScopeTierSchema,
   teamUserRoleSchema,
 } from "./authz.ts";
 
@@ -17,7 +17,7 @@ export const authzBindingWriteSchema = z
   .object({
     role: teamUserRoleSchema,
     customRoleId: z.string().min(1).nullish(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string().min(1),
   })
   .strict();
@@ -37,7 +37,7 @@ export const authzManagedUserBindingSchema = z
     role: teamUserRoleSchema,
     customRoleId: nullableTextSchema,
     customRoleName: nullableTextSchema,
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     scopeName: nullableTextSchema,
     createdAt: z.date(),
@@ -72,7 +72,7 @@ export const authzManagedOrganizationBindingSchema = z
     role: teamUserRoleSchema,
     customRoleId: nullableTextSchema,
     customRoleName: nullableTextSchema,
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     scopeName: nullableTextSchema,
     memberUserIds: z.array(z.string()),
@@ -105,7 +105,7 @@ export const authzAccessBreakdownBindingSchema = z
     id: z.string(),
     role: z.string(),
     customRoleName: nullableTextSchema,
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     scopeName: nullableTextSchema,
     permissions: z.array(z.string()),

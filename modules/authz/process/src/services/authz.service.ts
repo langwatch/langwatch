@@ -64,13 +64,13 @@ import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
+import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { findPermissionsBeyondHeld } from "../rules/grant-escalation.rules.ts";
-import { AuthzBindingReaderService } from "./authz-binding-reader.service.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
+import { AuthzGrantReaderService } from "./authz-grant-reader.service.ts";
 import { AuthzGrantSnapshotService } from "./authz-grant-snapshot.service.ts";
 import { AuthzIdDecisionsService } from "./authz-id-decisions.service.ts";
 import { AuthzPermissionGateService } from "./authz-permission-gate.service.ts";
@@ -94,7 +94,7 @@ type CheckArgs = {
 export type AuthzServiceOptions = {
   repository: AuthzReadRepository;
   listing: AuthzListingRepository;
-  bindings: AuthzBindingRepository;
+  bindings: AuthzManagedGrantRepository;
   /** Omitted = never cache. */
   epoch?: AuthzEpochRepository;
   /**
@@ -126,7 +126,7 @@ export class AuthzService extends AuthzServiceContract {
 
     return new AuthzService({
       collector,
-      bindingReader: AuthzBindingReaderService.create({
+      bindingReader: AuthzGrantReaderService.create({
         bindings: options.bindings,
         listing: options.listing,
       }),
@@ -143,7 +143,7 @@ export class AuthzService extends AuthzServiceContract {
   private readonly gate: AuthzPermissionGateService;
 
   private readonly collector: AuthzCollectorService;
-  private readonly bindingReader: AuthzBindingReaderService;
+  private readonly bindingReader: AuthzGrantReaderService;
   private readonly snapshots: AuthzGrantSnapshotService;
   private readonly scopeLineage: AuthzScopeLineageService;
   private readonly options: AuthzServiceOptions;
@@ -156,7 +156,7 @@ export class AuthzService extends AuthzServiceContract {
     options,
   }: {
     collector: AuthzCollectorService;
-    bindingReader: AuthzBindingReaderService;
+    bindingReader: AuthzGrantReaderService;
     snapshots: AuthzGrantSnapshotService;
     scopeLineage: AuthzScopeLineageService;
     options: AuthzServiceOptions;

@@ -19,7 +19,7 @@ function invalidateProjectListQueries(utils: ReturnType<typeof api.useUtils>): v
   void utils.limits.getUsage.invalidate();
   void utils.team.getTeamsWithMembers.invalidate();
   void utils.team.getTeamWithMembers.invalidate();
-  void utils.team.getTeamsWithRoleBindings.invalidate();
+  void utils.team.getTeamsWithGrants.invalidate();
 }
 
 export function CreateProjectDrawer({

@@ -1,4 +1,5 @@
-import { RoleBindingScopeType, TeamUserRole } from "@langwatch/organization-contract";
+import { GrantScopeTier } from "@langwatch/authz-contract";
+import { TeamUserRole } from "@langwatch/organization-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 /**
@@ -34,7 +35,7 @@ export class PrismaEffectiveTeamAdminsRepository {
     const adminBindings = await tx.roleBinding.findMany({
       where: {
         organizationId,
-        scopeType: RoleBindingScopeType.TEAM,
+        scopeType: GrantScopeTier.TEAM,
         scopeId: teamId,
         role: TeamUserRole.ADMIN,
       },

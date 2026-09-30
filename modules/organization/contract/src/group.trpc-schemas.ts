@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { organizationGroupBindingInputSchema } from "./group.ts";
+import { organizationGroupGrantInputSchema } from "./group.ts";
 
 /**
  * The transport inputs the group surface publishes; every call also carries
@@ -18,23 +18,23 @@ export type GroupApiGroupScope = z.infer<typeof groupApiGroupScopeSchema>;
 export const groupApiCreateInputSchema = z.object({
   organizationId: z.string(),
   name: groupApiNameSchema,
-  bindings: z.array(organizationGroupBindingInputSchema).optional(),
+  grants: z.array(organizationGroupGrantInputSchema).optional(),
   memberIds: z.array(z.string()).optional(),
 });
 export type GroupApiCreateInput = z.infer<typeof groupApiCreateInputSchema>;
 
-export const groupApiAddBindingInputSchema = z.object({
+export const groupApiAddGrantInputSchema = z.object({
   organizationId: z.string(),
   groupId: z.string(),
-  ...organizationGroupBindingInputSchema.shape,
+  ...organizationGroupGrantInputSchema.shape,
 });
-export type GroupApiAddBindingInput = z.infer<typeof groupApiAddBindingInputSchema>;
+export type GroupApiAddGrantInput = z.infer<typeof groupApiAddGrantInputSchema>;
 
-export const groupApiRemoveBindingInputSchema = z.object({
+export const groupApiRemoveGrantInputSchema = z.object({
   organizationId: z.string(),
-  bindingId: z.string(),
+  grantId: z.string(),
 });
-export type GroupApiRemoveBindingInput = z.infer<typeof groupApiRemoveBindingInputSchema>;
+export type GroupApiRemoveGrantInput = z.infer<typeof groupApiRemoveGrantInputSchema>;
 
 export const groupApiMemberInputSchema = z.object({
   organizationId: z.string(),
@@ -61,8 +61,8 @@ export const groupApiApplyEditsInputSchema = z.object({
   organizationId: z.string(),
   groupId: z.string(),
   rename: z.object({ name: groupApiNameSchema }).nullable().optional(),
-  bindingIdsToDelete: z.array(z.string()),
-  bindingsToCreate: z.array(organizationGroupBindingInputSchema),
+  grantIdsToRevoke: z.array(z.string()),
+  grantsToCreate: z.array(organizationGroupGrantInputSchema),
   memberUserIdsToAdd: z.array(z.string()),
   memberUserIdsToRemove: z.array(z.string()),
 });

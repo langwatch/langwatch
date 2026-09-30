@@ -79,15 +79,11 @@ export type AuthzApiMap = {
     revokeGrant: {
       mutation: { input: Omit<AuthzRevokeGrantByIdInput, "actor">; output: GrantRevoked };
     };
-  };
-
-  roleBinding: {
     /**
-     * Every role binding in the organization — audit-grade RBAC data, which is
-     * why the procedure is gated at `organization:manage` and why the page
-     * behind it is too.
+     * Every grant in the organization, principals and scopes named: audit-grade
+     * data, which is why the procedure is gated at `organization:manage`.
      */
-    listForOrg: {
+    listManagedGrants: {
       query: { input: OrganizationScope; output: AuthzManagedOrganizationBinding[] };
     };
   };

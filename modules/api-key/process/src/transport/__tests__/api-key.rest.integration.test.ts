@@ -45,7 +45,7 @@ function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
     ingestionTemplateId: null,
     createdAt: NOW,
     updatedAt: NOW,
-    roleBindings: [
+    grants: [
       {
         id: "binding-1",
         role: "MEMBER",

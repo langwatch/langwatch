@@ -12,18 +12,10 @@ export const TeamUserRole = {
   MEMBER: "MEMBER",
   VIEWER: "VIEWER",
   /**
-   * The role a CUSTOM role binding stores: the picker offers built-in and
+   * The role a CUSTOM role grant stores: the picker offers built-in and
    * custom roles side by side, and a custom pick stores this plus the
    * custom role's id. `@langwatch/trace-browser`'s copy omits it — unused there.
    */
   CUSTOM: "CUSTOM",
 } as const;
 export type TeamUserRole = (typeof TeamUserRole)[keyof typeof TeamUserRole];
-
-export const RoleBindingScopeType = {
-  ORGANIZATION: "ORGANIZATION",
-  TEAM: "TEAM",
-  PROJECT: "PROJECT",
-  PLATFORM: "PLATFORM",
-} as const;
-export type RoleBindingScopeType = (typeof RoleBindingScopeType)[keyof typeof RoleBindingScopeType];

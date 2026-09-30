@@ -4,8 +4,8 @@
  */
 export * from "./authz.ts";
 export * from "./authz.admission.ts";
-export { newAuthzBindingId } from "./authz-binding-id.ts";
-export * from "./authz.binding-management.ts";
+export { newAuthzGrantId } from "./authz-grant-id.ts";
+export * from "./authz.grant-management.ts";
 export * from "./authz.commands.ts";
 export * from "./authz.errors.ts";
 export * from "./authz-grant.events.ts";

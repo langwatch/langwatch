@@ -117,7 +117,7 @@ export class ApiKeyEnrichmentService {
           [
             ...new Set(
               apiKeys.flatMap((key) =>
-                key.roleBindings.flatMap((binding) =>
+                key.grants.flatMap((binding) =>
                   binding.customRoleId ? [binding.customRoleId] : [],
                 ),
               ),

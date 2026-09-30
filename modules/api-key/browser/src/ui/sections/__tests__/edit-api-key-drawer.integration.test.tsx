@@ -49,7 +49,7 @@ function keyRow(
     ingestSourceType: null,
     ingestionTemplateId: null,
     createdByDeviceLabel: null,
-    roleBindings: [
+    grants: [
       {
         id: "rb-1",
         role: "ADMIN",

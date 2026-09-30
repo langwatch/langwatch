@@ -174,7 +174,7 @@ function keyRow(overrides: Record<string, unknown> = {}) {
     ingestSourceType: null,
     ingestionTemplateId: null,
     createdByDeviceLabel: null,
-    roleBindings: [
+    grants: [
       {
         id: "rb-1",
         role: "ADMIN",
@@ -274,7 +274,7 @@ describe("given keys bound at different scopes", () => {
       keyRow({
         id: "key-other",
         name: "Growth key",
-        roleBindings: [
+        grants: [
           {
             id: "rb-2",
             role: "ADMIN",
@@ -367,7 +367,7 @@ describe("given keys bound at different scopes", () => {
       expect(screen.getByText("No API keys. Create one to get started.")).toBeInTheDocument();
       unmount();
 
-      state.keys = [keyRow({ roleBindings: [] })];
+      state.keys = [keyRow({ grants: [] })];
       renderWithApiKeyHost(
         <ApiKeysScreen />,
         new FakeApiKeyHost({ query: { [API_KEY_SCOPE_QUERY_KEY]: "TEAM:team-1" } }),

@@ -6,7 +6,7 @@ import {
   type PrincipalKind,
 } from "@langwatch/authz-contract";
 
-import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
+import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
 import type { AuthzSessionVersionRepository } from "../repositories/authz-session-version.repository.ts";
 
 /** A key or a share link's audience is never a browser session, so its grant bumps no one. */
@@ -19,14 +19,14 @@ const SESSIONLESS_PRINCIPALS: ReadonlySet<PrincipalKind> = new Set(["apiKey", "p
 export class AuthzSessionVersionService {
   static create(dependencies: {
     versions: AuthzSessionVersionRepository;
-    bindings: AuthzBindingRepository;
+    bindings: AuthzManagedGrantRepository;
   }): AuthzSessionVersionService {
     return new AuthzSessionVersionService(dependencies.versions, dependencies.bindings);
   }
 
   private constructor(
     private readonly versions: AuthzSessionVersionRepository,
-    private readonly bindings: AuthzBindingRepository,
+    private readonly bindings: AuthzManagedGrantRepository,
   ) {}
 
   getSessionVersion({ userId }: { userId: string }): Promise<number> {

@@ -9,7 +9,7 @@ import {
   PERMISSION_CATEGORIES,
   selectionsFromPermissions,
   type ApiKeyListEntry,
-  type ApiKeyTrpcRoleBinding,
+  type ApiKeyTrpcGrant,
   type NamedApiKeyBinding,
 } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
@@ -51,7 +51,7 @@ type UpdateApiKeyInput = {
   scopeType?: string;
   scopeId?: string;
   permissions?: string[];
-  bindings?: ApiKeyTrpcRoleBinding[];
+  bindings?: ApiKeyTrpcGrant[];
 };
 
 /** The most permissive selection a category's availability allows. */
@@ -192,7 +192,7 @@ export function EditApiKeyDrawer({
       const mode = bindingsToPermissionMode(apiKey);
       setPermissionMode(mode);
 
-      setSelectedScopes(bindingsToScopes(apiKey.roleBindings));
+      setSelectedScopes(bindingsToScopes(apiKey.grants));
 
       if (mode === "restricted") {
         setCategorySelections(

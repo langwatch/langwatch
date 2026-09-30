@@ -15,7 +15,7 @@ export function useDirectoryTabCounts({
 }) {
   const reading = { enabled: enabled && !!organizationId };
   const groups = api.group.listAll.useQuery({ organizationId }, reading);
-  const teams = api.team.getTeamsWithRoleBindings.useQuery({ organizationId }, reading);
+  const teams = api.team.getTeamsWithGrants.useQuery({ organizationId }, reading);
   const members = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
     { organizationId, includeDeactivated: true },
     reading,

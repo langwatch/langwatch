@@ -2,9 +2,9 @@ import { GrantValidationError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
 import { permissiveGrantGuards } from "../services/__tests__/support/grant-guards.stub.ts";
@@ -20,7 +20,7 @@ describe("AuthzService on a resource scope", () => {
         // gate used to default to.
         isOnEngine: async () => true,
         listing: new StubAuthzListingRepository(),
-        bindings: new StubAuthzBindingRepository(),
+        bindings: new StubAuthzManagedGrantRepository(),
         repository: makeReader({
           findShareLinks: vi.fn().mockResolvedValue([liveShareLinkRow]),
         }),
@@ -55,7 +55,7 @@ describe("AuthzGrantsService and resource scopes", () => {
       ledger: {} as EventingAuthzLedgerAdapter,
       epoch: new StubAuthzEpoch(),
       newBindingId: () => "rb_test",
-      bindings: new StubAuthzBindingRepository(),
+      bindings: new StubAuthzManagedGrantRepository(),
     });
 
   describe("when a role binding is attached at a resource scope", () => {

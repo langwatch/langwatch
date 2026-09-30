@@ -19,9 +19,9 @@ import { z } from "zod";
 
 import { createAuthzTestApp } from "../../app/__tests__/authz.fixture.ts";
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
-import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { AuthzGrantManagementService } from "../../services/authz-grant-management.service.ts";
+import { AuthzGrantWriterService } from "../../services/authz-grant-writer.service.ts";
 import { authzGrantRest, grantRestFacts } from "../authz-grant.rest.ts";
 import { authzRoleBindingRest, roleBindingRestFacts } from "../authz-role-binding.rest.ts";
 
@@ -85,7 +85,7 @@ function world({
   deprecationLog?: RestDeprecationLog;
 } = {}) {
   let next = 0;
-  const bindings = new StubAuthzBindingRepository();
+  const bindings = new StubAuthzManagedGrantRepository();
   bindings.findScopeRows.mockImplementation(async ({ scopes }) =>
     SCOPES.filter((row) =>
       scopes.some((scope) => scope.scopeType === row.type && scope.scopeId === row.id),
@@ -153,7 +153,7 @@ function world({
       input.permissions.filter((permission) => lacks.includes(permission)),
     listManagedBindingsForOrganization: async () => [...rows],
   };
-  const writer = AuthzBindingWriterService.create({
+  const writer = AuthzGrantWriterService.create({
     bindings,
     ledger,
     newBindingId: () => `rb_${++next}`,

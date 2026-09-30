@@ -10,12 +10,12 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
-import { PrismaAuthzBindingRepository } from "../repositories/prisma/prisma.authz-binding.repository.ts";
+import { PrismaAuthzManagedGrantRepository } from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
 import {
   permissiveGrantGuards,
   TEST_CALLER,
 } from "../services/__tests__/support/grant-guards.stub.ts";
-import { AuthzBindingWriterService } from "../services/authz-binding-writer.service.ts";
+import { AuthzGrantWriterService } from "../services/authz-grant-writer.service.ts";
 
 const DB_URL = process.env.DATABASE_URL;
 
@@ -41,10 +41,10 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
   const prisma = new PrismaClient({
     adapter: PrismaDriverAdapterService.create().create(DB_URL ?? "").adapter,
   });
-  const bindings = PrismaAuthzBindingRepository.create({
+  const bindings = PrismaAuthzManagedGrantRepository.create({
     database: prisma,
   });
-  const writer = AuthzBindingWriterService.create({
+  const writer = AuthzGrantWriterService.create({
     permissions: permissiveGrantGuards,
     bindings,
     ledger: refusingLedger,

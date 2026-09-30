@@ -3,7 +3,7 @@ import type {
   AuthzManagedOrganizationBinding,
   RoleBindingPrincipal,
   RoleBindingRest,
-  RoleBindingScopeType,
+  GrantScopeTier,
   TeamUserRole,
 } from "@langwatch/authz-contract";
 import { type Instant, toDate } from "@langwatch/time";
@@ -19,7 +19,7 @@ export type BindingWire = {
   role: TeamUserRole;
   customRoleId: string | null;
   customRoleName: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   scopeName: string | null;
   /** The wire's own moment type: the listing contract declares it. */
@@ -49,7 +49,7 @@ export function optimisticBindingWire({
   principal: CreatedPrincipal;
   role: TeamUserRole;
   customRoleId?: string | undefined;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   expiresAt?: RoleBindingRest["expiresAt"] | undefined;
   now: () => Instant;

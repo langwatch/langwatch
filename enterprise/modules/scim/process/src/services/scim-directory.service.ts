@@ -40,7 +40,7 @@ export type ScimDirectoryRepository = Pick<
   | "findGroupMemberIds"
   | "findGroupMembers"
   | "listGroups"
-  | "findRoleBindings"
+  | "findGrantRows"
   | "renameGroup"
   | "findGroup"
   | "findGroupByExternalId"

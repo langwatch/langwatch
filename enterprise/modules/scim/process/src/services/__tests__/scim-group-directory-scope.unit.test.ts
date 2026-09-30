@@ -120,7 +120,7 @@ function repositoryOver(groups: ScimGroupRecord[]) {
     addGroupMember: vi.fn(async () => undefined),
     removeGroupMembers: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    findRoleBindings: vi.fn(async () => []),
+    findGrantRows: vi.fn(async () => []),
   };
 
   return { repository, created };

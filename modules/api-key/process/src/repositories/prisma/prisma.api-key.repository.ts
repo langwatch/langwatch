@@ -29,7 +29,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
   private constructor(private readonly database: PrismaApiKeyDatabase) {}
 
   create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
-    const { roleBindings: _roleBindings, startsDisabled, expiresAt, ...data } = input;
+    const { grants: _grants, startsDisabled, expiresAt, ...data } = input;
     return this.database.apiKey.create({
       data: {
         ...data,
@@ -84,7 +84,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
     });
   }
   update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
-    const { id, roleBindings: _roleBindings, revokedAt, lastUsedAt, ...data } = input;
+    const { id, grants: _grants, revokedAt, lastUsedAt, ...data } = input;
     return this.database.apiKey.update({
       where: { id },
       data: {

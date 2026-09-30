@@ -30,7 +30,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
 
   async create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
     const now = toDate(nowInstant());
-    const { roleBindings: _roleBindings, startsDisabled, expiresAt, ...data } = input;
+    const { grants: _grants, startsDisabled, expiresAt, ...data } = input;
     const key: ApiKeyRow = {
       ...data,
       createdByDeviceLabel: data.createdByDeviceLabel ?? null,
@@ -89,7 +89,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
   }
 
   async update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
-    const { id, roleBindings: _roleBindings, revokedAt, lastUsedAt, ...data } = input;
+    const { id, grants: _grants, revokedAt, lastUsedAt, ...data } = input;
 
     return this.#write(id, (key) => ({
       ...key,

@@ -28,7 +28,7 @@ function record(overrides: Partial<ApiKeyCreateRecord> = {}): ApiKeyCreateRecord
     ingestSourceType: null,
     ingestionTemplateId: null,
     startsDisabled: false,
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }
@@ -41,7 +41,7 @@ describe("given the memory API-key repository", () => {
       const created = await keys.create(record({ name: "Personal key", userId: "user_1" }));
 
       expect(created.revokedAt).toBeNull();
-      expect(created).not.toHaveProperty("roleBindings");
+      expect(created).not.toHaveProperty("grants");
       expect(await keys.findById({ id: created.id })).toMatchObject({ name: "Personal key" });
     });
 

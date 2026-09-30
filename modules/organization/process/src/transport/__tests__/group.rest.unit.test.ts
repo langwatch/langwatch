@@ -89,7 +89,7 @@ const summary = (name: string, memberCount: number) => ({
   createdAt: CREATED_AT,
   updatedAt: CREATED_AT,
   memberCount,
-  bindings: [binding],
+  grants: [binding],
 });
 
 const alice = { userId: "alice-id", name: "Alice", email: "alice@acme.test", image: null };
@@ -190,7 +190,7 @@ describe("given the /api/groups family", () => {
         {
           organizationId: ORGANIZATION_ID,
           name: "Full Team",
-          bindings,
+          grants: bindings,
           memberIds: ["alice-user-id"],
         },
         { id: "user-owner" },
@@ -361,8 +361,8 @@ describe("given the /api/groups family", () => {
 
     /** @scenario POST /api/groups/:id/bindings adds a role binding */
     it("answers 201 with the binding the application created", async () => {
-      const addGroupBinding = vi.fn(async () => binding);
-      const send = mount({ addGroupBinding });
+      const addGroupGrant = vi.fn(async () => binding);
+      const send = mount({ addGroupGrant });
 
       const response = await send("/api/groups/group_1/bindings", {
         method: "POST",
@@ -370,11 +370,11 @@ describe("given the /api/groups family", () => {
       });
 
       expect(response.status).toBe(201);
-      expect(addGroupBinding).toHaveBeenCalledWith(
+      expect(addGroupGrant).toHaveBeenCalledWith(
         {
           groupId: "group_1",
           organizationId: ORGANIZATION_ID,
-          binding: { role: "MEMBER", scopeType: "TEAM", scopeId: "frontend-team-id" },
+          grant: { role: "MEMBER", scopeType: "TEAM", scopeId: "frontend-team-id" },
         },
         { id: "user-owner" },
       );
@@ -382,14 +382,14 @@ describe("given the /api/groups family", () => {
 
     /** @scenario DELETE /api/groups/:id/bindings/:bindingId removes a binding */
     it("answers 200 and asks the application to remove that binding", async () => {
-      const removeGroupBinding = vi.fn(async () => {});
-      const send = mount({ removeGroupBinding });
+      const removeGroupGrant = vi.fn(async () => {});
+      const send = mount({ removeGroupGrant });
 
       const response = await send("/api/groups/group_1/bindings/rb_123", { method: "DELETE" });
 
       expect(response.status).toBe(200);
-      expect(removeGroupBinding).toHaveBeenCalledWith(
-        { groupId: "group_1", bindingId: "rb_123", organizationId: ORGANIZATION_ID },
+      expect(removeGroupGrant).toHaveBeenCalledWith(
+        { groupId: "group_1", grantId: "rb_123", organizationId: ORGANIZATION_ID },
         { id: "user-owner" },
       );
     });
@@ -397,7 +397,7 @@ describe("given the /api/groups family", () => {
     /** @scenario DELETE /api/groups/:id/bindings/:bindingId returns 404 for nonexistent binding */
     it("answers 404 role_binding_not_found for a binding that does not exist", async () => {
       const send = mount({
-        removeGroupBinding: async () => {
+        removeGroupGrant: async () => {
           throw new GroupBindingNotFoundError("nonexistent");
         },
       });

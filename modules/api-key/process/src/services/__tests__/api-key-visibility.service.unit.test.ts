@@ -12,14 +12,14 @@ import { ApiKeyVisibilityService } from "../api-key-visibility.service.ts";
 type Binding = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
 
 function serviceWith(options: {
-  key?: { id: string; roleBindings: Binding[] } | null;
+  key?: { id: string; grants: Binding[] } | null;
   organizationWide?: boolean;
   candidates?: { id: string; teamId: string }[];
   hasMore?: boolean;
   viewable?: string[];
 }) {
   const asked: Record<string, unknown>[] = [];
-  const key = options.key === undefined ? { id: "key-1", roleBindings: [] } : options.key;
+  const key = options.key === undefined ? { id: "key-1", grants: [] } : options.key;
   const service = ApiKeyVisibilityService.create({
     repository: {
       findByIdInOrganization: async (input: Record<string, unknown>) => {
@@ -30,7 +30,7 @@ function serviceWith(options: {
     authz: {
       // The key's grants live on authz's grants head, not on its row.
       listApiKeyBindings: async () =>
-        (key?.roleBindings ?? []).map((binding, index) => ({
+        (key?.grants ?? []).map((binding, index) => ({
           ...binding,
           id: `grant-${index}`,
           apiKeyId: key?.id ?? null,
@@ -94,7 +94,7 @@ describe("ApiKeyVisibilityService.resolveVisibleProjects", () => {
         const { service, asked } = serviceWith({
           key: {
             id: "key-1",
-            roleBindings: [
+            grants: [
               { scopeType: "TEAM", scopeId: "team-1" },
               { scopeType: "TEAM", scopeId: "team-1" },
               { scopeType: "PROJECT", scopeId: "project-9" },
@@ -117,7 +117,7 @@ describe("ApiKeyVisibilityService.resolveVisibleProjects", () => {
         const { service, asked } = serviceWith({
           key: {
             id: "key-1",
-            roleBindings: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+            grants: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
           },
         });
 

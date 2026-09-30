@@ -388,7 +388,7 @@ describe("bindingsToPermissionMode()", () => {
       expect(
         bindingsToPermissionMode({
           permissionMode: "all",
-          roleBindings: [{ role: "ADMIN" }],
+          grants: [{ role: "ADMIN" }],
         }),
       ).toBe("all");
     });
@@ -399,7 +399,7 @@ describe("bindingsToPermissionMode()", () => {
       expect(
         bindingsToPermissionMode({
           permissionMode: "restricted",
-          roleBindings: [{ role: "CUSTOM" }],
+          grants: [{ role: "CUSTOM" }],
         }),
       ).toBe("restricted");
     });
@@ -410,7 +410,7 @@ describe("bindingsToPermissionMode()", () => {
       expect(
         bindingsToPermissionMode({
           permissionMode: "readonly",
-          roleBindings: [{ role: "VIEWER" }],
+          grants: [{ role: "VIEWER" }],
         }),
       ).toBe("restricted");
     });
@@ -421,7 +421,7 @@ describe("bindingsToPermissionMode()", () => {
       expect(
         bindingsToPermissionMode({
           permissionMode: "all",
-          roleBindings: [{ role: "CUSTOM" }],
+          grants: [{ role: "CUSTOM" }],
         }),
       ).toBe("restricted");
     });
@@ -432,7 +432,7 @@ describe("bindingsToPermissionMode()", () => {
       expect(
         bindingsToPermissionMode({
           permissionMode: "all",
-          roleBindings: [{ role: "CUSTOM" }, { role: "ADMIN" }],
+          grants: [{ role: "CUSTOM" }, { role: "ADMIN" }],
         }),
       ).toBe("all");
     });
@@ -468,7 +468,7 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "readonly",
-          roleBindings: [{ role: "VIEWER", customRoleId: null, customRolePermissions: null }],
+          grants: [{ role: "VIEWER", customRoleId: null, customRolePermissions: null }],
         },
         fakeDeps,
       );
@@ -482,10 +482,7 @@ describe("bindingsToSelections()", () => {
 
   describe("when binding has no entries", () => {
     it("returns empty object", () => {
-      const result = bindingsToSelections(
-        { permissionMode: "restricted", roleBindings: [] },
-        fakeDeps,
-      );
+      const result = bindingsToSelections({ permissionMode: "restricted", grants: [] }, fakeDeps);
       expect(result).toEqual({});
     });
   });
@@ -495,7 +492,7 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "restricted",
-          roleBindings: [
+          grants: [
             {
               role: "CUSTOM",
               customRoleId: "cr-1",
@@ -514,7 +511,7 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "restricted",
-          roleBindings: [{ role: "VIEWER", customRoleId: null, customRolePermissions: null }],
+          grants: [{ role: "VIEWER", customRoleId: null, customRolePermissions: null }],
         },
         fakeDeps,
       );
@@ -531,7 +528,7 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "restricted",
-          roleBindings: [{ role: "MEMBER", customRoleId: null, customRolePermissions: null }],
+          grants: [{ role: "MEMBER", customRoleId: null, customRolePermissions: null }],
         },
         fakeDeps,
       );
@@ -544,7 +541,7 @@ describe("bindingsToSelections()", () => {
       const result = bindingsToSelections(
         {
           permissionMode: "all",
-          roleBindings: [{ role: "ADMIN", customRoleId: null, customRolePermissions: null }],
+          grants: [{ role: "ADMIN", customRoleId: null, customRolePermissions: null }],
         },
         fakeDeps,
       );

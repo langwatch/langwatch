@@ -24,7 +24,7 @@ export const namedApiKeyBindingSchema = z
 export type NamedApiKeyBinding = ApiKeyBinding & z.infer<typeof namedApiKeyBindingSchema>;
 
 /** One role binding on a key, with the names its row renders. */
-export const apiKeyListRoleBindingSchema = z
+export const apiKeyListGrantSchema = z
   .object({
     id: z.string(),
     role: z.string(),
@@ -39,7 +39,7 @@ export const apiKeyListRoleBindingSchema = z
     scopeName: z.string().nullable(),
   })
   .strict();
-export type ApiKeyListRoleBinding = z.infer<typeof apiKeyListRoleBindingSchema>;
+export type ApiKeyListGrant = z.infer<typeof apiKeyListGrantSchema>;
 
 /**
  * One API key, as every read of the feature answers it. Timestamps are
@@ -78,7 +78,7 @@ export const apiKeyListEntrySchema = z
      * came from. Null for keys minted outside a CLI session.
      */
     parentApiKeyId: z.string().nullable().optional(),
-    roleBindings: z.array(apiKeyListRoleBindingSchema),
+    grants: z.array(apiKeyListGrantSchema),
   })
   .strict();
 export type ApiKeyListEntry = z.infer<typeof apiKeyListEntrySchema>;

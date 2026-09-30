@@ -14,9 +14,6 @@ export const ROLE_KIND = {
 export const roleKindSchema = z.enum(ROLE_KIND);
 export type RoleKind = z.infer<typeof roleKindSchema>;
 
-export const roleBindingScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
-export type RoleBindingScopeType = z.infer<typeof roleBindingScopeTypeSchema>;
-
 export const roleSchema = z
   .object({
     id: z.string().min(1),
@@ -58,10 +55,3 @@ export const roleCreateSchema = z
   })
   .strict();
 export type RoleCreate = z.infer<typeof roleCreateSchema>;
-
-export const customRoleBindingSchema = z
-  .object({
-    customRoleId: z.string().min(1),
-    scopeType: roleBindingScopeTypeSchema,
-  })
-  .strict();

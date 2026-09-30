@@ -18,7 +18,7 @@ import {
   AuthzGrantRepository,
   type BindingPrincipalWhere,
   type DirectoryCausedGrantChange,
-  type RoleBindingWrite,
+  type GrantWrite,
 } from "../authz-grant.repository.ts";
 import type { AuthzDatabase, AuthzReadRepository } from "../authz-read.repository.ts";
 import {
@@ -190,7 +190,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     actor,
     source,
   }: {
-    row: RoleBindingWrite;
+    row: GrantWrite;
     actor: LedgerActor;
     source?: GrantEventSource;
   }): Promise<void> {
@@ -218,7 +218,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
   }: {
     bindingId: string;
     organizationId: string;
-    role: RoleBindingWrite["role"];
+    role: GrantWrite["role"];
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {
@@ -265,11 +265,11 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
   }: {
     deleteWhere: {
       organizationId: string;
-      scopeType: RoleBindingWrite["scopeType"];
+      scopeType: GrantWrite["scopeType"];
       scopeId: string;
       principal: BindingPrincipalWhere;
     };
-    create: RoleBindingWrite;
+    create: GrantWrite;
     actor: LedgerActor;
   }): Promise<void> {
     // Refuse before emitting writes when the original grant is absent. A

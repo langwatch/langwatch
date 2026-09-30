@@ -11,8 +11,8 @@ import type {
   AuthzPendingAdmissionRead,
   AuthzResolveAdmissionInput,
 } from "./authz.admission.ts";
-import type * as Binding from "./authz.binding-management.ts";
 import type * as Commands from "./authz.commands.ts";
+import type * as Binding from "./authz.grant-management.ts";
 import type * as Queries from "./authz.queries.ts";
 import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from "./authz.ts";
 import type * as declarationModule from "./declaration.ts";

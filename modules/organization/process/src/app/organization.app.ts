@@ -50,7 +50,7 @@ import {
   type OrganizationRestMemberTeamBinding,
   type OrganizationUpdatedMember,
   type OrganizationSettings,
-  type AddOrganizationGroupBindingInput,
+  type AddOrganizationGroupGrantInput,
   type AddOrganizationTeamMemberInput,
   type ApplyOrganizationGroupEditsInput,
   type ChangeOrganizationGroupMemberInput,
@@ -74,7 +74,7 @@ import {
   type OrganizationBillingProfile,
   type OrganizationWithAdministrators,
   type OrganizationGroup,
-  type OrganizationGroupBinding,
+  type OrganizationGroupGrant,
   type JoinRequestJoining,
   type OrganizationGroupDetails,
   type OrganizationGroupPage,
@@ -89,7 +89,7 @@ import {
   type PersonalWorkspace,
   type PersonalWorkspaceInput,
   type PersonalWorkspaceFeaturesInput,
-  type RemoveOrganizationGroupBindingInput,
+  type RemoveOrganizationGroupGrantInput,
   type RemoveOrganizationTeamMemberInput,
   type RenameOrganizationGroupInput,
   type UpdateOrganizationSettingsInput,
@@ -1276,7 +1276,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   resolveBindingScopeNames(input: {
     organizationId: string;
-    bindings: readonly organizationContractModule.OrganizationGroupBinding[];
+    bindings: readonly organizationContractModule.OrganizationGroupGrant[];
   }): Promise<ReadonlyMap<string, string>> {
     return this.#dependencies.groups.resolveBindingScopeNames(input);
   }
@@ -1319,27 +1319,27 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /** Every access binding one group holds. */
-  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]> {
+  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupGrant[]> {
     return this.#dependencies.organizations.listGroupBindings(input);
   }
 
   /** Adds one access binding to a group, attributed to its caller. */
-  addGroupBinding(
-    input: Omit<AddOrganizationGroupBindingInput, "actor">,
+  addGroupGrant(
+    input: Omit<AddOrganizationGroupGrantInput, "actor">,
     by: OrganizationCaller,
-  ): Promise<OrganizationGroupBinding> {
-    return this.#dependencies.organizations.addGroupBinding({
+  ): Promise<OrganizationGroupGrant> {
+    return this.#dependencies.organizations.addGroupGrant({
       ...input,
       actor: this.#ledgerActor(by),
     });
   }
 
   /** Removes one access binding from a group, attributed to its caller. */
-  removeGroupBinding(
-    input: Omit<RemoveOrganizationGroupBindingInput, "actor">,
+  removeGroupGrant(
+    input: Omit<RemoveOrganizationGroupGrantInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void> {
-    return this.#dependencies.organizations.removeGroupBinding({
+    return this.#dependencies.organizations.removeGroupGrant({
       ...input,
       actor: this.#ledgerActor(by),
     });
@@ -1732,7 +1732,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     const page = await this.listGroups({ ...input, ...GROUP_PAGE });
     const scopeNames = await this.resolveBindingScopeNames({
       organizationId: input.organizationId,
-      bindings: page.data.flatMap(({ bindings }) => bindings),
+      bindings: page.data.flatMap(({ grants }) => grants),
     });
 
     return page.data.map((group) => ({
@@ -1742,7 +1742,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       externalId: group.externalId,
       scimSource: group.scimSource,
       memberCount: group.memberCount,
-      bindings: group.bindings.map((binding) => ({
+      grants: group.grants.map((binding) => ({
         ...binding,
         scopeName: scopeNames.get(binding.scopeId) ?? null,
       })),
@@ -1754,7 +1754,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     const group = await this.getGroup(input);
     const scopeNames = await this.resolveBindingScopeNames({
       organizationId: input.organizationId,
-      bindings: group.bindings,
+      bindings: group.grants,
     });
 
     return {
@@ -1763,7 +1763,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       slug: group.slug,
       externalId: group.externalId,
       scimSource: group.scimSource,
-      bindings: group.bindings.map((binding) => ({
+      grants: group.grants.map((binding) => ({
         ...binding,
         scopeName: scopeNames.get(binding.scopeId) ?? null,
       })),
@@ -1787,14 +1787,14 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     const groups = await this.listGroupsForMember(input);
     const scopeNames = await this.resolveBindingScopeNames({
       organizationId: input.organizationId,
-      bindings: groups.flatMap(({ bindings }) => bindings),
+      bindings: groups.flatMap(({ grants }) => grants),
     });
 
     return groups.map((group) => ({
       id: group.id,
       name: group.name,
       scimSource: group.scimSource,
-      bindings: group.bindings.map((binding) => ({
+      grants: group.grants.map((binding) => ({
         id: binding.id,
         role: binding.role,
         customRoleName: binding.customRoleName,

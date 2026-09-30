@@ -20,18 +20,18 @@ import {
   type AuthzAttachBindingsInput,
   type AuthzRevokeBindingsInput,
   type OrganizationRole,
-  type RoleBindingScopeType,
+  type GrantScopeTier,
   type TeamUserRole,
 } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
 import type {
-  AuthzBindingRepository,
+  AuthzManagedGrantRepository,
   AuthzBindingScopeRow,
   AuthzManagedBindingRow,
-} from "../../repositories/authz-binding.repository.ts";
-import { AuthzBindingWriterService } from "../authz-binding-writer.service.ts";
+} from "../../repositories/authz-managed-grant.repository.ts";
+import { AuthzGrantWriterService } from "../authz-grant-writer.service.ts";
 import { permissiveGrantGuards, TEST_CALLER } from "./support/grant-guards.stub.ts";
 
 const ORGANIZATION_ID = "organization_1";
@@ -107,7 +107,7 @@ class MemberAccessStore {
     return this.rows.filter(predicate).length;
   }
 
-  bindings(): AuthzBindingRepository {
+  bindings(): AuthzManagedGrantRepository {
     return {
       findScopeRows: async ({
         scopes,
@@ -164,7 +164,7 @@ class MemberAccessStore {
             apiKeyId: principal.apiKeyId ?? null,
             role: binding.role as TeamUserRole,
             customRoleId: binding.customRoleId ?? null,
-            scopeType: binding.scopeType as RoleBindingScopeType,
+            scopeType: binding.scopeType as GrantScopeTier,
             scopeId: binding.scopeId,
           };
           const identity = identityOf(candidate);
@@ -251,7 +251,7 @@ function world(options: { seat?: OrganizationRole } = {}) {
     scopeId: SHARED_TEAM_ID,
   });
 
-  const writer = AuthzBindingWriterService.create({
+  const writer = AuthzGrantWriterService.create({
     permissions: permissiveGrantGuards,
     bindings: store.bindings(),
     ledger: store.ledger(),

@@ -1,10 +1,6 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
-import {
-  RoleBindingScopeType,
-  TeamUserRole,
-  type AuthzGrantsService,
-} from "@langwatch/authz-contract";
+import { GrantScopeTier, TeamUserRole, type AuthzGrantsService } from "@langwatch/authz-contract";
 import { isNativeSocialProvider } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -27,7 +23,7 @@ import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-au
 /**
  * The KSUID resource prefix a role-binding row is minted under.
  */
-const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
+const GRANT_KSUID_RESOURCE = "rolebinding";
 
 /**
  * The collaborators every hook in this file reaches, handed in together.
@@ -84,11 +80,11 @@ const grantDefaultOrgMembership = ({
     organizationId,
     bindings: [
       {
-        bindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
+        bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
         principal: { userId },
         role: TeamUserRole.MEMBER,
         customRoleId: null,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeType: GrantScopeTier.ORGANIZATION,
         scopeId: organizationId,
       },
     ],

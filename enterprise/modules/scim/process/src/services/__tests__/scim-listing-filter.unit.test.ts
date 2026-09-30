@@ -84,7 +84,7 @@ function directoryRepository(): ScimDirectoryRepository {
     renameGroup: vi.fn(async () => undefined),
     deleteGroup: vi.fn(async () => undefined),
     groupSlugExists: vi.fn(async () => false),
-    findRoleBindings: vi.fn(async () => []),
+    findGrantRows: vi.fn(async () => []),
   };
 }
 

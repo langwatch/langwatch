@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type AuthzBindingDatabase,
-  PrismaAuthzBindingRepository,
-} from "../prisma.authz-binding.repository.ts";
+  type AuthzManagedGrantDatabase,
+  PrismaAuthzManagedGrantRepository,
+} from "../prisma.authz-managed-grant.repository.ts";
 
 function setup() {
   const delegate = () => ({
@@ -23,14 +23,14 @@ function setup() {
     roleBinding: delegate(),
     team: delegate(),
     teamUser: delegate(),
-  } satisfies AuthzBindingDatabase;
+  } satisfies AuthzManagedGrantDatabase;
   return {
     database,
-    repository: PrismaAuthzBindingRepository.create({ database }),
+    repository: PrismaAuthzManagedGrantRepository.create({ database }),
   };
 }
 
-describe("PrismaAuthzBindingRepository", () => {
+describe("PrismaAuthzManagedGrantRepository", () => {
   it("finds a binding only inside the named organization", async () => {
     const { database, repository } = setup();
     database.grant.findFirst.mockResolvedValue({ id: "binding-1" });

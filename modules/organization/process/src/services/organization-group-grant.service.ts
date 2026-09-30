@@ -9,8 +9,8 @@ import {
   GroupRoleScopeError,
   GroupScopeNotInOrganizationError,
   PersonalWorkspaceNotManagedHereError,
-  type OrganizationGroupBinding,
-  type OrganizationGroupBindingInput,
+  type OrganizationGroupGrant,
+  type OrganizationGroupGrantInput,
 } from "@langwatch/organization-contract";
 
 import type { OrganizationGroupDependencies } from "./organization-group.service.ts";
@@ -18,10 +18,10 @@ import type { OrganizationGroupDependencies } from "./organization-group.service
 type GroupBindingWrite = {
   bindingId: string;
   principal: { groupId: string };
-  role: OrganizationGroupBindingInput["role"];
+  role: OrganizationGroupGrantInput["role"];
   customRoleId: string | null;
-  scopeType: OrganizationGroupBindingInput["scopeType"];
-  scopeId: OrganizationGroupBindingInput["scopeId"];
+  scopeType: OrganizationGroupGrantInput["scopeType"];
+  scopeId: OrganizationGroupGrantInput["scopeId"];
 };
 
 function bindingScopeIds(binding: {
@@ -33,9 +33,9 @@ function bindingScopeIds(binding: {
   return { projectId: binding.scopeId };
 }
 
-export class OrganizationGroupBindingService {
-  static create(dependencies: OrganizationGroupDependencies): OrganizationGroupBindingService {
-    return new OrganizationGroupBindingService(dependencies);
+export class OrganizationGroupGrantService {
+  static create(dependencies: OrganizationGroupDependencies): OrganizationGroupGrantService {
+    return new OrganizationGroupGrantService(dependencies);
   }
 
   private constructor(private readonly dependencies: OrganizationGroupDependencies) {}
@@ -62,7 +62,7 @@ export class OrganizationGroupBindingService {
 
   async validateGroupBindings(
     organizationId: string,
-    bindings: OrganizationGroupBindingInput[],
+    bindings: OrganizationGroupGrantInput[],
   ): Promise<void> {
     const customBindings = bindings.filter(({ role }) => role === "CUSTOM");
     if (customBindings.some(({ customRoleId }) => !customRoleId)) {
@@ -131,7 +131,7 @@ export class OrganizationGroupBindingService {
     }
   }
 
-  groupBindingWrite(groupId: string, binding: OrganizationGroupBindingInput): GroupBindingWrite {
+  groupBindingWrite(groupId: string, binding: OrganizationGroupGrantInput): GroupBindingWrite {
     return {
       bindingId: this.groupIdentities.createBindingId(),
       principal: { groupId },
@@ -145,7 +145,7 @@ export class OrganizationGroupBindingService {
   async readGroupBindings(input: {
     organizationId: string;
     groupId: string;
-  }): Promise<OrganizationGroupBinding[]> {
+  }): Promise<OrganizationGroupGrant[]> {
     const bindings = await this.authz.listGroupBindings({
       organizationId: input.organizationId,
       groupId: input.groupId,
@@ -161,7 +161,7 @@ export class OrganizationGroupBindingService {
     customRole: { name: string } | null;
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
-  }): OrganizationGroupBinding {
+  }): OrganizationGroupGrant {
     return {
       id: binding.id,
       role: binding.role,
@@ -182,8 +182,8 @@ export class OrganizationGroupBindingService {
       scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
       scopeId: string;
     }[],
-  ): Map<string, OrganizationGroupBinding[]> {
-    const result = new Map<string, OrganizationGroupBinding[]>();
+  ): Map<string, OrganizationGroupGrant[]> {
+    const result = new Map<string, OrganizationGroupGrant[]>();
     for (const binding of bindings) {
       if (!binding.groupId) {
         continue;

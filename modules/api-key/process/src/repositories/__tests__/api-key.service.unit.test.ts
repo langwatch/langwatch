@@ -16,7 +16,7 @@ import {
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ApiKeyBindingId } from "../../services/api-key-binding-id.service.ts";
+import type { ApiKeyGrantId } from "../../services/api-key-grant-id.service.ts";
 import { ApiKeyTokenService } from "../../services/api-key-token.service.ts";
 import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service.ts";
 import {
@@ -26,7 +26,7 @@ import {
   type ApiKeyUpdateRecord,
 } from "../api-key.repository.ts";
 
-class TestApiKeyBindingId implements ApiKeyBindingId {
+class TestApiKeyBindingId implements ApiKeyGrantId {
   static create(): TestApiKeyBindingId {
     return new TestApiKeyBindingId();
   }
@@ -43,7 +43,7 @@ const KEY_GRANTS = new Map<string, ApiKeyBinding[]>();
 
 beforeEach(() => KEY_GRANTS.clear());
 
-function grantKey(id: string, bindings: ApiKeyCreateRecord["roleBindings"]): void {
+function grantKey(id: string, bindings: ApiKeyCreateRecord["grants"]): void {
   KEY_GRANTS.set(
     id,
     bindings.map((binding, index) => ({
@@ -78,7 +78,7 @@ class MemoryApiKeys extends ApiKeyRepository {
   private rows: ApiKeyRow[] = [];
   create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
     const now = toDate(nowInstant());
-    const { roleBindings, startsDisabled, ...record } = input;
+    const { grants, startsDisabled, ...record } = input;
     const row: ApiKeyRow = {
       ...record,
       createdByDeviceLabel: record.createdByDeviceLabel ?? null,
@@ -91,7 +91,7 @@ class MemoryApiKeys extends ApiKeyRepository {
       createdAt: now,
       updatedAt: now,
     };
-    grantKey(row.id, roleBindings);
+    grantKey(row.id, grants);
     this.rows.push(row);
     return Promise.resolve(row);
   }
@@ -150,7 +150,7 @@ class MemoryApiKeys extends ApiKeyRepository {
   update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
     const row = this.rows.find((candidate) => candidate.id === input.id);
     if (!row) throw new Error("missing");
-    const { roleBindings, ...columns } = input;
+    const { grants, ...columns } = input;
     Object.assign(row, columns, {
       updatedAt: toDate(nowInstant()),
       ...(input.revokedAt === void 0
@@ -158,7 +158,7 @@ class MemoryApiKeys extends ApiKeyRepository {
         : { revokedAt: input.revokedAt && toDate(input.revokedAt) }),
       ...(input.lastUsedAt === void 0 ? {} : { lastUsedAt: toDate(input.lastUsedAt) }),
     });
-    if (roleBindings) grantKey(row.id, roleBindings);
+    if (grants) grantKey(row.id, grants);
     return Promise.resolve(row);
   }
   revoke({ id }: { id: string }): Promise<ApiKeyRow> {
@@ -593,7 +593,7 @@ describe("API-key service", () => {
       permissionMode: "all",
       bindings: [],
     });
-    expect(created.apiKey.roleBindings).toEqual([
+    expect(created.apiKey.grants).toEqual([
       {
         scopeType: "ORGANIZATION",
         scopeId: "org-1",

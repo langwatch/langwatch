@@ -307,10 +307,10 @@ export class OrganizationVisibilityService {
       team.members = team.members.filter(
         (member) => member.userId === userId || member.userId === demoProjectUserId,
       );
-      team.members = OrganizationMembershipService.enrichTeamWithRoleBindings({
+      team.members = OrganizationMembershipService.enrichTeamWithGrants({
         team,
         userId,
-        userRoleBindings: [...bindings],
+        userGrants: [...bindings],
         organizationId: organization.id,
       }).members;
 

@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthzService, type AuthzServiceOptions } from "../../services/authz.service.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
-import { StubAuthzBindingRepository } from "./support/authz-binding.stub.ts";
 import { StubAuthzEpoch } from "./support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "./support/authz-managed-grant.stub.ts";
 import { makeReader } from "./support/authz-read.stub.ts";
 
 const ORG = "org-1";
@@ -49,7 +49,7 @@ function makeService({
     isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
     epoch: epochPort,
     cacheEnabled: () => cacheEnabled,
     cacheMaxAgeMs,
@@ -65,7 +65,7 @@ function makeUncachedService(reader: AuthzReadRepository) {
     isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
   });
 }
 

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
-import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
+import { AuthzGrantWriterService } from "../../services/authz-grant-writer.service.ts";
 import { permissiveGrantGuards, TEST_CALLER } from "./support/grant-guards.stub.ts";
 
 const actor = { type: "user" as const, id: "admin-1" };
@@ -39,13 +39,13 @@ function ledger() {
 }
 
 function setup() {
-  const bindings = new StubAuthzBindingRepository();
+  const bindings = new StubAuthzManagedGrantRepository();
   bindings.findScopeRows.mockResolvedValue([scope]);
   bindings.findOrganizationRole.mockResolvedValue("MEMBER");
   bindings.isGroupInOrganization.mockResolvedValue(true);
   bindings.isApiKeyInOrganization.mockResolvedValue(true);
   const writes = ledger();
-  const writer = AuthzBindingWriterService.create({
+  const writer = AuthzGrantWriterService.create({
     permissions: permissiveGrantGuards,
     bindings,
     ledger: writes.ledger,

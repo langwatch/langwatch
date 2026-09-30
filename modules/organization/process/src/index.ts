@@ -22,7 +22,7 @@ export {
 export type { TeamRoleValue } from "./rules/member-role-constraints.rules.ts";
 export type {
   PersonalTeamScopeReader,
-  RoleBindingScope,
+  PersonalTeamGrantScope,
 } from "./services/personal-team-scope.service.ts";
 export type {
   AuditLogFilters,

@@ -1,19 +1,19 @@
-import type { OrganizationRole, RoleBindingScopeType } from "@langwatch/authz-contract";
+import type { OrganizationRole, GrantScopeTier } from "@langwatch/authz-contract";
 
 import {
   type AuthzAssignableRoleRow,
   type AuthzBindingScopeRow,
-  AuthzBindingRepository,
+  AuthzManagedGrantRepository,
   type AuthzGrantPrincipalRow,
   type AuthzManagedBindingRow,
   type AuthzUserGroupRow,
-} from "../authz-binding.repository.ts";
+} from "../authz-managed-grant.repository.ts";
 import type { AuthzMemoryStore } from "./authz-memory.store.ts";
 
 /** The binding facts a process without a database keeps in one shared store. */
-export class MemoryAuthzBindingRepository extends AuthzBindingRepository {
-  static create(options: { memory: AuthzMemoryStore }): MemoryAuthzBindingRepository {
-    return new MemoryAuthzBindingRepository(options.memory);
+export class MemoryAuthzManagedGrantRepository extends AuthzManagedGrantRepository {
+  static create(options: { memory: AuthzMemoryStore }): MemoryAuthzManagedGrantRepository {
+    return new MemoryAuthzManagedGrantRepository(options.memory);
   }
 
   private constructor(private readonly memory: AuthzMemoryStore) {
@@ -37,7 +37,7 @@ export class MemoryAuthzBindingRepository extends AuthzBindingRepository {
 
   async findScopeRows(input: {
     organizationId: string;
-    scopes: readonly { scopeType: RoleBindingScopeType; scopeId: string }[];
+    scopes: readonly { scopeType: GrantScopeTier; scopeId: string }[];
   }): Promise<AuthzBindingScopeRow[]> {
     return this.memory.scopes
       .filter(

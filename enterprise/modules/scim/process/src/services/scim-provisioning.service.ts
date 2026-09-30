@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type {
-  AuthzGrantsService,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/authz-contract";
+import type { AuthzGrantsService, GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
 import {
   type ScimCreateUserRequest,
   type ScimListResponse,
@@ -149,7 +145,7 @@ export class ScimProvisioningService {
           principal: { userId },
           role: "MEMBER" as TeamUserRole,
           customRoleId: null,
-          scopeType: "ORGANIZATION" as RoleBindingScopeType,
+          scopeType: "ORGANIZATION" as GrantScopeTier,
           scopeId: organizationId,
         },
       ],
@@ -263,7 +259,7 @@ export class ScimProvisioningService {
     }
 
     await this.organization.assertRemovalKeepsAnAdministrator({ organizationId, userId });
-    const visibleGrants = await this.prisma.findRoleBindings({
+    const visibleGrants = await this.prisma.findGrantRows({
       kind: "member-offboarding",
       organizationId,
       userId,

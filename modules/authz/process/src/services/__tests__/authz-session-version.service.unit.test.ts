@@ -7,7 +7,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
-import { MemoryAuthzBindingRepository } from "../../repositories/memory/memory.authz-binding.repository.ts";
+import { MemoryAuthzManagedGrantRepository } from "../../repositories/memory/memory.authz-managed-grant.repository.ts";
 import { MemoryAuthzSessionVersionRepository } from "../../repositories/memory/memory.authz-session-version.repository.ts";
 import { AuthzSessionVersionService } from "../authz-session-version.service.ts";
 
@@ -42,7 +42,7 @@ describe("AuthzSessionVersionService", () => {
     memory = AuthzMemoryStore.create();
     service = AuthzSessionVersionService.create({
       versions: MemoryAuthzSessionVersionRepository.create({ memory }),
-      bindings: MemoryAuthzBindingRepository.create({ memory }),
+      bindings: MemoryAuthzManagedGrantRepository.create({ memory }),
     });
     for (const userId of ["user_ada", "user_bo", "user_cy"]) {
       memory.organizationRoles.set(`${ORG}:${userId}`, "MEMBER");

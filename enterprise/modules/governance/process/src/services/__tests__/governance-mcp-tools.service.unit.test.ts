@@ -74,7 +74,7 @@ function ingestionKey(overrides: Partial<ApiKey>): ApiKey {
     ingestionTemplateId: null,
     createdAt: new Date(1_000),
     updatedAt: new Date(1_000),
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }

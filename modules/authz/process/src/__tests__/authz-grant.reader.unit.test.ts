@@ -1,9 +1,9 @@
 import type { AuthzAccessBinding } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
-import { AuthzBindingReaderService } from "../services/authz-binding-reader.service.ts";
+import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
+import { AuthzGrantReaderService } from "../services/authz-grant-reader.service.ts";
 
 const createdAt = new Date("2026-08-20T12:00:00.000Z");
 
@@ -28,9 +28,9 @@ function binding(overrides: Partial<AuthzAccessBinding> = {}): AuthzAccessBindin
 }
 
 function setup() {
-  const bindings = new StubAuthzBindingRepository();
+  const bindings = new StubAuthzManagedGrantRepository();
   const listing = new StubAuthzListingRepository();
-  const reader = AuthzBindingReaderService.create({ bindings, listing });
+  const reader = AuthzGrantReaderService.create({ bindings, listing });
   return { bindings, listing, reader };
 }
 

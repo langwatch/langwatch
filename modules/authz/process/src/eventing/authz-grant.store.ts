@@ -16,10 +16,7 @@ import { z } from "zod";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
-import {
-  BindingMissingError,
-  type RoleBindingWrite,
-} from "../repositories/authz-grant.repository.ts";
+import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
@@ -69,7 +66,7 @@ export type LedgerWriteSource = GrantEventSource;
 const CONVERGENCE_POLL_MS = 250;
 const CONVERGENCE_TIMEOUT_MS = 8_000;
 
-export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId"> & {
+export type LedgerBindingAttach = Omit<GrantWrite, "organizationId"> & {
   /** Internal generation captured by a membership transaction. Callers that
    *  create the membership before emitting leave this unset; the writer reads
    *  and locks the live row itself. */
@@ -542,7 +539,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }: {
     organizationId: string;
     bindingId: string;
-    role: RoleBindingWrite["role"];
+    role: GrantWrite["role"];
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {

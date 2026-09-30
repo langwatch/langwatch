@@ -2,9 +2,9 @@
  * The writer's guard reads for a test that is not about escalation, the limit or the
  * last administrator: the caller holds everything and the organization has no grants.
  */
-import type { AuthzBindingWriterPermissions } from "../../authz-binding-writer.service.ts";
+import type { AuthzGrantWriterPermissions } from "../../authz-grant-writer.service.ts";
 
-export const permissiveGrantGuards: AuthzBindingWriterPermissions = {
+export const permissiveGrantGuards: AuthzGrantWriterPermissions = {
   findPermissionsBeyondCaller: async () => [],
   listManagedBindingsForOrganization: async () => [],
 };

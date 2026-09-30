@@ -9,8 +9,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
 import { AuthzService } from "../authz.service.ts";
 
@@ -24,7 +24,7 @@ function authzWithNoBindings() {
       findProjectLineage: vi.fn().mockResolvedValue(PROJECT),
     }),
     listing: new StubAuthzListingRepository(),
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
   });
 }
 

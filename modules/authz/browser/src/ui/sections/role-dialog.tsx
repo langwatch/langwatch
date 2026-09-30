@@ -120,7 +120,7 @@ function useRoleMutations({
   const utils = authzApi.useUtils();
   const onSaved = (title: string) => {
     void utils.role.getAll.invalidate();
-    void utils.roleBinding.listForOrg.invalidate();
+    void utils.authz.listManagedGrants.invalidate();
     host.succeeded({ title });
     onClose();
   };

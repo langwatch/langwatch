@@ -7,9 +7,9 @@ import {
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import {
   type AuthzGrantRepository,
@@ -107,7 +107,7 @@ function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger
     ledger,
     epoch,
     newBindingId: () => "rb_test_ksuid",
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
   });
   const bumpEpoch = epoch.bump;
   return { service, bumpEpoch, ledger };
@@ -682,7 +682,7 @@ describe("AuthzGrantsService.offboard", () => {
             },
           ]),
         }),
-        bindings: new StubAuthzBindingRepository(),
+        bindings: new StubAuthzManagedGrantRepository(),
       });
 
       const decision = await authz.check({

@@ -21,7 +21,7 @@ import {
   type ScimGroupRecord,
   type ScimMembershipRecord,
   type ScimOrganizationUserRecord,
-  type ScimRoleBindingRecord,
+  type ScimGrantRecord,
   type ScimTokenRecord,
   type ScimTokenIdentity,
   type ScimUserRecord,
@@ -128,7 +128,7 @@ function isScimDatabase(value: object): value is ScimDatabase {
   );
 }
 
-function roleBindingScopeFilter(
+function grantScopeFilter(
   scope: ScimGrantBindingScope,
 ):
   | { userId: string; scopeType: "ORGANIZATION"; scopeId: string }
@@ -541,11 +541,11 @@ export class PrismaScimRepository extends ScimRepository {
   async groupSlugExists(input: { organizationId: string; slug: string }): Promise<boolean> {
     return (await this.prisma.group.findFirst({ where: input, select: { id: true } })) !== null;
   }
-  findRoleBindings(scope: ScimGrantBindingScope): Promise<ScimRoleBindingRecord[]> {
+  findGrantRows(scope: ScimGrantBindingScope): Promise<ScimGrantRecord[]> {
     return this.prisma.roleBinding.findMany({
       where: {
         organizationId: scope.organizationId,
-        ...roleBindingScopeFilter(scope),
+        ...grantScopeFilter(scope),
       },
       select: {
         id: true,

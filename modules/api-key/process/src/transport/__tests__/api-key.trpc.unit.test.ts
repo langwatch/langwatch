@@ -43,7 +43,7 @@ function storedKey(overrides: Partial<ApiKey> = {}): ApiKey {
     ingestionTemplateId: null,
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }
@@ -147,7 +147,7 @@ describe("the apiKey tRPC transport", () => {
         ingestSourceType: null,
         ingestionTemplateId: null,
         createdByDeviceLabel: null,
-        roleBindings: [],
+        grants: [],
       };
 
       expect(output?.validate([entry])).toBe(true);

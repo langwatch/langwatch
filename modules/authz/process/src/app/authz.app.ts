@@ -30,7 +30,7 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
-import { AuthzBindingIdService } from "../services/authz-binding-id.service.ts";
+import { AuthzGrantIdService } from "../services/authz-grant-id.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import { AuthzCommandDispatcherService } from "../services/authz-grants-command-dispatcher.service.ts";
 import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
@@ -152,7 +152,7 @@ export class AuthzApp implements AuthzApi {
    */
   static create(setup: AuthzSetup): AuthzApp {
     const dispatcher = AuthzCommandDispatcherService.create();
-    const bindingIds = AuthzBindingIdService.create();
+    const bindingIds = AuthzGrantIdService.create();
     const config = authzRuntimeConfig(setup.config);
     const built = PostgresAuthzAdapter.create({
       database: setup.members.prisma,

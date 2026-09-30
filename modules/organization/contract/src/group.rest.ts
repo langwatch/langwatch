@@ -6,8 +6,8 @@
 import { z } from "zod";
 
 import {
-  organizationGroupBindingInputSchema,
-  organizationGroupBindingSchema,
+  organizationGroupGrantInputSchema,
+  organizationGroupGrantSchema,
   organizationGroupMemberSchema,
   organizationGroupSchema,
 } from "./group.ts";
@@ -21,7 +21,7 @@ export const organizationGroupRestSummarySchema = organizationGroupSchema
   .omit({ organizationId: true, updatedAt: true })
   .safeExtend({
     memberCount: z.number().int().nonnegative(),
-    bindings: z.array(organizationGroupBindingSchema),
+    bindings: z.array(organizationGroupGrantSchema),
   });
 export type OrganizationGroupRestSummary = z.infer<typeof organizationGroupRestSummarySchema>;
 
@@ -53,7 +53,7 @@ export const organizationGroupRestDetailsSchema = organizationGroupSchema
   .omit({ organizationId: true, createdAt: true, updatedAt: true })
   .safeExtend({
     members: z.array(organizationGroupRestMemberSchema),
-    bindings: z.array(organizationGroupBindingSchema),
+    bindings: z.array(organizationGroupGrantSchema),
   });
 export type OrganizationGroupRestDetails = z.infer<typeof organizationGroupRestDetailsSchema>;
 
@@ -62,10 +62,10 @@ export const organizationGroupRestMemberListSchema = z.object({
 });
 
 export const organizationGroupRestBindingListSchema = z.object({
-  data: z.array(organizationGroupBindingSchema),
+  data: z.array(organizationGroupGrantSchema),
 });
 
-export const organizationGroupRestBindingSchema = organizationGroupBindingSchema.omit({
+export const organizationGroupRestBindingSchema = organizationGroupGrantSchema.omit({
   customRoleId: true,
   customRoleName: true,
 });
@@ -82,7 +82,7 @@ export const organizationGroupRestListQuerySchema = z.object({
 /** A new group, with the bindings and members it starts life holding. */
 export const organizationGroupRestCreateSchema = z.object({
   name: z.string().trim().min(1, "name is required").max(100),
-  bindings: z.array(organizationGroupBindingInputSchema).optional(),
+  bindings: z.array(organizationGroupGrantInputSchema).optional(),
   memberIds: z.array(z.string()).optional(),
 });
 

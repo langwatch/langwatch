@@ -7,7 +7,7 @@ import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";
-import { ApiKeyBindingsService } from "../api-key-bindings.service.ts";
+import { ApiKeyGrantsService } from "../api-key-grants.service.ts";
 
 function row(id: string, organizationId = "org-1"): ApiKeyRow {
   const at = new Date("2026-09-01T00:00:00Z");
@@ -68,14 +68,14 @@ describe("joining a key's grants", () => {
               }),
             ],
       );
-      const bindings = ApiKeyBindingsService.create({
+      const bindings = ApiKeyGrantsService.create({
         authz: createApiFixture<AuthzApi>({ listApiKeyBindings }),
       });
 
       const [first, second] = await bindings.attach([row("key-1"), row("key-2", "org-2")]);
 
       expect(listApiKeyBindings).toHaveBeenCalledTimes(2);
-      expect(first?.roleBindings).toEqual([
+      expect(first?.grants).toEqual([
         {
           id: "grant-key-1",
           role: "VIEWER",
@@ -84,19 +84,19 @@ describe("joining a key's grants", () => {
           scopeId: "project-1",
         },
       ]);
-      expect(second?.roleBindings).toMatchObject([{ scopeType: "ORGANIZATION", scopeId: "org-2" }]);
+      expect(second?.grants).toMatchObject([{ scopeType: "ORGANIZATION", scopeId: "org-2" }]);
     });
   });
 
   describe("given a key the grants head holds nothing for", () => {
     it("answers it with no bindings rather than dropping it", async () => {
-      const bindings = ApiKeyBindingsService.create({
+      const bindings = ApiKeyGrantsService.create({
         authz: createApiFixture<AuthzApi>({ listApiKeyBindings: async () => [] }),
       });
 
       await expect(bindings.attachOne(row("key-1"))).resolves.toMatchObject({
         id: "key-1",
-        roleBindings: [],
+        grants: [],
       });
     });
   });
@@ -108,7 +108,7 @@ describe("joining a key's grants", () => {
         grant("key-1", { id: "grant-again" }),
         grant("key-9", { apiKeyId: null, userId: "user-1" }),
       ]);
-      const bindings = ApiKeyBindingsService.create({
+      const bindings = ApiKeyGrantsService.create({
         authz: createApiFixture<AuthzApi>({ listScopeBindings }),
       });
 

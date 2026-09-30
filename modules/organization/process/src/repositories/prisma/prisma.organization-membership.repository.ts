@@ -197,7 +197,7 @@ async function planUserScopeBinding({
   return {
     revokeIds,
     attach: {
-      bindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
+      bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
       principal: { userId },
       role,
       customRoleId,
@@ -746,7 +746,7 @@ function auditLogFilterConditions({
   return conditions;
 }
 
-const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
+const GRANT_KSUID_RESOURCE = "rolebinding";
 
 export class PrismaOrganizationMembershipRepository implements OrganizationMembershipRepository {
   static create(options: {
@@ -777,7 +777,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return personalTeamScope.findSharedTeamIds({ client: this.prisma, organizationId });
   }
 
-  async findTeamRoleBindings({
+  async findTeamGrants({
     organizationId,
     userId,
     teamIds,
@@ -895,7 +895,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       organizationId: created.organization.id,
       bindings: [
         {
-          bindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
+          bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
           principal: { userId: input.userId },
           role: TeamUserRole.ADMIN,
           customRoleId: null,
@@ -903,7 +903,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           scopeId: created.organization.id,
         },
         {
-          bindingId: generate(ROLE_BINDING_KSUID_RESOURCE).toString(),
+          bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
           principal: { userId: input.userId },
           role: TeamUserRole.ADMIN,
           customRoleId: null,

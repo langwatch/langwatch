@@ -8,7 +8,11 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
-import { teamUserRoleSchema } from "@langwatch/authz-contract";
+import {
+  GrantScopeTier,
+  grantScopeTierSchema,
+  teamUserRoleSchema,
+} from "@langwatch/authz-contract";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
 import { Search, X } from "lucide-react";
@@ -19,20 +23,16 @@ import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organi
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import {
   getDefaultTeamRoleForOrganizationRole,
-  isBindingRoleAllowedForOrganizationRole,
+  isGrantRoleAllowedForOrganizationRole,
   type TeamRoleValue,
 } from "../../model/member-role-constraints.ts";
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "../../model/prisma-types.ts";
+import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 
 // ── Shared display helpers ────────────────────────────────────────────────────
 
-export function scopeTypeLabel(type: RoleBindingScopeType) {
-  if (type === RoleBindingScopeType.ORGANIZATION) return "🏢";
-  if (type === RoleBindingScopeType.TEAM) return "👥";
+export function scopeTypeLabel(type: GrantScopeTier) {
+  if (type === GrantScopeTier.ORGANIZATION) return "🏢";
+  if (type === GrantScopeTier.TEAM) return "👥";
   return "📁";
 }
 
@@ -66,20 +66,20 @@ function customRoleIdOfValue(value: string): string | undefined {
   return value.startsWith("CUSTOM:") ? value.slice("CUSTOM:".length) : undefined;
 }
 
-export type PendingBinding = {
+export type PendingGrant = {
   roleValue: string;
   role: TeamUserRole;
   customRoleId?: string;
   customRoleName?: string;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   scopeName?: string;
 };
 
 const SCOPE_TYPE_ITEMS = [
-  { label: "Organization", value: RoleBindingScopeType.ORGANIZATION },
-  { label: "Team", value: RoleBindingScopeType.TEAM },
-  { label: "Project", value: RoleBindingScopeType.PROJECT },
+  { label: "Organization", value: GrantScopeTier.ORGANIZATION },
+  { label: "Team", value: GrantScopeTier.TEAM },
+  { label: "Project", value: GrantScopeTier.PROJECT },
 ];
 
 const BASE_ROLE_ITEMS = [
@@ -118,7 +118,7 @@ function roleItemsForSeat({
   ];
   if (!organizationRole) return items;
   return items.filter((item) =>
-    isBindingRoleAllowedForOrganizationRole({
+    isGrantRoleAllowedForOrganizationRole({
       organizationRole,
       role: (item.customRoleId ? `custom:${item.customRoleId}` : item.value) as TeamRoleValue,
     }),
@@ -135,7 +135,7 @@ function defaultRoleValueFor(organizationRole?: OrganizationUserRole): string {
 /** A Lite Member seat has no organization-scoped rows, so the scope goes too. */
 function scopeTypeItemsForSeat(organizationRole?: OrganizationUserRole) {
   return organizationRole === OrganizationUserRole.EXTERNAL
-    ? SCOPE_TYPE_ITEMS.filter((item) => item.value !== RoleBindingScopeType.ORGANIZATION)
+    ? SCOPE_TYPE_ITEMS.filter((item) => item.value !== GrantScopeTier.ORGANIZATION)
     : SCOPE_TYPE_ITEMS;
 }
 
@@ -146,15 +146,14 @@ function scopeNameFor({
   teamItems,
   projectItems,
 }: {
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   organizationName: string | undefined;
   teamItems: { label: string; value: string }[];
   projectItems: { label: string; value: string }[];
 }): string | undefined {
-  if (scopeType === RoleBindingScopeType.ORGANIZATION) return organizationName ?? "Organization";
-  if (scopeType === RoleBindingScopeType.TEAM)
-    return teamItems.find((t) => t.value === scopeId)?.label;
+  if (scopeType === GrantScopeTier.ORGANIZATION) return organizationName ?? "Organization";
+  if (scopeType === GrantScopeTier.TEAM) return teamItems.find((t) => t.value === scopeId)?.label;
   return projectItems.find((p) => p.value === scopeId)?.label;
 }
 
@@ -172,12 +171,12 @@ function pickerSnapForSeat({
   organizationRole?: OrganizationUserRole;
   roleValue: string;
   customRoleId?: string;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
 }): { snapRoleToViewer: boolean; snapScopeToTeam: boolean } {
   if (!organizationRole) {
     return { snapRoleToViewer: false, snapScopeToTeam: false };
   }
-  const selectionAllowed = isBindingRoleAllowedForOrganizationRole({
+  const selectionAllowed = isGrantRoleAllowedForOrganizationRole({
     organizationRole,
     role: (customRoleId ? `custom:${customRoleId}` : roleValue) as TeamRoleValue,
   });
@@ -185,22 +184,22 @@ function pickerSnapForSeat({
     snapRoleToViewer: !selectionAllowed,
     snapScopeToTeam:
       organizationRole === OrganizationUserRole.EXTERNAL &&
-      scopeType === RoleBindingScopeType.ORGANIZATION,
+      scopeType === GrantScopeTier.ORGANIZATION,
   };
 }
 
-// ── BindingInputRow ───────────────────────────────────────────────────────────
+// ── GrantInputRow ───────────────────────────────────────────────────────────
 
-export type BindingInputRowHandle = {
-  /** Return uncommitted binding if valid, else null. Resets the row. */
-  flush: () => PendingBinding | null;
+export type GrantInputRowHandle = {
+  /** Return uncommitted grant if valid, else null. Resets the row. */
+  flush: () => PendingGrant | null;
 };
 
-export const BindingInputRow = forwardRef<
-  BindingInputRowHandle,
+export const GrantInputRow = forwardRef<
+  GrantInputRowHandle,
   {
     organizationId: string;
-    onAdd: (binding: PendingBinding) => void;
+    onAdd: (grant: PendingGrant) => void;
     /**
      * Reports whether the row currently holds a complete, addable draft. The
      * dialog counts that draft as a pending change, so Save works on a row
@@ -216,7 +215,7 @@ export const BindingInputRow = forwardRef<
     buttonLabel?: string;
     isPending?: boolean;
   }
->(function BindingInputRow(
+>(function GrantInputRow(
   {
     organizationId,
     onAdd,
@@ -229,7 +228,7 @@ export const BindingInputRow = forwardRef<
 ) {
   const defaultRoleValue = defaultRoleValueFor(organizationRole);
 
-  const [scopeType, setScopeType] = useState<RoleBindingScopeType>(RoleBindingScopeType.TEAM);
+  const [scopeType, setScopeType] = useState<GrantScopeTier>(GrantScopeTier.TEAM);
   const [scopeId, setScopeId] = useState("");
   const [roleValue, setRoleValue] = useState(defaultRoleValue);
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
@@ -272,7 +271,7 @@ export const BindingInputRow = forwardRef<
       setCustomRoleId(undefined);
     }
     if (snap.snapScopeToTeam) {
-      setScopeType(RoleBindingScopeType.TEAM);
+      setScopeType(GrantScopeTier.TEAM);
       setScopeId("");
     }
   }, [organizationRole, roleValue, customRoleId, scopeType]);
@@ -321,13 +320,13 @@ export const BindingInputRow = forwardRef<
     [projectItems],
   );
 
-  const isReady = isDirty && (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
+  const isReady = isDirty && (scopeId !== "" || scopeType === GrantScopeTier.ORGANIZATION);
 
   useEffect(() => {
     onReadyChange?.(isReady);
   }, [isReady, onReadyChange]);
 
-  function buildBinding(): PendingBinding {
+  function buildGrant(): PendingGrant {
     const cid = customRoleId;
     const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
     return {
@@ -336,7 +335,7 @@ export const BindingInputRow = forwardRef<
       customRoleId: cid,
       customRoleName: cname,
       scopeType,
-      scopeId: scopeType === RoleBindingScopeType.ORGANIZATION ? organizationId : scopeId,
+      scopeId: scopeType === GrantScopeTier.ORGANIZATION ? organizationId : scopeId,
       scopeName: scopeNameFor({
         scopeType,
         scopeId,
@@ -356,16 +355,16 @@ export const BindingInputRow = forwardRef<
 
   function handleAdd() {
     if (!isReady) return;
-    onAdd(buildBinding());
+    onAdd(buildGrant());
     resetRow();
   }
 
   useImperativeHandle(ref, () => ({
     flush() {
       if (!isReady) return null;
-      const binding = buildBinding();
+      const grant = buildGrant();
       resetRow();
-      return binding;
+      return grant;
     },
   }));
 
@@ -403,7 +402,7 @@ export const BindingInputRow = forwardRef<
         collection={scopeTypeCollection}
         value={[scopeType]}
         onValueChange={(e) => {
-          setScopeType((e.value[0] as RoleBindingScopeType) ?? RoleBindingScopeType.TEAM);
+          setScopeType(grantScopeTierSchema.catch(GrantScopeTier.TEAM).parse(e.value[0]));
           setScopeId("");
           setTeamSearch("");
           setProjectTeamId("");
@@ -426,7 +425,7 @@ export const BindingInputRow = forwardRef<
         </Select.Content>
       </Select.Root>
 
-      {scopeType === RoleBindingScopeType.TEAM && (
+      {scopeType === GrantScopeTier.TEAM && (
         <Select.Root
           collection={teamCollection}
           value={scopeId ? [scopeId] : []}
@@ -461,13 +460,13 @@ export const BindingInputRow = forwardRef<
         </Select.Root>
       )}
 
-      {scopeType === RoleBindingScopeType.ORGANIZATION && (
+      {scopeType === GrantScopeTier.ORGANIZATION && (
         <Text fontSize="sm" color="fg.muted" minWidth="160px">
           (whole organization)
         </Text>
       )}
 
-      {scopeType === RoleBindingScopeType.PROJECT && (
+      {scopeType === GrantScopeTier.PROJECT && (
         <>
           <Select.Root
             collection={projectTeamCollection}
@@ -553,9 +552,9 @@ export const BindingInputRow = forwardRef<
   );
 });
 
-// ── AddBindingForm ────────────────────────────────────────────────────────────
+// ── AddGrantForm ────────────────────────────────────────────────────────────
 
-export function AddBindingForm({
+export function AddGrantForm({
   organizationId,
   groupId,
   onAdded,
@@ -566,20 +565,20 @@ export function AddBindingForm({
 }) {
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
-  const addBinding = api.group.addBinding.useMutation({
+  const addGrant = api.group.addGrant.useMutation({
     onSuccess: () => {
-      toaster.create({ title: "Binding added", type: "success" });
+      toaster.create({ title: "Access added", type: "success" });
       onAdded();
     },
-    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't add the binding" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't add the access" }),
   });
 
   return (
-    <BindingInputRow
+    <GrantInputRow
       organizationId={organizationId}
-      isPending={addBinding.isPending}
+      isPending={addGrant.isPending}
       onAdd={(b) =>
-        addBinding.mutate({
+        addGrant.mutate({
           organizationId,
           groupId,
           role: b.role,
@@ -592,10 +591,10 @@ export function AddBindingForm({
   );
 }
 
-export type BindingRowShape = {
+export type GrantRowShape = {
   role: string;
   customRoleName?: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   scopeName?: string | null;
 };
@@ -607,13 +606,13 @@ export function toggled({ set, id }: { set: ReadonlySet<string>; id: string }): 
   return next;
 }
 
-export function DirectBindingRow({
-  binding,
+export function DirectGrantRow({
+  grant,
   markedForRemoval,
   removable,
   onToggle,
 }: {
-  binding: BindingRowShape;
+  grant: GrantRowShape;
   markedForRemoval: boolean;
   removable: boolean;
   onToggle: () => void;
@@ -629,12 +628,12 @@ export function DirectBindingRow({
       opacity={markedForRemoval ? 0.4 : 1}
       transition="opacity 0.15s"
     >
-      <Badge colorPalette={roleBadgeColor(binding.role)} size="sm" textDecoration={strike}>
-        {binding.customRoleName ?? binding.role}
+      <Badge colorPalette={roleBadgeColor(grant.role)} size="sm" textDecoration={strike}>
+        {grant.customRoleName ?? grant.role}
       </Badge>
       <Text color="fg.muted">on</Text>
       <Badge colorPalette="purple" size="sm" textDecoration={strike}>
-        {scopeTypeLabel(binding.scopeType)} {binding.scopeName ?? binding.scopeId}
+        {scopeTypeLabel(grant.scopeType)} {grant.scopeName ?? grant.scopeId}
       </Badge>
       <Spacer />
       {removable && (
@@ -642,7 +641,7 @@ export function DirectBindingRow({
           size="xs"
           variant="ghost"
           color={markedForRemoval ? "blue.500" : "fg.muted"}
-          aria-label={markedForRemoval ? "Undo removal" : "Remove binding"}
+          aria-label={markedForRemoval ? "Undo removal" : "Remove access"}
           onClick={onToggle}
         >
           <X size={14} />
@@ -652,21 +651,15 @@ export function DirectBindingRow({
   );
 }
 
-export function StagedBindingRow({
-  binding,
-  onUndo,
-}: {
-  binding: PendingBinding;
-  onUndo: () => void;
-}) {
+export function StagedGrantRow({ grant, onUndo }: { grant: PendingGrant; onUndo: () => void }) {
   return (
     <HStack px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm" opacity={0.7}>
-      <Badge colorPalette={roleBadgeColor(binding.role)} size="sm">
-        {binding.customRoleName ?? binding.role}
+      <Badge colorPalette={roleBadgeColor(grant.role)} size="sm">
+        {grant.customRoleName ?? grant.role}
       </Badge>
       <Text color="fg.muted">on</Text>
       <Badge colorPalette="purple" size="sm">
-        {scopeTypeLabel(binding.scopeType)} {binding.scopeName ?? binding.scopeId}
+        {scopeTypeLabel(grant.scopeType)} {grant.scopeName ?? grant.scopeId}
       </Badge>
       <Spacer />
       <Button size="xs" variant="ghost" color="fg.muted" aria-label="Undo add" onClick={onUndo}>

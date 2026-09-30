@@ -7,7 +7,6 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-
 type MutationOptions = {
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
@@ -31,10 +30,10 @@ const { api, state } = vi.hoisted(() => {
   const api = {
     useUtils: () => ({
       role: { getAll: { invalidate: state.invalidate } },
-      roleBinding: { listForOrg: { invalidate: state.invalidateBindings } },
+      authz: { listManagedGrants: { invalidate: state.invalidateBindings } },
     }),
-    roleBinding: {
-      listForOrg: {
+    authz: {
+      listManagedGrants: {
         useQuery: () => ({ data: state.bindings, isLoading: false, isError: false }),
       },
     },

@@ -12,20 +12,20 @@ import {
   type OrganizationRole,
 } from "@langwatch/authz-contract";
 
-import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";
+import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
 
-export class AuthzBindingReaderService {
+export class AuthzGrantReaderService {
   static create(options: {
-    bindings: AuthzBindingRepository;
+    bindings: AuthzManagedGrantRepository;
     listing: AuthzListingRepository;
-  }): AuthzBindingReaderService {
-    return new AuthzBindingReaderService(options);
+  }): AuthzGrantReaderService {
+    return new AuthzGrantReaderService(options);
   }
 
   private constructor(
     private readonly options: {
-      bindings: AuthzBindingRepository;
+      bindings: AuthzManagedGrantRepository;
       listing: AuthzListingRepository;
     },
   ) {}

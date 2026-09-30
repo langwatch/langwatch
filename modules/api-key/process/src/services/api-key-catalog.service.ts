@@ -14,7 +14,7 @@ import {
 } from "@langwatch/api-key-contract";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
-import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
+import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
@@ -38,13 +38,13 @@ export class ApiKeyCatalogService {
     return new ApiKeyCatalogService(options.repository, options);
   }
 
-  private readonly bindings: ApiKeyBindingsService;
+  private readonly bindings: ApiKeyGrantsService;
 
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
   ) {
-    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+    this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
   }
 
   async findById({ id }: { id: string }): Promise<ApiKey | null> {
@@ -230,7 +230,7 @@ export class ApiKeyCatalogService {
   private async customPermissions(row: StoredApiKey, organizationId: string): Promise<string[]> {
     const roleIds = [
       ...new Set(
-        row.roleBindings.flatMap((binding) => (binding.customRoleId ? [binding.customRoleId] : [])),
+        row.grants.flatMap((binding) => (binding.customRoleId ? [binding.customRoleId] : [])),
       ),
     ];
     if (roleIds.length === 0) {

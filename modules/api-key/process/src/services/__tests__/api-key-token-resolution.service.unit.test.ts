@@ -34,7 +34,7 @@ const storedKey = (over: Record<string, unknown> = {}) => ({
   organizationId: "organization-1",
   ingestSourceType: null,
   ingestionTemplateId: null,
-  roleBindings: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+  grants: [{ scopeType: "PROJECT", scopeId: "project-1" }],
   ...over,
 });
 
@@ -54,8 +54,8 @@ function serviceWith(fakes: Fakes = {}) {
     // The key's grants live on authz's grants head, not on its row.
     authz: {
       listApiKeyBindings: async () =>
-        Array.isArray(row?.roleBindings)
-          ? row.roleBindings.map((binding: Record<string, unknown>) => ({
+        Array.isArray(row?.grants)
+          ? row.grants.map((binding: Record<string, unknown>) => ({
               ...binding,
               id: "grant-1",
               apiKeyId: row.id,
@@ -65,7 +65,7 @@ function serviceWith(fakes: Fakes = {}) {
           : [],
     },
     repository: {
-      findByLookupId: async () => row && { ...row, roleBindings: undefined },
+      findByLookupId: async () => row && { ...row, grants: undefined },
       upgradeHash: async () => {
         calls.push("upgradeHash");
         if (fakes.upgradeFails) throw new Error("write failed");
@@ -258,7 +258,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("resolves that project", async () => {
         const { service } = serviceWith({
           row: storedKey({
-            roleBindings: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+            grants: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
           }),
           identity: project({ id: "project-2", teamId: "team-2" }),
         });
@@ -273,7 +273,7 @@ describe("ApiKeyTokenResolutionService", () => {
       /** @scenario "An organization or team key still selects a project it covers" */
       it("resolves that project", async () => {
         const { service } = serviceWith({
-          row: storedKey({ roleBindings: [{ scopeType: "TEAM", scopeId: "team-1" }] }),
+          row: storedKey({ grants: [{ scopeType: "TEAM", scopeId: "team-1" }] }),
           identity: project({ id: "project-2", teamId: "team-1" }),
         });
 
@@ -299,7 +299,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("refuses, rather than picking one of them", async () => {
         const { service } = serviceWith({
           row: storedKey({
-            roleBindings: [
+            grants: [
               { scopeType: "PROJECT", scopeId: "project-1" },
               { scopeType: "PROJECT", scopeId: "project-2" },
             ],
@@ -314,7 +314,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("refuses", async () => {
         const { service } = serviceWith({
           row: storedKey({
-            roleBindings: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+            grants: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
           }),
         });
 

@@ -5,7 +5,7 @@ import { organizationResourceSlug } from "../rules/organization-resource-slug.ru
 
 /** KSUID resource prefixes: a persisted format, since each id is written into a customer's row. */
 const GROUP_KSUID_RESOURCE = "group";
-const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
+const GRANT_KSUID_RESOURCE = "rolebinding";
 
 /**
  * Unlike a team, a group's id is a KSUID and its slug carries no id tail — the organization
@@ -23,7 +23,7 @@ export class GroupIdentityService implements GroupIdentity {
   }
 
   createBindingId(): string {
-    return generate(ROLE_BINDING_KSUID_RESOURCE).toString();
+    return generate(GRANT_KSUID_RESOURCE).toString();
   }
 
   slugify(name: string): string {

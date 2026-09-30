@@ -22,7 +22,7 @@ const { api, state } = vi.hoisted(() => {
   const api = {
     useUtils: () => ({
       role: { getAll: { invalidate: () => void 0 } },
-      roleBinding: { listForOrg: { invalidate: () => void 0 } },
+      authz: { listManagedGrants: { invalidate: () => void 0 } },
     }),
     role: {
       create: {

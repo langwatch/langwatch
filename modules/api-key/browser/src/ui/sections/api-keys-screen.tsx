@@ -15,7 +15,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { ApiKeyListEntry, ApiKeyTrpcRoleBinding } from "@langwatch/api-key-contract";
+import type { ApiKeyListEntry, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
@@ -433,7 +433,7 @@ export default function ApiKeysScreen() {
     [allApiKeys],
   );
 
-  // Client-side filter: map each regular key's roleBindings → scopes so the
+  // Client-side filter: map each regular key's grants → scopes so the
   // shared inclusive cascade applies directly. The scope filter only governs
   // the regular API keys section.
   const filteredKeys = useMemo(
@@ -441,7 +441,7 @@ export default function ApiKeysScreen() {
       filterRowsByScope(
         serviceApiKeys.map((k) => ({
           ...k,
-          scopes: k.roleBindings.map((rb) => ({
+          scopes: k.grants.map((rb) => ({
             scopeType: rb.scopeType,
             scopeId: rb.scopeId,
           })),
@@ -501,7 +501,7 @@ export default function ApiKeysScreen() {
     description?: string | null;
     permissionMode?: "all" | "readonly" | "restricted";
     permissions?: string[];
-    bindings?: ApiKeyTrpcRoleBinding[];
+    bindings?: ApiKeyTrpcGrant[];
   }) => {
     updateMutation.mutate(
       {
@@ -589,7 +589,7 @@ export default function ApiKeysScreen() {
     return (
       <ProviderScopeChips
         size="xs"
-        scopes={apiKeyRow.roleBindings.map((rb) => ({
+        scopes={apiKeyRow.grants.map((rb) => ({
           scopeType: rb.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
           scopeId: rb.scopeId,
           name: rb.scopeName ?? undefined,

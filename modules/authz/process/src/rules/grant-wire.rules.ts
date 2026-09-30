@@ -8,7 +8,7 @@ import {
   type GrantListQuery,
   type GrantPage,
   type GrantScopeType,
-  type RoleBindingScopeType,
+  type GrantScopeTier,
   type TeamUserRole,
 } from "@langwatch/authz-contract";
 
@@ -18,19 +18,19 @@ const BUILT_IN_ROLE: Readonly<Record<BuiltInRoleId, { role: TeamUserRole; name: 
   viewer: { role: "VIEWER", name: "Viewer" },
 };
 
-const SCOPE_TYPE: Readonly<Record<GrantScopeType, RoleBindingScopeType>> = {
+const SCOPE_TYPE: Readonly<Record<GrantScopeType, GrantScopeTier>> = {
   organization: "ORGANIZATION",
   team: "TEAM",
   project: "PROJECT",
 };
 
-const WIRE_SCOPE_TYPE: Readonly<Record<RoleBindingScopeType, GrantScopeType>> = {
+const WIRE_SCOPE_TYPE: Readonly<Record<GrantScopeTier, GrantScopeType>> = {
   ORGANIZATION: "organization",
   TEAM: "team",
   PROJECT: "project",
 };
 
-export function storedScopeType(scopeType: GrantScopeType): RoleBindingScopeType {
+export function storedScopeType(scopeType: GrantScopeType): GrantScopeTier {
   return SCOPE_TYPE[scopeType];
 }
 

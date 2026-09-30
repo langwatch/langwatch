@@ -1,6 +1,6 @@
 import {
   OrganizationGroupService as OrganizationGroupServiceContract,
-  type OrganizationGroupBinding,
+  type OrganizationGroupGrant,
   type OrganizationService,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -25,7 +25,7 @@ export class OrganizationGroupScopeService extends OrganizationGroupServiceContr
 
   async resolveBindingScopeNames(input: {
     organizationId: string;
-    bindings: readonly OrganizationGroupBinding[];
+    bindings: readonly OrganizationGroupGrant[];
   }): Promise<ReadonlyMap<string, string>> {
     const names = new Map<string, string>();
     const uniqueBindings = [

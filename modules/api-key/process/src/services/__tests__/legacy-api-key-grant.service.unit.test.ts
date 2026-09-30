@@ -29,7 +29,7 @@ function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
     ingestionTemplateId: null,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }
@@ -125,7 +125,7 @@ describe("LegacyApiKeyGrantService", () => {
   /** @scenario "A key owned by a user mints nothing it did not already have" */
   it.each([
     ["created at cutover", apiKey({ createdAt: CUTOVER_AT })],
-    ["already bound", apiKey({ roleBindings: [{ id: "binding-1" }] as ApiKey["roleBindings"] })],
+    ["already bound", apiKey({ grants: [{ id: "binding-1" }] as ApiKey["grants"] })],
     ["user owned", apiKey({ userId: "user-1" })],
     ["ingestion", apiKey({ ingestSourceType: "claude_code" })],
   ])("does not widen a %s key", async (_label, key) => {

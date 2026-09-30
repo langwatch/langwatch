@@ -17,7 +17,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { teamUserRoleSchema } from "@langwatch/authz-contract";
 import { Link } from "@langwatch/browser-host/link";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -37,8 +36,9 @@ import {
 } from "../../../behavior/use-department-column.ts";
 import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { grantRoleId } from "../../../model/grant-role-id.ts";
 import {
-  isBindingRoleAllowedForOrganizationRole,
+  isGrantRoleAllowedForOrganizationRole,
   type TeamRoleValue,
 } from "../../../model/member-role-constraints.ts";
 import { useOrganizationHost } from "../../../model/organization-host.ts";
@@ -46,7 +46,7 @@ import { OrganizationUserRole } from "../../../model/prisma-types.ts";
 import { RandomColorAvatar } from "../../../ui/elements/random-color-avatar.tsx";
 import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
 
-type TeamData = RouterOutputs["team"]["getTeamsWithRoleBindings"][number];
+type TeamData = RouterOutputs["team"]["getTeamsWithGrants"][number];
 type ProjectAccessEntry = TeamData["projectAccess"][string][number];
 
 // ── Role options ──────────────────────────────────────────────────────────────
@@ -151,10 +151,10 @@ function AddToTeamDialog({
   );
   const customRoles = api.role.getAll.useQuery({ organizationId }, { enabled: open });
 
-  const create = api.roleBinding.create.useMutation({
+  const create = api.authz.createGrant.useMutation({
     onSuccess: () => {
       toaster.create({ title: "Member added", type: "success" });
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+      void queryClient.team.getTeamsWithGrants.invalidate();
       onClose();
     },
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't add the member" }),
@@ -187,7 +187,7 @@ function AddToTeamDialog({
     ];
     if (!selectedMemberRole) return items;
     return items.filter((item) =>
-      isBindingRoleAllowedForOrganizationRole({
+      isGrantRoleAllowedForOrganizationRole({
         organizationRole: selectedMemberRole,
         role: (item.value.startsWith("CUSTOM:")
           ? `custom:${item.value.slice(7)}`
@@ -283,11 +283,11 @@ function AddToTeamDialog({
             onClick={() =>
               create.mutate({
                 organizationId,
-                userId,
-                role: teamUserRoleSchema.parse(customRoleId ? "CUSTOM" : role),
-                customRoleId,
-                scopeType: "TEAM",
-                scopeId: teamId,
+                grant: {
+                  principal: { type: "user", id: userId },
+                  roleId: grantRoleId({ role, customRoleId }),
+                  scope: { type: "team", id: teamId },
+                },
               })
             }
           >
@@ -327,10 +327,10 @@ function AddToProjectDialog({
   );
   const customRoles = api.role.getAll.useQuery({ organizationId }, { enabled: open });
 
-  const create = api.roleBinding.create.useMutation({
+  const create = api.authz.createGrant.useMutation({
     onSuccess: () => {
       toaster.create({ title: "Access added", type: "success" });
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+      void queryClient.team.getTeamsWithGrants.invalidate();
       onClose();
     },
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't add the access" }),
@@ -427,11 +427,11 @@ function AddToProjectDialog({
             onClick={() =>
               create.mutate({
                 organizationId,
-                userId,
-                role: teamUserRoleSchema.parse(customRoleId ? "CUSTOM" : role),
-                customRoleId,
-                scopeType: "PROJECT",
-                scopeId: projectId,
+                grant: {
+                  principal: { type: "user", id: userId },
+                  roleId: grantRoleId({ role, customRoleId }),
+                  scope: { type: "project", id: projectId },
+                },
               })
             }
           >
@@ -466,9 +466,9 @@ function ProjectSection({
   const { openDrawer } = useDrawer();
   const queryClient = api.useUtils();
 
-  const deleteBinding = api.roleBinding.delete.useMutation({
+  const revokeGrant = api.authz.revokeGrant.useMutation({
     onSuccess: () => {
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+      void queryClient.team.getTeamsWithGrants.invalidate();
     },
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't remove the access" }),
   });
@@ -608,11 +608,11 @@ function ProjectSection({
                             ? "Remove override, revert to team role"
                             : "Remove project access"
                         }
-                        loading={deleteBinding.isPending}
+                        loading={revokeGrant.isPending}
                         onClick={() =>
-                          deleteBinding.mutate({
+                          revokeGrant.mutate({
                             organizationId,
-                            bindingId: m.bindingId!,
+                            grantId: m.bindingId!,
                           })
                         }
                       >
@@ -713,8 +713,8 @@ function TeamMemberRoleControls({
   organizationId: string;
   canManage: boolean;
   removing: boolean;
-  onChangeRole: (change: { bindingId: string; role: string; customRoleId?: string }) => void;
-  onRemove: (bindingId: string) => void;
+  onChangeRole: (change: { grantId: string; role: string; customRoleId?: string }) => void;
+  onRemove: (grantId: string) => void;
 }) {
   const roleBadge = (
     <Badge colorPalette={roleBadgeColor(member.role)} size="sm">
@@ -731,22 +731,22 @@ function TeamMemberRoleControls({
       </>
     );
   }
-  const bindingId = member.bindingId;
-  if (!canManage || !bindingId) return roleBadge;
+  const grantId = member.bindingId;
+  if (!canManage || !grantId) return roleBadge;
   return (
     <>
       <RoleSelect
         value={member.role}
         customRoleId={member.customRoleId}
         organizationId={organizationId}
-        onChange={(role, customRoleId) => onChangeRole({ bindingId, role, customRoleId })}
+        onChange={(role, customRoleId) => onChangeRole({ grantId, role, customRoleId })}
       />
       <Button
         size="xs"
         variant="ghost"
         color="gray.400"
         loading={removing}
-        onClick={() => onRemove(bindingId)}
+        onClick={() => onRemove(grantId)}
       >
         <X size={14} />
       </Button>
@@ -774,16 +774,16 @@ function TeamCard({
   );
   const department = useDepartmentColumn(organizationId, governanceEnabled);
 
-  const deleteBinding = api.roleBinding.delete.useMutation({
+  const revokeGrant = api.authz.revokeGrant.useMutation({
     onSuccess: () => {
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+      void queryClient.team.getTeamsWithGrants.invalidate();
     },
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't remove the member" }),
   });
 
-  const updateBinding = api.roleBinding.update.useMutation({
+  const changeGrantRole = api.authz.changeGrantRole.useMutation({
     onSuccess: () => {
-      void queryClient.team.getTeamsWithRoleBindings.invalidate();
+      void queryClient.team.getTeamsWithGrants.invalidate();
     },
     onError: (e) =>
       showErrorToast({
@@ -837,7 +837,7 @@ function TeamCard({
 
         {expanded && (
           <Card.Body pt={0} borderTopWidth="1px">
-            {/* ── Team members (team-scoped bindings, editable) ── */}
+            {/* ── Team members (team-scoped grants, editable) ── */}
             <Box mt={4}>
               <HStack mb={3}>
                 <Text
@@ -887,19 +887,18 @@ function TeamCard({
                       member={m}
                       organizationId={organizationId}
                       canManage={canManage}
-                      removing={deleteBinding.isPending}
-                      onChangeRole={({ bindingId, role, customRoleId }) =>
-                        updateBinding.mutate({
+                      removing={revokeGrant.isPending}
+                      onChangeRole={({ grantId, role, customRoleId }) =>
+                        changeGrantRole.mutate({
                           organizationId,
-                          bindingId,
-                          role: teamUserRoleSchema.parse(role),
-                          customRoleId,
+                          grantId,
+                          roleId: grantRoleId({ role, customRoleId }),
                         })
                       }
-                      onRemove={(bindingId) =>
-                        deleteBinding.mutate({
+                      onRemove={(grantId) =>
+                        revokeGrant.mutate({
                           organizationId,
-                          bindingId,
+                          grantId,
                         })
                       }
                     />
@@ -1032,7 +1031,7 @@ export default function TeamsScreen() {
   const { organization, hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
 
-  const teams = api.team.getTeamsWithRoleBindings.useQuery(
+  const teams = api.team.getTeamsWithGrants.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization },
   );

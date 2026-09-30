@@ -23,7 +23,7 @@ import {
   type AuthzUpdateBindingInput,
   type AuthzDeleteBindingInput,
   type OrganizationRole,
-  type RoleBindingScopeType,
+  type GrantScopeTier,
 } from "@langwatch/authz-contract";
 // One class, one status: an organization's membership is the organization
 // feature's fact, and every surface answers this refusal 422.
@@ -36,9 +36,9 @@ import { fromDate, nowInstant } from "@langwatch/time";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type {
-  AuthzBindingRepository,
+  AuthzManagedGrantRepository,
   AuthzBindingScopeRow,
-} from "../repositories/authz-binding.repository.ts";
+} from "../repositories/authz-managed-grant.repository.ts";
 import {
   GRANT_LIMIT_PER_ORGANIZATION,
   isGrantLimitReached,
@@ -48,7 +48,7 @@ import {
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
 
 /** The reads the writer's guards ask of the permission side. */
-export type AuthzBindingWriterPermissions = Pick<
+export type AuthzGrantWriterPermissions = Pick<
   AuthzService,
   "findPermissionsBeyondCaller" | "listManagedBindingsForOrganization"
 >;
@@ -79,22 +79,22 @@ function assertScopeCanGrantRole({
   }
 }
 
-export class AuthzBindingWriterService {
+export class AuthzGrantWriterService {
   static create(options: {
-    bindings: AuthzBindingRepository;
+    bindings: AuthzManagedGrantRepository;
     ledger: AuthzCompatibilityLedger;
     newBindingId: () => string;
-    permissions: AuthzBindingWriterPermissions;
-  }): AuthzBindingWriterService {
-    return new AuthzBindingWriterService(options);
+    permissions: AuthzGrantWriterPermissions;
+  }): AuthzGrantWriterService {
+    return new AuthzGrantWriterService(options);
   }
 
   private constructor(
     private readonly options: {
-      bindings: AuthzBindingRepository;
+      bindings: AuthzManagedGrantRepository;
       ledger: AuthzCompatibilityLedger;
       newBindingId: () => string;
-      permissions: AuthzBindingWriterPermissions;
+      permissions: AuthzGrantWriterPermissions;
     },
   ) {}
 
@@ -375,7 +375,7 @@ export class AuthzBindingWriterService {
   }: {
     organizationId: string;
     scopes: readonly {
-      scopeType: RoleBindingScopeType;
+      scopeType: GrantScopeTier;
       scopeId: string;
     }[];
   }): Promise<AuthzBindingScopeRow[]> {

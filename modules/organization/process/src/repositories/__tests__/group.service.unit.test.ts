@@ -170,7 +170,7 @@ describe("OrganizationService groups", () => {
       service.createGroup({
         organizationId: "org_1",
         name: "Reviewers",
-        bindings: [
+        grants: [
           {
             role: "CUSTOM",
             customRoleId: "role_1",
@@ -218,7 +218,7 @@ describe("OrganizationService groups", () => {
       await expect(
         service.listGroupsForMember({ organizationId: "org_1", userId: "user_1" }),
       ).resolves.toMatchObject([
-        { id: "group_1", name: "Reviewers", bindings: [{ role: "VIEWER" }] },
+        { id: "group_1", name: "Reviewers", grants: [{ role: "VIEWER" }] },
       ]);
     });
   });
@@ -234,10 +234,10 @@ describe("OrganizationService groups", () => {
       const { service, authz, grants } = buildService();
 
       await expect(
-        service.addGroupBinding({
+        service.addGroupGrant({
           organizationId: "org_1",
           groupId: "group_1",
-          binding: {
+          grant: {
             role: "CUSTOM",
             customRoleId: "role_from_another_org",
             scopeType: "TEAM",
@@ -259,10 +259,10 @@ describe("OrganizationService groups", () => {
       vi.mocked(authz.listUserCreatedRoles).mockResolvedValue([]);
 
       await expect(
-        service.addGroupBinding({
+        service.addGroupGrant({
           organizationId: "org_1",
           groupId: "group_1",
-          binding: {
+          grant: {
             role: "CUSTOM",
             customRoleId: "api_key_system_role",
             scopeType: "TEAM",
@@ -280,10 +280,10 @@ describe("OrganizationService groups", () => {
   it("writes an identical group binding rather than refusing it", async () => {
     const { service, grants } = buildService();
 
-    await service.addGroupBinding({
+    await service.addGroupGrant({
       organizationId: "org_1",
       groupId: "group_1",
-      binding: {
+      grant: {
         role: "MEMBER",
         scopeType: "TEAM",
         scopeId: "team_1",
@@ -321,7 +321,7 @@ describe("OrganizationService groups", () => {
       service.getGroup({ organizationId: "org_1", groupId: "group_1" }),
     ).resolves.toMatchObject({
       id: "group_1",
-      bindings: [{ id: "binding_1", scopeId: "team_1" }],
+      grants: [{ id: "binding_1", scopeId: "team_1" }],
     });
   });
 
@@ -470,8 +470,8 @@ describe("OrganizationService groups", () => {
         organizationId: "org_1",
         groupId: "group_1",
         rename: null,
-        bindingIdsToDelete: [],
-        bindingsToCreate: [],
+        grantIdsToRevoke: [],
+        grantsToCreate: [],
         memberUserIdsToAdd: [],
         memberUserIdsToRemove: [],
         actor: { type: "user" as const, id: "actor_1" },
@@ -512,8 +512,8 @@ describe("OrganizationService groups", () => {
         organizationId: "org_1",
         groupId: "group_1",
         rename: null,
-        bindingIdsToDelete: ["binding_1"],
-        bindingsToCreate: [],
+        grantIdsToRevoke: ["binding_1"],
+        grantsToCreate: [],
         memberUserIdsToAdd: [],
         memberUserIdsToRemove: ["user_removed"],
         actor: { type: "user", id: "actor_1" },

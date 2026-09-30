@@ -8,11 +8,11 @@ import type { ApiKeyRow, StoredApiKey } from "../repositories/api-key.repository
  * key row carries none of its own, so every read that answers a key joins
  * them here, per organization, in one read per organization.
  */
-export class ApiKeyBindingsService {
+export class ApiKeyGrantsService {
   static create(options: {
     authz: Pick<AuthzApi, "listApiKeyBindings" | "listScopeBindings">;
-  }): ApiKeyBindingsService {
-    return new ApiKeyBindingsService(options.authz);
+  }): ApiKeyGrantsService {
+    return new ApiKeyGrantsService(options.authz);
   }
 
   private constructor(
@@ -38,13 +38,13 @@ export class ApiKeyBindingsService {
       }
     }
 
-    return rows.map((row) => ({ ...row, roleBindings: bindingsByKey.get(row.id) ?? [] }));
+    return rows.map((row) => ({ ...row, grants: bindingsByKey.get(row.id) ?? [] }));
   }
 
   async attachOne(row: ApiKeyRow): Promise<StoredApiKey> {
     const [attached] = await this.attach([row]);
 
-    return attached ?? { ...row, roleBindings: [] };
+    return attached ?? { ...row, grants: [] };
   }
 
   /** The keys granted anything on this project, read off the grants head. */

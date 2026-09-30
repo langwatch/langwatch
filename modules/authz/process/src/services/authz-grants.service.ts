@@ -53,19 +53,19 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
-import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type {
   AuthzGrantRepository,
   BindingPrincipalWhere,
-  RoleBindingWrite,
+  GrantWrite,
 } from "../repositories/authz-grant.repository.ts";
-import {
-  AuthzBindingWriterService,
-  type AuthzBindingWriterPermissions,
-} from "./authz-binding-writer.service.ts";
+import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
 import { AuthzGrantManagementService } from "./authz-grant-management.service.ts";
+import {
+  AuthzGrantWriterService,
+  type AuthzGrantWriterPermissions,
+} from "./authz-grant-writer.service.ts";
 import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
 
 /**
@@ -79,9 +79,9 @@ export type AuthzGrantsServiceOptions = {
   ledger: AuthzCompatibilityLedger;
   epoch: AuthzEpochRepository;
   newBindingId: () => string;
-  bindings: AuthzBindingRepository;
+  bindings: AuthzManagedGrantRepository;
   /** The permission side's reads the writer's guards need (escalation, limit, last admin). */
-  permissions: AuthzBindingWriterPermissions;
+  permissions: AuthzGrantWriterPermissions;
 };
 
 type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "actor" | "where"> & {
@@ -112,7 +112,7 @@ const RESOURCE_SCOPE_REJECTION =
 
 export class AuthzGrantsService extends AuthzGrantsServiceContract {
   static create(options: AuthzGrantsServiceOptions): AuthzGrantsService {
-    const bindingWriter = AuthzBindingWriterService.create({
+    const bindingWriter = AuthzGrantWriterService.create({
       bindings: options.bindings,
       ledger: options.ledger,
       newBindingId: options.newBindingId,
@@ -132,7 +132,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   }
 
   private readonly options: AuthzGrantsServiceOptions;
-  private readonly bindingWriter: AuthzBindingWriterService;
+  private readonly bindingWriter: AuthzGrantWriterService;
   private readonly grantManagement: AuthzGrantManagementService;
   private readonly offboarding: AuthzOffboardingService;
   private readonly guards: AuthzGrantGuardsService;
@@ -145,7 +145,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     guards,
   }: {
     options: AuthzGrantsServiceOptions;
-    bindingWriter: AuthzBindingWriterService;
+    bindingWriter: AuthzGrantWriterService;
     grantManagement: AuthzGrantManagementService;
     offboarding: AuthzOffboardingService;
     guards: AuthzGrantGuardsService;
@@ -459,7 +459,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     where: GrantableScope;
     organizationId: string;
     expiresAtMs: number | undefined;
-  }): RoleBindingWrite {
+  }): GrantWrite {
     return {
       bindingId: this.options.newBindingId(),
       organizationId,

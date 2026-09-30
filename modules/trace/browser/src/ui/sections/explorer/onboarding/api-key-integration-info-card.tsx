@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/trace-api.ts";
 import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint.ts";
-import { RoleBindingScopeType, TeamUserRole } from "../../../../model/prisma-types.ts";
+import { TeamUserRole } from "../../../../model/prisma-types.ts";
 import { showErrorToast } from "../../errors/index.ts";
 
 interface ApiKeyIntegrationInfoCardProps {
@@ -31,7 +31,7 @@ function buildEmptyStateBindings(projectId: string) {
     {
       role: TeamUserRole.MEMBER,
       customRoleId: null as string | null,
-      scopeType: RoleBindingScopeType.PROJECT,
+      scopeType: "PROJECT" as const,
       scopeId: projectId,
     },
   ];

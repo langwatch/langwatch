@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * BindingInputRow: access policy by seat type; lite seat limits roles offered.
+ * GrantInputRow: access policy by seat type; lite seat limits roles offered.
  * @see specs/members/member-access-editing.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -11,7 +11,7 @@ import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OrganizationUserRole } from "../../../model/prisma-types.ts";
-import { BindingInputRow } from "../../sections/group-binding-input-row.tsx";
+import { GrantInputRow } from "../../sections/group-grant-input-row.tsx";
 
 vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
@@ -47,8 +47,8 @@ const Wrapper = ({ children }: { children?: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function renderRow(overrides: Partial<ComponentProps<typeof BindingInputRow>> = {}) {
-  return render(<BindingInputRow organizationId="org-1" onAdd={vi.fn()} {...overrides} />, {
+function renderRow(overrides: Partial<ComponentProps<typeof GrantInputRow>> = {}) {
+  return render(<GrantInputRow organizationId="org-1" onAdd={vi.fn()} {...overrides} />, {
     wrapper: Wrapper,
   });
 }
@@ -57,7 +57,7 @@ function renderRow(overrides: Partial<ComponentProps<typeof BindingInputRow>> = 
 const rolePicker = () => screen.getAllByRole("combobox")[0]!;
 const scopeTypePicker = () => screen.getAllByRole("combobox")[1]!;
 
-describe("<BindingInputRow/>", () => {
+describe("<GrantInputRow/>", () => {
   afterEach(() => {
     cleanup();
   });
@@ -151,7 +151,7 @@ describe("<BindingInputRow/>", () => {
       expect(rolePicker().textContent).toContain("Admin");
 
       rerender(
-        <BindingInputRow
+        <GrantInputRow
           organizationId="org-1"
           onAdd={vi.fn()}
           organizationRole={OrganizationUserRole.EXTERNAL}

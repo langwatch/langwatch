@@ -37,7 +37,7 @@ function keyRow(overrides: Partial<StoredApiKey> = {}): StoredApiKey {
     createdAt: new Date(),
     updatedAt: new Date(),
     hashedSecret: "hashed",
-    roleBindings: [],
+    grants: [],
     ...overrides,
   };
 }

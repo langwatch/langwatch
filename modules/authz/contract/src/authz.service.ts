@@ -10,7 +10,7 @@ import type {
   AuthzListManagedBindingsForOrganizationOutput,
   AuthzListManagedBindingsForUserInput,
   AuthzListManagedBindingsForUserOutput,
-} from "./authz.binding-management.ts";
+} from "./authz.grant-management.ts";
 import type {
   ApiKeyPermissionCheck,
   ApiKeyProjectDecision,
