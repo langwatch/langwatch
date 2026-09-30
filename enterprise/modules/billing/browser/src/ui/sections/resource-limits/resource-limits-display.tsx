@@ -1,5 +1,6 @@
-import { SimpleGrid } from "@chakra-ui/react";
+import { StatTileGrid } from "@langwatch/design-system/stat-tile";
 import { LIMIT_TYPE_DISPLAY_LABELS, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import type { ReactNode } from "react";
 
 import { ResourceLimitRow } from "../../../behavior/lent-resource-limit-row.tsx";
 
@@ -17,16 +18,17 @@ export type ResourceKey =
  */
 export const RESOURCE_LABELS: Record<ResourceKey, string> = {
   ...LIMIT_TYPE_DISPLAY_LABELS,
-  membersLite: "Lite Members",
-  // Default label is "Events / Month"; for TIERED orgs this is overridden
+  members: "Team members",
+  membersLite: "Lite members",
+  // Default label is "Events / month"; for TIERED orgs this is overridden
   // via the `messagesLabel` prop so they can display a different label
-  // (e.g. "Traces / Month"). See ResourceLimitsDisplay component.
-  messagesPerMonth: "Events / Month",
+  // (e.g. "Traces / month"). See ResourceLimitsDisplay component.
+  messagesPerMonth: "Events / month",
   // Label-only keys: not part of the ResourceLimits interface but included
   // here so that dynamic label resolution in usage.tsx (around line 109) can
   // look up a human-readable name for these resource types at runtime.
-  eventsPerMonth: "Events / Month",
-  tracesPerMonth: "Traces / Month",
+  eventsPerMonth: "Events / month",
+  tracesPerMonth: "Traces / month",
 } as const;
 
 /** Ordered list of resource keys for consistent rendering */
@@ -99,10 +101,12 @@ export interface ResourceLimitsDisplayProps {
   limits: ResourceLimits;
   /** When true, show "current / max" for member resources. Typically only for free plans. */
   showLimits?: boolean;
-  /** Override label for the messagesPerMonth resource (e.g. "Traces / Month" for TIERED plans). */
+  /** Override label for the messagesPerMonth resource (e.g. "Traces / month" for TIERED plans). */
   messagesLabel?: string;
   /** When true, show the Lite Members row. Only applies to SEAT_EVENT pricing model. */
   showLiteMembers?: boolean;
+  /** A tile that leads the row, such as the plan the limits belong to. */
+  leading?: ReactNode;
 }
 
 /**
@@ -114,13 +118,15 @@ export function ResourceLimitsDisplay({
   showLimits = false,
   messagesLabel,
   showLiteMembers = false,
+  leading,
 }: ResourceLimitsDisplayProps) {
   const visibleKeys = showLiteMembers
     ? RESOURCE_ORDER
     : RESOURCE_ORDER.filter((key) => key !== "membersLite");
 
   return (
-    <SimpleGrid columns={{ base: 1, md: 3 }} gap={3} width="full">
+    <StatTileGrid columns={visibleKeys.length + (leading ? 1 : 0)}>
+      {leading}
       {visibleKeys.map((key) => {
         const hideMax = !showLimits;
         const label =
@@ -134,6 +140,6 @@ export function ResourceLimitsDisplay({
           />
         );
       })}
-    </SimpleGrid>
+    </StatTileGrid>
   );
 }

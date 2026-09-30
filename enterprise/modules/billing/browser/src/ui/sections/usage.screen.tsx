@@ -1,14 +1,15 @@
 /**
- * Organization usage at /settings/usage. One card per deployment shape (hosted
- * plan / self-hosted license / open-source). No chrome.
+ * Organization usage at /settings/usage. One row of tiles per deployment shape
+ * (hosted plan / self-hosted license / open-source). No chrome.
  */
 
-import { Badge, Button, Card, Flex, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Alert, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { StatusChip } from "@langwatch/design-system/settings-card";
+import { StatTile, StatTileFigure, StatTileSkeleton } from "@langwatch/design-system/stat-tile";
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
-import { ArrowRight } from "lucide-react";
 
 import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
@@ -25,67 +26,41 @@ import {
   ResourceLimitsDisplay,
 } from "./resource-limits/resource-limits-display.tsx";
 
-function ResourceLimitsCard({
+/** The plan the limits belong to, as the first tile of the row. */
+function PlanTile({ planLabel, chipLabel }: { planLabel: string; chipLabel?: string }) {
+  return (
+    <StatTile label="Plan" data-testid="usage-plan">
+      <StatTileFigure>{planLabel}</StatTileFigure>
+      {chipLabel ? (
+        <StatusChip label={chipLabel} tone={chipLabel === "Open source" ? "neutral" : "good"} />
+      ) : null}
+    </StatTile>
+  );
+}
+
+function ResourceLimitsTiles({
   planLabel,
-  planColorPalette,
-  subtitle,
+  chipLabel,
   limits,
   showLimits,
   showLiteMembers,
-  actionHref,
-  actionLabel,
   messagesLabel,
 }: {
   planLabel: string;
-  planColorPalette: string;
-  subtitle: string;
+  chipLabel: string;
   limits: React.ComponentProps<typeof ResourceLimitsDisplay>["limits"];
   showLimits?: boolean;
   showLiteMembers?: boolean;
-  actionHref: string;
-  actionLabel: string;
   messagesLabel?: string;
 }) {
   return (
-    <Card.Root borderWidth={1} borderColor="border">
-      <Card.Body paddingY={5} paddingX={6}>
-        <VStack align="stretch" gap={5}>
-          <Flex justifyContent="space-between" alignItems="flex-start">
-            <VStack align="start" gap={1}>
-              <HStack gap={3}>
-                <Text fontWeight="semibold" fontSize="lg">
-                  Resource Usage
-                </Text>
-                <Badge
-                  colorPalette={planColorPalette}
-                  variant="outline"
-                  borderRadius="md"
-                  paddingX={2}
-                  paddingY={0.5}
-                  fontSize="xs"
-                >
-                  {planLabel}
-                </Badge>
-              </HStack>
-              <Text color="fg.muted" fontSize="sm">
-                {subtitle}
-              </Text>
-            </VStack>
-            <Button asChild variant="ghost" size="sm" color="fg.muted">
-              <Link href={actionHref}>
-                {actionLabel} <ArrowRight size={14} />
-              </Link>
-            </Button>
-          </Flex>
-          <ResourceLimitsDisplay
-            limits={limits}
-            showLimits={showLimits}
-            showLiteMembers={showLiteMembers}
-            messagesLabel={messagesLabel}
-          />
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+    <ResourceLimitsDisplay
+      limits={limits}
+      showLimits={showLimits}
+      showLiteMembers={showLiteMembers}
+      messagesLabel={messagesLabel}
+      leading={<PlanTile planLabel={planLabel} chipLabel={chipLabel} />}
+    />
   );
 }
 
@@ -169,87 +144,67 @@ export default function UsageScreen() {
     hasValidLicense: false,
   });
 
+  const actionFor = ({ href, label }: { href: string; label: string }) => (
+    <PageLayout.HeaderButton asChild>
+      <Link unstyled href={href}>
+        {label}
+      </Link>
+    </PageLayout.HeaderButton>
+  );
+  const actionHref = isSelfHosted && !hasValidLicense ? "/settings/license" : planManagementHref;
+  const selfHostedActionLabel = hasValidLicense ? licensedActionLabel : unlicensedActionLabel;
+  const actionLabel = isSelfHosted ? selfHostedActionLabel : saasActionLabel;
+
   return (
     <>
       <PageLayout.Header>
         <PageLayout.Heading>Usage</PageLayout.Heading>
+        {isSaaS !== undefined && actionFor({ href: actionHref, label: actionLabel })}
       </PageLayout.Header>
       <VStack gap={6} width="full" align="stretch" paddingTop={4}>
-        <Text color="fg.muted" fontSize="sm">
-          Monitor your resource consumption and plan limits
-        </Text>
+        <Text color="fg.muted">How much this organization uses, against what its plan allows.</Text>
 
-        {/* SaaS: Resource limits from active plan */}
         {usage.data && isSaaS && (
-          <ResourceLimitsCard
+          <ResourceLimitsTiles
             planLabel={saasPlan?.free ? "Free" : (saasPlan?.name ?? "Plan")}
-            planColorPalette={saasPlan?.free ? "gray" : "blue"}
-            subtitle={`Current usage versus ${saasPlan?.free ? "free tier" : "your plan"} limits`}
+            chipLabel="Current"
             limits={mapUsageToLimits(usage.data, saasPlan ?? usage.data.activePlan)}
             showLimits={showLimits}
             showLiteMembers={showLiteMembers}
-            actionHref={planManagementHref}
-            actionLabel={saasActionLabel}
             messagesLabel={messagesLabel}
           />
         )}
 
-        {/* Self-hosted: Loading state */}
-        {isLoadingLimits && (
-          <Card.Root borderWidth={1} borderColor="border">
-            <Card.Body paddingY={5} paddingX={6}>
-              <VStack align="start" gap={4}>
-                <Text fontWeight="semibold" fontSize="lg">
-                  Resource Limits
-                </Text>
-                <Skeleton height="20px" width="200px" />
-                <Skeleton height="80px" width="full" />
-              </VStack>
-            </Card.Body>
-          </Card.Root>
-        )}
+        {isLoadingLimits && <StatTileSkeleton columns={showLiteMembers ? 4 : 3} />}
 
-        {/* Self-hosted: Error state */}
         {hasLimitsError && (
-          <Card.Root
-            borderWidth={1}
-            colorPalette="red"
-            borderColor="colorPalette.muted"
-            bg="colorPalette.subtle"
-          >
-            <Card.Body paddingY={5} paddingX={6}>
-              <Text color="colorPalette.fg" fontSize="sm">
+          <Alert.Root status="error">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>
                 Unable to load resource limits. Please refresh the page or contact support if the
                 issue persists.
-              </Text>
-            </Card.Body>
-          </Card.Root>
+              </Alert.Title>
+            </Alert.Content>
+          </Alert.Root>
         )}
 
-        {/* Self-hosted: Valid license */}
         {hasValidLicense && licenseStatus.data && "currentMembers" in licenseStatus.data && (
-          <ResourceLimitsCard
-            planLabel="Licensed"
-            planColorPalette="green"
-            subtitle="Current resource usage"
+          <ResourceLimitsTiles
+            planLabel={"planName" in licenseStatus.data ? licenseStatus.data.planName : "Licensed"}
+            chipLabel="Licensed"
             limits={mapLicenseStatusToLimits(licenseStatus.data)}
             showLiteMembers={showLiteMembers}
-            actionHref={planManagementHref}
-            actionLabel={licensedActionLabel}
             messagesLabel={messagesLabel}
           />
         )}
 
-        {/* Self-hosted without a license: the Open Source baseline, uncapped */}
         {isUnlicensed && (
-          <ResourceLimitsCard
-            planLabel="Open Source"
-            planColorPalette="gray"
-            subtitle="Current usage on this deployment"
+          <ResourceLimitsTiles
+            planLabel="Open source"
+            chipLabel="Open source"
             limits={mapUsageToLimits(usage.data, UNLIMITED_PLAN)}
             showLiteMembers={showLiteMembers}
-            actionHref="/settings/license"
-            actionLabel={unlicensedActionLabel}
             messagesLabel={messagesLabel}
           />
         )}

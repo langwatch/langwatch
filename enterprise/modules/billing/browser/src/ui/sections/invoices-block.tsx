@@ -1,10 +1,13 @@
 /**
  * InvoicesBlock — a card of recent Stripe invoices: number, date, amount,
- * status badge, and PDF download link.
+ * status chip, and PDF download link.
  */
-import { Badge, Card, Flex, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
+import { Alert, Card, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
-import { Download, ExternalLink } from "lucide-react";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { type StatusChipTone, StatusChip } from "@langwatch/design-system/settings-card";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
+import { Download, ExternalLink, Receipt } from "lucide-react";
 
 import { billingApi } from "../../behavior/billing-api.ts";
 import {
@@ -12,6 +15,12 @@ import {
   formatInvoiceDate,
   getInvoiceStatusColor,
 } from "../../model/invoice-utils.ts";
+
+const TONE_OF_PALETTE: Record<string, StatusChipTone> = {
+  green: "good",
+  yellow: "warning",
+  red: "bad",
+};
 
 export function InvoicesBlock({
   organizationId,
@@ -21,122 +30,121 @@ export function InvoicesBlock({
   onViewAllInStripe?: () => void;
 }) {
   const invoices = billingApi.subscription.listInvoices.useQuery({ organizationId });
+  const rows = !invoices.isLoading && !invoices.isError ? invoices.data : undefined;
 
   return (
-    <Card.Root data-testid="invoices-block" borderWidth={1} borderColor="border">
-      <Card.Body paddingY={5} paddingX={6}>
-        <VStack align="stretch" gap={4}>
-          <Flex justifyContent="space-between" alignItems="center">
-            <Text fontWeight="semibold" fontSize="lg">
-              Recent Invoices
-            </Text>
-            {!invoices.isLoading &&
-              !invoices.isError &&
-              invoices.data &&
-              invoices.data.length > 0 &&
-              onViewAllInStripe && (
-                <Text
-                  data-testid="view-all-invoices-link"
-                  as="button"
-                  fontSize="sm"
-                  color="fg.muted"
-                  cursor="pointer"
-                  _hover={{ color: "blue.fg" }}
-                  onClick={onViewAllInStripe}
-                >
-                  <HStack gap={1}>
-                    <span>View all in Stripe</span>
-                    <ExternalLink size={14} />
-                  </HStack>
-                </Text>
-              )}
-          </Flex>
-
-          {invoices.isLoading && (
-            <VStack data-testid="invoices-loading" gap={2}>
-              <Skeleton height="20px" width="100%" />
-              <Skeleton height="20px" width="100%" />
-              <Skeleton height="20px" width="100%" />
-            </VStack>
-          )}
-
-          {invoices.isError && (
-            <Text color="red.fg" fontSize="sm">
-              Failed to load invoices. Please try again later.
-            </Text>
-          )}
-
-          {!invoices.isLoading && !invoices.isError && invoices.data?.length === 0 && (
-            <Text color="fg.muted" fontSize="sm" textAlign="center" paddingY={4}>
-              No invoices yet
-            </Text>
-          )}
-
-          {!invoices.isLoading &&
-            !invoices.isError &&
-            invoices.data &&
-            invoices.data.length > 0 && (
-              <Table.Root size="sm" variant="outline">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Invoice #</Table.ColumnHeader>
-                    <Table.ColumnHeader>Date</Table.ColumnHeader>
-                    <Table.ColumnHeader>Amount</Table.ColumnHeader>
-                    <Table.ColumnHeader>Status</Table.ColumnHeader>
-                    <Table.ColumnHeader>Actions</Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {invoices.data.map((invoice) => (
-                    <Table.Row key={invoice.id}>
-                      <Table.Cell>
-                        <Text fontSize="sm">{invoice.number ?? "--"}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm">{formatInvoiceDate(invoice.date)}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text fontSize="sm">
-                          {formatInvoiceAmount({
-                            amountCents: invoice.amountDue,
-                            currency: invoice.currency,
-                          })}
-                        </Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge
-                          colorPalette={getInvoiceStatusColor(invoice.status)}
-                          variant="subtle"
-                          borderRadius="md"
-                          paddingX={2}
-                          paddingY={0.5}
-                          fontSize="xs"
-                        >
-                          {invoice.status}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        {invoice.pdfUrl && (
-                          <Link
-                            data-testid={`invoice-pdf-${invoice.id}`}
-                            href={invoice.pdfUrl}
-                            isExternal
-                            aria-label={`Download PDF for invoice ${invoice.number ?? invoice.id}`}
-                          >
-                            <HStack gap={1} color="blue.fg" fontSize="sm">
-                              <Download size={14} />
-                              <Text>PDF</Text>
-                            </HStack>
-                          </Link>
-                        )}
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            )}
+    <SettingsSection
+      data-testid="invoices-block"
+      icon={<Receipt size={18} />}
+      title="Invoices"
+      hint="Your recent invoices, as Stripe issued them."
+      actions={
+        rows &&
+        rows.length > 0 &&
+        onViewAllInStripe && (
+          <Text
+            data-testid="view-all-invoices-link"
+            as="button"
+            fontSize="sm"
+            color="orange.fg"
+            cursor="pointer"
+            onClick={onViewAllInStripe}
+          >
+            <HStack gap={1}>
+              <span>View all in Stripe</span>
+              <ExternalLink size={14} />
+            </HStack>
+          </Text>
+        )
+      }
+    >
+      {invoices.isLoading && (
+        <VStack data-testid="invoices-loading" gap={2} width="full">
+          <Skeleton height="20px" width="100%" />
+          <Skeleton height="20px" width="100%" />
+          <Skeleton height="20px" width="100%" />
         </VStack>
-      </Card.Body>
-    </Card.Root>
+      )}
+
+      {invoices.isError && (
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Failed to load invoices. Please try again later.</Alert.Title>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+
+      {rows?.length === 0 && (
+        <NoDataInfoBlock
+          icon={<Receipt />}
+          title="No invoices yet"
+          description="Invoices appear here once your subscription has billed."
+        />
+      )}
+
+      {rows && rows.length > 0 && (
+        <Card.Root width="full" overflow="hidden">
+          <Table.Root size="sm">
+            <Table.Header>
+              <Table.Row>
+                {["Invoice #", "Date", "Amount", "Status", "Actions"].map((column) => (
+                  <Table.ColumnHeader
+                    key={column}
+                    fontSize="xs"
+                    textTransform="uppercase"
+                    letterSpacing="wide"
+                    color="fg.muted"
+                  >
+                    {column}
+                  </Table.ColumnHeader>
+                ))}
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {rows.map((invoice) => (
+                <Table.Row key={invoice.id}>
+                  <Table.Cell>
+                    <Text fontSize="sm">{invoice.number ?? "--"}</Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text fontSize="sm">{formatInvoiceDate(invoice.date)}</Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text fontSize="sm">
+                      {formatInvoiceAmount({
+                        amountCents: invoice.amountDue,
+                        currency: invoice.currency,
+                      })}
+                    </Text>
+                  </Table.Cell>
+                  <Table.Cell>
+                    <StatusChip
+                      label={invoice.status}
+                      tone={TONE_OF_PALETTE[getInvoiceStatusColor(invoice.status)] ?? "neutral"}
+                    />
+                  </Table.Cell>
+                  <Table.Cell>
+                    {invoice.pdfUrl && (
+                      <Link
+                        data-testid={`invoice-pdf-${invoice.id}`}
+                        href={invoice.pdfUrl}
+                        isExternal
+                        aria-label={`Download PDF for invoice ${invoice.number ?? invoice.id}`}
+                      >
+                        <HStack gap={1} color="orange.fg" fontSize="sm">
+                          <Download size={14} />
+                          <Text>PDF</Text>
+                        </HStack>
+                      </Link>
+                    )}
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table.Root>
+        </Card.Root>
+      )}
+    </SettingsSection>
   );
 }

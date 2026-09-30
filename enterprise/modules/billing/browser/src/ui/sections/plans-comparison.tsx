@@ -1,5 +1,5 @@
 import {
-  Badge,
+  Alert,
   Box,
   Button,
   Card,
@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { StatusChip } from "@langwatch/design-system/settings-card";
 import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { ArrowLeft, Check, DollarSign, Euro, Info } from "lucide-react";
@@ -125,23 +126,17 @@ function PlanCardActions({
     if (currentPlan === "growth") {
       return (
         <VStack width="full" gap={2}>
-          <Button
-            asChild
-            width="full"
-            color="bg.emphasized"
-            backgroundColor="orange.600"
-            variant="solid"
-          >
-            <Link href="/settings/members">Add Members</Link>
+          <Button asChild width="full" colorPalette="orange" variant="outline">
+            <Link href="/settings/members">Add members</Link>
           </Button>
         </VStack>
       );
     }
 
     return (
-      <Button asChild width="full" colorPalette="orange" variant="solid">
-        <Link color="white" href="/settings/subscription">
-          Upgrade Now
+      <Button asChild width="full" colorPalette="orange" variant="outline">
+        <Link unstyled href="/settings/subscription">
+          Upgrade now
         </Link>
       </Button>
     );
@@ -196,11 +191,7 @@ function PlanCard({
               <Heading as="h2" size="xl">
                 {plan.name}
               </Heading>
-              {isCurrent && (
-                <Badge colorPalette="green" variant="surface" size={"lg"}>
-                  Current
-                </Badge>
-              )}
+              {isCurrent && <StatusChip label="Current" tone="good" />}
             </HStack>
             <Text color="fg" fontSize="md" fontWeight="medium">
               {getPlanPrice({ planId: plan.id, currency, billingPeriod, growthSeatPriceCents })}
@@ -346,30 +337,18 @@ export function PlansComparisonPage({
         </HStack>
 
         {showTieredNotice && (
-          <Box
-            data-testid="tiered-discontinued-notice"
-            backgroundColor="orange.50"
-            borderWidth={1}
-            borderColor="orange.200"
-            borderRadius="md"
-            padding={4}
-          >
-            <HStack gap={2} alignItems="start">
-              <Info size={16} color="var(--chakra-colors-orange-500)" />
-              <Text fontSize="sm" color="orange.900">
+          <Alert.Root status="warning" data-testid="tiered-discontinued-notice">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>
                 Your current pricing model has been discontinued.{" "}
-                <Link
-                  href="/settings/subscription"
-                  fontWeight="semibold"
-                  color="orange.700"
-                  _hover={{ color: "orange.900" }}
-                >
+                <Link href="/settings/subscription" color="orange.fg">
                   Update your plan
                 </Link>{" "}
                 to move to seat and usage billing.
-              </Text>
-            </HStack>
-          </Box>
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         )}
 
         <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
