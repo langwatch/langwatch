@@ -4,7 +4,8 @@
  * as-guardrail monitor in the same project, and that monitor carries the check run here too.
  */
 
-import type { EvaluatorTypes, SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type {
   GatewayGuardrailDirection,
   GuardrailWireDirection,
@@ -46,36 +47,23 @@ const ALLOW: GuardrailCheckVerdict = {
   policies_triggered: [],
 };
 
-/**
- * The evaluator call is the one boundary this service does not own. Injecting
- * it keeps the scoping, aggregation and failure-mode rules testable against a
- * real database without standing up the evaluator runtime.
- */
-export type EvaluatorRunInput = {
-  projectId: string;
-  evaluatorType: EvaluatorTypes;
-  data: { type: "default"; data: { input: string; output: string } };
-  settings?: Record<string, unknown>;
-};
-
-export type EvaluatorRunner = (args: EvaluatorRunInput) => Promise<SingleEvaluationResult>;
-
 export class GatewayGuardrailEvaluationService {
   private constructor(
     private readonly repository: GatewayGuardrailRepository,
     private readonly monitors: MonitorApi,
-    private readonly runEvaluator: EvaluatorRunner,
+    /** Evaluation owns running an evaluator, langevals and saved ones alike. */
+    private readonly evaluations: Pick<EvaluationApi, "runEvaluator">,
   ) {}
 
   static create(input: {
     repository: GatewayGuardrailRepository;
     monitors: MonitorApi;
-    runEvaluator: EvaluatorRunner;
+    evaluations: Pick<EvaluationApi, "runEvaluator">;
   }): GatewayGuardrailEvaluationService {
     return new GatewayGuardrailEvaluationService(
       input.repository,
       input.monitors,
-      input.runEvaluator,
+      input.evaluations,
     );
   }
 
@@ -225,9 +213,9 @@ export class GatewayGuardrailEvaluationService {
   }): Promise<GuardrailCheckVerdict> {
     let result: SingleEvaluationResult;
     try {
-      result = await this.runEvaluator({
+      result = await this.evaluations.runEvaluator({
         projectId,
-        evaluatorType: monitor.checkType as EvaluatorTypes,
+        evaluatorType: monitor.checkType,
         data: { type: "default", data },
         settings: (monitor.parameters ?? {}) as Record<string, unknown>,
       });

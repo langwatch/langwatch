@@ -169,7 +169,6 @@ async function installGateway({
       members: {
         prisma: relationalWithoutStore(),
         clickhouse,
-        gatewayInternalProtocol: {},
         encryption: createApiFixture<Encryption>(),
         redis,
       },

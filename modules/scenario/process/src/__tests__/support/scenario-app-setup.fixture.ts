@@ -45,11 +45,6 @@ export function scenarioExecutorPeers() {
 
 /** The process facts a child is started with, as a test process answers them. */
 export const scenarioHostMembers = {
-  scenarioChildBundle: {
-    packageRoot: "/app/apps/scenario-child",
-    sourcePath: "/app/apps/scenario-child/src/main.ts",
-    sourceRoots: ["/app/apps/scenario-child/src"],
-  },
   rawSocketPort: 0,
   voicePublicUrl: { unavailable: "no media door in a test process" },
   nlpServiceUrl: void 0,

@@ -183,6 +183,7 @@ async function callerFor(budgets: Record<string, unknown>[]) {
             })),
       }),
       evaluators: peer("evaluators"),
+      evaluations: peer("evaluations"),
       monitors: peer("monitors"),
       organizations: peer("organizations"),
       featureFlags: peer("featureFlags"),
@@ -193,7 +194,6 @@ async function callerFor(budgets: Record<string, unknown>[]) {
     members: {
       prisma: fakePrisma(budgets),
       clickhouse: fakeClickHouse(),
-      gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
       redis: redisDouble(),
     },

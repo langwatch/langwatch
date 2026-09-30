@@ -27,6 +27,7 @@ function gatewayApp(): Promise<GatewayApp> {
       authz: createApiFixture({}),
       projects: createApiFixture({}),
       evaluators: createApiFixture({}),
+      evaluations: createApiFixture({}),
       monitors: createApiFixture({}),
       organizations: createApiFixture({}),
       featureFlags: createApiFixture({}),
@@ -37,7 +38,6 @@ function gatewayApp(): Promise<GatewayApp> {
     members: {
       prisma: createApiFixture<PrismaClient>({}),
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      gatewayInternalProtocol: {},
       encryption: reversible,
       redis: memoryRedisDouble(),
       publicBaseUrl: "https://app.acme.example",

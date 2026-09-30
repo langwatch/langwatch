@@ -1047,9 +1047,6 @@ importers:
       '@langwatch/role-process':
         specifier: workspace:*
         version: link:../../modules/role/process
-      '@langwatch/scenario-child':
-        specifier: workspace:*
-        version: link:../scenario-child
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../modules/scenario/contract
@@ -1590,9 +1587,6 @@ importers:
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../modules/role/contract
-      '@langwatch/scenario-child':
-        specifier: workspace:*
-        version: link:../scenario-child
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
@@ -2264,9 +2258,6 @@ importers:
       '@langwatch/role-process':
         specifier: workspace:*
         version: link:../../modules/role/process
-      '@langwatch/scenario-child':
-        specifier: workspace:*
-        version: link:../scenario-child
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../modules/scenario/contract
@@ -8615,6 +8606,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -9209,6 +9203,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
+      '@langwatch/enterprise-licensing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract

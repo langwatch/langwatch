@@ -12,13 +12,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
-import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
 const noPlatformProviders = createApiFixture<ModelProviderApi>({
@@ -58,11 +58,6 @@ class SuiteProjectService extends TestProjectApi {
     return project ? { outcome: "resolved", project } : { outcome: "unknown" };
   }
 }
-
-/** Stored provider keys arrive already decrypted in these fixtures. */
-const credentials: GatewayModelProviderCredentials = {
-  readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,
-};
 
 const suffix = nanoid(8);
 const ORG_ID = `org-mat-${suffix}`;
@@ -106,7 +101,7 @@ const materialiser = () =>
     projects: new SuiteProjectService(),
     chRepo: null,
     budgetDecisions: gateway,
-    credentials,
+    modelProviders: seededCustomKeys(prisma),
     assembly: GatewayConfigAssemblyService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,

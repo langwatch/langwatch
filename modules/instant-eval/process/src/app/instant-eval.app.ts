@@ -1,4 +1,5 @@
 import { AnalyticsApi, type LangWatchQLRunCaller } from "@langwatch/analytics-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
@@ -22,7 +23,6 @@ import {
   instantEvalConfig,
 } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { createLogger } from "@langwatch/observability";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -47,6 +47,7 @@ import {
 } from "../eventing/instant-eval-processing.pipeline.ts";
 import { InstantEvalRunProjectionStore } from "../eventing/instant-eval-run.store.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
+import { instantEvalJudgeKind } from "../rules/instant-eval-judge-choice.rules.ts";
 import {
   toInstantEvalEstimateWire,
   toInstantEvalJudgmentWire,
@@ -56,6 +57,7 @@ import { InstantEvalAccessService } from "../services/instant-eval-access.servic
 import { InstantEvalCancelService } from "../services/instant-eval-cancel.service.ts";
 import { InstantEvalClassifyService } from "../services/instant-eval-classify.service.ts";
 import { InstantEvalCommandDispatcherService } from "../services/instant-eval-command-dispatcher.service.ts";
+import { InstantEvalConnectJudgeService } from "../services/instant-eval-connect-judge.service.ts";
 import { InstantEvalCreateService } from "../services/instant-eval-create.service.ts";
 import {
   InstantEvalEstimateService,
@@ -77,8 +79,6 @@ import {
 import { InstantEvalStatementService } from "../services/instant-eval-statement.service.ts";
 
 /** Seconds of refill a bucket holds as burst, at the sustained rate. */
-const logger = createLogger("langwatch:instant-eval:judge");
-
 const BUCKET_BURST_SECONDS = 2;
 
 /** The project's organization and team, which every judgement's spend is billed against. */
@@ -109,8 +109,6 @@ type InstantEvalRedis = InstantEvalRateLimiterRedis & {
 type InstantEvalMembers = Readonly<{
   /** The shared bucket, holds and cancel hints; absent in a memory process. */
   redis: InstantEvalRedis | null;
-  /** The hosted judge a Connect installation answers from licensing (ADR-156). */
-  connectJudge: InstantEvalJudgeChannel | null;
 }>;
 
 type InstantEvalDependencies = Readonly<{
@@ -124,6 +122,8 @@ type InstantEvalDependencies = Readonly<{
   gateway: typeof GatewayApi;
   /** The query door: a filtered shorthand target resolves its trace ids here. */
   traces: typeof TraceApi;
+  /** Judges a connected install's texts on LangWatch, against its licence. */
+  licensing: typeof LicensingApi;
 }>;
 
 type InstantEvalSetup = FeatureSetup<
@@ -142,6 +142,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     plans: EntitlementApi,
     gateway: GatewayApi,
     traces: TraceApi,
+    licensing: LicensingApi,
   };
   static readonly config = instantEvalConfig;
   /** LangWatch's own judge credential; a deployment without one judges nothing. */
@@ -149,7 +150,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
   } as const;
   /** `redis` is the shared token bucket that paces the judge across every pod. */
-  static readonly reads = ["redis", "connectJudge"] as const;
+  static readonly reads = ["redis"] as const;
 
   private readonly access: InstantEvalAccessService;
   private readonly classifications: InstantEvalClassifyService;
@@ -192,8 +193,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     const access = InstantEvalAccessService.create({
       flags: setup.dependencies.featureFlags,
       projects,
-      isJudgeConfigured: () =>
-        judge instanceof HttpInstantEvalJudgeChannel || judge === setup.members.connectJudge,
+      isJudgeConfigured: () => !(judge instanceof MemoryInstantEvalJudgeChannel),
       judge,
     });
     const reads = InstantEvalReadsService.create({
@@ -417,28 +417,21 @@ export class InstantEvalApp implements InstantEvalApiContract {
     this.dispatcher.connect(commands);
   }
 
-  /**
-   * The install's own key always wins, so it sends nothing to LangWatch; the
-   * connect judge comes next; the memory judge skips every question rather
-   * than refusing every query. `null` overrides all three.
-   */
+  /** The judge `instantEvalJudgeKind` names; `none` skips every question, refusing none. */
   private static judgeOf(
     setup: InstantEvalSetup,
     apiKey: string | undefined,
   ): InstantEvalJudgeChannel {
-    if (setup.config.classifier === "null") return MemoryInstantEvalJudgeChannel.create();
-    if (setup.config.classifier === "connect") {
-      if (!setup.members.connectJudge) {
-        throw new Error(
-          'INSTANT_EVAL_CLASSIFIER="connect" but this process composes no connect judge',
-        );
-      }
-      return setup.members.connectJudge;
-    }
-    if (!apiKey) {
-      if (setup.members.connectJudge) return setup.members.connectJudge;
-      logger.info("No Instant Evals classifier is configured; judged columns will be skipped");
-      return MemoryInstantEvalJudgeChannel.create();
+    const kind = instantEvalJudgeKind({
+      classifier: setup.config.classifier,
+      hasOwnKey: Boolean(apiKey),
+    });
+    if (kind === "none") return MemoryInstantEvalJudgeChannel.create();
+    if (kind === "connect" || !apiKey) {
+      return InstantEvalConnectJudgeService.create({
+        licensing: setup.dependencies.licensing,
+        projects: setup.dependencies.projects,
+      });
     }
     const tokensPerSecond = setup.config.globalTokensPerSecond;
     const tenantTokensPerSecond = Math.min(tokensPerSecond, setup.config.tenantTokensPerSecond);

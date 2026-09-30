@@ -33,6 +33,7 @@ function gatewayApp({
       authz: createApiFixture({}),
       projects: createApiFixture({}),
       evaluators: createApiFixture({}),
+      evaluations: createApiFixture({}),
       monitors: createApiFixture({}),
       organizations: createApiFixture({}),
       featureFlags: createApiFixture({}),
@@ -43,7 +44,6 @@ function gatewayApp({
     members: {
       prisma: createApiFixture<PrismaClient>({}),
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
       redis: redisDouble(),
       publicBaseUrl: "https://app.acme.example",

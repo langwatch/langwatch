@@ -11,6 +11,7 @@ import type {
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -33,8 +34,6 @@ import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { InstantEvalJudgeChannel } from "../../channels/instant-eval-judge.channel.ts";
-import { MemoryInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judge.channel.ts";
 import { instantEvalServer } from "../../instant-eval.server.ts";
 
 const PROJECT = "project-1";
@@ -136,39 +135,26 @@ function projectWithTeam(id: string): ProjectWithTeam {
   });
 }
 
-/** A connect judge that records which organizations it was asked about. */
-function connectJudgeAskedAbout(asked: string[]): InstantEvalJudgeChannel {
-  const memory = MemoryInstantEvalJudgeChannel.create();
-  return {
-    limits: memory.limits,
-    pricing: memory.pricing,
-    classify: () => memory.classify(),
-    isAvailableForOrganization: async (organizationId) => {
-      asked.push(organizationId);
-      return true;
-    },
-  };
-}
-
 /** The peers a run resolves through, each answering the one question it asks. */
 function installation({
   isReleased = true,
   isFreePlan = true,
   classifier = "jev",
   judgeKey = "test-judge-key",
-  connectJudge = null,
   isBounded = false,
   gateway = {},
+  isConnectOn = false,
 }: {
   isReleased?: boolean;
   isFreePlan?: boolean;
   classifier?: "jev" | "null" | undefined;
   /** `null` is an install that configured no key of its own. */
   judgeKey?: string | null;
-  connectJudge?: InstantEvalJudgeChannel | null;
   isBounded?: boolean;
   /** The gateway operations a hosted call's spend reaches. */
   gateway?: Partial<GatewayApi>;
+  /** Whether the organization switched hosted judging on, as licensing answers. */
+  isConnectOn?: boolean;
 } = {}) {
   return (
     createApp({ role: "api", secrets: judgeSecrets(judgeKey ?? undefined) })
@@ -195,7 +181,6 @@ function installation({
       )
       // The shared bucket, the holds and the cancel hints each have a twin.
       .withKeyvalue(null)
-      .withMembers({ connectJudge })
       .provide({
         analytics: createApiFixture<AnalyticsApi>({
           isLangWatchQLAvailable: () => true,
@@ -220,6 +205,9 @@ function installation({
           getActivePlan: async () => planFor({ free: isFreePlan }),
         }),
         gateway: createApiFixture<GatewayApi>(gateway),
+        licensing: createApiFixture<LicensingApi>({
+          isConnectServiceEnabled: async () => isConnectOn,
+        }),
         trace: createApiFixture<TraceApi>({}),
         "feature-flag": createApiFixture<FeatureFlagApi>({
           isEnabled: async () => isReleased,
@@ -377,52 +365,20 @@ describe("given a process that installs Instant Evals over the memory tier", () 
 });
 
 describe("given a deployment choosing which judge answers", () => {
-  describe("when the install sets no judge key and a connect judge is composed", () => {
-    /** @scenario "An install that sets nothing new keeps the classifier it had" */
-    it("judges through the connect judge, which answers per organization", async () => {
-      const asked: string[] = [];
-      await withInstallation(
-        { classifier: undefined, judgeKey: null, connectJudge: connectJudgeAskedAbout(asked) },
-        async (api) => {
-          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
-        },
-      );
-
-      expect(asked).toEqual([ORGANIZATION]);
-    });
-  });
-
-  describe("when the install has its own judge key as well", () => {
-    /** @scenario "An install with its own judge key keeps using it" */
-    it("judges with that key and never asks the connect judge", async () => {
-      const asked: string[] = [];
-      await withInstallation(
-        { classifier: undefined, connectJudge: connectJudgeAskedAbout(asked) },
-        async (api) => {
-          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
-        },
-      );
-
-      expect(asked).toEqual([]);
-    });
-  });
-
-  describe("when the install asked for no classifier at all", () => {
-    it("takes that over both a judge key and the connect judge", async () => {
-      await withInstallation(
-        { classifier: "null", connectJudge: connectJudgeAskedAbout([]) },
-        async (api) => {
-          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(false);
-        },
-      );
-    });
-  });
-
-  describe("when there is neither a key nor a connect judge", () => {
+  describe("when there is no judge key", () => {
     it("publishes the eval functions as unavailable", async () => {
       await withInstallation({ classifier: undefined, judgeKey: null }, async (api) => {
         await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(false);
       });
+    });
+
+    it("publishes them once the organization switches hosted judging on", async () => {
+      await withInstallation(
+        { classifier: undefined, judgeKey: null, isConnectOn: true },
+        async (api) => {
+          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
+        },
+      );
     });
   });
 });
@@ -437,19 +393,6 @@ describe("given a deployment that bounds the free budget", () => {
   });
 });
 
-/** A hosted Connect judge at its own rate, recording the signal each call carried. */
-function pricedConnectJudge(signals: (AbortSignal | undefined)[]): InstantEvalJudgeChannel {
-  const memory = MemoryInstantEvalJudgeChannel.create();
-  return {
-    limits: memory.limits,
-    pricing: { usdPerMillionInputTokens: 1, markup: 2 },
-    classify: async (_request, signal) => {
-      signals.push(signal);
-      return memory.classify();
-    },
-  };
-}
-
 const HOSTED_SPEND = {
   projectId: PROJECT,
   virtualKeyId: "vk-connect",
@@ -461,39 +404,6 @@ const HOSTED_SPEND = {
 };
 
 describe("given a hosted Connect call judged on LangWatch Cloud", () => {
-  describe("when licensing asks what a judgement was worth", () => {
-    /** @scenario "A hosted judgement is priced at the rate of the judge that made it" */
-    it("prices the input tokens at the judge's own rate and markup", async () => {
-      await withInstallation(
-        { judgeKey: null, classifier: undefined, connectJudge: pricedConnectJudge([]) },
-        async (api) => {
-          expect(api.priceOf({ inputTokens: 1_000_000 })).toEqual({ costUsd: 1, priceUsd: 2 });
-        },
-      );
-    });
-  });
-
-  describe("when the calling install hangs up", () => {
-    /** @scenario "A hosted judgement stops when the calling install hangs up" */
-    it("hands the request's signal to the judge", async () => {
-      const signals: (AbortSignal | undefined)[] = [];
-      const hangUp = new AbortController();
-      await withInstallation(
-        { judgeKey: null, classifier: undefined, connectJudge: pricedConnectJudge(signals) },
-        async (api) => {
-          await api.classify({
-            projectId: PROJECT,
-            text: "annoyed users",
-            questions: [],
-            signal: hangUp.signal,
-          });
-        },
-      );
-
-      expect(signals).toEqual([hangUp.signal]);
-    });
-  });
-
   describe("when the spend spine is registered", () => {
     /** @scenario "Hosted spend is billed to the calling key on the spend spine" */
     it("records the customer price under the project's organization and the calling key", async () => {

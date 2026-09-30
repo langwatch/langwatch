@@ -27,9 +27,9 @@ export {
   type BootedApplication,
   TasksProcessContainer,
   WorkerProcessContainer,
-  type ModuleBundle,
   type ProcessBoot,
   type ProcessModule,
+  isProcessModule,
 } from "./process-container.ts";
 
 export { processConfig } from "./config.ts";

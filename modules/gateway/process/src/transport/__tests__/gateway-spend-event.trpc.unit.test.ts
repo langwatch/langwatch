@@ -132,6 +132,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       authz: peer("authz"),
       projects: projectsStub({ findOrganizationId: async () => "org_1" }),
       evaluators: peer("evaluators"),
+      evaluations: peer("evaluations"),
       monitors: peer("monitors"),
       organizations: peer("organizations"),
       featureFlags: peer("featureFlags"),
@@ -142,7 +143,6 @@ async function gatewayAppStub(): Promise<GatewayApp> {
     members: {
       prisma: fakePrisma(),
       clickhouse: fakeClickHouse(),
-      gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
       redis: redisDouble(),
     },

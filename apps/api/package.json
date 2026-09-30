@@ -129,7 +129,6 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/role-process": "workspace:*",
-    "@langwatch/scenario-child": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-process": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",

@@ -14,7 +14,6 @@ import type { DatasetRepositories } from "../../repositories/dataset.repositorie
 import { MemoryDatasetRepositories } from "../../repositories/memory/memory.dataset.repositories.ts";
 import { DatasetAttachmentReferenceService } from "../../services/dataset-attachment-reference.service.ts";
 import { DatasetRequestBoundsService } from "../../services/dataset-request-bounds.service.ts";
-import type { DatasetInfrastructure } from "../dataset.app.ts";
 import { DatasetApp } from "../dataset.app.ts";
 
 /** One experiment, as this feature reads it: a name to borrow and an id. */
@@ -102,7 +101,6 @@ export function createDatasetTestAttachments(
 export function createDatasetTestApp(
   input: Readonly<{
     repositories?: DatasetRepositories;
-    members?: DatasetInfrastructure;
     objectStorage?: ObjectStorage;
     publicBaseUrl?: string;
     dependencies?: Partial<{
@@ -125,7 +123,6 @@ export function createDatasetTestApp(
         input.dependencies?.storedObjects ?? createApiFixture<StoredObjectApi>({}, "storedObjects"),
     },
     members: {
-      ...input.members,
       objectStorage: input.objectStorage ?? memoryObjectStorage(),
       publicBaseUrl: input.publicBaseUrl,
     },

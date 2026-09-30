@@ -21,7 +21,6 @@ import {
   systemClock,
   type ProcessMembers,
 } from "@langwatch/process-stores";
-import { scenarioChildBundle } from "@langwatch/scenario-child";
 import {
   refuseDoubleClaims,
   SecretsChain,
@@ -112,9 +111,7 @@ export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickH
         storage: void 0,
         queue: void 0,
         content: void 0,
-        gatewayInternalProtocol: {},
         connectJudge: null,
-        scenarioChildBundle,
         rawSocketPort: 0,
         monitor: void 0,
         langwatchQl: {

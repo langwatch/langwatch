@@ -64,6 +64,7 @@ async function mount() {
         listIdsByOrganization: async () => [PROJECT_ID],
       }),
       evaluators: createApiFixture({}),
+      evaluations: createApiFixture({}),
       monitors: createApiFixture({}),
       organizations: createApiFixture({}),
       featureFlags: createApiFixture({}),
@@ -74,7 +75,6 @@ async function mount() {
     members: {
       prisma,
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      gatewayInternalProtocol: {},
       encryption: reversible,
       redis: memoryRedisDouble(),
       publicBaseUrl: "https://app.acme.example",

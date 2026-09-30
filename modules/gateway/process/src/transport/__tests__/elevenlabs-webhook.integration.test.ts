@@ -27,6 +27,7 @@ import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis"
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { GatewayApp } from "../../app/gateway.app.ts";
 import type { GatewaySpendConfirmation } from "../../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
 import { gatewayServer } from "../../gateway.server.ts";
@@ -144,18 +145,6 @@ async function mountWebhook(): Promise<MountableRestApp> {
     .withAnalytical(peer("analytical store"))
     .withKeyvalue(memoryRedisDouble())
     .withSecrets(resolvedSecrets({}))
-    .withMember("gatewayInternalProtocol", {
-      spend: {
-        commands: {
-          confirmSpend: {
-            send: async (payload: unknown) => {
-              sentConfirmations.push(payload);
-            },
-          },
-        },
-        rating: ModelCatalogGatewaySpendRatingService.create(),
-      },
-    })
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
     .withMember("publicBaseUrl", "http://langwatch.test")
     .provide({
@@ -164,6 +153,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
       authz: peer("authz"),
       project: peer("project"),
       evaluator: peer("evaluator"),
+      evaluation: peer("evaluation"),
       monitor: peer("monitor"),
       organization: peer("organization"),
       "feature-flag": peer("feature flag"),
@@ -173,6 +163,17 @@ async function mountWebhook(): Promise<MountableRestApp> {
     })
     .boot();
   const gateway = runtime.module(gatewayServer).provided;
+  if (!(gateway instanceof GatewayApp)) throw new Error("gateway installs as its own app");
+  gateway.connectSpend({
+    confirmSpend: {
+      send: async (payload: unknown) => {
+        sentConfirmations.push(payload);
+      },
+      sendBatch: async () => {},
+      close: async () => {},
+      waitUntilReady: async () => {},
+    },
+  });
   const rest = createRestRuntime({
     identity: {
       authenticate: () => {

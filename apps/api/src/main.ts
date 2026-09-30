@@ -4,7 +4,6 @@ import { CHART_FRAME_PATH } from "@langwatch/analytics-contract/chart-frame-prot
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
-import { scenarioChildBundle } from "@langwatch/scenario-child";
 
 import { apiHealthRoute } from "./api-health-route.ts";
 import { processEnvironment } from "./config.ts";
@@ -38,15 +37,6 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
 
   const app = await server
     .container("api")
-    .withModules(processModules)
-    // Dataset's two optional seams. This process composes neither, so the
-    // module's own absent-behaviour applies: normalize runs in-process.
-    .withMember("queue", () => void 0)
-    .withMember("content", () => void 0)
-    .withMember("gatewayInternalProtocol", () => ({}))
-    .withMember("connectJudge", () => null)
-    .withMember("scenarioChildBundle", () => scenarioChildBundle)
-    .withMember("monitor", () => void 0)
     .exposeTransports((transports) =>
       transports
         .trpc()
@@ -54,7 +44,6 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
         .browserBundle()
         .framedDocument({ path: CHART_FRAME_PATH, document: buildChartFrameDocument }),
     )
-    .withPipelines((pipelines) => pipelines.produce())
     .boot();
 
   await server.serve(app);

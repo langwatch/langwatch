@@ -26,6 +26,7 @@ import {
   WorkerProcessContainer,
   type ProcessBoot,
   type ProcessBootInput,
+  type ProcessModule,
   type BootedApplication,
 } from "./process-container.ts";
 import {
@@ -49,6 +50,7 @@ export class ProcessServer implements ProcessBoot {
     resolver: SecretsResolver;
     healthPort?: number;
     ownsProcess?: boolean;
+    modules: readonly ProcessModule[];
   }): ProcessServer {
     const settings = processSettings.parse(options.config.process ?? {});
     const server = Server.create({
@@ -63,10 +65,12 @@ export class ProcessServer implements ProcessBoot {
       config: options.config,
       resolver: options.resolver,
       settings,
+      modules: options.modules,
     });
   }
 
   private readonly server: Server;
+  private readonly modules: readonly ProcessModule[];
   readonly config: ParsedConfig;
   private readonly resolver: SecretsResolver;
   private readonly settings: z.infer<typeof processSettings>;
@@ -76,7 +80,9 @@ export class ProcessServer implements ProcessBoot {
     config: ParsedConfig;
     resolver: SecretsResolver;
     settings: z.infer<typeof processSettings>;
+    modules: readonly ProcessModule[];
   }) {
+    this.modules = deps.modules;
     this.server = deps.server;
     this.config = deps.config;
     this.resolver = deps.resolver;
@@ -104,9 +110,9 @@ export class ProcessServer implements ProcessBoot {
   container(
     role: "api" | "worker" | "tasks",
   ): ApiProcessContainer | WorkerProcessContainer | TasksProcessContainer {
-    if (role === "api") return new ApiProcessContainer(this);
-    if (role === "tasks") return new TasksProcessContainer(this);
-    return new WorkerProcessContainer(this);
+    if (role === "api") return new ApiProcessContainer(this, this.modules);
+    if (role === "tasks") return new TasksProcessContainer(this, this.modules);
+    return new WorkerProcessContainer(this, this.modules);
   }
 
   async boot({

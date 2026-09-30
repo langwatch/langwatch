@@ -1,7 +1,6 @@
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { createLogger } from "@langwatch/observability";
 import { processConfig, Server } from "@langwatch/process-server";
-import { scenarioChildBundle } from "@langwatch/scenario-child";
 import { Task, TaskCatalogue } from "@langwatch/task";
 
 import { processEnvironment } from "./config.ts";
@@ -27,17 +26,7 @@ export async function runModuleTask({
     .withProcessOwnership(false)
     .start();
   try {
-    const app = await server
-      .container("tasks")
-      .withModules(processModules)
-      .withMember("queue", () => void 0)
-      .withMember("content", () => void 0)
-      .withMember("gatewayInternalProtocol", () => ({}))
-      .withMember("connectJudge", () => null)
-      .withMember("scenarioChildBundle", () => scenarioChildBundle)
-      .withMember("monitor", () => void 0)
-      .withPipelines((pipelines) => pipelines.produce())
-      .boot();
+    const app = await server.container("tasks").boot();
     await server.run(app);
     const catalogue = TaskCatalogue.create({ tasks: app.tasks(isTask) });
     const logger = createLogger("langwatch:tasks");

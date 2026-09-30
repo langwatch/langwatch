@@ -9,6 +9,7 @@ import type {
   GatewayGuardrailBundleEntry,
   GatewayGuardrailResource,
 } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
@@ -114,9 +115,11 @@ function testGuardrails(options?: {
     monitors: createApiFixture<MonitorApi>({
       listEnabledGuardrailMonitors: vi.fn(async () => options?.monitors ?? []),
     }),
-    runEvaluator:
-      options?.runEvaluator ??
-      vi.fn(async (): Promise<SingleEvaluationResult> => ({ status: "processed", passed: true })),
+    evaluations: {
+      runEvaluator:
+        options?.runEvaluator ??
+        vi.fn(async (): Promise<SingleEvaluationResult> => ({ status: "processed", passed: true })),
+    },
   });
 }
 
@@ -349,31 +352,43 @@ describe("the gateway internal control plane", () => {
       // sides have drifted apart again and every verdict silently allows.
       expect(body).not.toHaveProperty("action");
     });
+  });
 
-    it("refuses rather than allows when this deployment composes no evaluator runtime", async () => {
-      const app = mountGatewayInternalRest({ guardrails: undefined });
-
-      const response = await app.request(
+  describe("given the Codex refresh endpoint", () => {
+    const refreshOf = (outcome: Awaited<ReturnType<ModelProviderApi["refreshCodexForGateway"]>>) =>
+      mountGatewayInternalRest({
+        modelProviders: { refreshCodexForGateway: vi.fn(async () => outcome) },
+      }).request(
         signedGatewayRequest({
           method: "POST",
-          path: "/api/internal/gateway/guardrail/check",
-          body: {
-            vk_id: "vk_test",
-            project_id: "project-1",
-            direction: "request",
-            guardrail_ids: ["gr_1"],
-          },
+          path: "/api/internal/gateway/codex/refresh",
+          body: { provider_row_id: "mp_codex" },
         }),
       );
 
-      expect(response.status).toBe(503);
-      expect(await response.json()).toEqual({
-        error: {
-          type: "unavailable",
-          code: "guardrail_evaluation_unavailable",
-          message: "this deployment composes no evaluator runtime to check a guardrail with",
-        },
+    it("answers the refreshed session model provider holds for the row", async () => {
+      const response = await refreshOf({
+        status: "refreshed",
+        accessToken: "access-1",
+        accountId: "account-1",
       });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ access_token: "access-1", account_id: "account-1" });
+    });
+
+    it("refuses an expired session by name so the customer signs in again", async () => {
+      const response = await refreshOf({ status: "session_expired" });
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ error: { code: "codex_session_expired" } });
+    });
+
+    it("refuses a row with no connected Codex account as not found", async () => {
+      const response = await refreshOf({ status: "not_connected" });
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error: { code: "codex_not_connected" } });
     });
   });
 

@@ -56,11 +56,7 @@ describe("the §4 preamble", () => {
       .withSecrets((_, secrets) => secrets.withEnv())
       .start();
     try {
-      const runtime = await server
-        .container("worker")
-        .withModules([])
-        .withPipelines((pipelines) => pipelines.consume())
-        .boot();
+      const runtime = await server.container("worker").boot();
       expect(runtime.name).toBe("worker");
       await server.run(runtime);
     } finally {

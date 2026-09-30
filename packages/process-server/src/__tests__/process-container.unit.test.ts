@@ -41,10 +41,8 @@ describe("process container", () => {
         return {};
       })
       .build();
-    const runtime = await new ApiProcessContainer(containerRuntime(phases))
-      .withModules([module])
+    const runtime = await new ApiProcessContainer(containerRuntime(phases), [module])
       .exposeTransports((transports) => transports.browserBundle())
-      .withPipelines((pipelines) => pipelines.produce())
       .boot();
     expect(runtime.handler).toBe("bundle handler");
     expect(phases).toEqual(["producer"]);
@@ -71,11 +69,8 @@ describe("process container", () => {
         phases.push("close");
       })
       .build();
-    const worker = new WorkerProcessContainer(containerRuntime(phases));
-    const runtime = await worker
-      .withModules([module])
-      .withPipelines((pipelines) => pipelines.consume())
-      .boot();
+    const worker = new WorkerProcessContainer(containerRuntime(phases), [module]);
+    const runtime = await worker.boot();
     expect(phases).toEqual(["consumer"]);
     expect("exposeTransports" in worker).toBe(false);
     await runtime.start();

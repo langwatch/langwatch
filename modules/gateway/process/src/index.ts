@@ -149,7 +149,6 @@ export type {
   VirtualKeySessionActor,
 } from "./services/virtual-key-authorization.service.ts";
 export type { ApplicableBudget } from "./services/gateway-applicable-budgets.service.ts";
-export type { EvaluatorRunner } from "./services/gateway-guardrail-evaluation.service.ts";
 export {
   GatewayElevenLabsCredentialService,
   ELEVENLABS_DEFAULT_BASE_URL,

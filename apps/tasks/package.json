@@ -43,7 +43,6 @@
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
-    "@langwatch/scenario-child": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",

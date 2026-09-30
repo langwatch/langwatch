@@ -90,8 +90,10 @@ const guardrails = PrismaGatewayGuardrailRepository.create(prisma);
 const guardrailWire = GatewayGuardrailEvaluationService.create({
   repository: guardrails,
   monitors,
-  runEvaluator: async () => {
-    throw new Error("the wire mapping tests never run an evaluator");
+  evaluations: {
+    runEvaluator: async () => {
+      throw new Error("the wire mapping tests never run an evaluator");
+    },
   },
 });
 
@@ -99,7 +101,7 @@ const serviceReturning = (result: SingleEvaluationResult) =>
   GatewayGuardrailEvaluationService.create({
     repository: guardrails,
     monitors,
-    runEvaluator: async () => result,
+    evaluations: { runEvaluator: async () => result },
   });
 
 async function createGuardrail({
@@ -367,8 +369,9 @@ describe.skipIf(!databaseUrl)("GatewayGuardrailEvaluationService against real PG
       const routed = GatewayGuardrailEvaluationService.create({
         repository: guardrails,
         monitors,
-        runEvaluator: async ({ settings }) =>
-          (settings as { verdict?: string })?.verdict === "fail" ? failing : passing,
+        evaluations: {
+          runEvaluator: async ({ settings }) => (settings.verdict === "fail" ? failing : passing),
+        },
       });
       const blocked = await routed.check({
         projectId: PROJECT_ID,

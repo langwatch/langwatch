@@ -65,24 +65,13 @@ import { DatasetService } from "../services/dataset.service.ts";
 /** The KSUID resource a new dataset record's id is minted under. */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
 
-/** Composition-owned members, all optional. Absence never causes boot refusal;
- * code refuses BY NAME when an operation needs one.
- */
-export interface DatasetInfrastructure {
-  /** Where normalize work is queued; the in-process service when absent. */
-  readonly queue?: DatasetNormalizeQueue;
-  /** A process-supplied content seam, in place of the resolver-built one. */
-  readonly content?: DatasetContent;
-}
-
 /**
  * Shapes restated rather than imported: a module depends on contracts.
  * `publicBaseUrl` is the process's own fact, drilled in — absent where the
  * deployment named no `BASE_HOST`. `platformUrl` refuses by name when it is.
  */
 type DatasetMembers = Pick<ProcessMembers, "objectStorage"> &
-  Readonly<{ publicBaseUrl: string | undefined }> &
-  DatasetInfrastructure;
+  Readonly<{ publicBaseUrl: string | undefined }>;
 
 type DatasetSetup = FeatureSetup<
   typeof DatasetApp.dependencies,
@@ -124,12 +113,8 @@ export class DatasetApp implements DatasetApi {
     /** Reads the confirmed files a dataset is imported from (ADR-158 §6). */
     storedObjects: StoredObjectApi,
   };
-  /**
-   * `publicBaseUrl` is the process's own fact; the rest are the optional,
-   * process-specific collaborators in {@link DatasetInfrastructure} — every
-   * name a composition may `withMember` must be declared here too.
-   */
-  static readonly reads = ["publicBaseUrl", "objectStorage", "queue", "content"] as const;
+  /** `publicBaseUrl` is the process's own fact; `objectStorage` is the process's client. */
+  static readonly reads = ["publicBaseUrl", "objectStorage"] as const;
 
   #datasets: DatasetService;
   #attachmentUploads: DatasetAttachmentUploadService;
@@ -167,10 +152,8 @@ export class DatasetApp implements DatasetApi {
         chunks,
         storedObjects: dependencies.storedObjects,
       }),
-      queue: members.queue ?? this.#normalization,
-      content:
-        members.content ??
-        DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
+      queue: this.#normalization,
+      content: DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
       // The identifier format a new entry is written under is this module's
       // own business, not something a composing process supplies: every real
       // composition that ever wired this feature left it unset, and the
@@ -526,7 +509,7 @@ export interface DatasetNormalize {
   normalize(payload: DatasetNormalizePayload): Promise<void>;
 }
 
-/** {@link DatasetInfrastructure}'s process-supplied upload seam. */
+/** The upload seam a dataset service is built over. */
 export abstract class DatasetUpload {
   abstract uploadToExistingDataset(
     input: UploadExistingDatasetInput,

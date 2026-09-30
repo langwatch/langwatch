@@ -9,11 +9,11 @@ import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { seededCustomKeys } from "../../__tests__/support/seeded-custom-keys.ts";
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import { PostgresVirtualKeyAdapter } from "../../__tests__/testing.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import { PrismaGatewayAdapter } from "../../app/gateway-composition.build.ts";
-import type { GatewayModelProviderCredentials } from "../../app/gateway.members.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
@@ -53,11 +53,6 @@ const SECRET = "0123456789abcdef0123456789abcdef";
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The key's expiration date as the gateway reads it: unix seconds. */
 const EXPIRES_AT = nowInstant().add({ milliseconds: 7 * DAY_MS });
-
-/** Stored provider keys arrive already decrypted in these fixtures. */
-const credentials: GatewayModelProviderCredentials = {
-  readCustomKeys: (stored: unknown) => stored as Record<string, unknown>,
-};
 
 class SuiteProjectService extends TestProjectApi {
   override async findTraceDestination(
@@ -109,7 +104,7 @@ function buildApp(): void {
     projects: projects,
     chRepo: null,
     budgetDecisions: gateway,
-    credentials,
+    modelProviders: seededCustomKeys(prisma),
     assembly: GatewayConfigAssemblyService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,

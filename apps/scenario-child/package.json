@@ -7,13 +7,7 @@
     "scripts"
   ],
   "type": "module",
-  "main": "./src/bundle-path.ts",
-  "types": "./dist/bundle-path.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/bundle-path.d.ts",
-      "default": "./src/bundle-path.ts"
-    },
     "./package.json": "./package.json",
     "./bundle-optional-externals": "./scripts/bundle-optional-externals.mjs"
   },

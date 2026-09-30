@@ -30,7 +30,7 @@ packages below.
 `apps/scenario-child` is the one exception: a standalone program the scenario
 module spawns per run, which owns its own logic (adapters, turn execution) and
 reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
-2026-09-28).
+2026-09-28). The scenario module locates the program by its own path under the workspace root; no member and no app import carries it (Alex, 2026-09-29).
 
 `apps/*-web` are the internal consoles (haven hub and stack home, IdP
 simulator, mail sink): React bundles built by Vite and served by their Go
@@ -248,6 +248,9 @@ of:
    a **declared supply token** the process answers with one `.provide({...})`
    line — or the seam dies with the dead capability. A module never defaults
    its own availability.
+
+(Alex, 2026-09-29) A member exists only if a production process supplies it;
+test doubles go through the module's own test seams.
 
 One unowned service has one owning module: evaluation owns the langevals boundary — its endpoint,
 the S3 staging of large payloads and their config — and topic and workflow reach langevals through
@@ -474,9 +477,7 @@ const server = await Server.create("langwatch-api")
 
 const app = await server
   .container("api")
-  .withModules(processModules)
   .exposeTransports((transports) => transports.trpc().rest().browserBundle())
-  .withPipelines((pipelines) => pipelines.produce())
   .boot();
 
 await server.serve(app);
@@ -484,11 +485,9 @@ await server.serve(app);
 
 ```ts
 // apps/worker/src/main.ts — the whole difference
-const app = await server
-  .container("worker")
-  .withModules(processModules) // SAME module graph: apps install fully, jobs call them in-process
-  .withPipelines((pipelines) => pipelines.consume()) // consumers, jobs, process managers
-  .boot();
+// Same installed list (apps install fully, jobs call modules in-process); the role
+// decides pipelines: consumers, jobs, process managers.
+const app = await server.container("worker").boot();
 
 await server.run(app);
 ```
@@ -501,9 +500,11 @@ under the sandbox frame policy (a fresh nonce per answer, its own CSP, never
 the app's); it carries no members, logger, stores, credentials or paths. Required slots derive from the installed
 module declarations: an omitted declared transport refuses boot by name.
 The bundle is explicit, including an explicit opt-out for deployments
-without one. Both processes use `withPipelines`: the API's callback offers
-`produce()`, the worker's offers `consume()`. Pipelines are never exposed as
-HTTP surfaces. Consumption includes command production for follow-up work.
+without one. There is no `withModules` and no `withPipelines` in an app: a container takes its
+modules from the owners the app already handed to `withConfig(processConfig(processModules))`,
+so `packages/process-server` never imports the installed list, and the role decides
+pipeline participation (api produces, worker consumes, tasks produces) (Alex,
+2026-09-29). Pipelines are never exposed as HTTP surfaces. Consumption includes command production for follow-up work.
 The API also registers every pipeline's consume-side definitions descriptively, so ops
 introspection lists projections, subscribers and process managers: described, never started, and
 a module's `build` must describe itself without the worker's dependencies (Alex, 2026-09-29).
@@ -659,8 +660,8 @@ and secrets; the process entry point supplies neither credentials nor
 transport internals.
 
 **Deployment-choice modules are one line in the main.** A module whose
-implementation is a deployment choice is composed by one `.withModules`
-line, no conditional wiring. The audit log is **not** one (Alex,
+implementation is a deployment choice is composed by one line in the
+container chain, no conditional wiring. The audit log is **not** one (Alex,
 2026-09-24): every module is always installed and entitlement refuses per
 organization (§11), so the generated list installs audit-log in every
 deployment, as main recorded in every deployment. No app names it.
@@ -695,7 +696,7 @@ anywhere; `boot()` returns the runtime and the test drives `start`/`stop`.
 ## 5. What boot() does — the translation
 
 ```
-withModules(processModules)
+server.container(role)            # modules from the owners handed to withConfig
   │  collect installers, order by peer dependencies (tokens, never imports)
   ▼  for each module:
   1. pick the repository tier from the supplied stores (§7)
@@ -761,6 +762,10 @@ command on the other module's pipeline, or a pull by a scheduled process manager
 itself be a cycle). When the list is empty the kernel refuses a peer cycle at boot by name, and the
 list is deleted.
 
+`gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) are listed
+temporarily (Alex, 2026-09-30): hosted judging moves to instant-eval, and the guardrail check's owner is
+revisited later.
+
 **Registry resolution ends at `ModuleApp.create`.** Inside the module,
 `create()` is the composition root: internal services are built explicitly
 — `LicensingCapService.create({ prisma: process.prisma, graceDays:
@@ -775,11 +780,11 @@ reaches the module through its API, never through its factories (2026-09-23).
 The `processModules` list is generated from `modules/catalogue.json`
 (`pnpm generate:modules` → `@langwatch/installed-modules`). **Installing a
 module edits the catalogue, never a root.** A process composes the whole
-list in one call — `server.container(role).withModules(serverModules)` —
-and that is also the cheap shape: one call over all 49 modules costs ~88k type
+list by asking for its container — `server.container(role)` takes the modules
+`withConfig(processConfig(processModules))` named (Alex, 2026-09-29) — and that is also the cheap shape: one call over all 49 modules costs ~88k type
 instantiations, where the ten-step chunked chain it replaced cost 11.3M.
 Instantiation cost grows with the length of the chain, not the size of the
-list, because each `withModules` re-instantiates the accumulated type. Do not
+list, because each chained `withModules` re-instantiated the accumulated type. Do not
 split the list to appease TS2589. Uninstalling a module that another module
 peer-depends on fails to compile, naming the dependent.
 
@@ -1455,9 +1460,8 @@ process store exist, answered by `maintenancePipelines()`, and installed once by
 modules', where the role drains (2026-09-25). The producer role holds the process store too, so
 every role reads and writes one process store (Alex, 2026-09-27).
 
-`withPipelines((pipelines) => pipelines.produce())` selects API production;
-`withPipelines((pipelines) => pipelines.consume())` selects worker consumption.
-Neither declaration exposes a transport. `boot()` translates the same module
+The role selects participation: `container("api")` produces, `container("worker")` consumes and
+`container("tasks")` produces (Alex, 2026-09-29). Neither exposes a transport. `boot()` translates the same module
 pipeline declaration per role — **api is commands-only,
 structurally**:
 

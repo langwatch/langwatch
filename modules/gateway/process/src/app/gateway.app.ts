@@ -5,6 +5,7 @@ import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import type { RestDeclaredResult, RestIdentity } from "@langwatch/api/rest";
 import { type AuthzPermission, AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
   EventingCommandSender,
@@ -173,6 +174,7 @@ import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/p
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
 import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 import {
   type GatewayAgentCacheEntryStore,
@@ -190,6 +192,7 @@ import { GatewayBudgetChangeDedupeService } from "../services/gateway-budget-cha
 import { GatewayBudgetCrossingService } from "../services/gateway-budget-crossing.service.ts";
 import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
+import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
 import { GatewayElevenLabsCredentialService } from "../services/gateway-elevenlabs-credential.service.ts";
@@ -201,18 +204,11 @@ import { GatewayElevenLabsWebhookService } from "../services/gateway-elevenlabs-
  */
 import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
 import { GatewayGovernanceEventsService } from "../services/gateway-governance-events.service.ts";
-import {
-  GatewayGuardrailEvaluationService,
-  type EvaluatorRunner,
-} from "../services/gateway-guardrail-evaluation.service.ts";
+import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
 import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
-import type {
-  GatewayCodexRefresh,
-  GatewayInternalSpendPipeline,
-  GatewaySpendCommandSender,
-} from "../services/gateway-internal-protocol.service.ts";
+import type { GatewaySpendCommandSender } from "../services/gateway-internal-protocol.service.ts";
 import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
 import {
   GatewayRealtimeSessionReconciliationService,
@@ -249,12 +245,7 @@ import {
   buildGatewayControlPlane,
   GatewayEndUserCapsAdapter,
 } from "./gateway-composition.build.ts";
-import {
-  type GatewayBudgetSpend,
-  type GatewayChangeEvents,
-  type GatewayConfigAssembly,
-  type GatewayModelProviderCredentials,
-} from "./gateway.members.ts";
+import { type GatewayBudgetSpend, type GatewayChangeEvents } from "./gateway.members.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -729,19 +720,9 @@ type GatewaySetup = FeatureSetup<
     Readonly<{
       /** The expected control plane, where the gateway's own setting says nothing. */
       publicBaseUrl?: string | undefined;
-      gatewayInternalProtocol: GatewayInternalProtocolCollaborators;
     }>,
   GatewayServerConfig
 >;
-
-export type GatewayInternalProtocolCollaborators = Readonly<{
-  modelProviderCredentials?: GatewayModelProviderCredentials | undefined;
-  configAssembly?: GatewayConfigAssembly | undefined;
-  langyMirrorProjectId?: string | undefined;
-  evaluatorRunner?: EvaluatorRunner | undefined;
-  refreshCodex?: GatewayCodexRefresh | undefined;
-  spend?: GatewayInternalSpendPipeline | undefined;
-}>;
 
 export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
   static readonly contract = GatewayApiToken;
@@ -766,6 +747,8 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     authz: AuthzApi,
     projects: ProjectApi,
     evaluators: EvaluatorApi,
+    /** Runs the evaluator a gateway guardrail binds, as every other evaluate door does. */
+    evaluations: EvaluationApi,
     monitors: MonitorApi,
     /**
      * The two peers the per-member budget overview reads: organization
@@ -798,14 +781,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
    * `clickhouse` is the control plane's ONE routing client, resolved per tenant
    * rather than a second pool — the spend ledger is a projection in that instance.
    */
-  static readonly reads = [
-    "prisma",
-    "clickhouse",
-    "encryption",
-    "redis",
-    "gatewayInternalProtocol",
-    "publicBaseUrl",
-  ] as const;
+  static readonly reads = ["prisma", "clickhouse", "encryption", "redis", "publicBaseUrl"] as const;
 
   static async create(setup: GatewaySetup): Promise<GatewayApp> {
     return setup.secrets.into(GatewayApp.secrets.internalSecret, (internalSecret) =>
@@ -842,7 +818,6 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       virtualKeyPepper: secrets.virtualKeyPepper,
       governanceSignals: governanceEvents,
     });
-    const internalCollaborators = setup.members.gatewayInternalProtocol;
     // `settlementGraceMs` owns the parse, the bound and the warning on the raw
     // `LW_SPEND_SETTLEMENT_GRACE_MS` string, so the reconciliation door and the
     // sweeper carry one answer. `setup.config` is undefined only in a test stub.
@@ -851,28 +826,8 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       repository: PrismaGatewayConnectUpstreamRepository.create(setup.members.prisma),
       cipher: setup.members.encryption,
     });
-    const config =
-      internalCollaborators.modelProviderCredentials && internalCollaborators.configAssembly
-        ? GatewayConfigMaterialiserService.create({
-            scopeResolution: controlPlane.internalScopeResolution,
-            projects: setup.dependencies.projects,
-            chRepo: controlPlane.budgetSpend ?? null,
-            budgetDecisions: controlPlane.budgetDecisions,
-            credentials: internalCollaborators.modelProviderCredentials,
-            assembly: internalCollaborators.configAssembly,
-            langyMirrorProjectId: internalCollaborators.langyMirrorProjectId,
-            connectUpstream,
-          })
-        : void 0;
-    const guardrails = internalCollaborators.evaluatorRunner
-      ? GatewayGuardrailEvaluationService.create({
-          repository: PrismaGatewayGuardrailRepository.create(setup.members.prisma),
-          monitors: setup.dependencies.monitors,
-          runEvaluator: internalCollaborators.evaluatorRunner,
-        })
-      : void 0;
     const spendCommands: Record<string, GatewaySpendCommandSender | undefined> = {};
-    const spend = internalCollaborators.spend ?? {
+    const spend = {
       commands: spendCommands,
       rating: ModelCatalogGatewaySpendRatingService.create(),
     };
@@ -888,6 +843,25 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
         },
       },
     };
+    const config = GatewayConfigMaterialiserService.create({
+      scopeResolution: controlPlane.internalScopeResolution,
+      projects: setup.dependencies.projects,
+      chRepo: controlPlane.budgetSpend ?? null,
+      budgetDecisions: controlPlane.budgetDecisions,
+      modelProviders: setup.dependencies.modelProviders,
+      assembly: GatewayConfigAssemblyService.create({
+        repository: PrismaGatewayScopeResolutionRepository.create({
+          database: setup.members.prisma,
+        }),
+        platformProviders: setup.dependencies.modelProviders,
+      }),
+      connectUpstream,
+    });
+    const guardrails = GatewayGuardrailEvaluationService.create({
+      repository: PrismaGatewayGuardrailRepository.create(setup.members.prisma),
+      monitors: setup.dependencies.monitors,
+      evaluations: setup.dependencies.evaluations,
+    });
     const voiceCredentials = { modelProviders: setup.dependencies.modelProviders };
     const elevenLabsCredential = GatewayElevenLabsCredentialService.create(voiceCredentials);
     const internalProtocol = GatewayInternalProtocolService.create({
@@ -898,7 +872,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       changes: controlPlane.internalChanges,
       config,
       budgetSpend: controlPlane.budgetSpend,
-      refreshCodex: internalCollaborators.refreshCodex,
+      modelProviders: setup.dependencies.modelProviders,
       guardrails,
       spend,
       realtimeSessions,

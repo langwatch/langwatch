@@ -131,17 +131,6 @@ export {
   statusOfActivationCode,
 } from "./rules/activation-code.rules.ts";
 
-/** The hosted Instant Evals judge a connected install judges with (ADR-156 §9). */
-export {
-  ConnectInstantEvalJudgeService,
-  CONNECT_JUDGE_STATE_TTL_MS,
-} from "./services/connect-instant-eval-judge.service.ts";
-export type {
-  ConnectInstantEvalJudge,
-  ConnectInstantEvalJudgeCollaborators,
-  ConnectProjectOrganizations,
-} from "./services/connect-instant-eval-judge.service.ts";
-
 /** The registry of self-hosted installs (ADR-156, section 10), on LangWatch Cloud only. */
 export { MemorySelfHostedInstanceRepository } from "./repositories/memory/memory.self-hosted-instance.repository.ts";
 export { PrismaSelfHostedInstanceRepository } from "./repositories/prisma/prisma.self-hosted-instance.repository.ts";

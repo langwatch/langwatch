@@ -2,7 +2,6 @@ import "@langwatch/time/polyfill";
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
-import { scenarioChildBundle } from "@langwatch/scenario-child";
 
 import { processEnvironment } from "./config.ts";
 
@@ -32,19 +31,7 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
       : preamble
   ).start();
 
-  const app = await server
-    .container("worker")
-    .withModules(processModules)
-    // Dataset's two optional seams. This process composes neither, so the
-    // module's own absent-behaviour applies: normalize runs in-process.
-    .withMember("queue", () => void 0)
-    .withMember("content", () => void 0)
-    .withMember("gatewayInternalProtocol", () => ({}))
-    .withMember("connectJudge", () => null)
-    .withMember("scenarioChildBundle", () => scenarioChildBundle)
-    .withMember("monitor", () => void 0)
-    .withPipelines((pipelines) => pipelines.consume())
-    .boot();
+  const app = await server.container("worker").boot();
 
   await server.run(app);
 

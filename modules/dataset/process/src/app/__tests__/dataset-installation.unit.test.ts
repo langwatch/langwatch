@@ -12,7 +12,6 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
 import { datasetServer } from "../../dataset.server.ts";
-import type { DatasetContent, DatasetNormalizeQueue } from "../dataset.app.ts";
 import {
   createDatasetTestAuthz,
   createDatasetTestEntitlement,
@@ -25,8 +24,6 @@ function process(role: "api" | "worker") {
     .withModules([withMemoryRepositories(datasetServer)])
     .withStores(memoryStores())
     .withMember("publicBaseUrl", undefined)
-    .withMember("content", createApiFixture<DatasetContent>())
-    .withMember("queue", createApiFixture<DatasetNormalizeQueue>())
     .provide({
       experiment: createDatasetTestExperiments(),
       authz: createDatasetTestAuthz(),

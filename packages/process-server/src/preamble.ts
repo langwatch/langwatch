@@ -14,6 +14,7 @@ import {
   secretLogRedactPaths,
 } from "@langwatch/secrets";
 
+import { isProcessModule } from "./process-container.ts";
 import { ProcessServer } from "./process-server.ts";
 import type { ServerComponent, ServerContribution, ServerLogger } from "./server.ts";
 
@@ -135,6 +136,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
       config,
       resolver,
       ownsProcess: this.state.ownsProcess,
+      modules: owners.filter(isProcessModule),
     };
 
     if (this.state.healthPort !== undefined) {

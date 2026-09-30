@@ -89,7 +89,7 @@ export interface MonitorAppInfrastructure {
 /** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type MonitorSetup = FeatureSetup<
   typeof MonitorApp.dependencies,
-  Readonly<{ monitor: MonitorAppInfrastructure | undefined; publicBaseUrl: string | undefined }>,
+  Readonly<{ publicBaseUrl: string | undefined }>,
   undefined,
   MonitorRepositories
 >;
@@ -105,7 +105,7 @@ export class MonitorApp implements MonitorApi {
     /** Removes the workflow a monitor copy replicated when the replica is refused. */
     workflows: WorkflowApi,
   };
-  static readonly reads = ["monitor", "publicBaseUrl"] as const;
+  static readonly reads = ["publicBaseUrl"] as const;
 
   #monitors: MonitorService;
   #usage: MonitorRepositories["monitors"];
@@ -141,13 +141,11 @@ export class MonitorApp implements MonitorApi {
    * does. Replaces apps/api's hand composition, deleted in b383462d96.
    */
   static create(setup: MonitorSetup): MonitorApp {
-    const infrastructure =
-      setup.members.monitor ??
-      buildMonitorInfrastructure({
-        evaluators: setup.dependencies.evaluators,
-        evaluation: setup.dependencies.evaluation,
-        workflows: setup.dependencies.workflows,
-      });
+    const infrastructure = buildMonitorInfrastructure({
+      evaluators: setup.dependencies.evaluators,
+      evaluation: setup.dependencies.evaluation,
+      workflows: setup.dependencies.workflows,
+    });
 
     return MonitorApp.fromInfrastructure({
       infrastructure: {

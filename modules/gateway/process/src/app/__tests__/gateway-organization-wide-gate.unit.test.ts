@@ -33,6 +33,7 @@ function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayApp> {
       authz: createApiFixture<AuthzApi>(authz),
       projects: createApiFixture({}),
       evaluators: createApiFixture({}),
+      evaluations: createApiFixture({}),
       monitors: createApiFixture({}),
       organizations: createApiFixture({}),
       featureFlags: createApiFixture({}),
@@ -43,7 +44,6 @@ function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayApp> {
     members: {
       prisma: createApiFixture<PrismaClient>({}),
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      gatewayInternalProtocol: {},
       encryption: reversible,
       redis: memoryRedisDouble(),
       publicBaseUrl: "https://app.acme.example",

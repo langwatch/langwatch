@@ -5,34 +5,40 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import { type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { evaluatorSchema, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { monitorServer } from "../../monitor.server.ts";
-import {
-  FakeMonitorEvaluators,
-  FakeMonitorPerformance,
-  FakeMonitorReplication,
-} from "./monitor.fixture.ts";
 
 const PUBLIC_BASE_URL = "https://app.langwatch.example";
+
+function evaluatorRow(input: { id: string; projectId: string }) {
+  return evaluatorSchema.parse({
+    ...input,
+    name: "Quality",
+    slug: "quality",
+    type: "evaluator",
+    config: {},
+    workflowId: null,
+    copiedFromEvaluatorId: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+}
 
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(monitorServer)])
-    .withMember("monitor", {
-      evaluators: new FakeMonitorEvaluators(),
-      performance: new FakeMonitorPerformance(),
-      replication: new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null }),
-      generateId: () => `monitor_${Math.random().toString(36).slice(2, 10)}`,
-    })
     .withMember("publicBaseUrl", PUBLIC_BASE_URL)
     .provide({
       authz: createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
-      evaluator: createApiFixture<EvaluatorApi>(),
+      evaluator: createApiFixture<EvaluatorApi>({
+        getById: async ({ id, projectId }) => evaluatorRow({ id, projectId }),
+      }),
       evaluation: createApiFixture<EvaluationApi>(),
       workflow: createApiFixture<WorkflowApi>(),
     });

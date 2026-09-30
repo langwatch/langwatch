@@ -1,5 +1,6 @@
 import { TransportSelection } from "@langwatch/api/hosting/selection";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
+import type { ConfigOwner } from "@langwatch/config";
 import type { InstallableServerFeature } from "@langwatch/kernel";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import {
@@ -11,11 +12,12 @@ import {
 import type { ServedApplication } from "./server.ts";
 
 export type ProcessModule = InstallableServerFeature<never> & {
-  readonly publicConfig?: (config: unknown) => unknown;
+  readonly publicConfig?: (config: unknown, api: unknown) => unknown;
 };
-export type ModuleBundle =
-  | readonly ProcessModule[]
-  | Readonly<{ chunks: readonly (readonly ProcessModule[])[] }>;
+/** An owner the server's config named that is also an installable module. */
+export function isProcessModule(owner: ConfigOwner): owner is ProcessModule {
+  return "install" in owner && typeof owner.install === "function";
+}
 /** A booted application: the server hosts it, and only the tasks role answers `tasks` (§9). */
 export type BootedApplication = ServedApplication &
   Readonly<{
@@ -41,17 +43,13 @@ export interface ProcessBoot {
  */
 export type ProcessMemberFactory = (members: ProcessMemberSource) => unknown;
 
+/** A container installs the modules its server's config named; the role decides its pipelines. */
 class ProcessContainer {
-  protected modules: readonly ProcessModule[] = [];
-  protected pipelines: PipelineParticipation | undefined;
   protected members: Record<string, ProcessMemberFactory> = {};
-  protected constructor(protected readonly runtime: ProcessBoot) {}
-
-  withModules(bundle: ModuleBundle): this {
-    const modules = "chunks" in bundle ? bundle.chunks.flat() : bundle;
-    this.modules = [...this.modules, ...modules];
-    return this;
-  }
+  protected constructor(
+    protected readonly runtime: ProcessBoot,
+    protected readonly modules: readonly ProcessModule[],
+  ) {}
 
   /**
    * One member this process answers itself, beyond what its stores supply.
@@ -62,28 +60,16 @@ class ProcessContainer {
     this.members[name] = build;
     return this;
   }
-
-  protected participation(): PipelineParticipation {
-    if (!this.pipelines)
-      throw new Error("pipelines must explicitly produce or consume before boot.");
-    return this.pipelines;
-  }
 }
 
 export class ApiProcessContainer extends ProcessContainer {
   #transports: TransportSelection | undefined;
-  constructor(runtime: ProcessBoot) {
-    super(runtime);
+  constructor(runtime: ProcessBoot, modules: readonly ProcessModule[]) {
+    super(runtime, modules);
   }
 
   exposeTransports(build: (transports: TransportSelection) => TransportSelection): this {
     this.#transports = build(TransportSelection.create(this.runtime.surfaceDefaults));
-    return this;
-  }
-
-  withPipelines(build: (pipelines: ProducerPipelines) => PipelineParticipation<"produce">): this {
-    this.pipelines = build(new ProducerPipelines());
-    if (this.pipelines.mode !== "produce") throw new Error("API pipelines can only produce.");
     return this;
   }
 
@@ -100,7 +86,7 @@ export class ApiProcessContainer extends ProcessContainer {
     return this.runtime.boot({
       role: "api",
       modules: this.modules,
-      pipelines: this.participation(),
+      pipelines: new ProducerPipelines().produce(),
       members: this.members,
       transports: this.#transports,
     });
@@ -108,21 +94,15 @@ export class ApiProcessContainer extends ProcessContainer {
 }
 
 export class WorkerProcessContainer extends ProcessContainer {
-  constructor(runtime: ProcessBoot) {
-    super(runtime);
-  }
-
-  withPipelines(build: (pipelines: ConsumerPipelines) => PipelineParticipation<"consume">): this {
-    this.pipelines = build(new ConsumerPipelines());
-    if (this.pipelines.mode !== "consume") throw new Error("Worker pipelines must consume.");
-    return this;
+  constructor(runtime: ProcessBoot, modules: readonly ProcessModule[]) {
+    super(runtime, modules);
   }
 
   boot(): Promise<ServedApplication> {
     return this.runtime.boot({
       role: "worker",
       modules: this.modules,
-      pipelines: this.participation(),
+      pipelines: new ConsumerPipelines().consume(),
       members: this.members,
     });
   }
@@ -130,21 +110,15 @@ export class WorkerProcessContainer extends ProcessContainer {
 
 /** One-shot work over the installed modules: sends commands, hosts no consumer (§9). */
 export class TasksProcessContainer extends ProcessContainer {
-  constructor(runtime: ProcessBoot) {
-    super(runtime);
-  }
-
-  withPipelines(build: (pipelines: ProducerPipelines) => PipelineParticipation<"produce">): this {
-    this.pipelines = build(new ProducerPipelines());
-    if (this.pipelines.mode !== "produce") throw new Error("Tasks pipelines can only produce.");
-    return this;
+  constructor(runtime: ProcessBoot, modules: readonly ProcessModule[]) {
+    super(runtime, modules);
   }
 
   boot(): Promise<BootedApplication> {
     return this.runtime.boot({
       role: "tasks",
       modules: this.modules,
-      pipelines: this.participation(),
+      pipelines: new ProducerPipelines().produce(),
       members: this.members,
     });
   }

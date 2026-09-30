@@ -170,10 +170,7 @@ import { RunConfigurationsService } from "../services/run-configurations.service
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
-import {
-  ScenarioExecutorService,
-  type ScenarioChildBundle,
-} from "../services/scenario-executor.service.ts";
+import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import { ScenarioFailureHandlerService } from "../services/scenario-failure-handler.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
@@ -305,8 +302,6 @@ type ScenarioProcessMembers = Readonly<{
   /** Broadcasts and cancel signals across the fleet; absent in a memory process. */
   redis: ScenarioRedis | null;
   publicBaseUrl: string | undefined;
-  /** The compiled scenario child, as the app that ships it answers (a deployment fact). */
-  scenarioChildBundle: ScenarioChildBundle;
   /** The raw-socket door's port, which the worker's quick tunnel points at. */
   rawSocketPort: number;
   nlpServiceUrl: string | undefined;
@@ -336,7 +331,6 @@ export class ScenarioApp implements ScenarioApi {
     "rateLimiter",
     "redis",
     "publicBaseUrl",
-    "scenarioChildBundle",
     "rawSocketPort",
     "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
@@ -433,7 +427,6 @@ export class ScenarioApp implements ScenarioApi {
     });
 
     const childHost = {
-      scenarioChildBundle: setup.members.scenarioChildBundle,
       voicePublicUrl: voice.publicUrl,
       nlpServiceUrl: setup.members.nlpServiceUrl,
       isSaas: setup.members.isSaas,

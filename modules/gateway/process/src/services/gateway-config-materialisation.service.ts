@@ -12,6 +12,12 @@ import {
   type GatewayResolvedBudget,
 } from "@langwatch/gateway-contract";
 import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
+import {
+  type ModelProviderApi,
+  ModelProviderCustomKeysMissingError,
+  ModelProviderNotFoundError,
+  PLATFORM_PROVIDER_ID_PREFIX,
+} from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
@@ -37,12 +43,24 @@ import { GatewayConnectUpstreamService } from "./gateway-connect-upstream.servic
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
+/** The one model-provider read the bundle needs. */
+export type GatewayCustomKeys = Pick<ModelProviderApi, "getCustomKeys">;
+
+const NO_KEYS: GatewayModelProviderCredentials = { readCustomKeys: () => ({}) };
+const PLAIN_KEYS: GatewayModelProviderCredentials = {
+  readCustomKeys: (stored) => (isKeyBag(stored) ? stored : {}),
+};
+
+function isKeyBag(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export class GatewayConfigMaterialiserService {
   private readonly scopeResolution: GatewayScopeResolutionService;
   private readonly projects: ProjectApi;
   private readonly chRepo: GatewayBudgetSpend | null;
   private readonly budgetDecisions: GatewayService;
-  private readonly credentials: GatewayModelProviderCredentials;
+  private readonly modelProviders: GatewayCustomKeys;
   private readonly assembly: GatewayConfigAssembly;
   private readonly langyMirrorProjectId: string | undefined;
   private readonly connectUpstream: GatewayConnectUpstreamService | undefined;
@@ -54,7 +72,7 @@ export class GatewayConfigMaterialiserService {
       projects,
       chRepo,
       budgetDecisions,
-      credentials,
+      modelProviders,
       assembly,
       langyMirrorProjectId,
       connectUpstream,
@@ -63,7 +81,7 @@ export class GatewayConfigMaterialiserService {
       projects: ProjectApi;
       chRepo: GatewayBudgetSpend | null;
       budgetDecisions: GatewayService;
-      credentials: GatewayModelProviderCredentials;
+      modelProviders: GatewayCustomKeys;
       assembly: GatewayConfigAssembly;
       langyMirrorProjectId: string | undefined;
       connectUpstream: GatewayConnectUpstreamService | undefined;
@@ -73,7 +91,7 @@ export class GatewayConfigMaterialiserService {
     this.projects = projects;
     this.chRepo = chRepo;
     this.budgetDecisions = budgetDecisions;
-    this.credentials = credentials;
+    this.modelProviders = modelProviders;
     this.assembly = assembly;
     this.langyMirrorProjectId = langyMirrorProjectId;
     this.connectUpstream = connectUpstream;
@@ -84,7 +102,8 @@ export class GatewayConfigMaterialiserService {
     projects: ProjectApi;
     chRepo: GatewayBudgetSpend | null;
     budgetDecisions: GatewayService;
-    credentials: GatewayModelProviderCredentials;
+    /** Model provider decrypts its own rows' keys; the gateway never holds that cipher. */
+    modelProviders: GatewayCustomKeys;
     assembly: GatewayConfigAssembly;
     /** `LANGY_MIRROR_PROJECT_ID`; absent means nothing is mirrored. */
     langyMirrorProjectId?: string | undefined;
@@ -95,7 +114,7 @@ export class GatewayConfigMaterialiserService {
       projects: input.projects,
       chRepo: input.chRepo,
       budgetDecisions: input.budgetDecisions,
-      credentials: input.credentials,
+      modelProviders: input.modelProviders,
       assembly: input.assembly,
       langyMirrorProjectId: input.langyMirrorProjectId,
       connectUpstream: input.connectUpstream,
@@ -170,8 +189,14 @@ export class GatewayConfigMaterialiserService {
     );
     const policySides = resolvePolicySideOfBundle(vk, config, this.assembly);
     const upstream = await this.upstreamOf(vk.organizationId);
+    const readers = await Promise.all(providers.map((mp) => this.credentialReaderFor(mp)));
     const ownSlots = providers.map((mp, index) =>
-      buildProviderSlot({ mp, index, credentialReader: this.credentials, assembly: this.assembly }),
+      buildProviderSlot({
+        mp,
+        index,
+        credentialReader: readers[index] ?? NO_KEYS,
+        assembly: this.assembly,
+      }),
     );
     // LangWatch goes last: a customer credential keeps serving the models it serves.
     const slots = upstream
@@ -239,6 +264,22 @@ export class GatewayConfigMaterialiserService {
       vk_tags: config.metadata?.tags ?? [],
       expires_at: toExpiresAtWire(vk.expiresAt),
     };
+  }
+
+  /**
+   * One row's keys, decrypted by model provider. A synthesised platform row holds its bag in
+   * plain; a row deleted mid-read or storing none reads as no keys, as main's decoder did.
+   */
+  private async credentialReaderFor(mp: ModelProvider): Promise<GatewayModelProviderCredentials> {
+    if (mp.id.startsWith(PLATFORM_PROVIDER_ID_PREFIX)) return PLAIN_KEYS;
+    try {
+      const { customKeys } = await this.modelProviders.getCustomKeys({ modelProviderId: mp.id });
+      return { readCustomKeys: () => customKeys };
+    } catch (error) {
+      if (error instanceof ModelProviderCustomKeysMissingError) return NO_KEYS;
+      if (error instanceof ModelProviderNotFoundError) return NO_KEYS;
+      throw error;
+    }
   }
 
   /**

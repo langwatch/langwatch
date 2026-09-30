@@ -180,6 +180,7 @@ async function mountAsLegacyProjectKey() {
       authz: createApiFixture<AuthzApi>({}),
       projects,
       evaluators: createApiFixture({}),
+      evaluations: createApiFixture({}),
       monitors: createApiFixture({}),
       organizations: createApiFixture({}),
       featureFlags: createApiFixture({}),
@@ -190,7 +191,6 @@ async function mountAsLegacyProjectKey() {
     members: {
       prisma,
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      gatewayInternalProtocol: {},
       encryption: reversible,
       redis: memoryRedisDouble(),
       publicBaseUrl: "https://app.acme.example",
@@ -330,13 +330,7 @@ describe("a legacy project key's organization-wide gateway writes", () => {
 
   describe("when it addresses another organization's budget or cache rule by id", () => {
     const foreignRows = [
-      [
-        "updates a budget",
-        "PATCH",
-        "/budgets/budget_b",
-        { name: "mine" },
-        "budget_not_found",
-      ],
+      ["updates a budget", "PATCH", "/budgets/budget_b", { name: "mine" }, "budget_not_found"],
       ["archives a budget", "DELETE", "/budgets/budget_b", undefined, "budget_not_found"],
       ["resets a budget", "POST", "/budgets/budget_b/reset", {}, "budget_not_found"],
       [

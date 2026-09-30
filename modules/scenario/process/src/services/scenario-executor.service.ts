@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
@@ -45,16 +47,12 @@ export type ScenarioExecutorPeers = Readonly<{
   apiKeys: ApiKeyApi;
 }>;
 
-/** Where the compiled child sits and the sources a spawn checks it against. */
-export type ScenarioChildBundle = Readonly<{
-  packageRoot: string;
-  sourcePath: string;
-  sourceRoots: readonly string[];
-}>;
+/** The repository root: this file sits five folders below it, in source and in dist alike. */
+const WORKSPACE_ROOT = path.join(import.meta.dirname, "..", "..", "..", "..", "..");
+const CHILD_PACKAGE_ROOT = path.join(WORKSPACE_ROOT, "apps", "scenario-child");
 
 /** The process facts a child is started with, read as members. */
 export type ScenarioExecutorHost = Readonly<{
-  scenarioChildBundle: ScenarioChildBundle;
   voicePublicUrl: VoicePublicUrl;
   nlpServiceUrl: string | undefined;
   isSaas: boolean;
@@ -176,9 +174,13 @@ export class ScenarioExecutorService {
     host: ScenarioExecutorHost;
   }): ScenarioChildProcessConfig {
     return {
-      packageRoot: host.scenarioChildBundle.packageRoot,
-      sourcePath: host.scenarioChildBundle.sourcePath,
-      sourceRoots: [...host.scenarioChildBundle.sourceRoots],
+      packageRoot: CHILD_PACKAGE_ROOT,
+      sourcePath: path.join(CHILD_PACKAGE_ROOT, "src", "main.ts"),
+      sourceRoots: [
+        path.join(CHILD_PACKAGE_ROOT, "src"),
+        path.join(WORKSPACE_ROOT, "modules", "scenario", "contract", "src"),
+        path.join(WORKSPACE_ROOT, "modules", "scenario", "process", "src", "channels"),
+      ],
       nodeEnv: host.nodeEnvironment,
       isSaas: host.isSaas,
       voicePublicUrl: host.voicePublicUrl,

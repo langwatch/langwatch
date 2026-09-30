@@ -28,6 +28,7 @@ import {
   type VirtualKeyWithScopes,
   type GatewayVirtualKeyRecord,
 } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
@@ -73,15 +74,6 @@ export type GatewayInternalSpendPipeline = Readonly<{
   rating: GatewaySpendRating;
 }>;
 
-/** How a 401 on a Codex-backed provider is recovered, where the process can. */
-export type GatewayCodexRefresh = (input: {
-  providerRowId: string;
-}) => Promise<
-  | { status: "refreshed"; accessToken: string; accountId: string }
-  | { status: "not_connected" }
-  | { status: "session_expired" }
->;
-
 /** Everything the internal control plane reaches that it does not own. */
 export type GatewayInternalProtocolMembers = Readonly<{
   /** The SAME virtual-key service every other gateway door reads. */
@@ -95,13 +87,13 @@ export type GatewayInternalProtocolMembers = Readonly<{
   /** The durable revision feed the configuration long-poll walks. */
   changes: GatewayChangeEvents;
   /** Builds one key's warm-cache configuration bundle. */
-  config: GatewayConfigMaterialiserService | undefined;
+  config: GatewayConfigMaterialiserService;
   /** Absent with no ClickHouse; the bucket read then reports zero spend, not an invented figure. */
   budgetSpend: GatewayBudgetSpend | undefined;
-  /** Absent with no model-provider service composed; a 401 recovery then refuses by name. */
-  refreshCodex: GatewayCodexRefresh | undefined;
+  /** Owns the Codex session a 401 on a Codex-backed provider is recovered through. */
+  modelProviders: Pick<ModelProviderApi, "refreshCodexForGateway">;
   /** All-or-nothing; a guardrail that cannot verdict must refuse, never answer allow. */
-  guardrails: GatewayGuardrailEvaluationService | undefined;
+  guardrails: GatewayGuardrailEvaluationService;
   /** Absent with no spend pipeline registered; /spend-commands then answers 503. */
   spend: GatewayInternalSpendPipeline | undefined;
   /** Absent with no spend confirmation path; a booked session would then never bill. */
@@ -180,34 +172,24 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return this.#members.virtualKeys.touchUsage(id);
   }
 
-  async refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult> {
-    const refresh = this.#members.refreshCodex;
-    if (!refresh) return { status: "unavailable" };
-    return refresh(input);
+  refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult> {
+    return this.#members.modelProviders.refreshCodexForGateway(input);
   }
 
   findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null> {
     return this.#members.store.findVirtualKeyForConfig(id);
   }
 
-  async configVersionToken(
+  configVersionToken(
     input: Parameters<GatewayConfigMaterialiserService["versionToken"]>[0],
   ): Promise<string> {
-    const config = this.#members.config;
-    if (!config)
-      throw new Error("gateway config materialisation is unavailable in this deployment");
-
-    return config.versionToken(input);
+    return this.#members.config.versionToken(input);
   }
 
-  async materialiseConfig(
+  materialiseConfig(
     input: Parameters<GatewayConfigMaterialiserService["materialise"]>[0],
   ): Promise<unknown> {
-    const config = this.#members.config;
-    if (!config)
-      throw new Error("gateway config materialisation is unavailable in this deployment");
-
-    return config.materialise(input);
+    return this.#members.config.materialise(input);
   }
 
   listChanges(
@@ -233,9 +215,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   }
 
   async checkGuardrails(input: GatewayGuardrailCheckInput): Promise<GatewayGuardrailCheckResult> {
-    const guardrails = this.#members.guardrails;
-    if (!guardrails) return { status: "unavailable" } as const;
-    return { status: "evaluated", verdict: await guardrails.check(input) } as const;
+    return { status: "evaluated", verdict: await this.#members.guardrails.check(input) } as const;
   }
 
   async budgetBucketSpend(input: { budgetId: string; endUserId: string }): Promise<
