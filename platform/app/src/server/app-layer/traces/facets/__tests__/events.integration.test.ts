@@ -26,7 +26,10 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { EVENT_METRICS_PREFIX } from "../../query-language/eventMetrics";
+import {
+  EVENT_METRIC_SEP,
+  EVENT_METRICS_PREFIX,
+} from "../../query-language/eventMetrics";
 import { buildEventsFacetQuery } from "../events";
 import { baseParams, buildTimeWhere } from "../helpers";
 
@@ -47,7 +50,6 @@ const UP_VOTE_EVERY = 60;
 
 const VOTE_EVENT = "thumbs_up_down";
 const VOTE_KEY = `${EVENT_METRICS_PREFIX}vote`;
-const SEP = String.fromCharCode(31);
 
 const VOTING_SPANS = SPAN_COUNT / VOTE_EVERY;
 const UP_VOTES = Math.ceil(SPAN_COUNT / UP_VOTE_EVERY);
@@ -60,7 +62,9 @@ const MEMORY_CAP = "40000000"; // 40 MB
 type FacetRow = {
   facet_value: string;
   cnt: string;
-  metric_values: Array<[string, number]>;
+  // UInt64 counts arrive as numbers or quoted strings depending on
+  // output_format_json_quote_64bit_integers, so reads go through Number().
+  metric_values: Array<[string, number | string]>;
   total_distinct: string;
 };
 
@@ -149,28 +153,50 @@ async function seedSpansWithEvents({
 }
 
 /**
- * The single-pass shape this facet replaced: names and metric buckets both
- * read from one zip of `Events.Name` with the whole `Events.Attributes` map.
- * Kept here only as the witness that the memory test discriminates.
+ * The query this facet replaced, verbatim as it shipped: names and metric
+ * buckets both read from one zip of `Events.Name` with the whole
+ * `Events.Attributes` map. Kept here only as the witness that the memory test
+ * discriminates, so it must stay the real former query rather than a
+ * simplification the optimizer could prune differently.
  */
-function singlePassSql(where: string): string {
+function formerSinglePassSql(where: string): string {
   return `
-    SELECT name AS facet_value, count() AS cnt
+    SELECT
+      name AS facet_value,
+      cnt,
+      arraySlice(
+        arrayReverseSort(x -> x.2, arrayZip(metric_buckets.1, metric_buckets.2)),
+        1, 10
+      ) AS metric_values,
+      count() OVER () AS total_distinct
     FROM (
-      SELECT ev.1 AS name,
-        arrayFilter(
-          x -> startsWith(x.1, '${EVENT_METRICS_PREFIX}') AND x.2 != '',
-          arrayZip(mapKeys(ev.2), mapValues(ev.2))
-        ) AS metric_entries
+      SELECT
+        name,
+        count() AS cnt,
+        sumMap(
+          arrayMap(x -> concat(x.1, char(31), x.2), metric_entries),
+          arrayMap(x -> toUInt64(1), metric_entries)
+        ) AS metric_buckets
       FROM (
-        SELECT arrayJoin(arrayZip(\`Events.Name\`, \`Events.Attributes\`)) AS ev
-        FROM stored_spans
-        WHERE ${where}
-          AND length(\`Events.Name\`) > 0
+        SELECT
+          ev.1 AS name,
+          arrayFilter(
+            x -> startsWith(x.1, '${EVENT_METRICS_PREFIX}') AND x.2 != '',
+            arrayZip(mapKeys(ev.2), mapValues(ev.2))
+          ) AS metric_entries
+        FROM (
+          SELECT arrayJoin(arrayZip(\`Events.Name\`, \`Events.Attributes\`)) AS ev
+          FROM stored_spans
+          WHERE ${where}
+            AND length(\`Events.Name\`) > 0
+        )
+        WHERE ev.1 != ''
       )
-      WHERE ev.1 != ''
+      WHERE 1 = 1
+      GROUP BY name
     )
-    GROUP BY name
+    ORDER BY cnt DESC
+    LIMIT {limit:UInt32} OFFSET {offset:UInt32}
   `;
 }
 
@@ -181,10 +207,16 @@ describe("events facet integration", () => {
     const rawClient = getTestClickHouseClient();
     if (!rawClient) throw new Error("ClickHouse client not available");
     ch = wrapWithDefaultSettings(rawClient);
+    // The seed puts voting spans in parts of their own, and the memory test
+    // depends on that layout. A background merge would fold them back in with
+    // the payload spans and make the result depend on merge timing, so merges
+    // on stored_spans stay stopped for the life of this suite.
+    await ch.command({ query: "SYSTEM STOP MERGES stored_spans" });
     await seedSpansWithEvents({ ch });
   }, 180_000);
 
   afterAll(async () => {
+    await ch?.command({ query: "SYSTEM START MERGES stored_spans" });
     await cleanupTestData(TENANT_ID);
   });
 
@@ -230,9 +262,12 @@ describe("events facet integration", () => {
         const rows = await runFacet();
         const byName = new Map(rows.map((r) => [r.facet_value, r]));
 
-        expect(byName.get(VOTE_EVENT)?.metric_values).toEqual([
-          [`${VOTE_KEY}${SEP}-1`, DOWN_VOTES],
-          [`${VOTE_KEY}${SEP}1`, UP_VOTES],
+        const buckets = byName
+          .get(VOTE_EVENT)
+          ?.metric_values.map(([key, count]) => [key, Number(count)]);
+        expect(buckets).toEqual([
+          [`${VOTE_KEY}${EVENT_METRIC_SEP}-1`, DOWN_VOTES],
+          [`${VOTE_KEY}${EVENT_METRIC_SEP}1`, UP_VOTES],
         ]);
         for (const name of PAYLOAD_EVENTS) {
           expect(byName.get(name)?.metric_values).toEqual([]);
@@ -253,7 +288,7 @@ describe("events facet integration", () => {
 
       /** @scenario The Event name section loads when events carry large payloads */
       it("exceeds the same budget with the single-pass shape it replaced", async () => {
-        const sql = singlePassSql(buildTimeWhere("StartTime"));
+        const sql = formerSinglePassSql(buildTimeWhere("StartTime"));
 
         await expect(
           ch

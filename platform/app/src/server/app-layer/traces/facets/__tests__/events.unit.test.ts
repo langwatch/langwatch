@@ -73,8 +73,10 @@ describe("buildEventsFacetQuery", () => {
         // Gated on the keys subcolumn, which reaches PREWHERE and never opens
         // the values column, so granules with no metric-bearing span skip the
         // values entirely.
+        // Explicit rather than left to optimize_move_to_prewhere, so the
+        // saving holds whatever the optimizer settings are.
         expect(metrics).toMatch(
-          /arrayExists\(\s*keys -> arrayExists\(k -> startsWith\(k, 'event\.metrics\.'\), keys\),\s*`Events\.Attributes`\.keys\s*\)/,
+          /PREWHERE[\s\S]*arrayExists\(\s*keys -> arrayExists\(k -> startsWith\(k, 'event\.metrics\.'\), keys\),\s*`Events\.Attributes`\.keys\s*\)/,
         );
       });
 
