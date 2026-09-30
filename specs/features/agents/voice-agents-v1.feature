@@ -684,6 +684,18 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When a metadata refresh carrying a null audio url is folded onto it
     Then the run's audio url is cleared while its other refreshed fields win
 
+  # 8032 AC4
+  # Every re-drive of one finished call carries the same end time, so the
+  # refresh cannot be keyed on it: two re-drives with different recording
+  # metadata would share an idempotency key and the event log would keep only
+  # the first. Each re-drive names its own attempt; a retry of that same
+  # attempt still dedupes, and at one end time the attempt written last wins.
+  @unit @regression
+  Scenario: Two re-drives at the same end time each keep their own refresh
+    Given two re-drives of one finished call with different recording metadata
+    When the run's event log is replayed and deduped by idempotency key
+    Then both refreshes survive and the later re-drive's recording is the run's
+
   # ---------------------------------------------------------------------------
   # Talk to it authorization and the cutoff marker (#8021)
   # ---------------------------------------------------------------------------

@@ -353,9 +353,17 @@ export type SimulationRunCutAtLimitRecordedEvent = z.infer<
  * The fold merges these fields over the run's top-level metadata, so a reader
  * that keys on `source` / `audioUrl` / `agentId` sees the latest attempt. Only
  * the keys present are touched; the run's other metadata is left as it was.
+ *
+ * `attemptId` names the attempt that wrote the refresh and is its idempotency
+ * identity. The event's `occurredAt` cannot be: every re-drive of one finished
+ * call carries the same end time, so two re-drives with different recording
+ * metadata would share a key and the log would keep only the first. Ordering
+ * between refreshes is the fold's usual rule (occurredAt, then arrival), so at
+ * one end time the attempt written last wins.
  */
 export const simulationRunMetadataRefreshedEventDataSchema = z.object({
   scenarioRunId: z.string(),
+  attemptId: z.string().min(1),
   metadata: z.record(z.unknown()),
 });
 export type SimulationRunMetadataRefreshedEventData = z.infer<

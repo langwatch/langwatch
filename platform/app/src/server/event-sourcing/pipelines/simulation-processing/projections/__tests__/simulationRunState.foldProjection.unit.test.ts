@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
+import { deduplicateEvents } from "../../../../stores/eventStoreUtils";
+import { RefreshMetadataCommand } from "../../commands";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
@@ -140,6 +142,7 @@ function createMetadataRefreshedEvent(
     version: SIMULATION_EVENT_VERSIONS.METADATA_REFRESHED,
     data: {
       scenarioRunId: "scenario-run-1",
+      attemptId: "attempt-1",
       metadata: {},
       ...overrides,
     },
@@ -505,6 +508,100 @@ describe("simulationRunStateFoldProjection", () => {
         targetType: "voice",
         isCutAtLimit: false,
       });
+    });
+
+    /** @scenario "Two re-drives at the same end time each keep their own refresh" */
+    it("keeps the later re-drive's refresh on a refold when both share the call's end time", () => {
+      // Two re-drives of one finished call: same end time, different recording
+      // metadata. Built through the real command so the idempotency key is the
+      // one the event log dedupes on.
+      const CALL_ENDED_AT = 2000;
+      const refreshFrom = ({
+        attemptId,
+        writtenAt,
+        audioUrl,
+      }: {
+        attemptId: string;
+        writtenAt: number;
+        audioUrl: string | null;
+      }) => {
+        vi.setSystemTime(writtenAt);
+        const [event] = new RefreshMetadataCommand().handle({
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "scenario-run-1",
+          data: {
+            tenantId: TEST_TENANT_ID,
+            occurredAt: CALL_ENDED_AT,
+            scenarioRunId: "scenario-run-1",
+            attemptId,
+            metadata: { source: "provider", audioUrl },
+          },
+        } as never);
+        return event as SimulationRunMetadataRefreshedEvent;
+      };
+      // The first re-drive found no recording; its finish then failed, and a
+      // second re-drive found the provider recording.
+      const firstRedrive = refreshFrom({
+        attemptId: "attempt-a",
+        writtenAt: 5000,
+        audioUrl: null,
+      });
+      const secondRedrive = refreshFrom({
+        attemptId: "attempt-b",
+        writtenAt: 6000,
+        audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+      });
+
+      // Replay the event log the way a refold does: dedupe on the
+      // idempotency key, then fold in occurredAt-then-arrival order.
+      const log = [
+        createRunStartedEvent(
+          {
+            metadata: { source: "browser", langwatch: { targetType: "voice" } },
+          },
+          { id: "event-started-1", occurredAt: 1000 },
+        ),
+        createMessageSnapshotEvent({
+          messages: [{ role: "user", content: "hello" }],
+        }),
+        firstRedrive,
+        secondRedrive,
+      ];
+      const replayed = deduplicateEvents(log as SimulationProcessingEvent[]);
+
+      // Both refreshes survive the dedupe: they are different attempts.
+      expect(
+        replayed.filter(
+          (e) => e.type === SIMULATION_RUN_EVENT_TYPES.METADATA_REFRESHED,
+        ),
+      ).toHaveLength(2);
+
+      const state = foldEvents(replayed);
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      // The latest attempt's recording is what the run shows (#8032).
+      expect(metadata.audioUrl).toBe(
+        "/api/voice/session/conv_1/audio?projectId=p1",
+      );
+    });
+
+    it("still dedupes a retry of the same attempt", () => {
+      const handleOnce = () =>
+        new RefreshMetadataCommand().handle({
+          tenantId: TEST_TENANT_ID,
+          aggregateId: "scenario-run-1",
+          data: {
+            tenantId: TEST_TENANT_ID,
+            occurredAt: 2000,
+            scenarioRunId: "scenario-run-1",
+            attemptId: "attempt-a",
+            metadata: { source: "provider" },
+          },
+        } as never)[0]!;
+
+      const [original, retried] = [handleOnce(), handleOnce()];
+
+      expect(retried.idempotencyKey).toBe(original.idempotencyKey);
+      expect(deduplicateEvents([original, retried])).toHaveLength(1);
     });
   });
 

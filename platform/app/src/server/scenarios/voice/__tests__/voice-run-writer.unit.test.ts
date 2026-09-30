@@ -144,6 +144,31 @@ describe("writeVoiceCallRun", () => {
         expect(refresh.occurredAt).toBe(2);
       });
 
+      it("names each re-drive as its own attempt, though both share the call's end time", async () => {
+        const redrive = {
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record: fakeRecord({ source: "provider" }),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
+          turnTraceIds: [],
+          isRedrive: true,
+        };
+
+        await writeVoiceCallRun(redrive);
+        await writeVoiceCallRun(redrive);
+
+        const [first, second] = mockRefreshMetadata.mock.calls.map(
+          (call) => call[0] as { attemptId: string; occurredAt: number },
+        );
+        // Same end time on both, so occurredAt cannot tell them apart (#8032).
+        expect(first?.occurredAt).toBe(second?.occurredAt);
+        expect(first?.attemptId).toEqual(expect.any(String));
+        expect(first?.attemptId).not.toBe("");
+        expect(second?.attemptId).not.toBe(first?.attemptId);
+      });
+
       it("carries audioUrl: null in the refresh when this attempt has none, clearing any stale link", async () => {
         await writeVoiceCallRun({
           projectId: "project_1",

@@ -16,6 +16,7 @@
  * over injected ports.
  */
 
+import { randomUUID } from "node:crypto";
 import { HandledError } from "@langwatch/handled-error";
 
 import { AgentRepository } from "~/server/agents/agent.repository";
@@ -164,6 +165,11 @@ export async function writeVoiceCallRun({
     await getApp().simulations.refreshMetadata({
       tenantId: projectId,
       scenarioRunId,
+      // Each re-drive is its own attempt. The end time below is the same on
+      // every re-drive of this call, so it cannot tell two attempts apart;
+      // this id does, so a later re-drive with different recording metadata
+      // is not deduped away as a copy of the first.
+      attemptId: randomUUID(),
       metadata: {
         source: record.source,
         langwatch: { isCutAtLimit: record.isCutAtLimit },
