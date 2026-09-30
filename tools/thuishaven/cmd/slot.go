@@ -48,7 +48,7 @@ const (
 
 func runSlot(ctx context.Context, _ deps, inv invocation) error {
 	if len(inv.raw) == 0 {
-		return errors.New("usage: haven slot run [--label <name>] -- <command> [args…] | haven slot explain")
+		return errors.New("usage: haven slot run [--label <name>] [--timeout <duration>] -- <command> [args…] | haven slot explain")
 	}
 	switch inv.raw[0] {
 	case "explain":
@@ -69,7 +69,7 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		explainWaiters(store)
 		return nil
 	case "run":
-		label, argv, err := parseSlotRun(inv.raw[1:])
+		label, limit, argv, err := parseSlotRun(inv.raw[1:])
 		if err != nil {
 			return err
 		}
@@ -79,6 +79,7 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		job := &slotJob{
 			sem:             semaphore.New(havenHome()),
 			label:           label,
+			limit:           limit,
 			argv:            argv,
 			progress:        os.Stderr,
 			pressure:        resolveSlotPressure(),
@@ -300,23 +301,36 @@ func resolveSlotPressure() domain.Pressure {
 	)
 }
 
-// parseSlotRun splits `[--label <name>] -- <command> [args…]`. The `--` is
-// required so no command flag can ever be read as ours.
-func parseSlotRun(raw []string) (label string, argv []string, err error) {
+// parseSlotRun splits `[--label <name>] [--timeout <duration>] -- <command> [args…]`.
+// The `--` is required so no command flag can ever be read as ours.
+func parseSlotRun(raw []string) (label string, limit time.Duration, argv []string, err error) {
 	rest := raw
-	if len(rest) >= 2 && rest[0] == "--label" {
-		label, rest = rest[1], rest[2:]
+	for len(rest) >= 2 && (rest[0] == "--label" || rest[0] == "--timeout") {
+		if rest[0] == "--label" {
+			label = rest[1]
+		} else if limit, err = parseSlotTimeout(rest[1]); err != nil {
+			return "", 0, nil, err
+		}
+		rest = rest[2:]
 	}
 	if len(rest) > 0 && rest[0] == "--" {
 		rest = rest[1:]
 	}
 	if len(rest) == 0 {
-		return "", nil, errors.New("usage: haven slot run [--label <name>] -- <command> [args…]")
+		return "", 0, nil, errors.New("usage: haven slot run [--label <name>] [--timeout <duration>] -- <command> [args…]")
 	}
 	if label == "" {
 		label = rest[0]
 	}
-	return label, rest, nil
+	return label, limit, rest, nil
+}
+
+func parseSlotTimeout(raw string) (time.Duration, error) {
+	limit, err := time.ParseDuration(raw)
+	if err != nil || limit <= 0 {
+		return 0, fmt.Errorf("--timeout %q: want a positive duration such as 10m", raw)
+	}
+	return limit, nil
 }
 
 // slotAcquirer is what a slot job needs from the semaphore, so tests can pass
@@ -340,6 +354,7 @@ type waiterRegistry interface {
 type slotJob struct {
 	sem      slotAcquirer
 	label    string
+	limit    time.Duration // zero means the command may run as long as it likes
 	argv     []string
 	progress io.Writer
 	pressure domain.Pressure
@@ -377,9 +392,25 @@ func (j *slotJob) run(ctx context.Context) int {
 	if j.announced && release != nil {
 		fmt.Fprintf(j.progress, "checks: slot free after %s in the queue, starting now.\n", formatSlotWait(time.Since(j.queuedAt)))
 	}
-	code := slotExec(ctx, j.argv, j.pressure)
+	code := j.exec(ctx)
 	if release != nil {
 		release()
+	}
+	return code
+}
+
+// exec runs the command, stopping it with exit 124 once it outlives limit, so
+// a stuck check fails instead of holding its caller and its slot forever.
+func (j *slotJob) exec(ctx context.Context) int {
+	if j.limit <= 0 {
+		return slotExec(ctx, j.argv, j.pressure)
+	}
+	runCtx, cancel := context.WithTimeout(ctx, j.limit)
+	defer cancel()
+	code := slotExec(runCtx, j.argv, j.pressure)
+	if ctx.Err() == nil && errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		fmt.Fprintf(j.progress, "checks: %s ran past %s and was stopped; it is stuck or the machine is overloaded.\n", j.label, j.limit)
+		return 124
 	}
 	return code
 }

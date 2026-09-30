@@ -114,6 +114,13 @@ Feature: Machine-wide slots for whole-repo checks
     Then it warns that it is starting without a slot
     And it runs the command rather than hanging
 
+  @unit
+  Scenario: A stuck check fails instead of waiting forever
+    Given a run was started with a timeout
+    When the command is still running when the timeout passes
+    Then the wrapper stops the command and exits 124
+    And it says the command ran past its timeout and was stopped
+
   # --- Choosing the limit ---
 
   @unit
