@@ -83,7 +83,7 @@
     "typecheck": [
       {
         "cache": true,
-        "dependsOn": ["^typecheck"],
+        "dependsOn": ["^typecheck", "^build", "^prisma:generate"],
         "inputs": [
           "default",
           "^production",
@@ -115,6 +115,12 @@
       },
       {
         "filter": {
+          "projects": ["@langwatch/prisma-client"]
+        },
+        "dependsOn": ["^typecheck", "^build", "prisma:generate"]
+      },
+      {
+        "filter": {
           "projects": ["@langwatch/mail"]
         },
         "outputs": [
@@ -127,6 +133,7 @@
         "filter": {
           "projects": ["langwatch"]
         },
+        "dependsOn": ["^typecheck", "^build", "^prisma:generate", "build"],
         "outputs": [
           "{projectRoot}/dist/src",
           "{projectRoot}/dist/__tests__",
@@ -266,20 +273,30 @@
       ],
       "outputs": ["{projectRoot}/src/generated", "{projectRoot}/src/table-catalogue.ts"]
     },
-    "test": {
-      "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "npmDeps",
-        {
-          "externalDependencies": ["vitest"]
-        }
-      ],
-      "outputs": []
-    },
+    "test": [
+      {
+        "cache": true,
+        "dependsOn": ["^build", "^prisma:generate"],
+        "inputs": [
+          "default",
+          "^production",
+          "npmDeps",
+          {
+            "externalDependencies": ["vitest"]
+          }
+        ],
+        "outputs": []
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/prisma-client"]
+        },
+        "dependsOn": ["^build", "prisma:generate"]
+      }
+    ],
     "test:unit": {
       "cache": true,
+      "dependsOn": ["^build", "^prisma:generate"],
       "inputs": [
         "default",
         "^production",
@@ -313,6 +330,7 @@
     ],
     "lint:types": {
       "cache": true,
+      "dependsOn": ["^build", "^prisma:generate"],
       "inputs": [
         "default",
         "^production",
