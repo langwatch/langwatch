@@ -88,7 +88,8 @@ func TestStartLLMSpan_ModelID(t *testing.T) {
 		name, model, provider, want string
 	}{
 		{"prefixes a bare model with its provider", "gpt-5.6-terra", "openai", "openai/gpt-5.6-terra"},
-		{"keeps a model that already has a path segment", "deployments/gpt-5-mini", "azure", "deployments/gpt-5-mini"},
+		{"prefixes a model with slashes of its own", "Qwen/Qwen2.5-32B-Instruct", "custom", "custom/Qwen/Qwen2.5-32B-Instruct"},
+		{"keeps a model that already starts with its provider", "openai/gpt-5-mini", "openai", "openai/gpt-5-mini"},
 		{"keeps the model when the provider is unknown", "gpt-5-mini", "", "gpt-5-mini"},
 	}
 	for _, tc := range cases {

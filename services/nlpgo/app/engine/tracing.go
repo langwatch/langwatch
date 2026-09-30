@@ -202,10 +202,12 @@ func startLLMSpan(ctx context.Context, model, provider string, messages []app.Ch
 // modelID reports the model under the platform's provider-prefixed spelling
 // ("openai/gpt-5-mini"), the id SDK and gateway spans carry, so a trace's
 // Models column names one model the same way whichever surface ran it. The
-// engine splits the prefix off for routing; this puts it back. A model with
-// no known provider, or one that already has a path segment, is kept as is.
+// engine splits the prefix off at the first slash for routing; this puts it
+// back, so a model with slashes of its own ("Qwen/Qwen2.5-32B-Instruct") still
+// gets its provider. A model with no known provider, or one that already
+// starts with it, is kept as is.
 func modelID(model, provider string) string {
-	if model == "" || provider == "" || strings.Contains(model, "/") {
+	if model == "" || provider == "" || strings.HasPrefix(model, provider+"/") {
 		return model
 	}
 	return provider + "/" + model
