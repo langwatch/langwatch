@@ -1,9 +1,15 @@
+import type {
+  DomainClaimLicenseAuthority,
+  LicensingApi,
+} from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   type IdentityActor,
   type SsoConnectionCommandType,
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
+  type SsoDomainClaimAuthority,
+  SsoLicenseRequiredError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
   SsoConnectionOperatorActRequiredError,
@@ -153,6 +159,8 @@ export interface SsoConnectionGuardsDeps {
   breakGlass: SsoBreakGlassBindingRepository;
   stranding: SsoConnectionStrandingRepository;
   platformOperators: SsoPlatformOperatorRepository;
+  /** What the installation's licence may decide (D05 tier 2), asked per ceremony. */
+  licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
 }
 
 export class SsoConnectionGuardChecksService {
@@ -165,6 +173,7 @@ export class SsoConnectionGuardChecksService {
   private readonly breakGlass: SsoBreakGlassBindingRepository;
   private readonly stranding: SsoConnectionStrandingRepository;
   private readonly platformOperators: SsoPlatformOperatorRepository;
+  private readonly licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
 
   private constructor(deps: SsoConnectionGuardsDeps) {
     this.connections = deps.connections;
@@ -172,6 +181,57 @@ export class SsoConnectionGuardChecksService {
     this.breakGlass = deps.breakGlass;
     this.stranding = deps.stranding;
     this.platformOperators = deps.platformOperators;
+    this.licensing = deps.licensing;
+  }
+
+  /** Asked afresh at every decision rather than trusted from the request. */
+  getLicenseAuthority(): Promise<DomainClaimLicenseAuthority> {
+    return this.licensing.getDomainClaimAuthority();
+  }
+
+  /**
+   * Who may decide a claim on the authority the command names. `dns-proof` is only
+   * `verifyDomain`'s to state, in the commit of the record it read; the licence speaks
+   * for an installation, so the hosted service's port answers no to every organization.
+   */
+  async assertClaimAuthority({
+    authority,
+    actor,
+    act,
+  }: {
+    authority: SsoDomainClaimAuthority;
+    actor: IdentityActor;
+    act: string;
+  }): Promise<void> {
+    if (authority === "dns-proof") {
+      throw new SsoConnectionInvalidTransitionError(
+        `nothing may ${act} on a published record's authority except the check that read the record`,
+      );
+    }
+    if (authority === "platform-operator") {
+      await this.assertPlatformOperator({ actor, act });
+      return;
+    }
+    const licence = await this.getLicenseAuthority();
+    if (!licence.authorizesDomainClaims) {
+      throw new SsoLicenseRequiredError(`no license on this deployment authorizes ${act}`);
+    }
+    await this.assertLicenseSpeaksFor({ licence, actor, act });
+  }
+
+  /** With one organization its administrator runs the installation; with several,
+   *  only a platform operator may use the licence in place of a published proof. */
+  async assertLicenseSpeaksFor({
+    licence,
+    actor,
+    act,
+  }: {
+    licence: DomainClaimLicenseAuthority;
+    actor: IdentityActor;
+    act: string;
+  }): Promise<void> {
+    if (licence.hostsSingleOrganization) return;
+    await this.assertPlatformOperator({ actor, act });
   }
 
   /**

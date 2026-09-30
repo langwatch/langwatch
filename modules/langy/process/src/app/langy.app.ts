@@ -150,6 +150,7 @@ import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts
 import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
+import { LangySkillGatesService } from "../services/langy-skill-gates.service.ts";
 import { LangyTitleGeneratorService } from "../services/langy-title-generator.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
@@ -313,6 +314,7 @@ export class LangyApp implements LangyApiContract {
         gateway: setup.dependencies.gateway,
       }),
       uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
+      skillGates: LangySkillGatesService.create(setup.dependencies.featureFlags),
       navigateFallback: LangyNavigateFallbackService.create({
         projects: setup.dependencies.projects,
         resources: LangyNavigateResourceLocatorService.create({

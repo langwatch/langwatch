@@ -142,6 +142,12 @@ async function harness(
           allowed: options.licensed ?? true,
           inspections: [],
         }),
+        // Several organizations, so an organization administrator publishes a record.
+        getDomainClaimAuthority: async () => ({
+          authorizesDomainClaims: options.licensed ?? true,
+          hostsSingleOrganization: false,
+          licenseDigests: [],
+        }),
       }),
       auditLog,
       identity: createSsoTestIdentity({
@@ -279,10 +285,12 @@ describe("the organization's own single sign-on surface", () => {
       await expect(caller.claimDomain({ ...TARGET, domain: "acme.test" })).resolves.toEqual({
         waitsForReview: false,
         disputed: false,
+        verified: false,
       });
       expect(ceremony.claimDomain).toHaveBeenCalledWith({
         ...TARGET,
         domain: "acme.test",
+        proof: "dns-txt",
         actor: { userId: "user_ana" },
       });
     });

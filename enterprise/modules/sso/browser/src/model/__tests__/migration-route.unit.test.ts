@@ -43,7 +43,7 @@ describe("an inherited domain's line", () => {
     ["operator-attested", "operator attestation"],
     ["dns-txt", "published domain proof"],
     ["https-file", "published domain proof"],
-    ["license-token", "installation licence"],
+    ["license-token", "installation license"],
   ])("names where %s trust came from", (method, proof) => {
     expect(inheritedDomainLine({ domain: "acme.test", method })).toBe(`acme.test (${proof})`);
   });

@@ -7,6 +7,7 @@ import { bindTrpcFact, callerAddressFact, createTrpcRuntime } from "@langwatch/a
 import {
   type FrontDoorRateLimitedError,
   type AuthApi,
+  InvalidAuthOriginError,
   NoAddressToConfirmError,
 } from "@langwatch/auth-contract";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
@@ -21,6 +22,7 @@ const isWithinBudget = vi.fn<AuthApi["isWithinBudget"]>();
 const route = vi.fn<AuthApi["route"]>();
 const addressIsRegistered = vi.fn<AuthApi["addressIsRegistered"]>();
 const requestSignUpVerification = vi.fn<AuthApi["requestSignUpVerification"]>();
+const assertSignUpOrigin = vi.fn<AuthApi["assertSignUpOrigin"]>();
 const requestNewAccountVerification = vi.fn<AuthApi["requestNewAccountVerification"]>();
 const sendMyAddressConfirmation = vi.fn<AuthApi["sendMyAddressConfirmation"]>();
 const readInviteLanding = vi.fn<AuthApi["readInviteLanding"]>();
@@ -41,6 +43,7 @@ const door: AuthApi = {
   route,
   addressIsRegistered,
   requestSignUpVerification,
+  assertSignUpOrigin,
   requestNewAccountVerification,
   sendMyAddressConfirmation,
   claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
@@ -230,6 +233,24 @@ describe("the signed-out front door", () => {
         sent: false,
         addressProof: "proof-1",
       });
+    });
+  });
+
+  describe("when a sign-up starts on a web address the installation is not set up for", () => {
+    /** @scenario "A sign-up started on a web address the installation is not set up for issues nothing" */
+    it("refuses with the invalid origin code before mailing a link or issuing a proof", async () => {
+      assertSignUpOrigin.mockRejectedValueOnce(new InvalidAuthOriginError());
+
+      await expect(
+        router
+          .createCaller({ address: "203.0.113.7", headers: { origin: "http://localhost:18560" } })
+          .requestSignUpVerification({ email: "sam@acme.com" }),
+      ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
+      expect(assertSignUpOrigin).toHaveBeenCalledWith({
+        origin: "http://localhost:18560",
+        referer: null,
+      });
+      expect(requestNewAccountVerification).not.toHaveBeenCalled();
     });
   });
 

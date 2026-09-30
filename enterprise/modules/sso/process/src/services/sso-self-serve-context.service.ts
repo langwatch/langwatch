@@ -23,22 +23,30 @@ import { ssoSelfServeAvailability } from "../rules/sso-self-serve-availability.r
  * for the installation, and the claim queue is right beside it.
  */
 export class LicenseDomainClaimAuthority {
-  static create(deps: {
-    isHosted: () => boolean;
-    licensedAtStartup: () => Promise<boolean>;
-  }): LicenseDomainClaimAuthority {
+  static create(deps: LicenseDomainClaimAuthorityDeps): LicenseDomainClaimAuthority {
     return new LicenseDomainClaimAuthority(deps);
   }
 
-  private constructor(
-    private readonly deps: { isHosted: () => boolean; licensedAtStartup: () => Promise<boolean> },
-  ) {}
+  private constructor(private readonly deps: LicenseDomainClaimAuthorityDeps) {}
 
   async licenseAuthorizesDomainClaims(): Promise<boolean> {
     if (this.deps.isHosted()) return false;
 
     return this.deps.licensedAtStartup();
   }
+
+  /** The count the guards ask too, so the screen and the rule agree on it. */
+  async hostsSingleOrganization(): Promise<boolean> {
+    if (this.deps.isHosted()) return false;
+
+    return (await this.deps.licensing.getDomainClaimAuthority()).hostsSingleOrganization;
+  }
+}
+
+export interface LicenseDomainClaimAuthorityDeps {
+  isHosted: () => boolean;
+  licensedAtStartup: () => Promise<boolean>;
+  licensing: Pick<LicensingApi, "getDomainClaimAuthority">;
 }
 
 /**
@@ -74,12 +82,22 @@ export interface SsoSelfServeOptIn {
   isOptedIn(input: { organizationId: string }): Promise<boolean>;
 }
 
+/** Who counts as a platform operator (ADMIN_EMAILS). */
+export interface SsoPlatformOperators {
+  isPlatformOperator(input: { actorId: string }): Promise<boolean>;
+}
+
 export interface SsoSelfServeContextDeps {
   authority: LicenseDomainClaimAuthority;
   licenseProof: InstanceLicenseProof;
   optIn: SsoSelfServeOptIn;
+  platformOperators: SsoPlatformOperators;
   isHosted: () => boolean;
 }
+
+/** Who is asking, absent where nobody in particular is: a platform operator is
+ *  offered a proof an organization administrator is not. */
+type SelfServeContextInput = { organizationId: string; actorId?: string };
 
 /**
  * Which tier an organization gets, assembled from the deployment, the frozen
@@ -92,9 +110,13 @@ export class SsoSelfServeContextService {
 
   private constructor(private readonly deps: SsoSelfServeContextDeps) {}
 
-  async resolve({ organizationId }: { organizationId: string }): Promise<SsoSelfServeContext> {
+  async resolve({ organizationId, actorId }: SelfServeContextInput): Promise<SsoSelfServeContext> {
     const deployment = this.deps.isHosted() ? "hosted" : "self-hosted";
     const licensed = await this.deps.authority.licenseAuthorizesDomainClaims();
+    const { singleOrganization, actorIsPlatformOperator } =
+      deployment === "self-hosted" && licensed
+        ? await this.whoTheLicenseSpeaksFor({ actorId })
+        : { singleOrganization: false, actorIsPlatformOperator: false };
 
     return {
       deployment,
@@ -105,21 +127,22 @@ export class SsoSelfServeContextService {
           : false,
       optedIn:
         deployment === "hosted" ? await this.deps.optIn.isOptedIn({ organizationId }) : false,
+      singleOrganization,
+      actorIsPlatformOperator,
     };
   }
 
-  async availability({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<SsoSelfServeAvailability> {
-    return ssoSelfServeAvailability(await this.resolve({ organizationId }));
+  async availability(input: SelfServeContextInput): Promise<SsoSelfServeAvailability> {
+    return ssoSelfServeAvailability(await this.resolve(input));
   }
 
   /** Setup is available, or refused with the one thing that would change that. */
-  async assertAvailable({ organizationId }: { organizationId: string }): Promise<void> {
-    const availability = await this.availability({ organizationId });
-    if (availability.available) return;
+  async assertAvailable(
+    input: SelfServeContextInput,
+  ): Promise<Extract<SsoSelfServeAvailability, { available: true }>> {
+    const { organizationId } = input;
+    const availability = await this.availability(input);
+    if (availability.available) return availability;
     if (availability.refusal === "not_opted_in") {
       throw new SsoSelfServeUnavailableError(
         `organization ${organizationId} is not opted in to self-serve single sign-on setup`,
@@ -127,8 +150,26 @@ export class SsoSelfServeContextService {
     }
     throw new SsoLicenseRequiredError(
       availability.refusal === "license_restart_required"
-        ? `organization ${organizationId}: a licence was activated after this process started`
-        : `organization ${organizationId}: the installation holds no genuine licence`,
+        ? `organization ${organizationId}: a license was activated after this process started`
+        : `organization ${organizationId}: the installation holds no genuine license`,
     );
+  }
+
+  /** Asked only on a licensed self-hosted installation, and the operator only
+   *  where there is more than one organization for it to matter. */
+  private async whoTheLicenseSpeaksFor({
+    actorId,
+  }: {
+    actorId?: string;
+  }): Promise<{ singleOrganization: boolean; actorIsPlatformOperator: boolean }> {
+    const singleOrganization = await this.deps.authority.hostsSingleOrganization();
+    if (singleOrganization || actorId === undefined) {
+      return { singleOrganization, actorIsPlatformOperator: false };
+    }
+
+    return {
+      singleOrganization,
+      actorIsPlatformOperator: await this.deps.platformOperators.isPlatformOperator({ actorId }),
+    };
   }
 }

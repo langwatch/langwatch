@@ -34,6 +34,7 @@ import type {
   SsoSetupPageView,
   SsoSetupRegistration,
   SsoSetupRemovalInput,
+  SsoSelfServeAvailability,
 } from "@langwatch/enterprise-sso-contract";
 
 /** The operator a command is appended under. The ledger mints nothing itself. */
@@ -64,14 +65,21 @@ export interface SsoConnectionLedger {
  *  the transport, never taken from an input. */
 export type SsoSelfServeActor = Readonly<{ userId: string }>;
 
+/** A claim or an ask to prove, with how this organization proves a domain. */
+export type SsoProvingDomainInput = SsoSetupDomainInput &
+  Readonly<{ proof: Extract<SsoSelfServeAvailability, { available: true }>["proof"] }>;
+
 /**
  * The organization's own half of the domain ceremony (ADR-123), as identity
  * offers it. Separate from the back office's ledger above because the two
  * surfaces are gated apart and only share the aggregate underneath.
  */
 export interface SsoDomainCeremonyLedger {
-  claimDomain(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainClaimOutcome>;
-  proveDomain(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProof>;
+  claimDomain(
+    input: SsoProvingDomainInput,
+    actor: SsoSelfServeActor,
+  ): Promise<SsoDomainClaimOutcome>;
+  proveDomain(input: SsoProvingDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProof>;
   removeDomain(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<void>;
   checkDomainRecord(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProved>;
   checkDomainFile(input: SsoSetupDomainInput, actor: SsoSelfServeActor): Promise<SsoDomainProved>;

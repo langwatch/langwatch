@@ -4,6 +4,7 @@
  * module adds the addresses it is the one serving.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -15,6 +16,7 @@ import {
 } from "./sso.fixture.ts";
 
 const ORGANIZATION = "organization-1";
+const ANA = { id: "user_ana" };
 
 function journeyOf(connection: SsoSetupView["connection"]): SsoSetupView {
   return {
@@ -65,7 +67,7 @@ describe("reading where an organization's setup stands", () => {
   /** @scenario "The setup read carries the addresses an identity provider is pointed at" */
   it("asks identity for the journey and answers the addresses beside it", async () => {
     const { app, getSetup } = await appReading(registered);
-    const setup = await app.getSetup({ organizationId: ORGANIZATION });
+    const setup = await app.getSetup({ organizationId: ORGANIZATION }, ANA);
 
     expect(getSetup).toHaveBeenCalledWith({ organizationId: ORGANIZATION });
     expect(setup.connection?.connectionId).toBe("connection-1");
@@ -73,13 +75,13 @@ describe("reading where an organization's setup stands", () => {
       "https://acme.test/api/auth/sso/callback/connection-1",
     );
     expect(setup.serviceProvider.entityId).toBe("https://acme.test/api/auth/sso/saml2/sp");
-    expect(setup.availability).toEqual({ available: true });
+    expect(setup.availability).toEqual({ available: true, proof: "dns-txt" });
   });
 
   /** @scenario "Before a connection exists the addresses show their shape" */
   it("shows the shape of the addresses before anything is registered", async () => {
     const { app } = await appReading(null);
-    const setup = await app.getSetup({ organizationId: ORGANIZATION });
+    const setup = await app.getSetup({ organizationId: ORGANIZATION }, ANA);
 
     expect(setup.connection).toBeNull();
     expect(setup.serviceProvider.redirectUrl).toBe(
@@ -89,8 +91,37 @@ describe("reading where an organization's setup stands", () => {
 
   it("answers why setup is refused where the installation holds no licence", async () => {
     const { app } = await appReading(null, { optedIn: false });
-    const setup = await app.getSetup({ organizationId: ORGANIZATION });
+    const setup = await app.getSetup({ organizationId: ORGANIZATION }, ANA);
 
     expect(setup.availability).toEqual({ available: false, refusal: "license_required" });
+  });
+
+  describe("given a self-hosted installation holding a genuine licence and one organization", () => {
+    /** @scenario "A self-hosted administrator is not offered attestation either" */
+    it("offers the licence as the proof, and no way to attest a domain", async () => {
+      const app = await createSsoTestApp({
+        members: { isSaas: false },
+        dependencies: {
+          licensing: createApiFixture<LicensingApi>({
+            inspectPlatformAccess: async () => ({ allowed: true, inspections: [] }),
+            getDomainClaimAuthority: async () => ({
+              authorizesDomainClaims: true,
+              hostsSingleOrganization: true,
+              licenseDigests: ["sha256:licence"],
+            }),
+          }),
+          identity: createSsoTestIdentity({
+            connections: RecordingSsoConnectionLedger.create(),
+            setup: createApiFixture<SsoSetupApi>({ getSetup: async () => journeyOf(null) }),
+          }),
+        },
+      });
+      const setup = await app.getSetup({ organizationId: ORGANIZATION }, ANA);
+
+      expect(setup.availability).toEqual({ available: true, proof: "license-token" });
+      // Vouching for a domain is a LangWatch operator's act on every tier.
+      expect(Object.keys(setup)).not.toContain("attestationOffered");
+      expect("setupAttestDomain" in app).toBe(false);
+    });
   });
 });

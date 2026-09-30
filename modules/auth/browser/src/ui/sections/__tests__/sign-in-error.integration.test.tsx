@@ -3,6 +3,7 @@
  * Sign-in error UI; regression: federated logout on account collision
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { signInErrorMayCross } from "@langwatch/auth-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -101,6 +102,19 @@ describe("given a failure whose cause was withheld", () => {
     renderError("sign_in_failed");
 
     expect(screen.queryByTestId("sign-in-error-trace")).toBeNull();
+  });
+});
+
+describe("given a sign-in refused because an unconfirmed account holds the address", () => {
+  /** @scenario "The refusal reaches the sign-in screen with words the reader can act on" */
+  it("crosses the boundary as itself and says how to get in", () => {
+    expect(signInErrorMayCross("sso_existing_account_unconfirmed")).toBe(true);
+
+    renderError("sso_existing_account_unconfirmed");
+
+    expect(screen.getByText(/An account with this address already exists/i)).toBeTruthy();
+    expect(screen.getByText(/Sign in the way you did before/i)).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });
 

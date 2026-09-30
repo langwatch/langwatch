@@ -81,7 +81,7 @@ export function IdentityProviderTile({
       >
         <TileMark mark={Mark} monogram={preset.monogram} selected={selected} />
       </Box>
-      <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
+      <Text fontSize="sm" fontWeight="medium" lineHeight="short">
         {preset.name}
       </Text>
     </chakra.button>

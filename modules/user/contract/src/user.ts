@@ -221,6 +221,9 @@ export const registerCredentialAccountInputSchema = z
     addressProof: z.string().min(1),
     /** The caller's address, for the per-address signup budget. */
     callerAddress: z.string().min(1),
+    /** The request's `Origin` and `Referer`, checked against the installation's address first. */
+    origin: z.string().nullable(),
+    referer: z.string().nullable(),
   })
   .strict();
 export type RegisterCredentialAccountInput = z.infer<typeof registerCredentialAccountInputSchema>;

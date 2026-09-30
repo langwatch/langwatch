@@ -5,7 +5,7 @@ import {
   type GenerateLicenseOutput,
   type LicenseData,
 } from "@langwatch/enterprise-licensing-contract";
-import { getPlanTemplate, quotedPlanLimits } from "@langwatch/plans";
+import { getPlanTemplate, quotedPlanLimits, resolveMembersLite } from "@langwatch/plans";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import type { LicenseCryptography } from "./license-cryptography.ts";
@@ -65,7 +65,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
         name: template.name,
         ...quotedPlanLimits({
           members: seats,
-          membersLite: maxMembersLite ?? template.maxMembersLite,
+          membersLite: resolveMembersLite({ planType, maxMembersLite }),
           messagesPerMonth: maxMessagesPerMonth ?? template.maxMessagesPerMonth,
           publish: template.canPublish,
         }),

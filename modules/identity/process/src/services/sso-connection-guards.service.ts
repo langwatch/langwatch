@@ -74,6 +74,7 @@ import {
   SsoConnectionActivationBlockedError,
   SsoConnectionInvalidTransitionError,
   SsoDomainProofExpiredError,
+  SsoDomainProofNotFoundError,
   verificationHasExpired,
   SsoConnectionTeardownStrandsUsersError,
   type SuspendConnectionCommandData,
@@ -243,7 +244,8 @@ export class SsoConnectionGuardsService {
   }
 
   /**
-   * Deciding a domain claim is a LangWatch operator's act, on every tier and every deployment.
+   * Deciding a domain claim is a LangWatch operator's act, or on a self-hosted
+   * installation its licence's; a published record decides only through `verifyDomain`.
    */
   async approveDomainClaim(data: ApproveDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, APPROVE_DOMAIN_CLAIM_COMMAND_TYPE);
@@ -252,17 +254,11 @@ export class SsoConnectionGuardsService {
       return [];
     }
 
-    // An operator's hand is what a command that says nothing means: the
-    // published record is the newer authority, so it is the one that has to
-    // name itself — and naming it here, without having read a record, is
-    // exactly the move this refuses. Only `verifyDomain` states it.
+    // An operator's hand is what a command that says nothing means: the newer
+    // authorities have to name themselves.
     const authority = data.authority ?? "platform-operator";
-    if (authority === "dns-proof") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: nothing may approve the claim on ${domain} on a published record's authority except the check that read the record`,
-      );
-    }
-    await this.checks.assertPlatformOperator({
+    await this.checks.assertClaimAuthority({
+      authority,
       actor: data.actor,
       act: `approve the claim on ${domain}`,
     });
@@ -330,15 +326,30 @@ export class SsoConnectionGuardsService {
   ): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, REQUEST_VERIFICATION_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    // A record may be asked for against an approved claim, or against one
-    // still waiting — the record is what will decide the waiting one. Only
-    // the published-record ceremony may stand in for a decision.
+    // A proof may be asked for against an approved claim, or against one still
+    // waiting: the published record, or on a self-hosted installation the
+    // licence, decides the waiting one when it lands.
     const decided = state.approvedDomains.includes(domain);
     const waiting = state.claimedDomains.includes(domain);
-    if (!decided && !(waiting && data.method === "dns-txt")) {
+    if (!decided && !waiting) {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${data.connectionId}: domain ${domain} has no claim a ${data.method} ceremony may prove`,
       );
+    }
+    // Asked of the port rather than the command, so a hosted organization naming the
+    // licence gets the refusal an unlicensed installation does.
+    if (data.method === "license-token") {
+      const licence = await this.checks.getLicenseAuthority();
+      if (!licence.authorizesDomainClaims) {
+        throw new SsoDomainProofNotFoundError(
+          `connection ${data.connectionId}: no license on this deployment proves ${domain}; publish the DNS record or file`,
+        );
+      }
+      await this.checks.assertLicenseSpeaksFor({
+        licence,
+        actor: data.actor,
+        act: `prove ${domain} with the installation's license`,
+      });
     }
     await this.checks.refuseIfDomainOwnedElsewhere({
       domain,
@@ -482,14 +493,15 @@ export class SsoConnectionGuardsService {
       );
     }
     const method = data.channel ?? pending.method;
-    // The record decides the claim: an undecided domain is approved by the
+    // The proof decides the claim: an undecided domain is approved by the
     // same act that proved it, and the approval says what authorized it.
     const undecided = state.claimedDomains.includes(domain);
-    if (undecided && pending.method !== "dns-txt") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: a ${pending.method} ceremony cannot decide the claim on ${domain}`,
-      );
-    }
+    const authority = await this.authorityDecidingClaim({
+      data,
+      domain,
+      ceremony: pending.method,
+      undecided,
+    });
 
     return [
       ...(undecided
@@ -500,7 +512,7 @@ export class SsoConnectionGuardsService {
                 connectionId: data.connectionId,
                 domain,
                 actor: data.actor,
-                authority: "dns-proof" as const,
+                authority,
                 source: data.source,
               },
             },
@@ -517,6 +529,40 @@ export class SsoConnectionGuardsService {
         },
       },
     ];
+  }
+
+  /**
+   * Which authority a landing ceremony decides a waiting claim under: a published
+   * record, or a self-hosted installation's licence, asked again at the moment it
+   * decides rather than trusted from the request.
+   */
+  private async authorityDecidingClaim({
+    data,
+    domain,
+    ceremony,
+    undecided,
+  }: {
+    data: VerifyDomainCommandData;
+    domain: string;
+    ceremony: string;
+    undecided: boolean;
+  }): Promise<"license" | "dns-proof"> {
+    if (ceremony === "license-token") {
+      if (undecided) {
+        await this.checks.assertClaimAuthority({
+          authority: "license",
+          actor: data.actor,
+          act: `approve the claim on ${domain}`,
+        });
+      }
+      return "license";
+    }
+    if (undecided && ceremony !== "dns-txt") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: a ${ceremony} ceremony cannot decide the claim on ${domain}`,
+      );
+    }
+    return "dns-proof";
   }
 
   /**

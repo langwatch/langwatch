@@ -159,6 +159,7 @@ import {
   type SsoTestArrivalAccounts,
   type SsoTestArrivalMemberships,
 } from "../services/sso-test-arrival.service.ts";
+import { SsoUserResolutionService } from "../services/sso-user-resolution.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
 import { SsoDomainOwnershipMigrationService } from "../services/system-migration-sso-domain-ownership.service.ts";
@@ -521,6 +522,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         mailer,
         baseUrl: setup.members.publicBaseUrl ?? "",
       }),
+      licensing: setup.dependencies.licensing,
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
@@ -556,6 +558,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         ? SsoDomainCeremonyService.create({
             connections: () => ssoConnections,
             reads: setup.repositories.ssoConnections,
+            licensing: setup.dependencies.licensing,
             ...domainProofChannels,
           })
         : null;
@@ -574,6 +577,13 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         organizations: setup.dependencies.organizations,
       }),
       breakGlass,
+      resolution: SsoUserResolutionService.create({
+        people: setup.repositories.ssoRegistrants,
+        connections: setup.repositories.ssoConnections,
+        directory: setup.dependencies.scim,
+        memberships: setup.dependencies.organizations,
+        isHosted: setup.members.isSaas,
+      }),
     });
     const joinRequests = JoinRequestsService.create({
       requests: JoinRequestService.create(joinRequestGuards, infrastructure.joinRequestLedger),

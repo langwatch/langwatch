@@ -1,7 +1,4 @@
-import {
-  findLatestOpenAIChatFlagship,
-  type ModelMetadataForFrontend,
-} from "@langwatch/model-provider-contract";
+import { DEFAULT_MODEL, type ModelMetadataForFrontend } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,8 +7,6 @@ import {
   normalizeMaxTokens,
 } from "../max-tokens.utils.ts";
 import { parameterRegistry } from "../parameter-registry.ts";
-
-const DEFAULT_MODEL = findLatestOpenAIChatFlagship()[0] ?? "openai/gpt-5";
 
 describe("buildModelChangeValues", () => {
   describe("when called with a model name", () => {

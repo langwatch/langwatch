@@ -9,7 +9,12 @@ function serviceOver({ provider }: { provider: string | undefined }) {
   const sendEmail = vi.fn(async () => undefined);
   const mail = {
     sendEmail,
-    getMailDelivery: async () => ({ provider, smtpConfigured: false, misconfigured: false }),
+    getMailDelivery: async () => ({
+      provider,
+      smtpConfigured: false,
+      smtpSendsCredentials: false,
+      misconfigured: false,
+    }),
   };
   const unused = vi.fn(async () => {
     throw new Error("an email test fire reaches no other transport");

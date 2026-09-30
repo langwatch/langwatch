@@ -429,6 +429,14 @@ export class ScimApp implements ScimApiContract {
     return this.#directoryExternalIds.findForOrganization(input);
   }
 
+  isDirectoryUserInactive(input: { organizationId: string; userId: string }): Promise<boolean> {
+    return this.#directoryExternalIds.isDirectoryUserInactive(input);
+  }
+
+  findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
+    return this.#directoryExternalIds.findDirectoryConnectionsForUser(input);
+  }
+
   generateToken(input: {
     organizationId: string;
     connectionId?: string | undefined;

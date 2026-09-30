@@ -20,6 +20,7 @@ const { mockGetAllForProjectForFrontend, mockGetResolvedDefault } = vi.hoisted((
 
 vi.mock("../prompt-api.ts", () => ({
   promptApi: {
+    useUtils: () => ({ modelProvider: { getResolvedDefault: { fetch: vi.fn() } } }),
     modelProvider: {
       getAllForProjectForFrontend: { useQuery: mockGetAllForProjectForFrontend },
       getResolvedDefault: { useQuery: mockGetResolvedDefault },

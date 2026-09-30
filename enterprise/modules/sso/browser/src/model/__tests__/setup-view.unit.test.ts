@@ -85,28 +85,18 @@ describe("the domains put forward and not proved", () => {
 });
 
 describe("whether this installation proves with its licence", () => {
-  it("says so while the ceremony in flight is the licensed one", () => {
-    expect(
-      provesWithLicense({
-        connection: connection([]),
-        record: { domain: "acme.com", method: "license-token", expiresAtMs: null, expired: false },
-      }),
-    ).toBe(true);
-  });
-
-  it("says so where a domain was already proved that way", () => {
-    expect(
-      provesWithLicense({
-        connection: connection([proof({ method: "license-token" })]),
-        record: null,
-      }),
-    ).toBe(true);
+  it("says so where the server offers the licence as the proof", () => {
+    expect(provesWithLicense({ availability: { available: true, proof: "license-token" } })).toBe(
+      true,
+    );
   });
 
   /** A record to publish is what a DNS ceremony has and a licensed one never does. */
-  it("says no while nothing names the licence, so nobody is sent to publish nothing", () => {
-    expect(provesWithLicense({ connection: connection([proof()]), record: null })).toBe(false);
-    expect(provesWithLicense({ connection: null, record: null })).toBe(false);
+  it("says no where a record is the proof, or setup is refused, so nobody is sent to publish nothing", () => {
+    expect(provesWithLicense({ availability: { available: true, proof: "dns-txt" } })).toBe(false);
+    expect(
+      provesWithLicense({ availability: { available: false, refusal: "license_required" } }),
+    ).toBe(false);
   });
 });
 

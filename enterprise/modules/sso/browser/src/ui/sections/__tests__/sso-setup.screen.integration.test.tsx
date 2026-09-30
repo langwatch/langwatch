@@ -159,7 +159,7 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
     },
     legacyRoute: null,
     migration: null,
-    availability: { available: true },
+    availability: { available: true, proof: "dns-txt" },
     serviceProvider: SERVICE_PROVIDER,
     ...overrides,
   };
@@ -279,7 +279,7 @@ describe("the single sign-on setup page", () => {
 
       renderWithSsoHost(<SsoSetupScreen />);
 
-      expect(screen.getByTestId("sso-availability-refusal")).toHaveTextContent(/active licence/);
+      expect(screen.getByTestId("sso-availability-refusal")).toHaveTextContent(/active license/);
       expect(screen.queryByTestId("sso-setup")).toBeNull();
     });
   });

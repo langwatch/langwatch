@@ -60,7 +60,7 @@ const viewWith = (live: Connection | null): SsoSetupPageView => ({
   goLive: null,
   legacyRoute: null,
   migration: null,
-  availability: { available: true },
+  availability: { available: true, proof: "dns-txt" },
   serviceProvider: {
     redirectUrl: "https://app/redirect",
     assertionConsumerServiceUrl: "https://app/acs",

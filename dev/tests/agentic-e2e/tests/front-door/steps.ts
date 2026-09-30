@@ -12,11 +12,10 @@ import { confirmAddressOf, findSignUpVerificationToken } from "./db";
 export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
 
 /**
- * better-auth's origin-check refuses a cookie-bearing POST with no trusted
- * `Origin`/`Referer`; `page.request` sends neither, so a bare call reads as
- * a silent 403, not a sign-out. tRPC endpoints skip this check.
+ * Origin headers for the origin-gated endpoints: `/api/auth/*`, `auth.requestSignUpVerification`
+ * and `user.register`. `page.request` sends no `Origin`/`Referer`, so a bare POST there is a 403.
  */
-export function betterAuthRequestHeaders(): Record<string, string> {
+export function originGatedRequestHeaders(): Record<string, string> {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:5570";
   return { Origin: new URL(baseURL).origin };
 }
@@ -116,6 +115,7 @@ export async function requestSignUpAddressProof(
   email: string,
 ): Promise<string> {
   const response = await request.post("/api/trpc/auth.requestSignUpVerification?batch=1", {
+    headers: originGatedRequestHeaders(),
     data: { "0": { email } },
   });
   const body: unknown = await response.json().catch(() => null);
@@ -164,6 +164,7 @@ export async function registerConfirmedAccount(
 ): Promise<void> {
   const addressProof = await requestSignUpAddressProof(request, email);
   const response = await request.post("/api/trpc/user.register?batch=1", {
+    headers: originGatedRequestHeaders(),
     data: { "0": { addressProof, email, password, ...(name ? { name } : {}) } },
   });
   if (!response.ok()) {
@@ -402,7 +403,7 @@ export async function whenISignOut(page: Page): Promise<void> {
   // (`Content-Type is required`) — `data: {}` is what makes Playwright send
   // `application/json`.
   const response = await page.request.post("/api/auth/sign-out", {
-    headers: betterAuthRequestHeaders(),
+    headers: originGatedRequestHeaders(),
     data: {},
   });
   if (!response.ok()) {

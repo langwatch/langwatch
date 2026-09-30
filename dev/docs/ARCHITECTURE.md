@@ -2121,6 +2121,18 @@ trace-usage or billing-usage cycle forms (Alex, 2026-09-29).
 guards and ledger); identity keeps none of it, and `ScimApp` builds the sync lifecycle over its
 own rows (Alex, 2026-09-28).
 
+**Identity owns the SSO sign-in user resolver** (Alex, 2026-10-01): picking or linking the existing
+account after the domain gate is an `SsoAssertionApi` operation over identity's own rows; scim answers
+its directory facts (owns the user, inactive, active membership) through `ScimApi`, and auth's
+better-auth channel only calls both in order.
+
+**Langy's flag-gated skills are a contract constant** (Alex, 2026-10-01): `LANGY_SKILL_GATES` sits in
+the langy contract beside `LANGY_TURN_SKILL_IDS`; the warm and the turn probe carry the same disabled
+skills.
+
+**An orgless SSO test sign-in bounces in navigation** (Alex, 2026-10-01): the landing redirect sends a
+person with no organization back to their own account; the browser-host scope hook does not redirect.
+
 ---
 
 ## 12. Errors

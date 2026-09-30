@@ -173,6 +173,12 @@ export function RegisterConnectionSection({
  * their company runs Okta, and the engineer holding a metadata file who knows
  * only that it is SAML. The second is not made to pick "Something else".
  */
+/**
+ * The narrowest a provider tile gets: wide enough for the longest name ("Microsoft Entra ID") on
+ * one line beside its mark, so the grid drops a column before a name is cut.
+ */
+const PROVIDER_TILE_MIN_WIDTH = "12rem";
+
 function ProviderPicker({
   selected,
   onPick,
@@ -198,7 +204,11 @@ function ProviderPicker({
           Pick your identity provider and we&apos;ll walk you through its side of the setup.
         </Text>
       </VStack>
-      <SimpleGrid columns={{ base: 2, md: 4 }} gap={2} data-testid="sso-provider-products">
+      <SimpleGrid
+        minChildWidth={PROVIDER_TILE_MIN_WIDTH}
+        gap={2}
+        data-testid="sso-provider-products"
+      >
         {tilesFor("product")}
       </SimpleGrid>
 
@@ -206,7 +216,11 @@ function ProviderPicker({
         <Text color="fg.muted" fontSize="sm">
           Or connect by protocol, if you already know which one you have.
         </Text>
-        <SimpleGrid columns={{ base: 2, md: 4 }} gap={2} data-testid="sso-provider-protocols">
+        <SimpleGrid
+          minChildWidth={PROVIDER_TILE_MIN_WIDTH}
+          gap={2}
+          data-testid="sso-provider-protocols"
+        >
           {tilesFor("protocol")}
         </SimpleGrid>
       </VStack>
@@ -277,7 +291,7 @@ function CredentialsAct({
         <Text color="fg.muted" fontSize="sm">
           {preset.protocolIsChosen
             ? "These are the values your identity provider's app hands back."
-            : "Two ways to connect: pick whichever your identity provider's app gave you. Either one works."}
+            : "There are two ways to connect. Pick the one your identity provider's app gave you. Either one works."}
         </Text>
       </VStack>
       {/* A tile that IS a protocol has answered this already; asking again

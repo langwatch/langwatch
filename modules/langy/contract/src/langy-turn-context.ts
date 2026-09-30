@@ -91,6 +91,51 @@ export const LANGY_TURN_SKILL_IDS = [
   "support.bug-reports",
 ] as const;
 
+/** The one flag the mutually-exclusive chart-authoring skills pivot on. */
+export const LANGY_SKILL_GATE_FLAG = "release_custom_chart_playground" as const;
+
+export type LangySkillGateFlag = typeof LANGY_SKILL_GATE_FLAG;
+
+export type LangySkillGate = {
+  /** The skill is offered only while this flag is on. */
+  featureFlag?: LangySkillGateFlag;
+  /** The skill is withheld while this flag is on. */
+  excludedByFlag?: LangySkillGateFlag;
+};
+
+/**
+ * The flag-gated skills, by id: the two that `langySkills.generated.json`
+ * declares (`feature-flag` / `exclude-when-flag`). Every other skill is
+ * always available.
+ */
+export const LANGY_SKILL_GATES: Readonly<Record<string, LangySkillGate>> = {
+  "dashboard-widgets": { featureFlag: LANGY_SKILL_GATE_FLAG },
+  "lwql-charts": { excludedByFlag: LANGY_SKILL_GATE_FLAG },
+};
+
+/** Every flag a gated skill references: what a caller must resolve. */
+export function langySkillGateFlags(): LangySkillGateFlag[] {
+  const flags = new Set<LangySkillGateFlag>();
+  for (const gate of Object.values(LANGY_SKILL_GATES)) {
+    if (gate.featureFlag) flags.add(gate.featureFlag);
+    if (gate.excludedByFlag) flags.add(gate.excludedByFlag);
+  }
+
+  return [...flags];
+}
+
+/** The gated skill ids hidden from the model, given the caller's flag state. */
+export function disabledLangySkillIds(
+  isFlagEnabled: (flag: LangySkillGateFlag) => boolean,
+): string[] {
+  return Object.entries(LANGY_SKILL_GATES)
+    .filter(([, gate]) => {
+      if (gate.featureFlag && !isFlagEnabled(gate.featureFlag)) return true;
+      return gate.excludedByFlag !== undefined && isFlagEnabled(gate.excludedByFlag);
+    })
+    .map(([id]) => id);
+}
+
 export type LangyResourceContext = z.infer<typeof langyResourceContextSchema>;
 
 export type LangySkillContext = z.infer<typeof langySkillContextSchema>;

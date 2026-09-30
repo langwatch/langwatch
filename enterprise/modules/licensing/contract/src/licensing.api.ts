@@ -47,6 +47,7 @@ import type {
   StoreLicenseInput,
 } from "./license.commands.ts";
 import type {
+  DomainClaimLicenseAuthority,
   LicenseStatus,
   PlatformLicenseAccess,
   RemoveLicenseResult,
@@ -77,6 +78,8 @@ export interface LicensingApi {
   getSsoGateStatus(): Promise<SsoGateStatus>;
   /** Whether a signed license on this deployment permits platform single sign-on. */
   isPlatformSsoLicensed(): Promise<boolean>;
+  /** Whether the licence may prove a claimed single sign-on domain, and for whom. */
+  getDomainClaimAuthority(): Promise<DomainClaimLicenseAuthority>;
   /** Validates a pasted key and stores it, answering the plan it grants. */
   uploadLicense(input: StoreLicenseInput): Promise<PlanInfo>;
   /**

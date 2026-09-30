@@ -36,6 +36,9 @@ const METRIC_ALIASES: Record<string, keyof typeof METRIC_PRESETS> = {
   "pass-rate": "eval-pass-rate",
 };
 
+/** The origin Langy's own turns carry. */
+const LANGY_ORIGIN = "langy";
+
 /** One metric path, as the timeseries endpoint's own schema declares them. */
 type AnalyticsMetric =
   paths["/api/v1/analytics/timeseries"]["post"]["requestBody"]["content"]["application/json"]["series"][number]["metric"];
@@ -91,6 +94,7 @@ export const queryAnalyticsCommand = async (options: {
   endDate?: string;
   groupBy?: string;
   timeScale?: string;
+  shouldIncludeLangy?: boolean;
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -141,6 +145,8 @@ export const queryAnalyticsCommand = async (options: {
       groupBy: options.groupBy as "metadata.model" | undefined,
       timeScale: parseTimeScale(options.timeScale),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      // Langy's own turns stay out unless asked for, as in the Trace Explorer.
+      ...(options.shouldIncludeLangy ? {} : { excludeOrigins: [LANGY_ORIGIN] }),
     });
 
     spinner.succeed("Analytics query complete");
@@ -158,6 +164,7 @@ export const queryAnalyticsCommand = async (options: {
           currentPeriod: result.currentPeriod,
           previousPeriod: result.previousPeriod,
           metric,
+          aggregation,
         }),
       },
       table: () => printTimeseries(result),

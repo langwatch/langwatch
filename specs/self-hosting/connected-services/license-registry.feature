@@ -267,6 +267,11 @@ Feature: License registry
     And the license is linked to it
 
   @integration
+  Scenario: A customer organization gets the same kind of id as any other organization
+    When an operator issues the first license for a new customer "ACME"
+    Then the organization created for "ACME" has an id that starts with "organization_"
+
+  @integration
   Scenario: The backoffice lists licenses with their state
     Given licenses in the registry that are active, revoked and expired
     When an operator opens the licenses screen

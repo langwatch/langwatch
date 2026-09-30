@@ -404,6 +404,10 @@ export class UserApp implements UserApi {
    * Decision 4), and blocking this path would kill fresh-signup recovery (5c).
    */
   async registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser> {
+    // Before anything is claimed or written: the sign-in that follows is refused on a foreign
+    // origin, and an account created first would be left with nobody signed in to it.
+    await this.#peers.auth.assertSignUpOrigin({ origin: input.origin, referer: input.referer });
+
     // The same rules the form ran, from the same module, so the two cannot
     // drift into accepting different passwords. Carried as `fieldErrors` so the
     // refusal lands on the password box rather than in a banner over it.

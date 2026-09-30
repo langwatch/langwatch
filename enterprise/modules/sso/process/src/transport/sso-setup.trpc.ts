@@ -30,7 +30,7 @@ export const ssoSetupTrpcTransport: TrpcRouterDeclaration<SsoApi, typeof ssoSetu
   defineTrpcRouter(SsoApi, ssoSetupTrpc)
     .procedure("getSetup")
     .withPermission("sso:view")
-    .handle(({ app, input }) => app.getSetup(input))
+    .handle(({ app, input, actor }) => app.getSetup(input, administratorOf(actor)))
 
     /** The wire answers the cutover itself, as the surface it replaces did;
      *  identity and this module carry it inside an answer of its own. */

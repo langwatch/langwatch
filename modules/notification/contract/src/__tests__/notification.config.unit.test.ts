@@ -28,7 +28,12 @@ describe("notification server configuration", () => {
       environment: {},
     }).notification;
     const answering = (view: { provider?: "sendgrid" }) => ({
-      getMailDelivery: async () => ({ ...view, smtpConfigured: false, misconfigured: false }),
+      getMailDelivery: async () => ({
+        ...view,
+        smtpConfigured: false,
+        smtpSendsCredentials: false,
+        misconfigured: false,
+      }),
     });
 
     it("projects email on when the member names a gateway", async () => {

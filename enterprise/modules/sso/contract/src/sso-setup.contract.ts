@@ -263,10 +263,11 @@ export type SsoSetupDomainInput = z.infer<typeof ssoSetupDomainSchema>;
 
 /**
  * What a claim answers: whether a person has to look at it before the domain
- * routes, and whether somebody else has already proved the same domain.
+ * routes, whether somebody else has already proved the same domain, and
+ * whether the installation's licence verified it at once.
  */
 export const ssoDomainClaimOutcomeSchema = z
-  .object({ waitsForReview: z.boolean(), disputed: z.boolean() })
+  .object({ waitsForReview: z.boolean(), disputed: z.boolean(), verified: z.boolean() })
   .strict();
 
 export type SsoDomainClaimOutcome = z.infer<typeof ssoDomainClaimOutcomeSchema>;

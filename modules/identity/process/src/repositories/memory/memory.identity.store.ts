@@ -80,6 +80,8 @@ export class MemoryIdentityStore {
   readonly organizationMembers = new Map<string, string[]>();
   readonly organizationAdmins = new Map<string, { userId: string; email: string }[]>();
   readonly finalizedUsers = new Set<string>();
+  /** Users carrying `User.deactivatedAt`, which the memory user row does not hold. */
+  readonly deactivatedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */
   readonly legacySignInAccounts = new Map<string, LegacySignInAccount>();
   readonly breakGlassBindings = new Map<string, BreakGlassBinding>();

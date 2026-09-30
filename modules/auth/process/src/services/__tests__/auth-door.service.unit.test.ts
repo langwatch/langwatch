@@ -165,6 +165,44 @@ describe("AuthDoorService", () => {
     });
   });
 
+  describe("when a sign-up procedure checks the web address it was called from", () => {
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("refuses a foreign origin with the invalid origin code, logging origins only", async () => {
+      loggerSpies.warn.mockClear();
+
+      expect(() =>
+        door().service.assertSignUpOrigin({
+          origin: "http://localhost:18560",
+          referer: "http://localhost:18560/auth/signup?verify=secret",
+        }),
+      ).toThrow(expect.objectContaining({ code: "auth_invalid_origin" }));
+      expect(loggerSpies.warn).toHaveBeenCalledWith(
+        {
+          expectedOrigin: BASE_URL,
+          receivedOrigin: "http://localhost:18560",
+          receivedReferer: "http://localhost:18560",
+        },
+        expect.any(String),
+      );
+    });
+
+    /** @scenario "A sign-up request that names no web address is refused" */
+    it("refuses a request carrying neither an origin nor a referer", () => {
+      expect(() => door().service.assertSignUpOrigin({ origin: null, referer: null })).toThrow(
+        expect.objectContaining({ code: "auth_invalid_origin" }),
+      );
+    });
+
+    it("accepts the configured address, from a referer when no origin is sent", () => {
+      expect(() =>
+        door().service.assertSignUpOrigin({
+          origin: null,
+          referer: `${BASE_URL}/auth/signup`,
+        }),
+      ).not.toThrow();
+    });
+  });
+
   describe("when the browser polls its session", () => {
     it("publishes the resolved session's document", async () => {
       const world = door();

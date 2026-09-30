@@ -15,6 +15,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 /**
@@ -72,6 +73,7 @@ beforeEach(() => {
     breakGlass: new StubBreakGlassBindings(true),
     stranding: new StubStranding(),
     platformOperators: new StubPlatformOperators(),
+    licensing: licensingFixture(),
   });
 });
 
@@ -241,6 +243,7 @@ describe("given a domain no published proof ever proved", () => {
           breakGlass: new StubBreakGlassBindings(true),
           stranding: new StubStranding(),
           platformOperators: new StubPlatformOperators(),
+          licensing: licensingFixture(),
         });
         seed({ method });
 

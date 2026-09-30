@@ -84,7 +84,7 @@ export type SsoPublishedProofChannel = z.infer<typeof ssoPublishedProofChannelSc
  * rather than inferred from the deployment, because a deployment changes and
  * a fact does not: a dispute about a domain is answered from history alone.
  */
-export const SSO_DOMAIN_CLAIM_AUTHORITIES = ["platform-operator", "dns-proof"] as const;
+export const SSO_DOMAIN_CLAIM_AUTHORITIES = ["platform-operator", "license", "dns-proof"] as const;
 export const ssoDomainClaimAuthoritySchema = z.enum(SSO_DOMAIN_CLAIM_AUTHORITIES);
 export type SsoDomainClaimAuthority = z.infer<typeof ssoDomainClaimAuthoritySchema>;
 
@@ -1097,6 +1097,12 @@ function reduceSsoLifecycleFact({
             isSsoPublishedProofChannel(state.pendingVerification.method)
               ? state.pendingVerification.tokenHash
               : null,
+          // A licence ceremony's hash is of the installation's licence key: kept as the
+          // evidence and never as a `tokenHash`, since nothing published it to re-read.
+          ...(state.pendingVerification?.domain === fact.data.domain &&
+          state.pendingVerification.method === "license-token"
+            ? { evidenceRef: state.pendingVerification.tokenHash }
+            : {}),
         }),
         pendingVerification: null,
       };

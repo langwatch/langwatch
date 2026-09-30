@@ -470,6 +470,7 @@ export async function buildBetterAuth(
     },
     ssoAssertions: {
       decide: (args) => options.identityApi.ssoAssertion().decide(args),
+      resolveUser: (args) => options.identityApi.ssoAssertion().resolveUser(args),
     },
     ssoIssuers: SsoRegisteredIssuersService.create({
       issuers: {

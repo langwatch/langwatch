@@ -40,11 +40,12 @@ export const isCredentialRejection = ({
   message?: string;
 }): boolean => CREDENTIAL_REJECTION_KEYS.has(normalize(code) || normalize(message));
 
+/** better-auth's refusal and the sign-up procedures' own one are the same failure. */
+const KEYED_ALIASES: Record<string, string> = { auth_invalid_origin: "invalid_origin" };
+
 /** The wording for each identifier worth naming beyond a credential rejection. */
 const KEYED_MESSAGES: Record<string, string> = {
-  // Naming the concept ("origin", "trusted origins") would only help someone
-  // who already knows the answer. The address bar is the thing this reader can
-  // actually look at.
+  // The address bar is the thing this reader can look at, not "origin".
   invalid_origin:
     "LangWatch is set up for a different web address than the one you are using. Check the address and try again.",
   user_already_exists: "An account with that email already exists. Try signing in instead.",
@@ -106,7 +107,10 @@ export const authFailureMessage = ({
   // registry has no entry for them. The registry BEFORE the status class,
   // because a platform refusal with named copy must not be flattened into
   // "something went wrong on our side" by its own 5xx.
-  const keyed = KEYED_MESSAGES[key] ?? registryMessage(key) ?? statusClassMessage(status, key);
+  const keyed =
+    KEYED_MESSAGES[KEYED_ALIASES[key] ?? key] ??
+    registryMessage(key) ??
+    statusClassMessage(status, key);
   if (keyed) {
     return keyed;
   }

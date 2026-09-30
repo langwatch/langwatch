@@ -215,8 +215,8 @@ describe("given a domain this installation proves with its licence", () => {
   it("says there is nothing to publish and offers that press instead", () => {
     renderSection({ provesWithLicense: true });
 
-    expect(screen.getByRole("button", { name: "Prove with our licence" })).toBeTruthy();
-    expect(screen.getByText(/enterprise licence is that proof/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Verify this domain" })).toBeTruthy();
+    expect(screen.getByText(/verified right away, with nothing to publish/i)).toBeTruthy();
   });
 });
 

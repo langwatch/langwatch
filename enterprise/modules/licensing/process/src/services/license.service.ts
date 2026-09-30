@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
 import {
   LICENSE_ERRORS,
@@ -115,30 +117,44 @@ export class LicenseService extends LicensingServiceContract {
   }
 
   async inspectPlatformAccess(): Promise<PlatformLicenseAccess> {
+    return (await this.scanPlatformLicenses()).access;
+  }
+
+  /** `sha256:` of the licence key that permits the platform, empty where none does: the
+   *  evidence a licence-proved domain records, so the key itself never leaves licensing. */
+  async findPlatformLicenseDigests(): Promise<string[]> {
+    const { permitting } = await this.scanPlatformLicenses();
+    if (permitting === undefined) return [];
+    return [`sha256:${createHash("sha256").update(permitting).digest("hex")}`];
+  }
+
+  /** The instance key first, then every stored one, until one permits the platform. */
+  private async scanPlatformLicenses(): Promise<{
+    access: PlatformLicenseAccess;
+    permitting?: string;
+  }> {
     const inspections: PlatformLicenseInspection[] = [];
-    if (this.instanceLicenseKey) {
-      const inspection = this.inspectPlatformLicense(this.instanceLicenseKey, {
-        source: "instance",
-      });
+    const permits = (
+      licenseKey: string,
+      source: Pick<PlatformLicenseInspection, "source" | "organizationId">,
+    ): boolean => {
+      const inspection = this.inspectPlatformLicense(licenseKey, source);
       inspections.push(inspection);
-      if (inspection.valid) {
-        return { allowed: true, inspections };
-      }
+      return inspection.valid;
+    };
+    if (this.instanceLicenseKey && permits(this.instanceLicenseKey, { source: "instance" })) {
+      return { access: { allowed: true, inspections }, permitting: this.instanceLicenseKey };
     }
 
     const candidates = await this.repository.findOrganizationsWithLicense();
     for (const candidate of candidates) {
-      const inspection = this.inspectPlatformLicense(candidate.licenseKey, {
-        source: "organization",
-        organizationId: candidate.organizationId,
-      });
-      inspections.push(inspection);
-      if (inspection.valid) {
-        return { allowed: true, inspections };
+      const source = { source: "organization" as const, organizationId: candidate.organizationId };
+      if (permits(candidate.licenseKey, source)) {
+        return { access: { allowed: true, inspections }, permitting: candidate.licenseKey };
       }
     }
 
-    return { allowed: false, inspections };
+    return { access: { allowed: false, inspections } };
   }
 
   /**

@@ -11,12 +11,18 @@ import type {
  */
 export function ssoSelfServeAvailability(context: SsoSelfServeContext): SsoSelfServeAvailability {
   if (context.deployment === "self-hosted") {
-    if (context.licensed) return { available: true };
+    if (context.licensed) {
+      // The installation's operator already decides who has an account on it, so a
+      // record proves nothing they could not do anyway; with several organizations
+      // an organization administrator is not that operator.
+      const licenseProves = context.singleOrganization || context.actorIsPlatformOperator;
+      return { available: true, proof: licenseProves ? "license-token" : "dns-txt" };
+    }
     return {
       available: false,
       refusal: context.licenseActivatedSinceStart ? "license_restart_required" : "license_required",
     };
   }
   if (!context.optedIn) return { available: false, refusal: "not_opted_in" };
-  return { available: true };
+  return { available: true, proof: "dns-txt" };
 }

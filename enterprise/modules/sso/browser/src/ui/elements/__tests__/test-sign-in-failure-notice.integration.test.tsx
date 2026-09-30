@@ -52,6 +52,23 @@ describe("given a refusal of our own", () => {
   });
 });
 
+describe("given a test sign-in refused because the administrator's account address is unconfirmed", () => {
+  /** @scenario "The refusal reaches the sign-in screen with words the reader can act on" */
+  it("tells them to verify the domain and check the provider's verified claim", () => {
+    const { container } = renderWithSsoHost(
+      <TestSignInFailureNotice
+        failure={testSignInFailureFor({ code: "sso_existing_account_unconfirmed" })}
+      />,
+    );
+
+    const words = container.textContent ?? "";
+    expect(words).toMatch(/account's address isn't confirmed/i);
+    expect(words).toMatch(/verify the domain on this connection/i);
+    expect(words).toMatch(/email_verified/);
+    expect(words).not.toMatch(/sent you back with an error/i);
+  });
+});
+
 describe("given a refusal from the provider itself", () => {
   /** @scenario "A provider's own error is still quoted verbatim" */
   it("quotes their words unchanged, beside our advice rather than instead of it", () => {

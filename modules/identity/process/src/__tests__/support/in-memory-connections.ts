@@ -1,3 +1,8 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type {
+  DomainClaimLicenseAuthority,
+  LicensingApi,
+} from "@langwatch/enterprise-licensing-contract";
 import {
   emptySsoConnection,
   reduceSsoConnection,
@@ -129,6 +134,21 @@ export class StubPlatformOperators implements SsoPlatformOperatorRepository {
   async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
     return this.operators.has(actorId);
   }
+}
+
+/** What the licence may decide, as licensing answers it; unlicensed and one
+ *  organization unless a test says otherwise, so no stray path is licence-bound. */
+export function licensingFixture(
+  overrides: Partial<DomainClaimLicenseAuthority> = {},
+): Pick<LicensingApi, "getDomainClaimAuthority"> {
+  return createApiFixture<LicensingApi>({
+    getDomainClaimAuthority: async () => ({
+      authorizesDomainClaims: false,
+      hostsSingleOrganization: true,
+      licenseDigests: [],
+      ...overrides,
+    }),
+  });
 }
 
 export class StubStranding implements SsoConnectionStrandingRepository {

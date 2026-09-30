@@ -137,6 +137,49 @@ export type EvaluatorEditorController = {
 };
 
 /**
+ * Fills a new evaluator's form once per evaluator type, then latches, so
+ * late-resolving defaults never overwrite what the user has typed. It waits for
+ * both default queries, or the configured default would never replace the fallback.
+ */
+function useResetCreateForm({
+  form,
+  evaluatorDef,
+  evaluatorId,
+  evaluatorType,
+  defaultSettings,
+  forceUserToDecideAName,
+  isLoading,
+}: {
+  form: UseFormReturn<EvaluatorFormValues>;
+  evaluatorDef: { name: string } | undefined;
+  evaluatorId: string | undefined;
+  evaluatorType: string | undefined;
+  defaultSettings: Record<string, unknown>;
+  forceUserToDecideAName: boolean;
+  isLoading: boolean;
+}) {
+  const didInitializeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!evaluatorDef || evaluatorId || isLoading) return;
+    const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
+    if (didInitializeRef.current === key) return;
+    form.reset({
+      name: defaultNameFor(evaluatorDef, forceUserToDecideAName),
+      settings: defaultSettings,
+    });
+    didInitializeRef.current = key;
+  }, [
+    evaluatorDef,
+    evaluatorId,
+    evaluatorType,
+    defaultSettings,
+    form,
+    forceUserToDecideAName,
+    isLoading,
+  ]);
+}
+
+/**
  * Owns all state/behavior for the evaluator editor. Consumers render the
  * returned controller via <EvaluatorEditorBody/> and <EvaluatorEditorFooter/>.
  */
@@ -215,7 +258,11 @@ export function useEvaluatorEditorController(
 
   const settingsSchema = useMemo(() => settingsSchemaOf(evaluatorType), [evaluatorType]);
 
-  const defaultSettings = useResolvedDefaultSettings({ evaluatorDef, project, isOpen });
+  const { defaultSettings, isLoading: resolvedDefaultsLoading } = useResolvedDefaultSettings({
+    evaluatorDef,
+    project,
+    isOpen,
+  });
 
   const forceUserToDecideAName = mustChooseName(evaluatorType);
 
@@ -228,21 +275,15 @@ export function useEvaluatorEditorController(
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // `defaultSettings` can resolve (new reference) after the user has already
-  // started filling the form; `form.formState.isDirty` doesn't survive that
-  // race reliably. Latch a ref so late-resolving defaults never re-fire the
-  // reset once the form is live.
-  const didInitializeCreateFormRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!evaluatorDef || evaluatorId) return;
-    const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
-    if (didInitializeCreateFormRef.current === key) return;
-    form.reset({
-      name: defaultNameFor(evaluatorDef, forceUserToDecideAName),
-      settings: defaultSettings,
-    });
-    didInitializeCreateFormRef.current = key;
-  }, [evaluatorDef, evaluatorId, evaluatorType, defaultSettings, form, forceUserToDecideAName]);
+  useResetCreateForm({
+    form,
+    evaluatorDef,
+    evaluatorId,
+    evaluatorType,
+    defaultSettings,
+    forceUserToDecideAName,
+    isLoading: resolvedDefaultsLoading,
+  });
 
   const savedFormValuesRef = useRef<EvaluatorFormValues | null>(null);
   const onLocalConfigChangeRef = useRef(onLocalConfigChange);
@@ -431,7 +472,9 @@ export function useEvaluatorEditorController(
     evaluatorType,
     evaluatorDef,
     effectiveEvaluatorDef,
-    isLoadingEvaluator: evaluatorQuery.isLoading,
+    // A new evaluator's form holds until its default models answer, so the
+    // reset that fills them in never lands on top of something typed.
+    isLoadingEvaluator: evaluatorQuery.isLoading || (!evaluatorId && resolvedDefaultsLoading),
     workflowCard,
     isWorkflowEvaluator,
     hasSettings,
@@ -506,7 +549,6 @@ export function EvaluatorGateSection({
 export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEditorController }) {
   const {
     form,
-    evaluatorId,
     evaluatorType,
     evaluatorDef,
     effectiveEvaluatorDef,
@@ -532,7 +574,7 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
   // drawer transitions wipe flowCallbacks/complexProps mid-flight.
   const isComparison = isComparisonEvaluatorType(evaluatorType);
 
-  if (evaluatorId && isLoadingEvaluator) {
+  if (isLoadingEvaluator) {
     return (
       <HStack justify="center" paddingY={8}>
         <Spinner size="md" />
@@ -690,6 +732,7 @@ export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorF
     handleDiscard,
     handleApply,
     handleClose,
+    isLoadingEvaluator,
   } = controller;
 
   return (
@@ -699,6 +742,7 @@ export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorF
       hasUnsavedChanges={hasUnsavedChanges}
       isSaving={isSaving}
       isValid={isValid}
+      isLoading={isLoadingEvaluator}
       isComparisonEditor={!!onComparisonChange}
       saveButtonText={saveButtonText}
       onSave={handleSave}
@@ -848,7 +892,10 @@ function useResolvedDefaultSettings({
     resolvedDefaultModel.data?.model,
     resolvedDefaultEmbeddings.data?.model,
   ]);
-  return defaultSettings;
+  return {
+    defaultSettings,
+    isLoading: resolvedDefaultModel.isLoading || resolvedDefaultEmbeddings.isLoading,
+  };
 }
 
 /** A flow callback that handled navigation wins; otherwise step back, or close the last drawer. */

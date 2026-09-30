@@ -1,4 +1,5 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
+import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
 import { defineServerModule } from "@langwatch/kernel";
 import type { MePersonalCredential } from "@langwatch/user-contract";
 
@@ -7,7 +8,7 @@ import { userRepositories } from "./repositories/user-repositories.registry.ts";
 import { createGdprUserDataEraseRunner } from "./tasks/user-data-erase.task.ts";
 import { mePersonalCredential, meRest } from "./transport/me.rest.ts";
 import { userAvatarRest } from "./transport/user-avatar.rest.ts";
-import { userTrpcTransport } from "./transport/user.trpc.ts";
+import { signUpOriginFact, userTrpcTransport } from "./transport/user.trpc.ts";
 
 export const userServer = defineServerModule("user")
   .withRepositories(userRepositories)
@@ -28,4 +29,9 @@ export const userServer = defineServerModule("user")
         organizationId: credential.organizationId,
       };
     }),
+    // A Node header may arrive repeated; the first value is the one the browser sent.
+    bindTrpcFact(signUpOriginFact, (context: TrpcRuntimeContext) => ({
+      origin: [context.req?.headers.origin].flat()[0] ?? null,
+      referer: [context.req?.headers.referer].flat()[0] ?? null,
+    })),
   ]);

@@ -20,6 +20,11 @@ export const ssoSelfServeContextSchema = z.object({
   licenseActivatedSinceStart: z.boolean(),
   /** Hosted self-serve, which is opted into per organization. */
   optedIn: z.boolean(),
+  /** Self-hosted only: the installation holds exactly one organization. */
+  singleOrganization: z.boolean(),
+  /** Whether the person asking is a platform operator (ADMIN_EMAILS); asked only
+   *  where it changes the answer. */
+  actorIsPlatformOperator: z.boolean(),
 });
 
 export type SsoSelfServeContext = z.infer<typeof ssoSelfServeContextSchema>;
@@ -30,9 +35,12 @@ export const SSO_SELF_SERVE_REFUSALS = [
   "not_opted_in",
 ] as const;
 
+/** How a claimed domain is proved: the installation's licence, or a published record. */
+export const SSO_SELF_SERVE_PROOFS = ["license-token", "dns-txt"] as const;
+
 /** Whether setup is open to this organization, or the one thing that would change that. */
 export const ssoSelfServeAvailabilitySchema = z.discriminatedUnion("available", [
-  z.object({ available: z.literal(true) }).strict(),
+  z.object({ available: z.literal(true), proof: z.enum(SSO_SELF_SERVE_PROOFS) }).strict(),
   z.object({ available: z.literal(false), refusal: z.enum(SSO_SELF_SERVE_REFUSALS) }).strict(),
 ]);
 

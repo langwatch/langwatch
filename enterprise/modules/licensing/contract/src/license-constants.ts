@@ -57,10 +57,10 @@ export const FREE_PLAN: PlanInfo = {
 };
 
 /**
- * * Embedded production public key used when no env var is configured. * Enables license
- * verification out-of-the-box; override via env for rotation.
+ * Embedded production public key used when no env var is configured.
+ * Enables license verification out of the box; override via env for rotation.
  */
-// gitleaks:allow — public keys
+// gitleaks:allow (public keys)
 
 export const DEFAULT_LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvyNNiu5B0lretFaxowsu

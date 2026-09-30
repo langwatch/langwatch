@@ -39,6 +39,10 @@ export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServi
     sessionKeys: createApiFixture(over.sessionKeys, "sessionKeys"),
     context: createApiFixture(over.context, "context"),
     uiActionSurface: createApiFixture(over.uiActionSurface, "uiActionSurface"),
+    skillGates: createApiFixture(
+      over.skillGates ?? { resolveDisabled: async () => [] },
+      "skillGates",
+    ),
     metrics: createApiFixture(over.metrics, "metrics"),
     admission: createApiFixture(over.admission, "admission"),
     accessStore: nullable(over.accessStore, "accessStore"),

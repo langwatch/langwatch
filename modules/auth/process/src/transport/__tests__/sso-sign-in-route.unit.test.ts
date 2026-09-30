@@ -57,21 +57,23 @@ describe("given the single sign-on plugin this deployment mounts", () => {
 });
 
 describe("given identity decides whether an assertion may become a session", () => {
-  it("lets an admitted assertion through", async () => {
+  it("lets an admitted assertion through to the user identity resolves", async () => {
     const assertions = createApiFixture<SsoAssertionApi>({
       decide: async () => ({ action: "continue" }),
+      resolveUser: async () => ({ action: "link", userId: "user_1", profile: "preserve" }),
     });
 
     await expect(
       resolveSsoUser({ assertions, input: assertionOf("person@acme.test") }),
-    ).resolves.toEqual({ action: "continue" });
+    ).resolves.toEqual({ action: "link", userId: "user_1", profile: "preserve" });
   });
 
   it("asks with the subject the provider asserted, not the address alone", async () => {
     const decide = vi.fn(async () => ({ action: "continue" }) as const);
+    const resolveUser = vi.fn(async () => ({ action: "continue" }) as const);
 
     await resolveSsoUser({
-      assertions: createApiFixture<SsoAssertionApi>({ decide }),
+      assertions: createApiFixture<SsoAssertionApi>({ decide, resolveUser }),
       input: assertionOf("person@acme.test"),
     });
 
@@ -79,6 +81,13 @@ describe("given identity decides whether an assertion may become a session", () 
       providerId: "connection_1",
       accountId: "subject-1",
       email: "person@acme.test",
+    });
+    expect(resolveUser).toHaveBeenCalledWith({
+      protocol: "oidc",
+      providerId: "connection_1",
+      accountKey: { issuer: "https://idp.acme.test", accountId: "subject-1" },
+      email: "person@acme.test",
+      emailVerified: true,
     });
   });
 
@@ -95,5 +104,21 @@ describe("given identity decides whether an assertion may become a session", () 
     await expect(
       resolveSsoUser({ assertions, input: assertionOf("person@acme.test") }),
     ).resolves.toEqual({ action: "reject", code: error.code });
+  });
+
+  it("never asks which user a refused assertion belongs to", async () => {
+    const resolveUser = vi.fn(async () => ({ action: "continue" }) as const);
+    const assertions = createApiFixture<SsoAssertionApi>({
+      decide: async () => ({
+        action: "reject",
+        reason: "domain-not-verified",
+        error: new SsoSignInRefusedError("the connection has never proved the asserted domain"),
+      }),
+      resolveUser,
+    });
+
+    await resolveSsoUser({ assertions, input: assertionOf("person@acme.test") });
+
+    expect(resolveUser).not.toHaveBeenCalled();
   });
 });

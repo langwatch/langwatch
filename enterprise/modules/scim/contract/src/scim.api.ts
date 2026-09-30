@@ -75,6 +75,11 @@ export interface ScimApi {
   findDirectoryExternalIds(input: {
     organizationId: string;
   }): Promise<{ userId: string; externalId: string }[]>;
+  /** Whether this organization's directory holds the person as inactive: asked
+   *  by a single sign-on before it attaches an assertion to them. */
+  isDirectoryUserInactive(input: { organizationId: string; userId: string }): Promise<boolean>;
+  /** The connections whose directory sync provisioned the person. */
+  findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]>;
   /**
    * Mints a token for one directory connection. `connectionId` is the whole of
    * the token's write authority, so it is named rather than defaulted.

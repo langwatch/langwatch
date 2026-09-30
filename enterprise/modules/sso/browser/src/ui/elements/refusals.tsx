@@ -70,12 +70,12 @@ export function LoadFailure({ error, what }: { error: unknown; what: string }) {
 /** What the reader is told when setting single sign-on up is not theirs yet. */
 const AVAILABILITY_REFUSAL_COPY = {
   license_required: {
-    title: "Single sign-on needs an active licence",
-    body: "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+    title: "Single sign-on needs an active license",
+    body: "Activate an enterprise license on this installation, then restart it, and you can set single sign-on up here.",
   },
   license_restart_required: {
     title: "Restart to finish activating single sign-on",
-    body: "The licence is active. This installation decides what it federates when it starts, so single sign-on becomes available after the next restart.",
+    body: "The license is active. This installation decides what it federates when it starts, so single sign-on becomes available after the next restart.",
   },
   not_opted_in: {
     title: "Setting single sign-on up yourself isn't switched on yet",

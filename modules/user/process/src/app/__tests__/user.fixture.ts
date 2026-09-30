@@ -44,6 +44,7 @@ export function createUserTestAuth(
     revokeAllBrowserSessions: vi.fn(async () => undefined),
     resolveAuthProvider: vi.fn(async () => provider),
     issuesOwnPasswords: vi.fn(() => issuesOwnPasswords),
+    assertSignUpOrigin: vi.fn(async () => undefined),
     claimSignUpAddressProof: vi.fn(
       async ({ token }: { token: string; email: string }) =>
         token !== REFUSED_ADDRESS_PROOF && token !== UNCONFIRMED_ADDRESS_PROOF,

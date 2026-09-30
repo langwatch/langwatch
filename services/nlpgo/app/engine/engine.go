@@ -789,10 +789,7 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 	// Use the provider/model form (matching the cost table keys + the LLM span
 	// name) so the consumer's model-cost lookup hits the right entry.
 	if u := resp.Usage; u.TotalTokens > 0 || u.PromptTokens > 0 || u.CompletionTokens > 0 {
-		metricsModel := model
-		if provider != "" && model != "" {
-			metricsModel = provider + "/" + model
-		}
+		metricsModel := modelID(model, provider)
 		ns.Metrics = &NodeMetrics{
 			PromptTokens:     u.PromptTokens,
 			CompletionTokens: u.CompletionTokens,

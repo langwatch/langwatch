@@ -76,6 +76,7 @@ async function appFor(
           misconfigured: false,
           ...mailDelivery,
           smtpConfigured: false,
+          smtpSendsCredentials: false,
         }),
       }),
       sso: createApiFixture<SsoApi>(),

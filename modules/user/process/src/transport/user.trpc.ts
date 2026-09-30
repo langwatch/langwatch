@@ -7,11 +7,13 @@ import { publicRoute } from "@langwatch/api/access";
 import {
   browserSessionFact,
   callerAddressFact,
+  defineTrpcFact,
   defineTrpcRouter,
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
 import { UserApi, userTrpc, type UserCaller } from "@langwatch/user-contract";
+import { z } from "zod";
 
 /** Why every account procedure below asks for no permission. */
 const OWN_ACCOUNT = "operates on the session user's own account, so no tenant scope applies";
@@ -35,6 +37,12 @@ function callerOf(actor: TrpcHandlerActor): UserCaller {
   return { id: actor.id, operatorId, impersonated: operatorId !== actor.id };
 }
 
+/** The web address a sign-up was sent from, bound by user's own install, as auth's headers are. */
+export const signUpOriginFact = defineTrpcFact(
+  "signUpOrigin",
+  z.object({ origin: z.string().nullable(), referer: z.string().nullable() }).strict(),
+);
+
 export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> = defineTrpcRouter(
   UserApi,
   userTrpc,
@@ -42,20 +50,22 @@ export const userTrpcTransport: TrpcRouterDeclaration<UserApi, typeof userTrpc> 
   // `register` predates the account it creates, so it runs with no caller at
   // all and the address it arrived from is the only thing to throttle on.
   .procedure("register")
-  .withFacts(callerAddressFact)
+  .withFacts(callerAddressFact, signUpOriginFact)
   .withAccess(
     publicRoute({
       reason:
         "the signup form's own backend: it mints the account a caller would otherwise need to already hold",
     }),
   )
-  .handle(({ app, input }, callerAddress) =>
+  .handle(({ app, input }, callerAddress, signUpOrigin) =>
     app.registerCredentialAccount({
       name: input.name ?? null,
       email: input.email,
       password: input.password,
       addressProof: input.addressProof,
       callerAddress: callerAddress ?? "unknown",
+      origin: signUpOrigin.origin,
+      referer: signUpOrigin.referer,
     }),
   )
 

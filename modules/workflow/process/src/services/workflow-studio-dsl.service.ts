@@ -3,7 +3,7 @@
  */
 import {
   ModelNotConfiguredError,
-  findLatestOpenAIChatFlagship,
+  DEFAULT_MODEL,
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import {
@@ -13,11 +13,6 @@ import {
 } from "@langwatch/workflow-contract";
 
 import { type WorkflowStudioDsl } from "../app/workflow.app.ts";
-
-/**
- * Terminal fallback model (registry flagship); derived from registry call, not hardcoded.
- */
-const REGISTRY_FLAGSHIP_MODEL = findLatestOpenAIChatFlagship()[0] ?? "openai/gpt-5";
 
 type LlmParameterLike = { identifier?: string; type?: string; value?: unknown };
 type NodeLike = { data?: { parameters?: LlmParameterLike[] } };
@@ -85,7 +80,7 @@ export class ModelProviderWorkflowStudioDslService implements WorkflowStudioDsl 
         // flagship. An members failure must not silently pin a model.
         if (!(error instanceof ModelNotConfiguredError)) throw error;
       }
-      fallback = { model: resolvedModel ?? REGISTRY_FLAGSHIP_MODEL };
+      fallback = { model: resolvedModel ?? DEFAULT_MODEL };
     }
 
     for (const parameter of modellessParameters) {

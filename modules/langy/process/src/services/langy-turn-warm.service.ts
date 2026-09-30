@@ -92,6 +92,17 @@ export class LangyTurnWarmService {
       }
     }
 
+    // Signature parity with the turn, which sends the same list: a warm worker
+    // booted without it is replaced by the first real turn.
+    const disabledSkills = await this.deps.skillGates.resolveDisabled({
+      userId,
+      projectId,
+      organizationId: credentials.organizationId,
+    });
+    if (disabledSkills.length > 0) {
+      credentials.disabledSkillIds = disabledSkills;
+    }
+
     const alive = await worker.probe(
       LANGY_TURN_SHARED.buildWorkerProbeArgs({
         projectId,
@@ -99,6 +110,7 @@ export class LangyTurnWarmService {
         conversationId,
         model: warmModel,
         credentials,
+        disabledSkillIds: disabledSkills,
       }),
     );
     if (alive) {

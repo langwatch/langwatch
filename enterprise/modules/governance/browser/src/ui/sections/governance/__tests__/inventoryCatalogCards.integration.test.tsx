@@ -87,7 +87,7 @@ describe("given an admin on the Inventory page", () => {
       const card = screen.getByTestId("tool-card-tool-claude-code");
       expect(within(card).getByText("Subscriptions")).toBeInTheDocument();
       expect(within(card).queryByText("Seats")).toBeNull();
-      expect(within(card).queryByText("Licence per month")).toBeNull();
+      expect(within(card).queryByText("License per month")).toBeNull();
       expect(within(card).queryByText("Tokens · 30 days")).toBeNull();
       expect(within(card).queryByText("Conversations · 30 days")).toBeNull();
     });
@@ -170,8 +170,8 @@ describe("given an admin on the Inventory page", () => {
       const table = await screen.findByRole("table");
       for (const header of [
         "Seats",
-        "Licence per month",
-        "Unassigned licence cost",
+        "License per month",
+        "Unassigned license cost",
         "Subscriptions",
         "Usage · 30 days",
         "Agents",

@@ -25,6 +25,7 @@ interface Draft {
   email: string;
   planType: PlanType;
   maxMembers: string;
+  maxMembersLite: string;
   licenseTermDays: string;
   services: Service[];
   expiresOn: string;
@@ -40,6 +41,7 @@ function emptyDraft(): Draft {
     email: "",
     planType: "ENTERPRISE",
     maxMembers: "25",
+    maxMembersLite: "",
     licenseTermDays: String(DEFAULT_TERM_DAYS),
     services: [...SERVICES],
     expiresOn: isoDaysFromNow(DEFAULT_CODE_DAYS),
@@ -119,6 +121,9 @@ export function IssueActivationCodeDrawer({
                       email: draft.email.trim(),
                       planType: draft.planType,
                       maxMembers: Number(draft.maxMembers),
+                      ...(draft.maxMembersLite.trim() === ""
+                        ? {}
+                        : { maxMembersLite: Number(draft.maxMembersLite) }),
                       licenseTermDays: Number(draft.licenseTermDays),
                       services: draft.services,
                       expiresAt,
@@ -199,6 +204,18 @@ function TermsFields({ draft, set }: { draft: Draft; set: SetField }) {
             onChange={(event) => set("maxMembers", event.target.value)}
           />
         </Field.Root>
+        <Field.Root>
+          <Field.Label>Lite member seats</Field.Label>
+          <Input
+            type="number"
+            min={0}
+            value={draft.maxMembersLite}
+            onChange={(event) => set("maxMembersLite", event.target.value)}
+            placeholder="Plan default"
+          />
+        </Field.Root>
+      </HStack>
+      <HStack gap={4} width="full" align="start">
         <Field.Root>
           <Field.Label>License term, in days</Field.Label>
           <Input

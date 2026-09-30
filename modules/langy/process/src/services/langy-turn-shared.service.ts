@@ -13,6 +13,7 @@ import {
   type LangyModel,
   type LangySessionKey,
   type LangyTurnContextRenderer,
+  type LangySkillGates,
   type LangyTurnMetrics,
   type LangyUiActionSurface,
 } from "../app/langy.members.ts";
@@ -63,6 +64,7 @@ export interface LangyTurnServiceDeps {
   sessionKeys: LangySessionKey;
   context: LangyTurnContextRenderer;
   uiActionSurface: LangyUiActionSurface;
+  skillGates: LangySkillGates;
   metrics: LangyTurnMetrics;
   admission: LangyTurnAdmissionRepository;
   accessStore: LangyTurnAccessRepository | null;
@@ -87,6 +89,7 @@ export type LangyTurnTechnicalMembers = {
   sessionKeys: LangySessionKey;
   context: LangyTurnContextRenderer;
   uiActionSurface: LangyUiActionSurface;
+  skillGates: LangySkillGates;
   metrics: LangyTurnMetrics;
   accessStore: LangyTurnAccessRepository | null;
   handoffStore: LangyTurnHandoffRepository | null;
@@ -157,18 +160,23 @@ export class LangyTurnSharedService {
     conversationId,
     model,
     credentials,
+    disabledSkillIds,
   }: {
     projectId: string;
     actorUserId: string;
     conversationId: string;
     model: string;
     credentials: LangyCredentials;
+    /** Passed explicitly: the turn resolves them after the probe starts, and the
+     * worker signature keys on them, so a probe without them answers for another worker. */
+    disabledSkillIds: readonly string[];
   }): LangyWorkerProbeInput {
     return {
       projectId,
       actorUserId,
       conversationId,
       model,
+      ...(disabledSkillIds.length > 0 ? { disabledSkillIds: [...disabledSkillIds] } : {}),
       hasGithubAuth: !!credentials.githubToken,
       ...(credentials.githubRepoScopeKey
         ? { githubRepoScopeKey: credentials.githubRepoScopeKey }

@@ -40,6 +40,7 @@ export class MailDeliveryService {
     return {
       ...(provider === null ? {} : { provider }),
       smtpConfigured: Boolean(settings.smtp.url ?? settings.smtp.host),
+      smtpSendsCredentials: sendsSmtpCredentials({ smtp: settings.smtp }),
       misconfigured,
     };
   }
@@ -104,4 +105,14 @@ function envelopeOf({
 function noReplyAddress({ tag, defaultFrom }: { tag: string; defaultFrom: string }): string {
   const domain = defaultFrom.match(/<[^@]+@([^>]+)>/)?.[1]?.trim() || "langwatch.ai";
   return `LangWatch Triggers <no-reply+${tag}@${domain}>`;
+}
+
+/** Whether the transport logs in: a user in the URL, else `SMTP_USER` (a URL wins). */
+function sendsSmtpCredentials({ smtp }: { smtp: MailGatewaySettings["smtp"] }): boolean {
+  if (!smtp.url) return Boolean(smtp.user);
+  try {
+    return new URL(smtp.url).username !== "";
+  } catch {
+    return false;
+  }
 }

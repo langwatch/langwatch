@@ -24,6 +24,7 @@ import {
   type ConnectCredentialResolution,
   type ConnectedSeats,
   type ConnectDeploymentView,
+  type DomainClaimLicenseAuthority,
   type ConnectService,
   type ConnectStatus,
   type InstanceIdentityView,
@@ -104,6 +105,7 @@ import { ConnectInstallService } from "../services/connect-install.service.ts";
 import { ConnectSpendBufferService } from "../services/connect-spend-buffer.service.ts";
 import { ContractBudgetStoreService } from "../services/contract-budget-store.service.ts";
 import { ContractBudgetService } from "../services/contract-budget.service.ts";
+import { DomainClaimAuthorityService } from "../services/domain-claim-authority.service.ts";
 import { HostedServicesService } from "../services/hosted-services.service.ts";
 import { HostedUsageReaderService } from "../services/hosted-usage-reader.service.ts";
 import { InstanceIdentityService } from "../services/instance-identity.service.ts";
@@ -253,6 +255,7 @@ export class LicensingApp implements LicensingApiContract {
   readonly #refresh: LicenseRefreshService;
   readonly #isSaas: boolean;
   readonly #signingKey: string | undefined;
+  readonly #domainClaims: DomainClaimAuthorityService;
 
   private constructor({
     service,
@@ -263,8 +266,10 @@ export class LicensingApp implements LicensingApiContract {
     isSaas,
     generation,
     signingKey,
+    domainClaims,
   }: {
     generation: LicenseGenerationService;
+    domainClaims: DomainClaimAuthorityService;
     service: LicenseService;
     runtime: LicensingRuntime;
     entitlements: LicensingEntitlementSourceService;
@@ -275,6 +280,7 @@ export class LicensingApp implements LicensingApiContract {
   }) {
     this.#isSaas = isSaas;
     this.#signingKey = signingKey;
+    this.#domainClaims = domainClaims;
     this.#service = service;
     this.#entitlements = entitlements;
     this.#runtime = runtime;
@@ -395,6 +401,11 @@ export class LicensingApp implements LicensingApiContract {
       }),
       isSaas: members.isSaas,
       signingKey: licensePrivateKey,
+      domainClaims: DomainClaimAuthorityService.create({
+        isSaas: members.isSaas,
+        licenses: service,
+        organizations: dependencies.organizations,
+      }),
     });
     // Hosted spend a gateway reported but the buffer has not written yet is written at shutdown.
     resources.own("hosted-service spend buffer", () => app.flushHostedSpend());
@@ -428,6 +439,10 @@ export class LicensingApp implements LicensingApiContract {
 
   isPlatformSsoLicensed(): Promise<boolean> {
     return this.#service.isPlatformSsoLicensed({ isSaas: this.#isSaas });
+  }
+
+  getDomainClaimAuthority(): Promise<DomainClaimLicenseAuthority> {
+    return this.#domainClaims.getDomainClaimAuthority();
   }
 
   /**

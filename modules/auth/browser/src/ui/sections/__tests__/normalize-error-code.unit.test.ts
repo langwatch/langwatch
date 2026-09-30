@@ -4,6 +4,7 @@
 import {
   isStableAuthError,
   normalizeSignInErrorCode,
+  signInErrorMayCross,
   STABLE_AUTH_ERRORS,
 } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
@@ -31,6 +32,14 @@ describe("normalizeSignInErrorCode", () => {
   });
 
   describe("when given a BetterAuth account-already-linked error", () => {
+    /** @scenario "The native account-link refusal maps to a stable sign-in error" */
+    it("normalizes the native account-link refusal", () => {
+      const code = normalizeSignInErrorCode("account not linked");
+      expect(code).toBe("OAuthAccountNotLinked");
+      expect(signInErrorMayCross("account not linked")).toBe(true);
+      expect(isStableAuthError(code)).toBe(true);
+    });
+
     it("maps account_already_linked_to_different_user to OAuthAccountNotLinked", () => {
       expect(normalizeSignInErrorCode("account_already_linked_to_different_user")).toBe(
         "OAuthAccountNotLinked",

@@ -115,9 +115,14 @@ export const authTrpcTransport: TrpcRouterDeclaration<AuthApi, typeof authTrpc> 
    * no-oracle invariant covers sign-in and reset, not sign-up.
    */
   .procedure("requestSignUpVerification")
-  .withFacts(callerAddressFact)
+  .withFacts(callerAddressFact, authRequestHeadersFact)
   .withAccess(OWN_SIGN_UP)
-  .handle(async ({ app, input }, address) => {
+  .handle(async ({ app, input }, address, headers) => {
+    // The sign-in this sign-up ends in is refused on a foreign origin, so refuse before mailing.
+    await app.assertSignUpOrigin({
+      origin: headers.get("origin"),
+      referer: headers.get("referer"),
+    });
     await spend({
       app,
       address,

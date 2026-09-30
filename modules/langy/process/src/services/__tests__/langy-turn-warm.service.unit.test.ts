@@ -7,6 +7,7 @@ import {
   LangyConversationIdUnadoptableError,
   LangyModelNotConfiguredError,
   LangySessionKeyScopeError,
+  langyWorkerCredentialsSchema,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -157,6 +158,34 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
         credentials: { langwatchApiKeyId?: string };
       };
       expect(warmArgs.credentials.langwatchApiKeyId).toBe("key-warm");
+    });
+  });
+
+  describe("given a skill is gated off for the user by a feature flag", () => {
+    /** @scenario The warm and the turn's probe carry the same disabled skills */
+    it("warms and probes a worker with that skill disabled", async () => {
+      const { deps, mocks } = makeDeps({
+        skillGates: { resolveDisabled: vi.fn(async () => ["dashboard-widgets"]) },
+      });
+      const service = LangyTurnWarmService.create(deps);
+
+      await service.warmConversationWorker(warmInput());
+
+      const probeArgs = mocks.probe.mock.calls[0]![0];
+      const warmArgs = mocks.warm.mock.calls[0]![0];
+      expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
+      expect(langyWorkerCredentialsSchema.parse(warmArgs.credentials).disabledSkillIds).toEqual(
+        probeArgs.disabledSkillIds,
+      );
+    });
+
+    it("sends no disabled skills when no skill is gated off", async () => {
+      const { deps, mocks } = makeDeps();
+      const service = LangyTurnWarmService.create(deps);
+
+      await service.warmConversationWorker(warmInput());
+
+      expect(mocks.probe.mock.calls[0]![0].disabledSkillIds).toBeUndefined();
     });
   });
 

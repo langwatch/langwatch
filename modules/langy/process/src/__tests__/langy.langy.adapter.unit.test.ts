@@ -130,6 +130,7 @@ describe("LangyPostgresService", () => {
       },
       context: { render: vi.fn(() => null) },
       uiActionSurface: { resolve: vi.fn(async () => true) },
+      skillGates: { resolveDisabled: vi.fn(async () => []) },
       metrics: { count: vi.fn() },
     });
     const database: LangyDatabase = undefined!;
@@ -262,6 +263,7 @@ function compositionOptions() {
     sessionKeys: { mint: vi.fn(), revoke: vi.fn() },
     context: { render: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
+    skillGates: { resolveDisabled: vi.fn(async () => []) },
     metrics: { count: vi.fn() },
   });
 }

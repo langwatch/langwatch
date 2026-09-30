@@ -108,6 +108,7 @@ function service() {
         getMailDelivery: async () => ({
           provider: "smtp",
           smtpConfigured: true,
+          smtpSendsCredentials: false,
           misconfigured: false,
         }),
         verifySmtp: async () => {

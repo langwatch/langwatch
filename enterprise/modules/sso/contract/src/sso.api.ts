@@ -138,8 +138,9 @@ export interface SsoApi {
   ): AsyncGenerator<SsoHistoryActivity>;
 
   /** Where this organization's setup stands, with the addresses this module
-   *  serves folded in beside identity's own reading of the journey. */
-  getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupPageView>;
+   *  serves folded in beside identity's own reading of the journey. Who is
+   *  looking decides the proof offered: a platform operator may use the licence. */
+  getSetup(input: SsoSetupOrganizationInput, by: SsoAdministrator): Promise<SsoSetupPageView>;
 
   /**
    * Which tier this organization's own setup runs under (D05): the

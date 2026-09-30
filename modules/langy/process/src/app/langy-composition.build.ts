@@ -26,7 +26,12 @@ import type {
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
 import type { OpenLangyRelay } from "../services/langy.service.ts";
-import { LangyGithubPermit, type LangyModel, type LangyUiActionSurface } from "./langy.members.ts";
+import {
+  LangyGithubPermit,
+  type LangyModel,
+  type LangySkillGates,
+  type LangyUiActionSurface,
+} from "./langy.members.ts";
 
 /** The turn's three permit calls, on the feature package's own quota service. */
 class LangyGithubPrPermitsAdapter extends LangyGithubPermit {
@@ -73,6 +78,8 @@ export function buildLangyInfrastructure(input: {
   virtualKeys: LangyVirtualKeyService;
   /** Whether a turn may advertise the page channel; absent holds it closed. */
   uiActionSurface?: LangyUiActionSurface;
+  /** Which gated skills a turn hides; absent hides none. */
+  skillGates?: LangySkillGates;
   /** Where a navigate the conversation remembered no link for opens. */
   navigateFallback: LangyNavigateFallbackService;
 }): LangyBuiltInfrastructure {
@@ -101,6 +108,7 @@ export function buildLangyInfrastructure(input: {
       redis && input.uiActionSurface
         ? input.uiActionSurface
         : { resolve: () => Promise.resolve(false) },
+    skillGates: input.skillGates ?? { resolveDisabled: () => Promise.resolve([]) },
     metrics: { count: () => undefined },
     accessStore: repositories.turnAccess,
     handoffStore: repositories.turnHandoff,

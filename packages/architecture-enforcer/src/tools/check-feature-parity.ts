@@ -553,7 +553,6 @@ const LEGACY_INERT: string[] = [
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
-  "specs/nlp-go/telemetry.feature",
   "specs/nlp-go/topic-clustering.feature",
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
@@ -742,6 +741,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/event-sourced-analytics-materialization.feature",
   "specs/automations/authoring-drawer.feature",
+  // Reason: left LEGACY_INERT when its two default-layout scenarios (trace
+  // excerpts, the default Slack message) gained bindings; the other
+  // nineteen Liquid-template scenarios stay untagged.
+  "specs/automations/notification-templates.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
   // Reason: reached this branch from main already partially tagged, and its

@@ -84,6 +84,7 @@ export {
   LANGY_UI_ACTIONS_FLAG,
   LangyBlockMetrics,
   LangyGithubPermit,
+  LangySkillGates,
   LangyUiActionSurface,
 } from "./app/langy.members.ts";
 export { LangyWorkerMetrics, LangyWorker } from "./channels/langy-worker.channel.ts";
@@ -94,6 +95,7 @@ export type {
   LangyWorkerWarmInput,
 } from "./channels/langy-worker.channel.ts";
 export { LangyUiActionSurfaceService } from "./services/langy-ui-action-surface.service.ts";
+export { LangySkillGatesService } from "./services/langy-skill-gates.service.ts";
 export { LangyConversationPipelineService } from "./services/langy-conversation-pipeline.service.ts";
 export type { LangyConversationProcessingPipelineDeps } from "./services/langy-conversation-pipeline.service.ts";
 export {

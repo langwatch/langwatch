@@ -66,6 +66,15 @@ describe("OrganizationMembershipService.createSelfHostedCustomer", () => {
       expect(seeded).toEqual([customer.id]);
     });
 
+    /** @scenario "A customer organization gets the same kind of id as any other organization" */
+    it("gives the organization an organization_ id", async () => {
+      const { service } = installed();
+
+      const customer = await service.createSelfHostedCustomer({ name: "ACME" });
+
+      expect(customer.id).toMatch(/^organization_/);
+    });
+
     it("marks the organization as a self-hosted customer", async () => {
       const { service, memory } = installed();
 

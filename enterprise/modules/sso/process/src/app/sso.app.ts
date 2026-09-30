@@ -56,6 +56,7 @@ import {
   type SsoSetupRegisterInput,
   type SsoSetupRemovalInput,
   type SsoSetupRenameInput,
+  type SsoSelfServeAvailability,
   type SsoSelfServeContext,
   type SsoSetupStartMigrationInput,
 } from "@langwatch/enterprise-sso-contract";
@@ -242,7 +243,15 @@ export class SsoApp implements SsoApiContract {
       authority: LicenseDomainClaimAuthority.create({
         isHosted,
         licensedAtStartup: () => gate.platformAllowed(),
+        licensing: dependencies.licensing,
       }),
+      // The same staff list the back office gates on (ADMIN_EMAILS).
+      platformOperators: {
+        isPlatformOperator: async ({ actorId }) =>
+          dependencies.operators.isAdmin({
+            email: (await dependencies.users.findById({ id: actorId }))?.email,
+          }),
+      },
       licenseProof: InstanceLicenseProof.create({ licensing: dependencies.licensing }),
       // Hosted self-serve (tier 3) is opted into per organization (D05).
       optIn: {
@@ -337,12 +346,15 @@ export class SsoApp implements SsoApiContract {
    * addresses an identity provider is pointed at are this module's, because
    * this module is what answers them.
    */
-  async getSetup(input: SsoSetupOrganizationInput): Promise<SsoSetupPageView> {
+  async getSetup(
+    input: SsoSetupOrganizationInput,
+    by: SsoAdministrator,
+  ): Promise<SsoSetupPageView> {
     const journey = await this.#setup.getSetup(input);
 
     return {
       ...journey,
-      availability: await this.#selfServeContext.availability(input),
+      availability: await this.#selfServeContext.availability({ ...input, actorId: by.id }),
       serviceProvider: ssoServiceProviderAddresses({
         baseUrl: this.#baseUrl,
         connectionId: journey.connection?.connectionId ?? null,
@@ -597,13 +609,13 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupDomainInput,
     by: SsoAdministrator,
   ): Promise<SsoDomainClaimOutcome> {
-    await this.#assertSelfServeAvailable(input.organizationId);
+    const { proof } = await this.#assertSelfServeAvailable(input.organizationId, by);
 
     return this.#attempted({
       by,
       action: "claimDomain",
       args: input,
-      ceremony: (actor) => this.#ceremony.claimDomain(input, actor),
+      ceremony: (actor) => this.#ceremony.claimDomain({ ...input, proof }, actor),
     });
   }
 
@@ -611,13 +623,13 @@ export class SsoApp implements SsoApiContract {
     input: SsoSetupDomainInput,
     by: SsoAdministrator,
   ): Promise<SsoDomainProof> {
-    await this.#assertSelfServeAvailable(input.organizationId);
+    const { proof } = await this.#assertSelfServeAvailable(input.organizationId, by);
 
     return this.#attempted({
       by,
       action: "proveDomain",
       args: input,
-      ceremony: (actor) => this.#ceremony.proveDomain(input, actor),
+      ceremony: (actor) => this.#ceremony.proveDomain({ ...input, proof }, actor),
     });
   }
 
@@ -901,9 +913,13 @@ export class SsoApp implements SsoApiContract {
    * READS are deliberately never gated: a page that refuses to render cannot
    * say what it is refusing.
    */
-  /** D05's tier gate: a licence decides self-hosted, the opt-in decides hosted. */
-  #assertSelfServeAvailable(organizationId: string): Promise<void> {
-    return this.#selfServeContext.assertAvailable({ organizationId });
+  /** D05's tier gate: a licence decides self-hosted, the opt-in decides hosted; the
+   *  answer names how the administrator asking proves a domain. */
+  #assertSelfServeAvailable(
+    organizationId: string,
+    by?: SsoAdministrator,
+  ): Promise<Extract<SsoSelfServeAvailability, { available: true }>> {
+    return this.#selfServeContext.assertAvailable({ organizationId, actorId: by?.id });
   }
 
   async #requireEnterprisePlan(organizationId: string): Promise<void> {

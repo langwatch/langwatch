@@ -100,6 +100,18 @@ export const platformLicenseAccessSchema = z.object({
   inspections: z.array(platformLicenseInspectionSchema),
 });
 
+/** Who the installation's licence speaks for when an SSO domain is claimed (D05 tier 2). */
+export const domainClaimLicenseAuthoritySchema = z.object({
+  /** Self-hosted, and the frozen single sign-on gate found a genuine licence. */
+  authorizesDomainClaims: z.boolean(),
+  /** Self-hosted with at most one organization, so its administrator runs the installation. */
+  hostsSingleOrganization: z.boolean(),
+  /** `sha256:` of the licence key that permits the platform; the key itself never leaves. */
+  licenseDigests: z.array(z.string()),
+});
+
+export type DomainClaimLicenseAuthority = z.infer<typeof domainClaimLicenseAuthoritySchema>;
+
 export type PlatformLicenseInspection = z.infer<typeof platformLicenseInspectionSchema>;
 export type PlatformLicenseAccess = z.infer<typeof platformLicenseAccessSchema>;
 

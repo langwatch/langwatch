@@ -84,13 +84,32 @@ describe("qualifying what proved a domain", () => {
     ).toEqual({ status: "UNKNOWN", reason: "incomplete" });
   });
 
-  it("treats a licence token as installation evidence, not domain proof", () => {
-    expect(
-      qualifySsoDomainOwnership({
-        state: stateWith(proof({ method: "license-token", tokenHash: null })),
-        domain: DOMAIN,
-      }),
-    ).toEqual({ status: "UNKNOWN", reason: "inferred" });
+  describe("when a self-hosted installation's licence proved the domain", () => {
+    it("qualifies it with the licence's hash and the person who claimed it", () => {
+      const licensed = proof({
+        method: "license-token",
+        tokenHash: null,
+        evidenceRef: "sha256:licence",
+        actorId: "user_ana",
+      });
+      expect(qualifySsoDomainOwnership({ state: stateWith(licensed), domain: DOMAIN }).status).toBe(
+        "QUALIFIED",
+      );
+    });
+
+    it("treats it as incomplete without the licence's hash or a person", () => {
+      for (const overrides of [
+        { evidenceRef: null, actorId: "user_ana" },
+        { evidenceRef: "sha256:licence", actorId: null },
+      ]) {
+        expect(
+          qualifySsoDomainOwnership({
+            state: stateWith(proof({ method: "license-token", tokenHash: null, ...overrides })),
+            domain: DOMAIN,
+          }),
+        ).toEqual({ status: "UNKNOWN", reason: "incomplete" });
+      }
+    });
   });
 
   it("requires an attestation to name the operator who made it", () => {

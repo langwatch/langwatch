@@ -18,6 +18,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 const ORG = "org_acme";
@@ -106,6 +107,7 @@ beforeEach(() => {
     breakGlass,
     stranding,
     platformOperators: new StubPlatformOperators([OPS.id]),
+    licensing: licensingFixture(),
   });
 });
 
@@ -677,8 +679,8 @@ describe("sso connection guards", () => {
       expect(held?.domainClaims[0]?.state).toBe("WAITING");
     });
 
-    /** @scenario "Entitlement cannot stand in for domain ownership" */
-    it("refuses a licence ceremony against a claim nobody decided", async () => {
+    /** @scenario "A licence that authorizes nothing cannot prove a domain" */
+    it("refuses a licence ceremony where the licence authorizes nothing, stating nothing", async () => {
       await expect(
         guards.requestVerification({
           ...identity,
@@ -686,7 +688,72 @@ describe("sso connection guards", () => {
           method: "license-token",
           tokenHash: "sha256:licence",
         }),
-      ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
+      ).rejects.toMatchObject({ code: "sso_domain_proof_not_found" });
+
+      const held = await connections.getConnection({ connectionId: CONNECTION });
+      expect(held?.pendingVerification).toBeNull();
+      expect(held?.approvedDomains).toEqual([]);
+    });
+  });
+
+  describe("given a licensed self-hosted installation with several organizations", () => {
+    beforeEach(async () => {
+      guards = SsoConnectionGuardsService.create({
+        connections,
+        registrationSlots: connections,
+        breakGlass,
+        stranding,
+        platformOperators: new StubPlatformOperators([OPS.id]),
+        licensing: licensingFixture({
+          authorizesDomainClaims: true,
+          hostsSingleOrganization: false,
+        }),
+      });
+      await run(() =>
+        guards.registerConnection({ ...identity, type: "oidc", idp: IDP, arrivalPolicy: "admit" }),
+      );
+      await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
+    });
+
+    const askForLicence = (actor: typeof ANA) =>
+      guards.requestVerification({
+        ...identity,
+        actor,
+        domain: "acme.com",
+        method: "license-token",
+        tokenHash: "sha256:licence",
+      });
+
+    /** @scenario "A licence ceremony on a multi-organization installation takes a platform operator" */
+    it("refuses an organization administrator and verifies for a platform operator", async () => {
+      await expect(askForLicence(ANA)).rejects.toMatchObject({
+        code: "sso_connection_operator_act_required",
+      });
+
+      await run(() => askForLicence(OPS));
+      const { facts, state } = await run(() =>
+        guards.verifyDomain({ ...identity, actor: OPS, domain: "acme.com" }),
+      );
+
+      expect(facts.map((fact) => fact.type)).toEqual([
+        DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        DOMAIN_VERIFIED_EVENT_TYPE,
+      ]);
+      expect(facts[0]!.data).toMatchObject({ authority: "license" });
+      expect(state.verifiedDomains).toEqual(["acme.com"]);
+      expect(state.domainVerifications[0]).toMatchObject({
+        method: "license-token",
+        tokenHash: null,
+        evidenceRef: "sha256:licence",
+      });
+    });
+
+    it("refuses the licence's approval to an organization administrator when the proof lands", async () => {
+      await run(() => askForLicence(OPS));
+
+      await expect(
+        guards.verifyDomain({ ...identity, actor: ANA, domain: "acme.com" }),
+      ).rejects.toMatchObject({ code: "sso_connection_operator_act_required" });
     });
   });
 

@@ -77,26 +77,36 @@ export function qualifySsoDomainOwnership({
   if (proof.proofState === "LAPSED") return { status: "LAPSED", proof };
   if (proof.verifiedAtMs <= 0) return { status: "UNKNOWN", reason: "incomplete" };
 
-  if (isSsoPublishedProofChannel(proof.method)) {
-    if (!proof.tokenHash) return { status: "UNKNOWN", reason: "incomplete" };
-    return { status: "QUALIFIED", proof };
-  }
+  const completeness = proofCompleteness({ proof, source: state.source });
+  if (completeness === "complete") return { status: "QUALIFIED", proof };
+  return { status: "UNKNOWN", reason: completeness };
+}
 
-  if (proof.method === "operator-attested") {
-    if (proof.actorId === null) return { status: "UNKNOWN", reason: "incomplete" };
-    return { status: "QUALIFIED", proof };
+/** Whether a proof carries what its method needs; "inferred" for a method nothing records. */
+function proofCompleteness({
+  proof,
+  source,
+}: {
+  proof: SsoDomainVerification;
+  source: QualifiableConnection["source"];
+}): "complete" | "incomplete" | "inferred" {
+  if (isSsoPublishedProofChannel(proof.method)) return completeWhen(Boolean(proof.tokenHash));
+  if (proof.method === "operator-attested") return completeWhen(proof.actorId !== null);
+  // A self-hosted installation's licence, recorded by the person who claimed the
+  // domain; the guards state it only where the licence speaks for that person.
+  if (proof.method === "license-token") {
+    return completeWhen(Boolean(proof.evidenceRef) && proof.actorId !== null);
   }
-
+  // The one-time import stands in for an operator nobody asked, so a named
+  // person on it is a row that did not come from the migration.
   if (proof.method === "legacy-configuration") {
-    // The one-time import stands in for an operator nobody asked, so a named
-    // person on it is a row that did not come from the migration.
-    if (state.source !== "legacy-grandfathered" || proof.actorId !== null) {
-      return { status: "UNKNOWN", reason: "incomplete" };
-    }
-    return { status: "QUALIFIED", proof };
+    return completeWhen(source === "legacy-grandfathered" && proof.actorId === null);
   }
+  return "inferred";
+}
 
-  return { status: "UNKNOWN", reason: "inferred" };
+function completeWhen(holds: boolean): "complete" | "incomplete" {
+  return holds ? "complete" : "incomplete";
 }
 
 /**

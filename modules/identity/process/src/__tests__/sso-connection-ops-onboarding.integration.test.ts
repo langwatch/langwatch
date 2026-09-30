@@ -9,6 +9,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 /**
@@ -74,6 +75,7 @@ beforeEach(() => {
       breakGlass,
       stranding: new StubStranding([]),
       platformOperators: new StubPlatformOperators([OLIVE.id]),
+      licensing: licensingFixture(),
     }),
     ledger,
   );

@@ -69,16 +69,16 @@ export type ToolCardRow = (typeof TOOL_CARD_ROWS)[number];
 export const TOOL_CARD_ROW_META: Record<ToolCardRow, { label: string; filledBy: string }> = {
   seats: {
     label: "Seats",
-    filledBy: "Seat counts arrive from a source that reads the vendor's licence list.",
+    filledBy: "Seat counts arrive from a source that reads the vendor's license list.",
   },
   licencePerMonth: {
-    label: "Licence per month",
-    filledBy: "Contract price required to calculate monthly licence cost.",
+    label: "License per month",
+    filledBy: "Contract price required to calculate monthly license cost.",
   },
   idlePerMonth: {
-    label: "Unassigned licence cost",
+    label: "Unassigned license cost",
     filledBy:
-      "Assigned seat counts and contract price required to calculate monthly unassigned licence cost.",
+      "Assigned seat counts and contract price required to calculate monthly unassigned license cost.",
   },
   subscriptions: {
     label: "Subscriptions",
@@ -121,7 +121,7 @@ export const TOOL_CARD_ROW_META: Record<ToolCardRow, { label: string; filledBy: 
 export type ToolCardBadge = "seatsAndLicences" | "subscription" | "billed" | "metered";
 
 export const TOOL_CARD_BADGE_LABEL: Record<ToolCardBadge, string> = {
-  seatsAndLicences: "seats · licences",
+  seatsAndLicences: "seats · licenses",
   subscription: "subscription",
   billed: "billed",
   metered: "metered",

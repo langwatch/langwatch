@@ -33,6 +33,7 @@ import type {
   SsoConnectionLifecycleState,
   SsoDomainVerification,
   SsoMigrationRoute,
+  SsoVerificationCeremonyMethod,
 } from "./connection.ts";
 import type {
   AttachIdentifierCommandData,
@@ -71,6 +72,8 @@ import type {
   SsoArrivingUser,
   SsoAssertionDecision,
   SsoTestArrivalStanding,
+  SsoUserResolution,
+  SsoUserResolutionInput,
 } from "./sso-admission.ts";
 import type {
   OrganizationSsoConnection,
@@ -390,18 +393,24 @@ export interface SsoDomainCeremonyCommand {
   actor: SelfServeActor;
 }
 
+/** A claim or an ask to prove, with how this organization proves a domain: the
+ *  setup surface's answer, which the guards check again rather than trust. */
+export interface SsoDomainProvingCommand extends SsoDomainCeremonyCommand {
+  proof: SsoVerificationCeremonyMethod;
+}
+
 /**
- * The domain ceremony an administrator runs themselves (ADR-123, D05 tier 3).
- * A claim somebody else already proved waits for a person; everything else is
- * decided by what the domain publishes.
+ * The domain ceremony an administrator runs themselves (ADR-123, D05 tiers 2 and 3).
+ * Where the licence is the proof a claim is verified at once; elsewhere a claim
+ * somebody else proved waits for a person, and the rest is what the domain publishes.
  */
 export interface SsoDomainCeremonyApi {
   claimDomain(
-    command: SsoDomainCeremonyCommand,
-  ): Promise<{ waitsForReview: boolean; disputed: boolean }>;
-  /** The record to publish, with its value answered once. */
+    command: SsoDomainProvingCommand,
+  ): Promise<{ waitsForReview: boolean; disputed: boolean; verified: boolean }>;
+  /** The record to publish, with its value answered once; `proved` where the licence proves it. */
   proveDomain(
-    command: SsoDomainCeremonyCommand,
+    command: SsoDomainProvingCommand,
   ): Promise<{ proved: true } | { proved: false; record: SelfServeIssuedDnsRecord }>;
   checkDomainRecord(command: SsoDomainCeremonyCommand): Promise<{ proved: true }>;
   checkDomainFile(command: SsoDomainCeremonyCommand): Promise<{ proved: true }>;
@@ -514,6 +523,9 @@ export interface SsoAssertionApi {
     accountId?: string;
     email: string | null | undefined;
   }): Promise<SsoAssertionDecision>;
+  /** Which existing person an assertion `decide` admitted signs in as, asked
+   *  after it and never instead of it (specs/identity/scim-sso-signin.feature). */
+  resolveUser(args: SsoUserResolutionInput): Promise<SsoUserResolution>;
 }
 
 /**

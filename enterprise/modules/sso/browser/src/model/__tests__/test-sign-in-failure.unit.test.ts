@@ -16,6 +16,7 @@ describe("given one of our own codes", () => {
       "sso_assertion_without_address",
       "sso_domain_not_verified",
       "sso_domain_proof_lapsed",
+      "sso_existing_account_unconfirmed",
       "sso_sign_in_refused",
     ]) {
       const failure = testSignInFailureFor({ code });

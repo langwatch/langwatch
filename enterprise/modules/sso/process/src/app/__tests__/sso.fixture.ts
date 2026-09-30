@@ -146,6 +146,7 @@ export class RecordingSsoDomainCeremony implements SsoDomainCeremonyApi {
   readonly claimDomain = vi.fn<SsoDomainCeremonyApi["claimDomain"]>(async () => ({
     waitsForReview: false,
     disputed: false,
+    verified: false,
   }));
   readonly proveDomain = vi.fn<SsoDomainCeremonyApi["proveDomain"]>(async ({ domain }) => ({
     proved: false,

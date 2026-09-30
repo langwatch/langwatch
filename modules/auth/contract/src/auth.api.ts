@@ -167,6 +167,13 @@ export interface AuthApi {
   ): Promise<RoutingDecision>;
   /** Whether an account already exists for this address. */
   addressIsRegistered(input: Readonly<{ email: string }>): Promise<boolean>;
+  /**
+   * The `/api/auth/*` origin rule for a sign-up that writes before any such call: `origin`, or
+   * with none `referer`, must match the configured address. Throws `auth_invalid_origin`.
+   */
+  assertSignUpOrigin(
+    input: Readonly<{ origin: string | null; referer: string | null }>,
+  ): Promise<void>;
   /** Mails a fresh confirmation link. Asking twice sends twice. */
   requestSignUpVerification(input: Readonly<{ email: string }>): Promise<void>;
   /**

@@ -119,7 +119,11 @@ export function scimTestApp(
     connections,
     directoryExternalIds: ScimDirectoryExternalIdsService.create({
       connections,
-      identities: { findDirectoryExternalIds: () => Promise.resolve([]) },
+      identities: {
+        findDirectoryExternalIds: () => Promise.resolve([]),
+        findUserResource: () => Promise.resolve(null),
+        findDirectoryConnectionsForUser: () => Promise.resolve([]),
+      },
     }),
     reconciliation: ScimReconciliationService.create({
       identity,

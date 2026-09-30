@@ -92,7 +92,7 @@ export function GovernanceHero({
       <VStack align="center" gap={1.5}>
         <GovernanceWelcomeHeader />
         <Text fontSize="sm" color="fg.muted" textAlign="center">
-          Every AI tool, agent, licence and dollar across the organization.
+          Every AI tool, agent, license and dollar across the organization.
         </Text>
       </VStack>
 

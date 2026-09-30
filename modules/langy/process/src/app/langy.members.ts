@@ -301,6 +301,16 @@ export abstract class LangyUiActionSurface {
   }): Promise<boolean>;
 }
 
+/** Resolves the flag-gated skill ids hidden from the model for one caller. Never rejects:
+ * an unreadable flag reads as off, so the gated skill stays withheld. */
+export abstract class LangySkillGates {
+  abstract resolveDisabled(input: {
+    userId: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<string[]>;
+}
+
 /** Mints and revokes the restricted worker session credential. */
 export abstract class LangySessionKey {
   abstract mint(input: {

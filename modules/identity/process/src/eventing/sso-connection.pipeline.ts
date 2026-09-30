@@ -27,6 +27,7 @@ import type { SsoEngineProviderProjection } from "../repositories/sso-engine-pro
 import { SsoBreakGlassRecoveryService } from "../services/sso-break-glass-recovery.service.ts";
 import { RequiresLocalDoorAndBinding } from "../services/sso-break-glass.service.ts";
 import type { SsoConnectionDirectoryMoveService } from "../services/sso-connection-directory-move.service.ts";
+import type { SsoConnectionGuardsDeps } from "../services/sso-connection-guard-checks.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import {
   SsoConnectionTeardownCompletionService,
@@ -433,6 +434,8 @@ export function composeSsoConnectionGraph(options: {
   directory?: SsoConnectionDirectoryRevocation;
   mail?: SsoDomainProofMail;
   engineProvider?: SsoEngineProviderProjection;
+  /** What the installation's licence may decide, for the licence ceremony. */
+  licensing: SsoConnectionGuardsDeps["licensing"];
 }): SsoConnectionGraph {
   const { repositories, eventSourcing } = options;
   const head = EngineFollowingSsoConnectionHeadStore.create({
@@ -448,6 +451,7 @@ export function composeSsoConnectionGraph(options: {
     }),
     stranding: repositories.ssoStranding,
     platformOperators: repositories.ssoPlatformOperators,
+    licensing: options.licensing,
   });
   const connections = SsoConnectionService.create(
     guards,

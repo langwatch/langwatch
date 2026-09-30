@@ -139,6 +139,9 @@ export const projectRoutes = {
     title: "Automations",
     parent: "automations",
   },
+  // The alerts path is a preserved alias: automations and alerts are one list
+  // now (ADR-093 §1), so it resolves to the automations table and its
+  // breadcrumb and document title have to say so.
   automations_alerts: {
     path: "/[project]/automations/alerts",
     title: "Automations",

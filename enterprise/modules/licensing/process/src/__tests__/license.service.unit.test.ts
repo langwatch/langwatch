@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,
@@ -166,6 +168,16 @@ describe("LicenseService", () => {
       inspections: [{ source: "instance", valid: true }],
     });
     expect(repository.listCalls).toBe(0);
+  });
+
+  it("names the permitting licence by its hash alone, and nothing where no licence permits", async () => {
+    const [digest] = await serviceWithInstanceKey(VALID_LICENSE_KEY).findPlatformLicenseDigests();
+
+    expect(digest).toBe(`sha256:${createHash("sha256").update(VALID_LICENSE_KEY).digest("hex")}`);
+    expect(digest).not.toContain(VALID_LICENSE_KEY);
+    await expect(
+      serviceWithInstanceKey(TAMPERED_LICENSE_KEY).findPlatformLicenseDigests(),
+    ).resolves.toEqual([]);
   });
 
   /** @scenario "Inspect platform access for another feature" */

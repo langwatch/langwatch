@@ -1,14 +1,15 @@
 import { ClientAddress } from "@langwatch/api/policy";
-import type {
-  BrowserSessionResolution,
-  BrowserSessionVerification,
-  VerifiedBrowserSession,
+import {
+  type BrowserSessionResolution,
+  type BrowserSessionVerification,
+  InvalidAuthOriginError,
+  type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import { getActiveTraceId } from "@langwatch/observability/tracing";
 import { z } from "zod";
 
-import { isAllowedAuthOrigin } from "../rules/auth-origin.rules.ts";
+import { isAllowedAuthOrigin, parseOrigin } from "../rules/auth-origin.rules.ts";
 import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
 import {
@@ -66,6 +67,27 @@ export class AuthDoorService {
         "sign-out could not revoke the session; its cookies are still cleared",
       );
     }
+  }
+
+  /**
+   * The door's origin rule for a sign-up that writes before any `/api/auth/*` call does:
+   * refused here, its account is never half-made. Logs origins only, never a full URL.
+   */
+  assertSignUpOrigin(input: { origin: string | null; referer: string | null }): void {
+    const origin = input.origin ?? undefined;
+    const referer = input.referer ?? undefined;
+    const baseUrl = this.deps.baseUrl();
+    if (isAllowedAuthOrigin({ method: "POST", origin, referer, baseUrl })) return;
+
+    logger.warn(
+      {
+        expectedOrigin: parseOrigin(baseUrl),
+        receivedOrigin: parseOrigin(origin),
+        receivedReferer: parseOrigin(referer),
+      },
+      "rejected sign-up request: origin does not match the deployment's base URL",
+    );
+    throw new InvalidAuthOriginError();
   }
 
   /** Better Auth's own fetch handler, behind the origin gate and the born-finalized entrance. */

@@ -268,7 +268,7 @@ describe("given the Copilot Studio licence switch", () => {
 
       // The field label is a heading beside the control, not a <label> bound
       // to it, so the accessible name has to come from the control itself.
-      expect(toggle.getAttribute("aria-label")).toBe("Also record licence counts");
+      expect(toggle.getAttribute("aria-label")).toBe("Also record license counts");
     });
   });
 });

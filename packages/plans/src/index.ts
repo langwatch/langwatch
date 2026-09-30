@@ -31,6 +31,7 @@ export {
   planPublishing,
   planPublishingShape,
   PRO_TEMPLATE,
+  resolveMembersLite,
   templateFormDefaults,
   type LicensePlanTemplate,
   type LicenseResourceCounts,

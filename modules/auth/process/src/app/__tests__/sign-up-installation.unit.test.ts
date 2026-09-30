@@ -30,7 +30,12 @@ import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 /** A signed-out sign-up through the installed auth module, memory rows and a recording mailer. */
 async function bootAuth({
   sent,
-  mailDelivery = { provider: "smtp", smtpConfigured: true, misconfigured: false },
+  mailDelivery = {
+    provider: "smtp",
+    smtpConfigured: true,
+    smtpSendsCredentials: false,
+    misconfigured: false,
+  },
 }: {
   sent: SendEmailCommand[];
   mailDelivery?: MailDeliveryView;
@@ -113,7 +118,7 @@ describe("sign-up installation", () => {
       const sent: SendEmailCommand[] = [];
       const runtime = await bootAuth({
         sent,
-        mailDelivery: { smtpConfigured: false, misconfigured: false },
+        mailDelivery: { smtpConfigured: false, smtpSendsCredentials: false, misconfigured: false },
       });
       try {
         const answer = await runtime
@@ -134,7 +139,7 @@ describe("sign-up installation", () => {
       const sent: SendEmailCommand[] = [];
       const runtime = await bootAuth({
         sent,
-        mailDelivery: { smtpConfigured: false, misconfigured: true },
+        mailDelivery: { smtpConfigured: false, smtpSendsCredentials: false, misconfigured: true },
       });
       try {
         await expect(

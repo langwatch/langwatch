@@ -64,6 +64,7 @@ export {
 } from "./sso-setup.contract.ts";
 export {
   SSO_SELF_SERVE_DEPLOYMENTS,
+  SSO_SELF_SERVE_PROOFS,
   SSO_SELF_SERVE_REFUSALS,
   ssoSelfServeAvailabilitySchema,
   ssoSelfServeContextSchema,

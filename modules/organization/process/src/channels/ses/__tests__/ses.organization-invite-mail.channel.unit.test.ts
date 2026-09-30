@@ -10,7 +10,12 @@ import { SesOrganizationInviteMailChannel } from "../ses.organization-invite-mai
 function channelOver({ provider }: { provider: string | undefined }) {
   const sent: EmailContent[] = [];
   const notifications = {
-    getMailDelivery: async () => ({ provider, smtpConfigured: false, misconfigured: false }),
+    getMailDelivery: async () => ({
+      provider,
+      smtpConfigured: false,
+      smtpSendsCredentials: false,
+      misconfigured: false,
+    }),
     sendEmail: vi.fn(async (content: EmailContent) => {
       sent.push(content);
     }),

@@ -102,7 +102,7 @@ describe("given an organization that cannot set single sign-on up yet", () => {
     expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/talk to us/i);
 
     rerenderWithSsoHost(<AvailabilityRefusalNotice refusal="license_required" />);
-    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/active licence/);
+    expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/active license/);
 
     rerenderWithSsoHost(<AvailabilityRefusalNotice refusal="license_restart_required" />);
     expect(screen.getByTestId("sso-availability-refusal").textContent).toMatch(/next restart/);

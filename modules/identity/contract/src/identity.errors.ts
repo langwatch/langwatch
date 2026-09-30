@@ -956,6 +956,22 @@ export class SsoDomainProofLapsedError extends SsoAssertionRefusedError {
 }
 
 /**
+ * An account exists at the asserted address, never confirmed it, and this sign-in cannot vouch for
+ * it: a connection links onto it only with a verified domain AND a provider-verified address.
+ * Names nothing about the account beyond what the reader asserted.
+ */
+export class SsoExistingAccountUnconfirmedError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super("sso_existing_account_unconfirmed", "sso_existing_account_unconfirmed", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoExistingAccountUnconfirmedError";
+  }
+}
+
+/**
  * A registration that named a protocol and then left out what that protocol
  * cannot work without. Refused at COMMAND time, before a fact is written.
  */

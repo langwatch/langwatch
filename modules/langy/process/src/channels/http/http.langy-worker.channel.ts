@@ -93,6 +93,7 @@ export class HttpLangyWorkerChannel extends LangyWorker {
     egressAllowlist,
     mirrorTier,
     harness,
+    disabledSkillIds,
   }: LangyWorkerProbeInput): Promise<boolean> {
     try {
       const response = await fetch(`${this.agentUrl}/worker/probe`, {
@@ -108,6 +109,7 @@ export class HttpLangyWorkerChannel extends LangyWorker {
           ...(egressAllowlist?.length ? { egressAllowlist } : {}),
           ...(mirrorTier ? { mirrorTier } : {}),
           ...(harness ? { harness } : {}),
+          ...(disabledSkillIds?.length ? { disabledSkillIds } : {}),
         }),
         signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
       });

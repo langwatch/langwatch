@@ -15,6 +15,7 @@ import type {
   SsoDomainProofChannel,
   SsoDomainTxtLookup,
 } from "../channels/sso-domain-proof.channel.ts";
+import { PrismaSsoDomainReproofTargetRepository } from "../repositories/prisma/prisma.sso-domain-reproof.repository.ts";
 import type {
   SsoDomainReproofTarget,
   SsoDomainReproofTargetRepository,
@@ -32,6 +33,7 @@ import {
   StubBreakGlassBindings,
   StubPlatformOperators,
   StubStranding,
+  licensingFixture,
 } from "./support/in-memory-connections.ts";
 
 /**
@@ -162,6 +164,7 @@ beforeEach(() => {
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding(),
       platformOperators: new StubPlatformOperators([OLIVE.id]),
+      licensing: licensingFixture(),
     }),
     ledger,
   );
@@ -366,6 +369,84 @@ describe("re-reading the record that proves a domain", () => {
 
       const attested = await connections.getConnection({ connectionId: "ssoc_attested" });
       expect(attested?.domainVerifications[0]?.proofState).toBe("VERIFIED");
+    });
+  });
+
+  describe("given a self-hosted installation verified a domain with its licence", () => {
+    /** @scenario "Re-checking published proof leaves a domain the installation's licence verified" */
+    it("never reads it at DNS or at its file, and leaves it verified", async () => {
+      const licensed = {
+        ...emptySsoConnection({ connectionId: "ssoc_licensed" }),
+        organizationId: "org_beta",
+        state: "ACTIVE" as const,
+        verifiedDomains: ["beta.example"],
+        domainVerifications: [
+          {
+            domain: "beta.example",
+            method: "license-token" as const,
+            actorId: ANA.id,
+            verifiedAtMs: T0,
+            proofState: "VERIFIED" as const,
+            firstAbsentAtMs: null,
+            graceEndsAtMs: null,
+            tokenHash: null,
+            evidenceRef: "sha256:installation-licence",
+          },
+        ],
+        testLoginAccountId: "acc_beta",
+      };
+      connections.seed(licensed);
+      // The production target read, over rows shaped as the projection
+      // stores them: one domain a record proved, one the licence proved.
+      const rows = [
+        {
+          id: CONNECTION,
+          organizationId: ORG,
+          verifiedDomains: ["acme.com"],
+          domainVerifications: (await held())?.domainVerifications,
+        },
+        {
+          id: licensed.connectionId,
+          organizationId: licensed.organizationId,
+          verifiedDomains: licensed.verifiedDomains,
+          domainVerifications: licensed.domainVerifications,
+        },
+      ];
+      const prismaTargets = PrismaSsoDomainReproofTargetRepository.create({
+        ssoConnection: {
+          findMany: async ({ where }) => ("is" in where.reproofCursor ? rows : []),
+        },
+        ssoConnectionReproofCursor: {
+          createMany: async () => undefined,
+          updateMany: async () => undefined,
+        },
+      });
+      proofs.answer = { outcome: "absent" };
+      fileReads.answer = { outcome: "absent" };
+      reproof = SsoDomainReproofService.create({
+        connections: () => connectionService,
+        targets: prismaTargets,
+        proofs,
+        files: fileReads,
+        now: () => clock,
+      });
+
+      await reproof.sweep();
+      clock = T0 + SSO_DNS_REPROOF_GRACE_MS + HOUR_MS;
+      await reproof.sweep();
+
+      expect(proofs.asked).not.toContain(ssoDnsRecordName({ domain: "beta.example" }));
+      expect(fileReads.asked).toEqual([]);
+      expect(
+        committed.filter((entry) => entry.command.data.connectionId === "ssoc_licensed"),
+      ).toEqual([]);
+      const after = await connections.getConnection({ connectionId: "ssoc_licensed" });
+      expect(after.verifiedDomains).toEqual(["beta.example"]);
+      expect(
+        after.domainVerifications.find((entry) => entry.domain === "beta.example")?.proofState,
+      ).toBe("VERIFIED");
+      // The domain a record proved was still re-read, so the sweep ran.
+      expect(proofs.asked).toContain(ssoDnsRecordName({ domain: "acme.com" }));
     });
   });
 

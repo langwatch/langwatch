@@ -1875,9 +1875,9 @@ const presentations = {
     },
   },
   join_auto_not_licensed: {
-    title: "Automatic joining needs a licence",
+    title: "Automatic joining needs a license",
     describe: () =>
-      "Colleagues can still ask to join and you approve them. To let them in without asking, add a licence.",
+      "Colleagues can still ask to join and you approve them. To let them in without asking, add a license.",
   },
   // Company domains only, and the copy stops there. Listing what counts as a
   // consumer mail provider would turn the refusal into a way to enumerate
@@ -2021,6 +2021,10 @@ const presentations = {
   auth_no_address_to_confirm: {
     title: "This account has no email address",
     describe: () => "Add an email address in your account settings, then confirm it.",
+  },
+  auth_invalid_origin: {
+    title: "LangWatch is set up for a different web address than the one you are using",
+    describe: () => "Check the address and try again.",
   },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
@@ -3087,6 +3091,11 @@ const presentations = {
     title: "SAML connections are set up with us",
     describe: () =>
       "Single sign-on you can set up yourself is OpenID Connect for now. Contact support to set up SAML and we will do it with you.",
+  },
+  sso_existing_account_unconfirmed: {
+    title: "An account with this address already exists",
+    describe: () =>
+      "Its address was never confirmed, so single sign-on can't be added to it yet. Sign in the way you did before, or ask whoever manages single sign-on to verify your organization's domain.",
   },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",

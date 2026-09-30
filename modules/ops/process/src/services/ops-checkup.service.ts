@@ -248,6 +248,7 @@ export class OpsCheckupService {
         return {
           provider: view.provider,
           smtpConfigured: view.smtpConfigured,
+          smtpSendsCredentials: view.smtpSendsCredentials,
           verifySmtp: () => peers.mail.verifySmtp(),
         };
       },

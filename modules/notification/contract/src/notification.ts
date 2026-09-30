@@ -54,6 +54,8 @@ export const mailDeliveryViewSchema = z
     provider: z.string().optional(),
     /** Whether an SMTP relay is named, so a connection to it can be verified. */
     smtpConfigured: z.boolean(),
+    /** The transport logs in to the relay; an internal relay often takes none. */
+    smtpSendsCredentials: z.boolean(),
     /** A gateway is named but its settings are unusable: not the same as having no email at all. */
     misconfigured: z.boolean(),
   })

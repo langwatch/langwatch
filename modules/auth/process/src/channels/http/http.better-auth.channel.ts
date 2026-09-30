@@ -760,12 +760,19 @@ export async function resolveSsoUser({
       accountId: input.accountKey.accountId,
       email: input.providerUser.email,
     });
-    if (decision.action === "continue") return { action: "continue" };
-
     /** RETURNED, NEVER THROWN: the plugin catches and answers
      *  `SSO_USER_RESOLUTION_FAILED`, destroying a thrown handled error.
      *  Returned, the code reaches the screen that renders its copy. */
-    return { action: "reject", code: decision.error.code };
+    if (decision.action === "reject") return { action: "reject", code: decision.error.code };
+
+    // Only an admitted assertion is linked to anybody (specs/identity/scim-sso-signin.feature).
+    return await assertions.resolveUser({
+      protocol: input.protocol,
+      providerId: input.providerId,
+      accountKey: input.accountKey,
+      email: input.providerUser.email,
+      emailVerified: input.providerUser.emailVerified,
+    });
   } catch (error) {
     /** We log our own failure because nobody else will: the plugin discards
      *  this error and answers `SSO_USER_RESOLUTION_FAILED` to the customer. */

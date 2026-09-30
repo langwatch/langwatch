@@ -315,6 +315,72 @@ describe("given the sign-up screen", () => {
     });
   });
 
+  describe("when the browser is on a web address the installation is not set up for", () => {
+    const invalidOrigin = {
+      data: {
+        error: {
+          code: "auth_invalid_origin",
+          httpStatus: 403,
+          fault: "customer",
+        },
+      },
+    };
+
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("says which address to check when creating the account is refused", async () => {
+      requestVerificationMock.mockResolvedValue({
+        sent: false,
+        addressProof: "unconfirmed_proof",
+      });
+      enrollmentMock.mockResolvedValue({
+        outcome: "enroll",
+        methodSet: [{ id: "password", kind: "password", connectionId: null }],
+        reasonCode: "identifier_unknown",
+      });
+      registerMock.mockRejectedValue(invalidOrigin);
+
+      const { container } = renderScreen();
+      await userEvent.type(
+        await screen.findByLabelText(/email/i),
+        "sam@acme.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+      await screen.findByTestId("unconfirmed-address");
+
+      await fillPasswordPair(container, "a-good-password");
+      await userEvent.click(
+        screen.getByRole("button", { name: "Create account" }),
+      );
+
+      expect(
+        await screen.findByText(
+          /LangWatch is set up for a different web address than the one you are using/,
+        ),
+      ).toBeTruthy();
+      expect(signInMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A sign-up started on a web address the installation is not set up for issues nothing" */
+    it("says which address to check when starting the sign-up is refused", async () => {
+      requestVerificationMock.mockRejectedValue(invalidOrigin);
+
+      renderScreen();
+      await userEvent.type(
+        await screen.findByLabelText(/email/i),
+        "sam@acme.com",
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      expect(
+        await screen.findByText(
+          /LangWatch is set up for a different web address than the one you are using/,
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("unconfirmed-address")).toBeNull();
+    });
+  });
+
   describe("when a confirmation link comes back for an account that exists", () => {
     it("goes straight into the app on the session the link opened", async () => {
       searchParamsRef.current = new URLSearchParams("verify=a-token&callbackUrl=%2Fprojects");

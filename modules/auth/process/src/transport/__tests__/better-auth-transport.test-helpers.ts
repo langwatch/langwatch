@@ -88,6 +88,7 @@ export function betterAuthTransportFor(
     }),
     ssoAssertions: createApiFixture<SsoAssertionApi>({
       decide: async () => ({ action: "continue" }),
+      resolveUser: async () => ({ action: "continue" }),
     }),
     /** Nothing registered: a test that needs an origin trusted says so. */
     ssoIssuers: { issuersForRequest: async () => [] },

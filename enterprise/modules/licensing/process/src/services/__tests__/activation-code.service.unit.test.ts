@@ -6,6 +6,7 @@ import {
   ActivationRateLimitedError,
   ConnectInstanceRequiredError,
 } from "@langwatch/enterprise-licensing-contract";
+import { ENTERPRISE_TEMPLATE } from "@langwatch/plans";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -55,11 +56,17 @@ function rowFor(
 }
 
 class RecordingMinter implements LicenseMinter {
-  readonly issued: { organizationId: string; expiresAt: string; services?: string[] }[] = [];
+  readonly issued: {
+    organizationId: string;
+    expiresAt: string;
+    services?: string[];
+  }[] = [];
+  readonly liteSeats: (number | undefined)[] = [];
   refusing = false;
 
   async issue(input: Parameters<LicenseMinter["issue"]>[0]) {
     if (this.refusing) throw new Error("the signing key is not configured");
+    this.liteSeats.push(input.maxMembersLite);
     this.issued.push({
       organizationId: input.customer.organizationId,
       expiresAt: input.expiresAt.toString(),
@@ -317,5 +324,53 @@ describe("the backoffice side of activation codes", () => {
     await expect(service.revoke({ id: "code-1", operatorId: "operator-1" })).rejects.toBeInstanceOf(
       ActivationCodeNotFoundError,
     );
+  });
+});
+
+function enterpriseInput(overrides: { maxMembersLite?: number } = {}) {
+  return {
+    organizationId: "org-acme",
+    organizationName: "ACME",
+    email: "ops@example.com",
+    planType: "ENTERPRISE",
+    maxMembers: 25,
+    licenseTermDays: 365,
+    expiresAt: "2027-01-01T00:00:00Z",
+    operatorId: "operator-1",
+    ...overrides,
+  };
+}
+
+describe("lite seats on an activation code", () => {
+  /** @scenario "A code issued with no lite seats mints the plan's lite seats" */
+  it("mints the enterprise plan's lite seats when none were given", async () => {
+    const { service, licenses } = harness({ rows: [] });
+
+    const { code, row } = await service.issue(enterpriseInput());
+    expect(row.maxMembersLite).toBe(ENTERPRISE_TEMPLATE.maxMembersLite);
+
+    await service.redeem({ code, instanceId: "install-1" });
+
+    expect(licenses.liteSeats).toEqual([ENTERPRISE_TEMPLATE.maxMembersLite]);
+  });
+
+  /** @scenario "A code issued with lite seats mints exactly those" */
+  it("mints exactly the lite seats the code was issued with", async () => {
+    const { service, licenses } = harness({ rows: [] });
+
+    const { code, row } = await service.issue(enterpriseInput({ maxMembersLite: 3 }));
+    expect(row.maxMembersLite).toBe(3);
+
+    await service.redeem({ code, instanceId: "install-1" });
+
+    expect(licenses.liteSeats).toEqual([3]);
+  });
+
+  it("keeps an explicit 0 rather than reading it as unset", async () => {
+    const { service } = harness({ rows: [] });
+
+    const { row } = await service.issue(enterpriseInput({ maxMembersLite: 0 }));
+
+    expect(row.maxMembersLite).toBe(0);
   });
 });

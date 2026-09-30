@@ -960,6 +960,12 @@ export class AuthApp implements AuthApiContract {
     return this.requireSignUp().addressIsRegistered(input);
   }
 
+  async assertSignUpOrigin(
+    input: Readonly<{ origin: string | null; referer: string | null }>,
+  ): Promise<void> {
+    this.#door.assertSignUpOrigin(input);
+  }
+
   async requestSignUpVerification(input: Readonly<{ email: string }>): Promise<void> {
     return this.requireSignUp().requestVerification(input);
   }
