@@ -1,5 +1,5 @@
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -25,7 +25,7 @@ export function triggerRequest({
     ...(method === "GET" ? {} : { method }),
     headers: {
       ...(sendsJson ? { "Content-Type": "application/json" } : {}),
-      ...buildAuthHeaders({ apiKey }),
+      ...buildRequestHeaders({ apiKey }),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
