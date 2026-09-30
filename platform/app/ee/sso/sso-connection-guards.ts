@@ -945,24 +945,12 @@ export class SsoConnectionGuards {
     }
     const method = data.channel ?? pending.method;
     const undecided = state.claimedDomains.includes(domain);
-    // Two ceremonies may decide a waiting claim: a published record, and a
-    // self-hosted installation's licence. The licence is asked again here,
-    // at the moment it decides, rather than trusted from the request.
-    if (undecided && pending.method === "license-token") {
-      await this.requireClaimAuthority({
-        authority: "license",
-        actor: data.actor,
-        act: `approve the claim on ${domain}`,
-      });
-    } else if (undecided && pending.method !== "dns-txt") {
-      throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: a ${pending.method} ceremony cannot decide the claim on ${domain}`,
-      );
-    }
-    const authority =
-      pending.method === "license-token"
-        ? ("license" as const)
-        : ("dns-proof" as const);
+    const authority = await this.authorityDecidingClaim({
+      data,
+      domain,
+      ceremony: pending.method,
+      undecided,
+    });
     return [
       ...(undecided
         ? [
@@ -993,6 +981,41 @@ export class SsoConnectionGuards {
         },
       },
     ];
+  }
+
+  /**
+   * Which authority a landing ceremony decides a waiting claim under. Two
+   * ceremonies may decide one: a published record, and a self-hosted
+   * installation's licence. The licence is asked again here, at the moment
+   * it decides, rather than trusted from the request.
+   */
+  private async authorityDecidingClaim({
+    data,
+    domain,
+    ceremony,
+    undecided,
+  }: {
+    data: VerifyDomainCommandData;
+    domain: string;
+    ceremony: string;
+    undecided: boolean;
+  }): Promise<"license" | "dns-proof"> {
+    if (ceremony === "license-token") {
+      if (undecided) {
+        await this.requireClaimAuthority({
+          authority: "license",
+          actor: data.actor,
+          act: `approve the claim on ${domain}`,
+        });
+      }
+      return "license";
+    }
+    if (undecided && ceremony !== "dns-txt") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: a ${ceremony} ceremony cannot decide the claim on ${domain}`,
+      );
+    }
+    return "dns-proof";
   }
 
   /**

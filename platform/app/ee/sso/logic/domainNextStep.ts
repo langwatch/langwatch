@@ -59,29 +59,13 @@ export function domainNextStepFor({
    *  waiting to be published. */
   recordIssued?: boolean;
 }): DomainNextStep {
-  if (proved && proofState !== "VERIFIED") {
-    return {
-      kind: "republish",
-      action: "Get a fresh record",
-      explanation:
-        "We can no longer find the record that proved this domain. People already here still sign in as usual. Publish it again and this goes back to normal.",
-    };
-  }
-  if (proved) {
-    return {
-      kind: "done",
-      action: null,
-      explanation: provesWithLicense
-        ? "This domain is added. Once the connection is live, sign-ins with an address at it go to your identity provider."
-        : "This domain is proved. Anyone with an address at it can be sent to your identity provider.",
-    };
-  }
+  if (proved) return provedStep({ proofState, provesWithLicense });
   if (claim?.state === "REJECTED") {
     return {
       kind: "claim-again",
       action: "Claim it again",
       explanation:
-        "This claim was not approved. You can claim the domain again — you do not need to start the connection over.",
+        "This claim was not approved. You can claim the domain again. You do not need to start the connection over.",
     };
   }
   // The only claim a PERSON here decides is one on a domain another
@@ -108,11 +92,50 @@ export function domainNextStepFor({
         "We have given you a value for this domain. Publish it, then use the check below. Asking to prove again replaces it with a new value, which would make anything you have already published stop counting.",
     };
   }
+  return getRecordStep({ provesWithLicense });
+}
+
+function provedStep({
+  proofState,
+  provesWithLicense,
+}: {
+  proofState: "VERIFIED" | "WAVERING" | "LAPSED";
+  provesWithLicense: boolean;
+}): DomainNextStep {
+  if (proofState !== "VERIFIED") {
+    return {
+      kind: "republish",
+      action: "Get a fresh record",
+      explanation:
+        "We can no longer find the record that proved this domain. People already here still sign in as usual. Publish it again and this goes back to normal.",
+    };
+  }
+  return {
+    kind: "done",
+    action: null,
+    explanation: provesWithLicense
+      ? "This domain is added. Once the connection is live, sign-ins with an address at it go to your identity provider."
+      : "This domain is proved. Anyone with an address at it can be sent to your identity provider.",
+  };
+}
+
+function getRecordStep({
+  provesWithLicense,
+}: {
+  provesWithLicense: boolean;
+}): DomainNextStep {
+  if (provesWithLicense) {
+    return {
+      kind: "get-record",
+      action: "Verify this domain",
+      explanation:
+        "This domain is not verified yet. On this installation that takes one press, and there is nothing to publish.",
+    };
+  }
   return {
     kind: "get-record",
-    action: provesWithLicense ? "Verify this domain" : "Prove this domain",
-    explanation: provesWithLicense
-      ? "This domain is not verified yet. On this installation that takes one press, and there is nothing to publish."
-      : "Next you prove the domain is yours. We give you a short value to publish in your domain's DNS, or as a file on your website, and then we look for it.",
+    action: "Prove this domain",
+    explanation:
+      "Next you prove the domain is yours. We give you a short value to publish in your domain's DNS, or as a file on your website, and then we look for it.",
   };
 }

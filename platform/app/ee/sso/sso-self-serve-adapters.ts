@@ -180,14 +180,10 @@ export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
     const licensed = await (
       this.deps.licensedAtStartup ?? platformSSOAllowed
     )();
-    const selfHostedLicensed = deployment === "self-hosted" && licensed;
-    const singleOrganization = selfHostedLicensed
-      ? await this.deps.licenseAuthority.hostsSingleOrganization()
-      : false;
-    const actorIsPlatformOperator =
-      selfHostedLicensed && !singleOrganization && actorId !== null
-        ? await this.deps.platformOperators.isPlatformOperator({ actorId })
-        : false;
+    const { singleOrganization, actorIsPlatformOperator } =
+      deployment === "self-hosted" && licensed
+        ? await this.whoTheLicenseSpeaksFor({ actorId })
+        : { singleOrganization: false, actorIsPlatformOperator: false };
     return {
       singleOrganization,
       actorIsPlatformOperator,
@@ -207,6 +203,28 @@ export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
               distinctId: organizationId,
             })
           : false,
+    };
+  }
+
+  /** Asked only on a licensed self-hosted installation, and the operator
+   *  only where there is more than one organization for it to matter. */
+  private async whoTheLicenseSpeaksFor({
+    actorId,
+  }: {
+    actorId: string | null;
+  }): Promise<{
+    singleOrganization: boolean;
+    actorIsPlatformOperator: boolean;
+  }> {
+    const singleOrganization =
+      await this.deps.licenseAuthority.hostsSingleOrganization();
+    if (singleOrganization || actorId === null) {
+      return { singleOrganization, actorIsPlatformOperator: false };
+    }
+    return {
+      singleOrganization,
+      actorIsPlatformOperator:
+        await this.deps.platformOperators.isPlatformOperator({ actorId }),
     };
   }
 }
