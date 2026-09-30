@@ -1,42 +1,879 @@
 [
-{"name":"en input, pt output mismatch","settings":{},"entry":{"input":"hello how is it going my friend? testing","output":"ola como vai voce eu vou bem obrigado"}},
-{"name":"en input, en output match","settings":{},"entry":{"input":"hello how is it going my friend? testing","output":"i am doing very well thank you for asking today"}},
-{"name":"expected EN, both EN","settings":{"check_for":"input_matches_output","expected_language":"EN"},"entry":{"input":"hello how is it going my friend? testing","output":"hello how is it going my friend? testing"}},
-{"name":"expected PT, output EN","settings":{"check_for":"input_matches_output","expected_language":"PT"},"entry":{"input":"hello how is it going my friend? testing","output":"hello how is it going my friend? testing"}},
-{"name":"short input skipped","settings":{"check_for":"input_matches_output","expected_language":"EN"},"entry":{"input":"small text","output":"small text"}},
-{"name":"short output skipped","settings":{},"entry":{"input":"hello how is it going my friend? testing","output":"hi"}},
-{"name":"output_matches_language any language","settings":{"check_for":"output_matches_language","expected_language":null},"entry":{"input":"small text","output":"hello how is it going my friend? testing"}},
-{"name":"output_matches_language expected EN pass","settings":{"check_for":"output_matches_language","expected_language":"EN"},"entry":{"output":"the quick brown fox jumps over the lazy dog every morning"}},
-{"name":"output_matches_language expected FR fail","settings":{"check_for":"output_matches_language","expected_language":"FR"},"entry":{"output":"the quick brown fox jumps over the lazy dog every morning"}},
-{"name":"output_matches_language French","settings":{"check_for":"output_matches_language","expected_language":"FR"},"entry":{"output":"le renard brun rapide saute par dessus le chien paresseux chaque matin"}},
-{"name":"output_matches_language German","settings":{"check_for":"output_matches_language","expected_language":"DE"},"entry":{"output":"der schnelle braune fuchs springt jeden morgen ueber den faulen hund"}},
-{"name":"output_matches_language Spanish","settings":{"check_for":"output_matches_language","expected_language":"ES"},"entry":{"output":"el rapido zorro marron salta sobre el perro perezoso cada manana"}},
-{"name":"output_matches_language Italian","settings":{"check_for":"output_matches_language","expected_language":"IT"},"entry":{"output":"la veloce volpe marrone salta sopra il cane pigro ogni mattina"}},
-{"name":"output_matches_language Dutch","settings":{"check_for":"output_matches_language","expected_language":"NL"},"entry":{"output":"de snelle bruine vos springt elke ochtend over de luie hond heen"}},
-{"name":"output_matches_language Russian","settings":{"check_for":"output_matches_language","expected_language":"RU"},"entry":{"output":"быстрая коричневая лиса прыгает через ленивую собаку каждое утро"}},
-{"name":"output_matches_language Arabic RTL","settings":{"check_for":"output_matches_language","expected_language":"AR"},"entry":{"output":"الثعلب البني السريع يقفز فوق الكلب الكسول كل صباح في الحديقة"}},
-{"name":"output_matches_language Hebrew RTL","settings":{"check_for":"output_matches_language","expected_language":"HE"},"entry":{"output":"השועל החום המהיר קופץ מעל הכלב העצל בכל בוקר בגינה הגדולה"}},
-{"name":"Japanese input and output","settings":{"min_words":0},"entry":{"input":"自動更新の解約の仕方を教えてください","output":"自動更新を解約するには、ユーザーのアカウントにログインして、「設定」を選択して、「自動更新」を解約してください。"}},
-{"name":"Chinese output_matches_language","settings":{"check_for":"output_matches_language","expected_language":"ZH"},"entry":{"output":"敏捷的棕色狐狸每天早上都会跳过那只懒惰的狗狗"}},
-{"name":"Korean output_matches_language","settings":{"check_for":"output_matches_language","expected_language":"KO"},"entry":{"output":"빠른 갈색 여우는 매일 아침 게으른 개를 뛰어넘습니다 정말로"}},
-{"name":"Thai output_matches_language","settings":{"check_for":"output_matches_language","expected_language":"TH"},"entry":{"output":"สุนัขจิ้งจอกสีน้ำตาลกระโดดข้ามสุนัขขี้เกียจทุกเช้า"}},
-{"name":"Latin long repeated input","settings":{"min_words":0},"entry":{"input":"lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor","output":"cogito ergo modus operandi"}},
-{"name":"mixed language output EN and FR","settings":{"check_for":"output_matches_language","expected_language":"FR"},"entry":{"output":"the weather today is very nice and le temps est vraiment magnifique aujourd'hui"}},
-{"name":"mixed language input EN and ES vs ES output","settings":{"min_words":3},"entry":{"input":"hello my friend, como estas hoy amigo mio","output":"estoy muy bien gracias por preguntar amigo"}},
-{"name":"very short text with min_words 0","settings":{"check_for":"output_matches_language","min_words":0},"entry":{"output":"ok"}},
-{"name":"very short text with min_words 1 single word","settings":{"check_for":"output_matches_language","min_words":1,"threshold":0.05},"entry":{"output":"bonjour"}},
-{"name":"very short two words input_matches_output","settings":{"min_words":0,"threshold":0.05},"entry":{"input":"thank you","output":"merci beaucoup"}},
-{"name":"high threshold skips","settings":{"check_for":"output_matches_language","threshold":0.99},"entry":{"output":"the weather today is very nice and le temps est vraiment magnifique aujourd'hui"}},
-{"name":"threshold 0 detects many languages","settings":{"check_for":"output_matches_language","threshold":0.0},"entry":{"output":"the quick brown fox jumps over the lazy dog every morning"}},
-{"name":"min_words 20 skips normal sentence","settings":{"check_for":"output_matches_language","min_words":20},"entry":{"output":"the quick brown fox jumps over the lazy dog every morning"}},
-{"name":"empty input default with input_matches_output","settings":{},"entry":{"output":"the quick brown fox jumps over the lazy dog every morning"}},
-{"name":"empty output","settings":{"check_for":"output_matches_language"},"entry":{"input":"the quick brown fox jumps over the lazy dog","output":""}},
-{"name":"whitespace-only output min_words 0","settings":{"check_for":"output_matches_language","min_words":0},"entry":{"output":"      "}},
-{"name":"emoji only output min_words 0","settings":{"check_for":"output_matches_language","min_words":0},"entry":{"output":"😀😀😀😀😀😀😀😀"}},
-{"name":"multi-line output","settings":{"check_for":"output_matches_language","expected_language":"EN"},"entry":{"output":"the quick brown fox\njumps over the lazy dog\nevery single morning"}},
-{"name":"numbers only output","settings":{"check_for":"output_matches_language","min_words":0},"entry":{"output":"1234 5678 9012 3456"}},
-{"name":"expected language present as secondary","settings":{"check_for":"output_matches_language","expected_language":"EN","threshold":0.1},"entry":{"output":"the weather today is very nice and le temps est vraiment magnifique aujourd'hui"}},
-{"name":"Portuguese vs Spanish similar languages","settings":{"min_words":3},"entry":{"input":"eu gostaria de comprar um livro novo hoje","output":"yo quisiera comprar un libro nuevo hoy"}},
-{"name":"long text output English","settings":{"check_for":"output_matches_language","expected_language":"EN"},"entry":{"output":"Lorem ipsum is placeholder text, but this sentence is written in plain English so that the detector has a long run of common words to work with. The quick brown fox jumps over the lazy dog, and then it runs across the field toward the river where the children are playing in the afternoon sun. When the evening comes everyone goes home for dinner and talks about what happened during the day."}},
-{"name":"whitespace-only input skipped","settings":{},"entry":{"input":"         ","output":"the quick brown fox jumps over the lazy dog every morning"}}
+  {
+    "name": "en input, pt output mismatch",
+    "settings": {},
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "ola como vai voce eu vou bem obrigado"
+    }
+  },
+  {
+    "name": "en input, en output match",
+    "settings": {},
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "i am doing very well thank you for asking today"
+    }
+  },
+  {
+    "name": "expected EN, both EN",
+    "settings": {
+      "check_for": "input_matches_output",
+      "expected_language": "EN"
+    },
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "hello how is it going my friend? testing"
+    }
+  },
+  {
+    "name": "expected PT, output EN",
+    "settings": {
+      "check_for": "input_matches_output",
+      "expected_language": "PT"
+    },
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "hello how is it going my friend? testing"
+    }
+  },
+  {
+    "name": "short input skipped",
+    "settings": {
+      "check_for": "input_matches_output",
+      "expected_language": "EN"
+    },
+    "entry": {
+      "input": "small text",
+      "output": "small text"
+    }
+  },
+  {
+    "name": "short output skipped",
+    "settings": {},
+    "entry": {
+      "input": "hello how is it going my friend? testing",
+      "output": "hi"
+    }
+  },
+  {
+    "name": "output_matches_language any language",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": null
+    },
+    "entry": {
+      "input": "small text",
+      "output": "hello how is it going my friend? testing"
+    }
+  },
+  {
+    "name": "output_matches_language expected EN pass",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "EN"
+    },
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    }
+  },
+  {
+    "name": "output_matches_language expected FR fail",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "FR"
+    },
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    }
+  },
+  {
+    "name": "output_matches_language French",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "FR"
+    },
+    "entry": {
+      "output": "le renard brun rapide saute par dessus le chien paresseux chaque matin"
+    }
+  },
+  {
+    "name": "output_matches_language German",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "DE"
+    },
+    "entry": {
+      "output": "der schnelle braune fuchs springt jeden morgen ueber den faulen hund"
+    }
+  },
+  {
+    "name": "output_matches_language Spanish",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "ES"
+    },
+    "entry": {
+      "output": "el rapido zorro marron salta sobre el perro perezoso cada manana"
+    }
+  },
+  {
+    "name": "output_matches_language Italian",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "IT"
+    },
+    "entry": {
+      "output": "la veloce volpe marrone salta sopra il cane pigro ogni mattina"
+    }
+  },
+  {
+    "name": "output_matches_language Dutch",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "NL"
+    },
+    "entry": {
+      "output": "de snelle bruine vos springt elke ochtend over de luie hond heen"
+    }
+  },
+  {
+    "name": "output_matches_language Russian",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "RU"
+    },
+    "entry": {
+      "output": "быстрая коричневая лиса прыгает через ленивую собаку каждое утро"
+    }
+  },
+  {
+    "name": "output_matches_language Arabic RTL",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "AR"
+    },
+    "entry": {
+      "output": "الثعلب البني السريع يقفز فوق الكلب الكسول كل صباح في الحديقة"
+    }
+  },
+  {
+    "name": "output_matches_language Hebrew RTL",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "HE"
+    },
+    "entry": {
+      "output": "השועל החום המהיר קופץ מעל הכלב העצל בכל בוקר בגינה הגדולה"
+    }
+  },
+  {
+    "name": "Japanese input and output",
+    "settings": {
+      "min_words": 0
+    },
+    "entry": {
+      "input": "自動更新の解約の仕方を教えてください",
+      "output": "自動更新を解約するには、ユーザーのアカウントにログインして、「設定」を選択して、「自動更新」を解約してください。"
+    }
+  },
+  {
+    "name": "Chinese output_matches_language",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "ZH"
+    },
+    "entry": {
+      "output": "敏捷的棕色狐狸每天早上都会跳过那只懒惰的狗狗"
+    }
+  },
+  {
+    "name": "Korean output_matches_language",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "KO"
+    },
+    "entry": {
+      "output": "빠른 갈색 여우는 매일 아침 게으른 개를 뛰어넘습니다 정말로"
+    }
+  },
+  {
+    "name": "Thai output_matches_language",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "TH"
+    },
+    "entry": {
+      "output": "สุนัขจิ้งจอกสีน้ำตาลกระโดดข้ามสุนัขขี้เกียจทุกเช้า"
+    }
+  },
+  {
+    "name": "Latin long repeated input",
+    "settings": {
+      "min_words": 0
+    },
+    "entry": {
+      "input": "lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor lorem ipsum dolor",
+      "output": "cogito ergo modus operandi"
+    }
+  },
+  {
+    "name": "mixed language output EN and FR",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "FR"
+    },
+    "entry": {
+      "output": "the weather today is very nice and le temps est vraiment magnifique aujourd'hui"
+    }
+  },
+  {
+    "name": "mixed language input EN and ES vs ES output",
+    "settings": {
+      "min_words": 3
+    },
+    "entry": {
+      "input": "hello my friend, como estas hoy amigo mio",
+      "output": "estoy muy bien gracias por preguntar amigo"
+    }
+  },
+  {
+    "name": "very short text with min_words 0",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 0
+    },
+    "entry": {
+      "output": "ok"
+    }
+  },
+  {
+    "name": "very short text with min_words 1 single word",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1,
+      "threshold": 0.05
+    },
+    "entry": {
+      "output": "bonjour"
+    }
+  },
+  {
+    "name": "very short two words input_matches_output",
+    "settings": {
+      "min_words": 0,
+      "threshold": 0.05
+    },
+    "entry": {
+      "input": "thank you",
+      "output": "merci beaucoup"
+    }
+  },
+  {
+    "name": "high threshold skips",
+    "settings": {
+      "check_for": "output_matches_language",
+      "threshold": 0.99
+    },
+    "entry": {
+      "output": "the weather today is very nice and le temps est vraiment magnifique aujourd'hui"
+    }
+  },
+  {
+    "name": "threshold 0 detects many languages",
+    "settings": {
+      "check_for": "output_matches_language",
+      "threshold": 0.0
+    },
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    }
+  },
+  {
+    "name": "min_words 20 skips normal sentence",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 20
+    },
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    }
+  },
+  {
+    "name": "empty input default with input_matches_output",
+    "settings": {},
+    "entry": {
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    }
+  },
+  {
+    "name": "empty output",
+    "settings": {
+      "check_for": "output_matches_language"
+    },
+    "entry": {
+      "input": "the quick brown fox jumps over the lazy dog",
+      "output": ""
+    }
+  },
+  {
+    "name": "whitespace-only output min_words 0",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 0
+    },
+    "entry": {
+      "output": "      "
+    }
+  },
+  {
+    "name": "emoji only output min_words 0",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 0
+    },
+    "entry": {
+      "output": "😀😀😀😀😀😀😀😀"
+    }
+  },
+  {
+    "name": "multi-line output",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "EN"
+    },
+    "entry": {
+      "output": "the quick brown fox\njumps over the lazy dog\nevery single morning"
+    }
+  },
+  {
+    "name": "numbers only output",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 0
+    },
+    "entry": {
+      "output": "1234 5678 9012 3456"
+    }
+  },
+  {
+    "name": "expected language present as secondary",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "EN",
+      "threshold": 0.1
+    },
+    "entry": {
+      "output": "the weather today is very nice and le temps est vraiment magnifique aujourd'hui"
+    }
+  },
+  {
+    "name": "Portuguese vs Spanish similar languages",
+    "settings": {
+      "min_words": 3
+    },
+    "entry": {
+      "input": "eu gostaria de comprar um livro novo hoje",
+      "output": "yo quisiera comprar un libro nuevo hoy"
+    }
+  },
+  {
+    "name": "long text output English",
+    "settings": {
+      "check_for": "output_matches_language",
+      "expected_language": "EN"
+    },
+    "entry": {
+      "output": "Lorem ipsum is placeholder text, but this sentence is written in plain English so that the detector has a long run of common words to work with. The quick brown fox jumps over the lazy dog, and then it runs across the field toward the river where the children are playing in the afternoon sun. When the evening comes everyone goes home for dinner and talks about what happened during the day."
+    }
+  },
+  {
+    "name": "whitespace-only input skipped",
+    "settings": {},
+    "entry": {
+      "input": "         ",
+      "output": "the quick brown fox jumps over the lazy dog every morning"
+    }
+  },
+  {
+    "name": "mixed script 00 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "The quick brown fox jumps over the lazy dog while the farmer watches from the porch."
+    }
+  },
+  {
+    "name": "mixed script 01 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Le renard brun rapide saute par-dessus le chien paresseux pendant que le fermier regarde."
+    }
+  },
+  {
+    "name": "mixed script 02 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Der schnelle braune Fuchs springt über den faulen Hund, während der Bauer zusieht."
+    }
+  },
+  {
+    "name": "mixed script 03 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "El rápido zorro marrón salta sobre el perro perezoso mientras el granjero mira."
+    }
+  },
+  {
+    "name": "mixed script 04 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "A rápida raposa marrom pula sobre o cão preguiçoso enquanto o fazendeiro observa."
+    }
+  },
+  {
+    "name": "mixed script 05 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "La volpe marrone veloce salta sopra il cane pigro mentre il contadino guarda."
+    }
+  },
+  {
+    "name": "mixed script 06 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "De snelle bruine vos springt over de luie hond terwijl de boer toekijkt."
+    }
+  },
+  {
+    "name": "mixed script 07 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Szybki brązowy lis przeskakuje nad leniwym psem, a rolnik patrzy z ganku."
+    }
+  },
+  {
+    "name": "mixed script 08 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Den snabba bruna räven hoppar över den lata hunden medan bonden tittar på."
+    }
+  },
+  {
+    "name": "mixed script 09 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Den hurtige brune ræv springer over den dovne hund, mens landmanden ser på."
+    }
+  },
+  {
+    "name": "mixed script 10 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Nopea ruskea kettu hyppää laiskan koiran yli, kun maanviljelijä katsoo."
+    }
+  },
+  {
+    "name": "mixed script 11 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "A gyors barna róka átugrik a lusta kutya fölött, miközben a gazda nézi."
+    }
+  },
+  {
+    "name": "mixed script 12 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Rychlá hnědá liška skáče přes líného psa, zatímco farmář se dívá."
+    }
+  },
+  {
+    "name": "mixed script 13 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Hızlı kahverengi tilki tembel köpeğin üzerinden atlarken çiftçi izliyor."
+    }
+  },
+  {
+    "name": "mixed script 14 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Rubah coklat yang cepat melompati anjing yang malas sementara petani melihat."
+    }
+  },
+  {
+    "name": "mixed script 15 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Con cáo nâu nhanh nhẹn nhảy qua con chó lười trong khi người nông dân nhìn."
+    }
+  },
+  {
+    "name": "mixed script 16 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Быстрая коричневая лиса прыгает через ленивую собаку, пока фермер смотрит."
+    }
+  },
+  {
+    "name": "mixed script 17 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Швидка коричнева лисиця стрибає через ледачого собаку, поки фермер дивиться."
+    }
+  },
+  {
+    "name": "mixed script 18 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Бързата кафява лисица прескача мързеливото куче, докато фермерът гледа."
+    }
+  },
+  {
+    "name": "mixed script 19 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Η γρήγορη καφέ αλεπού πηδάει πάνω από τον τεμπέλη σκύλο ενώ ο αγρότης κοιτάζει."
+    }
+  },
+  {
+    "name": "mixed script 20 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "الثعلب البني السريع يقفز فوق الكلب الكسول بينما يراقب المزارع."
+    }
+  },
+  {
+    "name": "mixed script 21 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "روباه قهوه ای سریع از روی سگ تنبل می پرد در حالی که کشاورز نگاه می کند."
+    }
+  },
+  {
+    "name": "mixed script 22 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "तेज़ भूरी लोमड़ी आलसी कुत्ते के ऊपर कूदती है जबकि किसान देखता है।"
+    }
+  },
+  {
+    "name": "mixed script 23 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "敏捷的棕色狐狸跳过了懒狗，而农民在门廊上看着。"
+    }
+  },
+  {
+    "name": "mixed script 24 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "素早い茶色の狐が怠惰な犬を飛び越え、農夫がポーチから見ている。"
+    }
+  },
+  {
+    "name": "mixed script 25 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "빠른 갈색 여우가 게으른 개를 뛰어넘고 농부는 현관에서 지켜본다."
+    }
+  },
+  {
+    "name": "mixed script 26 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "hello how are you doing today my friend"
+    }
+  },
+  {
+    "name": "mixed script 27 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "ok"
+    }
+  },
+  {
+    "name": "mixed script 28 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Bonjour, can you help me with my commande please? Merci beaucoup."
+    }
+  },
+  {
+    "name": "mixed script 29 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+    }
+  },
+  {
+    "name": "mixed script 30 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Ang mabilis na kayumangging soro ay tumalon sa tamad na aso habang nanonood ang magsasaka."
+    }
+  },
+  {
+    "name": "mixed script 31 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Mbweha mwepesi wa kahawia anaruka juu ya mbwa mvivu wakati mkulima anaangalia."
+    }
+  },
+  {
+    "name": "mixed script 32 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Il était une fois, dans un pays lointain, une princesse qui vivait dans un grand château entouré de forêts profondes et mystérieuses, où personne n'osait s'aventurer après la tombée de la nuit."
+    }
+  },
+  {
+    "name": "mixed script 33 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Es war einmal in einem fernen Land eine Prinzessin, die in einem großen Schloss lebte, das von tiefen und geheimnisvollen Wäldern umgeben war, in die sich nach Einbruch der Dunkelheit niemand wagte."
+    }
+  },
+  {
+    "name": "mixed script 34 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "দ্রুত বাদামী শিয়াল অলস কুকুরের উপর দিয়ে লাফ দেয় যখন কৃষক দেখছে।"
+    }
+  },
+  {
+    "name": "mixed script 35 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "வேகமான பழுப்பு நரி சோம்பேறி நாயின் மேல் குதிக்கிறது, விவசாயி பார்க்கிறார்."
+    }
+  },
+  {
+    "name": "mixed script 36 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "వేగవంతమైన గోధుమ నక్క సోమరి కుక్క మీదుగా దూకుతుంది, రైతు చూస్తున్నాడు."
+    }
+  },
+  {
+    "name": "mixed script 37 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "ઝડપી ભૂરા શિયાળ આળસુ કૂતરા પર કૂદકો મારે છે જ્યારે ખેડૂત જુએ છે."
+    }
+  },
+  {
+    "name": "mixed script 38 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "ਤੇਜ਼ ਭੂਰੀ ਲੂੰਬੜੀ ਆਲਸੀ ਕੁੱਤੇ ਉੱਤੇ ਛਾਲ ਮਾਰਦੀ ਹੈ ਜਦੋਂ ਕਿਸਾਨ ਦੇਖਦਾ ਹੈ।"
+    }
+  },
+  {
+    "name": "mixed script 39 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "वेगवान तपकिरी कोल्हा आळशी कुत्र्यावर उडी मारतो आणि शेतकरी पाहतो."
+    }
+  },
+  {
+    "name": "mixed script 40 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "สุนัขจิ้งจอกสีน้ำตาลกระโดดข้ามสุนัขขี้เกียจ"
+    }
+  },
+  {
+    "name": "mixed script 41 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "안녕하세요 hello 여러분 how are you 오늘"
+    }
+  },
+  {
+    "name": "mixed script 42 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Ελλάδα και Россия and English together in one line"
+    }
+  },
+  {
+    "name": "mixed script 43 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "Tiếng Việt có dấu: Hôm nay trời đẹp quá, chúng ta đi chơi nhé!"
+    }
+  },
+  {
+    "name": "mixed script 44 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "اردو ایک خوبصورت زبان ہے اور یہ پاکستان کی قومی زبان ہے۔"
+    }
+  },
+  {
+    "name": "mixed script 45 default threshold",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "עברית היא שפה עתיקה ומודרנית בו זמנית"
+    }
+  },
+  {
+    "name": "korean with english words",
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    },
+    "entry": {
+      "output": "안녕하세요 hello 여러분 how are you 오늘"
+    }
+  },
+  {
+    "name": "hindi input matches hindi output",
+    "settings": {
+      "check_for": "input_matches_output",
+      "min_words": 1
+    },
+    "entry": {
+      "input": "मैं आज बाज़ार जा रहा हूँ और कुछ फल खरीदूँगा",
+      "output": "यह एक बहुत अच्छा दिन है और मौसम सुहावना है"
+    }
+  }
 ]

@@ -12,10 +12,10 @@
       "passed": false,
       "raw_response": {
         "input": {
-          "EN": 0.37591396587304043
+          "EN": 0.3759139658730404
         },
         "output": {
-          "PT": 0.5438860811112145
+          "PT": 0.5438860811112146
         }
       },
       "score": 2.0,
@@ -36,10 +36,10 @@
       "passed": true,
       "raw_response": {
         "input": {
-          "EN": 0.37591396587304027
+          "EN": 0.37591396587304016
         },
         "output": {
-          "EN": 0.5475020411414724
+          "EN": 0.5475020411414726
         }
       },
       "score": 1.0,
@@ -60,10 +60,10 @@
       "passed": true,
       "raw_response": {
         "input": {
-          "EN": 0.3759139658730406
+          "EN": 0.3759139658730404
         },
         "output": {
-          "EN": 0.37591396587303993
+          "EN": 0.3759139658730402
         }
       },
       "score": 1.0,
@@ -87,10 +87,10 @@
       "passed": false,
       "raw_response": {
         "input": {
-          "EN": 0.3759139658730403
+          "EN": 0.3759139658730404
         },
         "output": {
-          "EN": 0.3759139658730403
+          "EN": 0.37591396587304043
         }
       },
       "score": 1.0,
@@ -144,7 +144,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "EN": 0.3759139658730402
+          "EN": 0.37591396587304077
         }
       },
       "score": 1.0,
@@ -168,7 +168,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "EN": 0.4114423234603733
+          "EN": 0.41144232346037324
         }
       },
       "score": 1.0,
@@ -192,7 +192,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "EN": 0.4114423234603738
+          "EN": 0.41144232346037335
         }
       },
       "score": 1.0,
@@ -216,7 +216,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "FR": 0.8273065149533293
+          "FR": 0.8273065149533294
         }
       },
       "score": 1.0,
@@ -240,7 +240,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "DE": 0.7859894327549456
+          "DE": 0.7859894327549454
         }
       },
       "score": 1.0,
@@ -264,7 +264,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "ES": 0.5391288488965982
+          "ES": 0.5391288488965975
         }
       },
       "score": 1.0,
@@ -288,7 +288,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "IT": 0.7885234922925511
+          "IT": 0.7885234922925516
         }
       },
       "score": 1.0,
@@ -312,7 +312,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "NL": 0.5870118040635839
+          "NL": 0.5870118040635837
         }
       },
       "score": 1.0,
@@ -506,10 +506,10 @@
       "passed": true,
       "raw_response": {
         "input": {
-          "LA": 0.9426325856644994
+          "LA": 0.9426325856644995
         },
         "output": {
-          "LA": 0.25458835034554744
+          "LA": 0.2545883503455474
         }
       },
       "score": 1.0,
@@ -532,7 +532,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "FR": 0.7729416062083618
+          "FR": 0.772941606208361
         }
       },
       "score": 1.0,
@@ -556,7 +556,7 @@
       "passed": true,
       "raw_response": {
         "input": {
-          "ES": 0.37025245960221265
+          "ES": 0.3702524596022126
         },
         "output": {
           "ES": 0.9199061387954103
@@ -597,7 +597,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "FR": 0.5448040264614572
+          "FR": 0.544804026461457
         }
       },
       "score": 1.0,
@@ -622,12 +622,12 @@
       "passed": false,
       "raw_response": {
         "input": {
-          "EN": 0.1073688328892744,
-          "SO": 0.05990045335524344,
-          "XH": 0.06470028577093141
+          "EN": 0.10736883288927444,
+          "SO": 0.05990045335524335,
+          "XH": 0.06470028577093144
         },
         "output": {
-          "FR": 0.7779402810633835
+          "FR": 0.777940281063383
         }
       },
       "score": 4.0,
@@ -666,55 +666,55 @@
       "raw_response": {
         "input": null,
         "output": {
-          "AF": 0.014908012744178427,
-          "AZ": 0.0006883092850851785,
-          "BS": 0.004820985735158884,
-          "CA": 0.004090285725533969,
-          "CS": 0.013537935237794627,
-          "CY": 0.03601755452926647,
-          "DA": 0.03862588499109949,
-          "DE": 0.02080635288054333,
-          "EN": 0.41144232346037324,
-          "EO": 0.012320749806558,
-          "ES": 0.006758830667893219,
-          "ET": 0.0030345336274120735,
-          "EU": 0.0028659707630545703,
-          "FI": 0.0033360446048087597,
-          "FR": 0.007940643920853923,
-          "GA": 0.005903682694846931,
-          "HR": 0.005558334915661546,
-          "HU": 0.008668780367570118,
-          "ID": 0.011767151811685327,
-          "IS": 0.016545410687969265,
-          "IT": 0.004246406773875349,
-          "LA": 0.013684851671810569,
-          "LG": 0.004775193875513178,
-          "LT": 0.0052370262572107185,
-          "LV": 0.0007655435636200648,
-          "MI": 0.007698164902068776,
-          "MS": 0.009670026830045026,
-          "NB": 0.026553369483825674,
-          "NL": 0.024671497431236703,
-          "NN": 0.012684473378438978,
-          "PL": 0.019234257470587768,
-          "PT": 0.003623187232065828,
-          "RO": 0.003690356691383057,
-          "SK": 0.016622776655168037,
-          "SL": 0.005929332544875536,
-          "SN": 0.00638894644129114,
-          "SO": 0.00202692143727399,
-          "SQ": 0.01225655668062588,
-          "ST": 0.0037499617896622067,
-          "SV": 0.03183183875769781,
-          "SW": 0.0072995867974784195,
-          "TL": 0.054110314570442,
-          "TN": 0.006794837439679458,
-          "TR": 0.005093357669683981,
-          "TS": 0.012126654981365868,
-          "VI": 0.007537347552022077,
-          "XH": 0.02110077683268043,
-          "YO": 0.026484847261369134,
-          "ZU": 0.014473808569654866
+          "AF": 0.014908012744178432,
+          "AZ": 0.0006883092850851763,
+          "BS": 0.004820985735158859,
+          "CA": 0.004090285725533956,
+          "CS": 0.01353793523779463,
+          "CY": 0.036017554529266485,
+          "DA": 0.03862588499109951,
+          "DE": 0.020806352880543336,
+          "EN": 0.41144232346037335,
+          "EO": 0.012320749806558026,
+          "ES": 0.006758830667893209,
+          "ET": 0.0030345336274120744,
+          "EU": 0.002865970763054571,
+          "FI": 0.003336044604808761,
+          "FR": 0.007940643920853927,
+          "GA": 0.005903682694846933,
+          "HR": 0.005558334915661529,
+          "HU": 0.00866878036757012,
+          "ID": 0.01176715181168527,
+          "IS": 0.016545410687969272,
+          "IT": 0.00424640677387535,
+          "LA": 0.01368485167181055,
+          "LG": 0.00477519387551318,
+          "LT": 0.005237026257210711,
+          "LV": 0.000765543563620065,
+          "MI": 0.0076981649020688055,
+          "MS": 0.00967002683004501,
+          "NB": 0.026553369483825733,
+          "NL": 0.024671497431236714,
+          "NN": 0.012684473378438981,
+          "PL": 0.01923425747058774,
+          "PT": 0.003623187232065829,
+          "RO": 0.003690356691383071,
+          "SK": 0.016622776655168044,
+          "SL": 0.005929332544875538,
+          "SN": 0.006388946441291143,
+          "SO": 0.0020269214372739906,
+          "SQ": 0.012256556680625906,
+          "ST": 0.003749961789662208,
+          "SV": 0.031831838757697815,
+          "SW": 0.007299586797478408,
+          "TL": 0.0541103145704421,
+          "TN": 0.006794837439679472,
+          "TR": 0.005093357669684,
+          "TS": 0.012126654981365849,
+          "VI": 0.007537347552022066,
+          "XH": 0.021100776832680437,
+          "YO": 0.026484847261369144,
+          "ZU": 0.014473808569654871
         }
       },
       "score": 49.0,
@@ -810,7 +810,7 @@
       "raw_response": {
         "input": null,
         "output": {
-          "EN": 0.47131973789768355
+          "EN": 0.4713197378976829
         }
       },
       "score": 1.0,
@@ -849,8 +849,8 @@
       "raw_response": {
         "input": null,
         "output": {
-          "EN": 0.10004005658686256,
-          "FR": 0.7729416062083616
+          "EN": 0.10004005658686221,
+          "FR": 0.7729416062083617
         }
       },
       "score": 2.0,
@@ -875,10 +875,10 @@
       "passed": false,
       "raw_response": {
         "input": {
-          "PT": 0.6828254152941141
+          "PT": 0.6828254152941148
         },
         "output": {
-          "ES": 0.6620365573792198
+          "ES": 0.6620365573792197
         }
       },
       "score": 2.0,
@@ -924,5 +924,1135 @@
       "status": "skipped"
     },
     "settings": {}
+  },
+  {
+    "entry": {
+      "output": "The quick brown fox jumps over the lazy dog while the farmer watches from the porch."
+    },
+    "name": "mixed script 00 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.5309281076766158
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Le renard brun rapide saute par-dessus le chien paresseux pendant que le fermier regarde."
+    },
+    "name": "mixed script 01 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FR",
+      "label": "FR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "FR": 0.9074702894509409
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Der schnelle braune Fuchs springt über den faulen Hund, während der Bauer zusieht."
+    },
+    "name": "mixed script 02 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: DE",
+      "label": "DE",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "DE": 0.9897970123401718
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "El rápido zorro marrón salta sobre el perro perezoso mientras el granjero mira."
+    },
+    "name": "mixed script 03 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: ES",
+      "label": "ES",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "ES": 0.9778605612341051
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "A rápida raposa marrom pula sobre o cão preguiçoso enquanto o fazendeiro observa."
+    },
+    "name": "mixed script 04 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: PT",
+      "label": "PT",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "PT": 0.9489128834577061
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "La volpe marrone veloce salta sopra il cane pigro mentre il contadino guarda."
+    },
+    "name": "mixed script 05 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: IT",
+      "label": "IT",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "IT": 0.847859806588719
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "De snelle bruine vos springt over de luie hond terwijl de boer toekijkt."
+    },
+    "name": "mixed script 06 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: NL",
+      "label": "NL",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "NL": 0.9780131149933019
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Szybki brązowy lis przeskakuje nad leniwym psem, a rolnik patrzy z ganku."
+    },
+    "name": "mixed script 07 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: PL",
+      "label": "PL",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "PL": 0.9998245897145923
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Den snabba bruna räven hoppar över den lata hunden medan bonden tittar på."
+    },
+    "name": "mixed script 08 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: SV",
+      "label": "SV",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "SV": 0.9101413025033553
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Den hurtige brune ræv springer over den dovne hund, mens landmanden ser på."
+    },
+    "name": "mixed script 09 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: DA",
+      "label": "DA",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "DA": 0.7633649848187658
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Nopea ruskea kettu hyppää laiskan koiran yli, kun maanviljelijä katsoo."
+    },
+    "name": "mixed script 10 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FI",
+      "label": "FI",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "FI": 0.9993265454047005
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "A gyors barna róka átugrik a lusta kutya fölött, miközben a gazda nézi."
+    },
+    "name": "mixed script 11 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: HU",
+      "label": "HU",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "HU": 0.9984487871080614
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Rychlá hnědá liška skáče přes líného psa, zatímco farmář se dívá."
+    },
+    "name": "mixed script 12 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: CS",
+      "label": "CS",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "CS": 0.9947539747037005
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Hızlı kahverengi tilki tembel köpeğin üzerinden atlarken çiftçi izliyor."
+    },
+    "name": "mixed script 13 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: TR",
+      "label": "TR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "TR": 0.9991536957883435
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Rubah coklat yang cepat melompati anjing yang malas sementara petani melihat."
+    },
+    "name": "mixed script 14 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: ID, MS",
+      "label": "ID",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "ID": 0.5996387311355297,
+          "MS": 0.3899896318382071
+        }
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Con cáo nâu nhanh nhẹn nhảy qua con chó lười trong khi người nông dân nhìn."
+    },
+    "name": "mixed script 15 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: VI",
+      "label": "VI",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "VI": 0.9873939966555126
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Быстрая коричневая лиса прыгает через ленивую собаку, пока фермер смотрит."
+    },
+    "name": "mixed script 16 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: RU",
+      "label": "RU",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "RU": 0.9550727776870311
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Швидка коричнева лисиця стрибає через ледачого собаку, поки фермер дивиться."
+    },
+    "name": "mixed script 17 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: UK",
+      "label": "UK",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "UK": 0.9838242890949368
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Бързата кафява лисица прескача мързеливото куче, докато фермерът гледа."
+    },
+    "name": "mixed script 18 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: BG",
+      "label": "BG",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "BG": 0.9890087686784843
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Η γρήγορη καφέ αλεπού πηδάει πάνω από τον τεμπέλη σκύλο ενώ ο αγρότης κοιτάζει."
+    },
+    "name": "mixed script 19 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EL",
+      "label": "EL",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EL": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "الثعلب البني السريع يقفز فوق الكلب الكسول بينما يراقب المزارع."
+    },
+    "name": "mixed script 20 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: AR",
+      "label": "AR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "AR": 0.9990957630368092
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "روباه قهوه ای سریع از روی سگ تنبل می پرد در حالی که کشاورز نگاه می کند."
+    },
+    "name": "mixed script 21 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FA",
+      "label": "FA",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "FA": 0.9771228574459817
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "तेज़ भूरी लोमड़ी आलसी कुत्ते के ऊपर कूदती है जबकि किसान देखता है।"
+    },
+    "name": "mixed script 22 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: HI",
+      "label": "HI",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "HI": 0.8794745240690672
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "敏捷的棕色狐狸跳过了懒狗，而农民在门廊上看着。"
+    },
+    "name": "mixed script 23 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: ZH",
+      "label": "ZH",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "ZH": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "素早い茶色の狐が怠惰な犬を飛び越え、農夫がポーチから見ている。"
+    },
+    "name": "mixed script 24 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: JA",
+      "label": "JA",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "JA": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "빠른 갈색 여우가 게으른 개를 뛰어넘고 농부는 현관에서 지켜본다."
+    },
+    "name": "mixed script 25 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: KO",
+      "label": "KO",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "KO": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "hello how are you doing today my friend"
+    },
+    "name": "mixed script 26 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.5372513041959059
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "ok"
+    },
+    "name": "mixed script 27 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the output with a confidence higher than 0.25",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Bonjour, can you help me with my commande please? Merci beaucoup."
+    },
+    "name": "mixed script 28 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FR, EN",
+      "label": "FR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.31306431032618226,
+          "FR": 0.4423003233469867
+        }
+      },
+      "score": 2.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+    },
+    "name": "mixed script 29 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: LA",
+      "label": "LA",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "LA": 0.9990781609944264
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Ang mabilis na kayumangging soro ay tumalon sa tamad na aso habang nanonood ang magsasaka."
+    },
+    "name": "mixed script 30 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: TL",
+      "label": "TL",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "TL": 0.9978874759489058
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Mbweha mwepesi wa kahawia anaruka juu ya mbwa mvivu wakati mkulima anaangalia."
+    },
+    "name": "mixed script 31 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: SW",
+      "label": "SW",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "SW": 0.9929579872518439
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Il était une fois, dans un pays lointain, une princesse qui vivait dans un grand château entouré de forêts profondes et mystérieuses, où personne n'osait s'aventurer après la tombée de la nuit."
+    },
+    "name": "mixed script 32 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: FR",
+      "label": "FR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "FR": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Es war einmal in einem fernen Land eine Prinzessin, die in einem großen Schloss lebte, das von tiefen und geheimnisvollen Wäldern umgeben war, in die sich nach Einbruch der Dunkelheit niemand wagte."
+    },
+    "name": "mixed script 33 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: DE",
+      "label": "DE",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "DE": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "দ্রুত বাদামী শিয়াল অলস কুকুরের উপর দিয়ে লাফ দেয় যখন কৃষক দেখছে।"
+    },
+    "name": "mixed script 34 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: BN",
+      "label": "BN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "BN": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "வேகமான பழுப்பு நரி சோம்பேறி நாயின் மேல் குதிக்கிறது, விவசாயி பார்க்கிறார்."
+    },
+    "name": "mixed script 35 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: TA",
+      "label": "TA",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "TA": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "వేగవంతమైన గోధుమ నక్క సోమరి కుక్క మీదుగా దూకుతుంది, రైతు చూస్తున్నాడు."
+    },
+    "name": "mixed script 36 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: TE",
+      "label": "TE",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "TE": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "ઝડપી ભૂરા શિયાળ આળસુ કૂતરા પર કૂદકો મારે છે જ્યારે ખેડૂત જુએ છે."
+    },
+    "name": "mixed script 37 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: GU",
+      "label": "GU",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "GU": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "ਤੇਜ਼ ਭੂਰੀ ਲੂੰਬੜੀ ਆਲਸੀ ਕੁੱਤੇ ਉੱਤੇ ਛਾਲ ਮਾਰਦੀ ਹੈ ਜਦੋਂ ਕਿਸਾਨ ਦੇਖਦਾ ਹੈ।"
+    },
+    "name": "mixed script 38 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: PA",
+      "label": "PA",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "PA": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "वेगवान तपकिरी कोल्हा आळशी कुत्र्यावर उडी मारतो आणि शेतकरी पाहतो."
+    },
+    "name": "mixed script 39 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: MR",
+      "label": "MR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "MR": 0.9496837667514774
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "สุนัขจิ้งจอกสีน้ำตาลกระโดดข้ามสุนัขขี้เกียจ"
+    },
+    "name": "mixed script 40 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: TH",
+      "label": "TH",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "TH": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "안녕하세요 hello 여러분 how are you 오늘"
+    },
+    "name": "mixed script 41 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the output with a confidence higher than 0.25",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Ελλάδα και Россия and English together in one line"
+    },
+    "name": "mixed script 42 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: EN",
+      "label": "EN",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "EN": 0.5632734000938302
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "Tiếng Việt có dấu: Hôm nay trời đẹp quá, chúng ta đi chơi nhé!"
+    },
+    "name": "mixed script 43 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: VI",
+      "label": "VI",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "VI": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "اردو ایک خوبصورت زبان ہے اور یہ پاکستان کی قومی زبان ہے۔"
+    },
+    "name": "mixed script 44 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: UR",
+      "label": "UR",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "UR": 0.9908490305064586
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "עברית היא שפה עתיקה ומודרנית בו זמנית"
+    },
+    "name": "mixed script 45 default threshold",
+    "result": {
+      "cost": null,
+      "details": "Languages detected: HE",
+      "label": "HE",
+      "passed": true,
+      "raw_response": {
+        "input": null,
+        "output": {
+          "HE": 1.0
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "output": "안녕하세요 hello 여러분 how are you 오늘"
+    },
+    "name": "korean with english words",
+    "result": {
+      "cost": null,
+      "details": "Skipped because no language could be detected on the output with a confidence higher than 0.25",
+      "status": "skipped"
+    },
+    "settings": {
+      "check_for": "output_matches_language",
+      "min_words": 1
+    }
+  },
+  {
+    "entry": {
+      "input": "मैं आज बाज़ार जा रहा हूँ और कुछ फल खरीदूँगा",
+      "output": "यह एक बहुत अच्छा दिन है और मौसम सुहावना है"
+    },
+    "name": "hindi input matches hindi output",
+    "result": {
+      "cost": null,
+      "details": "Input languages detected: HI. Output languages detected: HI",
+      "label": "HI",
+      "passed": true,
+      "raw_response": {
+        "input": {
+          "HI": 0.8200374875651574
+        },
+        "output": {
+          "HI": 0.8338501645765933
+        }
+      },
+      "score": 1.0,
+      "status": "processed"
+    },
+    "settings": {
+      "check_for": "input_matches_output",
+      "min_words": 1
+    }
   }
 ]
