@@ -8,6 +8,10 @@
  * into the real rollup store over ClickHouse. Spec: pulled-usage-cost-reporting.feature
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import {
+  migrateTestClickHouseOnce,
+  startTestClickHouseEndpoints,
+} from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
   PULLED_USAGE_AGGREGATE_TYPE,
@@ -16,10 +20,6 @@ import {
   pulledUsageObservedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { createTenantId } from "@langwatch/eventing";
-import {
-  migrateTestClickHouseOnce,
-  startTestClickHouseEndpoints,
-} from "@langwatch/test-harness/clickhouse";
 import { type Instant, Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

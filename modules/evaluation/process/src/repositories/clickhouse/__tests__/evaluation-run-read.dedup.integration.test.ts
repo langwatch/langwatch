@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 /** Spec: specs/evaluations/trace-evaluations-read.feature */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
+import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { EvaluationRunClickHouseReadRepository } from "../evaluation-run-read.repository.ts";

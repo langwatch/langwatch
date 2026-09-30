@@ -14909,6 +14909,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-client
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -15803,9 +15806,15 @@ importers:
         specifier: workspace:*
         version: link:../time
     devDependencies:
+      '@testcontainers/clickhouse':
+        specifier: 'catalog:'
+        version: 12.1.0(supports-color@10.2.2)
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
+      nanoid:
+        specifier: 'catalog:'
+        version: 5.1.16
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -15831,9 +15840,6 @@ importers:
         specifier: workspace:*
         version: link:../task
     devDependencies:
-      '@langwatch/test-harness':
-        specifier: workspace:*
-        version: link:../test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -17160,9 +17166,6 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
-      '@testcontainers/clickhouse':
-        specifier: 'catalog:'
-        version: 12.1.0(supports-color@10.2.2)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)

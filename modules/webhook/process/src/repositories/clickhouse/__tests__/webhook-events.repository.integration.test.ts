@@ -2,7 +2,7 @@
 /** @vitest-environment node */
 /** Spec: specs/webhooks/webhook-endpoints.feature */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
+import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {

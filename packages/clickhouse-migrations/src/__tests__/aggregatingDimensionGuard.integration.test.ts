@@ -10,7 +10,7 @@ import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
-} from "@langwatch/test-harness/clickhouse";
+} from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseMigrateTask } from "../clickhouse-migrate.task.ts";

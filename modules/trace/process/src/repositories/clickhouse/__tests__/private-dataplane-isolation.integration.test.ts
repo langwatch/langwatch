@@ -17,16 +17,16 @@ import {
   type ClickHouseClientCreationInput,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
+import {
+  migrateTestClickHouseOnce,
+  privateRouteOrgId,
+  startTestClickHouseEndpoints,
+} from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
   createEventingRetentionConfiguration,
   EventingClickHouseEventRepository,
 } from "@langwatch/eventing/server";
-import {
-  migrateTestClickHouseOnce,
-  privateRouteOrgId,
-  startTestClickHouseEndpoints,
-} from "@langwatch/test-harness/clickhouse";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

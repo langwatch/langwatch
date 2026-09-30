@@ -5,11 +5,11 @@
 import { randomUUID } from "node:crypto";
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
   migrateTestClickHouseOnce,
   startTestClickHouseEndpoints,
-} from "@langwatch/test-harness/clickhouse";
+} from "@langwatch/clickhouse-client/testing";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

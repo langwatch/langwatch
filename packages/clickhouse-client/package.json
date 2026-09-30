@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/clickhouse-test-endpoints.d.ts",
+      "default": "./src/clickhouse-test-endpoints.ts"
     }
   },
   "scripts": {
@@ -29,7 +33,9 @@
     "@langwatch/time": "workspace:*"
   },
   "devDependencies": {
+    "@testcontainers/clickhouse": "catalog:",
     "@types/node": "catalog:",
+    "nanoid": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

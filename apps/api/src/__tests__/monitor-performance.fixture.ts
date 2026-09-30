@@ -10,9 +10,9 @@ import {
   type AnalyticsSeries,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { startTestClickHouseEndpoints } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { generate } from "@langwatch/ksuid";
-import { startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HALF_DAY_MS = 12 * 60 * 60 * 1000;

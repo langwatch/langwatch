@@ -48,7 +48,7 @@ Interrupted vitest workers reparent to pid 1 and keep holding their memory.
   silent no-op.
 - `cleanupTestRows` for datastore rows.
 - `startTestClickHouseEndpoints` when a suite needs several mutually isolated
-  ClickHouse endpoints.
+  ClickHouse endpoints (`@langwatch/clickhouse-client/testing`).
 - `createTestLogger()` returns `{ logger, lines }` - a real pino instance writing
   synchronously into an in-memory array, read back with `lines.find(level,
 msgIncludes)`. `createLogger` is silent under vitest, so a test that asserts on

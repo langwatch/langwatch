@@ -10,10 +10,6 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./clickhouse": {
-      "types": "./dist/clickhouse-test-endpoints.d.ts",
-      "default": "./src/clickhouse-test-endpoints.ts"
-    },
     "./client-doubles/clickhouse": {
       "types": "./dist/client-doubles/clickhouse.double.d.ts",
       "default": "./src/client-doubles/clickhouse.double.ts"
@@ -54,7 +50,6 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
-    "@testcontainers/clickhouse": "catalog:",
     "ioredis": "catalog:",
     "nanoid": "catalog:",
     "picomatch": "^4.0.4",

@@ -74,7 +74,7 @@ const MAY_CONSTRUCT = new Set([
   "modules/ops/process/src/repositories/clickhouse/clickhouse.ops-explain.repository.ts",
   // A throwaway container, test endpoints and a never-connected double: no tenant rows.
   "modules/analytics/process/scripts/generate-lwql-columns-manifest.ts",
-  "packages/test-harness/src/clickhouse-test-endpoints.ts",
+  "packages/clickhouse-client/src/clickhouse-test-endpoints.ts",
   "packages/test-harness/src/client-doubles/clickhouse.double.ts",
 ]);
 
