@@ -1,6 +1,6 @@
 /**
- * Unit tests for StoredObjectsRepository — verifies that queries are project-scoped and
- * that insert/tryFindById delegate to the ClickHouse client with the expected shape.
+ * Unit tests for StoredObjectsRepository — verifies that the lookup is project-scoped and
+ * delegates to the ClickHouse client with the expected shape.
  * @vitest-environment node
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,14 +9,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-const { mockInsert, mockQuery, mockExec, mockQueryResult } = vi.hoisted(() => {
+const { mockQuery, mockQueryResult } = vi.hoisted(() => {
   const queryResult = {
     json: vi.fn().mockResolvedValue([]),
   };
   return {
-    mockInsert: vi.fn().mockResolvedValue(undefined),
     mockQuery: vi.fn().mockResolvedValue(queryResult),
-    mockExec: vi.fn().mockResolvedValue(undefined),
     mockQueryResult: queryResult,
   };
 });
@@ -40,38 +38,13 @@ vi.mock("langwatch", () => ({
 import { TenantGuard, TenantScopeError } from "@langwatch/clickhouse-client";
 
 import type { StoredObjectsClickHouse } from "../../../app/stored-object.members.ts";
-import type { StoredObject } from "../../../rules/stored-object-row.rules.ts";
 import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository.ts";
 
 /** The routed connection, as this suite's one project resolves it. */
 class FakeStoredObjectsClickHouse implements StoredObjectsClickHouse {
   async resolveClient() {
-    return {
-      insert: mockInsert,
-      query: mockQuery,
-      exec: mockExec,
-    } as never;
+    return { query: mockQuery };
   }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeRow(): StoredObject {
-  return {
-    id: "test-id",
-    project_id: "proj-1",
-    purpose: "trace_content",
-    owner_kind: "span",
-    owner_id: "owner-1",
-    media_type: "text/plain",
-    size_bytes: 5,
-    sha256: "abc123",
-    storage_uri: "file:///var/lib/langwatch/objects/proj-1/abc123",
-    created_at: new Date("2025-01-01T00:00:00Z"),
-    inserted_at: new Date("2025-01-01T00:00:00Z"),
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -85,28 +58,6 @@ describe("StoredObjectsRepository", () => {
     vi.clearAllMocks();
     mockQueryResult.json.mockResolvedValue([]);
     repo = ClickHouseStoredObjectsRepository.create(new FakeStoredObjectsClickHouse());
-  });
-
-  describe("insert()", () => {
-    describe("when called with a projectId and row", () => {
-      it("calls client.insert with the expected table and values", async () => {
-        const row = makeRow();
-
-        await repo.insert({ projectId: "proj-1", row });
-
-        expect(mockInsert).toHaveBeenCalledOnce();
-        const call = mockInsert.mock.calls[0]![0];
-        expect(call.table).toBe("stored_objects");
-        expect(call.format).toBe("JSONEachRow");
-        expect(call.values).toHaveLength(1);
-        expect(call.values[0]).toMatchObject({
-          id: row.id,
-          project_id: row.project_id,
-          sha256: row.sha256,
-          storage_uri: row.storage_uri,
-        });
-      });
-    });
   });
 
   describe("tryFindById()", () => {
@@ -162,27 +113,20 @@ describe("StoredObjectsRepository", () => {
     });
   });
 
-  describe("when any statement is sent against a table with no TenantId column", () => {
+  describe("when the lookup is sent against a table with no TenantId column", () => {
     const tenantId = "proj-1";
 
     /** @scenario "Every legacy index statement declares itself unscoped" */
     it("declares itself unscoped, or the tenant guard refuses it", async () => {
       mockQueryResult.json.mockResolvedValue([]);
       await repo.tryFindById({ projectId: tenantId, id: "x" });
-      await repo.findAllByProject({ projectId: tenantId });
-      await repo.sumSizeBytesByProject({ projectId: tenantId, purpose: "trace_content" });
-      await repo.deleteByIds({ projectId: tenantId, ids: ["x"] });
 
-      const sent = [...mockQuery.mock.calls, ...mockExec.mock.calls].map(([call]) => call);
-      expect(sent).toHaveLength(4);
-      for (const call of sent) {
-        const request = { tenantId, sql: call.query, params: call.query_params };
-        expect(() => new TenantGuard().assert(request)).toThrow(TenantScopeError);
-        expect(() =>
-          new TenantGuard().assert({ ...request, unscoped: call.unscoped }),
-        ).not.toThrow();
-        expect(call.query).toContain("project_id = {projectId:String}");
-      }
+      expect(mockQuery).toHaveBeenCalledOnce();
+      const call = mockQuery.mock.calls[0]![0];
+      const request = { tenantId, sql: call.query, params: call.query_params };
+      expect(() => new TenantGuard().assert(request)).toThrow(TenantScopeError);
+      expect(() => new TenantGuard().assert({ ...request, unscoped: call.unscoped })).not.toThrow();
+      expect(call.query).toContain("project_id = {projectId:String}");
     });
   });
 });

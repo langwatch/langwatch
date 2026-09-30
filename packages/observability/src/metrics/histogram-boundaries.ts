@@ -32,9 +32,6 @@ export const HISTOGRAM_BOUNDARIES: Readonly<Record<string, readonly number[]>> =
   trace_span_count: [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100, 125, 150, 175, 200,
   ],
-  stored_object_size_bytes: [
-    128, 1_024, 4_096, 16_384, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216,
-  ],
 
   // --- work ---
   job_processing_duration_milliseconds: JOB_MS,

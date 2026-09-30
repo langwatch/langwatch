@@ -10,7 +10,6 @@ import {
   StoredObjectCapabilityUnavailableError,
   StoredObjectNotFoundError,
   type StoredObjectDeliveryCapability,
-  mintStoredObjectUri,
 } from "@langwatch/stored-object-contract";
 
 import { ClickHouseStoredObjectsRepository } from "../repositories/clickhouse/stored-objects.repository.ts";
@@ -61,21 +60,6 @@ class MemberStoredObjectsClickHouseClient implements StoredObjectsClickHouseClie
     private readonly tenantId: string,
   ) {}
 
-  async insert(input: {
-    table: string;
-    values: readonly Record<string, unknown>[];
-    clickhouse_settings?: Record<string, unknown>;
-  }): Promise<unknown> {
-    return this.clickhouse.insert({
-      tenantId: this.tenantId,
-      table: input.table,
-      rows: input.values,
-      ...(input.clickhouse_settings
-        ? { settings: input.clickhouse_settings as Record<string, string | number> }
-        : {}),
-    });
-  }
-
   async query(input: {
     query: string;
     query_params: Record<string, unknown>;
@@ -88,23 +72,6 @@ class MemberStoredObjectsClickHouseClient implements StoredObjectsClickHouseClie
       unscoped: input.unscoped,
     });
     return { json: async <Result>() => result.rows as Result[] };
-  }
-
-  async exec(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    clickhouse_settings?: Record<string, unknown>;
-    unscoped?: { reason: string };
-  }): Promise<unknown> {
-    return this.clickhouse.command({
-      tenantId: this.tenantId,
-      sql: input.query,
-      params: input.query_params,
-      unscoped: input.unscoped,
-      ...(input.clickhouse_settings
-        ? { settings: input.clickhouse_settings as Record<string, string | number> }
-        : {}),
-    });
   }
 }
 
@@ -149,13 +116,6 @@ export function buildStoredObjectInfrastructure(input: {
     ),
     registry: (projectId: string) =>
       ObjectStorageStoredObjectStorageRepository.create({ objectStorage, projectId }),
-    mintStorageUri: async ({ projectId, sha256 }) => {
-      const destination = await objectStorage.destination(projectId);
-      if (destination.kind === "memory") {
-        throw new Error("The legacy index names no URI for in-memory object storage.");
-      }
-      return mintStoredObjectUri({ destination, objectPath: `${projectId}/${sha256}` });
-    },
     telemetry: StoredObjectsTelemetryService.create(),
   });
 

@@ -3,15 +3,12 @@
  * Round-trip bytes through Azure Blob with real driver, registry, and policy.
  * @see specs/features/scenarios/externalize-event-byte-content.feature
  */
-import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 
 import { TieredBlobStore } from "@langwatch/group-queue/operational";
-import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
-import type { StoredObject } from "#rules/stored-object-row.rules";
 import {
   StoredObjectAzureDestination,
   StoredObjectDestinationPolicyService,
@@ -19,7 +16,6 @@ import {
   type StoredObjectProjectBucket,
 } from "#services/stored-object-destination-policy.service";
 import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
-import { StoredObjectsService } from "#services/stored-objects.service";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
   if (input === undefined) return "";
@@ -124,60 +120,6 @@ afterEach(() => {
 });
 
 describe("given a deployment whose object storage is Azure Blob and nothing else", () => {
-  describe("when scenario media is stored and read back", () => {
-    /** @scenario "Scenario media round-trips through Azure Blob when azure is the configured backend" */
-    it("writes the bytes to the azure account and streams the same bytes back", async () => {
-      const bytes = Buffer.from("a scenario audio turn");
-      const rows = new Map<string, StoredObject>();
-      const policy = azureOnlyPolicy();
-      const service = StoredObjectsService.create({
-        repository: {
-          insert: vi.fn(async ({ row }: { row: StoredObject }) => {
-            rows.set(row.id, row);
-          }),
-          tryFindById: vi.fn(async ({ id }: { id: string }) => rows.get(id) ?? null),
-          findAllByProject: vi.fn(async () => []),
-          deleteByIds: vi.fn(async () => undefined),
-          sumSizeBytesByProject: () =>
-            Promise.reject(new Error("sumSizeBytesByProject is not used here")),
-        },
-        registry: azureOnlyRegistry(),
-        mintStorageUri: async ({ projectId, sha256 }) =>
-          mintStoredObjectUri({
-            destination: await policy.resolve(projectId),
-            objectPath: `${projectId}/${sha256}`,
-          }),
-        telemetry: {
-          recordExtract: vi.fn(),
-          recordDedupHit: vi.fn(),
-          recordWriteFailure: vi.fn(),
-          recordReadFailure: vi.fn(),
-          observeSizeBytes: vi.fn(),
-        },
-      });
-
-      const stored = await service.storeFromBytes({
-        projectId: PROJECT_ID,
-        purpose: "scenario_event",
-        ownerKind: "scenario_run",
-        ownerId: "run-1",
-        mediaType: "audio/wav",
-        bytes,
-      });
-
-      const row = rows.get(stored.id);
-      expect(row?.storage_uri).toBe(
-        `azure-blob://${ACCOUNT}/${CONTAINER}/${PROJECT_ID}/${createHash("sha256")
-          .update(bytes)
-          .digest("hex")}`,
-      );
-
-      const read = await service.getById({ projectId: PROJECT_ID, id: stored.id });
-      expect(read && "stream" in read).toBe(true);
-      await expect(drain((read as { stream: Readable }).stream)).resolves.toBe(bytes.toString());
-    });
-  });
-
   describe("when the groupQueue offloads an oversized envelope", () => {
     /** @scenario "The groupQueue durable blob tier works on an Azure-only install" */
     it("puts the bytes in Azure Blob under the durable tier and reads them back", async () => {

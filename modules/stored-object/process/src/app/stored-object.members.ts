@@ -89,26 +89,14 @@ export interface StoredObjectS3TargetResolver {
   resolve(projectId: string): Promise<StoredObjectS3Target>;
 }
 
-/** The three operations the stored-object table needs, as the driver exposes them. */
+/** The one operation the legacy stored-object index needs, as the driver exposes it. */
 export type StoredObjectsClickHouseClient = Readonly<{
-  insert(input: {
-    table: string;
-    values: readonly Record<string, unknown>[];
-    format: "JSONEachRow";
-    clickhouse_settings?: Record<string, unknown>;
-  }): Promise<unknown>;
   query(input: {
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
     unscoped?: { reason: string };
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
-  exec(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    clickhouse_settings?: Record<string, unknown>;
-    unscoped?: { reason: string };
-  }): Promise<unknown>;
 }>;
 
 /** Resolves the client one project's stored-object rows live on. */
@@ -116,20 +104,10 @@ export interface StoredObjectsClickHouse {
   resolveClient(projectId: string): Promise<StoredObjectsClickHouseClient>;
 }
 
-/**
- * What the content-addressed store reports about its own work.
- */
+/** What the legacy index reports about its own work. */
 export interface StoredObjectsTelemetry {
-  /** One `storeFromBytes` call arrived, whatever it went on to do. */
-  recordExtract(purpose: string): void;
-  /** The content was already held for this project, so nothing was written. */
-  recordDedupHit(purpose: string): void;
-  /** The storage backend refused a write, or the row insert after it failed. */
-  recordWriteFailure(purpose: string): void;
   /** A read reached the storage backend and it failed for anything but a 404. */
   recordReadFailure(): void;
-  /** The payload size one call carried. */
-  observeSizeBytes(purpose: string, bytes: number): void;
 }
 
 export type StoredObjectStorageAddress = Readonly<{
