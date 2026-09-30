@@ -4098,6 +4098,11 @@
       capture: {"scimUserId": "id"}
   request: {"path": "/api/organization/members"}
   expect: {"status": 200, "contains": "vd-{uid}@example.com"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-members-list-include-disabled"
   endpoint: "GET /api/organization/members"
@@ -4159,6 +4164,11 @@
   expect:
     status: 200
     body: {"userId": "{scimUserId}", "disabled": false}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-get-not-found"
   endpoint: "GET /api/organization/members/{userId}"
@@ -4215,6 +4225,11 @@
       body: {"role": "VIEWER", "scopeType": "PROJECT", "scopeId": "{projectId}"}
   request: {"path": "/api/organization/members/{scimUserId}/access"}
   expect: {"status": 200, "contains": "{groupId}"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-access-not-found"
   endpoint: "GET /api/organization/members/{userId}/access"
@@ -4266,6 +4281,11 @@
   verify:
     - request: "GET /api/organization/members/{scimUserId}"
       expect: {"status": 200, "body": {"role": "EXTERNAL"}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-update-disable"
   endpoint: "PATCH /api/organization/members/{userId}"
@@ -4291,6 +4311,11 @@
       expect: {"status": 200, "body": {"disabled": true}}
     - request: "GET /api/organization/members?includeDisabled=true"
       expect: {"status": 200, "contains": "{scimUserId}"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-update-reenable"
   endpoint: "PATCH /api/organization/members/{userId}"
@@ -4314,6 +4339,11 @@
   verify:
     - request: "GET /api/organization/members/{scimUserId}"
       expect: {"status": 200, "body": {"disabled": false}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-update-rejects-both-fields"
   endpoint: "PATCH /api/organization/members/{userId}"
@@ -4332,6 +4362,11 @@
     path: "/api/organization/members/{scimUserId}"
     body: {"role": "MEMBER", "disabled": true}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-update-rejects-neither-field"
   endpoint: "PATCH /api/organization/members/{userId}"
@@ -4348,6 +4383,11 @@
       capture: {"scimUserId": "id"}
   request: {"path": "/api/organization/members/{scimUserId}", "body": {}}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-update-rejects-invalid-role"
   endpoint: "PATCH /api/organization/members/{userId}"
@@ -4369,6 +4409,11 @@
   verify:
     - request: "GET /api/organization/members/{scimUserId}"
       expect: {"status": 200, "body": {"role": "MEMBER"}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-update-rejects-non-boolean-disabled"
   endpoint: "PATCH /api/organization/members/{userId}"
@@ -4387,6 +4432,11 @@
     path: "/api/organization/members/{scimUserId}"
     body: {"disabled": "yes"}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-update-not-found"
   endpoint: "PATCH /api/organization/members/{userId}"
@@ -4448,6 +4498,11 @@
       expect: {"status": 404}
     - request: "GET /api/organization/members"
       expect: {"status": 200, "notContains": "vd-{uid}@example.com"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-remove-drops-team-membership"
   endpoint: "DELETE /api/organization/members/{userId}"
@@ -4472,6 +4527,11 @@
   verify:
     - request: "GET /api/teams/{teamId}/members"
       expect: {"status": 200, "notContains": "{scimUserId}"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-remove-not-found"
   endpoint: "DELETE /api/organization/members/{userId}"
@@ -4495,6 +4555,11 @@
     - request: "DELETE /api/organization/members/{scimUserId}"
   request: {"path": "/api/organization/members/{scimUserId}"}
   expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "organization-member-remove-refuses-no-key"
   endpoint: "DELETE /api/organization/members/{userId}"
@@ -5407,6 +5472,11 @@
     body: {"totalResults": 1}
     path: "Resources"
     length: 1
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-list-filter-no-match"
   endpoint: "GET /api/scim/v2/Users"
@@ -5492,6 +5562,11 @@
     - request: "GET /api/organization/members?limit=200"
       auth: "org"
       expect: {"status": 200, "contains": "vd-{uid}@example.com"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-create-inactive"
   endpoint: "POST /api/scim/v2/Users"
@@ -5510,6 +5585,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200, "body": {"active": false}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-create-with-external-id"
   endpoint: "POST /api/scim/v2/Users"
@@ -5529,6 +5609,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-create-blank-external-id-is-absent"
   endpoint: "POST /api/scim/v2/Users"
@@ -5544,6 +5629,11 @@
       externalId: ""
   capture: {"scimUserId": "id"}
   expect: {"status": 201}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-create-rejects-invalid-email"
   endpoint: "POST /api/scim/v2/Users"
@@ -5596,6 +5686,11 @@
       emails: [{"primary": true, "value": "vd-{uid}@example.com", "type": "work"}]
       active: true
   expect: {"status": [201, 409]}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-create-refuses-no-key"
   endpoint: "POST /api/scim/v2/Users"
@@ -5643,6 +5738,11 @@
       id: "{scimUserId}"
       userName: "vd-{uid}@example.com"
       meta: {"resourceType": "User"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-get-not-found"
   endpoint: "GET /api/scim/v2/Users/{id}"
@@ -5688,6 +5788,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200, "body": {"name": {"givenName": "Renamed"}}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-replace-deactivates"
   endpoint: "PUT /api/scim/v2/Users/{id}"
@@ -5715,6 +5820,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200, "body": {"active": false}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-replace-rejects-invalid-email"
   endpoint: "PUT /api/scim/v2/Users/{id}"
@@ -5738,6 +5848,11 @@
       emails: [{"primary": true, "value": "vd-{uid}@example.com", "type": "work"}]
       active: true
   expect: {"status": 400}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-replace-not-found"
   endpoint: "PUT /api/scim/v2/Users/{id}"
@@ -5801,6 +5916,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200, "body": {"active": false}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-reactivate"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -5830,6 +5950,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200, "body": {"active": true}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-capitalised-op-entra-style"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -5854,6 +5979,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200, "body": {"active": false}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-given-name"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -5878,6 +6008,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200, "body": {"name": {"givenName": "Patched"}}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-username"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -5905,6 +6040,11 @@
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
       expect: {"status": 200, "body": {"userName": "vd-new-{uid}@example.com"}}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-empty-operations"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -5925,6 +6065,11 @@
       schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"]
       Operations: []
   expect: {"status": [200, 400]}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-rejects-invalid-op"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -5945,6 +6090,11 @@
       schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"]
       Operations: [{"op": "move", "path": "active"}]
   expect: {"status": 400}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-rejects-missing-operations"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -5963,6 +6113,11 @@
     path: "/api/scim/v2/Users/{scimUserId}"
     body: {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"]}
   expect: {"status": 400}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-unsupported-path"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -5983,6 +6138,11 @@
       schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"]
       Operations: [{"op": "replace", "path": "title", "value": "Boss"}]
   expect: {"status": [200, 400]}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-users-patch-not-found"
   endpoint: "PATCH /api/scim/v2/Users/{id}"
@@ -6127,6 +6287,11 @@
     path: "/api/scim/v2/Groups"
     query: {"excludedAttributes": "members"}
   expect: {"status": 200}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-groups-list-rejects-unsupported-filter"
   endpoint: "GET /api/scim/v2/Groups"
@@ -6199,6 +6364,11 @@
     - request: "GET /api/scim/v2/Groups/{scimGroupId}"
       auth: "scim"
       expect: {"status": 200, "contains": "{scimUserId}"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-groups-create-skips-unknown-member"
   endpoint: "POST /api/scim/v2/Groups"
@@ -6363,6 +6533,11 @@
     - request: "GET /api/scim/v2/Groups/{scimGroupId}"
       auth: "scim"
       expect: {"status": 200, "contains": "{scimUserId}"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-groups-replace-clears-members"
   endpoint: "PUT /api/scim/v2/Groups/{id}"
@@ -6395,6 +6570,11 @@
     - request: "GET /api/scim/v2/Groups/{scimGroupId}"
       auth: "scim"
       expect: {"status": 200, "notContains": "{scimUserId}"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-groups-replace-rejects-missing-display-name"
   endpoint: "PUT /api/scim/v2/Groups/{id}"
@@ -6473,6 +6653,11 @@
     - request: "GET /api/scim/v2/Groups/{scimGroupId}"
       auth: "scim"
       expect: {"status": 200, "contains": "{scimUserId}"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-groups-patch-remove-member-by-filter"
   endpoint: "PATCH /api/scim/v2/Groups/{id}"
@@ -6504,6 +6689,11 @@
     - request: "GET /api/scim/v2/Groups/{scimGroupId}"
       auth: "scim"
       expect: {"status": 200, "notContains": "{scimUserId}"}
+  teardown:
+    - request: "DELETE /api/scim/v2/Users/{scimUserId}"
+      auth: "scim"
+      expect: {"status": [204, 404]}
+
 
 - id: "scim-groups-patch-replace-display-name"
   endpoint: "PATCH /api/scim/v2/Groups/{id}"

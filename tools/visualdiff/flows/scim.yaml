@@ -1,8 +1,9 @@
 # Directory screens (lane green-scim). Labels, states and test ids come from origin/main
 # (DirectorySummary, DirectoryFacts, DirectoryCard). The diff stack seeds no identity-provider
-# connection, so these flows read the "nothing connected yet" state. A SCIM push (Users, Groups)
-# and token issue/reveal/revoke need an ACTIVE connection and a SCIM-bearer setup step: see the
-# green-scim handoff. Unrun.
+# connection, so the flows read the "nothing connected yet" source. scim-push-synced-groups-and-people
+# pushes a person and a group in its setup (`auth: scim`), and setups run before every flow, so no
+# flow here may assert that nothing has been pushed. Token issue/reveal/revoke needs an ACTIVE
+# connection the seed does not have yet: see the scim-harness handoff. Unrun.
 flows:
   - id: directory-summary-no-provider
     title: The Directory band says no source is set up and offers the way to connect one
@@ -23,9 +24,6 @@ flows:
           text: Nobody is provisioned here automatically.
       - action: expect
         with:
-          text: No push yet
-      - action: expect
-        with:
           testId: directory-managed-people
           min: "1"
       - action: expect
@@ -43,7 +41,7 @@ flows:
           url: /settings/authentication
 
   - id: directory-card-waits-then-opens-connectors
-    title: The Authentication overview's Directory card says nothing has arrived and opens the provisioning page
+    title: The Authentication overview's Directory card opens the provisioning page
     steps:
       - action: go
         with:
@@ -51,14 +49,56 @@ flows:
       - action: expect
         with:
           testId: directory-card
-          hasText: Nothing has arrived yet
           timeout: "20000"
       - action: click
         with:
-          text: Issue a token
+          selector: '[data-testid="directory-card"] a[href="/settings/authentication/connectors"]'
       - action: expect
         with:
           url: /settings/authentication/connectors
       - action: expect
         with:
           text: Provisioning tokens
+
+  - id: scim-push-synced-groups-and-people
+    title: A SCIM push of a person and a group shows on the Authentication card and the Directory
+    setup:
+      - post: /api/scim/v2/Users
+        auth: scim
+        body:
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"]
+          userName: "vd-scim-{uid}@example.com"
+          name: { givenName: Vd, familyName: "Pushed" }
+          emails: [{ primary: true, value: "vd-scim-{uid}@example.com", type: work }]
+          active: true
+        as:
+          userId: id
+          personEmail: userName
+      - post: /api/scim/v2/Groups
+        auth: scim
+        body:
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"]
+          displayName: "vd-group-{uid}"
+          members: [{ value: "{userId}" }]
+        as:
+          groupName: displayName
+    steps:
+      - action: go
+        with:
+          path: /settings/authentication
+      - action: expect
+        with:
+          testId: directory-card-group-chip
+          hasText: "{groupName}"
+          timeout: "20000"
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          testId: directory-managed-people
+          min: "1"
+          timeout: "20000"
+      - action: expect
+        with:
+          text: "{personEmail}"

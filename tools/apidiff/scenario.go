@@ -155,18 +155,19 @@ func rejectUnknownKeys(node *yaml.Node, kind string, allowed ...string) error {
 // scenarioStep is one prior (setup) or after (verify) action: a request, a
 // countDelta or a mail check, optionally polled with eventually.
 type scenarioStep struct {
-	Request     *scenarioRequest  `yaml:"request"`
-	Body        any               `yaml:"body"`
-	BodyRaw     *string           `yaml:"bodyRaw"`
-	ContentType string            `yaml:"contentType"`
-	Query       map[string]any    `yaml:"query"`
-	Headers     map[string]string `yaml:"headers"`
-	Auth        string            `yaml:"auth"`
-	Capture     map[string]string `yaml:"capture"`
-	Expect      *scenarioExpect   `yaml:"expect"`
-	Eventually  time.Duration     `yaml:"eventually"`
-	CountDelta  *scenarioCount    `yaml:"countDelta"`
-	Mail        *scenarioMail     `yaml:"mail"`
+	Request     *scenarioRequest   `yaml:"request"`
+	Body        any                `yaml:"body"`
+	BodyRaw     *string            `yaml:"bodyRaw"`
+	ContentType string             `yaml:"contentType"`
+	Query       map[string]any     `yaml:"query"`
+	Headers     map[string]string  `yaml:"headers"`
+	Auth        string             `yaml:"auth"`
+	Capture     map[string]string  `yaml:"capture"`
+	Expect      *scenarioExpect    `yaml:"expect"`
+	Eventually  time.Duration      `yaml:"eventually"`
+	CountDelta  *scenarioCount     `yaml:"countDelta"`
+	Mail        *scenarioMail      `yaml:"mail"`
+	Analytics   *scenarioAnalytics `yaml:"analytics"`
 }
 
 // scenarioCount asserts a list's length changed by By between before the
@@ -372,13 +373,13 @@ func validateCaptures(where string, captures map[string]string) []string {
 // request's sibling body, query and headers into the request itself.
 func validateStep(where string, step *scenarioStep, verify bool) []string {
 	kinds := 0
-	for _, present := range []bool{step.Request != nil, step.CountDelta != nil, step.Mail != nil} {
+	for _, present := range []bool{step.Request != nil, step.CountDelta != nil, step.Mail != nil, step.Analytics != nil} {
 		if present {
 			kinds++
 		}
 	}
 	if kinds != 1 {
-		return []string{where + ": a step is exactly one of request, countDelta or mail"}
+		return []string{where + ": a step is exactly one of request, countDelta, mail or analytics"}
 	}
 	if step.Eventually < 0 {
 		return []string{where + ": eventually must not be negative"}
@@ -388,6 +389,8 @@ func validateStep(where string, step *scenarioStep, verify bool) []string {
 		return validateCountDelta(where, step.CountDelta, verify)
 	case step.Mail != nil:
 		return validateMail(where, step.Mail, verify)
+	case step.Analytics != nil:
+		return validateAnalytics(where, step.Analytics, verify)
 	}
 	return validateRequestStep(where, step, verify)
 }
