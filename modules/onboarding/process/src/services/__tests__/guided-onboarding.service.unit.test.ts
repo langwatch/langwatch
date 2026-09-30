@@ -237,6 +237,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
   });
 
   /** @scenario "every guided state write reaches the onboarding event hook" */
+  /** @scenario "a guided state write reaches PostHog through the service" */
   it("tracks a paths_selected event for the organization and user", async () => {
     const { api } = createOrganizations({
       org_1: { state: { paths: [], donePaths: [] }, variant: "guided" },
@@ -257,7 +258,7 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     expect(events.tracked[0]).toMatchObject({
       userId: "user_1",
       event: "guided_onboarding_paths_selected",
-      properties: expect.objectContaining({ organization_id: "org_1" }),
+      properties: expect.objectContaining({ organization_id: "org_1", primary_path: "gateway" }),
     });
   });
 });

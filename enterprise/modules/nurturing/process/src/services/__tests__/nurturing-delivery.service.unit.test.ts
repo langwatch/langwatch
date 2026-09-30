@@ -160,6 +160,7 @@ describe("NurturingDeliveryService", () => {
 
   describe("when a project's first trace is delivered", () => {
     /** @scenario "A first trace reaches PostHog and Customer.io, against the organization's admin" */
+    /** @scenario "first_trace_integrated carries the SDK of the first trace and no onboarding variant" */
     it("tracks first_trace_integrated in both sinks with the SDK", async () => {
       const { posthog, cio, delivery } = deliveryOverBothSinks();
 
@@ -255,6 +256,57 @@ describe("NurturingDeliveryService", () => {
         },
       ]);
       expect(cio.sent).toEqual([]);
+    });
+  });
+
+  describe("when an active-day signal is delivered", () => {
+    const activeDay: NurturingSignal = {
+      kind: "project_active_day",
+      sourceEventId: "event-6",
+      ...source,
+      userId: "admin-1",
+      projectId: "project-1",
+      source: "trace",
+    };
+
+    /** @scenario "an active-day signal reaches PostHog with its source, its signup age and the experiment property" */
+    it("tracks the source, the signup age and the experiment property, and sends Customer.io nothing", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "project_active_day:event-6",
+        signal: { ...activeDay, daysSinceSignup: 3, onboardingVariant: "guided" },
+      });
+      await settle();
+
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "admin-1",
+          event: "project_active_day",
+          properties: {
+            source: "trace",
+            days_since_signup: 3,
+            "$feature/experiment_onboarding_langy_guided": "guided",
+            projectId: "project-1",
+          },
+        },
+      ]);
+      expect(cio.sent).toEqual([]);
+    });
+
+    /** @scenario "an active-day signal without a signup age or a variant carries neither" */
+    it("carries the source and the project only", async () => {
+      const { posthog, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "project_active_day:event-7",
+        signal: { ...activeDay, sourceEventId: "event-7", source: "scenario_run" },
+      });
+
+      expect(posthog.tracked[0]?.properties).toEqual({
+        source: "scenario_run",
+        projectId: "project-1",
+      });
     });
   });
 
