@@ -234,3 +234,9 @@ Feature: Enterprise governance package boundary
       When the pass runs
       Then the pass fails rather than reporting success
       And the next wake evaluates every rule again
+
+    @unit
+    Scenario: CLI bootstrap reports the first admin's stored email as stored
+      Given an organisation whose first admin has a stored email that is not RFC-valid
+      When the CLI bootstrap answer is parsed
+      Then the answer carries that email unchanged

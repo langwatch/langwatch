@@ -41,7 +41,7 @@ export const cliBootstrapResultSchema = z
       })
       .strict(),
     gatewayUrl: z.string().url(),
-    adminEmail: z.string().email().nullable(),
+    adminEmail: z.string().nullable(),
     toolPolicies: cliToolPolicyMapSchema,
   })
   .strict();
