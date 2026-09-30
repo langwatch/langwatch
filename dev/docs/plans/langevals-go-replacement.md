@@ -514,4 +514,4 @@ Patterns (all Presidio recognisers we request, with scores and boosting); `PIIAn
 | D13 | Who hosts the PII model for self-hosters by default | `null` until the sidecar is enabled in the chart |
 | D14 | Rollout switch | **Decided:** Python stays the production path; Go only behind an explicit flag (haven `+go-evaluators` in dev; chart values default off; nlpgo mounts `/go/evaluators` only with its secret) |
 | D15 | `valid_format` python and sql modes | **Decided:** best-effort Go parsers measured against the recorded fixtures; a mode short of parity keeps the evaluator on Python |
-| D16 | `lingua/language_detection` | lingua-go matches Python to 1e-15 but costs +130 MB binary and ~2.1 GB RSS; alternatives under measurement |
+| D16 | `lingua/language_detection` | **Decided:** Fork C: vendored lingua-go v1.4.0 in `third_party/`, flat models generated at build time and embedded behind the `lingua_models` tag, Rust tokeniser regex; 1e-15 parity, ~7 MB anonymous RSS (measurements: the lingua research notes) |
