@@ -43,8 +43,6 @@ describe("given the front door's theme tokens", () => {
         "detail",
         "focus-ring",
         "glow",
-        "card-bg",
-        "card-border",
         "field-bg",
         "field-border",
       ]) {

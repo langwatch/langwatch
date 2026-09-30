@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SseEventSourceConstructor, SseEventSourceLike } from "../sse-subscription-link";
+import { isUiBatchRequest, uiBatchResponse } from "../testing";
 import { createUiFeatureApiClient, UI_SSE_ENDPOINT_PREFIX, UI_TRPC_ENDPOINT } from "../transport";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
@@ -62,9 +63,11 @@ function transport(bodies: unknown[] = []): Wiring {
     }
   };
 
-  const fetch = (async (input: RequestInfo | URL) => {
+  const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     requests.push(requestUrl(input));
-    return new Response(JSON.stringify(queue.shift()), {
+    const body = queue.shift();
+    if (isUiBatchRequest(init) && Array.isArray(body)) return uiBatchResponse({ results: body });
+    return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "content-type": "application/json" },
     });

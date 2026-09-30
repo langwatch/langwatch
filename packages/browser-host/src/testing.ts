@@ -112,3 +112,21 @@ export function createUiCapabilitiesFromHost(
     feedback: new HostUiFeedback(host),
   };
 }
+
+/**
+ * A batch's answers as the transport's batch lane reads them: JSON lines, a
+ * head naming one pending answer per call, then each answer. For a fake
+ * fetch standing in for `/api/trpc`; a single (unbatched) call stays JSON.
+ */
+export function uiBatchResponse({ results }: { results: readonly unknown[] }): Response {
+  const head = Object.fromEntries(results.map((_, index) => [index, [[0], [null, 0, index]]]));
+  const lines = [head, ...results.map((result, index) => [index, 0, [[result]]])];
+  return new Response(lines.map((line) => `${JSON.stringify(line)}\n`).join(""), {
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/** Whether a request went out on the batch lane, which asks for a streamed answer. */
+export function isUiBatchRequest(init: RequestInit | undefined): boolean {
+  return new Headers(init?.headers).get("trpc-accept") === "application/jsonl";
+}

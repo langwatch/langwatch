@@ -1,7 +1,7 @@
 /**
- * The browser transport a feature package's hooks run on: one tRPC client
- * per application, HTTP split by `skipBatch`, subscriptions same-origin SSE.
- * See ADR-128 (public REST / internal tRPC), subscription-wire appendix.
+ * One tRPC client per application: HTTP split by `skipBatch`, subscriptions
+ * same-origin SSE, batches streamed (JSON lines) so each answer lands as it
+ * resolves. See ADR-128, subscription-wire appendix.
  */
 
 import { type ModuleApiClient, type ModuleApiMap, type RouterFromMap } from "@langwatch/api/web";
@@ -9,7 +9,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import {
   createTRPCClient,
   getUntypedClient,
-  httpBatchLink,
+  httpBatchStreamLink,
   httpLink,
   splitLink,
 } from "@trpc/client";
@@ -67,7 +67,7 @@ function uiFeatureApiLinks({
   const batchRouting = splitLink({
     condition: (operation) => operation.context.skipBatch === true,
     true: httpLink({ url, ...(fetch ? { fetch } : {}) }),
-    false: httpBatchLink({
+    false: httpBatchStreamLink({
       url,
       maxURLLength: MAX_BATCHED_URL_LENGTH,
       ...(fetch ? { fetch } : {}),
