@@ -36,10 +36,15 @@ const binary = (root) => {
   };
 };
 
+// A console reaches a binary only through its built output, never its sources.
+const consoleInputs = { namedInputs: { goBuild: [] } };
+
 export const createNodes = [
-  "{go.work,cmd/*/main.go,infra/clickhouse-serverless/cmd/*/main.go}",
+  "{go.work,cmd/*/main.go,infra/clickhouse-serverless/cmd/*/main.go,apps/{haven,idpsim,mailsim}-web/package.json}",
   (files, _options, context) =>
     files.map((file) => {
+      if (file.endsWith("package.json"))
+        return [file, { projects: { [dirname(file)]: consoleInputs } }];
       if (file !== "go.work")
         return [file, { projects: { [dirname(file)]: binary(dirname(file)) } }];
       const roots = useDirs(readFileSync(join(context.workspaceRoot, file), "utf8"));
