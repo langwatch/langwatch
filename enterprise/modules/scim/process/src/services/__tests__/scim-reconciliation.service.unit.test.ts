@@ -355,6 +355,7 @@ describe("the organization's directory sync panel", () => {
     });
 
     /** @scenario "A push and the failure after it read as the directory's acts, in words" */
+    /** @scenario "A push and the failure that followed it are both in the sequence" */
     it("words each line as the directory's act, naming the person and the failure", async () => {
       reads = createReads({
         activity: [
