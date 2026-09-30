@@ -33,15 +33,21 @@ export interface InstanceIdentityRepository {
   mint(instanceId: string): Promise<InstanceIdentityRecord>;
 
   /**
-   * Records what a customer switched off. An install with no identity has
-   * nothing to write to, and would be writing the defaults anyway.
+   * Records what a customer switched off, creating the one row under
+   * `instanceIdIfMissing` when none exists yet. Never a second row.
    */
-  setReportSwitches(switches: InstanceReportSwitches): Promise<void>;
+  setReportSwitches(params: {
+    switches: InstanceReportSwitches;
+    instanceIdIfMissing: string;
+  }): Promise<void>;
 
   /**
-   * Records how the last report went. A refused report is written down rather
-   * than logged and forgotten, so an install whose reports are being rejected
-   * stops looking healthy from both sides.
+   * Records how the last report went, creating the row as above. A refused
+   * report is written down rather than logged and forgotten.
    */
-  recordReport(params: { error: string | null; at: Instant }): Promise<void>;
+  recordReport(params: {
+    error: string | null;
+    at: Instant;
+    instanceIdIfMissing: string;
+  }): Promise<void>;
 }

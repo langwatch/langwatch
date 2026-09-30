@@ -38,22 +38,33 @@ export class MemoryInstanceIdentityRepository implements InstanceIdentityReposit
   }
 
   async setReportSwitches({
-    optionalMetricsOptOut,
-    hostnameOptOut,
-  }: InstanceReportSwitches): Promise<void> {
-    if (!this.#row) return;
+    switches: { optionalMetricsOptOut, hostnameOptOut },
+    instanceIdIfMissing,
+  }: {
+    switches: InstanceReportSwitches;
+    instanceIdIfMissing: string;
+  }): Promise<void> {
+    const row = await this.mint(instanceIdIfMissing);
     this.#row = {
-      ...this.#row,
+      ...row,
       ...(optionalMetricsOptOut === undefined ? {} : { optionalMetricsOptOut }),
       ...(hostnameOptOut === undefined ? {} : { hostnameOptOut }),
     };
   }
 
-  async recordReport({ error, at }: { error: string | null; at: Instant }): Promise<void> {
-    if (!this.#row) return;
+  async recordReport({
+    error,
+    at,
+    instanceIdIfMissing,
+  }: {
+    error: string | null;
+    at: Instant;
+    instanceIdIfMissing: string;
+  }): Promise<void> {
+    const row = await this.mint(instanceIdIfMissing);
     this.#row = error
-      ? { ...this.#row, lastReportError: error }
-      : { ...this.#row, lastReportAt: at, lastReportError: null };
+      ? { ...row, lastReportError: error }
+      : { ...row, lastReportAt: at, lastReportError: null };
   }
 }
 
