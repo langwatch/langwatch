@@ -7,6 +7,7 @@
 import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { useMemo, type ReactNode } from "react";
 
+import { traceApi } from "./trace-api.ts";
 import {
   TraceHostApi,
   TraceHostProvider,
@@ -119,6 +120,29 @@ class CapabilityTraceHost extends TraceHostApi {
 }
 
 /**
+ * The project's legacy base key, off its `organization.getAll` row (the session
+ * scope carries no credentials; the server blanks it for a reader who may not
+ * manage the project). The shared-trace page has no reader and asks nothing.
+ */
+function useProjectBaseKey(input: {
+  projectId: string | undefined;
+  enabled: boolean;
+}): string | undefined {
+  const graph = traceApi.organization.getAll.useQuery(
+    { isDemo: false },
+    { enabled: input.enabled && input.projectId !== void 0 },
+  );
+  if (!input.projectId) return void 0;
+  for (const organization of graph.data ?? []) {
+    for (const team of organization.teams) {
+      const project = team.projects.find((candidate) => candidate.id === input.projectId);
+      if (project) return project.apiKey || void 0;
+    }
+  }
+  return void 0;
+}
+
+/**
  * The mount the declaration names: one provider above the routed tree, so a
  * peer's screen reading this port finds it too. Default-exported because that
  * is what `mounts.load` resolves.
@@ -142,6 +166,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
   const actorName = actor?.name;
   const actorEmail = actor?.email;
   const actorImage = actor?.image;
+  const apiKey = useProjectBaseKey({ projectId, enabled: actorId !== void 0 });
 
   const host = useMemo(
     () =>
@@ -150,7 +175,12 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
           project:
             projectId === void 0
               ? void 0
-              : { id: projectId, slug: projectSlug ?? "", name: projectName ?? "" },
+              : {
+                  id: projectId,
+                  slug: projectSlug ?? "",
+                  name: projectName ?? "",
+                  ...(apiKey ? { apiKey } : {}),
+                },
           organization:
             organizationId === void 0
               ? void 0
@@ -184,6 +214,7 @@ export default function TraceHostMount({ children }: { children?: ReactNode }) {
       projectId,
       projectName,
       projectSlug,
+      apiKey,
       organizationId,
       organizationName,
       teamId,
