@@ -7,9 +7,9 @@ dependencies:
   version: 0.4.0
 - name: langwatch-gateway
   repository: file://../gateway
-  version: 3.18.1
+  version: 3.19.0
 - name: langwatch-langyagent
   repository: file://../langyagent
-  version: 3.18.1
-digest: sha256:411a862ab313e09d5a46d5dcf96901ba4109860e6af7eb379bfd6bd1f6cb3df3
-generated: "2026-09-29T08:50:06.837136752Z"
+  version: 3.19.0
+digest: sha256:150affa2e9a0315cdb08bdebeab0256224ce0d3eea78c664877eca3704797f6d
+generated: "2026-09-30T14:52:38.708562167Z"
