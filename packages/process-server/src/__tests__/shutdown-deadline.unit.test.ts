@@ -14,9 +14,9 @@ const deadlineFor = (environment: Record<string, string | undefined>) => {
 };
 
 describe("process shutdown deadline", () => {
-  /** @scenario "The process deadline defaults above the queue drain" */
   describe("given a drain budget and no PROCESS_SHUTDOWN_DEADLINE_MS", () => {
     describe("when the deadline is resolved", () => {
+      /** @scenario "The process deadline defaults above the queue drain" */
       it("is the drain plus twenty seconds of close slack", () => {
         expect(deadlineFor({ SHUTDOWN_DRAIN_TIMEOUT_MS: "120000" })).toBe(140_000);
       });

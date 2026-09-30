@@ -18,7 +18,6 @@ const roles = [
 ] as const;
 
 describe("queue drain budget", () => {
-  /** @scenario "The queue drains for as long as the chart's drain value" */
   describe("given SHUTDOWN_DRAIN_TIMEOUT_MS names a drain budget", () => {
     const config = read({ SHUTDOWN_DRAIN_TIMEOUT_MS: "120000" });
 
@@ -28,6 +27,7 @@ describe("queue drain budget", () => {
 
     for (const [label, pipelines] of roles) {
       describe(`when a ${label} role configures its eventing`, () => {
+        /** @scenario "The queue drains for as long as the chart's drain value" */
         it("gives the queue that drain timeout", () => {
           const eventing = pipelines.configure({
             defaultRetentionDays: config.defaultRetentionDays,
@@ -59,7 +59,6 @@ describe("queue drain budget", () => {
     }
   });
 
-  /** @scenario "A malformed drain override is reported and falls back, never fatal" */
   describe("given a drain budget that is not a positive number", () => {
     let reported: ReturnType<typeof vi.spyOn>;
 
@@ -72,6 +71,7 @@ describe("queue drain budget", () => {
     });
 
     describe.each(["0", "-5", "abc", "1.5"])("when it is %s", (value) => {
+      /** @scenario "A malformed drain override is reported and falls back, never fatal" */
       it("boots with the queue's own default", () => {
         expect(read({ SHUTDOWN_DRAIN_TIMEOUT_MS: value }).shutdownDrainTimeoutMs).toBeUndefined();
       });
