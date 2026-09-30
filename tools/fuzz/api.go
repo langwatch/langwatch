@@ -159,6 +159,9 @@ func (run *apiRun) plan(operations []diffkit.Operation) []job {
 		if run.options.Only != "" && !strings.Contains(op.Path, run.options.Only) {
 			continue
 		}
+		if isVersionAlias(op.Path) {
+			continue // served, hidden alias: the canonical route is fuzzed instead
+		}
 		hasBody := op.BodySchema != nil
 		hasParams := strings.Contains(op.Path, "{")
 		for _, mutation := range Mutations {

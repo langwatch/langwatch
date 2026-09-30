@@ -76,7 +76,6 @@ routes:
   - /{slug}/analytics/custom
   - /{slug}/analytics/evaluations
   - /{slug}/analytics/metrics
-  - /{slug}/analytics/query
   - /{slug}/analytics/reports
   - /{slug}/analytics/topics
   - /{slug}/analytics/users

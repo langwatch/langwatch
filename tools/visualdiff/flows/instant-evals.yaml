@@ -1,18 +1,23 @@
 # Instant evals: a plain-words question judged over the project's traces.
 #
 # There is no settings switch: the feature is a run over traces, started from the trace
-# explorer's search bar (an eval chip) or over REST. The judge is the deployment's classifier
-# (INSTANT_EVAL_CLASSIFIER jev, connect or null); a stack with none finishes each run with every
-# row skipped as classifier_not_configured, which the run's counters still record.
+# explorer's search bar (an eval chip) or over REST. The check stack judges with the
+# deterministic stand-in (INSTANT_EVAL_CLASSIFIER=memory), so a run finishes with every row
+# judged. The cost confirm dialog opens at half a dollar or more, which a stand-in priced run
+# never reaches, so the estimate is proven in apidiff (query-instant-evals-estimate-*), not here.
+# The progress bar lives for the seconds a run judges; a stand-in run over a few rows ends before
+# a poll can see it, so the flows prove it is gone and the run's own counters instead.
 # Cancelling a run has no UI, so it is not scripted. Names carry {uid}.
 flows:
   - id: instant-eval-run-persists
-    title: Start a run over traces through the API and read it back from the run list
+    title: Start a run over the seeded error trace through the API, follow it to the end and read its verdicts and sample back
     setup:
       - post: /api/v1/instant-evals
         body:
           name: vd-instant-eval-setup
           target: traces
+          filter: traceId:{errorTrace}
+          start: "2020-01-01T00:00:00Z"
           limit: 20
           questions:
             - id: q1
@@ -39,9 +44,134 @@ flows:
           api: /api/v1/instant-evals/{runId}
           field: questions.0.kind
           equals: boolean
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: status
+          equals: finished
+          timeout: "60000"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: total
+          equals: "1"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: progress
+          equals: "1"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: failed
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: skipped
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: tokens
+          min: "1"
+
+  - id: instant-eval-run-verdicts-and-sample
+    title: A finished run lists one judged verdict for the trace and re-reads the judged row in its sample
+    setup:
+      - post: /api/v1/instant-evals
+        body:
+          name: vd-instant-eval-verdicts
+          target: traces
+          filter: traceId:{errorTrace}
+          start: "2020-01-01T00:00:00Z"
+          limit: 20
+          questions:
+            - id: q1
+              kind: boolean
+              instructions: The trace has an error
+        as:
+          runId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: status
+          equals: finished
+          timeout: "60000"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments
+          equals: "1"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.0.traceId
+          equals: "{errorTrace}"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.0.status
+          equals: judged
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.0.questionId
+          equals: q1
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/sample
+          field: rows.0.TraceId
+          equals: "{errorTrace}"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/sample
+          field: judgments.0.status
+          equals: judged
+
+  - id: instant-eval-thread-target-judges-a-conversation
+    title: A run over conversations judges the seeded two-turn thread as one row
+    setup:
+      - post: /api/v1/instant-evals
+        body:
+          name: vd-instant-eval-thread
+          target: threads
+          filter: conversation:{conversation}
+          start: "2020-01-01T00:00:00Z"
+          limit: 20
+          questions:
+            - id: q1
+              kind: boolean
+              instructions: The customer is annoyed
+        as:
+          runId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: status
+          equals: finished
+          timeout: "60000"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}
+          field: total
+          equals: "1"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.0.status
+          equals: judged
 
   - id: instant-eval-search-chip-starts-run
-    title: Type an eval chip into the trace search bar and find the run it started in the run list
+    title: Type an eval chip into the trace search bar, find the run it started in the run list and see the progress bar clear
     steps:
       - action: go
         with:
@@ -57,3 +187,28 @@ flows:
           field: runs
           contains: vd{uid}
           timeout: "45000"
+      - action: expect
+        with:
+          text: the reply mentions vd{uid}
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: instant-eval-progress
+          equals: "0"
+          timeout: "60000"
+
+  - id: instant-eval-refuses-anonymous-and-unknown
+    title: The run list refuses a call with no key and an unknown run id is not found
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          api: /api/v1/instant-evals
+          status: "401"
+          auth: none
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/vd-none-{uid}
+          status: "404"

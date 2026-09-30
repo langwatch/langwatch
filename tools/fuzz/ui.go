@@ -42,9 +42,15 @@ type uiPlan struct {
 }
 
 type uiCredential struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email          string   `json:"email"`
+	Password       string   `json:"password"`
+	FallbackEmails []string `json:"fallbackEmails,omitempty"`
 }
+
+// fuzzUIEmail is the seeded account the UI fuzzer browses as (apps/tasks storage-seed). The
+// admin's session list, passkey offer and password are state other tools read, so the fuzzer
+// gets an account of its own and falls back to the admin only where the seed predates it.
+const fuzzUIEmail = "fuzz-ui@mail.langwatch.localhost"
 
 // runUI seeds the fuzzer org (so its account and credentials exist), writes
 // plan.json, and execs the TypeScript runner another lane owns under
@@ -83,7 +89,7 @@ func runUI(ctx context.Context, streams Streams, options Options) error {
 	plan := uiPlan{
 		RunID: runID, URL: appURL, Seed: options.Seed, Workers: options.Workers,
 		DurationMs: options.Duration.Milliseconds(), ActionsPerRoute: options.ActionsPerRoute, ReloadEvery: options.ReloadEvery, Only: options.Only, MaxErrors: options.errorLimit(DefaultUIMaxErrors), Org: org,
-		Credential: uiCredential{Email: diffkit.CeremonyEmail("fuzzer"), Password: diffkit.CeremonyPassword},
+		Credential: uiCredential{Email: fuzzUIEmail, Password: diffkit.CeremonyPassword, FallbackEmails: []string{diffkit.CeremonyEmail("fuzzer")}},
 	}
 	planPath := filepath.Join(runDir, "plan.json")
 	if err := writeJSON(planPath, plan); err != nil {

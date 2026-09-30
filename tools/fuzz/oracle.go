@@ -47,13 +47,20 @@ func Evaluate(observation Observation) []Hit {
 	if observation.Mutation.Foreign && observation.SeparateOrg && success(observation.Status) && leaksForeign(observation.Body, observation.ForeignIDs, observation.OwnIDs) {
 		hits = append(hits, Hit{Oracle: "cross-tenant", Message: fmt.Sprintf("another tenant's resource read with the fuzzer's key: %d", observation.Status)})
 	}
-	if observation.JSONExpected && success(observation.Status) && observation.Mutation.Name == "valid" && !json.Valid(observation.Body) {
+	if observation.JSONExpected && success(observation.Status) && observation.Mutation.Name == "valid" && !json.Valid(observation.Body) && !eventFrame(observation.Body) {
 		hits = append(hits, Hit{Oracle: "schema-mismatch", Message: "documented JSON response was not valid JSON"})
 	}
 	if observation.Elapsed > cap {
 		hits = append(hits, Hit{Oracle: "latency", Message: fmt.Sprintf("%s over the %s cap", observation.Elapsed.Round(time.Millisecond), cap)})
 	}
 	return hits
+}
+
+// eventFrame is a server-sent event frame: a stream route answers one where JSON is not the
+// wire (the device-login approval stream), so it is not a schema mismatch.
+func eventFrame(body []byte) bool {
+	frame := bytes.TrimSpace(body)
+	return bytes.HasPrefix(frame, []byte("data:")) || bytes.HasPrefix(frame, []byte("event:")) || bytes.HasPrefix(frame, []byte(":"))
 }
 
 func success(status int) bool { return status >= 200 && status < 300 }

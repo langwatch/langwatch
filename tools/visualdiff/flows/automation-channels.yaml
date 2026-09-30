@@ -1,7 +1,8 @@
-# Automations beyond the email flows in prompts-automations.yaml: a webhook channel and a
-# condition built from the query chips, each read back from the API and the list after a
-# reload. Slack is not scripted: new Slack automations need a connected Slack app.
-# Unrun: written under load.
+# Automations beyond the email flows in prompts-automations.yaml: every action kind main offers
+# (email, webhook, Slack bot, add to dataset, add to annotation queue), the traces-view entry point,
+# a condition built from the query chips, and the two "Send a test" round trips. Each is read back
+# from the API and the list after a reload. main's REST list omits filterQuery and the webhook
+# URL, so those are read from the list page, never the API. Unrun.
 flows:
   - id: automation-channel-webhook
     title: Deliver an automation to a webhook and find it after a reload
@@ -42,7 +43,7 @@ flows:
       - action: expect
         with:
           api: /api/triggers
-          contains: https://example.com/hooks/vd-{uid}
+          contains: SEND_WEBHOOK
       - action: go
         with:
           path: /{slug}/automations/automations
@@ -93,13 +94,290 @@ flows:
         with:
           api: /api/triggers
           contains: vd-cond-{uid}
-      - action: expect
-        with:
-          api: /api/triggers
-          contains: model:gpt*
       - action: go
         with:
           path: /{slug}/automations/automations
       - action: expect
         with:
           label: 'Actions for vd-cond-{uid}'
+      - action: expect
+        with:
+          text: 'model:gpt*'
+
+  - id: automation-from-traces-view
+    title: Automate the current trace filter from the traces toolbar and find the automation listed
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: type
+        with:
+          label: Search filters or type what you are looking for
+          text: status:error
+          submit: true
+      - action: click
+        with:
+          label: Create an automation from the current filter
+      - action: fill
+        with:
+          field: Flag failing traces
+          value: 'vd-fromtraces-{uid}'
+      - action: click
+        with:
+          text: /^\s*Email/
+      - action: fill
+        with:
+          field: 'alerts@partner.com'
+          value: 'vd-{uid}@example.com'
+      - action: click
+        with:
+          text: Add email
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: vd-fromtraces-{uid}
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          label: 'Actions for vd-fromtraces-{uid}'
+      - action: expect
+        with:
+          text: 'status:error'
+
+  - id: automation-action-add-to-dataset
+    title: Add matching traces to a dataset and read the dataset id back from the API
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-autods-{uid}
+          columnTypes:
+            - name: input
+              type: string
+            - name: output
+              type: string
+        as:
+          dsId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: click
+        with:
+          text: New automation
+      - action: fill
+        with:
+          field: Flag failing traces
+          value: 'vd-autods-{uid}'
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: 'status:error'
+      - action: click
+        with:
+          text: /^\s*Add to dataset/
+      - action: click
+        with:
+          text: Select Dataset
+      - action: click
+        with:
+          text: 'vd-autods-{uid}'
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: ADD_TO_DATASET
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: '{dsId}'
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          label: 'Actions for vd-autods-{uid}'
+
+  - id: automation-action-add-to-annotation-queue
+    title: Queue matching traces for annotation and read the action back from the API
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: click
+        with:
+          text: New automation
+      - action: fill
+        with:
+          field: Flag failing traces
+          value: 'vd-autoq-{uid}'
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: 'status:error'
+      - action: click
+        with:
+          text: /^\s*Add to annotation queue/
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          selector: '[role="option"]'
+      - action: click
+        with:
+          text: 'Send to:'
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: ADD_TO_ANNOTATION_QUEUE
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          label: 'Actions for vd-autoq-{uid}'
+
+  - id: automation-channel-slack-bot
+    title: Configure a Slack app delivery with a token and channel and find the automation after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: click
+        with:
+          text: New automation
+      - action: fill
+        with:
+          field: Flag failing traces
+          value: 'vd-slack-{uid}'
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: 'status:error'
+      - action: click
+        with:
+          text: /^\s*Slack/
+      - action: fill
+        with:
+          field: 'xoxb-'
+          value: 'xoxb-vd-{uid}'
+      - action: wait
+        with:
+          millis: '2500'
+      - action: type
+        with:
+          placeholder: 'C0123'
+          text: 'C0VD1234567'
+          submit: true
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: /api/triggers
+          contains: SEND_SLACK_MESSAGE
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          label: 'Actions for vd-slack-{uid}'
+
+  - id: automation-webhook-send-a-test
+    title: Send a test request from the webhook channel and see the outcome under the button
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: click
+        with:
+          text: New automation
+      - action: fill
+        with:
+          field: Flag failing traces
+          value: 'vd-hooktest-{uid}'
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: 'status:error'
+      - action: click
+        with:
+          text: /^\s*Webhook/
+      - action: fill
+        with:
+          field: 'https://example.com/hooks/langwatch'
+          value: 'https://example.com/hooks/vd-{uid}'
+      - action: click
+        with:
+          text: Send a test
+      - action: expect
+        with:
+          testId: webhook-test-result
+          timeout: '20000'
+
+  - id: automation-email-send-a-test-reaches-inbox
+    title: Send a test email from the email channel and read it back from the mail sink
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: click
+        with:
+          text: New automation
+      - action: fill
+        with:
+          field: Flag failing traces
+          value: 'vd-mailtest-{uid}'
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: 'status:error'
+      - action: click
+        with:
+          text: /^\s*Email/
+      - action: fill
+        with:
+          field: 'alerts@partner.com'
+          value: 'vd-{uid}@example.com'
+      - action: click
+        with:
+          text: Add email
+      - action: click
+        with:
+          text: Send a test
+      - action: mail
+        with:
+          to: '{actor}'
+          as: testMailLink

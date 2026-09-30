@@ -47,3 +47,55 @@
     path: "/api/auth/cli/device-approval"
     query: {"device_code": "{deviceCode}"}
   expect: {"status": 200, "contains": "approved"}
+
+# The whole CLI login as `langwatch login` runs it: start, approve in the browser (the session),
+# exchange, use the access token, then sign out. The token authenticates until logout and not
+# after; main deletes the token records on logout (auth-cli.ts POST /logout).
+- id: "auth-cli-login-token-authenticates-until-logout"
+  endpoint: "GET /api/auth/cli/bootstrap"
+  auth: "none"
+  setup:
+    - request: "POST /api/auth/cli/device-code"
+      body: {}
+      auth: "none"
+      capture: {"deviceCode": "device_code", "userCode": "user_code"}
+    - request: "POST /api/auth/cli/approve"
+      body: {"user_code": "{userCode}", "organization_id": "{orgId}"}
+      auth: "session"
+    - request: "POST /api/auth/cli/exchange"
+      body: {"device_code": "{deviceCode}", "client_info": {"device_label": "vd-{uid}"}}
+      auth: "none"
+      capture: {"accessToken": "access_token", "refreshToken": "refresh_token"}
+  request:
+    path: "/api/auth/cli/bootstrap"
+    headers: {"Authorization": "Bearer {accessToken}"}
+  expect: {"status": 200}
+  verify:
+    - request: "POST /api/auth/cli/logout"
+      auth: "none"
+      body: {"access_token": "{accessToken}", "refresh_token": "{refreshToken}"}
+      expect: {"status": 200}
+    - request: "GET /api/auth/cli/bootstrap"
+      auth: "none"
+      headers: {"Authorization": "Bearer {accessToken}"}
+      expect: {"status": 401}
+
+- id: "auth-cli-login-device-code-is-single-use"
+  endpoint: "POST /api/auth/cli/exchange"
+  auth: "none"
+  setup:
+    - request: "POST /api/auth/cli/device-code"
+      body: {}
+      auth: "none"
+      capture: {"deviceCode": "device_code", "userCode": "user_code"}
+    - request: "POST /api/auth/cli/approve"
+      body: {"user_code": "{userCode}", "organization_id": "{orgId}"}
+      auth: "session"
+    - request: "POST /api/auth/cli/exchange"
+      body: {"device_code": "{deviceCode}", "client_info": {"device_label": "vd-{uid}"}}
+      auth: "none"
+      expect: {"status": 200, "contains": "access_token"}
+  request:
+    path: "/api/auth/cli/exchange"
+    body: {"device_code": "{deviceCode}"}
+  expect: {"status": 408, "contains": "expired_token"}

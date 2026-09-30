@@ -316,9 +316,9 @@ A click that misses fails the flow: `optional: "true"` is for tours and nudges.
 | `capture` | `testId` or `selector`, `as`, `match` (regex, first group kept); stored as `{as}` |
 | `mail` | `to`, `subject`, `as` (default `mailLink`); the newest message's first link, from the side's mailsim |
 | `acceptInvite` | `link` (a mailed invite link), `email`, `name`; signs that person up in a cookieless page and joins by the invite, leaving the signed-in page as it was |
-| `go` | `path` (an absolute `{mailLink}` keeps its path and query); `anonymous: "true"` opens it in a fresh cookieless context |
+| `go` | `path` (an absolute `{mailLink}` keeps its path and query); `anonymous: "true"` opens it in a fresh cookieless context; any other name (`anonymous: second`) is a further cookieless context of its own, kept for the flow |
 | `expect` | see above |
-| `wait`, `signIn`, `dismissTour` | as before |
+| `wait`, `signIn`, `dismissTour` | as before; `signIn` takes `email` and `password` to sign in as an account the flow made |
 
 Any argument may hold `{uid}` (unique per run and flow, equal on both sides),
 `{slug}`, `{isolatedSlug}`, a seeded fixture (`{dataset}`, `{graph}`, `{monitor}`,
@@ -769,7 +769,9 @@ side whose first five routes all reach it prints one loud warning. Telemetry
 (`/api/rum/v1/traces`) is ignored, and the join offer's 429 is noise: its
 allowance is a product constant a run's page loads exceed. Main raises the
 passkey offer on every screen, so every capture declines it before its
-screenshot; sign-in photographs it once as the `sign-in` flow.
+screenshot; sign-in photographs it once as the `sign-in` flow, as the seeded
+`passkey-probe` account in a context of its own and never answers it (an answer lasts 30
+days on the account, and both stacks share one database), falling back to the run's account.
 
 ## Layout
 

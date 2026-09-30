@@ -20,9 +20,11 @@
   shard: project
   serial: true
   setup:
+    # A foreign claim counts against the caller before the gate refuses it, and never reaches
+    # the store, so the 120 reads finish inside the 60s window even when the stack is loaded.
     - &fileRead
-      request: "GET /api/files/{projectId}/vd-{uid}"
-      expect: { status: 404 }
+      request: "GET /api/files/{projectIdB}/vd-{uid}"
+      expect: { status: 403 }
     - *fileRead
     - *fileRead
     - *fileRead

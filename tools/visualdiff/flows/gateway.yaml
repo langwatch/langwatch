@@ -2,8 +2,9 @@
 # webhooks, usage and the spend reads. Steps click and fill by data-testid; text only
 # asserts. A `setup:` prerequisite is posted through the public API and captured, and
 # its names come from the setup's own {uid}, so a flow reaches it through a capture.
-# Not scriptable here: a call made WITH a virtual key (needs the gateway data plane and
-# a POST through its own origin) and a budget crossing its limit (needs spend on the ledger).
+# A call made WITH a virtual key is a setup step carrying `bearer:` (setup.go): it posts
+# to the stack's gateway origin and llmsim answers. Not scriptable here: a budget
+# crossing its limit (needs spend on the ledger).
 flows:
   - id: gateway-virtual-key-create-reveal-revoke
     title: Create a virtual key, reveal its secret once, revoke it and see the API read it back revoked
@@ -153,6 +154,143 @@ flows:
       - action: expect
         with:
           text: "{oldSecret}"
+          equals: "0"
+
+  - id: gateway-virtual-key-budget-and-limits
+    title: Set a virtual key's budget and request limit from its edit drawer and read both back from the API
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-limits-{uid}
+        as:
+          vkId: virtual_key.id
+          vkName: virtual_key.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: click
+        with:
+          selector: 'tr:has-text("{vkName}") button[aria-label^="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          testId: vk-budget-limit
+          value: "25"
+      - action: select
+        with:
+          testId: vk-budget-window
+          option: /per week/
+      - action: fill
+        with:
+          selector: 'xpath=//label[normalize-space(.)="rpm"]/following::input[1]'
+          value: "60"
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.config.rateLimits.rpm
+          equals: "60"
+      - action: expect
+        with:
+          api: /api/gateway/v1/budgets?scope_type=virtual_key&limit=200
+          contains: "{vkId}"
+
+  - id: gateway-virtual-key-disable-enable
+    title: Disable a virtual key from its page, see it disabled in the API, then enable it again
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-disable-{uid}
+        as:
+          vkId: virtual_key.id
+    steps:
+      - action: go
+        with:
+          path: /gateway/virtual-keys/{vkId}
+      - action: click
+        with:
+          text: /^\s*Disable\s*$/
+      - action: click
+        with:
+          text: Disable key
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.status
+          equals: disabled
+      - action: expect
+        with:
+          testId: vk-detail-status
+          hasText: /disabled/i
+      - action: click
+        with:
+          text: /^\s*Enable\s*$/
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.status
+          equals: active
+
+  - id: gateway-virtual-key-real-call-usage-and-spend
+    title: Call the gateway with a virtual key, then read its requests and spend from the API, the key list and the usage page
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-vk-call-{uid}
+        as:
+          vkId: virtual_key.id
+          vkName: virtual_key.name
+          vkSecret: secret
+      - post: /v1/chat/completions
+        bearer: "{vkSecret}"
+        body:
+          model: openai/gpt-5-mini
+          messages:
+            - role: user
+              content: Say hi in one word
+    steps:
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}/spend
+          field: requests
+          min: "1"
+          timeout: "60000"
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: expect
+        with:
+          testId: vk-spend-{vkId}
+      - action: go
+        with:
+          path: /gateway/virtual-keys/{vkId}
+      - action: expect
+        with:
+          testIdPrefix: vk-usage-model-
+          timeout: "30000"
+      - action: go
+        with:
+          path: /gateway/usage?vk={vkId}
+      - action: expect
+        with:
+          testId: usage-key-filter
+          hasText: "{vkName}"
+      - action: expect
+        with:
+          text: Total spend
+          timeout: "30000"
+      - action: expect
+        with:
+          text: No usage in this window
           equals: "0"
 
   - id: gateway-budget-create
@@ -730,7 +868,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /gateway/usage
+          path: /gateway/usage?vk={virtualKey}
       - action: expect
         with:
           testId: usage-key-filter
@@ -781,3 +919,103 @@ flows:
           auth: "{orgKey}"
           status: "200"
           contains: '"data":['
+
+  - id: gateway-cache-rule-create
+    title: Create a cache rule that forces caching for a model and see it listed and in the API
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: click
+        with:
+          text: New rule
+      - action: fill
+        with:
+          field: e.g. force-cache-on-enterprise
+          value: cr-{uid}
+      - action: fill
+        with:
+          field: claude-3-5-sonnet-latest
+          value: gpt-5-mini
+      - action: select
+        with:
+          selector: 'xpath=//label[contains(normalize-space(.),"Cache control mode")]/following::select[1]'
+          option: /^force/
+      - action: click
+        with:
+          text: Create rule
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: expect
+        with:
+          text: cr-{uid}
+      - action: expect
+        with:
+          api: /api/gateway/v1/cache-rules?limit=200
+          contains: cr-{uid}
+
+  - id: gateway-cache-rule-edit-toggle-archive
+    title: Switch a cache rule's mode from its row, turn it off, then archive it and see it gone after a reload
+    isolated: true
+    setup:
+      - post: /api/gateway/v1/cache-rules
+        body:
+          name: vd-cache-{uid}
+          matchers:
+            model: gpt-5-mini
+          action:
+            mode: force
+        as:
+          ruleId: cache_rule.id
+          ruleName: cache_rule.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: click
+        with:
+          selector: 'tr:has-text("{ruleName}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: select
+        with:
+          selector: 'xpath=//label[contains(normalize-space(.),"Cache control mode")]/following::select[1]'
+          option: /^disable/
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: expect
+        with:
+          api: /api/gateway/v1/cache-rules/{ruleId}
+          field: cache_rule.action.mode
+          equals: disable
+      - action: click
+        with:
+          selector: 'tr:has-text("{ruleName}") [data-scope="switch"][data-part="control"]'
+      - action: expect
+        with:
+          api: /api/gateway/v1/cache-rules/{ruleId}
+          field: cache_rule.enabled
+          equals: "false"
+      - action: click
+        with:
+          selector: 'tr:has-text("{ruleName}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Archive
+      - action: click
+        with:
+          text: Archive
+          hasText: ^Archive$
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: expect
+        with:
+          count: 'tr:has-text("{ruleName}")'
+          equals: "0"

@@ -54,6 +54,8 @@ export interface Credential {
   slug: string;
   /** fallbackEmails are tried in order when email does not sign in on a side. */
   fallbackEmails?: string[];
+  /** probeEmail signs in, in a context of its own, to photograph the passkey offer unanswered. */
+  probeEmail?: string;
 }
 
 export interface Plan {

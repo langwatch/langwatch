@@ -282,9 +282,10 @@
 - {"id": "experiments-execute-refuses-readonly-key", "endpoint": "POST /api/experiments/execute", "auth": "restricted", "request": {"path": "/api/experiments/execute", "body": {}}, "expect": {"status": [400, 401, 403, 422]}}
 - {"id": "experiments-execute-unknown-experiment", "endpoint": "POST /api/experiments/execute", "auth": "session", "request": {"path": "/api/experiments/execute", "body": {"experimentId": "exp_missing_{uid}"}}, "expect": {"status": [400, 404, 422]}}
 - {"id": "experiments-abort-refuses-no-key", "endpoint": "POST /api/experiments/abort", "auth": "none", "request": {"path": "/api/experiments/abort", "body": {}}, "expect": {"status": [400, 401, 422]}}
-- {"id": "experiments-abort-empty-body", "endpoint": "POST /api/experiments/abort", "request": {"path": "/api/experiments/abort", "body": {}}, "expect": {"status": [400, 422]}}
+- {"id": "experiments-abort-empty-body", "endpoint": "POST /api/experiments/abort", "auth": "session", "request": {"path": "/api/experiments/abort", "body": {}}, "expect": {"status": [400, 422]}}
 - {"id": "experiments-abort-refuses-readonly-key", "endpoint": "POST /api/experiments/abort", "auth": "restricted", "request": {"path": "/api/experiments/abort", "body": {}}, "expect": {"status": [400, 401, 403, 422]}}
-- {"id": "experiments-abort-unknown-run", "endpoint": "POST /api/experiments/abort", "request": {"path": "/api/experiments/abort", "body": {"runId": "run_missing_{uid}", "experimentId": "exp_missing_{uid}"}}, "expect": {"status": [200, 400, 404, 422]}}
+- {"id": "experiments-abort-unknown-run", "endpoint": "POST /api/experiments/abort", "auth": "session", "request": {"path": "/api/experiments/abort", "body": {"projectId": "{projectId}", "runId": "run_missing_{uid}"}}, "expect": {"status": 404}}
+- {"id": "experiments-abort-refuses-api-key", "endpoint": "POST /api/experiments/abort", "request": {"path": "/api/experiments/abort", "body": {"projectId": "{projectId}", "runId": "run_missing_{uid}"}}, "expect": {"status": 401}}
 - {"id": "evaluations-list-happy", "endpoint": "GET /api/evaluations/list", "request": {"path": "/api/evaluations/list"}, "expect": {"status": 200}}
 - {"id": "evaluations-list-is-public-without-key", "endpoint": "GET /api/evaluations/list", "auth": "none", "request": {"path": "/api/evaluations/list"}, "expect": {"status": 200}}
 - {"id": "evaluations-list-readonly-key-allowed", "endpoint": "GET /api/evaluations/list", "auth": "restricted", "request": {"path": "/api/evaluations/list"}, "expect": {"status": 200}}

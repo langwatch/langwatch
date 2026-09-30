@@ -28,6 +28,11 @@ const (
 	SeededSlug     = "local-dev-project"
 )
 
+// SeededPasskeyProbeEmail is the seeded account only the sign-in capture uses. It signs in in
+// a context of its own and never answers the passkey offer, so the offer stays outstanding
+// for every run; no fuzzer or flow shares it (apps/tasks storage-seed).
+const SeededPasskeyProbeEmail = "passkey-probe@mail.langwatch.localhost"
+
 // RetiredSeededEmails are earlier seeded admins an older ref still creates.
 var RetiredSeededEmails = []string{"admin@haven.localhost"}
 
@@ -40,6 +45,9 @@ func (identity SeedIdentity) withSeededDefaults() SeedIdentity {
 	if identity.Email == "" {
 		identity.Email = SeededEmail
 		identity.FallbackEmails = RetiredSeededEmails
+		if identity.ProbeEmail == "" {
+			identity.ProbeEmail = SeededPasskeyProbeEmail
+		}
 	}
 	if identity.Password == "" {
 		identity.Password = SeededPassword
@@ -59,6 +67,9 @@ type SeedIdentity struct {
 	Slug       string `json:"slug"`
 	// FallbackEmails are tried in order when Email does not sign in on a side.
 	FallbackEmails []string `json:"fallbackEmails,omitempty"`
+	// ProbeEmail is the account the sign-in capture photographs the passkey offer with; the
+	// runner falls back to Email when it does not sign in. Empty: the run's own account.
+	ProbeEmail string `json:"probeEmail,omitempty"`
 }
 
 // SeedRequest is one seeding step: which API to post to, as whom, and how
@@ -244,6 +255,7 @@ type postSpec struct {
 	key    string
 	body   any
 	method string
+	bearer string
 }
 
 func post(ctx context.Context, client *http.Client, spec postSpec) error {
@@ -266,7 +278,11 @@ func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byt
 		return nil, err
 	}
 	outgoing.Header.Set("Content-Type", "application/json")
-	outgoing.Header.Set("X-Auth-Token", spec.key)
+	if spec.bearer != "" {
+		outgoing.Header.Set("Authorization", "Bearer "+spec.bearer)
+	} else {
+		outgoing.Header.Set("X-Auth-Token", spec.key)
+	}
 	response, err := client.Do(outgoing)
 	if err != nil {
 		return nil, err

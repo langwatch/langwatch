@@ -17,10 +17,13 @@ import (
 // prerequisite is posted instead of clicked through: Post is the path (its {name} filled too), Body its JSON
 // with {name} filled from the fixtures and earlier captures, As names the strings
 // kept from the answer (value name to dot path). A flow reads them as {name}.
+// A step with a Bearer goes to the stack's gateway origin carrying that virtual key
+// secret, so a flow can make a real model call through the data plane.
 type SetupStep struct {
-	Post string            `yaml:"post"`
-	Body map[string]any    `yaml:"body,omitempty"`
-	As   map[string]string `yaml:"as,omitempty"`
+	Post   string            `yaml:"post"`
+	Body   map[string]any    `yaml:"body,omitempty"`
+	As     map[string]string `yaml:"as,omitempty"`
+	Bearer string            `yaml:"bearer,omitempty"`
 }
 
 // setupRequest is every flow's setup against one stack, with that stack's fixtures.
@@ -79,11 +82,16 @@ func runSetup(ctx context.Context, request setupRequest, key string, flow Flow) 
 		if err != nil {
 			return captured, fmt.Errorf("step %d: %w", index, err)
 		}
-		path := step.Post
-		for name, value := range values {
-			path = strings.ReplaceAll(path, "{"+name+"}", value)
+		path := fillText(step.Post, values)
+		origin, bearer := request.apiURL, ""
+		if step.Bearer != "" {
+			origin = Stack{HavenURL: request.apiURL}.GatewayURL()
+			bearer = fillText(step.Bearer, values)
+			if origin == "" {
+				return captured, fmt.Errorf("step %d: %s has no gateway origin", index, request.apiURL)
+			}
 		}
-		answer, err := postReading(ctx, request.client, postSpec{url: request.apiURL + path, key: key, body: body})
+		answer, err := postReading(ctx, request.client, postSpec{url: origin + path, key: key, body: body, bearer: bearer})
 		if err != nil {
 			return captured, fmt.Errorf("step %d: %w", index, err)
 		}
@@ -113,4 +121,12 @@ func fillBody(body map[string]any, values map[string]string) (any, error) {
 	var filled any
 	err = json.Unmarshal([]byte(text), &filled)
 	return filled, err
+}
+
+// fillText substitutes each {name} in text with its value.
+func fillText(text string, values map[string]string) string {
+	for name, value := range values {
+		text = strings.ReplaceAll(text, "{"+name+"}", value)
+	}
+	return text
 }

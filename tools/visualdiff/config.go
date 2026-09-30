@@ -118,6 +118,8 @@ var RunnerActions = []string{
 	// primitives
 	"go", "click", "fill", "select", "dismissTour", "type", "wait", "expect",
 	"upload", "drag", "download", "hover", "capture", "mail", "acceptInvite",
+	// virtual WebAuthn authenticator, TOTP code from a shown secret, API call
+	"passkey", "totp", "request",
 	// named flow actions
 	"signIn", "createAutomation", "createEvaluation", "sendTrace", "openTrace",
 	"annotate", "editProjectSettings", "createPrompt", "createExperiment",

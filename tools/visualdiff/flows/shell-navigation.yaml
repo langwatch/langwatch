@@ -1,0 +1,519 @@
+# App shell flows (lane green-home-nav): the sidebar, the project home, the switchers, the command
+# bar, the user menu, the theme toggle, the 404 and permission-denied pages, deep links.
+# Every label comes from main: platform/app/src/components/MainMenu.tsx (sidebar labels, aria-label
+# on each link, aria-current on the active one), AppHeaderUserMenu.tsx, sidebar/ThemeToggle.tsx,
+# NotFoundScene.tsx, PermissionAlert.tsx, features/command-bar and features/navigation/shell.
+# Members come from a real invite (`mail` then `acceptInvite`), so sign-out and the permission
+# wall never touch the shared admin session.
+flows:
+  # One step per sidebar entry of main's MainMenu. A link is found by its aria-label and proved by
+  # aria-current (main marks the active item) and the page's own heading where main has one.
+  # Sessions and Pull requests sit behind the coding-agent flag and are not in this list.
+  - id: shell-sidebar-every-entry
+    title: Every sidebar entry lands on its page, marked as the current item
+    steps:
+      - action: go
+        with:
+          path: /{slug}
+      - action: click
+        with:
+          label: Analytics
+      - action: expect
+        with:
+          url: /{slug}/analytics
+      - action: expect
+        with:
+          count: '[aria-current="page"][aria-label="Analytics"]'
+          equals: "1"
+      - action: expect
+        with:
+          text: Analytics
+          role: heading
+      - action: click
+        with:
+          label: Trace Explorer
+      - action: expect
+        with:
+          url: /{slug}/traces
+      - action: expect
+        with:
+          count: '[aria-current="page"][aria-label="Trace Explorer"]'
+          equals: "1"
+      - action: click
+        with:
+          label: Online Evals
+      - action: expect
+        with:
+          url: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: Online Evaluations
+          role: heading
+      - action: click
+        with:
+          label: Agent Testing
+      - action: expect
+        with:
+          url: /{slug}/agent-testing
+      - action: expect
+        with:
+          testId: agent-testing-title
+          hasText: Agent Testing
+      - action: click
+        with:
+          label: Experiments
+      - action: expect
+        with:
+          url: /{slug}/experiments
+      - action: expect
+        with:
+          text: Experiments
+          role: heading
+      - action: click
+        with:
+          label: Annotations
+      - action: expect
+        with:
+          url: /{slug}/annotations
+      - action: expect
+        with:
+          count: '[aria-current="page"][aria-label="Annotations"]'
+          equals: "1"
+      - action: click
+        with:
+          label: Prompts
+      - action: expect
+        with:
+          url: /{slug}/prompts
+      - action: expect
+        with:
+          text: Prompts
+          role: heading
+      - action: click
+        with:
+          label: Agents
+      - action: expect
+        with:
+          url: /{slug}/agents
+      - action: expect
+        with:
+          text: Agents
+          role: heading
+      - action: click
+        with:
+          label: Workflows
+      - action: expect
+        with:
+          url: /{slug}/workflows
+      - action: expect
+        with:
+          text: Workflows
+          role: heading
+      - action: click
+        with:
+          label: Evaluators
+      - action: expect
+        with:
+          url: /{slug}/evaluators
+      - action: expect
+        with:
+          text: Evaluators
+          role: heading
+      - action: click
+        with:
+          label: Datasets
+      - action: expect
+        with:
+          url: /{slug}/datasets
+      - action: expect
+        with:
+          text: Datasets
+          role: heading
+      - action: click
+        with:
+          label: Automations
+      - action: expect
+        with:
+          url: /{slug}/automations
+      - action: expect
+        with:
+          count: '[aria-current="page"][aria-label="Automations"]'
+          equals: "1"
+      - action: click
+        with:
+          label: Home
+      - action: expect
+        with:
+          url: /^\/{slug}$/
+      - action: expect
+        with:
+          count: '[aria-current="page"][aria-label="Home"]'
+          equals: "1"
+
+  # Main's HomePage greets in WelcomeHeader ("Good morning, <name>"), the Langy home keeps the
+  # same greeting in its hero. A project that has traces draws the "Traces overview" card.
+  - id: shell-home-project-with-traces
+    title: The home of a project with traces greets the person and draws the traces overview
+    steps:
+      - action: sendTrace
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          text: /Good (morning|afternoon|evening)/
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Traces overview
+          timeout: "30000"
+
+  # A project made from the switcher has no traces: its home offers the first-message step
+  # (main's OnboardingProgress) and no traces overview with data. The new project is then found
+  # again through the switcher's list, the way a person moves between projects.
+  - id: shell-project-switcher-creates-and-opens-fresh-home
+    title: Create a project from the switcher, open it from the list and see the fresh home
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /{isolatedSlug}
+      - action: click
+        with:
+          label: Switch project
+      - action: click
+        with:
+          text: New Project
+      - action: fill
+        with:
+          field: AI Project
+          value: 'vd-fresh-{uid}'
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /{isolatedSlug}
+      - action: click
+        with:
+          label: Switch project
+      - action: click
+        with:
+          text: vd-fresh-{uid}
+      - action: expect
+        with:
+          url: /vd-fresh-{uid}
+          timeout: "20000"
+      - action: expect
+        with:
+          text: /Good (morning|afternoon|evening)/
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Sync your first message
+          timeout: "20000"
+
+  # Main shows a switcher only when the person belongs to more than one organisation; a single
+  # organisation is a plain statement of its name (OrganizationSelect). The stack's admin is in
+  # one, so no control is drawn. The two-organisation menu needs a second organisation the
+  # seed does not make.
+  - id: shell-organisation-name-without-switcher
+    title: A member of one organisation sees its name and no switcher
+    steps:
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          label: Switch project
+      - action: expect
+        with:
+          label: Switch organization
+          equals: "0"
+
+  - id: shell-command-bar-jumps-to-a-page
+    title: Open the command bar from the top bar and jump to Datasets by typing
+    steps:
+      - action: go
+        with:
+          path: /{slug}
+      - action: click
+        with:
+          label: Open command bar
+      - action: type
+        with:
+          placeholder: Where would you like to go?
+          text: Datasets
+          submit: "true"
+      - action: expect
+        with:
+          url: /{slug}/datasets
+
+  # The toggle is main's three-way radio group ("Set theme to light|system|dark"); next-themes
+  # writes the choice to the html class and to storage, so a reload keeps it.
+  - id: shell-theme-toggle-persists-after-reload
+    title: Choose the dark theme, reload and still be in it, then choose light
+    steps:
+      - action: go
+        with:
+          path: /{slug}
+      - action: click
+        with:
+          label: Set theme to dark
+      - action: expect
+        with:
+          count: html.dark
+          equals: "1"
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          count: html.dark
+          equals: "1"
+      - action: click
+        with:
+          label: Set theme to light
+      - action: expect
+        with:
+          count: html.light
+          equals: "1"
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          count: html.light
+          equals: "1"
+
+  # The avatar menu of a real member (main: My Workspace when governed, API Keys, Settings,
+  # Navigation, Reduced graphics, Logout). The profile is its own settings page. Logout ends the
+  # member's session, so the next visit is sent to sign in; the admin stays signed in.
+  - id: shell-user-menu-profile-and-sign-out
+    title: A member opens the user menu, reaches their profile and signs out
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-nav-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-nav-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-nav-{uid}@mail.langwatch.localhost
+          name: vd-nav-{uid}
+      - action: signIn
+        with:
+          anonymous: member
+          email: vd-nav-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: member
+      - action: expect
+        with:
+          text: Profile
+          role: heading
+          timeout: "20000"
+          anonymous: member
+      - action: click
+        with:
+          label: /^Open user menu/
+          anonymous: member
+      - action: expect
+        with:
+          text: Settings
+          role: menu
+          anonymous: member
+      - action: expect
+        with:
+          text: Logout
+          role: menu
+          anonymous: member
+      - action: click
+        with:
+          text: /^\s*Logout\s*$/
+          anonymous: member
+      - action: expect
+        with:
+          url: /auth/signin
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: member
+      - action: expect
+        with:
+          url: /auth/signin
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          label: Actions for vd-nav-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-nav-{uid}
+          equals: "0"
+
+  - id: shell-not-found-page
+    title: An address that does not exist draws the 404 page, inside a project and outside one
+    steps:
+      - action: go
+        with:
+          path: /{slug}/no-such-page-{uid}
+      - action: expect
+        with:
+          text: You've wandered out of the simulation
+          timeout: "20000"
+      - action: expect
+        with:
+          text: This page doesn't exist or has been moved.
+      - action: go
+        with:
+          path: /no-such-place-{uid}/deeper
+      - action: expect
+        with:
+          text: You've wandered out of the simulation
+          timeout: "20000"
+
+  # An organisation setting behind organization:manage (main: audit-log withPermissionGuard). A
+  # default member reads PermissionAlert's "Access Restricted" and the missing permission.
+  - id: shell-permission-denied-for-a-member
+    title: A member without organization:manage meets Access Restricted on an admin page
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-deny-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-deny-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-deny-{uid}@mail.langwatch.localhost
+          name: vd-deny-{uid}
+      - action: signIn
+        with:
+          anonymous: member
+          email: vd-deny-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/audit-log
+          anonymous: member
+      - action: expect
+        with:
+          text: Access Restricted
+          timeout: "20000"
+          anonymous: member
+      - action: expect
+        with:
+          text: /organization:manage/
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          label: Actions for vd-deny-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-deny-{uid}
+          equals: "0"
+
+  # A `go` to the address a page is already on is a full load, so each step proves the address
+  # alone is enough to rebuild the view: a project page, a trace drawer, a settings tab.
+  - id: shell-deep-links-survive-reload
+    title: A project page, an open trace and a settings tab all come back from their address
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics
+      - action: go
+        with:
+          path: /{slug}/analytics
+      - action: expect
+        with:
+          url: /{slug}/analytics
+      - action: expect
+        with:
+          text: Analytics
+          role: heading
+      - action: go
+        with:
+          path: /{slug}/traces/trace_visualdiff_0
+      - action: go
+        with:
+          path: /{slug}/traces/trace_visualdiff_0
+      - action: expect
+        with:
+          url: /{slug}/traces/trace_visualdiff_0
+      - action: click
+        with:
+          text: /^\s*Trace\s*$/
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: handle_request
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: expect
+        with:
+          text: New team

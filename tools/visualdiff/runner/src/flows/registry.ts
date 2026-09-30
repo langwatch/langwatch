@@ -4,7 +4,10 @@ import { expectOutcome } from "./expect.ts";
 import { capture, download, drag, hover, upload } from "./interactions.ts";
 import { acceptInvite } from "./invite.ts";
 import { mail } from "./mail.ts";
+import { passkey } from "./passkey.ts";
 import { click, dismissTour, fill, go, select, type, wait } from "./primitives.ts";
+import { request } from "./request.ts";
+import { totp } from "./totp.ts";
 
 /** Keep names aligned with `RunnerActions` in tools/visualdiff/config.go; tests enforce parity. */
 export const REGISTRY: Record<string, Action> = {
@@ -23,6 +26,9 @@ export const REGISTRY: Record<string, Action> = {
   capture,
   mail,
   acceptInvite,
+  passkey,
+  totp,
+  request,
   signIn: actions.signIn,
   createAutomation: actions.createAutomation,
   createEvaluation: actions.createEvaluation,

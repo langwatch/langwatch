@@ -279,3 +279,69 @@ flows:
       - action: expect
         with:
           text: /Where the tokens went|What it did|Where the time went|No usage summary for this session/
+
+  - id: coding-session-usage-shows-tool-run
+    title: A session's Usage tab counts its Bash tool run and lists it under what it did, with a cost
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/5c0d1a6e0000000000000000000000a1
+      - action: click
+        with:
+          text: /^\s*Usage\s*$/
+      - action: expect
+        with:
+          text: What it did
+      - action: expect
+        with:
+          text: /^\s*Tools run\s*$/
+      - action: expect
+        with:
+          text: /^\s*Bash\s*$/
+      - action: expect
+        with:
+          text: No tools were run
+          equals: "0"
+      - action: expect
+        with:
+          text: No usage summary for this session
+          equals: "0"
+      - action: expect
+        with:
+          text: /^\s*Cost\s*$/
+
+  - id: coding-session-list-shows-token-cost
+    title: The session list prices each session in its Token cost column
+    steps:
+      - action: go
+        with:
+          path: /{slug}/sessions
+      - action: expect
+        with:
+          text: /^\s*Token cost\s*$/
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("/Visual diff alpha session.*\$0\.\d+/s")'
+          min: '1'
+
+  - id: coding-personal-usage-card-links-to-sessions
+    title: The personal overview carries the coding-agent usage card, and its View sessions link opens the sessions page
+    steps:
+      - action: go
+        with:
+          path: /me
+      - action: expect
+        with:
+          text: Coding-agent usage (last 30 days)
+      - action: expect
+        with:
+          text: /No coding-agent usage yet|Active time/
+      - action: click
+        with:
+          text: /^\s*View sessions\s*$/
+      - action: expect
+        with:
+          url: /me/sessions
+      - action: expect
+        with:
+          text: Every coding-agent session you ran

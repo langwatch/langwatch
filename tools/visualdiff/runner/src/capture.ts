@@ -169,6 +169,7 @@ export class Side {
     page.on("pageerror", (error) => {
       this.recorder.consoleError(`pageerror: ${String(error.message)}`);
     });
+    page.on("dialog", (dialog) => void dialog.accept());
     page.on("crash", () => {
       this.died = true;
     });

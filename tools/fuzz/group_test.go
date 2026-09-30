@@ -28,3 +28,18 @@ func TestSignatureOfIsStable(t *testing.T) {
 		t.Fatal("different routes share a signature")
 	}
 }
+
+func TestAliasPathsShareTheCanonicalRouteSignature(t *testing.T) {
+	canonical := signatureOf("5xx", "GET", "/api/annotations/{id}", 500)
+	for _, alias := range []string{"/api/annotations/latest/{id}", "/api/annotations/2026-08-07/{id}"} {
+		if signatureOf("5xx", "GET", alias, 500) != canonical {
+			t.Fatalf("%s does not group with %s", alias, "/api/annotations/{id}")
+		}
+		if !isVersionAlias(alias) {
+			t.Fatalf("%s not recognised as an alias", alias)
+		}
+	}
+	if isVersionAlias("/api/annotations/{id}") || canonicalRoute("/api/annotations/latest") != "/api/annotations" {
+		t.Fatal("canonical route or alias detection wrong")
+	}
+}

@@ -5,9 +5,16 @@ import { clickText, dismissTour, fillField, goTo } from "./primitives.ts";
 const required = async (context: Parameters<Action>[0], text: string): Promise<void> =>
   clickText({ context, text });
 
-/** signIn signs the run in, signing up first when the account does not exist yet. */
+/**
+ * signIn signs the run in, signing up first when the account does not exist yet. The `email`
+ * and `password` arguments sign in as another account, for a flow that made its own.
+ */
 export const signIn: Action = async (context) => {
-  const { credential } = context;
+  const credential = {
+    ...context.credential,
+    email: context.args.email ?? context.credential.email,
+    password: context.args.password ?? context.credential.password,
+  };
   const formShown = async (): Promise<boolean> => {
     await goTo({ context, path: "/auth/signin" });
     return context.side.page
@@ -215,7 +222,7 @@ export const createScenario: Action = async (context) => {
 export const createRunSet: Action = async (context) => {
   await goTo({
     context,
-    path: argument({ context, name: "start", fallback: "/{slug}/analytics/query" }),
+    path: argument({ context, name: "start", fallback: "/{slug}/analytics/reports" }),
   });
   await context.snapshot("query surface");
   const editor = context.side.page.locator("textarea, .cm-content, [contenteditable=true]").first();

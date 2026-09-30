@@ -1,0 +1,436 @@
+# A person's own settings, /settings/profile and /settings/security, each change read back after a
+# reload. Every mutation runs as an invited member in a cookieless browser (never the shared admin,
+# whose name, addresses and second factor every other flow depends on); the admin removes the
+# member at the end. The photo is files-media.yaml, the password change, sessions and sign-out are
+# auth.yaml. Labels and test ids are main's (platform/app/src/components/me/*).
+# Not scripted, and why: passkey create, rename and delete (needs a WebAuthn virtual authenticator,
+# which the runner does not open), two-step enrolment, backup codes and turning it off (needs a
+# TOTP code from the shown secret, which no action computes), delete account and notification
+# preferences (main has neither on a person's own settings). Unrun: first run proves them.
+flows:
+  - id: personal-profile-name-round-trip
+    title: Change your name, see it kept after a reload and shown in the directory
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-pn-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-pn-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-pn-{uid}@mail.langwatch.localhost
+          name: vd-pn-{uid}
+      - action: signIn
+        with:
+          anonymous: member
+          email: vd-pn-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: member
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: member
+      - action: expect
+        with:
+          text: Your details
+          timeout: "20000"
+          anonymous: member
+      - action: expect
+        with:
+          testId: profile-email
+          hasText: vd-pn-{uid}@mail.langwatch.localhost
+          anonymous: member
+      - action: expect
+        with:
+          testId: profile-standing-chip
+          hasText: /^Member of /
+          anonymous: member
+      - action: expect
+        with:
+          count: '[data-testid="profile-name-save"][disabled]'
+          equals: "1"
+          anonymous: member
+      - action: fill
+        with:
+          testId: profile-name-input
+          value: vd-pn-{uid}-renamed
+          anonymous: member
+      - action: click
+        with:
+          testId: profile-name-save
+          anonymous: member
+      - action: expect
+        with:
+          text: Name updated
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: member
+      - action: expect
+        with:
+          count: '[data-testid="profile-name-input"][value="vd-pn-{uid}-renamed"]'
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-pn-{uid}-renamed
+          timeout: "20000"
+      - action: click
+        with:
+          label: /^Actions for vd-pn-{uid}/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-pn-{uid}
+          equals: "0"
+
+  - id: personal-security-address-add-confirm-remove
+    title: Add a second email address, confirm it from the mailed link in the same browser, then remove it
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-ps-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-ps-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-ps-{uid}@mail.langwatch.localhost
+          name: vd-ps-{uid}
+      - action: signIn
+        with:
+          anonymous: member
+          email: vd-ps-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: go
+        with:
+          path: /settings/security
+          anonymous: member
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: member
+      - action: expect
+        with:
+          text: Linked Accounts
+          timeout: "20000"
+          anonymous: member
+      - action: expect
+        with:
+          testId: email-identifier-row
+          anonymous: member
+      - action: expect
+        with:
+          testId: passkeys-section
+          anonymous: member
+      - action: expect
+        with:
+          text: No passkeys yet
+          anonymous: member
+      - action: expect
+        with:
+          testId: create-passkey
+          anonymous: member
+      - action: expect
+        with:
+          testId: password-section
+          anonymous: member
+      - action: click
+        with:
+          testId: add-address
+          anonymous: member
+      - action: fill
+        with:
+          testId: new-address
+          value: vd-ps2-{uid}@mail.langwatch.localhost
+          anonymous: member
+      - action: click
+        with:
+          testId: confirm-add-address
+          anonymous: member
+      - action: expect
+        with:
+          testId: address-link-sent
+          timeout: "20000"
+          anonymous: member
+      - action: expect
+        with:
+          testId: address-unconfirmed
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/security
+          anonymous: member
+      - action: expect
+        with:
+          text: vd-ps2-{uid}@mail.langwatch.localhost
+          timeout: "20000"
+          anonymous: member
+      - action: expect
+        with:
+          testId: address-unconfirmed
+          anonymous: member
+      - action: mail
+        with:
+          to: vd-ps2-{uid}@mail.langwatch.localhost
+          as: addressLink
+      - action: go
+        with:
+          path: "{addressLink}"
+          anonymous: member
+      - action: expect
+        with:
+          testId: address-confirmed-now
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/security
+          anonymous: member
+      - action: expect
+        with:
+          testId: address-unconfirmed
+          equals: "0"
+          timeout: "20000"
+          anonymous: member
+      - action: expect
+        with:
+          testId: address-confirmed
+          min: "2"
+          anonymous: member
+      - action: click
+        with:
+          selector: '[data-testid="email-identifier-row"]:has-text("vd-ps2-{uid}") [data-testid="remove-address"]'
+          anonymous: member
+      - action: expect
+        with:
+          text: Address removed
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/security
+          anonymous: member
+      - action: expect
+        with:
+          text: vd-ps2-{uid}@mail.langwatch.localhost
+          equals: "0"
+          timeout: "20000"
+          anonymous: member
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          label: /^Actions for vd-ps-{uid}/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-ps-{uid}
+          equals: "0"
+
+  # Stops at the shared secret: turning it on needs a TOTP code, and an enrolled admin would sign
+  # every other flow into a code prompt. The pending secret a started setup leaves is replaced by
+  # the next start.
+  - id: personal-security-passkeys-and-two-step-offers
+    title: Security offers passkeys and two-step verification, and setup shows a scannable code and a shared secret
+    steps:
+      - action: go
+        with:
+          path: /settings/security
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+      - action: expect
+        with:
+          testId: passkeys-section
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Passkeys
+      - action: expect
+        with:
+          testId: two-factor-section
+      - action: expect
+        with:
+          testId: two-factor-empty
+      - action: click
+        with:
+          testId: set-up-two-factor
+      - action: expect
+        with:
+          text: Confirm your password to begin
+      - action: fill
+        with:
+          testId: two-factor-password
+          value: "{actorPassword}"
+      - action: click
+        with:
+          testId: start-two-factor
+      - action: expect
+        with:
+          testId: two-factor-shared-secret
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: two-factor-scannable-code
+      - action: expect
+        with:
+          testId: two-factor-shown-once
+      - action: click
+        with:
+          text: /^\s*Cancel\s*$/
+      - action: go
+        with:
+          path: /settings/security
+      - action: expect
+        with:
+          testId: two-factor-empty
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: two-factor-status
+          equals: "0"
+
+  - id: personal-profile-api-key-listed-then-revoked
+    title: A personal API key created on the API Keys page is listed under Your API keys on Profile, and gone once revoked
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: click
+        with:
+          text: Create new secret key
+      - action: fill
+        with:
+          field: e.g., CI Pipeline
+          value: vd-ppk-{uid}
+      - action: click
+        with:
+          text: Create secret key
+      - action: expect
+        with:
+          text: Token Created
+      - action: click
+        with:
+          label: Close
+      - action: go
+        with:
+          path: /settings/profile
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+      - action: expect
+        with:
+          text: Your API keys
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: personal-api-key-row
+          hasText: vd-ppk-{uid}
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: api-keys-manage
+      - action: click
+        with:
+          text: Manage API keys
+      - action: expect
+        with:
+          url: /settings/api-keys
+      - action: click
+        with:
+          label: Revoke API key vd-ppk-{uid}
+      - action: click
+        with:
+          text: /^\s*Revoke\s*$/
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          text: Your API keys
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: personal-api-key-row
+          hasText: vd-ppk-{uid}
+          equals: "0"
+          timeout: "20000"
+
+  - id: personal-profile-manage-links-to-security
+    title: The sign-in methods band on Profile links to Security
+    steps:
+      - action: go
+        with:
+          path: /settings/profile
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+      - action: expect
+        with:
+          text: Sign-in methods
+          timeout: "20000"
+      - action: click
+        with:
+          testId: sign-in-methods-manage
+      - action: expect
+        with:
+          url: /settings/security
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Linked Accounts

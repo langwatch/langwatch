@@ -2,10 +2,27 @@ package fuzz
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 )
+
+// versionSelector is the hidden alias segment of /api/<x>: `/api/<ns>/latest/<x>` and
+// `/api/<ns>/<date>/<x>` answer as `/api/<ns>/<x>`.
+var versionSelector = regexp.MustCompile(`/(latest|preview|\d{4}-\d{2}-\d{2})(/|$)`)
+
+// isVersionAlias reports whether path is a dated or latest alias of another route.
+func isVersionAlias(path string) bool { return versionSelector.MatchString(path) }
+
+// canonicalRoute is the route an alias path stands for.
+func canonicalRoute(path string) string {
+	canonical := versionSelector.ReplaceAllString(path, "$2")
+	if canonical == "" {
+		return "/"
+	}
+	return canonical
+}
 
 // Finding is one oracle hit, written to findings.jsonl. Signature groups
 // findings by distinct cause, so thousands of hits collapse to a short list.
@@ -26,7 +43,7 @@ type Finding struct {
 // signatureOf is the grouping key: oracle, method, path template and status,
 // so one distinct cause is one row however many times it fires.
 func signatureOf(oracle, method, route string, status int) string {
-	return fmt.Sprintf("%s :: %s %s :: %d", oracle, method, route, status)
+	return fmt.Sprintf("%s :: %s %s :: %d", oracle, method, canonicalRoute(route), status)
 }
 
 // Group is one distinct cause with a count and a representative finding (the

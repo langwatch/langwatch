@@ -94,6 +94,16 @@ func (stack Stack) MailURL() string {
 	return parsed.Scheme + "://mail." + strings.TrimPrefix(parsed.Host, "app.")
 }
 
+// GatewayURL is the origin of the stack's AI gateway data plane, routed by haven as
+// gateway.<slug>... beside app.<slug>...; empty off haven, where no route exists.
+func (stack Stack) GatewayURL() string {
+	parsed, err := url.Parse(stack.HavenURL)
+	if err != nil || !strings.HasPrefix(parsed.Host, "app.") {
+		return ""
+	}
+	return parsed.Scheme + "://gateway." + strings.TrimPrefix(parsed.Host, "app.")
+}
+
 // APIURL is the origin the seeder posts fixtures to. haven serves the API
 // under /api on the same routed origin as the UI, so it is the same address
 // as URL() there.

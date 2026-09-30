@@ -7,7 +7,7 @@
 # least one active annotation score and one organisation member so a queue can
 # be created. The queue flows pick the first option of each picker.
 # Steps use handles both trees share (aria labels, button words, placeholders,
-# anchor-comment-button, tab and lens words); analytics-query-run is the one branch-only flow.
+# anchor-comment-button, tab and lens words).
 # trace-llm-call-in-drawer posts a fixed trace id in setup (a setup {uid} is not the flow's) and its
 # span times are fixed: refresh them within 31 days of the run, or the span is dropped as too old.
 # Not scripted: the user-events and sample-agents journeys (no UI).
@@ -651,21 +651,3 @@ flows:
         with:
           api: /api/graphs
           contains: vd-chart-{uid}
-
-  # branch-only: main has no analytics query workbench page (lwql-editor, lwql-run); only the REST route.
-  - id: analytics-query-run
-    title: Write a query in the analytics workbench, run it and read the result table
-    steps:
-      - action: go
-        with:
-          path: /{slug}/analytics/query
-      - action: type
-        with:
-          testId: lwql-editor
-          text: "SELECT trace_id, latency_ms FROM analytics.traces_daily LIMIT 100"
-      - action: click
-        with:
-          testId: lwql-run
-      - action: expect
-        with:
-          label: Query result rows

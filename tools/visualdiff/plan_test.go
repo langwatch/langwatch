@@ -131,3 +131,13 @@ func TestMailURLIsTheAppHostnameOnTheMailService(t *testing.T) {
 		t.Fatalf("a stack off haven has no mail sink, got %q", got)
 	}
 }
+
+func TestGatewayURLIsTheAppHostnameOnTheGatewayService(t *testing.T) {
+	stack := Stack{HavenURL: "https://app.visualdiff-check.langwatch.localhost"}
+	if got := stack.GatewayURL(); got != "https://gateway.visualdiff-check.langwatch.localhost" {
+		t.Fatalf("GatewayURL = %q", got)
+	}
+	if got := (Stack{}).GatewayURL(); got != "" {
+		t.Fatalf("a stack off haven has no gateway route, got %q", got)
+	}
+}

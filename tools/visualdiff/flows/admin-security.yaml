@@ -123,6 +123,13 @@ flows:
       - action: expect
         with:
           text: Input drop
+      # The rule gates content reads for every later flow and scenario on the shared stack: remove it.
+      - action: click
+        with:
+          selector: 'button[aria-label^="Actions for "][aria-label$=" privacy rule"]'
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
 
   - id: settings-legacy-redirects
     title: The retired access, scim and role-bindings addresses land on Directory and Roles

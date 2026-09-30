@@ -27,6 +27,7 @@ const (
 	CodingBetaBranch    = "feat/vd-beta"
 	CodingAlphaTitle    = "Visual diff alpha session"
 	CodingBetaTitle     = "Visual diff beta session"
+	CodingAlphaTool     = "Bash"
 	claudeEventsScope   = "com.anthropic.claude_code.events"
 	langwatchHookScope  = "langwatch.coding_agent.hook"
 	sessionContextEvent = "langwatch.session_context"
@@ -89,9 +90,19 @@ func codingSessionLogs(now int64) []map[string]any {
 }
 
 // codingSessionSpans is alpha's model call as a Claude Code llm_request span, so the
-// session has a stored trace to replay and to read back through the trace API.
+// session has a stored trace to replay and to read back through the trace API, and
+// one Bash tool span after it, so the session's usage summary has a tool run to show.
 func codingSessionSpans(now int64) []map[string]any {
 	start := (now - 7*60_000) * 1_000_000
+	toolStart := start + 2_500_000_000
+	tool := map[string]any{
+		"traceId": "5c0d1a6e0000000000000000000000a1", "spanId": "5c0d1a6e000000a2", "name": "claude_code.tool",
+		"kind": 1, "startTimeUnixNano": strconv.FormatInt(toolStart, 10), "endTimeUnixNano": strconv.FormatInt(toolStart+800_000_000, 10),
+		"attributes": []map[string]any{
+			otlpAttribute("session.id", CodingSessionAlpha), otlpAttribute("tool_name", CodingAlphaTool),
+			otlpAttribute("duration_ms", 800),
+		},
+	}
 	span := map[string]any{
 		"traceId": "5c0d1a6e0000000000000000000000a1", "spanId": "5c0d1a6e000000a1", "name": "claude_code.llm_request",
 		"kind": 1, "startTimeUnixNano": strconv.FormatInt(start, 10), "endTimeUnixNano": strconv.FormatInt(start+2_100_000_000, 10),
@@ -105,7 +116,7 @@ func codingSessionSpans(now int64) []map[string]any {
 			"resource": map[string]any{"attributes": []map[string]any{otlpAttribute("service.name", "claude-code")}},
 			"scopeSpans": []any{map[string]any{
 				"scope": map[string]any{"name": claudeEventsScope, "version": "1"},
-				"spans": []any{span},
+				"spans": []any{span, tool},
 			}},
 		}},
 	}}

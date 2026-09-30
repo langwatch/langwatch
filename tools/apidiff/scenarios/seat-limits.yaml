@@ -1,0 +1,175 @@
+# Plan seat limits (lane green-billing-usage). Main enforces two levers only, members and
+# membersLite (platform/app/src/server/license-enforcement/types.ts): projects, workflows,
+# prompts, scenarios, evaluators and every other resource are uncapped on every plan, so there is
+# nothing to assert for them. The monthly event allowance refuses with ERR_PLAN_LIMIT (402) at
+# 50k events on Free; no scenario reaches it without ingesting past the allowance.
+# The refusal is written before any invite row, so a refused batch leaves nothing behind. The
+# batch is the endpoint maximum (50) of EXTERNAL invites, which take lite seats: it overflows any
+# lite allowance under 50, and an organization already past its full seats refuses first as
+# members, so limitType is asserted present, not by value.
+
+- id: lim-invites-beyond-lite-seats-is-refused
+  endpoint: POST /api/organization/invites
+  auth: org
+  request:
+    path: /api/organization/invites
+    body:
+      invites:
+        - email: "vd-00-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-01-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-02-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-03-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-04-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-05-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-06-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-07-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-08-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-09-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-10-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-11-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-12-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-13-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-14-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-15-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-16-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-17-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-18-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-19-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-20-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-21-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-22-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-23-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-24-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-25-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-26-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-27-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-28-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-29-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-30-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-31-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-32-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-33-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-34-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-35-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-36-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-37-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-38-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-39-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-40-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-41-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-42-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-43-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-44-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-45-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-46-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-47-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-48-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+        - email: "vd-49-{uid}@example.com"
+          role: "EXTERNAL"
+          teams: [{"teamId": "{teamId}", "role": "VIEWER"}]
+  expect:
+    status: 403
+    body:
+      code: member_seat_limit_reached
+      meta: { limitType: "<any>", current: "<any>", max: "<any>" }
+  verify:
+    - request: GET /api/organization/invites
+      expect: { status: 200, notContains: "vd-00-{uid}@example.com" }

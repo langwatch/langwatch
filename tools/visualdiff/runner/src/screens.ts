@@ -327,6 +327,12 @@ export const flowProject = ({
   return { slug, credential: { ...plan.credential, slug, projectKey }, missing: "" };
 };
 
+/** actorValues are `{actor}` and `{actorPassword}`: the account the flow's own steps sign in as. */
+const actorValues = ({ credential }: FlowProject): Record<string, string> => ({
+  actor: credential.email,
+  actorPassword: credential.password,
+});
+
 /** FlowWalk is what every step of one flow's walk shares. */
 interface FlowWalk {
   plan: Plan;
@@ -344,15 +350,14 @@ const runStep = async ({
   walk,
   stepIndex,
   step,
-  anonymous: opened,
+  guests,
 }: {
   walk: FlowWalk;
   stepIndex: number;
   step: PlanStep;
-  anonymous: Side | undefined;
-}): Promise<{ error: string; anonymous: Side | undefined }> => {
+  guests: Map<string, Side>;
+}): Promise<string> => {
   const { plan, flow, side, collect, project, values, mailUrl, everyStep } = walk;
-  let anonymous = opened;
   let snapshots = 0;
   let active = side;
   const startedAt = Date.now();
@@ -389,15 +394,19 @@ const runStep = async ({
   let error = "";
   try {
     if (project.missing !== "") throw new Error(project.missing);
-    if (step.with?.anonymous === "true") {
-      anonymous ??= await side.openAnonymous();
-      active = anonymous;
+    const guest = step.with?.anonymous;
+    if (guest !== undefined && guest !== "false") {
+      if (!guests.has(guest)) guests.set(guest, await side.openAnonymous());
+      active = guests.get(guest) ?? side;
     }
     await resolveAction(step.action)({
       side: active,
       slug: project.slug,
       credential: project.credential,
-      args: fillArgs({ args: step.with ?? {}, values }),
+      args: fillArgs({
+        args: step.with ?? {},
+        values: { ...actorValues(project), ...values },
+      }),
       values,
       mailUrl,
       snapshot: async (label: string) => (everyStep ? shoot({ label, error: "" }) : undefined),
@@ -414,7 +423,7 @@ const runStep = async ({
   // Check mode still settles after every step: the next step's 6s starts on a loaded screen.
   if (everyStep || error !== "" || step.action === "expect") await shoot({ label: "after", error });
   else await active.waitUntilQuiet();
-  return { error, anonymous };
+  return error;
 };
 
 /**
@@ -447,16 +456,15 @@ export const captureFlow = async ({
   };
   const mailUrl = plan.sides.find((candidate) => candidate.name === side.name)?.mailUrl;
   const walk: FlowWalk = { plan, flow, side, collect, project, values, mailUrl, everyStep };
-  let anonymous: Side | undefined;
+  const guests = new Map<string, Side>();
   for (const [stepIndex, step] of flow.steps.entries()) {
-    const ran = await runStep({ walk, stepIndex, step, anonymous });
-    anonymous = ran.anonymous;
-    if (ran.error === "") continue;
+    if ((await runStep({ walk, stepIndex, step, guests })) === "") continue;
     failed += 1;
     break;
   }
-  await anonymous?.dispose();
-  const crashed = side.crashed || anonymous?.crashed === true;
+  const crashedGuest = [...guests.values()].some((guest) => guest.crashed);
+  await Promise.all([...guests.values()].map(async (guest) => guest.dispose()));
+  const crashed = side.crashed || crashedGuest;
   let outcome = failed === 0 ? "ok" : `${failed} failed`;
   if (crashed) outcome = CRASHED;
   note({

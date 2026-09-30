@@ -1,11 +1,13 @@
 # Auth beyond sign-in and sign-out: a wrong password is refused and leaves the visitor
 # signed out, and a password-reset mail carries a live link. Both run in a fresh cookieless
-# context. The shared account is never reset (resetting signs every other device out), so
-# the reset runs on an account the flow signs up itself. Sign-up, the dead-link resend, the
-# browser-session revoke, the SSO refusal screens and the CLI device-login pages follow.
-# Not scripted: a real SSO redirect (needs a verified-domain connection and an IdP), the
-# device-login approval round trip past the page (only the CLI's poll sees the record) and
-# passkey ceremonies. Handoff: .claude/handoffs/ui-coverage-auth-cli.md. Unrun: written under load.
+# context. The shared account is never reset or re-passworded (that signs every other device
+# out), so those flows run on an account they sign up or invite themselves. Sign-up, the
+# dead-link resend, the browser-session revoke, sign-out-everywhere on a password change, the
+# SSO refusal screens and the CLI device-login pages follow. `{actor}` and `{actorPassword}`
+# are the run's own sign-in account.
+# Not scripted: a real SSO redirect (needs an operator-approved verified-domain connection
+# beside the idpsim tenant) and passkey ceremonies. The CLI's poll is in apidiff
+# (auth-cli-approval.yaml, organization.yaml auth-cli-*).
 flows:
   - id: auth-wrong-password-refused
     title: A wrong password is refused and the visitor stays signed out
@@ -450,3 +452,120 @@ flows:
           url: /auth/signin
           timeout: "20000"
           anonymous: "true"
+
+  # Sign-out everywhere: a credential write ends every other session. The account is a real
+  # invitee (never the shared admin), signed in in two cookieless browsers; the one that
+  # changes its password stays in, the other is sent to sign in. Removing the member ends it.
+  - id: auth-password-change-signs-out-other-browsers
+    title: Changing your password signs every other browser out and keeps this one
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-pw-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-pw-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-pw-{uid}@mail.langwatch.localhost
+          name: vd-pw-{uid}
+      - action: signIn
+        with:
+          anonymous: browser-b
+          email: vd-pw-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: signIn
+        with:
+          anonymous: browser-c
+          email: vd-pw-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: browser-c
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: browser-c
+      - action: expect
+        with:
+          text: Where you are signed in
+          timeout: "20000"
+          anonymous: browser-c
+      - action: click
+        with:
+          testId: password-action
+          anonymous: browser-c
+      - action: fill
+        with:
+          field: /^Current Password$/i
+          value: "{actorPassword}"
+          anonymous: browser-c
+      - action: fill
+        with:
+          field: /^New Password$/i
+          value: Vd!Change-{uid}-Xr9
+          anonymous: browser-c
+      - action: fill
+        with:
+          field: /^Confirm New Password$/i
+          value: Vd!Change-{uid}-Xr9
+          anonymous: browser-c
+      - action: click
+        with:
+          text: /^\s*change password\s*$/i
+          anonymous: browser-c
+      - action: expect
+        with:
+          text: Password changed successfully
+          timeout: "20000"
+          anonymous: browser-c
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: browser-b
+      - action: expect
+        with:
+          url: /auth/signin
+          timeout: "20000"
+          anonymous: browser-b
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: browser-c
+      - action: expect
+        with:
+          text: This browser
+          timeout: "20000"
+          anonymous: browser-c
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          label: Actions for vd-pw-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-pw-{uid}
+          equals: "0"

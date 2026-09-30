@@ -1,6 +1,6 @@
 # Agents beyond the HTTP agent in simulations.yaml: code, workflow, connect-from-code
-# and deleting one. Voice agents are not scripted: release_voice_agents_enabled is off in
-# the check stack and the type selector has no voice card. Unrun: written under load.
+# and deleting one. Voice agents ride release_voice_agents_enabled, forced on by haven
+# (tools/visualdiff/haven.go), so the type selector carries the voice card.
 flows:
   - id: agent-create-code
     title: Create a code agent with the default template and find it after a reload
@@ -44,6 +44,10 @@ flows:
       - action: click
         with:
           testId: agent-type-workflow
+      - action: expect
+        with:
+          testId: agent-name-input
+          timeout: "30000"
       - action: fill
         with:
           testId: agent-name-input
