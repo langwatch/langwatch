@@ -5953,9 +5953,15 @@ importers:
 
   modules/authz/browser-kit:
     dependencies:
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
