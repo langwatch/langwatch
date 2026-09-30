@@ -40,11 +40,16 @@ func commitMigration(t *testing.T, root, name string) {
 
 func commitMigrationAt(t *testing.T, root, directory, name string) {
 	t.Helper()
+	commitMigrationContent(t, root, directory, name, "SELECT 1;\n")
+}
+
+func commitMigrationContent(t *testing.T, root, directory, name, content string) {
+	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(directory), name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte("SELECT 1;\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	gitIn(t, root, "add", ".")
@@ -200,6 +205,52 @@ func TestRepoInputsPortOfAMigrationReleasedOnMain(t *testing.T) {
 	}
 	if findings := prismaFindings("main"); len(findings) != 0 {
 		t.Errorf("with main as a release line, the port is history, got findings %+v", findings)
+	}
+}
+
+func TestRepoInputsPortWithDifferentSQLThanTheRelease(t *testing.T) {
+	// The PR carries a migration under a name main released, but with other SQL.
+	// Databases that ran the release recorded that name for main's SQL, so the
+	// port would never run there: the name alone does not make it history.
+	const prismaDir = "packages/prisma-client/prisma/migrations"
+	root := initRepo(t)
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260901000000_shared/migration.sql")
+	gitIn(t, root, "checkout", "-q", "-b", "long-branch")
+	if err := os.MkdirAll(filepath.Join(root, filepath.Dir(filepath.FromSlash(prismaDir))), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, root, "mv", "platform/app/prisma/migrations", prismaDir)
+	gitIn(t, root, "commit", "-q", "-m", "move migrations")
+	gitIn(t, root, "checkout", "-q", "main")
+	commitMigrationContent(t, root, "platform/app/prisma/migrations",
+		"20260928120001_released/migration.sql", "ALTER TABLE a ADD COLUMN b TEXT;\n")
+	gitIn(t, root, "checkout", "-q", "long-branch")
+	gitIn(t, root, "checkout", "-q", "-b", "port")
+	commitMigrationContent(t, root, prismaDir,
+		"20260928120001_released/migration.sql", "DROP TABLE a;\n")
+
+	inputs, err := migrationorder.Repo{Root: root}.Inputs(t.Context(), "long-branch", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := slices.IndexFunc(inputs, func(in migrationorder.Input) bool {
+		return in.Set.Name == "Prisma"
+	})
+	if index < 0 {
+		t.Fatalf("no Prisma input in %+v", inputs)
+	}
+
+	want := []migrationorder.Divergence{{
+		Entry: "20260928120001_released",
+		Ref:   "main",
+		Path:  "platform/app/prisma/migrations/20260928120001_released",
+	}}
+	if !slices.Equal(inputs[index].Diverged, want) {
+		t.Fatalf("Diverged = %+v, want %+v", inputs[index].Diverged, want)
+	}
+	findings := migrationorder.Check(inputs[index])
+	if len(findings) != 1 || findings[0].Entry != "20260928120001_released" {
+		t.Fatalf("want one finding for the changed port, got %+v", findings)
 	}
 }
 

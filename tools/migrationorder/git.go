@@ -69,6 +69,9 @@ func (r Repo) input(ctx context.Context, set Set, refs comparedRefs) (Input, err
 	if in.Misplaced, err = r.misplacedEntries(ctx, set); err != nil {
 		return Input{}, err
 	}
+	if in.Diverged, err = r.divergedPorts(ctx, in, refs.released); err != nil {
+		return Input{}, err
+	}
 	return in, nil
 }
 
@@ -83,6 +86,79 @@ func (r Repo) releasedEntries(ctx context.Context, set Set, refs []string) ([]st
 		released = append(released, entries...)
 	}
 	return released, nil
+}
+
+// divergedPorts compares every released entry the branch head carries, and the
+// base branch does not, with each release line's copy of it, wherever that copy
+// lives there: the set's directory or one it previously lived at. Git object ids
+// stand for the contents, a blob for a ClickHouse file and a tree for a Prisma
+// directory.
+func (r Repo) divergedPorts(ctx context.Context, in Input, refs []string) ([]Divergence, error) {
+	var diverged []Divergence
+	for _, entry := range portedEntries(in) {
+		divergence, found, err := r.divergence(ctx, port{set: in.Set, entry: entry}, refs)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			diverged = append(diverged, divergence)
+		}
+	}
+	return diverged, nil
+}
+
+// port is one released migration the branch head carries.
+type port struct {
+	set   Set
+	entry string
+}
+
+// divergence reports the first release line whose copy of p differs from the
+// branch head's.
+func (r Repo) divergence(ctx context.Context, p port, refs []string) (Divergence, bool, error) {
+	head, err := r.objectID(ctx, "HEAD", p.set.Directory+"/"+p.entry)
+	if err != nil {
+		return Divergence{}, false, err
+	}
+	for _, ref := range refs {
+		path, released, err := r.releasedCopy(ctx, ref, p)
+		if err != nil {
+			return Divergence{}, false, err
+		}
+		if path != "" && released != head {
+			return Divergence{Entry: p.entry, Ref: ref, Path: path}, true, nil
+		}
+	}
+	return Divergence{}, false, nil
+}
+
+// releasedCopy finds p on ref under the set's directory or a previous one,
+// returning its path and object id, or an empty path when ref lacks it.
+func (r Repo) releasedCopy(ctx context.Context, ref string, p port) (string, string, error) {
+	for _, directory := range slices.Concat([]string{p.set.Directory}, p.set.PreviousDirectories) {
+		entries, err := r.entriesAt(ctx, ref, directory)
+		if err != nil {
+			return "", "", err
+		}
+		if !slices.Contains(entries, p.entry) {
+			continue
+		}
+		path := directory + "/" + p.entry
+		id, err := r.objectID(ctx, ref, path)
+		if err != nil {
+			return "", "", err
+		}
+		return path, id, nil
+	}
+	return "", "", nil
+}
+
+func (r Repo) objectID(ctx context.Context, ref, path string) (string, error) {
+	out, err := r.git(ctx, "rev-parse", "--verify", "--end-of-options", ref+":"+path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
 }
 
 // misplacedEntries lists the entries under the set's forbidden roots at HEAD,

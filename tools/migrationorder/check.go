@@ -33,6 +33,21 @@ type Input struct {
 	// branch carrying it is porting history, not adding a migration, and it
 	// must keep the name.
 	Released []string
+	// Diverged are released entries the branch head carries with contents that
+	// differ from the release line's copy. The name alone does not make a port
+	// history: databases that ran the release recorded that name for its SQL.
+	Diverged []Divergence
+}
+
+// Divergence is a released migration the branch carries with other contents.
+type Divergence struct {
+	// Entry is the migration name, as it appears under the set's directory.
+	Entry string
+	// Ref is the release line whose copy differs.
+	Ref string
+	// Path is the repository-relative path of the copy on Ref, which may sit
+	// under one of the set's previous directories.
+	Path string
 }
 
 // Finding is one migration that is out of order, and how to fix it.
@@ -89,10 +104,25 @@ func Check(in Input) []Finding {
 		}
 	}
 
+	for _, divergence := range slices.SortedFunc(slices.Values(in.Diverged), func(a, b Divergence) int {
+		return cmp.Compare(a.Entry, b.Entry)
+	}) {
+		findings = append(findings, Finding{
+			Set:     in.Set.Name,
+			Entry:   divergence.Entry,
+			Problem: fmt.Sprintf("differs from %s:%s, and migrations that have run somewhere cannot change", divergence.Ref, divergence.Path),
+			Fix:     restoreReleased(divergence, in.Set),
+		})
+	}
+
 	// Keys are taken by everything ever seen on either ref: a migration deleted
 	// from the base branch after this branch forked has still run somewhere, so
 	// its key is not free to reuse.
 	taken, highest := keysOf(slices.Concat(in.Base, in.MergeBase), in.Set)
+
+	// A released migration the branch ports keeps its name, and with it its key:
+	// a migration the branch adds may not share that key either.
+	portedKeys, highestPorted := keysOf(portedEntries(in), in.Set)
 
 	var added []migration
 	for _, entry := range slices.Sorted(slices.Values(in.Head)) {
@@ -113,10 +143,10 @@ func Check(in Input) []Finding {
 	slices.SortFunc(added, func(a, b migration) int { return cmp.Compare(a.key, b.key) })
 
 	// Suggested keys are handed out above everything in play — the newest on the
-	// base branch and anything this branch already numbered — so a suggestion
-	// never lands on a key that is itself taken, and two clashing migrations get
-	// two different answers.
-	free := highest
+	// base branch, the released migrations this branch ports, and anything this
+	// branch already numbered — so a suggestion never lands on a key that is
+	// itself taken, and two clashing migrations get two different answers.
+	free := max(highest, highestPorted)
 	for _, m := range added {
 		free = max(free, m.key)
 	}
@@ -148,6 +178,13 @@ func Check(in Input) []Finding {
 				Problem: fmt.Sprintf("is numbered below %d, the newest migration on %s, so it runs out of order or not at all", highest, base),
 				Fix:     suggest(m.entry),
 			})
+		case portedKeys[m.key] != "":
+			findings = append(findings, Finding{
+				Set:     in.Set.Name,
+				Entry:   m.entry,
+				Problem: fmt.Sprintf("shares key %d with %s, a released migration this branch ports", m.key, portedKeys[m.key]),
+				Fix:     suggest(m.entry),
+			})
 		case twin:
 			findings = append(findings, Finding{
 				Set:     in.Set.Name,
@@ -159,6 +196,34 @@ func Check(in Input) []Finding {
 	}
 
 	return findings
+}
+
+// portedEntries are the released entries the branch head carries that the base
+// branch never had: migrations the branch ports from a release line.
+func portedEntries(in Input) []string {
+	onBase := map[string]bool{}
+	for _, entry := range slices.Concat(in.Base, in.MergeBase) {
+		onBase[entry] = true
+	}
+	var ported []string
+	for _, entry := range in.Head {
+		if !onBase[entry] && slices.Contains(in.Released, entry) {
+			ported = append(ported, entry)
+		}
+	}
+	return ported
+}
+
+// restoreReleased is the command that puts the release line's copy of a
+// diverged migration back under the set's directory.
+func restoreReleased(divergence Divergence, set Set) string {
+	target := set.Directory + "/" + divergence.Entry
+	if divergence.Path == target {
+		return fmt.Sprintf("git checkout %s -- %s", shellArg(divergence.Ref), shellArg(target))
+	}
+	return fmt.Sprintf("git rm -r -q %s && git checkout %s -- %s && git mv %s %s",
+		shellArg(target), shellArg(divergence.Ref), shellArg(divergence.Path),
+		shellArg(divergence.Path), shellArg(target))
 }
 
 func misplacedEntry(misplaced string, set Set) string {
