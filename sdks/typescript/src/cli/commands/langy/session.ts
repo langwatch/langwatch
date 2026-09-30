@@ -304,7 +304,7 @@ class SharedFolderSession {
     if (!project || !readProjectApiKey || !endpoint) {
       throw new LocalCallFailure({
         code: "exec_failed",
-        message: `This terminal cannot fetch the project's key, so ${file} was not changed. Tell the user in one line that the credentials were not written because the command line was started without a LangWatch endpoint, and offer to write them again once \`langwatch langy --share-control\` runs signed in.`,
+        message: `This terminal cannot fetch the project's key, so ${file} was not changed. Tell the user in one line that the credentials were not written because this command line has no signed-in project to fetch the key for, and offer to write them again once \`langwatch langy --share-control\` runs signed in.`,
       });
     }
     const apiKey = await readKeyOrRefuse({ readProjectApiKey, project, file });
