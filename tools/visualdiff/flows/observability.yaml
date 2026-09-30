@@ -8,6 +8,8 @@
 # be created. The queue flows pick the first option of each picker.
 # Steps use handles both trees share (aria labels, button words, placeholders,
 # anchor-comment-button, tab and lens words); analytics-query-run is the one branch-only flow.
+# trace-llm-call-in-drawer posts a fixed trace id in setup (a setup {uid} is not the flow's) and its
+# span times are fixed: refresh them within 31 days of the run, or the span is dropped as too old.
 # Not scripted: the user-events and sample-agents journeys (no UI).
 flows:
   - id: trace-share-link
@@ -102,6 +104,72 @@ flows:
       - action: expect
         with:
           text: vd-note-{uid}
+
+  - id: trace-annotate-with-score
+    title: Create a score metric, rate a trace with it from the drawer and read note and score back
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-rate-{uid}
+      - action: fill
+        with:
+          label: /^Description/
+          value: Rated by the visual diff flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-rate-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          testId: anchor-comment-button
+      - action: fill
+        with:
+          selector: 'textarea[placeholder="Optional"]'
+          value: vd-scored-{uid}
+      - action: click
+        with:
+          selector: 'button:has-text("vd-rate-{uid}")'
+      - action: click
+        with:
+          text: /^good$/
+      - action: click
+        with:
+          selector: 'button:text-is("OK")'
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          api: /api/annotations/trace/{trace}
+          field: data
+          contains: vd-scored-{uid}
+      - action: expect
+        with:
+          api: /api/annotations/trace/{trace}
+          field: data
+          contains: good
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          text: vd-scored-{uid}
 
   - id: trace-annotation-add-edit-delete
     title: Annotate a message in Conversation mode, edit it, delete it and see the annotations list follow
@@ -485,6 +553,70 @@ flows:
           selector: 'button:text-is("Export")'
           contains: trace_id,timestamp,input,output,labels
           filename: '/\.csv$/'
+      - action: click
+        with:
+          label: Export traces
+      - action: expect
+        with:
+          text: Export Traces
+      - action: download
+        with:
+          selector: 'button:text-is("Export")'
+          contains: "{trace},"
+          filename: '/\.csv$/'
+
+  - id: trace-llm-call-in-drawer
+    title: An LLM span sent over the collector shows its model, input and output in the drawer
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-llm-call-trace
+          spans:
+            - type: llm
+              span_id: vd-llm-call-span
+              trace_id: vd-llm-call-trace
+              name: vd-llm-call
+              model: gpt-5
+              vendor: openai
+              input:
+                type: text
+                value: vd llm question
+              output:
+                type: text
+                value: vd llm answer
+              metrics:
+                prompt_tokens: 12
+                completion_tokens: 34
+              timestamps:
+                started_at: 1790723307541
+                finished_at: 1790723308041
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-llm-call-trace
+          contains: vd llm answer
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-llm-call-trace
+      - action: expect
+        with:
+          text: vd llm answer
+          timeout: "20000"
+      - action: click
+        with:
+          text: /^Trace(?![a-z])/
+      - action: click
+        with:
+          testId: waterfall-row
+          hasText: vd-llm-call
+      - action: expect
+        with:
+          text: gpt-5
+      - action: expect
+        with:
+          api: /api/traces/vd-llm-call-trace
+          contains: vd llm question
 
   - id: trace-conversation-thread
     title: Open a conversation trace in Conversation mode and see its turns

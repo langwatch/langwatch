@@ -4089,7 +4089,9 @@
       body:
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"]
         userName: "vd-{uid}@example.com"
-        name: {"givenName": "Vd", "familyName": "Person"}
+        # The list pages at 50 by name (main's only filters are offset and limit); this
+        # name falls as the clock rises, so the newest user heads page 1 past leftovers.
+        name: {"givenName": "0{nowMs-9999999999999}", "familyName": "Person"}
         emails: [{"primary": true, "value": "vd-{uid}@example.com", "type": "work"}]
         active: true
       auth: "scim"
@@ -4273,7 +4275,9 @@
       body:
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"]
         userName: "vd-{uid}@example.com"
-        name: {"givenName": "Vd", "familyName": "Person"}
+        # The list pages at 50 by name (main's only filters are offset and limit); this
+        # name falls as the clock rises, so the newest user heads page 1 past leftovers.
+        name: {"givenName": "0{nowMs-9999999999999}", "familyName": "Person"}
         emails: [{"primary": true, "value": "vd-{uid}@example.com", "type": "work"}]
         active: true
       auth: "scim"
