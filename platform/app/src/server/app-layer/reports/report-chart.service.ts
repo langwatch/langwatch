@@ -1,9 +1,10 @@
 import type { ReportChart } from "@langwatch/automations/templating/templateContext";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type { CustomGraph } from "~/generated/prisma/client";
-import type {
-  SeriesInputType,
-  TimeseriesInputType,
+import {
+  type SeriesInputType,
+  seriesInput as seriesInputSchema,
+  type TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
@@ -191,17 +192,23 @@ async function buildChart({
 }): Promise<ReportChart> {
   const graphData = graph.graph as unknown as CustomGraphInput;
   const type = chartTypeOf(graphData.graphType);
+  // Stored graph JSON never went through the request schema, so parse it here:
+  // a pairing the metric's `allowedAggregations` forbids (e.g. after a metric's
+  // meaning changed under a saved dashboard) must surface as a validation error
+  // naming the series, not as a ClickHouse type error mid-query.
   const seriesInputs: SeriesInputType[] = (graphData.series ?? [])
     .slice(0, MAX_SERIES)
-    .map((series) => ({
-      metric: series.metric,
-      aggregation: series.aggregation,
-      key: series.key,
-      subkey: series.subkey,
-      pipeline: series.pipeline,
-      filters: series.filters,
-      asPercent: series.asPercent,
-    }));
+    .map((series) =>
+      seriesInputSchema.parse({
+        metric: series.metric,
+        aggregation: series.aggregation,
+        key: series.key,
+        subkey: series.subkey,
+        pipeline: series.pipeline,
+        filters: series.filters,
+        asPercent: series.asPercent,
+      }),
+    );
 
   const empty: ReportChart = {
     id: graph.id,
