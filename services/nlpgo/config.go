@@ -55,6 +55,10 @@ type Config struct {
 	// EvaluatorsInternalSecret is the bearer secret the evaluator runtime
 	// requires. Not required to boot: unset, the runtime refuses every request.
 	EvaluatorsInternalSecret string `env:"NLPGO_INTERNAL_SECRET"`
+	// PIIAnalyzerURL is the operator's PII model service; empty leaves PERSON and LOCATION unsupported.
+	PIIAnalyzerURL string `env:"NLPGO_PII_ANALYZER_URL"`
+	// PIIAnalyzerKey is its Bearer key. A secret: never logged.
+	PIIAnalyzerKey string `env:"NLPGO_PII_ANALYZER_KEY"`
 }
 
 // EngineConfig surfaces engine knobs (timeouts, code-block sandbox).

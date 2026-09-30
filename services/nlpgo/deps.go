@@ -21,6 +21,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators"
+	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/gateway"
 	evalhttp "github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/channels/http"
 	evalrpc "github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/transport/rpc"
@@ -153,11 +154,16 @@ func NewEvaluatorsHandler(ctx context.Context, opts EvaluatorsOptions) (http.Han
 	if err != nil {
 		return nil, nil, fmt.Errorf("evaluators customer trace: %w", err)
 	}
+	var piiAnalyzer channels.PIIAnalyzer // a nil *PIIAnalyzer must not become a non-nil interface
+	if cfg.PIIAnalyzerURL != "" {
+		piiAnalyzer = evalhttp.NewPIIAnalyzer(evalhttp.PIIAnalyzerOptions{BaseURL: cfg.PIIAnalyzerURL, Key: cfg.PIIAnalyzerKey})
+	}
 	module := evaluators.New(evaluators.Deps{
 		Config:        cfg.Evaluators,
 		LLM:           gateway.New(gateway.Options{Dispatcher: disp, Logger: deps.Logger}),
 		CustomerTrace: customerTrace,
 		Vendor:        evalhttp.NewVendor(evalhttp.VendorOptions{Egress: opts.Egress}),
+		PIIAnalyzer:   piiAnalyzer,
 		OpsTracer:     opsProvider.Tracer("langwatch.nlpgo.evaluators"),
 		Logger:        deps.Logger.Named("evaluators"),
 	})

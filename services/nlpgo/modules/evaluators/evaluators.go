@@ -20,6 +20,7 @@ type Deps struct {
 	LLM           channels.LLMChannel
 	CustomerTrace channels.CustomerTraceChannel
 	Vendor        channels.VendorChannel
+	PIIAnalyzer   channels.PIIAnalyzer
 	OpsTracer     trace.Tracer
 	Logger        *zap.Logger
 }
@@ -38,6 +39,7 @@ func New(deps Deps) *Module {
 		LLM:           deps.LLM,
 		CustomerTrace: deps.CustomerTrace,
 		Vendor:        deps.Vendor,
+		PIIAnalyzer:   deps.PIIAnalyzer,
 		OpsTracer:     deps.OpsTracer,
 		Logger:        deps.Logger,
 	})}
