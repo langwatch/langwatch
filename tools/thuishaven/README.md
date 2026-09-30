@@ -119,8 +119,8 @@ haven logs       captured service logs from any terminal, attached or detached:
 haven status     one-shot report: selection, per-service health, shared servers,
                  RAM footprints, every running Nx daemon (--json for machines)
 haven db         this stack's data: `db seed [preset]` (reseed in place, drops
-                 nothing) · `db reset [preset]` (fresh database, confirmed;
-                 --yes for scripts) · `db url [engine]`. Presets: demo,
+                 nothing) · `db reset [preset]` (fresh databases and this
+                 stack's Redis db flushed, confirmed; --yes for scripts) · `db url [engine]`. Presets: demo,
                  onboarding, post-onboarding, bare
 haven clean      one cleanup: worktree picker, then job-scratch picker, then safe reclaim
                  (build artifacts, orphaned processes); --yes applies only the
@@ -349,7 +349,8 @@ captures. The hub and every stack home are one React bundle, `apps/haven-web`
 
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive
-sibling that starts from a fresh, migrated database. Both take a preset:
+sibling that starts from a fresh, migrated database and flushes the stack's own
+Redis db (FLUSHDB on that index only, never another stack's). Both take a preset:
 `demo` marks the project past onboarding and adds the demo prompt, HTTP agent
 and dataset, `onboarding` / `post-onboarding` flip the first-trace flag, and
 `bare` seeds the identity alone. Every preset is switches that the

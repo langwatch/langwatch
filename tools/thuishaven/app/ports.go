@@ -326,6 +326,8 @@ type Redis interface {
 	Running() bool
 	// Health pings the server and returns a one-line status for `haven doctor`.
 	Health(ctx context.Context) (ok bool, detail string)
+	// FlushDB empties one logical database (FLUSHDB, never FLUSHALL).
+	FlushDB(ctx context.Context, db int) error
 	// Stop is a no-op in the real adapter — a brew-managed Redis is a
 	// machine-wide resource other local work may already depend on.
 	Stop()

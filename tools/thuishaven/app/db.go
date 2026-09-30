@@ -131,6 +131,16 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, preset string) e
 		}
 		fmt.Printf("dropped postgres database %q\n", db)
 	}
+	if o.rds != nil && o.cfg.ShouldManageRedis {
+		if _, err := o.rds.Ensure(ctx); err != nil {
+			return fmt.Errorf("managed redis is unavailable: %w", err)
+		}
+		rdb := o.redisDBFor(slug)
+		if err := o.rds.FlushDB(ctx, rdb); err != nil {
+			return fmt.Errorf("flushing redis db %d: %w", rdb, err)
+		}
+		fmt.Printf("flushed redis db %d (this stack's queues and caches)\n", rdb)
+	}
 	if err := os.RemoveAll(filepath.Join(o.cfg.Home, "storage", slug)); err != nil {
 		return fmt.Errorf("removing storagesim objects: %w", err)
 	}

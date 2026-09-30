@@ -15,7 +15,7 @@ func TestHubJSONCarriesTheWholeMachine(t *testing.T) {
 	if hub.Shared.HubURL != "https://hub.langwatch.localhost" || hub.Machine.TotalRAMBytes != 64<<30 || hub.Machine.Pressure != "green" {
 		t.Errorf("shared %+v machine %+v", hub.Shared, hub.Machine)
 	}
-	if len(hub.Stacks) != 1 || hub.Stacks[0].HomeURL != "https://feat-x.langwatch.localhost" || !hub.Stacks[0].Live || len(hub.Stacks[0].Surfaces) != 15 {
+	if len(hub.Stacks) != 1 || hub.Stacks[0].HomeURL != "https://feat-x.langwatch.localhost" || !hub.Stacks[0].Live || len(hub.Stacks[0].Surfaces) != 16 {
 		t.Errorf("stacks = %+v", hub.Stacks)
 	}
 	if len(hub.Worktrees) != 1 || hub.Worktrees[0].Name != "parked" || hub.Worktrees[0].HomeURL != "https://parked.langwatch.localhost" || !hub.Worktrees[0].CanStart {

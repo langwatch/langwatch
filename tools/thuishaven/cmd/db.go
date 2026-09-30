@@ -118,7 +118,7 @@ func confirmDBReset(c dbResetConfirm) (bool, error) {
 			c.db)
 	case c.isAgent:
 		return false, fmt.Errorf(
-			"db reset drops and recreates database %q on the managed ClickHouse and Postgres — pass --yes to confirm", c.db)
+			"db reset drops and recreates database %q on the managed ClickHouse and Postgres and flushes this stack's Redis db — pass --yes to confirm", c.db)
 	}
 
 	answer := askDBReset(c, shared)

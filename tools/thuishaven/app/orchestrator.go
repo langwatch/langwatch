@@ -1217,6 +1217,9 @@ func (o *Orchestrator) allocateRedisDB(slug string) (int, bool) {
 			zap.Int("pinned", pinned),
 		)
 	}
+	// Db 0 is what every process outside haven's registry (the primary checkout,
+	// a plain `pnpm dev`) uses by default, so a managed stack never takes it.
+	taken[0] = true
 	if registered >= 0 && !taken[registered] {
 		return registered, true
 	}

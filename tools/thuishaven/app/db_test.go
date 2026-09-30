@@ -454,3 +454,50 @@ func TestDBSeed(t *testing.T) {
 		})
 	})
 }
+
+type fakeRedis struct {
+	flushed  []int
+	flushErr error
+}
+
+func (f *fakeRedis) Ensure(context.Context) (int, error)   { return 6379, nil }
+func (f *fakeRedis) Port() int                             { return 6379 }
+func (f *fakeRedis) Running() bool                         { return true }
+func (f *fakeRedis) Health(context.Context) (bool, string) { return true, "" }
+func (f *fakeRedis) Stop()                                 {}
+func (f *fakeRedis) FlushDB(_ context.Context, db int) error {
+	f.flushed = append(f.flushed, db)
+	return f.flushErr
+}
+
+func TestDBResetFlushesOnlyTheStacksRedisDB(t *testing.T) {
+	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x"}
+	store := &fakeStore{stacks: []domain.Stack{
+		{Slug: "feat-x", RedisDB: 7},
+		{Slug: "other", RedisDB: 3},
+	}}
+
+	t.Run("when resetting, only this stack's recorded db is flushed", func(t *testing.T) {
+		rds := &fakeRedis{}
+		o := dbOrchestrator(&fakeSupervisor{}, store, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+		o.rds, o.cfg.ShouldManageRedis = rds, true
+		if err := o.DBReset(context.Background(), params, ""); err != nil {
+			t.Fatalf("DBReset: %v", err)
+		}
+		if len(rds.flushed) != 1 || rds.flushed[0] != 7 {
+			t.Fatalf("flushed = %v, want only [7]", rds.flushed)
+		}
+	})
+
+	t.Run("when the flush fails, the reset stops before migrating", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, store, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+		o.rds, o.cfg.ShouldManageRedis = &fakeRedis{flushErr: errors.New("boom")}, true
+		if err := o.DBReset(context.Background(), params, ""); err == nil {
+			t.Fatal("DBReset succeeded, want the flush failure")
+		}
+		if len(sup.shells) != 0 {
+			t.Fatalf("shells = %v, want none after a failed flush", sup.shells)
+		}
+	})
+}
