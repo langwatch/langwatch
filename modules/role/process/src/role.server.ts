@@ -12,7 +12,9 @@ export const roleServer = defineServerModule("role")
   .withApp(RoleApp)
   .withTransports(roleRest, roleTrpcTransport, roleBindingTrpcTransport)
   .withTransportFacts(() => [
-    bindRestMiddleware(roleRestFacts, (context) => ({
-      organizationId: organizationCredentialOfRequest(context.req.raw).organizationId,
-    })),
+    bindRestMiddleware(roleRestFacts, (context) => {
+      const credential = organizationCredentialOfRequest(context.req.raw);
+
+      return { organizationId: credential.organizationId, apiKeyId: credential.apiKeyId };
+    }),
   ]);

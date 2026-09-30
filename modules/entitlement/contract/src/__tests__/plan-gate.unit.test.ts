@@ -4,6 +4,7 @@ import {
   assertEnterprisePlan,
   assertEnterprisePlanType,
   ENTERPRISE_FEATURE_ERRORS,
+  EnterprisePlanRequiredError,
   isEnterpriseTier,
 } from "../index.ts";
 import type { Plan } from "../plan.ts";
@@ -42,6 +43,17 @@ describe("the Enterprise plan gate", () => {
     });
   });
 
+  describe("EnterprisePlanRequiredError", () => {
+    /** @scenario "A REST or setup gate refuses a non-Enterprise plan with 402" */
+    it("answers 402 and names the feature by default", () => {
+      expect(new EnterprisePlanRequiredError("MANAGEMENT_API")).toMatchObject({
+        code: "enterprise_plan_required",
+        httpStatus: 402,
+        meta: { feature: "MANAGEMENT_API" },
+      });
+    });
+  });
+
   describe("assertEnterprisePlanType()", () => {
     describe("when plan type is ENTERPRISE", () => {
       it("does not throw", () => {
@@ -55,6 +67,7 @@ describe("the Enterprise plan gate", () => {
     });
 
     describe("when plan type is not ENTERPRISE", () => {
+      /** @scenario "A tRPC plan assertion refuses a non-Enterprise plan with 403" */
       it("throws a handled enterprise plan refusal", () => {
         expect(() =>
           assertEnterprisePlanType({

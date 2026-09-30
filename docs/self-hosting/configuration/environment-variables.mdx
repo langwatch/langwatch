@@ -337,7 +337,6 @@ The `smtp` gateway ignores these variables on purpose, because an SMTP relay is 
 
 | Variable              | Description                                     | Default |
 | --------------------- | ----------------------------------------------- | ------- |
-| `SKIP_ENV_VALIDATION` | Skip environment variable validation on startup | `false` |
 | `SKIP_PRISMA_MIGRATE` | Skip PostgreSQL migrations on startup           | `false` |
 
 ## Cloud admin
@@ -376,7 +375,6 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |
-| `app.features.skipEnvValidation` | `SKIP_ENV_VALIDATION` |
 | `app.email.provider` | `EMAIL_PROVIDER` |
 | `app.email.providers.sendgrid.apiKey.value` | `SENDGRID_API_KEY` |
 | `app.email.providers.ses.region` | `AWS_REGION` (with `USE_AWS_SES=true`) |

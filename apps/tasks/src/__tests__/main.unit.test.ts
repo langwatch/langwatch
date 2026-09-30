@@ -65,6 +65,8 @@ beforeEach(() => {
 
 describe("given a migration sequence", () => {
   describe("when all tasks finish", () => {
+    /** @scenario The tasks run in the order named and stop at the first failure */
+    /** @scenario Several task names in one invocation run in one process */
     it("runs in argv order under one migration lock", async () => {
       await runTasks(names, input());
       expect(calls.order).toEqual(["lock", "prisma", "clickhouse", "lwql", "system", "unlock"]);
@@ -72,7 +74,19 @@ describe("given a migration sequence", () => {
     });
   });
 
+  describe("when no database is configured", () => {
+    /** @scenario A stack with no database configured prepares without a lock */
+    it("runs every task and waits for nothing", async () => {
+      const base = input();
+      await runTasks(names, { ...base, connections: { ...base.connections, database: null } });
+      expect(calls.order).toEqual(["prisma", "clickhouse", "lwql", "system"]);
+      expect(calls.lock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the first migration fails", () => {
+    /** @scenario The tasks run in the order named and stop at the first failure */
+    /** @scenario The lock is released even when a task fails */
     it("stops the sequence and releases the lock", async () => {
       const failure = new Error("migration failed");
       calls.prisma.mockRejectedValueOnce(failure);
@@ -82,6 +96,7 @@ describe("given a migration sequence", () => {
   });
 
   describe("when a name is unknown or missing", () => {
+    /** @scenario An unknown name is still reported against the catalogue */
     it.each([{ argv: [] }, { argv: ["prisma-migrate", "unknown-task"] }])(
       "refuses before running any task: $argv",
       async ({ argv }) => {

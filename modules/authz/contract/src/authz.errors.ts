@@ -392,3 +392,104 @@ export class AuthzRoleDuplicateNameError extends HandledError {
     this.name = "AuthzRoleDuplicateNameError";
   }
 }
+
+// ── `/api/grants`: the successor family's own codes, `<resource>_<condition>` ──
+
+export class GrantNotFoundError extends NotFoundError {
+  declare readonly code: "grant_not_found";
+
+  constructor(grantId: string) {
+    super("grant_not_found", { resource: "Grant", id: grantId }, { meta: { grantId } });
+    this.name = "GrantNotFoundError";
+  }
+}
+
+/** The principal is not in the organization; one code for users, groups and API keys. */
+export class GrantPrincipalNotFoundError extends HandledError {
+  declare readonly code: "grant_principal_not_found";
+
+  constructor(meta: { principalType: string; principalId: string }) {
+    super("grant_principal_not_found", "The principal is not in this organization", {
+      httpStatus: 422,
+      meta,
+    });
+    this.name = "GrantPrincipalNotFoundError";
+  }
+}
+
+export class GrantRoleNotFoundError extends HandledError {
+  declare readonly code: "grant_role_not_found";
+
+  constructor(roleId: string) {
+    super("grant_role_not_found", "The role does not exist in this organization", {
+      httpStatus: 422,
+      meta: { roleId },
+    });
+    this.name = "GrantRoleNotFoundError";
+  }
+}
+
+export class GrantScopeNotFoundError extends HandledError {
+  declare readonly code: "grant_scope_not_found";
+
+  constructor(meta: { scopeType: string; scopeId: string }) {
+    super("grant_scope_not_found", "The scope is not in this organization", {
+      httpStatus: 422,
+      meta,
+    });
+    this.name = "GrantScopeNotFoundError";
+  }
+}
+
+/** The role carries a permission that only takes effect at organization scope. */
+export class GrantScopeNotAllowedError extends HandledError {
+  declare readonly code: "grant_scope_not_allowed";
+
+  constructor(meta: { permission: string; scopeType: string }) {
+    super("grant_scope_not_allowed", "That role can only be granted on the organization", {
+      httpStatus: 422,
+      meta,
+    });
+    this.name = "GrantScopeNotAllowedError";
+  }
+}
+
+export class GrantScopePersonalWorkspaceError extends HandledError {
+  declare readonly code: "grant_scope_personal_workspace";
+
+  constructor(meta: { scopeId: string }) {
+    super(
+      "grant_scope_personal_workspace",
+      "A personal workspace has exactly one member, its owner",
+      { httpStatus: 403, meta },
+    );
+    this.name = "GrantScopePersonalWorkspaceError";
+  }
+}
+
+/** The organization already holds as many grants as it may. */
+export class GrantLimitReachedError extends HandledError {
+  declare readonly code: "grant_limit_reached";
+
+  constructor(limit: number) {
+    super("grant_limit_reached", `Maximum of ${limit} grants per organization reached`, {
+      httpStatus: 409,
+      meta: { limit },
+    });
+    this.name = "GrantLimitReachedError";
+  }
+}
+
+/** Nobody grants more than they hold at that scope: names what the caller lacks. */
+export class GrantExceedsCallerPermissionsError extends HandledError {
+  declare readonly code: "grant_exceeds_caller_permissions";
+
+  constructor(missingPermissions: readonly string[]) {
+    super(
+      "grant_exceeds_caller_permissions",
+      "You cannot grant a role with permissions you do not hold yourself",
+      { httpStatus: 403, meta: { missingPermissions: [...missingPermissions] } },
+    );
+    this.name = "GrantExceedsCallerPermissionsError";
+  }
+}

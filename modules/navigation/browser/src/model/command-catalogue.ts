@@ -372,11 +372,11 @@ export const navigationCommands: Command[] = [
   },
   {
     id: "nav-settings-roles",
-    label: "Roles",
-    description: "Settings → Roles",
+    label: "Roles & access",
+    description: "Settings → Roles & access",
     icon: UserCog,
     category: "navigation",
-    keywords: ["role", "permission", "access"],
+    keywords: ["role", "permission", "access", "grant"],
     path: "/settings/roles",
   },
   {

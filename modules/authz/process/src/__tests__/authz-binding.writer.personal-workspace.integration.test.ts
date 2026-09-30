@@ -11,6 +11,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import { PrismaAuthzBindingRepository } from "../repositories/prisma/prisma.authz-binding.repository.ts";
+import {
+  permissiveGrantGuards,
+  TEST_CALLER,
+} from "../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzBindingWriterService } from "../services/authz-binding-writer.service.ts";
 
 const DB_URL = process.env.DATABASE_URL;
@@ -41,6 +45,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
     database: prisma,
   });
   const writer = AuthzBindingWriterService.create({
+    permissions: permissiveGrantGuards,
     bindings,
     ledger: refusingLedger,
     newBindingId: () => `binding_${uniqueSuffix()}`,
@@ -173,6 +178,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
           scopeType: "TEAM",
           scopeId: personalTeamId,
           actor,
+          caller: TEST_CALLER,
         }),
       ).rejects.toMatchObject({ code: "personal_workspace_not_managed_here" });
 
@@ -191,6 +197,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
           scopeType: "PROJECT",
           scopeId: personalProjectId,
           actor,
+          caller: TEST_CALLER,
         }),
       ).rejects.toMatchObject({ code: "personal_workspace_not_managed_here" });
 
@@ -214,6 +221,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
           scopeType: "TEAM",
           scopeId: personalTeamId,
           actor,
+          caller: TEST_CALLER,
         }),
       ).rejects.toMatchObject({ code: "personal_workspace_not_managed_here" });
 
@@ -240,7 +248,13 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
     /** @scenario Changing the owner's role on their own workspace is refused */
     it("refuses the demotion and leaves the owner an admin of it", async () => {
       await expect(
-        writer.update({ organizationId, bindingId: ownerBindingId, role: "VIEWER", actor }),
+        writer.update({
+          organizationId,
+          bindingId: ownerBindingId,
+          role: "VIEWER",
+          actor,
+          caller: TEST_CALLER,
+        }),
       ).rejects.toMatchObject({ code: "personal_workspace_not_managed_here" });
 
       await expect(bindingsOnPersonalTeam()).resolves.toEqual([
@@ -251,7 +265,13 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
     /** @scenario Refusing a change to a personal workspace says whose workspace it is */
     it("names the workspace so an admin knows whose it is", async () => {
       const error = await writer
-        .update({ organizationId, bindingId: ownerBindingId, role: "VIEWER", actor })
+        .update({
+          organizationId,
+          bindingId: ownerBindingId,
+          role: "VIEWER",
+          actor,
+          caller: TEST_CALLER,
+        })
         .catch((caught: unknown) => caught);
 
       // "a personal workspace" leaves an admin looking for the one they hit

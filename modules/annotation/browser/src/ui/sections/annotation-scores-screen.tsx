@@ -6,7 +6,6 @@ import {
   Badge,
   Box,
   Button,
-  Heading,
   HStack,
   Skeleton,
   Spacer,
@@ -254,19 +253,22 @@ export default function AnnotationScoresScreen() {
 
   return (
     <>
-      <VStack gap={6} width="full" align="start">
-        <HStack width="full" marginTop={2}>
-          <Heading as="h2">Annotation Scoring</Heading>
-          <Spacer />
-          {canManage && (
-            <PageLayout.HeaderButton
-              onClick={() => host.openEditor()}
-              data-testid="annotation-score-add"
-            >
-              <Plus /> Add new score metric
-            </PageLayout.HeaderButton>
-          )}
-        </HStack>
+      <PageLayout.Header>
+        <PageLayout.Heading>Annotation Scores</PageLayout.Heading>
+        <Spacer />
+        {canManage && getAllAnnotationScores.data?.length !== 0 && (
+          <PageLayout.HeaderButton
+            onClick={() => host.openEditor()}
+            data-testid="annotation-score-add"
+          >
+            <Plus /> Add new score metric
+          </PageLayout.HeaderButton>
+        )}
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text color="fg.muted">
+          The score metrics reviewers fill in when they annotate a trace.
+        </Text>
         {getAllAnnotationScores.data?.length === 0 ? (
           <Box width="full">
             <NoDataInfoBlock
@@ -276,7 +278,7 @@ export default function AnnotationScoresScreen() {
                 <Text>
                   To learn more about scores and how to use them, please visit our{" "}
                   <Link
-                    color="orange.400"
+                    color="orange.fg"
                     href="https://docs.langwatch.ai/features/annotations#annotation-scoring"
                     isExternal
                   >

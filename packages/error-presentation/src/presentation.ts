@@ -2030,6 +2030,20 @@ const presentations = {
     title: "That role is already bound",
     describe: () => "An identical binding already exists, so there's nothing to add.",
   },
+  role_exceeds_caller_permissions: {
+    title: "You cannot give a role more access than you have",
+    describe: (error) => {
+      const missing = strList(error, "missingPermissions");
+      return missing.length > 0
+        ? `You do not hold these permissions yourself: ${missing.join(", ")}.`
+        : "You can only add permissions you hold yourself.";
+    },
+  },
+  role_is_built_in: {
+    title: "Built-in roles cannot be changed",
+    describe: () =>
+      "Admin, Member and Viewer are fixed. Create a custom role to tailor the permissions.",
+  },
   role_binding_principal_invalid: {
     title: "Choose who this role applies to",
     describe: () => "Bind it to exactly one user, group, or API key.",
@@ -2160,6 +2174,50 @@ const presentations = {
         ? `Ask an organization admin to grant you "${permission}".`
         : "Ask an organization admin for access.";
     },
+  },
+  grant_exceeds_caller_permissions: {
+    title: "You cannot grant more access than you have",
+    describe: (error) => {
+      const missing = strList(error, "missingPermissions");
+      return missing.length > 0
+        ? `This role includes permissions you do not hold at that scope: ${missing.join(", ")}.`
+        : "This role includes permissions you do not hold at that scope.";
+    },
+  },
+  grant_limit_reached: {
+    title: "This organization has reached its grant limit",
+    describe: (error) => {
+      const limit = num(error, "limit", 0);
+      return limit > 0
+        ? `An organization can hold up to ${limit} grants. Revoke unused grants and try again.`
+        : "Revoke unused grants and try again.";
+    },
+  },
+  grant_not_found: {
+    title: "Grant not found",
+    describe: () => "It may have been revoked already. Reload to see the current access.",
+  },
+  grant_principal_not_found: {
+    title: "That person, group or API key is not in this organization",
+    describe: () => "Pick someone who belongs to this organization.",
+  },
+  grant_role_not_found: {
+    title: "That role does not exist",
+    describe: () => "It may have been deleted. Pick a role from the current list.",
+  },
+  grant_scope_not_allowed: {
+    title: "This role can only be granted on the organization",
+    describe: () =>
+      "It includes a permission that only takes effect organization-wide. Grant it on the organization instead.",
+  },
+  grant_scope_not_found: {
+    title: "That team or project is not in this organization",
+    describe: () => "Pick a team or project that belongs to this organization.",
+  },
+  grant_scope_personal_workspace: {
+    title: "Personal workspaces cannot be shared",
+    describe: () =>
+      "A personal workspace has exactly one member, its owner. Create a shared team to collaborate.",
   },
   grant_expiry_in_past: {
     title: "That expiry date has already passed",

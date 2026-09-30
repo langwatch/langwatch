@@ -60,7 +60,7 @@ export function UsageReportSection({
             {report.nextReportAt
               ? `Next report at ${report.nextReportAt}. Schema version ${report.schemaVersion}.`
               : `Schema version ${report.schemaVersion}.`}{" "}
-            <Link href={DOCS_URL} target="_blank" rel="noopener noreferrer" color="blue.600">
+            <Link href={DOCS_URL} target="_blank" rel="noopener noreferrer" color="orange.fg">
               Every field explained <ExternalLink size={12} />
             </Link>
           </Text>

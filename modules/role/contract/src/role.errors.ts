@@ -90,3 +90,28 @@ export class OrgExclusivePermissionScopeError extends HandledError {
     this.name = "OrgExclusivePermissionScopeError";
   }
 }
+
+/** `admin`, `member` and `viewer` are fixed: a change or delete is refused, not ignored. */
+export class RoleIsBuiltInError extends HandledError {
+  declare readonly code: "role_is_built_in";
+  constructor(roleId: string) {
+    super("role_is_built_in", "Built-in roles cannot be changed or deleted", {
+      httpStatus: 409,
+      meta: { roleId },
+    });
+    this.name = "RoleIsBuiltInError";
+  }
+}
+
+/** Nobody writes a role wider than they are: names the permissions the caller lacks. */
+export class RoleExceedsCallerPermissionsError extends HandledError {
+  declare readonly code: "role_exceeds_caller_permissions";
+  constructor(missingPermissions: readonly string[]) {
+    super(
+      "role_exceeds_caller_permissions",
+      "You cannot give a role permissions you do not hold yourself",
+      { httpStatus: 403, meta: { missingPermissions: [...missingPermissions] } },
+    );
+    this.name = "RoleExceedsCallerPermissionsError";
+  }
+}

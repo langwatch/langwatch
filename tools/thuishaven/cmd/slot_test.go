@@ -441,6 +441,8 @@ func TestResolvePriorityStateWithoutTheEnvVarNeverClaims(t *testing.T) {
 }
 
 // @scenario "A run queued inside haven says so"
+// @scenario "A run past the limit waits and names what it is waiting for"
+// @scenario "A run that waited says how long it waited"
 func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	sem := semaphore.New(t.TempDir())
 	t.Setenv("CHECK_SLOTS", "1")
@@ -473,6 +475,9 @@ func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	report := progress.String()
 	if !strings.Contains(report, "queued") || !strings.Contains(report, "CHECK_SLOTS") {
 		t.Fatalf("a queued run must say so and name the knob, got %q", report)
+	}
+	if !strings.Contains(report, "already active") || !strings.Contains(report, "limit 1") {
+		t.Fatalf("a queued run must name what holds the slot and the limit, got %q", report)
 	}
 	if !strings.Contains(report, "slot free after") {
 		t.Fatalf("a run that waited must report it, got %q", report)

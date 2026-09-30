@@ -125,6 +125,7 @@ describe.skipIf(!databaseUrl)("Scenario parameter definition persistence", () =>
       getDistinctExternalSetIds: async () => new Set(),
       countRunsForExport: async () => 0,
       countUsage: async () => 0,
+      countOrganizationRuns: async () => 0,
       listRunsForExport: async () => ({ runs: [], hasMore: false }),
       queueRun: async () => {},
       startRun: async () => {},

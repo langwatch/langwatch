@@ -23,7 +23,10 @@ const ORGANIZATION_ID = "org-1";
 const OTHER_ORGANIZATION_ID = "org-2";
 const CREDENTIAL = "organization-credential";
 
-const stored = (over: Partial<Role> & Pick<Role, "id" | "name">): Role => ({
+/** A custom role as the ledger stores it: always with its definition moment. */
+type StoredRole = Role & { createdAt: Date; updatedAt: Date };
+
+const stored = (over: Partial<StoredRole> & Pick<Role, "id" | "name">): StoredRole => ({
   organizationId: ORGANIZATION_ID,
   description: null,
   permissions: ["project:view"],
@@ -43,11 +46,12 @@ const catalogSchema = z.object({
   ),
 });
 
-function world({ bindings = [] as AuthzAccessBinding[] } = {}) {
+function world({ bindings = [] as AuthzAccessBinding[], callerLacks = [] as string[] } = {}) {
   const roles = MemoryRoleRepository.create();
-  const ledger = new Map<string, Role>();
-  const state = (role: Role) => {
-    ledger.set(role.id, roles.save(role));
+  const ledger = new Map<string, StoredRole>();
+  const state = (role: StoredRole) => {
+    roles.save(role);
+    ledger.set(role.id, role);
   };
   const { app } = createRoleTestApp({
     roles,
@@ -70,6 +74,8 @@ function world({ bindings = [] as AuthzAccessBinding[] } = {}) {
       listUserCreatedRoles: async ({ organizationId }) =>
         [...ledger.values()].filter((role) => role.organizationId === organizationId),
       listOrganizationBindings: async () => bindings,
+      findPermissionsBeyondCaller: async (input) =>
+        input.permissions.filter((permission) => callerLacks.includes(permission)),
     },
   });
 
@@ -95,7 +101,12 @@ function world({ bindings = [] as AuthzAccessBinding[] } = {}) {
       loggerName: "langwatch:test:roles:errors",
       label: "Roles API Error",
     }),
-    facts: [bindRestMiddleware(roleRestFacts, () => ({ organizationId: ORGANIZATION_ID }))],
+    facts: [
+      bindRestMiddleware(roleRestFacts, () => ({
+        organizationId: ORGANIZATION_ID,
+        apiKeyId: "key-1",
+      })),
+    ],
   });
 
   const send = (path: string, init: { method?: string; body?: unknown } = {}) =>
@@ -109,6 +120,12 @@ function world({ bindings = [] as AuthzAccessBinding[] } = {}) {
 
   return { send, ledger, state };
 }
+
+const roleIdsOf = (body: unknown) =>
+  z
+    .object({ roles: z.array(z.object({ id: z.string() })) })
+    .parse(body)
+    .roles.map((role) => role.id);
 
 describe("given the /api/roles family", () => {
   describe("when the organization's roles are listed", () => {
@@ -124,8 +141,11 @@ describe("given the /api/roles family", () => {
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({
         roles: [
-          { id: "role-a", name: "Release Manager", permissions: ["project:view"] },
-          { id: "role-b", name: "Auditor", permissions: ["traces:view"] },
+          { id: "admin", builtIn: true },
+          { id: "member", builtIn: true },
+          { id: "viewer", builtIn: true },
+          { id: "role-a", name: "Release Manager", permissions: ["project:view"], builtIn: false },
+          { id: "role-b", name: "Auditor", permissions: ["traces:view"], builtIn: false },
         ],
       });
     });
@@ -293,6 +313,131 @@ describe("given the /api/roles family", () => {
       expect(catalog.resources.map((entry) => entry.organizationExclusive)).toEqual(
         expect.arrayContaining([true, false]),
       );
+    });
+  });
+
+  describe("when the built-in roles are addressed", () => {
+    /** @scenario The role list includes the built-in roles unless filtered */
+    it("lists admin, member and viewer first, marked built in, even with no custom roles", async () => {
+      const { send } = world();
+
+      const response = await send("/api/roles");
+
+      expect(response.status).toBe(200);
+      const body = z
+        .object({ roles: z.array(z.object({ id: z.string(), builtIn: z.boolean() })) })
+        .parse(await response.json());
+      expect(body.roles).toEqual([
+        { ...body.roles[0], id: "admin", builtIn: true },
+        { ...body.roles[1], id: "member", builtIn: true },
+        { ...body.roles[2], id: "viewer", builtIn: true },
+      ]);
+    });
+
+    /** @scenario The role list filters to the built-in roles */
+    it("lists only admin, member and viewer when builtIn is true", async () => {
+      const { send, state } = world();
+      state(stored({ id: "role-a", name: "Auditor" }));
+
+      const response = await send("/api/roles?builtIn=true");
+
+      expect(response.status).toBe(200);
+      expect(roleIdsOf(await response.json())).toEqual(["admin", "member", "viewer"]);
+    });
+
+    /** @scenario The role list filters to the custom roles */
+    it("lists only the custom roles when builtIn is false", async () => {
+      const { send, state } = world();
+      state(stored({ id: "role-a", name: "Auditor" }));
+
+      const response = await send("/api/roles?builtIn=false");
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        roles: [expect.objectContaining({ id: "role-a", name: "Auditor", builtIn: false })],
+      });
+    });
+
+    /** @scenario A builtIn filter that is not true or false is refused */
+    it("refuses builtIn=yes as a validation error", async () => {
+      const { send } = world();
+
+      const response = await send("/api/roles?builtIn=yes");
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
+    });
+
+    /** @scenario Built-in roles are addressable by stable ids */
+    it("answers the admin role by its stable id with its permissions", async () => {
+      const { send } = world();
+
+      const response = await send("/api/roles/admin");
+
+      expect(response.status).toBe(200);
+      const body = z
+        .object({ id: z.string(), builtIn: z.boolean(), permissions: z.array(z.string()) })
+        .parse(await response.json());
+      expect(body.id).toBe("admin");
+      expect(body.builtIn).toBe(true);
+      expect(body.permissions).toContain("project:view");
+    });
+
+    /** @scenario A built-in role cannot be changed or deleted */
+    it("refuses a change or a delete of a built-in role with role_is_built_in", async () => {
+      const { send } = world();
+
+      const patched = await send("/api/roles/viewer", {
+        method: "PATCH",
+        body: { name: "Reader" },
+      });
+      const deleted = await send("/api/roles/viewer", { method: "DELETE" });
+
+      for (const response of [patched, deleted]) {
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({ code: "role_is_built_in" });
+      }
+    });
+  });
+
+  describe("when a role would carry a permission the caller lacks", () => {
+    /** @scenario A custom role cannot be given a permission the caller lacks */
+    it("refuses the create and the widening with role_exceeds_caller_permissions", async () => {
+      const { send, state, ledger } = world({ callerLacks: ["secrets:manage"] });
+      state(stored({ id: "role-a", name: "Release Manager", permissions: ["project:view"] }));
+
+      const created = await send("/api/roles", {
+        method: "POST",
+        body: { name: "Vault", permissions: ["secrets:manage"] },
+      });
+      const widened = await send("/api/roles/role-a", {
+        method: "PATCH",
+        body: { permissions: ["project:view", "secrets:manage"] },
+      });
+
+      for (const response of [created, widened]) {
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({
+          code: "role_exceeds_caller_permissions",
+          meta: { missingPermissions: ["secrets:manage"] },
+        });
+      }
+      expect(ledger.get("role-a")?.permissions).toEqual(["project:view"]);
+      expect([...ledger.values()].some((role) => role.name === "Vault")).toBe(false);
+    });
+
+    /** @scenario A custom role may keep permissions the caller lacks when they are not added */
+    it("renames a role that already carries a permission the caller lacks", async () => {
+      const { send, state } = world({ callerLacks: ["secrets:manage"] });
+      state(stored({ id: "role-v", name: "Vault", permissions: ["secrets:manage"] }));
+
+      const response = await send("/api/roles/role-v", {
+        method: "PATCH",
+        body: { name: "Vault keepers" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ name: "Vault keepers" });
     });
   });
 });

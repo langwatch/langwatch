@@ -247,6 +247,7 @@ export class PostgresAuthzAdapter {
       newBindingId: this.options.newBindingId,
       ledger,
       bindings: bindingRepository,
+      permissions: authz,
     });
 
     const { redis } = this.options;

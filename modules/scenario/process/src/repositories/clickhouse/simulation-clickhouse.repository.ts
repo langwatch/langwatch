@@ -225,6 +225,8 @@ export type SimulationClickHouseClient = {
     query: string;
     query_params: Record<string, string | string[]>;
     format: "JSONEachRow";
+    /** A declared tenant set: one organization's projects, bound by `TenantId IN (...)`. */
+    tenantIds?: readonly string[];
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
 };
 
@@ -1440,6 +1442,35 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       }),
     );
     return totals.reduce((sum, total) => sum + total, 0);
+  }
+
+  /**
+   * One read for the whole organization, routed by its first project
+   * (gateway-spend-events precedent).
+   */
+  async countOrganizationRuns({ projectIds }: { projectIds: readonly string[] }): Promise<number> {
+    const tenantIds = [...new Set(projectIds)];
+    const [routingTenant] = tenantIds;
+    if (routingTenant === undefined) return 0;
+    const placeholders = tenantIds.map((_, i) => `{tenant${i}:String}`).join(", ");
+    const client = await this.getClient(routingTenant);
+    const result = await client.query({
+      query: `SELECT toString(count()) AS Total
+       FROM ${TABLE_NAME} AS t
+       WHERE t.TenantId IN (${placeholders})
+         AND t.ArchivedAt IS NULL
+         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+           FROM ${TABLE_NAME}
+           WHERE TenantId IN (${placeholders})
+           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         )`,
+      query_params: Object.fromEntries(tenantIds.map((id, i) => [`tenant${i}`, id])),
+      format: "JSONEachRow",
+      tenantIds,
+    });
+    const [row] = await result.json<{ Total: string }>();
+    return Number(row?.Total ?? "0");
   }
 
   /**

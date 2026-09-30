@@ -208,6 +208,15 @@ func (exec *scenarioExec) expandExpect(expect scenarioExpect) (scenarioExpect, e
 	if expect.NotContains, err = exec.expandList(expect.NotContains); err != nil {
 		return expect, err
 	}
+	if len(expect.Headers) > 0 {
+		expanded := make(map[string]string, len(expect.Headers))
+		for name, text := range expect.Headers {
+			if expanded[name], err = expandText(text, exec.vars); err != nil {
+				return expect, err
+			}
+		}
+		expect.Headers = expanded
+	}
 	expect.Path, err = expandText(expect.Path, exec.vars)
 	return expect, err
 }

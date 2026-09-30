@@ -18,10 +18,11 @@ import {
 import type { ApiKeyListEntry, ApiKeyTrpcRoleBinding } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
-import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
+import { Clipboard, Key, MoreVertical, Plus, RotateCw } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
@@ -322,27 +323,31 @@ function ApiKeyTableRow({
       <Table.Cell>
         {/* Owner/admin can edit/revoke; service keys (no userId) need admin */}
         {canModify && (
-          <HStack gap={1}>
-            <Button
-              size="xs"
-              variant="ghost"
-              aria-label={`Edit API key ${apiKey.name}`}
-              data-testid="api-key-edit"
-              onClick={() => onEdit(apiKey)}
-            >
-              <Pencil size={14} />
-            </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              colorPalette="red"
-              aria-label={`Revoke API key ${apiKey.name}`}
-              data-testid="api-key-revoke"
-              onClick={() => onRevoke(apiKey.id)}
-            >
-              <Trash2 size={14} aria-hidden="true" />
-            </Button>
-          </HStack>
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button
+                size="xs"
+                variant="ghost"
+                aria-label={`Actions for API key ${apiKey.name}`}
+                data-testid="api-key-actions"
+              >
+                <MoreVertical size={14} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item value="edit" data-testid="api-key-edit" onClick={() => onEdit(apiKey)}>
+                Edit
+              </Menu.Item>
+              <Menu.Item
+                value="revoke"
+                color="red.500"
+                data-testid="api-key-revoke"
+                onClick={() => onRevoke(apiKey.id)}
+              >
+                Revoke
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
         )}
       </Table.Cell>
     </Table.Row>
@@ -605,12 +610,7 @@ export default function ApiKeysScreen() {
           currentTeamId={scope.teamId}
           currentProjectId={scope.projectId}
         />
-        <PageLayout.HeaderButton
-          variant="solid"
-          colorPalette="blue"
-          onClick={onCreateOpen}
-          data-testid="api-key-create"
-        >
+        <PageLayout.HeaderButton onClick={onCreateOpen} data-testid="api-key-create">
           <Plus size={16} />
           Create new secret key
         </PageLayout.HeaderButton>
@@ -638,9 +638,9 @@ export default function ApiKeysScreen() {
                     <Table.Row>
                       <Table.ColumnHeader>Name</Table.ColumnHeader>
                       <Table.ColumnHeader>Status</Table.ColumnHeader>
-                      <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
+                      <Table.ColumnHeader whiteSpace="nowrap">Secret key</Table.ColumnHeader>
                       <Table.ColumnHeader>Created</Table.ColumnHeader>
-                      <Table.ColumnHeader>Last Used</Table.ColumnHeader>
+                      <Table.ColumnHeader whiteSpace="nowrap">Last used</Table.ColumnHeader>
                       <Table.ColumnHeader>Type</Table.ColumnHeader>
                       <Table.ColumnHeader>Scope</Table.ColumnHeader>
                       <Table.ColumnHeader>Permissions</Table.ColumnHeader>

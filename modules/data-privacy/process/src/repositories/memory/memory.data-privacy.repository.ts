@@ -87,6 +87,26 @@ export class MemoryDataPrivacyPolicyRepository implements DataPrivacyPolicyRepos
     return structuredClone(row);
   }
 
+  async mergeConfigForScope(input: {
+    organizationId: string;
+    scope: DataPrivacyScope;
+    personalOnly: boolean;
+    merge: (config: DataPrivacyConfig | undefined) => DataPrivacyConfig;
+  }): Promise<DataPrivacyPolicy> {
+    const previous = this.#rows.find(
+      (row) =>
+        row.organizationId === input.organizationId &&
+        sameRule(row, input.scope, input.personalOnly),
+    );
+
+    return this.upsertForScope({
+      organizationId: input.organizationId,
+      scope: input.scope,
+      personalOnly: input.personalOnly,
+      config: input.merge(previous && structuredClone(previous.config)),
+    });
+  }
+
   async deleteForScope(input: {
     organizationId: string;
     scope: DataPrivacyScope;

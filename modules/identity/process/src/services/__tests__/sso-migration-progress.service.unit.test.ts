@@ -375,6 +375,15 @@ describe("given a cutover that is nearly done", () => {
     expect(view?.blockers.map((blocker) => blocker.code)).toContain("recovery-path-missing");
   });
 
+  /** @scenario "The ask to set a password lands while the old provider can still sign somebody in" */
+  it("carries the remedy in the blocker: a password, set while somebody is still signed in", async () => {
+    const view = await progress(scenario({ bindings: [] }));
+
+    const blocker = view?.blockers.find(({ code }) => code === "recovery-path-missing");
+    expect(blocker?.message).toContain("somebody who has set a password");
+    expect(blocker?.message).toContain("only be set while somebody is still signed in");
+  });
+
   it("does not hold the update for a member who holds no identifier on the replacement", async () => {
     const view = await progress(scenario({ members: [ANA, BEN] }));
 

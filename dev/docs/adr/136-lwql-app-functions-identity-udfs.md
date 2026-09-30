@@ -371,3 +371,22 @@ the one LangWatchQL shape that keeps spending after its caller has gone, so the
 REST route passes the request's own `AbortSignal`, the runner checks it between
 classifications, and an abort propagates rather than being counted as a row that
 could not be judged.
+
+## Amendment, 2026-09-30: a query does not judge
+
+The amendment above describes judging inside the synchronous query. The tree
+never built that. A query's eval column answers with the text to be judged, and
+judging is an Instant Eval run ([ADR-153](153-instant-eval-run-is-a-judgment-job.md)),
+which reads pages through `hydrateLangWatchQLTexts` and asks the classifier. The
+per-query ceilings live on the page: `instant_eval_questions_too_long` and
+`instant_eval_query_budget_exceeded` refuse a page before it is sent.
+
+### Ideas not built
+
+- A synchronous query that judges its own rows, with the classifier called in the hydration stage.
+- `instant_eval_classifier_unavailable` as a refusal of a whole query when nothing could be judged.
+- A row the classifier could not judge answering null with an `INSTANT_EVAL_SKIPPED` diagnostic on the query result.
+- A cancelled query that keeps the judgements already made and names the rows never judged.
+- One spend record per synchronous query, carrying no run.
+- A query's elapsed time covering the judging as well as the database read.
+- Resolving the Instant Evals gate and building the classifier only for a statement that calls an eval function.

@@ -2,9 +2,10 @@ import { Badge, Box, Button, Card, Heading, HStack, Table, Text, VStack } from "
 import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { Radio, Trash2 } from "lucide-react";
+import { MoreVertical, Radio } from "lucide-react";
 
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
 import { readableDate } from "../../model/display-formatters.ts";
@@ -133,15 +134,26 @@ export function IngestionKeysSection({
                     {/* Ingestion keys carry no role bindings to edit; revoke
                         only, gated to admins. */}
                     {isAdmin && (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        colorPalette="red"
-                        aria-label={`Revoke ingestion key ${apiKey.name}`}
-                        onClick={() => onRevoke(apiKey.id)}
-                      >
-                        <Trash2 size={14} aria-hidden="true" />
-                      </Button>
+                      <Menu.Root>
+                        <Menu.Trigger asChild>
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            aria-label={`Actions for ingestion key ${apiKey.name}`}
+                          >
+                            <MoreVertical size={14} />
+                          </Button>
+                        </Menu.Trigger>
+                        <Menu.Content>
+                          <Menu.Item
+                            value="revoke"
+                            color="red.500"
+                            onClick={() => onRevoke(apiKey.id)}
+                          >
+                            Revoke
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Root>
                     )}
                   </Table.Cell>
                 </Table.Row>

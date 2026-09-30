@@ -168,3 +168,44 @@ describe("given the Instant Evals flag read is still in flight", () => {
     expect(result.current.refusal).toEqual({ kind: "model" });
   });
 });
+
+/** The last start request's callbacks. */
+function startCallbacks(): MutateOptions {
+  const call = mutations.start.mutate.mock.calls.at(-1);
+  if (!call) throw new Error("no run was started");
+  return call[1];
+}
+
+describe("given the router answered instant_eval", () => {
+  /** @scenario "An Instant Eval route starts a run" */
+  it("starts a run when the estimate is under the cost line and applies its eval chip", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() => estimateCallbacks().onSuccess?.({ rows: 120, isRowsCapped: false, priceUsd: 0.1 }));
+
+    expect(mutations.start.mutate).toHaveBeenCalledTimes(1);
+    expect(result.current.confirmation).toBeNull();
+
+    act(() => startCallbacks().onSuccess?.({ id: "run-1" }));
+
+    const applied = useFilterStore.getState().queryText;
+    expect(applied).toContain("service:api");
+    expect(applied).toContain('eval:"the user is annoyed"');
+  });
+
+  /** @scenario "An Instant Eval route starts a run" */
+  it("asks first instead of starting when the estimate is at or over the cost line", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() =>
+      estimateCallbacks().onSuccess?.({ rows: 90_000, isRowsCapped: false, priceUsd: 0.5 }),
+    );
+
+    expect(mutations.start.mutate).not.toHaveBeenCalled();
+    expect(result.current.confirmation).toMatchObject({ question: "the user is annoyed" });
+
+    act(() => result.current.confirmRun());
+
+    expect(mutations.start.mutate).toHaveBeenCalledTimes(1);
+  });
+});

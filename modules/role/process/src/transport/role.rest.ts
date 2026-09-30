@@ -11,10 +11,12 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
+  ROLE_KIND,
   RoleApi,
   rolePermissionCatalogSchema,
   roleRestCreateSchema,
   roleRestDeletedSchema,
+  roleRestListQuerySchema,
   roleRestListSchema,
   roleRestParamsSchema,
   roleRestSchema,
@@ -29,14 +31,15 @@ import { z } from "zod";
  * Who a write is attributed to: the person the key acts as, or the management
  * credential itself, which the grants ledger records as a system actor.
  */
-const callerOf = (actor: Actor | null): RoleCaller => ({
+const callerOf = (actor: Actor | null, apiKeyId: string): RoleCaller => ({
   id: actor && "id" in actor ? actor.id : null,
+  apiKeyId,
 });
 
-/** The organization the credential resolved, as this family reads it. */
+/** The organization the credential resolved, and the key whose permissions bound a write. */
 export const roleRestFacts = defineRestMiddleware(
   "roleRestFacts",
-  z.object({ organizationId: z.string() }),
+  z.object({ organizationId: z.string(), apiKeyId: z.string() }),
 );
 
 const wire = (role: Role): RoleRest => ({
@@ -44,6 +47,7 @@ const wire = (role: Role): RoleRest => ({
   name: role.name,
   description: role.description,
   permissions: role.permissions,
+  builtIn: role.kind === ROLE_KIND.BUILT_IN,
   createdAt: role.createdAt,
   updatedAt: role.updatedAt,
 });
@@ -58,15 +62,20 @@ export const roleRest: Readonly<{
   .withCredential("organization")
 
   .get("/", "listRoles")
+  .withQuery(roleRestListQuerySchema)
   .withPermission("organization:manage")
   .withOutput(roleRestListSchema)
   .withDocs({
     tags: ["Roles"],
-    description: "List the organization's custom roles with their permission sets.",
+    description:
+      "List the organization's roles with their permission sets: the built-in roles `admin`, `member` and `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in roles, `?builtIn=false` only the custom ones.",
   })
   .withMiddleware(roleRestFacts)
-  .handle(async ({ app }, organization) => {
-    const roles = await app.listRoles({ organizationId: organization.organizationId });
+  .handle(async ({ app, input }, organization) => {
+    const roles = await app.listRoles({
+      organizationId: organization.organizationId,
+      ...(input.builtIn === undefined ? {} : { builtIn: input.builtIn }),
+    });
 
     return { roles: roles.map(wire) };
   })
@@ -93,7 +102,7 @@ export const roleRest: Readonly<{
             permissions: input.permissions,
           },
         },
-        callerOf(actor),
+        callerOf(actor, organization.apiKeyId),
       ),
     ),
   )
@@ -116,7 +125,7 @@ export const roleRest: Readonly<{
   .withDocs({
     tags: ["Roles"],
     description:
-      "Read one custom role. An id from another organization answers 404 custom_role_not_found.",
+      "Read one role: `admin`, `member` or `viewer`, or a custom role's id. A custom id from another organization answers 404 custom_role_not_found.",
   })
   .withMiddleware(roleRestFacts)
   .handle(async ({ app, input }, organization) =>
@@ -136,7 +145,7 @@ export const roleRest: Readonly<{
   .withDocs({
     tags: ["Roles"],
     description:
-      "Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright.",
+      "Update a custom role. Partial: only the fields present are written; a permissions list replaces the set outright. A built-in role answers 409 role_is_built_in; adding a permission the caller does not hold on the organization answers 403 role_exceeds_caller_permissions.",
   })
   .withMiddleware(roleRestFacts)
   .handle(async ({ app, input, actor }, organization) =>
@@ -151,7 +160,7 @@ export const roleRest: Readonly<{
             ...(input.permissions === void 0 ? {} : { permissions: input.permissions }),
           },
         },
-        callerOf(actor),
+        callerOf(actor, organization.apiKeyId),
       ),
     ),
   )
@@ -163,13 +172,13 @@ export const roleRest: Readonly<{
   .withDocs({
     tags: ["Roles"],
     description:
-      "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta.",
+      "Delete a custom role. A role that anything still holds, a legacy team assignment or a role binding, answers 409 custom_role_in_use with the counts in meta. A built-in role answers 409 role_is_built_in.",
   })
   .withMiddleware(roleRestFacts)
   .handle(async ({ app, input, actor }, organization) =>
     app.deleteRoleInOrganization(
       { roleId: input.id, organizationId: organization.organizationId },
-      callerOf(actor),
+      callerOf(actor, organization.apiKeyId),
     ),
   )
   .build();

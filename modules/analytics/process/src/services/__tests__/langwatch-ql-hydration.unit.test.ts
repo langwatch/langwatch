@@ -2,6 +2,7 @@ import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/an
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { LWQL_APP_FUNCTION_KEY_CAPS } from "../../rules/langwatch-ql-app-function-shapes.rules.ts";
 import {
   LangWatchQLHydrationComputeService,
   type LangWatchQLTraceRenderer,
@@ -103,6 +104,25 @@ describe("LangWatchQLHydrationService.hydrate", () => {
     expect(result.rows).toEqual([{ transcript: "### the transcript" }]);
   });
 
+  /** @scenario "More distinct trace keys than the cap allows is a refusal, not a partial answer" */
+  it("refuses more distinct trace ids than the trace cap, naming the cap and the key kind", async () => {
+    const cap = LWQL_APP_FUNCTION_KEY_CAPS.trace;
+    const { service } = hydrationService();
+
+    await expect(
+      service.hydrate({
+        projectIds: ["project-1"],
+        protections: {},
+        calls: [{ column: "trace", function: "trace_json", options: [] }],
+        columns: [{ name: "trace", type: "String" }],
+        rows: Array.from({ length: cap + 1 }, (_, index) => ({ trace: `trace-${index}` })),
+      }),
+    ).rejects.toMatchObject({
+      code: "lwql_app_function_key_cap",
+      meta: { keyKind: "trace", cap },
+    });
+  });
+
   /** @scenario "More distinct thread keys than the thread cap allows is refused the same way" */
   it("checks the caps before any fetch", async () => {
     const readThreadTraces = vi.fn(async () => []);
@@ -145,6 +165,7 @@ describe("LangWatchQLHydrationService.hydrateTexts", () => {
     expect(input?.pass).toEqual({ kind: "page", traceIds: ["trace-a"] });
   });
 
+  /** @scenario "A page read for a run holds the text that would be judged, not a verdict" */
   it("answers the text an eval would judge rather than a verdict, calling no judge", async () => {
     const { service } = hydrationService();
 

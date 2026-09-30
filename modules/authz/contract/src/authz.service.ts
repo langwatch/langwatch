@@ -1,5 +1,6 @@
 import type { Instant } from "@langwatch/time";
 
+import type { AuthzFindPermissionsBeyondCallerInput } from "./authz-grants-rest.schemas.ts";
 import type { AuthzScopeLineageInput, AuthzScopeLineageResult } from "./authz-scope-lineage.ts";
 import type {
   AuthzAccessBreakdownInput,
@@ -116,6 +117,11 @@ export abstract class AuthzService {
   ): Promise<AuthzCanBatchPermissionsByIdsOutput>;
 
   abstract getScope(args: AuthzResolveScopeInput): Promise<AuthzScopeRef>;
+
+  /** The listed permissions the caller does not hold at that scope; empty when all are held. */
+  abstract findPermissionsBeyondCaller(
+    args: AuthzFindPermissionsBeyondCallerInput,
+  ): Promise<string[]>;
 
   /** Refuses mixed scope ids that do not resolve to one organization. */
   abstract checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;

@@ -281,6 +281,7 @@ export const scenarioAppDependencyTokens = {
 export type ScenarioReadOnlyClickHouse = Readonly<{
   query<Row>(input: {
     tenantId: string;
+    tenantIds?: readonly string[];
     sql: string;
     params?: Record<string, unknown>;
   }): Promise<{ rows: Row[] }>;

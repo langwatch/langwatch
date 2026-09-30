@@ -3,7 +3,6 @@ package analyticssim
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 )
@@ -48,16 +47,19 @@ func (f Filter) matches(r Record) bool {
 		(f.Name == "" || f.Name == r.Name)
 }
 
-// maxRecords bounds memory; the oldest record goes first.
-//
-// ponytail: a plain capped slice; a ring buffer if a stack ever outruns it.
-const maxRecords = 5000
-
-// store keeps the records since start, newest last.
+// store keeps the most recent records since start in a fixed ring: adding is
+// O(1) and the oldest record is overwritten once it is full.
 type store struct {
-	mu      sync.Mutex
-	next    int
-	records []Record
+	mu     sync.Mutex
+	next   int
+	ring   []Record
+	head   int // index of the oldest record
+	size   int
+	maxRaw int
+}
+
+func newStore(maxRecords, maxRawBytes int) store {
+	return store{ring: make([]Record, maxRecords), maxRaw: maxRawBytes}
 }
 
 func (s *store) add(records []Record, at time.Time) {
@@ -71,28 +73,44 @@ func (s *store) add(records []Record, at time.Time) {
 		if r.Properties == nil {
 			r.Properties = map[string]any{}
 		}
-		s.records = append(s.records, r)
-	}
-	if over := len(s.records) - maxRecords; over > 0 {
-		s.records = slices.Delete(s.records, 0, over)
+		if len(r.Raw) > s.maxRaw {
+			r.Raw = json.RawMessage(fmt.Sprintf(`{"truncated":true,"bytes":%d}`, len(r.Raw)))
+		}
+		if s.size < len(s.ring) {
+			s.ring[(s.head+s.size)%len(s.ring)] = r
+			s.size++
+			continue
+		}
+		s.ring[s.head] = r
+		s.head = (s.head + 1) % len(s.ring)
 	}
 }
+
+// at is the i-th record, oldest first.
+func (s *store) at(i int) Record { return s.ring[(s.head+i)%len(s.ring)] }
 
 // list returns the matching records, newest first.
 func (s *store) list(f Filter) []Record {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := []Record{}
-	for i := len(s.records) - 1; i >= 0; i-- {
-		if f.matches(s.records[i]) {
-			out = append(out, s.records[i])
+	for i := s.size - 1; i >= 0; i-- {
+		if r := s.at(i); f.matches(r) {
+			out = append(out, r)
 		}
 	}
 	return out
 }
 
+func (s *store) count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.size
+}
+
 func (s *store) clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.records = nil
+	clear(s.ring)
+	s.head, s.size = 0, 0
 }

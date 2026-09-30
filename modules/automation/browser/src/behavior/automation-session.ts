@@ -44,6 +44,17 @@ export function useFeatureFlag(flag: string): AutomationFeatureFlagReading {
   return { enabled: answer === true, isLoading: answer === void 0 };
 }
 
+/** Closes the drawer the address names by clearing its `drawer.*` keys. */
+export function useCloseAddressedDrawer(): () => void {
+  const host = useAutomationHost();
+  return () =>
+    host.setQuery(
+      Object.fromEntries(
+        Object.entries(host.route().query).filter(([key]) => !key.startsWith("drawer.")),
+      ),
+    );
+}
+
 /** This application's own address, for the links a rendered preview prints. */
 export function useAppBaseUrl(): string {
   return useAutomationHost().appBaseUrl();

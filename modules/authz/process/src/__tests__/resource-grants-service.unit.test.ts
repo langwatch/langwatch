@@ -7,6 +7,7 @@ import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.st
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
+import { permissiveGrantGuards } from "../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
 import { liveShareLinkRow, ORG, traceScope } from "./support/resource-fixtures.ts";
@@ -49,6 +50,7 @@ describe("AuthzService on a resource scope", () => {
 describe("AuthzGrantsService and resource scopes", () => {
   const makeService = () =>
     AuthzGrantsService.create({
+      permissions: permissiveGrantGuards,
       repository: {} as AuthzGrantRepository,
       ledger: {} as EventingAuthzLedgerAdapter,
       epoch: new StubAuthzEpoch(),

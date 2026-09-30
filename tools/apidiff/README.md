@@ -727,7 +727,9 @@ failed: <cause>` (exit 2): the shared or run organization could not be made
   user), `{projectId}`, `{orgId}`, `{projectKey}`, `{orgKey}`, `{teamId}` and
   every capture.
 - **Expect:** `body: { key: "<any>" }` is present and not null;
-  `body: { key: "<absent>" }` is not in the body at all. Methods: GET, HEAD,
+  `body: { key: "<absent>" }` is not in the body at all;
+  `headers: { Deprecation: "true" }` wants each named response header to
+  contain the text (the name is case-insensitive). Methods: GET, HEAD,
   POST, PUT, PATCH, DELETE (no multipart bodies yet).
 - **Absolute-URL and raw-body steps:** a request whose path is a placeholder
   that expands to an `http(s)://` URL (`request: "PUT {uploadUrl}"`, with

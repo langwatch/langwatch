@@ -250,6 +250,14 @@ export class TestAuthzApi implements AuthzApi {
   updateRoleBinding = unsupported<AuthzApi["updateRoleBinding"]>("updateRoleBinding");
   deleteBinding = unsupported<AuthzApi["deleteBinding"]>("deleteBinding");
   applyMemberBindings = unsupported<AuthzApi["applyMemberBindings"]>("applyMemberBindings");
+  listGrants = unsupported<AuthzApi["listGrants"]>("listGrants");
+  getGrant = unsupported<AuthzApi["getGrant"]>("getGrant");
+  createGrant = unsupported<AuthzApi["createGrant"]>("createGrant");
+  changeGrantRole = unsupported<AuthzApi["changeGrantRole"]>("changeGrantRole");
+  revokeGrant = unsupported<AuthzApi["revokeGrant"]>("revokeGrant");
+  findPermissionsBeyondCaller = unsupported<AuthzApi["findPermissionsBeyondCaller"]>(
+    "findPermissionsBeyondCaller",
+  );
   retireDirectoryGrants = unsupported<AuthzApi["retireDirectoryGrants"]>("retireDirectoryGrants");
   findDirectoryCausedChanges = unsupported<AuthzApi["findDirectoryCausedChanges"]>(
     "findDirectoryCausedChanges",

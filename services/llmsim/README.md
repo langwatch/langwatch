@@ -77,6 +77,12 @@ The gateway forwards no custom headers upstream, so through the product use
 the model-name forms. The console's settings tab sets a forced error and a
 seed for every call that carries no header of its own.
 
+## Limits and canned models
+
+`LLMSIM_MAX_CALLS` (default 500) calls are kept, each with at most
+`LLMSIM_MAX_BODY_BYTES` (default 262144) of request body. A model containing
+`canned-hello`, `canned-ok` or `canned-json` answers that fixed text to any prompt.
+
 ## Console
 
 `GET /` serves the React console (`apps/llmsim-web`, ADR-160, built into

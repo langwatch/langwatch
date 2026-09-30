@@ -45,5 +45,10 @@ export class GrantsFake extends AuthzGrantsService {
   readonly updateBinding = vi.fn();
   readonly deleteBinding = vi.fn();
   readonly applyMemberBindings = vi.fn();
+  readonly listGrants = vi.fn();
+  readonly getGrant = vi.fn();
+  readonly createGrant = vi.fn();
+  readonly changeGrantRole = vi.fn();
+  readonly revokeGrant = vi.fn();
   readonly invalidateOrganization = vi.fn();
 }

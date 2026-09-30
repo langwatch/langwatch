@@ -311,3 +311,20 @@ Registry default wins for registered flags. The `defaultValue` argument is only 
 - tRPC: https://trpc.io/
 - React Query: https://tanstack.com/query
 - specs/ops/internal-feature-flags.feature: behavioural contract
+
+## Amendment, 2026-09-30: what the onboarding experiment shipped
+
+The experiment property and the `onboarding_variant` person property ship on
+every guided onboarding event, on `scenario_created` and on
+`scenario_run_succeeded`; the browser registers the property once the variant
+is known. The mapping lives in the onboarding contract
+(`onboardingExperimentProperties`). The rest of the amendment above was not
+built, and is recorded here as ideas.
+
+### Ideas not built
+
+- An `onboarding_variant_assigned` exposure event, tracked once when the organization is created.
+- `first_trace_integrated` carrying `onboarding_variant` and the experiment property.
+- A producer for `project_active_day`: the first application trace of a day, and the first successful scenario run of a day, each once per project per day, never for Langy's own turns or sample traces.
+- The `viewed onboarding_progress` event carrying `onboarding_variant`.
+- Resolving the variant next to the admin (`resolveOrgAdmin`) for every project-scoped milestone.

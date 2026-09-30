@@ -292,6 +292,7 @@
                 "pages": [
                   "platform/members-and-teams",
                   "platform/rbac",
+                  "platform/roles-and-access",
                   "platform/sso",
                   "platform/sso-update",
                   "platform/api-keys",
@@ -1541,6 +1542,10 @@
               "api-reference/roles/update-role",
               "api-reference/roles/delete-role"
             ]
+          },
+          {
+            "group": "Grants",
+            "pages": ["api-reference/grants/overview"]
           },
           {
             "group": "Role Bindings",

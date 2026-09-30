@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthzCompatibilityLedger } from "../../app/authz.app.ts";
 import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
 import { AuthzBindingWriterService } from "../../services/authz-binding-writer.service.ts";
+import { permissiveGrantGuards, TEST_CALLER } from "./support/grant-guards.stub.ts";
 
 const actor = { type: "user" as const, id: "admin-1" };
 const scope = {
@@ -45,6 +46,7 @@ function setup() {
   bindings.isApiKeyInOrganization.mockResolvedValue(true);
   const writes = ledger();
   const writer = AuthzBindingWriterService.create({
+    permissions: permissiveGrantGuards,
     bindings,
     ledger: writes.ledger,
     newBindingId: () => "binding-new",
@@ -59,6 +61,7 @@ const createInput = {
   scopeType: "TEAM" as const,
   scopeId: "team-1",
   actor,
+  caller: TEST_CALLER,
 };
 
 beforeEach(() => {
@@ -221,6 +224,7 @@ describe("Authz binding management writes", () => {
         bindingId: "binding-foreign",
         role: "VIEWER",
         actor,
+        caller: TEST_CALLER,
       }),
     ).rejects.toMatchObject({ code: "role_binding_not_found", httpStatus: 404 });
     expect(writes.changeBindingRole).not.toHaveBeenCalled();
@@ -254,6 +258,7 @@ describe("Authz binding management writes", () => {
         },
       ],
       actor,
+      caller: TEST_CALLER,
     });
 
     expect(writes.revokeBindings).toHaveBeenCalledWith({
@@ -284,6 +289,7 @@ describe("Authz binding management writes", () => {
         bindingIdsToDelete: ["binding-old"],
         bindingsToCreate: [{ role: "VIEWER", scopeType: "TEAM", scopeId: "team-1" }],
         actor,
+        caller: TEST_CALLER,
       }),
     ).rejects.toMatchObject({ code: "user_not_in_organization" });
     expect(writes.revokeBindings).not.toHaveBeenCalled();

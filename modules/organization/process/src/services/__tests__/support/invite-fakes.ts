@@ -154,6 +154,11 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
   deleteBinding = unsupported<AuthzGrantsService["deleteBinding"]>("deleteBinding");
   applyMemberBindings =
     unsupported<AuthzGrantsService["applyMemberBindings"]>("applyMemberBindings");
+  listGrants = unsupported<AuthzGrantsService["listGrants"]>("listGrants");
+  getGrant = unsupported<AuthzGrantsService["getGrant"]>("getGrant");
+  createGrant = unsupported<AuthzGrantsService["createGrant"]>("createGrant");
+  changeGrantRole = unsupported<AuthzGrantsService["changeGrantRole"]>("changeGrantRole");
+  revokeGrant = unsupported<AuthzGrantsService["revokeGrant"]>("revokeGrant");
 }
 
 function authzApiFromFake(grants: FakeAuthzGrantsService): AuthzApi {

@@ -21,6 +21,12 @@ type Database = Pick<
 >;
 type RootDatabase = Database & Pick<PrismaClient, "$transaction">;
 
+/**
+ * Writes queue on advisory locks and the wait counts against the transaction
+ * timeout, so the budget must outlast the queue (Prisma's default is 5s).
+ */
+export const WRITE_TX_BUDGET = { timeout: 20_000, maxWait: 10_000 } as const;
+
 export class PrismaModelDefaultRepository implements ModelDefaultRepository {
   private constructor(private readonly database: RootDatabase) {}
 
@@ -74,8 +80,9 @@ export class PrismaModelDefaultRepository implements ModelDefaultRepository {
   }
 
   async save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig> {
-    return this.database.$transaction(async (database) =>
-      this.saveInTransaction(database, input, input.organizationId),
+    return this.database.$transaction(
+      async (database) => this.saveInTransaction(database, input, input.organizationId),
+      WRITE_TX_BUDGET,
     );
   }
 
@@ -181,7 +188,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scope.scopeType}:${scope.
         },
         input.organizationId,
       );
-    });
+    }, WRITE_TX_BUDGET);
   }
 
   async delete(id: string): Promise<void> {

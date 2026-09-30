@@ -36,3 +36,5 @@
       expect: { status: 404 }
     - request: GET /api/monitors
       expect: { status: 200, notContains: "cv3mon-edited-{uid}" }
+  teardown:
+    - request: DELETE /api/monitors/{monitorId}

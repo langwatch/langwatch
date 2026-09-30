@@ -236,6 +236,7 @@ function ProvidersPanel({
           <Button
             size="sm"
             variant="outline"
+            colorPalette="orange"
             disabled={!!addProviderDisabledReason}
             data-testid="empty-state-add-model-provider"
           >
@@ -449,8 +450,6 @@ export default function ModelProvidersScreen() {
           onPick={(providerKey) => openProviderEditor({ providerKey, modelProviderId: "new" })}
         >
           <PageLayout.HeaderButton
-            variant="solid"
-            colorPalette="blue"
             disabled={!!addProviderDisabledReason}
             data-testid="model-provider-add"
           >
@@ -460,6 +459,9 @@ export default function ModelProvidersScreen() {
       </PageLayout.Header>
 
       <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text color="fg.muted">
+          The AI providers your projects call, and the default models they use.
+        </Text>
         <ProvidersPanel
           addProviderDisabledReason={addProviderDisabledReason}
           addable={addable}

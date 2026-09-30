@@ -5,6 +5,7 @@ import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemorySignUpVerificationMailChannel } from "../../channels/memory/memory.sign-up-verification-mail.channel.ts";
+import { SignUpVerificationMailChannel } from "../../channels/sign-up-verification-mail.channel.ts";
 import { MemoryAuthDatabase } from "../../repositories/memory/memory.auth.database.ts";
 import { MemorySignUpVerificationTokenRepository } from "../../repositories/memory/memory.signup-verification-token.repository.ts";
 import {
@@ -50,11 +51,13 @@ function makeService({
   decision = SIGN_UP_DECISION,
   budgetAllowed = true,
   emailUnconfigured = false,
+  mailer,
 }: {
   holder?: UserProfile | null;
   decision?: RoutingDecision;
   budgetAllowed?: boolean;
   emailUnconfigured?: boolean;
+  mailer?: SignUpVerificationMailChannel;
 } = {}) {
   const memory = MemoryAuthDatabase.create();
   const mail = MemorySignUpVerificationMailChannel.create();
@@ -66,7 +69,7 @@ function makeService({
 
   const service = SignUpVerificationService.create({
     tokens: MemorySignUpVerificationTokenRepository.create({ memory }),
-    mailer: mail,
+    mailer: mailer ?? mail,
     users: createApiFixture<UserApi>({ findByEmail: async () => current }),
     route: async () => decision,
     isWithinBudget: async ({ key }) => {
@@ -109,6 +112,27 @@ describe("given a sign-up address to confirm", () => {
       expect(harness.memory.verificationTokens.get("token-1")?.expires).toEqual(
         NOW.add({ milliseconds: SIGN_UP_VERIFICATION_TTL_MS }),
       );
+    });
+  });
+
+  describe("when a confirmation link is requested", () => {
+    /** @scenario Asking for verification creates no account */
+    it("creates no account and no credential, even when the mailer is down", async () => {
+      class DownMailer extends SignUpVerificationMailChannel {
+        async sendVerificationLink(): Promise<void> {
+          throw new Error("mailer down");
+        }
+      }
+      const sent = makeService();
+      const down = makeService({ mailer: new DownMailer() });
+
+      await sent.service.requestVerification({ email: "sam@acme.com" });
+      await expect(down.service.requestVerification({ email: "sam@acme.com" })).rejects.toThrow(
+        "mailer down",
+      );
+
+      expect(sent.memory.sessions.size).toBe(0);
+      expect(down.memory.sessions.size).toBe(0);
     });
   });
 
@@ -157,6 +181,24 @@ describe("given a sign-up address to confirm", () => {
       await expect(
         harness.service.completeVerification({ token: "token-1" }),
       ).rejects.toMatchObject({ code: "identity_verification_expired" });
+    });
+  });
+
+  describe("when two requests open the same unspent link at the same time", () => {
+    /** @scenario Simultaneous confirmation-link consumers yield one proof */
+    it("hands exactly one of them the proof and the other status only", async () => {
+      const harness = makeService();
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+
+      const answers = await Promise.all([
+        harness.service.completeVerification({ token: "token-1" }),
+        harness.service.completeVerification({ token: "token-1" }),
+      ]);
+
+      expect(answers.filter((answer) => answer.freshClaim)).toHaveLength(1);
+      expect(answers.filter((answer) => answer.addressProof !== null)).toHaveLength(1);
+      expect(answers.every((answer) => !answer.accountCreated)).toBe(true);
+      expect(harness.memory.sessions.size).toBe(0);
     });
   });
 
@@ -269,6 +311,20 @@ describe("given the proof a spent link handed to the credential step", () => {
 
 describe("given a signed-out sign-up asking for a new account's link", () => {
   describe("when the address's organization signs in through its own connection", () => {
+    /** @scenario Sign-up never reveals account existence on an SSO domain */
+    it.each([
+      ["a confirmed account", account({ emailVerified: true })],
+      ["an unconfirmed account", account({ emailVerified: false })],
+      ["no account", null],
+    ])("refuses %s alike and mails nothing", async (_label, holder) => {
+      const harness = makeService({ decision: DOMAIN_DECISION, holder });
+
+      await expect(
+        harness.service.requestNewAccountVerification({ email: "sam@acme.com" }),
+      ).rejects.toMatchObject({ code: "auth_direct_registration_unavailable" });
+      expect(harness.mail.sent).toEqual([]);
+    });
+
     it("refuses by name and mails nothing", async () => {
       const harness = makeService({ decision: DOMAIN_DECISION });
 
@@ -280,6 +336,7 @@ describe("given a signed-out sign-up asking for a new account's link", () => {
   });
 
   describe("when the address already holds a confirmed account", () => {
+    /** @scenario Sign-up still guides an existing account outside SSO domains */
     it("refuses by name and mails nothing", async () => {
       const harness = makeService({ holder: account({ emailVerified: true }) });
 

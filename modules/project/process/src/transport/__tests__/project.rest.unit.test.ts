@@ -5,6 +5,7 @@
  * Spec: specs/projects/projects-management-door.feature
  */
 import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
+import type { DataPrivacyPiiRedactionLevel } from "@langwatch/data-privacy-contract";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
@@ -399,6 +400,21 @@ describe("the projects REST family", () => {
       expect(JSON.stringify(body)).not.toContain(project().apiKey);
     });
 
+    /** @scenario "Reading a project answers its PII redaction level" */
+    it("answers the project's PII redaction level", async () => {
+      const getPiiRedactionLevel = vi.fn(
+        async (): Promise<DataPrivacyPiiRedactionLevel> => "DISABLED",
+      );
+      const { send } = mountProjectRest({
+        app: { findWithTeam: vi.fn(async () => projectWithTeam()), getPiiRedactionLevel },
+      });
+
+      const response = await send("/api/projects/project_1");
+
+      await expect(response.json()).resolves.toMatchObject({ piiRedactionLevel: "DISABLED" });
+      expect(getPiiRedactionLevel).toHaveBeenCalledWith({ projectId: "project_1" });
+    });
+
     it("reports an unknown id as not found", async () => {
       const { send } = mountProjectRest({
         app: { findWithTeam: vi.fn(async () => null) },
@@ -572,6 +588,90 @@ describe("the projects REST family", () => {
       });
 
       expect(response.status).toBe(404);
+    });
+
+    /** @scenario "Updating a project's PII redaction level writes it through data privacy" */
+    it("writes the level after the project fields and answers the level read back", async () => {
+      const updateInOrganization = vi.fn(async () => project({ name: "Renamed" }));
+      const setPiiRedactionLevel = vi.fn(async () => undefined);
+      const { send } = mountProjectRest({
+        app: {
+          updateInOrganization,
+          setPiiRedactionLevel,
+          getPiiRedactionLevel: vi.fn(async (): Promise<DataPrivacyPiiRedactionLevel> => "STRICT"),
+        },
+      });
+
+      const response = await send("/api/projects/project_1", {
+        method: "PATCH",
+        body: { name: "Renamed", piiRedactionLevel: "STRICT" },
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        name: "Renamed",
+        piiRedactionLevel: "STRICT",
+      });
+      expect(updateInOrganization).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { name: "Renamed" } }),
+      );
+      expect(setPiiRedactionLevel).toHaveBeenCalledWith({
+        projectId: "project_1",
+        level: "STRICT",
+      });
+    });
+
+    /** @scenario "A PATCH without a PII redaction level leaves it alone" */
+    it("writes no level when the body carries none", async () => {
+      const setPiiRedactionLevel = vi.fn(async () => undefined);
+      const { send } = mountProjectRest({
+        app: { updateInOrganization: vi.fn(async () => project()), setPiiRedactionLevel },
+      });
+
+      const response = await send("/api/projects/project_1", {
+        method: "PATCH",
+        body: { name: "Renamed" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(setPiiRedactionLevel).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An unknown PII redaction level is refused before anything is written" */
+    it("refuses a level outside STRICT, ESSENTIAL and DISABLED", async () => {
+      const updateInOrganization = vi.fn(async () => project());
+      const setPiiRedactionLevel = vi.fn(async () => undefined);
+      const { send } = mountProjectRest({ app: { updateInOrganization, setPiiRedactionLevel } });
+
+      const response = await send("/api/projects/project_1", {
+        method: "PATCH",
+        body: { piiRedactionLevel: "custom" },
+      });
+
+      expect(response.status).toBe(422);
+      expect(updateInOrganization).not.toHaveBeenCalled();
+      expect(setPiiRedactionLevel).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A PII redaction level for a project outside the organization is never written" */
+    it("writes no level when the project is not in the organization", async () => {
+      const setPiiRedactionLevel = vi.fn(async () => undefined);
+      const { send } = mountProjectRest({
+        app: {
+          updateInOrganization: vi.fn(async (): Promise<Project> => {
+            throw new ProjectNotFoundError();
+          }),
+          setPiiRedactionLevel,
+        },
+      });
+
+      const response = await send("/api/projects/project_other", {
+        method: "PATCH",
+        body: { piiRedactionLevel: "DISABLED" },
+      });
+
+      expect(response.status).toBe(404);
+      expect(setPiiRedactionLevel).not.toHaveBeenCalled();
     });
 
     it("reads a personal-workspace boundary as a refusal", async () => {

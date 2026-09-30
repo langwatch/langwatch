@@ -151,6 +151,7 @@ describe("given a connection part-way through its setup", () => {
     ]);
   });
 
+  /** @scenario "A rejected claim says why, and the domain can be claimed again" */
   it("carries a rejection's own words, so a re-claim starts from them", async () => {
     const service = scenario([
       connection({ rejection: { domain: "acme.net", note: "that domain is somebody else's" } }),

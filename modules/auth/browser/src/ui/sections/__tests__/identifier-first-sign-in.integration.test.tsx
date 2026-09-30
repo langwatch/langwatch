@@ -4,7 +4,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -737,6 +737,40 @@ describe("given the identifier-first sign-in screen", () => {
       expect(email.getAttribute("type")).toBe("email");
       await userEvent.type(email, "op@selfhosted.example");
       expect((email as HTMLInputElement).value).toBe("op@selfhosted.example");
+    });
+  });
+
+  describe("when the deployment configures methods to sit beside the address", () => {
+    /** @scenario The rail beside the address offers exactly what the deployment configured */
+    it("draws the one social provider and the passkey, and nothing else", async () => {
+      routeMock.mockResolvedValue({
+        outcome: "method_picker",
+        methodSet: [
+          { id: "google", kind: "federated", connectionId: null },
+          { id: "passkey", kind: "passkey", connectionId: null },
+        ],
+        reasonCode: "no_domain_match",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+
+      const rail = await screen.findByTestId("alternative-methods");
+      expect(within(rail).getAllByRole("button")).toHaveLength(2);
+      expect(within(rail).getByTestId("passkey-sign-in")).toBeTruthy();
+      expect(within(rail).getByRole("button", { name: /google/i })).toBeTruthy();
+    });
+
+    /** @scenario With nothing to offer beside the address, no divider is drawn */
+    it("draws no rail and no divider when only the password is offered", async () => {
+      routeMock.mockResolvedValue(localPicker);
+
+      renderScreen();
+      await screen.findByLabelText(/email/i);
+      await waitFor(() => expect(routeMock).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(screen.queryByTestId("alternative-methods")).toBeNull();
+      expect(screen.queryByText(/^or$/i)).toBeNull();
     });
   });
 

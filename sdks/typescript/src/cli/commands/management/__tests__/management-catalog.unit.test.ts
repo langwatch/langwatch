@@ -23,6 +23,7 @@ const MANAGEMENT_GROUPS = [
   "groups",
   "roles",
   "role-bindings",
+  "grants",
   "scim-tokens",
   "organizations",
 ] as const;
@@ -102,6 +103,14 @@ describe("the management command tree", () => {
       expect(addBinding).toContain("--custom-role-id <id>");
       expect(addBinding).toContain("--scope-type <type>");
       expect(addBinding).toContain("--scope-id <id>");
+    });
+
+    /** @scenario The grants commands cover the grant lifecycle */
+    it("gives the grants family its lifecycle, and create accepts an expiry and an idempotency key", () => {
+      expect(verbsOf("grants")).toEqual(["list", "get", "create", "change-role", "revoke"]);
+      expect(carriesFlag("grants create", "--expires-at <iso>")).toBe(true);
+      expect(carriesFlag("grants create", "--idempotency-key <key>")).toBe(true);
+      expect(carriesFlag("roles list", "--built-in")).toBe(true);
     });
 
     /** @scenario Every management command is covered by the feature map */

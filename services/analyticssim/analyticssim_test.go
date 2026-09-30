@@ -218,3 +218,32 @@ func TestHasProperties(t *testing.T) {
 		t.Error("a different value or a missing key should not match")
 	}
 }
+
+func TestRingKeepsNewestAndCapsRawBodies(t *testing.T) {
+	s := newStore(3, 10)
+	for range 5 {
+		s.add([]Record{{Provider: ProviderPostHog, Kind: KindEvent, Raw: []byte(`{"big":"0123456789"}`)}}, time.Time{})
+	}
+	got := s.list(Filter{})
+	if len(got) != 3 || got[0].ID != "rec_000005" || got[2].ID != "rec_000003" {
+		t.Fatalf("ring should hold the newest three, newest first: %+v", got)
+	}
+	if string(got[0].Raw) != `{"truncated":true,"bytes":20}` {
+		t.Fatalf("an oversized raw body should be replaced by a marker, got %s", got[0].Raw)
+	}
+	s.clear()
+	if s.count() != 0 {
+		t.Fatal("clear should empty the ring")
+	}
+}
+
+func TestSeedLoadsSampleRecordsFromBothProviders(t *testing.T) {
+	s := newServer(Config{Seed: true}, fstest.MapFS{"index.html": {Data: []byte("x")}})
+	providers := map[string]bool{}
+	for _, r := range s.records.list(Filter{}) {
+		providers[r.Provider] = true
+	}
+	if !providers[ProviderPostHog] || !providers[ProviderCustomerIO] {
+		t.Fatalf("seed should load both providers, got %v", providers)
+	}
+}

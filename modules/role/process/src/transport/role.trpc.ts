@@ -19,7 +19,9 @@ export const roleTrpcTransport: TrpcRouterDeclaration<RoleApi, typeof roleTrpc> 
    */
   .procedure("getAll")
   .withPermission("organization:manage")
-  .handle(async ({ app, input }) => app.listRoles({ organizationId: input.organizationId }))
+  .handle(async ({ app, input }) =>
+    app.listRoles({ organizationId: input.organizationId, builtIn: false }),
+  )
 
   .procedure("getById")
   .serviceAuthorized({

@@ -1,5 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { DataPrivacyConfig, DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -18,12 +20,16 @@ const organizations = createApiFixture<OrganizationApi>({
   getTeamById: async () => dataPrivacyTestTeam(),
 });
 
-function build() {
+function build({ projectDirectory = projects }: { projectDirectory?: ProjectApi } = {}) {
   const repository = MemoryDataPrivacyPolicyRepository.create();
 
   return {
     repository,
-    service: DataPrivacyService.create({ repository, projects, organizations }),
+    service: DataPrivacyService.create({
+      repository,
+      projects: projectDirectory,
+      organizations,
+    }),
     stored: () => repository.findAllInOrganization({ organizationId: ORGANIZATION_ID }),
   };
 }
@@ -168,5 +174,118 @@ describe("DataPrivacyService", () => {
       httpStatus: 400,
     });
     await expect(stored()).resolves.toHaveLength(0);
+  });
+
+  describe("when the project's PII redaction level is read or set", () => {
+    const PROJECT_SCOPE: DataPrivacyScope = { scopeType: "PROJECT", scopeId: "project-1" };
+
+    async function withProjectRule(config: DataPrivacyConfig) {
+      const built = build();
+      await built.service.setForScope({
+        organizationId: ORGANIZATION_ID,
+        scope: PROJECT_SCOPE,
+        personalOnly: false,
+        config,
+      });
+
+      return built;
+    }
+
+    const DROPS_INPUT_WITH_EXCEPTION: DataPrivacyConfig = {
+      categories: { input: { disposition: "drop" } },
+      pii: { level: "essential", exceptPatterns: ["ORD-[0-9]{6}"] },
+    };
+    const CUSTOM_ENTITIES: DataPrivacyConfig = {
+      pii: { level: "custom", entities: ["EMAIL_ADDRESS"] },
+    };
+
+    /** @scenario "A project with no rule reads the platform default level" */
+    it("reads ESSENTIAL when no rule is stored", async () => {
+      const { service } = build();
+
+      await expect(service.getPiiRedactionLevel({ projectId: "project-1" })).resolves.toBe(
+        "ESSENTIAL",
+      );
+    });
+
+    /** @scenario "A custom entity list reads as STRICT" */
+    it("reads a custom entity list as STRICT", async () => {
+      const { service } = await withProjectRule(CUSTOM_ENTITIES);
+
+      await expect(service.getPiiRedactionLevel({ projectId: "project-1" })).resolves.toBe(
+        "STRICT",
+      );
+    });
+
+    /** @scenario "Writing the level keeps every other field of the project's rule" */
+    it("merges the level into the project's rule and keeps the rest", async () => {
+      const { service, stored } = await withProjectRule(DROPS_INPUT_WITH_EXCEPTION);
+
+      await service.setPiiRedactionLevel({ projectId: "project-1", level: "STRICT" });
+
+      const [rule] = await stored();
+      expect(rule?.config).toEqual({
+        categories: { input: { disposition: "drop" } },
+        pii: { level: "strict", exceptPatterns: ["ORD-[0-9]{6}"] },
+      });
+      await expect(service.getPiiRedactionLevel({ projectId: "project-1" })).resolves.toBe(
+        "STRICT",
+      );
+    });
+
+    /** @scenario "Writing the level for a project with no rule creates its rule" */
+    it("creates the project's rule when none is stored", async () => {
+      const { service, stored } = build();
+
+      await service.setPiiRedactionLevel({ projectId: "project-1", level: "DISABLED" });
+
+      const rules = await stored();
+      expect(rules).toHaveLength(1);
+      expect(rules[0]).toMatchObject({
+        scopeType: "PROJECT",
+        scopeId: "project-1",
+        personalOnly: false,
+        config: { pii: { level: "disabled" } },
+      });
+    });
+
+    /** @scenario "Leaving the custom level drops the entity list" */
+    it("drops the entity list when leaving the custom level", async () => {
+      const { service, stored } = await withProjectRule(CUSTOM_ENTITIES);
+
+      await service.setPiiRedactionLevel({ projectId: "project-1", level: "ESSENTIAL" });
+
+      const [rule] = await stored();
+      expect(rule?.config.pii).toEqual({ level: "essential" });
+    });
+
+    /** @scenario "Disabling PII redaction drops the exception patterns" */
+    it("drops the exception patterns when PII redaction is disabled", async () => {
+      const { service, stored } = await withProjectRule(DROPS_INPUT_WITH_EXCEPTION);
+
+      await service.setPiiRedactionLevel({ projectId: "project-1", level: "DISABLED" });
+
+      const [rule] = await stored();
+      expect(rule?.config).toEqual({
+        categories: { input: { disposition: "drop" } },
+        pii: { level: "disabled" },
+      });
+    });
+
+    /** @scenario "A level written for a project that is gone is refused by name" */
+    it("refuses a project that is gone and writes nothing", async () => {
+      const { service, stored } = build({
+        projectDirectory: createApiFixture<ProjectApi>({
+          getWithTeam: async () => {
+            throw new ProjectNotFoundError();
+          },
+        }),
+      });
+
+      await expect(
+        service.setPiiRedactionLevel({ projectId: "project-gone", level: "STRICT" }),
+      ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
+      await expect(stored()).resolves.toHaveLength(0);
+    });
   });
 });

@@ -343,6 +343,13 @@ export class AuthzApp implements AuthzApi {
     return bindingWire(binding);
   };
   deleteBinding: AuthzApi["deleteBinding"] = (a) => this.#grants.deleteBinding(a);
+  listGrants: AuthzApi["listGrants"] = (a) => this.#grants.listGrants(a);
+  getGrant: AuthzApi["getGrant"] = (a) => this.#grants.getGrant(a);
+  createGrant: AuthzApi["createGrant"] = (a) => this.#grants.createGrant(a);
+  changeGrantRole: AuthzApi["changeGrantRole"] = (a) => this.#grants.changeGrantRole(a);
+  revokeGrant: AuthzApi["revokeGrant"] = (a) => this.#grants.revokeGrant(a);
+  findPermissionsBeyondCaller: AuthzApi["findPermissionsBeyondCaller"] = (a) =>
+    this.#permissions.findPermissionsBeyondCaller(a);
   applyMemberBindings: AuthzApi["applyMemberBindings"] = (a) => this.#grants.applyMemberBindings(a);
 
   registeredMigrations(): readonly SystemMigration[] {

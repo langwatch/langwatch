@@ -5,6 +5,8 @@ import {
   bindingScopeCanGrantPermission,
   CustomRoleIdRequiredError,
   CustomRoleNotAssignableError,
+  GrantExceedsCallerPermissionsError,
+  GrantLimitReachedError,
   GroupNotInOrganizationError,
   OrgExclusivePermissionScopeError,
   RoleBindingNotFoundError,
@@ -16,6 +18,8 @@ import {
   type AuthzCreateBindingInput,
   type AuthzCreateBindingOutput,
   type AuthzLedgerBindingPrincipal,
+  type AuthzPrincipalRef,
+  type AuthzService,
   type AuthzUpdateBindingInput,
   type AuthzDeleteBindingInput,
   type OrganizationRole,
@@ -23,7 +27,11 @@ import {
 } from "@langwatch/authz-contract";
 // One class, one status: an organization's membership is the organization
 // feature's fact, and every surface answers this refusal 422.
-import { UserNotInOrganizationError } from "@langwatch/organization-contract";
+import {
+  CannotDemoteLastAdminError,
+  CannotRemoveLastAdminError,
+  UserNotInOrganizationError,
+} from "@langwatch/organization-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
@@ -31,23 +39,34 @@ import type {
   AuthzBindingRepository,
   AuthzBindingScopeRow,
 } from "../repositories/authz-binding.repository.ts";
+import {
+  GRANT_LIMIT_PER_ORGANIZATION,
+  isGrantLimitReached,
+  isLastOrganizationAdmin,
+  permissionsConferred,
+} from "../rules/grant-escalation.rules.ts";
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
+
+/** The reads the writer's guards ask of the permission side. */
+export type AuthzBindingWriterPermissions = Pick<
+  AuthzService,
+  "findPermissionsBeyondCaller" | "listManagedBindingsForOrganization"
+>;
+
+const WIRE_SCOPE = { ORGANIZATION: "organization", TEAM: "team", PROJECT: "project" } as const;
 
 function assertScopeCanGrantRole({
   binding,
   rolesById,
 }: {
   binding: AuthzBindingWrite;
-  rolesById: ReadonlyMap<string, { permissions: unknown }>;
+  rolesById: ReadonlyMap<string, readonly string[]>;
 }): void {
   if (binding.scopeType === "ORGANIZATION" || !binding.customRoleId) {
     return;
   }
 
-  const role = rolesById.get(binding.customRoleId);
-  const permissions = Array.isArray(role?.permissions)
-    ? role.permissions.filter((permission): permission is string => typeof permission === "string")
-    : [];
+  const permissions = rolesById.get(binding.customRoleId) ?? [];
   const exclusivePermission = permissions.find(
     (permission) =>
       !bindingScopeCanGrantPermission({
@@ -65,6 +84,7 @@ export class AuthzBindingWriterService {
     bindings: AuthzBindingRepository;
     ledger: AuthzCompatibilityLedger;
     newBindingId: () => string;
+    permissions: AuthzBindingWriterPermissions;
   }): AuthzBindingWriterService {
     return new AuthzBindingWriterService(options);
   }
@@ -74,6 +94,7 @@ export class AuthzBindingWriterService {
       bindings: AuthzBindingRepository;
       ledger: AuthzCompatibilityLedger;
       newBindingId: () => string;
+      permissions: AuthzBindingWriterPermissions;
     },
   ) {}
 
@@ -96,7 +117,7 @@ export class AuthzBindingWriterService {
       groupId: input.groupId,
       apiKeyId: input.apiKeyId,
     });
-    await this.validateRoles({
+    const rolesById = await this.validateRoles({
       organizationId: input.organizationId,
       bindings: [input],
     });
@@ -105,6 +126,13 @@ export class AuthzBindingWriterService {
       bindings: [input],
       scopeRows,
     });
+    await this.assertWithinCaller({
+      organizationId: input.organizationId,
+      caller: input.caller,
+      bindings: [input],
+      rolesById,
+    });
+    await this.assertUnderGrantLimit({ organizationId: input.organizationId });
 
     const bindingId = this.options.newBindingId();
     await this.options.ledger.attachBindings({
@@ -138,17 +166,29 @@ export class AuthzBindingWriterService {
       scopes: [binding],
     });
     this.assertNoPersonalScope(scopeRows);
-    await this.validateRoles({
+    const changed = {
+      role: input.role,
+      customRoleId: input.customRoleId,
+      scopeType: binding.scopeType,
+      scopeId: binding.scopeId,
+    };
+    const rolesById = await this.validateRoles({
       organizationId: input.organizationId,
-      bindings: [
-        {
-          role: input.role,
-          customRoleId: input.customRoleId,
-          scopeType: binding.scopeType,
-          scopeId: binding.scopeId,
-        },
-      ],
+      bindings: [changed],
     });
+    await this.assertWithinCaller({
+      organizationId: input.organizationId,
+      caller: input.caller,
+      bindings: [changed],
+      rolesById,
+    });
+    if (input.role !== "ADMIN") {
+      await this.assertNotLastAdmin({
+        organizationId: input.organizationId,
+        bindingId: input.bindingId,
+        refusal: () => new CannotDemoteLastAdminError(),
+      });
+    }
 
     if (binding.userId) {
       const organizationRole = await this.options.bindings.findOrganizationRole({
@@ -186,6 +226,11 @@ export class AuthzBindingWriterService {
       scopes: [binding],
     });
     this.assertNoPersonalScope(scopeRows);
+    await this.assertNotLastAdmin({
+      organizationId: input.organizationId,
+      bindingId: input.bindingId,
+      refusal: () => new CannotRemoveLastAdminError(),
+    });
     await this.options.ledger.revokeBindings({
       organizationId: input.organizationId,
       bindingIds: [input.bindingId],
@@ -207,7 +252,7 @@ export class AuthzBindingWriterService {
       scopes: input.bindingsToCreate,
     });
     this.assertNoPersonalScope(createScopeRows);
-    await this.validateRoles({
+    const rolesById = await this.validateRoles({
       organizationId: input.organizationId,
       bindings: input.bindingsToCreate,
     });
@@ -215,6 +260,12 @@ export class AuthzBindingWriterService {
       organizationRole,
       bindings: input.bindingsToCreate,
       scopeRows: createScopeRows,
+    });
+    await this.assertWithinCaller({
+      organizationId: input.organizationId,
+      caller: input.caller,
+      bindings: input.bindingsToCreate,
+      rolesById,
     });
 
     const deletions = await this.options.bindings.findDirectUserBindings({
@@ -358,7 +409,7 @@ export class AuthzBindingWriterService {
   }: {
     organizationId: string;
     bindings: readonly AuthzBindingWrite[];
-  }): Promise<void> {
+  }): Promise<ReadonlyMap<string, readonly string[]>> {
     const customBindings = bindings.filter((binding) => {
       if (binding.role !== "CUSTOM") {
         return false;
@@ -376,14 +427,23 @@ export class AuthzBindingWriterService {
       ),
     ];
     if (roleIds.length === 0) {
-      return;
+      return new Map();
     }
 
     const roles = await this.options.bindings.findAssignableRoles({
       organizationId,
       roleIds,
     });
-    const rolesById = new Map(roles.map((role) => [role.id, role]));
+    const rolesById = new Map(
+      roles.map((role) => [
+        role.id,
+        Array.isArray(role.permissions)
+          ? role.permissions.filter(
+              (permission): permission is string => typeof permission === "string",
+            )
+          : [],
+      ]),
+    );
     const missingRoleId = roleIds.find((roleId) => !rolesById.has(roleId));
     if (missingRoleId) {
       throw new CustomRoleNotAssignableError(missingRoleId);
@@ -391,6 +451,70 @@ export class AuthzBindingWriterService {
 
     for (const binding of customBindings) {
       assertScopeCanGrantRole({ binding, rolesById });
+    }
+
+    return rolesById;
+  }
+
+  /** Every door's one escalation check: a binding never confers what the caller lacks there. */
+  private async assertWithinCaller({
+    organizationId,
+    caller,
+    bindings,
+    rolesById,
+  }: {
+    organizationId: string;
+    caller: AuthzPrincipalRef;
+    bindings: readonly AuthzBindingWrite[];
+    rolesById: ReadonlyMap<string, readonly string[]>;
+  }): Promise<void> {
+    for (const binding of bindings) {
+      const missing = await this.options.permissions.findPermissionsBeyondCaller({
+        organizationId,
+        caller,
+        scope: { type: WIRE_SCOPE[binding.scopeType], id: binding.scopeId },
+        permissions: [
+          ...permissionsConferred({
+            role: binding.role,
+            scopeType: binding.scopeType,
+            customPermissions: rolesById.get(binding.customRoleId ?? "") ?? [],
+          }),
+        ],
+      });
+      if (missing.length > 0) throw new GrantExceedsCallerPermissionsError(missing);
+    }
+  }
+
+  // ponytail: counts through the full listing; a count query when organisations near the cap.
+  private async assertUnderGrantLimit({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
+    const rows = await this.options.permissions.listManagedBindingsForOrganization({
+      organizationId,
+    });
+    if (isGrantLimitReached({ existing: rows.length })) {
+      throw new GrantLimitReachedError(GRANT_LIMIT_PER_ORGANIZATION);
+    }
+  }
+
+  private async assertNotLastAdmin({
+    organizationId,
+    bindingId,
+    refusal,
+  }: {
+    organizationId: string;
+    bindingId: string;
+    refusal: () => Error;
+  }): Promise<void> {
+    const rows = await this.options.permissions.listManagedBindingsForOrganization({
+      organizationId,
+    });
+    if (
+      isLastOrganizationAdmin({ rows, grantId: bindingId, nowMs: nowInstant().epochMilliseconds })
+    ) {
+      throw refusal();
     }
   }
 

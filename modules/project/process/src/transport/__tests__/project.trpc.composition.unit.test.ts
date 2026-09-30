@@ -8,6 +8,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { LangyApi } from "@langwatch/langy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -152,6 +153,7 @@ function application(
       trace: createApiFixture<TraceApi>({}, "trace"),
       auditLog: createApiFixture<AuditLogApi>({}, "auditLog"),
       langy: createApiFixture<LangyApi>({}, "langy"),
+      dataPrivacy: createApiFixture<DataPrivacyApi>({}, "dataPrivacy"),
     },
     repositories: { projects: MemoryProjectRepository.create({ memory: database }) },
     members: {

@@ -247,7 +247,8 @@ function buildSimulationProcessingProducerPipeline(input: {
           Promise.reject(producerOnly(processName, "list an organization's projects")),
       },
       simulations: {
-        countUsage: () => Promise.reject(producerOnly(processName, "count an organization's runs")),
+        countOrganizationRuns: () =>
+          Promise.reject(producerOnly(processName, "count an organization's runs")),
       },
       nurturing: {
         recordSignal: () =>

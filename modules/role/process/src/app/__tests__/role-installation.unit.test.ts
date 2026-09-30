@@ -46,9 +46,9 @@ describe("role app installation", () => {
       const app = runtime.service(RoleApi);
 
       expect(runtime.module(roleServer).provided).toBe(app);
-      await expect(app.listRoles({ organizationId: ORGANIZATION_ID })).resolves.toMatchObject([
-        { id: "role-1", name: "Auditor", kind: "custom" },
-      ]);
+      await expect(
+        app.listRoles({ organizationId: ORGANIZATION_ID, builtIn: false }),
+      ).resolves.toMatchObject([{ id: "role-1", name: "Auditor", kind: "custom" }]);
     } finally {
       await runtime.stop();
     }

@@ -5953,9 +5953,15 @@ importers:
 
   modules/authz/browser-kit:
     dependencies:
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -11572,6 +11578,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../auth/contract
+      '@langwatch/authz-browser-kit':
+        specifier: workspace:*
+        version: link:../../authz/browser-kit
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -12235,6 +12244,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../data-privacy/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -12272,6 +12284,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/data-privacy-contract':
+        specifier: workspace:*
+        version: link:../../data-privacy/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

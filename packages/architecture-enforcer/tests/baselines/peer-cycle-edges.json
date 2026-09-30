@@ -256,6 +256,7 @@
     "presence -> user": 1,
     "project -> api-key": 1,
     "project -> audit-log": 1,
+    "project -> data-privacy": 1,
     "project -> langy": 1,
     "project -> organization": 1,
     "project -> share": 1,

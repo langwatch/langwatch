@@ -8,6 +8,10 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type {
+  DataPrivacyApi,
+  DataPrivacyPiiRedactionLevel,
+} from "@langwatch/data-privacy-contract";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { LangyApi } from "@langwatch/langy-contract";
 import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
@@ -146,8 +150,16 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
     },
   });
 
+  let piiRedactionLevel: DataPrivacyPiiRedactionLevel = "ESSENTIAL";
+  const dataPrivacy = createApiFixture<DataPrivacyApi>({
+    getPiiRedactionLevel: async () => piiRedactionLevel,
+    setPiiRedactionLevel: async ({ level }) => {
+      piiRedactionLevel = level;
+    },
+  });
+
   const app = ProjectApp.create({
-    dependencies: { apiKeys, ...unreachablePeers(), organizations },
+    dependencies: { apiKeys, ...unreachablePeers(), organizations, dataPrivacy },
     repositories: {
       projects: MemoryProjectRepository.create({ memory: database }),
     },
@@ -210,6 +222,15 @@ describe("the projects REST family over the application the composition builds",
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toMatchObject({ id: "project_1" });
+    });
+
+    /** @scenario "Reading a project answers its PII redaction level" */
+    it("answers the level data privacy holds for the project", async () => {
+      const { send } = mountProjectRestApplication(application().app);
+
+      const response = await send("/api/projects/project_1");
+
+      await expect(response.json()).resolves.toMatchObject({ piiRedactionLevel: "ESSENTIAL" });
     });
 
     it("answers 404 for a project in another organization", async () => {
@@ -277,6 +298,25 @@ describe("the projects REST family over the application the composition builds",
 
       expect(response.status).toBe(200);
       expect(database.findProject("project_1")?.name).toBe("Renamed Project");
+    });
+
+    /** @scenario "Updating a project's PII redaction level writes it through data privacy" */
+    it("writes the level through data privacy and reads it back", async () => {
+      const { send } = mountProjectRestApplication(application().app);
+
+      const patched = await send("/api/projects/project_1", {
+        method: "PATCH",
+        body: { name: "Renamed Project", piiRedactionLevel: "STRICT" },
+      });
+
+      expect(patched.status).toBe(200);
+      await expect(patched.json()).resolves.toMatchObject({
+        name: "Renamed Project",
+        piiRedactionLevel: "STRICT",
+      });
+      await expect((await send("/api/projects/project_1")).json()).resolves.toMatchObject({
+        piiRedactionLevel: "STRICT",
+      });
     });
 
     /**

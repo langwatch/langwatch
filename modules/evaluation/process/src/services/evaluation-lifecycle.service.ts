@@ -12,7 +12,7 @@ const logger = createLogger("langwatch:evaluation:lifecycle");
 
 export type EvaluationLifecycleDeps = Readonly<{
   projects: Pick<ProjectApi, "resolveOrgAdmin" | "listIdsByOrganization">;
-  runs: Pick<EvaluationRunRepository, "countRuns">;
+  runs: Pick<EvaluationRunRepository, "countOrganizationRuns">;
 }>;
 
 /**
@@ -62,10 +62,9 @@ export class EvaluationLifecycleService {
     if (!userId || !organizationId) return;
 
     const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
-    const counts = await Promise.all(
-      projectIds.map((tenantId) => this.deps.runs.countRuns({ tenantId })),
-    );
-    const organizationEvaluationCount = counts.reduce((total, count) => total + count, 0);
+    const organizationEvaluationCount = await this.deps.runs.countOrganizationRuns({
+      tenantIds: projectIds,
+    });
     if (organizationEvaluationCount < 1) return;
 
     await this.#senders().recordEvaluationLifecycleCompleted.send({
