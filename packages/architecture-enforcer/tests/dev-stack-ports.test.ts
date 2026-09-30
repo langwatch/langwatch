@@ -160,7 +160,7 @@ describe("given a dev launcher deriving its ports from PORT", () => {
     /** @scenario "The browser application's api proxy follows the derived api port" */
     it("points the ui's api proxy at the derived api port", { timeout: 90_000 }, () => {
       const { env } = launchWithStubbedPnpm({
-        extraEnv: { LANGWATCH_API_URL: "http://localhost:5560" },
+        extraEnv: { LANGWATCH_API_URL: "http://localhost:5560", LANGWATCH_DEV_HTTP2: "0" },
       });
 
       expect(env.LANGWATCH_API_URL).toBe(`http://localhost:${SLOT + 1000}`);

@@ -56,3 +56,25 @@ describe("given the page is opened with a flag override in its address", () => {
     });
   });
 });
+
+describe("given another tab of this browser changes an override", () => {
+  beforeEach(() => clearAllFeatureFlagOverrides());
+
+  describe("when the storage event reaches this tab", () => {
+    it("reads the new answer", () => {
+      const { result } = renderHook(() => useFeatureFlagOverrides());
+
+      act(() => {
+        localStorage.setItem(
+          "langwatch:dev:feature-flag-overrides",
+          JSON.stringify({ [FLAG]: true }),
+        );
+        window.dispatchEvent(
+          new StorageEvent("storage", { key: "langwatch:dev:feature-flag-overrides" }),
+        );
+      });
+
+      expect(result.current[FLAG]).toBe(true);
+    });
+  });
+});

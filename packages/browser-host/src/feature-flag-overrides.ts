@@ -17,6 +17,7 @@ function notifyListeners(): void {
   for (const listener of listeners) listener();
 }
 
+/** Every flag this browser answered, ignoring unknown flags and non-boolean values. */
 export function readFeatureFlagOverrides(): FeatureFlagOverrides {
   if (typeof window === "undefined") return {};
   try {
@@ -50,16 +51,7 @@ function writeOverrides(overrides: FeatureFlagOverrides): void {
   notifyListeners();
 }
 
-export function setFeatureFlagOverride(
-  flag: FrontendFeatureFlag,
-  value: boolean | undefined,
-): void {
-  const next = { ...readFeatureFlagOverrides() };
-  if (value === undefined) delete next[flag];
-  else next[flag] = value;
-  writeOverrides(next);
-}
-
+/** Forgets every answer this browser set, so the deployment decides each flag again. */
 export function clearAllFeatureFlagOverrides(): void {
   writeOverrides({});
 }
