@@ -18,9 +18,14 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "~/server/app-layer/identity/admission-audit";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
+  holdsOrganizationBinding,
   holdsSharedAccess,
   ORGANIZATION_TO_TEAM_ROLE_MAP,
 } from "~/utils/memberRoleConstraints";
@@ -1621,6 +1626,32 @@ export class InviteService {
   }
 
   /**
+   * A Developer admission has no grant to reach the audit page through
+   * (ADR-143), so the row itself is audited, as the join paths do.
+   */
+  private async auditDeveloperAdmission({
+    userId,
+    invite,
+  }: {
+    userId: string;
+    invite: OrganizationInvite;
+  }): Promise<void> {
+    await this.prisma.auditLog.create({
+      data: {
+        action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+        userId,
+        actorUserId: invite.requestedBy ?? null,
+        organizationId: invite.organizationId,
+        metadata: {
+          seat: OrganizationUserRole.DEVELOPER,
+          inviteId: invite.id,
+          via: "invite" satisfies DeveloperAdmissionVia,
+        },
+      },
+    });
+  }
+
+  /**
    * The grant tail of `applyInvite`: the ORGANIZATION-scoped grant (skipped
    * for EXTERNAL) and each team's grant. Idempotent (revoke-then-attach,
    * duplicates skipped), so both the fresh-accept caller and the retry-repair
@@ -1644,12 +1675,13 @@ export class InviteService {
       fallback: "inviteService",
     });
 
+    if (invite.role === OrganizationUserRole.DEVELOPER) {
+      await this.auditDeveloperAdmission({ userId, invite });
+    }
+
     // No ORGANIZATION-scoped grant for a Lite Member (access comes from
     // their teams) nor for a Developer (ADR-143: personal team only).
-    if (
-      invite.role !== OrganizationUserRole.EXTERNAL &&
-      holdsSharedAccess(invite.role)
-    ) {
+    if (holdsOrganizationBinding(invite.role)) {
       await writer.revokeBindingsWhere({
         organizationId: invite.organizationId,
         where: {

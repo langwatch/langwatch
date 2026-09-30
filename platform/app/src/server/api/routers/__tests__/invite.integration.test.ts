@@ -466,6 +466,51 @@ describe("Invite router integration", () => {
       });
     });
 
+    describe("when a Developer invitation is accepted (ADR-143)", () => {
+      /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+      it("admits them on the seat with no organisation binding and an audit row", async () => {
+        const email = `invitee-${testNamespace}-developer@acme.com`;
+        const invite = await createPendingInvite(email, {
+          role: OrganizationUserRole.DEVELOPER,
+          teamIds: "",
+          requestedBy: adminUserId,
+        });
+        const { user, caller } = await createInvitee(email);
+
+        await caller.invite.acceptInvite({ inviteCode: invite.inviteCode });
+
+        const membership = await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: { userId: user.id, organizationId },
+          },
+        });
+        expect(membership?.role).toBe(OrganizationUserRole.DEVELOPER);
+        await expect(
+          prisma.roleBinding.count({
+            where: {
+              userId: user.id,
+              organizationId,
+              scopeType: RoleBindingScopeType.ORGANIZATION,
+            },
+          }),
+        ).resolves.toBe(0);
+        const audit = await prisma.auditLog.findFirst({
+          where: {
+            organizationId,
+            userId: user.id,
+            action: "organization.member.admitted",
+          },
+        });
+        expect(audit).toMatchObject({
+          actorUserId: adminUserId,
+          metadata: { seat: "DEVELOPER", via: "invite", inviteId: invite.id },
+        });
+        await prisma.auditLog.deleteMany({
+          where: { organizationId, userId: user.id },
+        });
+      });
+    });
+
     describe("when the organisation's joiner seat is Developer (ADR-143)", () => {
       beforeEach(async () => {
         await prisma.organization.update({
