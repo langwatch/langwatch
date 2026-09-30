@@ -16,3 +16,9 @@ Feature: HTTP tests use the owning execution and trace APIs
     When Agent records a captured HTTP test span through TraceApi
     Then one OTLP command preserves its tenant, span identifiers and time units
     And the command retains the agent-test metadata and attributed user
+
+  @unit
+  Scenario: An HTTP agent's dev tunnel marker keeps its heartbeat
+    Given an HTTP agent config whose devTunnel carries previousUrl, connectedAt and heartbeatAt
+    When the config is parsed by the HTTP agent schema
+    Then the parsed devTunnel still carries heartbeatAt

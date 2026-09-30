@@ -40,6 +40,7 @@ export const httpAgentConfigSchema = z.object({
     .object({
       previousUrl: z.string().optional(),
       connectedAt: z.string().optional(),
+      heartbeatAt: z.string().optional(),
     })
     .optional(),
 });
