@@ -12,7 +12,7 @@ import (
 func TestWriteConfig(t *testing.T) {
 	newServer := func(t *testing.T) *Server {
 		t.Helper()
-		return &Server{home: t.TempDir(), limits: domain.DefaultClickHouseLimits()}
+		return &Server{home: t.TempDir(), limits: domain.DefaultClickHouseLimits(0)}
 	}
 
 	t.Run("given no config on disk", func(t *testing.T) {

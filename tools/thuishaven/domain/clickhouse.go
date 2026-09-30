@@ -118,13 +118,14 @@ var KeptSystemLogs = []string{
 // room before the container's hard limit bites), a modest 64MiB mark cache, and
 // — set directly in the config template, not here — uncompressed/mmap/compiled-
 // expression caches all zeroed, since none of them pull their weight at this
-// scale and idle RSS is the whole point.
-func DefaultClickHouseLimits() ClickHouseLimits {
-	const containerMB = 1536 // 1.5 GiB
+// scale and idle RSS is the whole point. The container gets 3/64 of the
+// machine's RAM (3 GiB on 64 GiB), between 1.5 and 4 GiB.
+func DefaultClickHouseLimits(totalRAMBytes uint64) ClickHouseLimits {
+	containerMB := clampInt(int(totalRAMBytes>>20)*3/64, 1536, 4096)
 	return ClickHouseLimits{
 		ContainerMemoryMB:      containerMB,
-		MaxServerMemory:        int64(containerMB) * 9 / 10 * (1 << 20), // 1.35 GiB
-		MarkCacheSize:          64 << 20,                                // 64 MiB
+		MaxServerMemory:        int64(containerMB) * 9 / 10 * (1 << 20),
+		MarkCacheSize:          64 << 20, // 64 MiB
 		LightweightLogsEnabled: true,
 		SystemLogTTLDays:       DefaultSystemLogTTLDays,
 	}

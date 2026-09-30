@@ -205,7 +205,7 @@ func TestOverlayExportsClickHouseConcurrencyCapWhenManaged(t *testing.T) {
 	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES"); got != want {
 		t.Errorf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES = %q, want %q (the cap haven renders)", got, want)
 	}
-	if !strings.Contains(RenderClickHouseConfig(DefaultClickHouseLimits()), "<max_concurrent_queries>"+want+"</max_concurrent_queries>") {
+	if !strings.Contains(RenderClickHouseConfig(DefaultClickHouseLimits(0)), "<max_concurrent_queries>"+want+"</max_concurrent_queries>") {
 		t.Errorf("the exported cap must be the one rendered into the server's config")
 	}
 }

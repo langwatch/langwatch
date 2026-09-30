@@ -9,7 +9,7 @@ import (
 // @scenario "The managed ClickHouse keeps its own telemetry lightweight"
 func TestRenderClickHouseConfig(t *testing.T) {
 	t.Run("given the default limits", func(t *testing.T) {
-		cfg := RenderClickHouseConfig(DefaultClickHouseLimits())
+		cfg := RenderClickHouseConfig(DefaultClickHouseLimits(0))
 
 		t.Run("when rendering the config", func(t *testing.T) {
 			t.Run("disables every noisy system log", func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestRenderClickHouseConfig(t *testing.T) {
 	})
 
 	t.Run("given a custom TTL", func(t *testing.T) {
-		l := DefaultClickHouseLimits()
+		l := DefaultClickHouseLimits(0)
 		l.SystemLogTTLDays = 2
 
 		t.Run("when rendering the config", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestRenderClickHouseConfig(t *testing.T) {
 	})
 
 	t.Run("given a non-positive TTL", func(t *testing.T) {
-		l := DefaultClickHouseLimits()
+		l := DefaultClickHouseLimits(0)
 		l.SystemLogTTLDays = 0
 
 		t.Run("when rendering the config", func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestRenderClickHouseConfig(t *testing.T) {
 	})
 
 	t.Run("given full logs are requested", func(t *testing.T) {
-		l := DefaultClickHouseLimits()
+		l := DefaultClickHouseLimits(0)
 		l.LightweightLogsEnabled = false
 
 		t.Run("when rendering the config", func(t *testing.T) {
@@ -112,12 +112,12 @@ func TestRenderClickHouseConfig(t *testing.T) {
 
 // @scenario "The managed ClickHouse bounds its background work"
 func TestRenderClickHouseConfigBoundsBackgroundWork(t *testing.T) {
-	cfg := RenderClickHouseConfig(DefaultClickHouseLimits())
+	cfg := RenderClickHouseConfig(DefaultClickHouseLimits(0))
 
 	t.Run("when rendering the config", func(t *testing.T) {
 		t.Run("bounds background pools to the small VM it shares", func(t *testing.T) {
 			for _, want := range []string{
-				"<max_concurrent_queries>32</max_concurrent_queries>",
+				"<max_concurrent_queries>100</max_concurrent_queries>",
 				"<background_pool_size>8</background_pool_size>",
 				"<background_schedule_pool_size>64</background_schedule_pool_size>",
 			} {
@@ -150,7 +150,7 @@ func TestRenderClickHouseConfigBoundsBackgroundWork(t *testing.T) {
 // @scenario "The managed ClickHouse keeps its own telemetry lightweight"
 func TestSystemLogRetrofitStatements(t *testing.T) {
 	t.Run("given the default limits", func(t *testing.T) {
-		stmts := SystemLogRetrofitStatements(DefaultClickHouseLimits())
+		stmts := SystemLogRetrofitStatements(DefaultClickHouseLimits(0))
 
 		t.Run("when building the retrofit statements", func(t *testing.T) {
 			t.Run("drops every noisy system log", func(t *testing.T) {
@@ -174,7 +174,7 @@ func TestSystemLogRetrofitStatements(t *testing.T) {
 	})
 
 	t.Run("given full logs are requested", func(t *testing.T) {
-		l := DefaultClickHouseLimits()
+		l := DefaultClickHouseLimits(0)
 		l.LightweightLogsEnabled = false
 
 		t.Run("when building the retrofit statements", func(t *testing.T) {
@@ -187,7 +187,7 @@ func TestSystemLogRetrofitStatements(t *testing.T) {
 	})
 
 	t.Run("given a non-positive TTL", func(t *testing.T) {
-		l := DefaultClickHouseLimits()
+		l := DefaultClickHouseLimits(0)
 		l.SystemLogTTLDays = 0
 
 		t.Run("when resolving the effective TTL", func(t *testing.T) {
@@ -198,4 +198,16 @@ func TestSystemLogRetrofitStatements(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestDefaultClickHouseLimitsScaleWithRAMWithinBounds(t *testing.T) {
+	gib := uint64(1) << 30
+	for _, c := range []struct {
+		ram  uint64
+		want int
+	}{{0, 1536}, {16 * gib, 1536}, {64 * gib, 3072}, {256 * gib, 4096}} {
+		if got := DefaultClickHouseLimits(c.ram).ContainerMemoryMB; got != c.want {
+			t.Errorf("%d GiB: got %d MB, want %d", c.ram/gib, got, c.want)
+		}
+	}
 }

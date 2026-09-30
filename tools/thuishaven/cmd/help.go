@@ -175,7 +175,7 @@ var envHelpText = `Environment variables.
   ClickHouse
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).
     LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH container when no stacks run.
-    LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 1536).
+    LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 3/64 of RAM, 1536-4096).
     HAVEN_CH_IMAGE=<image>       Override the pinned Altinity ClickHouse image.
     HAVEN_CLICKHOUSE_FULL_LOGS=1 Keep ClickHouse's stock logging. By default
                                  haven disables the high-volume system logs

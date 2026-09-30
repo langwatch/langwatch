@@ -348,10 +348,10 @@ func observabilityEndpoints() domain.ObservabilityEndpoints {
 	return e
 }
 
-// clickHouseLimits applies the proven-in-production memory tuning, with the
-// container ceiling overridable for a machine that needs more (or less).
+// clickHouseLimits applies the proven-in-production memory tuning, sized to this
+// machine's RAM, with the container ceiling overridable by env.
 func clickHouseLimits() domain.ClickHouseLimits {
-	l := domain.DefaultClickHouseLimits()
+	l := domain.DefaultClickHouseLimits(system.New().TotalMemory())
 	if mb := envInt("LANGWATCH_HAVEN_CH_MEMORY_MB", 0); mb > 0 {
 		l.ContainerMemoryMB = mb
 		l.MaxServerMemory = int64(mb) * 9 / 10 * (1 << 20)
