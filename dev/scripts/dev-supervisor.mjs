@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Tears down detached dev stacks when their launcher dies; `--watch` debounces
- * restarts and collapses crash output while preserving full traces in a log.
+ * restarts (one at a time, held while an agent works, see ADR-168) and collapses
+ * crash output while preserving full traces in a log.
  */
 
 import { spawn, spawnSync } from "node:child_process";
@@ -23,11 +24,19 @@ const SENTINEL_FLAG = "--sentinel";
 /** Opts a command into debounced watch-and-restart instead of a one-shot run. */
 const WATCH_FLAG = "--watch";
 /**
- * 750 ms: an agent write storm lands hundreds of files over several seconds
- * with gaps, so a shorter window means a restart per gap. Matches the Go
- * lane's rebuild delay (`service-watch`) so the two halves stay in sync.
+ * Quiet window before a restart. An agent writes one file per tool call, seconds
+ * apart, so 750 ms saw every edit as its own burst (ADR-168): 2 s coalesces a
+ * turn's edits. `LANGWATCH_DEV_WATCH_DEBOUNCE_MS` overrides it.
  */
-const DEFAULT_WATCH_DEBOUNCE_MS = 750;
+const DEFAULT_WATCH_DEBOUNCE_MS = 2_000;
+/** A restart is never put off longer than this after the first unhandled change. */
+const DEFAULT_WATCH_MAX_WAIT_MS = 30_000;
+/** A boot that never says it is ready settles anyway after this (cold start p90 is 24 s). */
+const DEFAULT_BOOT_SETTLE_MS = 30_000;
+/** The agent-turn hold (`.haven-hmr-gate`) defers a restart at most this long. */
+const MAX_HOLD_MS = 60_000;
+/** How often a held restart looks at whether the hold was released. */
+const HOLD_POLL_MS = 500;
 /** Default watch roots, relative to cwd: the package's own source, plus every
  * workspace package (architecture-enforcer already forbids api/worker code from
  * reaching a web/ui package, so this needs no per-app allowlist). */
@@ -64,6 +73,9 @@ const WATCH_IGNORE_PATTERNS = [
   // and on a shared checkout it lets one session's screen work bounce
   // another's backend. specs/setup/dev-process-topology.feature.
   /(^|\/)modules\/[^/]+\/browser(-kit)?(\/|$)/,
+  // Prose and specs: no backend process ever loads them.
+  /\.(md|mdx|feature)$/,
+  /(^|\/)tsconfig[^/]*\.json$/,
 ];
 /** The pipe the sentinel reports the stack's pid, then its exit code, on. */
 const HANDSHAKE_FD = 3;
@@ -146,7 +158,15 @@ async function main(argv, env, { buildBundle } = {}) {
 /** Whether a changed path is churn nobody should restart for. */
 export function shouldIgnoreWatchPath(relativePath) {
   const normalized = relativePath.split(path.sep).join("/");
+  if (isConfigJson(normalized)) return true;
   return WATCH_IGNORE_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+/** A `.json` outside a `src/` tree that is not a package.json: tool config, never imported. */
+function isConfigJson(normalized) {
+  if (!normalized.endsWith(".json")) return false;
+  if (normalized.endsWith("package.json")) return false;
+  return !/(^|\/)src\//.test(normalized);
 }
 
 /** The watch roots and quiet window, from the environment (or its defaults). */
@@ -166,6 +186,12 @@ export function resolveWatchConfig(env) {
     enabled: !["0", "false", "off"].includes(watch),
     dirs,
     debounceMs: positiveInt(env.LANGWATCH_DEV_WATCH_DEBOUNCE_MS, DEFAULT_WATCH_DEBOUNCE_MS),
+    maxWaitMs: positiveInt(env.LANGWATCH_DEV_WATCH_MAX_WAIT_MS, DEFAULT_WATCH_MAX_WAIT_MS),
+    bootSettleMs: positiveInt(env.LANGWATCH_DEV_BOOT_SETTLE_MS, DEFAULT_BOOT_SETTLE_MS),
+    readyPattern: (env.LANGWATCH_DEV_READY_PATTERN ?? "").trim(),
+    holdMarker:
+      (env.LANGWATCH_DEV_HOLD_MARKER ?? "").trim() ||
+      path.join(REPO_ROOT, "apps", "ui", ".haven-hmr-gate"),
   };
 }
 
@@ -379,13 +405,15 @@ export function crashRecordLine(classified) {
  * otherwise a `stack`-carrying record collapses to one line (full text kept
  * in the crash log) and everything else passes through untouched.
  */
-function wireStdout(stream, { raw, crashLog }) {
+function wireStdout(stream, { raw, crashLog, onLine }) {
   if (raw) {
     stream.pipe(process.stdout);
+    if (onLine) stream.on("data", (chunk) => onLine(String(chunk)));
     return;
   }
   const reader = createInterface({ input: stream, crlfDelay: Infinity });
   reader.on("line", (line) => {
+    onLine?.(line);
     const collapsed = collapseStackRecord(line);
     if (collapsed) {
       process.stdout.write(`${collapsed.collapsed}\n`);
@@ -448,30 +476,162 @@ function wireStderr(stream, { raw, crashLog, quietMs = 150 }) {
 }
 
 /**
- * Coalesces file-change notifications into one `onFire` call after
- * `debounceMs` of quiet, reporting every file that contributed, not just
- * the last one.
+ * Coalesces changes into one `onFire` after `debounceMs` of quiet, naming every
+ * file. `maxWaitMs` bounds the wait from the first change so a trickle cannot
+ * starve it; `holdMs()` (an agent mid-turn) defers it, at most `holdCapMs`.
  */
-export function createDebouncer({ debounceMs, onFire }) {
+export function createDebouncer({
+  debounceMs,
+  maxWaitMs = Number.POSITIVE_INFINITY,
+  holdMs = () => 0,
+  holdCapMs = MAX_HOLD_MS,
+  holdPollMs = HOLD_POLL_MS,
+  onFire,
+}) {
   let timer = null;
+  let firstAt = 0;
+  let heldSince = 0;
   const pending = new Set();
-  const note = (file) => {
-    pending.add(file);
+  const arm = (ms) => {
     if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      timer = null;
-      const files = [...pending];
-      pending.clear();
-      onFire(files);
-    }, debounceMs);
+    timer = setTimeout(fire, Math.max(0, ms));
     timer.unref?.();
+  };
+  function fire() {
+    timer = null;
+    const hold = holdMs();
+    if (hold > 0) {
+      heldSince ||= Date.now();
+      const left = holdCapMs - (Date.now() - heldSince);
+      if (left > 0) return arm(Math.min(hold, holdPollMs, left));
+    }
+    heldSince = 0;
+    const files = [...pending];
+    pending.clear();
+    onFire(files);
+  }
+  const note = (file) => {
+    if (pending.size === 0) firstAt = Date.now();
+    pending.add(file);
+    arm(Math.min(debounceMs, firstAt + maxWaitMs - Date.now()));
   };
   const cancel = () => {
     if (timer) clearTimeout(timer);
     timer = null;
+    heldSince = 0;
     pending.clear();
   };
   return { note, cancel };
+}
+
+/**
+ * One reload at a time. A request during a run is queued, merged with any
+ * others, and answered by exactly one follow-up run once the current one ends.
+ */
+export function createReloadQueue({ run }) {
+  let running = false;
+  let queued = null;
+  const request = async (files) => {
+    if (running) {
+      queued ??= new Set();
+      for (const file of files) queued.add(file);
+      return;
+    }
+    running = true;
+    try {
+      for (let batch = files; batch; batch = takeQueued()) await run(batch);
+    } finally {
+      running = false;
+    }
+  };
+  const takeQueued = () => {
+    const next = queued === null ? null : [...queued];
+    queued = null;
+    return next;
+  };
+  return { request, isBusy: () => running };
+}
+
+/** Milliseconds the agent-turn marker still holds a restart: 0 when absent, stale or unreadable. */
+export function holdRemainingMs({ marker, now = Date.now() }) {
+  try {
+    const expiry = Number(fs.readFileSync(marker, "utf8").trim());
+    return Number.isFinite(expiry) ? Math.min(Math.max(expiry - now, 0), MAX_HOLD_MS) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Where workspace packages live, for resolving a dependency to its directory. */
+const WORKSPACE_ROOTS = ["apps", "tools", "packages", "modules", "enterprise"];
+/** Directories never worth descending into while looking for package.json files. */
+const PACKAGE_SCAN_SKIP = new Set(["src", "node_modules", "dist", "generated", "__tests__"]);
+
+/** Records `dir`'s package.json in `byName`; a half-written one is skipped. */
+function recordPackage({ dir, byName }) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
+    if (typeof pkg.name === "string") byName.set(pkg.name, { dir, pkg });
+  } catch {
+    // Not a package, or one mid-write: nothing to record.
+  }
+}
+
+const isScannable = (entry) =>
+  entry.isDirectory() && !entry.name.startsWith(".") && !PACKAGE_SCAN_SKIP.has(entry.name);
+
+/** Every workspace package under `roots`, by name: `{ dir, pkg }`. */
+function scanWorkspacePackages({ roots, depth = 4 }) {
+  const byName = new Map();
+  const visit = (dir, left) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    if (entries.some((e) => e.isFile() && e.name === "package.json"))
+      recordPackage({ dir, byName });
+    if (left === 0) return;
+    for (const entry of entries.filter(isScannable)) visit(path.join(dir, entry.name), left - 1);
+  };
+  for (const root of roots) visit(root, depth);
+  return byName;
+}
+
+/**
+ * The workspace packages the command can load: its own and its dependencies,
+ * transitively (pnpm resolves declared ones only). A file in no known package
+ * is never filtered: guessing wrong there hides a real change.
+ */
+export function createBackendFilter({ cwd, roots }) {
+  const byName = scanWorkspacePackages({ roots });
+  let own = null;
+  try {
+    own = JSON.parse(fs.readFileSync(path.join(cwd, "package.json"), "utf8"));
+  } catch {
+    return { isOutsideBackend: () => false };
+  }
+  byName.set(own.name, { dir: cwd, pkg: own });
+  const loadable = new Set();
+  const queue = [own.name];
+  while (queue.length > 0) {
+    const name = queue.pop();
+    if (loadable.has(name)) continue;
+    loadable.add(name);
+    const { pkg } = byName.get(name) ?? { pkg: {} };
+    const deps = { ...pkg.dependencies, ...pkg.optionalDependencies };
+    if (name === own.name) Object.assign(deps, pkg.devDependencies);
+    for (const dep of Object.keys(deps)) if (byName.has(dep)) queue.push(dep);
+  }
+  const owners = [...byName.entries()].toSorted((x, y) => y[1].dir.length - x[1].dir.length);
+  const isOutsideBackend = (absPath) => {
+    const owner = owners.find(
+      ([, { dir }]) => absPath === dir || absPath.startsWith(dir + path.sep),
+    );
+    return owner !== undefined && !loadable.has(owner[0]);
+  };
+  return { isOutsideBackend, loadable };
 }
 
 /**
@@ -479,7 +639,7 @@ export function createDebouncer({ debounceMs, onFire }) {
  * unwatchable directory is skipped with a warning, never a gate — the
  * command still runs, just without live reload for that path.
  */
-function watchDirs(dirs, debouncer) {
+function watchDirs({ dirs, debouncer, filter }) {
   const watchers = [];
   for (const dir of dirs) {
     const abs = path.resolve(process.cwd(), dir);
@@ -489,6 +649,7 @@ function watchDirs(dirs, debouncer) {
         if (!filename) return;
         const rel = path.join(dir, filename);
         if (shouldIgnoreWatchPath(rel)) return;
+        if (filter.isOutsideBackend(path.join(abs, filename))) return;
         debouncer.note(rel);
       });
       watchers.push(watcher);
@@ -515,10 +676,9 @@ async function runWatchSupervisor(rawArgv, env, buildBundle) {
   return new WatchSupervisor(argv, env, buildBundle).run();
 }
 
-/** One watched command: its current child, its restarts and its exit. */
+/** One watched command: its current child, its reloads and its exit. */
 class WatchSupervisor {
-  child = null;
-  restarting = false;
+  handle = null;
   settledCode = 0;
   finished = false;
   watchers = [];
@@ -527,28 +687,44 @@ class WatchSupervisor {
     this.argv = argv;
     this.env = env;
     this.buildBundle = buildBundle;
-    const { dirs, debounceMs } = resolveWatchConfig(env);
-    this.dirs = dirs;
+    const config = resolveWatchConfig(env);
+    this.config = config;
     this.graceMs = positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS);
     this.bundle = resolveBundleConfig(env);
-    this.crashOptions = { raw: rawCrashEnabled(env), crashLog: crashLogPath(env) };
+    this.ready = config.readyPattern === "" ? null : new RegExp(config.readyPattern);
+    this.crashOptions = {
+      raw: rawCrashEnabled(env),
+      crashLog: crashLogPath(env),
+      onLine: (text) => this.noteOutput(text),
+    };
     this.exited = new Promise((resolve) => {
       this.resolveExit = resolve;
     });
-    this.debouncer = createDebouncer({ debounceMs, onFire: (files) => this.onChange(files) });
+    this.queue = createReloadQueue({ run: (files) => this.reload(files) });
+    this.debouncer = createDebouncer({
+      debounceMs: config.debounceMs,
+      maxWaitMs: config.maxWaitMs,
+      holdMs: () => holdRemainingMs({ marker: config.holdMarker }),
+      onFire: (files) => void this.queue.request(files),
+    });
   }
 
   async run() {
-    this.watchers = watchDirs(this.dirs, this.debouncer);
+    const watched = this.config.dirs.map((d) => path.resolve(process.cwd(), d));
+    const roots = [
+      ...new Set([...watched, ...WORKSPACE_ROOTS.map((d) => path.join(REPO_ROOT, d))]),
+    ];
+    const filter = createBackendFilter({ cwd: process.cwd(), roots });
+    this.watchers = watchDirs({ dirs: this.config.dirs, debouncer: this.debouncer, filter });
     const firstBuild = await this.rebuild();
     if (!firstBuild.ok) {
       for (const w of this.watchers) w.close();
       return 1;
     }
-    if (!this.spawnOne()) return 127;
     for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       process.on(signal, () => this.onSignal());
     }
+    void this.queue.request([]); // the first boot is a reload too: a change during it queues
     return await this.exited;
   }
 
@@ -572,18 +748,47 @@ class WatchSupervisor {
     return result;
   }
 
+  /** Starts a child and its boot: `settled` resolves when it is ready, dead or out of time. */
   spawnOne() {
-    this.child = startChild(this.argv, this.env, false, { captureIO: true });
-    const { child } = this;
+    const child = startChild(this.argv, this.env, false, { captureIO: true });
     if (child === null) return false;
+    let settle = () => {};
+    const settled = new Promise((resolve) => {
+      settle = resolve;
+    });
+    const timer = setTimeout(settle, this.config.bootSettleMs);
+    timer.unref?.();
+    const handle = { child, stopping: false, settle, settled };
+    this.handle = handle;
     if (child.stdout) wireStdout(child.stdout, this.crashOptions);
     if (child.stderr) wireStderr(child.stderr, this.crashOptions);
     child.on("close", (code, signal) => {
-      if (this.restarting) return; // this exit was ours; the restart owns what happens next
-      this.settledCode = exitCodeFor({ code, signal });
-      this.finish();
+      clearTimeout(timer);
+      settle();
+      if (handle.stopping || this.handle !== handle) return; // ours; the reload owns what follows
+      this.onExit({ code, signal });
     });
     return true;
+  }
+
+  /** A line of the current child's output: the ready pattern ends its boot. */
+  noteOutput(text) {
+    if (this.ready !== null && this.handle !== null && this.ready.test(text)) this.handle.settle();
+  }
+
+  /**
+   * A non-zero exit is a crash: say so once and wait for the next change, since
+   * exiting would end the lane. A signal, a clean exit, or a crash with nothing
+   * watched ends us instead.
+   */
+  onExit({ code, signal }) {
+    if (signal !== null || code === 0 || code === null || this.watchers.length === 0) {
+      this.settledCode = exitCodeFor({ code, signal });
+      this.finish();
+      return;
+    }
+    this.handle = null;
+    stderr(`${PREFIX} exited with code ${code}; waiting for the next change to start it again\n`);
   }
 
   finish() {
@@ -595,34 +800,46 @@ class WatchSupervisor {
   }
 
   /**
-   * The rebuild IS the debounce boundary when one is configured: a restart
-   * only happens on a successful bundle, so a broken edit never takes down
-   * the process that was still working.
+   * With a bundle configured the rebuild gates the restart, so a broken edit
+   * keeps the old run. A reload ends when its boot settles: the queue never
+   * starts a second on top of it.
    */
-  async onChange(files) {
-    if (this.finished || this.child === null) return;
+  async reload(files) {
+    if (this.finished) return;
+    if (files.length > 0 && !(await this.restartOld(files))) return;
+    if (this.finished) return;
+    if (!this.spawnOne()) {
+      this.settledCode = 127;
+      return this.finish();
+    }
+    await this.handle.settled;
+  }
+
+  /** Rebuilds, then takes the running child down; false when a failed rebuild kept it. */
+  async restartOld(files) {
     const built = await this.rebuild();
-    if (!built.ok) return;
-    if (this.finished || this.child === null) return;
+    if (!built.ok || this.finished) return false;
     const noun = files.length === 1 ? "file" : "files";
     const more = files.length > 3 ? ", …" : "";
     stderr(
       `${PREFIX} restarting (${files.length} ${noun} changed): ${files.slice(0, 3).join(", ")}${more}\n`,
     );
-    this.restarting = true;
-    const stack = stackControls({ target: this.child.pid, graceMs: this.graceMs });
-    if (!(await stack.takeDown())) {
-      stderr(`${PREFIX} some of the previous run outlived SIGKILL, restarting anyway\n`);
+    const old = this.handle;
+    if (old !== null) {
+      old.stopping = true;
+      const stack = stackControls({ target: old.child.pid, graceMs: this.graceMs });
+      if (!(await stack.takeDown())) {
+        stderr(`${PREFIX} some of the previous run outlived SIGKILL, restarting anyway\n`);
+      }
     }
-    this.restarting = false;
-    if (this.finished) return;
-    if (!this.spawnOne()) this.finish();
+    return true;
   }
 
   onSignal() {
-    if (this.finished || this.child === null) return;
-    this.restarting = true; // the close handler must not treat this as a real exit
-    void stackControls({ target: this.child.pid, graceMs: this.graceMs })
+    const old = this.handle;
+    if (this.finished || old === null) return this.finish();
+    old.stopping = true;
+    void stackControls({ target: old.child.pid, graceMs: this.graceMs })
       .takeDown()
       .then(() => this.finish());
   }
