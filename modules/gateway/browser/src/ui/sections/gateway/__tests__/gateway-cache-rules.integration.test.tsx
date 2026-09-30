@@ -107,7 +107,7 @@ describe("cache rules page", () => {
       renderPage(ALL);
 
       expect(screen.getByText("No cache rules yet")).toBeInTheDocument();
-      expect(screen.getAllByRole("button", { name: /New rule/ })).toHaveLength(2);
+      expect(screen.getAllByRole("button", { name: /New rule/ })).toHaveLength(1);
     });
 
     it("offers no create button without the create grant", () => {

@@ -16,7 +16,15 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
-import { Archive, ChevronDown, ExternalLink, MoreVertical, Pencil, Plus } from "lucide-react";
+import {
+  Archive,
+  ChevronDown,
+  ExternalLink,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Users,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
@@ -58,6 +66,10 @@ import {
   UnifiedPeopleTable,
 } from "../../../features/people/ui/unified-people-table.tsx";
 import { readHandledError } from "../../../model/handled-error.ts";
+import {
+  GovernanceEmptyState,
+  GovernanceEmptyStateAction,
+} from "../../../ui/elements/governance-empty-state.tsx";
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
@@ -427,6 +439,12 @@ function PeoplePage() {
   const screen = usePeopleScreen();
   const { canManage, runMatch, sample, departmentTab, allRows, reads } = screen;
 
+  const bodyOffersMatch =
+    tab === "people" &&
+    screen.canReadActivity &&
+    allRows.length === 0 &&
+    (sample.active || !(reads.spend.isLoading || reads.people.isLoading));
+
   const [assigning, setAssigning] = useState<PeopleRow | null>(null);
   // Main opened this from a URL-routed drawer singleton this branch has no
   // host for (see the merge handoff); local state opens it instead.
@@ -439,6 +457,7 @@ function PeoplePage() {
         sampleActive={sample.active}
         onToggleSample={sample.toggle}
         canManage={canManage}
+        showRunMatch={!bodyOffersMatch}
         isRunningMatch={runMatch.isRunning}
         onRunMatch={runMatch.run}
         onAddDepartment={() => setCreatingDepartment(true)}
@@ -511,6 +530,7 @@ function PeopleTabsSection({
     sample,
     departmentTab,
     allRows,
+    runMatch,
   } = screen;
 
   return (
@@ -535,6 +555,8 @@ function PeopleTabsSection({
           sortBy={spendSort.sortBy}
           onSortChange={spendSort.setSortBy}
           onAssignDepartment={onAssignDepartment}
+          onRunMatch={runMatch.run}
+          isRunningMatch={runMatch.isRunning}
           onSuggestionsChanged={refreshers.refreshIdentity}
         />
       </Tabs.Content>
@@ -657,6 +679,7 @@ function PeoplePageHeader({
   sampleActive,
   onToggleSample,
   canManage,
+  showRunMatch,
   isRunningMatch,
   onRunMatch,
   onAddDepartment,
@@ -664,6 +687,8 @@ function PeoplePageHeader({
   sampleActive: boolean;
   onToggleSample: () => void;
   canManage: boolean;
+  /** Hidden while the People body offers the same action. */
+  showRunMatch: boolean;
   isRunningMatch: boolean;
   onRunMatch: () => void;
   onAddDepartment: () => void;
@@ -675,9 +700,11 @@ function PeoplePageHeader({
       <SampleDataToggle active={sampleActive} onToggle={onToggleSample} size="sm" />
       {canManage && (
         <>
-          <PageLayout.HeaderButton loading={isRunningMatch} onClick={onRunMatch}>
-            Run match pass
-          </PageLayout.HeaderButton>
+          {showRunMatch && (
+            <PageLayout.HeaderButton loading={isRunningMatch} onClick={onRunMatch}>
+              Run match pass
+            </PageLayout.HeaderButton>
+          )}
           <PageLayout.HeaderButton onClick={onAddDepartment}>
             <Plus size={14} /> Add department
           </PageLayout.HeaderButton>
@@ -703,6 +730,8 @@ function PeopleTabPane({
   sortBy,
   onSortChange,
   onAssignDepartment,
+  onRunMatch,
+  isRunningMatch,
   onSuggestionsChanged,
 }: {
   orgId: string;
@@ -717,6 +746,8 @@ function PeopleTabPane({
   sortBy: SpendSortField;
   onSortChange: (next: SpendSortField) => void;
   onAssignDepartment: (row: PeopleRow) => void;
+  onRunMatch: () => void;
+  isRunningMatch: boolean;
   onSuggestionsChanged: () => Promise<void>;
 }) {
   const departments = departmentsPresent(allRows);
@@ -752,6 +783,8 @@ function PeopleTabPane({
         sources={sampleActive ? undefined : reads.sources.data}
         canManage={canManage}
         onAssignDepartment={onAssignDepartment}
+        onRunMatch={onRunMatch}
+        isRunningMatch={isRunningMatch}
       />
 
       {suggestions.length > 0 && (
@@ -804,6 +837,8 @@ function PeopleTableSection({
   sources,
   canManage,
   onAssignDepartment,
+  onRunMatch,
+  isRunningMatch,
 }: {
   rows: PeopleRow[];
   isLoading: boolean;
@@ -811,12 +846,31 @@ function PeopleTableSection({
   sources: Parameters<typeof sourceForTarget>[0]["sources"];
   canManage: boolean;
   onAssignDepartment: (row: PeopleRow) => void;
+  onRunMatch: () => void;
+  isRunningMatch: boolean;
 }) {
   if (isLoading) {
     return (
       <Box padding={6}>
         <Spinner />
       </Box>
+    );
+  }
+
+  if (rows.length === 0 && department === null) {
+    return (
+      <GovernanceEmptyState
+        icon={Users}
+        headline="No people yet"
+        description={emptyPeopleLine({ department })}
+        action={
+          canManage && (
+            <GovernanceEmptyStateAction loading={isRunningMatch} onClick={onRunMatch}>
+              Run match pass
+            </GovernanceEmptyStateAction>
+          )
+        }
+      />
     );
   }
 

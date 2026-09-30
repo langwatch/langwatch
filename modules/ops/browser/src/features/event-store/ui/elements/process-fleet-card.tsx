@@ -41,7 +41,7 @@ function FleetRow({
     >
       <Table.Cell>
         <HStack gap={1.5}>
-          <Text textStyle="xs" fontFamily="mono" truncate title={row.processName}>
+          <Text textStyle="xs" fontFamily="mono" whiteSpace="nowrap" title={row.processName}>
             {row.processName}
           </Text>
           {row.scheduled && (
@@ -52,7 +52,7 @@ function FleetRow({
         </HStack>
       </Table.Cell>
       <Table.Cell>
-        <Text textStyle="xs" color="fg.muted" truncate title={row.pipelineName}>
+        <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap" title={row.pipelineName}>
           {row.pipelineName}
         </Text>
       </Table.Cell>
@@ -100,37 +100,27 @@ export function ProcessFleetCard({
             </Text>
           </Box>
         ) : (
-          <Table.Root size="sm" variant="line" tableLayout="fixed" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader width="30%">Process</Table.ColumnHeader>
-                <Table.ColumnHeader width="22%">Pipeline</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end" width="8%">
-                  Instances
-                </Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end" width="8%">
-                  Overdue wakes
-                </Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end" width="8%">
-                  Pending
-                </Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end" width="8%">
-                  Overdue pending
-                </Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end" width="8%">
-                  Lapsed leases
-                </Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end" width="8%">
-                  Dead
-                </Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {rows.map((row) => (
-                <FleetRow key={row.processName} row={row} onSelect={onSelect} />
-              ))}
-            </Table.Body>
-          </Table.Root>
+          <Box overflowX="auto">
+            <Table.Root size="sm" variant="line" width="full" minWidth="720px">
+              <Table.Header whiteSpace="nowrap">
+                <Table.Row>
+                  <Table.ColumnHeader>Process</Table.ColumnHeader>
+                  <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="end">Instances</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="end">Overdue wakes</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="end">Pending</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="end">Overdue pending</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="end">Lapsed leases</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="end">Dead</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {rows.map((row) => (
+                  <FleetRow key={row.processName} row={row} onSelect={onSelect} />
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Box>
         )}
       </Card.Body>
     </Card.Root>

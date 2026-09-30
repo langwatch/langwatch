@@ -298,6 +298,14 @@ flows:
           timeout: "30000"
       - action: expect
         with:
+          count: 'input[placeholder$="jump to anything"]'
+          timeout: "30000"
+      - action: expect
+        with:
+          text: Onboard your agent
+          timeout: "30000"
+      - action: expect
+        with:
           text: Docs and guides
       - action: expect
         with:

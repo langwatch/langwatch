@@ -315,11 +315,11 @@ function FlagRow({
           </Text>
         ) : (
           <VStack align="start" gap={0}>
-            <Text fontSize="xs">
+            <Text fontSize="xs" whiteSpace="nowrap">
               {row.updatedAt ? format(row.updatedAt, "dd/MM/yyyy HH:mm:ss") : ""}
             </Text>
-            <HStack gap={2}>
-              <Text fontSize="xs" color="fg.muted">
+            <HStack gap={2} flexWrap="nowrap">
+              <Text fontSize="xs" color="fg.muted" truncate maxWidth="160px">
                 {row.lastEditedBy ?? "unknown"}
               </Text>
               {canManage && (
@@ -327,6 +327,9 @@ function FlagRow({
                   variant="plain"
                   size="xs"
                   paddingX={0}
+                  height="auto"
+                  minWidth="auto"
+                  flexShrink={0}
                   disabled={pending}
                   onClick={() => void clear()}
                 >

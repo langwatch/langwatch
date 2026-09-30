@@ -4,7 +4,7 @@
  * belong to the composing application); this page is a child of that layout route.
  */
 
-import { HStack, VStack } from "@chakra-ui/react";
+import { Box, HStack, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
 import { PromptPlaygroundChatProvider } from "../../../model/prompt-chat-sync-context.tsx";
@@ -17,13 +17,15 @@ export function PromptStudioScreen() {
     <PromptConfigProvider>
       <PromptPlaygroundChatProvider>
         <HStack width="full" height="full" gap={0} position="relative">
-          <VStack position="relative" top={0} left={0} width="250px" height="full">
+          <VStack position="relative" top={0} left={0} width="250px" height="full" flexShrink={0}>
             <PageLayout.Header withBorder={false}>
               <PageLayout.Heading>Prompts</PageLayout.Heading>
             </PageLayout.Header>
             <PromptPlaygroundSidebar />
           </VStack>
-          <PromptPlaygroundMainContent />
+          <Box flex={1} minWidth={0} height="full">
+            <PromptPlaygroundMainContent />
+          </Box>
         </HStack>
       </PromptPlaygroundChatProvider>
     </PromptConfigProvider>

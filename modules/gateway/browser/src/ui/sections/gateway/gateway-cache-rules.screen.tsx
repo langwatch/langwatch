@@ -122,7 +122,7 @@ function CacheRulesPage() {
         <PageLayout.Header>
           <PageLayout.Heading>Cache Rules</PageLayout.Heading>
           <Spacer />
-          {canCreate && (
+          {canCreate && !showRulesEmpty && (
             <PageLayout.HeaderButton
               variant="solid"
               colorPalette="orange"

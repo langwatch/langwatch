@@ -44,7 +44,7 @@ export function BackofficeTable({
 }: BackofficeTableProps) {
   return (
     <>
-      <PageLayout.Header>
+      <PageLayout.Header withBorder={false}>
         <PageLayout.Heading>{title}</PageLayout.Heading>
         <Spacer />
         {createAction}
