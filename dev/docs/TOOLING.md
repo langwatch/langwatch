@@ -60,16 +60,9 @@ first.
 
   nx affected -t lint:types type-aware, per project,       cached per project
      |                      only what the change reached
-  pnpm lint:architecture    the slow oxlint rules          CI blocks on it; run it
-                            (.oxlintrc.architecture.jsonc)  on demand
-                            + the enforcer's whole-tree
-                            policies
+  pnpm lint:architecture    the enforcer's whole-tree      CI blocks on it; run it
+                            policies                       on demand
 ```
-
-A rule joins the architecture layer by measured cost, not by kind: at least 5%
-of the plugin's time in one whole-tree run (each rule's `create` and visitors
-timed with `process.hrtime`), and dropping it cuts the fast run by 10% or more.
-Today that is `langwatch/comment-block-size` alone.
 
 `lint` and `lint:types` aren't written in any `package.json`. A small plugin,
 `dev/nx/lint-plugin.mjs`, adds them to every workspace package, so the targets

@@ -1055,16 +1055,15 @@ jobs:
       - name: Lint rule reference is current (blocking)
         run: pnpm --filter @langwatch/architecture-enforcer docs:check
 
-      # `pnpm lint:architecture` in CI: the slow oxlint rules, then the
-      # architecture-enforcer policies that read zero findings on this tree,
-      # named one by one; a policy joins the list when its findings reach zero.
-      # `declarations` is left out because it reads the output of `tsc -b`.
+      # `pnpm lint:architecture` in CI: the architecture-enforcer policies that
+      # read zero findings on this tree, named one by one; a policy joins the
+      # list when its findings reach zero. `declarations` is left out because
+      # it reads the output of `tsc -b`.
       - name: Architecture lint (blocking)
-        run: |
-          pnpm lint:architecture:oxlint
-          pnpm --filter @langwatch/architecture-enforcer lint -- \
-            --no-declarations \
-            --policies application-boundaries,browser-kit-exports,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams
+        run: >-
+          pnpm --filter @langwatch/architecture-enforcer lint --
+          --no-declarations
+          --policies application-boundaries,browser-kit-exports,declaration-project-references,default-test-lane,prisma-migration-access,prisma-table-ownership,service-projection-boundaries,workspace-seams
 
       # THE GATE. Oxlint over the whole governed tree, and a non-zero exit
       # fails the job. A config error and a lint violation both surface here.
