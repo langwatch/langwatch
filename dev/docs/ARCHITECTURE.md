@@ -1540,6 +1540,13 @@ through the framework; no module scans queues or reads the `gq:parked-tenants` k
 2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
 
+**A spent trace job dead-letters instead of blocking its group** (Alex, 2026-09-30): order within
+a trace is not load-bearing, so trace registrations set `onExhausted: "dead-letter"`; every other
+registration blocks. The group queue owns and writes the dead-letter layout; ops lists, redrives
+and discards it through the queue's exported helpers. A span that cannot be scrubbed is never
+stored unredacted, and disabled DLP never skips redaction: it fails and, on a trace pipeline,
+dead-letters, redrivable once analysis is back.
+
 A fact is recorded by its owner; delivery modules are handed it; there is no relay module (Alex,
 2026-09-29). Gateway's budget crossings and virtual key lifecycle changes are the case: gateway
 detects a crossing after its own debit lands and records it with `recordBudgetCrossing`, keyed by

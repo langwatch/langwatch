@@ -1,3 +1,5 @@
+import type { ExhaustedOutcome } from "@langwatch/group-queue";
+
 import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { PipelineEventSchema } from "../domain/eventSchemas.ts";
@@ -38,6 +40,11 @@ export interface CommandSerializationOptions<Payload> {
    * its own); only consulted when `coalesceMaxBatch` enables coalescing.
    */
   coalesceMaxBytes?: number;
+  /**
+   * What a job that exhausts its retries (or fails non-retryably) does to its group: block it
+   * (the default) or dead-letter the job and drain on. Only where order is not load-bearing.
+   */
+  onExhausted?: ExhaustedOutcome;
 }
 
 /**

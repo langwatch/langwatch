@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { QueuedPayloadInvalidError } from "../../errorHandling.ts";
-import { type JobLane, routeJob, sealJobLane } from "../jobLane.ts";
+import {
+  JOB_ROUTING_FIELD,
+  type JobLane,
+  readJobRouting,
+  routeJob,
+  sealJobLane,
+} from "../jobLane.ts";
 
 const payloadSchema = z.object({ tenantId: z.string(), id: z.string(), oversized: z.boolean() });
 type Payload = z.infer<typeof payloadSchema>;
@@ -52,6 +58,21 @@ describe("routing a job at send", () => {
         score: 10,
         dedupId: "ns/a",
       });
+    });
+  });
+
+  describe("given a lane that dead-letters a spent job", () => {
+    it("carries the outcome in the routing the queue reads back", () => {
+      const routing = route(laneWith({ onExhausted: "dead-letter" }));
+
+      expect(routing.onExhausted).toBe("dead-letter");
+      expect(readJobRouting({ [JOB_ROUTING_FIELD]: routing })?.onExhausted).toBe("dead-letter");
+    });
+  });
+
+  describe("given a lane that names no outcome", () => {
+    it("routes without one, so the group blocks as before", () => {
+      expect(route(laneWith())).not.toHaveProperty("onExhausted");
     });
   });
 

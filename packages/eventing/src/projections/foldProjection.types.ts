@@ -1,3 +1,5 @@
+import type { ExhaustedOutcome } from "@langwatch/group-queue";
+
 import type { Event } from "../domain/types.ts";
 import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
@@ -101,6 +103,8 @@ export interface FoldProjectionOptions {
   // Re-fold aggregate history for out-of-order events; set false when apply
   // is order-insensitive (sum, counter) and commutes on event data not arrival order.
   refoldOnOutOfOrder?: boolean;
+  // A spent fold job blocks its group (default) or is dead-lettered; order-tolerant folds only.
+  onExhausted?: ExhaustedOutcome;
 }
 
 // ADR-146: `empty` until the first event is folded.

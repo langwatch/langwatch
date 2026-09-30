@@ -17,6 +17,7 @@ export type {
   GroupQueuePolicy,
   QueueSendOptions,
 } from "./contracts.ts";
+export { EXHAUSTED_OUTCOMES, type ExhaustedOutcome } from "./deadLetter.ts";
 export { defineGroupQueue } from "./definition.ts";
 export { GroupQueueProcessor } from "./groupQueue.ts";
 export {

@@ -807,6 +807,8 @@ export class EventSourcing {
         this.globalQueueCoalesceMaxBatch(payload),
       coalesceMaxBytes: (payload: Record<string, unknown>) =>
         this.globalQueueCoalesceMaxBytes(payload),
+      onExhausted: (payload: Record<string, unknown>) =>
+        readJobRouting(payload)?.onExhausted ?? "block",
       processBatch: async (payloads: Record<string, unknown>[], delivery?: JobDelivery) =>
         this.processGlobalQueueBatch(payloads, delivery, queueName),
     };

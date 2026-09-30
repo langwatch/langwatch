@@ -2,6 +2,7 @@ import type { Instant } from "@langwatch/time";
 import type { Attributes } from "@opentelemetry/api";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
+import type { ExhaustedOutcome } from "./deadLetter.ts";
 import type { ObjectStore, ProjectStorageDestination } from "./storage.ts";
 
 export interface GroupQueuePayloadSchema<Payload> {
@@ -22,6 +23,8 @@ export interface GroupQueueDefinition<
   readonly delay?: number;
   readonly deduplication?: DeduplicationConfig<Payload>;
   readonly coalescing?: GroupQueueCoalescing<Payload>;
+  /** Absent blocks the group, as before; "dead-letter" parks only the job and drains on. */
+  readonly onExhausted?: (payload: Payload) => ExhaustedOutcome;
 }
 
 export interface GroupQueueCoalescing<Payload> {
@@ -142,6 +145,7 @@ export interface GroupQueueRuntimeDefinition<Payload extends Record<string, unkn
   processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
   coalesceMaxBatch?: (payload: Payload) => number | undefined;
   coalesceMaxBytes?: (payload: Payload) => number | undefined;
+  onExhausted?: (payload: Payload) => ExhaustedOutcome;
   options?: { globalConcurrency?: number };
   delay?: number;
   deduplication?: DeduplicationConfig<Payload>;

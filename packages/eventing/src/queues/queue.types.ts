@@ -1,3 +1,4 @@
+import type { ExhaustedOutcome } from "@langwatch/group-queue";
 import type { SemConvAttributes } from "langwatch/observability";
 
 export interface EventSourcedQueueProcessorOptions {
@@ -99,6 +100,9 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
 
   /** Resolver for max byte size of a coalesced batch (see ADR-066). */
   coalesceMaxBytes?: (payload: Payload) => number | undefined;
+
+  /** What a job's group does once the job is spent: block (the default) or dead-letter it. */
+  onExhausted?: (payload: Payload) => ExhaustedOutcome;
 
   /**
    * Optional options for the queue processor.

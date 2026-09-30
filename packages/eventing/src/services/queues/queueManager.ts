@@ -1,3 +1,4 @@
+import type { ExhaustedOutcome } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -210,6 +211,7 @@ interface QueuedEventConsumerDefinition<E extends Event> {
     /** Answers undefined for an event it does not key, which then takes the aggregate's key. */
     groupKeyFn?: (event: E) => string | undefined;
     coalesceMaxBatch?: number;
+    onExhausted?: ExhaustedOutcome;
   };
 }
 
@@ -509,6 +511,7 @@ export class QueueManager<EventType extends Event = Event> {
                 )
             : undefined,
         coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
+        onExhausted: handlerDef.options.onExhausted,
         delay: handlerDef.options.delay,
         deduplication: resolveDeduplicationStrategy(
           handlerDef.options.deduplication,
@@ -542,6 +545,7 @@ export class QueueManager<EventType extends Event = Event> {
         groupKeyFn?: (event: EventType) => string;
         scoreFn?: (event: EventType) => number;
         coalesceMaxBatch?: number;
+        onExhausted?: ExhaustedOutcome;
         options?: { disabled?: boolean };
       }
     >;
@@ -616,6 +620,7 @@ export class QueueManager<EventType extends Event = Event> {
                 )
             : undefined,
         coalesceMaxBatch,
+        onExhausted: projectionDef.onExhausted,
         spanAttributes: (event: EventType) => ({
           "projection.name": projectionName,
           "event.type": event.type,
@@ -858,6 +863,7 @@ export class QueueManager<EventType extends Event = Event> {
         : undefined,
       coalesceMaxBatch,
       coalesceMaxBytes: cmdEntry.options.coalesceMaxBytes,
+      onExhausted: cmdEntry.options.onExhausted,
       delay: cmdEntry.options.delay,
       deduplication: rawDedup,
       spanAttributes: cmdEntry.spanAttributes,

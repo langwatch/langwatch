@@ -62,6 +62,7 @@ function runtimeDefinition<Payload extends Record<string, unknown>>({
     deduplication: definition.deduplication,
     coalesceMaxBatch: definition.coalescing?.maxItems,
     coalesceMaxBytes: definition.coalescing?.maxBytes,
+    onExhausted: definition.onExhausted,
     options: { globalConcurrency: dependencies.policy?.globalConcurrency },
   };
 }

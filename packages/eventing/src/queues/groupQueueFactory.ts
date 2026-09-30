@@ -49,6 +49,7 @@ export function createEventingGroupQueueFactory({
             maxBytes: eventingDefinition.coalesceMaxBytes,
           }
         : undefined,
+      onExhausted: eventingDefinition.onExhausted,
     });
 
     const producer = new GroupQueueProducer(queueDefinition, dependencies);

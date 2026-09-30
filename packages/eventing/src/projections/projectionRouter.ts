@@ -1,3 +1,4 @@
+import type { ExhaustedOutcome } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -591,6 +592,7 @@ export class ProjectionRouter<
         groupKeyFn?: (event: EventType) => string;
         scoreFn?: (event: EventType) => number;
         coalesceMaxBatch?: number;
+        onExhausted?: ExhaustedOutcome;
         options?: { disabled?: boolean };
       }
     > = {};
@@ -605,6 +607,7 @@ export class ProjectionRouter<
         // subscribers still fire per event, just observing the final batch
         // state. Opt out via options.coalesceMaxBatch = 1.
         coalesceMaxBatch: fold.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH,
+        onExhausted: fold.options?.onExhausted,
         options: fold.options,
       };
     }
@@ -698,6 +701,7 @@ export class ProjectionRouter<
           disabled: mapProj.options?.disabled,
           groupKeyFn: ownMapGroupKey(openMap),
           coalesceMaxBatch: mapProj.options?.coalesceMaxBatch,
+          onExhausted: mapProj.options?.onExhausted,
         },
       };
     }

@@ -83,9 +83,12 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
     deduplication: typeof RECORD_SPAN_DEDUPLICATION;
     getGroupKey?: (payload: RecordSpanCommandData) => string;
     coalesceMaxBatch: (payload: RecordSpanCommandData) => number;
+    onExhausted: "dead-letter";
   } = {
     deduplication: RECORD_SPAN_DEDUPLICATION,
     coalesceMaxBatch: (payload) => (payload.spoolRef ? 1 : RECORD_SPAN_COALESCE_MAX_BATCH),
+    // Order within a trace is not load-bearing: a spent span never blocks its trace (§9).
+    onExhausted: "dead-letter",
   };
   if (spanCommandShardCount > 1) {
     recordSpanOptions.getGroupKey = (payload) =>

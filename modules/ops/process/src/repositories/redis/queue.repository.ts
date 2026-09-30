@@ -1,14 +1,19 @@
 import {
   CachedLuaScript,
+  DISCARD_FROM_DLQ_LUA,
+  DLQ_TTL_SECONDS,
+  dlqGroupKeys,
+  dlqIndexKey,
   GROUP_QUEUE_REGISTRY_KEY,
   isEnvelope,
   isNoScriptResult,
+  MOVE_TO_DLQ_LUA,
   PARK_HELPER_LUA,
-  PENDING_INDEX_HELPER_LUA,
   pendingDriftKey,
   pendingGroupsKey,
   readEnvelopeDescriptor,
   readJobRoutingMeta,
+  REPLAY_FROM_DLQ_LUA,
   splitEnvelope,
   TTL_HELPER_LUA,
 } from "@langwatch/group-queue/operational";
@@ -162,149 +167,6 @@ end
 return totalDropped
 `;
 
-const MOVE_TO_DLQ_LUA = `
-local srcJobsKey   = KEYS[1]
-local srcDataKey   = KEYS[2]
-local activeKey    = KEYS[3]
-local readyKey     = KEYS[4]
-local blockedKey   = KEYS[5]
-local signalKey    = KEYS[6]
-local srcErrorKey  = KEYS[7]
-local dstJobsKey   = KEYS[8]
-local dstDataKey   = KEYS[9]
-local dstErrorKey  = KEYS[10]
-local dlqIndexKey  = KEYS[11]
-local strikesKey   = KEYS[12]
-local attemptKey   = KEYS[13]
-local failStreakKey = KEYS[14]
-local groupId      = ARGV[1]
-local ttl          = tonumber(ARGV[2])
-
-local jobs = redis.call("ZRANGE", srcJobsKey, 0, -1, "WITHSCORES")
-local count = #jobs / 2
-if count > 0 then
-  for i = 1, #jobs, 2 do
-    redis.call("ZADD", dstJobsKey, jobs[i+1], jobs[i])
-  end
-end
-
-local data = redis.call("HGETALL", srcDataKey)
-for i = 1, #data, 2 do
-  redis.call("HSET", dstDataKey, data[i], data[i+1])
-end
-
-local errorData = redis.call("HGETALL", srcErrorKey)
-for i = 1, #errorData, 2 do
-  redis.call("HSET", dstErrorKey, errorData[i], errorData[i+1])
-end
-
-if ttl > 0 then
-  redis.call("EXPIRE", dstJobsKey, ttl)
-  redis.call("EXPIRE", dstDataKey, ttl)
-  redis.call("EXPIRE", dstErrorKey, ttl)
-end
-
-redis.call("SADD", dlqIndexKey, groupId)
-
-redis.call("DEL", srcJobsKey)
-redis.call("DEL", srcDataKey)
-redis.call("DEL", activeKey)
-redis.call("DEL", srcErrorKey)
--- Moving to the DLQ empties the live group just like a drain, so it clears the
--- same counters for the same reason: a re-created group with the same id must
--- get a fresh run, not inherit strikes, a spent retry chain, or a failure
--- streak from the jobs that were carried off (ADR-080).
-redis.call("DEL", strikesKey)
--- The poison guard's per-group state is the claim marker; the legacy strikes
--- counter above is cleared alongside it so a group blocked by the old guard
--- still unblocks cleanly while both are in the fleet. Derived from strikesKey
--- (":strikes" is 8 chars) so the key arity stays fixed.
-redis.call("DEL", string.sub(strikesKey, 1, #strikesKey - 8) .. ":claim")
-redis.call("DEL", attemptKey)
-redis.call("DEL", failStreakKey)
-redis.call("ZREM", readyKey, groupId)
-redis.call("SREM", blockedKey, groupId)
-redis.call("LPUSH", signalKey, "1")
-redis.call("LTRIM", signalKey, 0, 999)
-
-return count
-`;
-
-const REPLAY_FROM_DLQ_LUA =
-  PENDING_INDEX_HELPER_LUA +
-  TTL_HELPER_LUA +
-  PARK_HELPER_LUA +
-  `
-local dlqJobsKey   = KEYS[1]
-local dlqDataKey   = KEYS[2]
-local dlqErrorKey  = KEYS[3]
-local dstJobsKey   = KEYS[4]
-local dstDataKey   = KEYS[5]
-local readyKey     = KEYS[6]
-local signalKey    = KEYS[7]
-local dlqIndexKey  = KEYS[8]
-local groupId      = ARGV[1]
-local nowMs        = tonumber(ARGV[2])
-
-local jobs = redis.call("ZRANGE", dlqJobsKey, 0, -1, "WITHSCORES")
-local count = #jobs / 2
-if count > 0 then
-  for i = 1, #jobs, 2 do
-    redis.call("ZADD", dstJobsKey, jobs[i+1], jobs[i])
-  end
-  -- Replaying puts jobs back on the live group, so it is a pending-index write
-  -- like any other stage. Same atomic step as the ZADD above.
-  gqMarkPending(parkKeyPrefixOf(readyKey), groupId)
-end
-
-local data = redis.call("HGETALL", dlqDataKey)
-for i = 1, #data, 2 do
-  redis.call("HSET", dstDataKey, data[i], data[i+1])
-end
-
-redis.call("DEL", dlqJobsKey)
-redis.call("DEL", dlqDataKey)
-redis.call("DEL", dlqErrorKey)
-redis.call("SREM", dlqIndexKey, groupId)
-
-if count > 0 then
-  -- Route through the parked-aware write so a replay can't clobber a parked
-  -- group back into the dispatch scan (TRAP 1). A DLQ group is never itself
-  -- parked; if the tenant is over cap, the next dispatch parks it again.
-  addToReadyOrParked(readyKey, groupId, 1, false)
-  -- Restore the safety-net TTL on the revived group keys (DLQ keys carry none).
-  refreshGroupKeyTtl(dstJobsKey, dstDataKey, nowMs)
-end
-
-redis.call("LPUSH", signalKey, "1")
-redis.call("LTRIM", signalKey, 0, 999)
-
-return count
-`;
-
-// Discard a DLQ group: the operator marking its jobs never-to-run
-// (specs/ops/dead-letter-recovery.feature). The Redis substrate already
-// forgets DLQ entries at their TTL, so the durable mark lives in the audit
-// row the service writes — this script's job is to remove the group and
-// hand back what that audit row must record: the job count and last error.
-const DISCARD_FROM_DLQ_LUA = `
-local dlqJobsKey   = KEYS[1]
-local dlqDataKey   = KEYS[2]
-local dlqErrorKey  = KEYS[3]
-local dlqIndexKey  = KEYS[4]
-local groupId      = ARGV[1]
-
-local count = redis.call("ZCARD", dlqJobsKey)
-local lastError = redis.call("HGET", dlqErrorKey, "message")
-
-redis.call("DEL", dlqJobsKey)
-redis.call("DEL", dlqDataKey)
-redis.call("DEL", dlqErrorKey)
-redis.call("SREM", dlqIndexKey, groupId)
-
-return {count, lastError or ""}
-`;
-
 // Re-arm or drop the pending-reconcile single-flight marker while the caller holds it.
 // GET-then-act is safe only inside a script.
 const RECONCILE_MARKER_TTL_LUA = `
@@ -368,7 +230,6 @@ const pendingIndexPruneScript = new CachedLuaScript(PENDING_INDEX_PRUNE_LUA);
 // ── Constants ────────────────────────────────────────────────────────
 
 const SUMMARY_TOP_N = 200;
-const DLQ_TTL_SECONDS = 604800;
 const SSCAN_BATCH = 500;
 
 /** Page size for the index reads that enumerate a queue's groups. */
@@ -633,7 +494,7 @@ export class QueueRedisRepository extends QueueRepository {
     ] = await Promise.all([
       this.redis.zcard(readyKey),
       this.redis.scard(blockedKey),
-      this.redis.scard(`${prefix}dlq`),
+      this.redis.scard(dlqIndexKey(prefix)),
       this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
       this.redis.zrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
       this.redis.get(`${prefix}stats:total-pending`),
@@ -1355,10 +1216,10 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}blocked`,
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
-      `${prefix}dlq:${params.groupId}:jobs`,
-      `${prefix}dlq:${params.groupId}:data`,
-      `${prefix}dlq:${params.groupId}:error`,
-      `${prefix}dlq`,
+      dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).jobs,
+      dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).data,
+      dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).error,
+      dlqIndexKey(prefix),
       `${prefix}group:${params.groupId}:strikes`,
       `${prefix}group:${params.groupId}:attempt`,
       `${prefix}group:${params.groupId}:failstreak`,
@@ -1387,10 +1248,10 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}blocked`,
       `${prefix}signal`,
       `${prefix}group:${groupId}:error`,
-      `${prefix}dlq:${groupId}:jobs`,
-      `${prefix}dlq:${groupId}:data`,
-      `${prefix}dlq:${groupId}:error`,
-      `${prefix}dlq`,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).jobs,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).data,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).error,
+      dlqIndexKey(prefix),
       `${prefix}group:${groupId}:strikes`,
       `${prefix}group:${groupId}:attempt`,
       `${prefix}group:${groupId}:failstreak`,
@@ -1459,14 +1320,14 @@ export class QueueRedisRepository extends QueueRepository {
     const result = await replayFromDlqScript.run(
       this.redis,
       8,
-      `${prefix}dlq:${params.groupId}:jobs`,
-      `${prefix}dlq:${params.groupId}:data`,
-      `${prefix}dlq:${params.groupId}:error`,
+      dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).jobs,
+      dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).data,
+      dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).error,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}group:${params.groupId}:data`,
       `${prefix}ready`,
       `${prefix}signal`,
-      `${prefix}dlq`,
+      dlqIndexKey(prefix),
       params.groupId,
       String(nowInstant().epochMilliseconds),
     );
@@ -1485,14 +1346,14 @@ export class QueueRedisRepository extends QueueRepository {
     let jobsReplayed = 0;
     const pipeline = this.redis.pipeline();
     const argsByIndex = groupIds.map((groupId) => [
-      `${prefix}dlq:${groupId}:jobs`,
-      `${prefix}dlq:${groupId}:data`,
-      `${prefix}dlq:${groupId}:error`,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).jobs,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).data,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).error,
       `${prefix}group:${groupId}:jobs`,
       `${prefix}group:${groupId}:data`,
       `${prefix}ready`,
       `${prefix}signal`,
-      `${prefix}dlq`,
+      dlqIndexKey(prefix),
       groupId,
       String(nowInstant().epochMilliseconds),
     ]);
@@ -1519,18 +1380,13 @@ export class QueueRedisRepository extends QueueRepository {
     errorFilter?: string;
   }): Promise<{ replayedCount: number; jobsReplayed: number }> {
     const prefix = `${params.queueName}:gq:`;
-    const dlqIndexKey = `${prefix}dlq`;
+    const indexKey = dlqIndexKey(prefix);
     let replayedCount = 0;
     let jobsReplayed = 0;
 
     let cursor = "0";
     do {
-      const [nextCursor, members] = await this.redis.sscan(
-        dlqIndexKey,
-        cursor,
-        "COUNT",
-        SSCAN_BATCH,
-      );
+      const [nextCursor, members] = await this.redis.sscan(indexKey, cursor, "COUNT", SSCAN_BATCH);
       cursor = nextCursor;
 
       const groupsToReplay = await this.groupsMatching({
@@ -1567,14 +1423,14 @@ export class QueueRedisRepository extends QueueRepository {
       script: replayFromDlqScript,
       keyCount: 8,
       argsFor: (groupId) => [
-        `${prefix}dlq:${groupId}:jobs`,
-        `${prefix}dlq:${groupId}:data`,
-        `${prefix}dlq:${groupId}:error`,
+        dlqGroupKeys({ keyPrefix: prefix, groupId }).jobs,
+        dlqGroupKeys({ keyPrefix: prefix, groupId }).data,
+        dlqGroupKeys({ keyPrefix: prefix, groupId }).error,
         `${prefix}group:${groupId}:jobs`,
         `${prefix}group:${groupId}:data`,
         `${prefix}ready`,
         `${prefix}signal`,
-        `${prefix}dlq`,
+        dlqIndexKey(prefix),
         groupId,
         String(nowInstant().epochMilliseconds),
       ],
@@ -1637,10 +1493,10 @@ export class QueueRedisRepository extends QueueRepository {
       script: discardFromDlqScript,
       keyCount: 4,
       argsFor: (groupId) => [
-        `${prefix}dlq:${groupId}:jobs`,
-        `${prefix}dlq:${groupId}:data`,
-        `${prefix}dlq:${groupId}:error`,
-        `${prefix}dlq`,
+        dlqGroupKeys({ keyPrefix: prefix, groupId }).jobs,
+        dlqGroupKeys({ keyPrefix: prefix, groupId }).data,
+        dlqGroupKeys({ keyPrefix: prefix, groupId }).error,
+        dlqIndexKey(prefix),
         groupId,
       ],
       onResult: (result) => {
@@ -1667,12 +1523,12 @@ export class QueueRedisRepository extends QueueRepository {
   }): Promise<{ redrivenCount: number; groupIds: string[] }> => {
     const count = params.count ?? 5;
     const prefix = `${params.queueName}:gq:`;
-    const dlqIndexKey = `${prefix}dlq`;
+    const indexKey = dlqIndexKey(prefix);
 
-    const dlqSize = await this.redis.scard(dlqIndexKey);
+    const dlqSize = await this.redis.scard(indexKey);
     if (dlqSize === 0) return { redrivenCount: 0, groupIds: [] };
 
-    const candidates = await this.redis.srandmember(dlqIndexKey, Math.min(count * 3, dlqSize));
+    const candidates = await this.redis.srandmember(indexKey, Math.min(count * 3, dlqSize));
     if (!candidates || candidates.length === 0) return { redrivenCount: 0, groupIds: [] };
 
     let groupsToRedrive = candidates.filter((id): id is string => id !== null);
@@ -1691,14 +1547,14 @@ export class QueueRedisRepository extends QueueRepository {
 
     const pipeline = this.redis.pipeline();
     const argsByIndex = groupsToRedrive.map((groupId) => [
-      `${prefix}dlq:${groupId}:jobs`,
-      `${prefix}dlq:${groupId}:data`,
-      `${prefix}dlq:${groupId}:error`,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).jobs,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).data,
+      dlqGroupKeys({ keyPrefix: prefix, groupId }).error,
       `${prefix}group:${groupId}:jobs`,
       `${prefix}group:${groupId}:data`,
       `${prefix}ready`,
       `${prefix}signal`,
-      `${prefix}dlq`,
+      dlqIndexKey(prefix),
       groupId,
       String(nowInstant().epochMilliseconds),
     ]);
@@ -1792,17 +1648,12 @@ export class QueueRedisRepository extends QueueRepository {
 
   async findDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
     const prefix = `${params.queueName}:gq:`;
-    const dlqIndexKey = `${prefix}dlq`;
+    const indexKey = dlqIndexKey(prefix);
     const groups: DlqGroupInfo[] = [];
 
     let cursor = "0";
     do {
-      const [nextCursor, members] = await this.redis.sscan(
-        dlqIndexKey,
-        cursor,
-        "COUNT",
-        SSCAN_BATCH,
-      );
+      const [nextCursor, members] = await this.redis.sscan(indexKey, cursor, "COUNT", SSCAN_BATCH);
       cursor = nextCursor;
       groups.push(...(await this.dlqGroupsOnPage({ prefix, members })));
     } while (cursor !== "0");
@@ -1823,9 +1674,9 @@ export class QueueRedisRepository extends QueueRepository {
 
     const pipeline = this.redis.pipeline();
     for (const groupId of members) {
-      pipeline.hgetall(`${prefix}dlq:${groupId}:error`);
-      pipeline.zcard(`${prefix}dlq:${groupId}:jobs`);
-      pipeline.zrange(`${prefix}dlq:${groupId}:jobs`, 0, 0);
+      pipeline.hgetall(dlqGroupKeys({ keyPrefix: prefix, groupId }).error);
+      pipeline.zcard(dlqGroupKeys({ keyPrefix: prefix, groupId }).jobs);
+      pipeline.zrange(dlqGroupKeys({ keyPrefix: prefix, groupId }).jobs, 0, 0);
     }
     const results = await pipeline.exec();
 

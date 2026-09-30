@@ -1,3 +1,4 @@
+import { EXHAUSTED_OUTCOMES, type ExhaustedOutcome } from "@langwatch/group-queue";
 import { z } from "zod";
 
 import type { DeduplicationConfig } from "../../queues/index.ts";
@@ -14,6 +15,7 @@ const jobRoutingSchema = z.object({
   groupKey: z.string(),
   score: z.number(),
   coalesceMaxBatch: z.number(),
+  onExhausted: z.enum(EXHAUSTED_OUTCOMES).optional(),
   dedupId: z.string().optional(),
   spanAttributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
 });
@@ -42,6 +44,8 @@ export interface JobLane<P> {
   coalesceMaxBatch?: number | ((payload: P) => number);
   /** ADR-066 pillar 2 byte cap for a coalesced batch; undefined takes the GroupQueue default. */
   coalesceMaxBytes?: number;
+  /** A spent job blocks its group (absent) or is dead-lettered while the group drains on. */
+  onExhausted?: ExhaustedOutcome;
 }
 
 /** The tenant a dequeued payload carries, and the tenant segment of the group it routes to. */
@@ -158,6 +162,7 @@ export function routeJob<P>({
     groupKey: lane.groupKeyFn(payload),
     score: lane.scoreFn(payload),
     coalesceMaxBatch: typeof coalesce === "function" ? coalesce(payload) : (coalesce ?? 1),
+    ...(lane.onExhausted ? { onExhausted: lane.onExhausted } : {}),
     ...(deduplication ? { dedupId: namespaceDedupId(deduplication.makeId(payload)) } : {}),
     ...spanAttributesOf(lane, payload),
   };

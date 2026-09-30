@@ -26,6 +26,14 @@ export type { BlobSweepReport, BlobSweepTally } from "./blobSweeper.ts";
 export { BlobSweeper, BlobSweeper as GroupQueueBlobSweeper } from "./blobSweeper.ts";
 export { CachedLuaScript, isNoScriptResult } from "./cachedLuaScript.ts";
 export {
+  DISCARD_FROM_DLQ_LUA,
+  DLQ_TTL_SECONDS,
+  dlqGroupKeys,
+  dlqIndexKey,
+  MOVE_TO_DLQ_LUA,
+  REPLAY_FROM_DLQ_LUA,
+} from "./deadLetter.ts";
+export {
   DecodeFailureError,
   type DecodeFailureReason,
   decodeJobEnvelope,

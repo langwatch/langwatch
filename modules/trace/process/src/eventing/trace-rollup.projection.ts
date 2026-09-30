@@ -80,6 +80,7 @@ export class TraceAnalyticsRollupMapProjection
     // Per-span parallelism — rollup rows are independent of each other and of
     // sibling spans on the same trace (the rollup is dim-keyed, not trace-keyed).
     groupKeyFn: (event: { id: string }): string => `rollup:${event.id}`,
+    onExhausted: "dead-letter" as const,
   };
 
   private constructor(deps: {

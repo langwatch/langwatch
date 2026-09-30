@@ -13,6 +13,7 @@ export function defineGroupQueue<
   delay?: number;
   deduplication?: GroupQueueDefinition<Payload>["deduplication"];
   coalescing?: GroupQueueDefinition<Payload>["coalescing"];
+  onExhausted?: GroupQueueDefinition<Payload>["onExhausted"];
 }): GroupQueueDefinition<Payload, Name> {
   const name = options.name.trim();
   if (!/^[a-z0-9][a-z0-9/_-]*$/i.test(name)) {

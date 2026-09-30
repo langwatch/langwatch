@@ -1,3 +1,5 @@
+import type { ExhaustedOutcome } from "@langwatch/group-queue";
+
 import type { TenantId } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
 import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
@@ -84,6 +86,9 @@ export interface MapProjectionOptions<E extends Event = Event> {
    * tenant-scoped because tenant identity is always part of its group key.
    */
   coalesceMaxBatch?: number;
+
+  /** A spent map job blocks its group (the default) or is dead-lettered while it drains on. */
+  onExhausted?: ExhaustedOutcome;
 
   /**
    * Skip duplicate deliveries with the same idempotencyKey. Fails open on

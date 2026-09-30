@@ -34,6 +34,7 @@ import type {
   QueueAuditAdapter,
   QueueSendOptions,
 } from "./contracts.ts";
+import { deadLetterJob, type ExhaustedOutcome } from "./deadLetter.ts";
 import { GroupQueueDispatcher } from "./dispatcher.ts";
 import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle.ts";
 import { defaultFailureDecision, GroupQueueConfigurationError, GroupQueueError } from "./errors.ts";
@@ -122,6 +123,8 @@ interface BisectionDispatchState {
   hasCommitted: boolean;
   /** Splits performed so far — compared against the budget above. */
   splits: number;
+  /** The staged job a split narrowed the failure to, when one was isolated. */
+  offender?: string;
 }
 
 /**
@@ -314,6 +317,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   private readonly processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
   private readonly coalesceMaxBatch?: (payload: Payload) => number | undefined;
   private readonly coalesceMaxBytes?: (payload: Payload) => number | undefined;
+  private readonly onExhausted?: (payload: Payload) => ExhaustedOutcome;
   private readonly spanAttributes?: (payload: Payload) => Attributes;
   private readonly processingQueue: fastq.queueAsPromised<DispatchResult, void>;
   private readonly delay?: number;
@@ -412,6 +416,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       processBatch,
       coalesceMaxBatch,
       coalesceMaxBytes,
+      onExhausted,
       options: defOptions,
       delay,
       spanAttributes,
@@ -461,6 +466,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     this.processBatch = processBatch;
     this.coalesceMaxBatch = coalesceMaxBatch;
     this.coalesceMaxBytes = coalesceMaxBytes;
+    this.onExhausted = onExhausted;
     this.auditAdapter = auditAdapter;
     this.globalConcurrency =
       defOptions?.globalConcurrency ?? GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
@@ -1303,6 +1309,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
     Object.assign(spanAttributes, this.customSpanAttributes(payload));
 
+    const bisection: BisectionDispatchState = { hasCommitted: false, splits: 0 };
     await withActiveSpan(
       spanName,
       {
@@ -1343,6 +1350,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                 attempt,
                 routingLabels,
                 span,
+                dispatch: bisection,
               });
             } else {
               await this.process(payload, { attempt, jobId: stagedJobId });
@@ -1351,7 +1359,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
           await this.completeClaimedJob(job);
         } catch (err) {
-          await this.failClaimedJob({ job, err, span, stopHeartbeat });
+          await this.failClaimedJob({
+            job,
+            err,
+            span,
+            stopHeartbeat,
+            offender: bisection.offender,
+          });
         }
       },
     );
@@ -1476,11 +1490,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     err,
     span,
     stopHeartbeat,
+    offender,
   }: {
     job: ClaimedJob<Payload>;
     err: unknown;
     span: Span;
     stopHeartbeat: () => void;
+    offender: string | undefined;
   }): Promise<void> {
     const { groupId, attempt, drainedSiblings } = job;
     const error = err instanceof Error ? err : new Error(String(err));
@@ -1500,7 +1516,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       await this.retryClaimedJob({ job, error, decision, stopHeartbeat });
       return;
     }
-    await this.exhaustClaimedJob({ job, error, isRetryable, quarantineError, span });
+    await this.exhaustClaimedJob({ job, error, isRetryable, quarantineError, span, offender });
   }
 
   /**
@@ -1716,31 +1732,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     );
   }
 
-  /** Out of retries, non-retryable, or quarantined: block the group and audit the death. */
+  /** Out of retries, non-retryable, or quarantined: block the group (or dead-letter) and audit. */
   private async exhaustClaimedJob({
     job,
     error,
     isRetryable,
     quarantineError,
     span,
+    offender,
   }: {
     job: ClaimedJob<Payload>;
     error: Error;
     isRetryable: boolean;
     quarantineError: Error | undefined;
     span: Span;
+    offender: string | undefined;
   }): Promise<void> {
-    const {
-      groupId,
-      stagedJobId,
-      jobDataJson,
-      originalScore,
-      payload,
-      contextMetadata,
-      attempt,
-      routingLabels,
-      batchPayloads,
-    } = job;
+    const { groupId, stagedJobId, jobDataJson, payload, attempt, routingLabels } = job;
     span.setAttribute("error", true);
     span.setAttribute("error.message", error.message);
 
@@ -1759,23 +1767,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       );
     }
 
-    await this.handleExhaustedRetries({
-      groupId,
-      stagedJobId,
-      payload,
-      originalScore,
-      // When the group tripped the quarantine breaker, block it with
-      // the descriptive quarantine error rather than the raw job
-      // error, so /ops shows why the group is blocked.
-      lastError: quarantineError ?? error,
-      contextMetadata,
-      routingLabels,
-    });
+    // When the group tripped the quarantine breaker, block it with the descriptive quarantine
+    // error rather than the raw job error, so /ops shows why the group is blocked.
+    const lastError = quarantineError ?? error;
+    const deadPayloads =
+      this.onExhausted?.(payload) === "dead-letter"
+        ? await this.deadLetterClaimedJob({ job, lastError, offender })
+        : await this.blockClaimedJob({ job, lastError });
 
-    // Audit hook: terminal — onDead fires for the dispatched
-    // payload + every drained sibling.
+    // Audit hook: terminal — onDead fires for every payload that died.
     await this.runAuditAll(
-      (batchPayloads ?? [payload]).map(
+      deadPayloads.map(
         (p) => () =>
           this.auditAdapter?.onDead({
             payload: p,
@@ -1788,6 +1790,94 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       values: [jobDataJson],
       groupId,
     });
+  }
+
+  /** Blocks the group with the job re-staged; every payload of the batch counts as dead. */
+  private async blockClaimedJob({
+    job,
+    lastError,
+  }: {
+    job: ClaimedJob<Payload>;
+    lastError: Error;
+  }): Promise<Payload[]> {
+    await this.handleExhaustedRetries({
+      groupId: job.groupId,
+      stagedJobId: job.stagedJobId,
+      payload: job.payload,
+      originalScore: job.originalScore,
+      lastError,
+      contextMetadata: job.contextMetadata,
+      routingLabels: job.routingLabels,
+    });
+    return job.batchPayloads ?? [job.payload];
+  }
+
+  /**
+   * Dead-letters the failed job, or only a batch's isolated offender (the rest re-staged), then
+   * completes the slot so the group drains on. Ops redrives the dead letter. Answers the payloads
+   * that died. Ruling: dev/docs/ARCHITECTURE.md §9 (Alex, 2026-09-30).
+   */
+  private async deadLetterClaimedJob({
+    job,
+    lastError,
+    offender,
+  }: {
+    job: ClaimedJob<Payload>;
+    lastError: Error;
+    offender: string | undefined;
+  }): Promise<Payload[]> {
+    const { groupId, stagedJobId, payload, contextMetadata, jobName, routingLabels } = job;
+    const score = this.restageScore(job.originalScore);
+    const batchJobIds = job.batchJobIds.length > 0 ? job.batchJobIds : [stagedJobId];
+    const deadJobIds = offender ? [offender] : batchJobIds;
+    // Re-encoded without its spent `__attempt`, as the block path does: the claimed job is no
+    // longer staged, so this value is what the dead letter or the re-stage keeps.
+    const freshValue = await this.blobLifecycle.encode({
+      jobData: { ...payload, __context: contextMetadata },
+      groupId,
+    });
+    const handlerError = lastError.cause instanceof Error ? lastError.cause : lastError;
+    for (const jobId of deadJobIds) {
+      await deadLetterJob({
+        redis: this.redisConnection,
+        keyPrefix: `${this.queueName}:gq:`,
+        groupId,
+        jobId,
+        score,
+        jobDataJson: jobId === stagedJobId ? freshValue : "",
+        errorMessage: lastError.message,
+        errorStack: handlerError.stack ?? "",
+      });
+    }
+    if (!deadJobIds.includes(stagedJobId)) {
+      await this.scripts.stage({
+        stagedJobId,
+        groupId,
+        dispatchAfterMs: score,
+        dedupId: "",
+        dedupTtlMs: 0,
+        jobDataJson: freshValue,
+      });
+    }
+    await this.scripts.complete({ groupId, stagedJobId, jobName, dropped: true });
+    // The chain is over for this group: the next job starts with a fresh budget and streak.
+    await this.scripts.clearGroupFailures(groupId).catch(() => {});
+    await this.clearGroupAttempt(groupId);
+
+    gqJobsExhaustedTotal.inc(routingLabels);
+    this.logger.error(
+      {
+        queueName: this.queueName,
+        groupId,
+        stagedJobId,
+        deadJobIds,
+        error: lastError,
+        handlerStack: handlerError === lastError ? undefined : handlerError.stack,
+      },
+      "Job dead-lettered after exhausted retries; its group drains on",
+    );
+    const payloads = job.batchPayloads ?? [payload];
+    return payloads.filter((_, index) => deadJobIds.includes(batchJobIds[index] ?? stagedJobId));
   }
 
   /**
@@ -2022,6 +2112,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     if (entries.length <= 1) {
       // Smallest attributable unit — report it, then let the existing retry
       // and quarantine path take over.
+      if (isNarrowed) dispatch.offender = entries[0]?.stagedJobId;
       this.reportBisectedIsolate({
         entry: isNarrowed ? entries[0] : undefined,
         attempt,

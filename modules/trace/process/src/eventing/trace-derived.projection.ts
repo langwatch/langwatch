@@ -311,6 +311,8 @@ export class TraceAnalyticsFoldProjection
     refoldOnOutOfOrder: false,
     readWindow: { widthMs: TRACE_ANALYTICS_READ_WINDOW_MS },
     coalesceMaxBatch: TRACE_ANALYTICS_COALESCE_MAX_BATCH,
+    // Order-insensitive (refoldOnOutOfOrder false): a redriven event folds late, not wrong (§9).
+    onExhausted: "dead-letter",
   };
 
   private constructor(deps: {

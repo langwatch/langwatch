@@ -144,6 +144,8 @@ export class TraceSummaryFoldProjection
     refoldOnOutOfOrder: false,
     trustAbsentMiss: true,
     readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS },
+    // Folds in arrival order already, so a redriven span folds late, not wrong (§9).
+    onExhausted: "dead-letter",
   } as const;
 
   protected readonly events = traceSummaryEvents;

@@ -45,6 +45,8 @@ export class SpanStorageMapProjection
     // spanStorageGroupKey.ts for the measured rationale.
     groupKeyFn: spanStorageMapGroupKey,
     coalesceMaxBatch: TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
+    // One row per span, independent of its neighbours: a spent span never blocks its shard (§9).
+    onExhausted: "dead-letter" as const,
   };
 
   private constructor(deps: {

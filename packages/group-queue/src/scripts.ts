@@ -307,7 +307,7 @@ end
 // Reads routing metadata (pipelineName, jobType, jobName) from a stored job
 // value. The canonical envelope exposes it in the tiny header so the payload
 // body is never decoded on Redis's thread.
-const ROUTING_META_HELPER_LUA = `
+export const ROUTING_META_HELPER_LUA = `
 local function gqRoutingMeta(jobDataJson)
   local prefix = string.sub(jobDataJson, 1, 4)
   if prefix == "GQ2|" then
@@ -360,7 +360,7 @@ end
 `;
 
 // GQ2 blob-lease lifecycle: leases move atomically with blob refs.
-const BLOB_LEASE_HELPER_LUA =
+export const BLOB_LEASE_HELPER_LUA =
   GQ_BLOB_GRACE_LUA +
   `
 local function gqTenantOf(groupId)
