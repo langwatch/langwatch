@@ -91,9 +91,9 @@ export function assertAllowedAuthOrigin({
   }
   logger.warn(
     {
-      expectedOrigin: baseUrl,
-      receivedOrigin: origin ?? null,
-      receivedReferer: referer ?? null,
+      expectedOrigin: originOf(baseUrl),
+      receivedOrigin: originOf(origin),
+      receivedReferer: originOf(referer),
     },
     "rejected sign-up request: origin does not match NEXTAUTH_URL",
   );

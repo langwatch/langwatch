@@ -71,13 +71,14 @@ export const isCredentialRejection = ({
 }): boolean =>
   CREDENTIAL_REJECTION_KEYS.has(normalize(code) || normalize(message));
 
-/** The wording for each identifier worth naming beyond a credential rejection. */
+/** Maps an auth-layer identifier onto the registry code whose copy it shows. */
 const KEYED_ALIASES: Record<string, string> = {
   // better-auth's refusal and the sign-up procedures' own one are the same
   // failure, so they share the registry's words.
   invalid_origin: "auth_invalid_origin",
 };
 
+/** The wording for each identifier worth naming beyond a credential rejection. */
 const KEYED_MESSAGES: Record<string, string> = {
   user_already_exists:
     "An account with that email already exists. Try signing in instead.",

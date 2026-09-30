@@ -93,6 +93,7 @@ const post = async (
 
 describe("given a dev checkout running on a non-default port", () => {
   let app: HonoTestApp;
+  let trpc: typeof import("~/server/routes/trpc").app;
   let env: { NEXTAUTH_URL: string; BASE_HOST: string };
   let prisma: typeof import("~/server/db").prisma;
   let userId: string;
@@ -104,6 +105,7 @@ describe("given a dev checkout running on a non-default port", () => {
     vi.resetModules();
     ({ env } = await import("~/env.mjs"));
     ({ app } = await import("~/server/routes/auth"));
+    ({ app: trpc } = await import("~/server/routes/trpc"));
     ({ prisma } = await import("~/server/db"));
 
     const { hash } = await import("bcrypt");
@@ -226,7 +228,6 @@ describe("given a dev checkout running on a non-default port", () => {
     const SIGNUP_EMAIL = `origin-gate-signup-${Date.now()}@example.com`;
 
     const register = async (origin: string) => {
-      const { app: trpc } = await import("~/server/routes/trpc");
       // The Node adapter supplies `incoming`; `app.request()` does not, so it
       // is handed one the way the server would.
       return trpc.request(

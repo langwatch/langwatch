@@ -168,8 +168,10 @@ describe("userRouter.register()", () => {
       ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
       expect(registerMock).not.toHaveBeenCalled();
     });
+  });
 
-    it("accepts a matching referer when the origin is absent", async () => {
+  describe("when the browser is on the configured address and sends only a referer", () => {
+    it("accepts the sign-up", async () => {
       await expect(
         createCaller({
           referer: "http://localhost:5560/auth/signup",

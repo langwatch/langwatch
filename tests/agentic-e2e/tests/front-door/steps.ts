@@ -39,7 +39,7 @@ export const FRONT_DOOR_PASSWORD = "FrontDoorTest123!";
  * neither on its own, so a bare `page.request.post(...)` there is a 403. The
  * onboarding calls below do not run this check and need nothing extra.
  */
-export function betterAuthRequestHeaders(): Record<string, string> {
+export function originGatedRequestHeaders(): Record<string, string> {
   const baseURL = test.info().project.use.baseURL ?? "http://localhost:5570";
   return { Origin: new URL(baseURL).origin };
 }
@@ -157,7 +157,7 @@ export async function requestSignUpAddressProof(
 ): Promise<string> {
   const response = await request.post(
     "/api/trpc/auth.requestSignUpVerification?batch=1",
-    { headers: betterAuthRequestHeaders(), data: { "0": { json: { email } } } },
+    { headers: originGatedRequestHeaders(), data: { "0": { json: { email } } } },
   );
   const body: unknown = await response.json().catch(() => null);
   const parsed = signUpVerificationBodySchema.safeParse(body);
@@ -174,7 +174,7 @@ export async function requestSignUpAddressProof(
     "/api/auth/sign-up/confirm-address",
     {
       data: { token },
-      headers: betterAuthRequestHeaders(),
+      headers: originGatedRequestHeaders(),
     },
   );
   const confirmationBody: unknown = await confirmationResponse
@@ -204,7 +204,7 @@ export async function registerConfirmedAccount(
 ): Promise<void> {
   const addressProof = await requestSignUpAddressProof(request, email);
   const response = await request.post("/api/trpc/user.register?batch=1", {
-    headers: betterAuthRequestHeaders(),
+    headers: originGatedRequestHeaders(),
     data: {
       "0": {
         json: { addressProof, email, password, ...(name ? { name } : {}) },
@@ -520,7 +520,7 @@ export async function whenISignOut(page: Page): Promise<void> {
   // (`Content-Type is required`) — `data: {}` is what makes Playwright send
   // `application/json`.
   const response = await page.request.post("/api/auth/sign-out", {
-    headers: betterAuthRequestHeaders(),
+    headers: originGatedRequestHeaders(),
     data: {},
   });
   if (!response.ok()) {
