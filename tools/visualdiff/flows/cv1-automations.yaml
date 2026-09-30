@@ -1,0 +1,86 @@
+# CV1 coverage sweep, automations: the hub sections and the read-only view of an automation.
+# The trigger is made through the API so the flow starts from a row it did not have to build.
+flows:
+  - id: cv1-automation-hub-sections
+    title: The automations hub shows its recent activity, popular uses, schedules and automations sections
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations
+      - action: expect
+        with:
+          text: Popular uses
+      - action: expect
+        with:
+          text: Schedules
+      - action: expect
+        with:
+          text: Automations
+
+  - id: cv1-automation-tabs-reach-each-page
+    title: The automations pages answer at their own addresses for activity, alerts, schedules and automations
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/activity
+      - action: expect
+        with:
+          url: /automations/activity
+      - action: go
+        with:
+          path: /{slug}/automations/alerts
+      - action: expect
+        with:
+          text: New alert
+      - action: go
+        with:
+          path: /{slug}/automations/schedules
+      - action: expect
+        with:
+          text: New schedule
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          text: New automation
+
+  - id: cv1-automation-view-opens-from-row-menu
+    title: An automation made through the API is listed, opens in view from its row menu and keeps its name
+    setup:
+      - post: /api/triggers
+        body:
+          name: vd-cv1-view-{uid}
+          action: SEND_EMAIL
+          actionParams:
+            members:
+              - vd-cv1-view@example.com
+          filters:
+            metadata.labels:
+              - vd-cv1-view
+          alertType: INFO
+          message: cv1 view
+        as:
+          triggerName: name
+          triggerId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/automations/automations
+      - action: expect
+        with:
+          text: "{triggerName}"
+      - action: click
+        with:
+          testId: "automation-row-actions-{triggerName}"
+      - action: click
+        with:
+          testId: automation-action-view
+      - action: expect
+        with:
+          url: viewAutomation
+      - action: expect
+        with:
+          api: /api/triggers/{triggerId}
+          field: name
+          equals: "{triggerName}"

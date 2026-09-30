@@ -1,0 +1,38 @@
+# CV3: an online-evaluation monitor from create to delete as one chain: change name, sample rate
+# and enabled together, read each back from the item and the list, delete, then read the 404.
+# The one-field cases live in evaluations.yaml; this is the chain the edit screen performs.
+
+- id: cv3-monitors-edit-together-list-delete-chain
+  endpoint: PATCH /api/monitors/{id}
+  auth: project
+  shard: project
+  setup:
+    - request: POST /api/evaluators
+      body: { name: "cv3ev-{uid}", config: { evaluatorType: langevals/exact_match } }
+      capture: { evaluatorId: id }
+    - request: POST /api/monitors
+      body:
+        name: "cv3mon-{uid}"
+        checkType: langevals/exact_match
+        evaluatorId: "{evaluatorId}"
+        parameters: {}
+      capture: { monitorId: id }
+      expect: { status: 201 }
+  request:
+    path: /api/monitors/{monitorId}
+    body: { name: "cv3mon-edited-{uid}", sample: 0.25, enabled: false }
+  expect: { status: 200 }
+  verify:
+    - request: GET /api/monitors/{monitorId}
+      expect:
+        status: 200
+        body: { name: "cv3mon-edited-{uid}", sample: 0.25, enabled: false, evaluatorId: "{evaluatorId}" }
+    - request: GET /api/monitors
+      expect: { status: 200, contains: "cv3mon-edited-{uid}", notContains: "cv3mon-{uid}" }
+    - request: DELETE /api/monitors/{monitorId}
+      expect: { status: 200 }
+    - request: GET /api/monitors/{monitorId}
+      eventually: 10s
+      expect: { status: 404 }
+    - request: GET /api/monitors
+      expect: { status: 200, notContains: "cv3mon-edited-{uid}" }

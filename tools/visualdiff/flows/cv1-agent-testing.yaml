@@ -1,0 +1,64 @@
+# CV1 coverage sweep, agent testing: suites made through the API show in the rail, so the flow
+# does not depend on New Test Suite being on screen among a crowd of seeded suites.
+flows:
+  - id: cv1-sim-api-suite-shows-in-rail-and-opens
+    title: A test suite made through the API is listed in the rail and opens on its own page
+    setup:
+      - post: /api/v1/test-suites
+        body:
+          name: vd-cv1-suite-{uid}
+        as:
+          suiteName: name
+          suiteId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/simulations
+      - action: expect
+        with:
+          text: "{suiteName}"
+          timeout: "20000"
+      - action: click
+        with:
+          text: "{suiteName}"
+      - action: expect
+        with:
+          text: "{suiteName}"
+          min: "2"
+      - action: expect
+        with:
+          api: /api/v1/test-suites/{suiteId}
+          field: name
+          equals: "{suiteName}"
+
+  - id: cv1-sim-api-archived-suite-leaves-the-rail
+    title: A test suite archived through the API is gone from the rail after a reload
+    setup:
+      - post: /api/v1/test-suites
+        body:
+          name: vd-cv1-archived-{uid}
+        as:
+          suiteName: name
+          suiteId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/simulations
+      - action: expect
+        with:
+          text: "{suiteName}"
+          timeout: "20000"
+      - action: request
+        with:
+          path: /api/v1/test-suites/{suiteId}
+          method: DELETE
+      - action: go
+        with:
+          path: /{slug}/simulations
+      - action: expect
+        with:
+          text: New Test Suite
+      - action: expect
+        with:
+          text: "{suiteName}"
+          equals: "0"
