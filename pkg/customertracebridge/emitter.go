@@ -461,11 +461,13 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 // strips the prefix for provider routing, and stamping the stripped name made
 // the gateway the one surface reporting bare wire-names: a Langy turn's
 // Models filter listed the SAME model twice, once bare (this span), once
-// prefixed (the worker's own span). A model whose provider is unknown
-// (implicit resolution never fills it) or that already carries a path
-// segment is reported as requested.
+// prefixed (the worker's own span). Resolution cuts the prefix at the first slash, so a model
+// with slashes of its own ("Qwen/Qwen2.5-32B-Instruct") still gets its
+// provider, as nlpgo does. A model whose provider is unknown (implicit
+// resolution never fills it) or that already starts with its provider is
+// reported as requested.
 func canonicalModelID(provider domain.ProviderID, model string) string {
-	if provider == "" || model == "" || strings.Contains(model, "/") {
+	if provider == "" || model == "" || strings.HasPrefix(model, string(provider)+"/") {
 		return model
 	}
 	return string(provider) + "/" + model
