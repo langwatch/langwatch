@@ -22,6 +22,7 @@
       "{workspaceRoot}/packages/oxlint-rules/**/*"
     ]
   },
+  "plugins": ["./dev/nx/lint-types-plugin.mjs"],
   "targetDefaults": {
     "typecheck": {
       "cache": true,
@@ -44,9 +45,22 @@
       "inputs": ["default", "^production"],
       "outputs": []
     },
-    "lint": {
+    "lint": [
+      {
+        "cache": true,
+        "inputs": ["default", "lintGlobals"],
+        "outputs": []
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/architecture-enforcer"]
+        },
+        "cache": false
+      }
+    ],
+    "lint:types": {
       "cache": true,
-      "inputs": ["default", "lintGlobals"],
+      "inputs": ["default", "^production", "lintGlobals"],
       "outputs": []
     }
   },

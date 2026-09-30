@@ -1104,6 +1104,19 @@ jobs:
       - name: Oxlint (blocking -- config errors included)
         run: pnpm lint:oxlint
 
+      # Type-aware rules per project, only where a change reached (ADR-150).
+      # A global lint input changing, or a push, lints every project.
+      - name: Oxlint type-aware, affected projects (blocking)
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
+            | grep -qE '^(\.oxlintrc\.jsonc|packages/oxlint-rules/|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|dev/nx/)'; then
+            pnpm exec nx affected -t lint:types --base="$BASE" --head=HEAD
+          else
+            pnpm exec nx run-many -t lint:types
+          fi
+
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
         env:

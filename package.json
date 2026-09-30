@@ -35,8 +35,8 @@
     "test:dev-scripts": "TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs",
     "lint": "pnpm lint:oxlint",
     "lint:architecture": "pnpm --filter @langwatch/architecture-enforcer lint",
-    "lint:oxlint": "oxlint --quiet --type-aware --config .oxlintrc.jsonc .",
-    "lint:oxlint:ci": "oxlint --quiet --type-aware --format=github --config .oxlintrc.jsonc .",
+    "lint:oxlint": "oxlint --quiet --config .oxlintrc.jsonc .",
+    "lint:oxlint:ci": "oxlint --quiet --format=github --config .oxlintrc.jsonc .",
     "lint:fix": "oxlint --fix --quiet --config .oxlintrc.jsonc .",
     "format": "oxfmt --write --disable-nested-config .",
     "format:check": "oxfmt --check --disable-nested-config .",
@@ -61,11 +61,11 @@
     "typecheck:all": "nx run-many -t typecheck",
     "typecheck:affected": "nx affected -t typecheck",
     "build:affected": "nx affected -t build",
-    "lint:affected": "nx affected -t lint"
+    "lint:affected": "nx affected -t lint",
+    "lint:types:affected": "nx affected -t lint:types"
   },
   "devDependencies": {
     "@0xdeafcafe/tslsp-cli": "0.6.0",
-    "@nx/oxlint": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

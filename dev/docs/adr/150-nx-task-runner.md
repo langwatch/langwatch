@@ -68,6 +68,14 @@ documentation already invoke. Nx is added beside them as `test:all`,
 `test:affected`, `typecheck:all`, `typecheck:affected`, `build:affected`,
 `lint:affected` and `graph`.
 
+Type-aware oxlint is a per-project `lint:types` target (amended 2026-09-30).
+`dev/nx/lint-types-plugin.mjs` infers it for every TypeScript workspace member,
+so no package.json carries it; it takes `["default", "^production", "lintGlobals"]`
+and no `dependsOn`, because workspace imports resolve to source through `exports`
+and tsgolint reads no emitted `.d.ts`. The whole-tree root `lint` is not
+type-aware. The architecture enforcer's `lint` reads the whole tree, so it is
+never cached: its own project's files cannot describe its result.
+
 ## Rationale / Trade-offs
 
 Nx was configured in its inferred-target mode rather than its project-oriented

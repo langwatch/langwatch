@@ -137,7 +137,7 @@ undeclared imports is a known gap rather than a hidden one.
 `dev/nx/tags-plugin.mjs` is not in the tree, so no project carries a derived
 tag, and the lint review of 2026-09-23 deleted `pnpm check:boundaries`. The
 "40 violations" starting count above measured a check that no longer runs.
-`dev/nx/module-boundaries.json` remains, read by nothing.
+`dev/nx/module-boundaries.json` was deleted 2026-09-30.
 
 Package-level boundaries are enforced per import by `langwatch/package-boundaries`
 (ADR-137), which reads import statements and so does not share the
