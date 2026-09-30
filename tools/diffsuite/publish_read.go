@@ -68,7 +68,7 @@ var (
 	deferredLine   = regexp.MustCompile(`scenarios: (\d+) deferred`)
 	flowTally      = regexp.MustCompile(`(\d+)/(\d+) flows passed`)
 	routeTally     = regexp.MustCompile(`(\d+)/(\d+) routes without a finding`)
-	flowLine       = regexp.MustCompile(`(?m)^(?:\[[0-9:]+\] )?(PASS|FAIL|UNPROVEN)\s+(\S+)`)
+	flowLine       = regexp.MustCompile(`(?m)^(?:\[[0-9:]+\] )?(PASS|VERIFIED|FAIL|UNPROVEN)\s+(\S+)`)
 	flowID         = regexp.MustCompile(`(?m)^\s*- id:\s*(\S+)`)
 	fuzzDir        = regexp.MustCompile(`fuzz (?:api|ui): wrote (\S+)`)
 	fuzzOperations = regexp.MustCompile(`operations exercised: (\d+)/(\d+)`)
@@ -263,7 +263,7 @@ func readVisual(log string, flowAreas map[string]string) visualResults {
 	for id, verdict := range verdicts {
 		area := entry(found.areas, cmp.Or(flowAreas[id], otherArea))
 		area.total++
-		if verdict == "PASS" {
+		if verdict == "PASS" || verdict == "VERIFIED" {
 			area.pass++
 		} else {
 			area.failing = append(area.failing, id)

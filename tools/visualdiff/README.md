@@ -291,6 +291,12 @@ unproven, with the first failure) and `signatures.md` (log lines by shape,
 new on the candidate first). Read `verdict.md` first; open PNGs only for
 broken rows. `visualdiff done` keeps a flow's held expects as its proof.
 
+A flow that passes with no main baseline to compare screens against is
+`VERIFIED ... · verified, not compared` when at least one of its expect steps
+checks data (`hasText`, `value`, `count`, `api` or `url`), and stays
+`PASS ... · no baseline, presence only` when its expects only check presence.
+It counts as passed and is marked done like any pass.
+
 ## Writing flows
 
 Flows live in `flows/*.yaml` beside `visualdiff.yaml` (`flows:` in either is

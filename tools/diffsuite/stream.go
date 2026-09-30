@@ -21,7 +21,7 @@ var (
 	apiStepLine       = regexp.MustCompile(`^\s+first failing step: .+$`)
 	visualVerdictLine = regexp.MustCompile(`^(?:\[[0-9:]+\] )?(FAIL|UNPROVEN|ROUTE)\s+(\S+)`)
 	countPair         = regexp.MustCompile(`(?i)(\d+) (pass|fail(?:-\w+)?|err(?:or)?)\b`)
-	apiCountLine      = regexp.MustCompile(`^(?:\[[0-9:]+\] )?scenarios(?: \d+/\d+|: \d+ run:)`)
+	apiCountLine      = regexp.MustCompile(`^(?:\[[0-9:]+\] )?(?:scenarios(?: \d+/\d+|: \d+ run:)|worker: \d+ checked:)`)
 	versionSegment    = regexp.MustCompile(`^v\d+$`)
 )
 

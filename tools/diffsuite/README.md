@@ -81,6 +81,7 @@ With no `name=` after `--`, `-tools` (default `api,visual,fuzzapi,fuzzui`) picks
 | visual | `visualdiff check -routes -all` (every flow and route) |
 | fuzzapi | `fuzz api -duration 20m` |
 | fuzzui | `fuzz ui -duration 20m -workers 3 -actions 10` |
+| worker | `workerrun -run-dir "$DIFFSUITE_OUT/worker"` (opt-in: only when `-tools` names it; `tools/workerrun/README.md`) |
 
 Each runs `.bin/<tool>/<tool>`, built with `go build` before the suite starts. After `--`,
 `name+='<flags>'` appends flags to a tool in the suite, and `name='<command>'` replaces one
@@ -94,7 +95,7 @@ or adds another (run from the repository root, with the environment above).
   exit, stop reason and cause, duration and the verdict.
 - **stdout is the live view** (plain text, no ANSI, so `> r.log` and grep work): every 15 s one
   `[name] RUNNING <elapsed> load <1m 5m 15m>: <latest>` line per running tool, where latest is the last
-  line matching the tool's progress pattern (api `N run`, visual `flows passed`/`step`, fuzz `visits ... routes`),
+  line matching the tool's progress pattern (api `N run`, visual `flows passed`/`step`, fuzz `visits ... routes`, worker `worker fire:`/`worker landed:`),
   else its last line; every events.log line as it happens; `[name] EXIT <code>`; and at the end a table of
   tool, exit, duration and the tool's last tally line. Load is `uptime`'s load average.
 - **Results stream as they appear**, prefixed `[name]`: apidiff `FAIL*`/`ERROR` lines and their

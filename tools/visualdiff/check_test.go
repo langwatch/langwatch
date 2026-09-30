@@ -45,6 +45,30 @@ func TestCheckAnswersPassOrFailAndHowEachFlowComparesWithMain(t *testing.T) {
 	}
 }
 
+func TestAPassWithNoBaselineIsVerifiedOnlyWhenAnExpectChecksData(t *testing.T) {
+	results := newFlowResults()
+	for _, id := range []string{"data", "presence"} {
+		results.add(Capture{Kind: "flow", Key: id, Side: "candidate", Expect: "ok"})
+	}
+	expect := func(key string) Step { return Step{Action: ExpectAction, With: map[string]string{key: "x"}} }
+	outcome := results.outcome(checkOutcomeInputs{flows: []Flow{
+		{ID: "data", Steps: []Step{expect("testId"), expect("hasText")}},
+		{ID: "presence", Steps: []Step{expect("testId")}},
+	}})
+	for _, want := range []string{
+		"VERIFIED data (1 expects, 1 data) · verified, not compared",
+		"PASS     presence (1 expects) · no baseline, presence only",
+		"2/2 flows passed, 1 verified not compared",
+	} {
+		if !strings.Contains(outcome.text, want) {
+			t.Errorf("missing %q in\n%s", want, outcome.text)
+		}
+	}
+	if len(outcome.passed) != 2 || outcome.failed != 0 {
+		t.Errorf("failed %d, passed %v", outcome.failed, outcome.passed)
+	}
+}
+
 func TestGCNeverTakesChecksOwnStackAsAnOrphan(t *testing.T) {
 	plan := SelectGarbage(nil, GCSelection{Registered: []string{CheckSlug, "visualdiff-stray"}})
 	if len(plan.OrphanSlugs) != 1 || plan.OrphanSlugs[0] != "visualdiff-stray" {

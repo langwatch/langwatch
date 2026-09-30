@@ -15,9 +15,22 @@ var defaultTools = []tool{
 	{name: "visual", binary: "visualdiff", command: ".bin/visualdiff/visualdiff check -routes -all"},
 	{name: "fuzzapi", binary: "fuzz", command: ".bin/fuzz/fuzz api -duration 20m"},
 	{name: "fuzzui", binary: "fuzz", command: ".bin/fuzz/fuzz ui -duration 20m -workers 3 -actions 10"},
+	// worker runs only when -tools names it: it is load, and would skew the others' timings.
+	{name: "worker", binary: "workerrun", command: `.bin/workerrun/workerrun -run-dir "$DIFFSUITE_OUT/worker"`, optIn: true},
 }
 
+// defaultNames are the tools -tools picks when it is not given: every default but the opt-in ones.
 func defaultNames() []string {
+	names := make([]string, 0, len(defaultTools))
+	for index := range defaultTools {
+		if !defaultTools[index].optIn {
+			names = append(names, defaultTools[index].name)
+		}
+	}
+	return names
+}
+
+func allNames() []string {
 	names := make([]string, 0, len(defaultTools))
 	for index := range defaultTools {
 		names = append(names, defaultTools[index].name)
@@ -55,7 +68,7 @@ func suiteTools(names, specs []string) ([]*tool, error) {
 			}
 		}
 		if index < 0 {
-			return nil, fmt.Errorf("-tools: no default tool %q (have %s)", name, strings.Join(defaultNames(), ", "))
+			return nil, fmt.Errorf("-tools: no default tool %q (have %s)", name, strings.Join(allNames(), ", "))
 		}
 		copied := defaultTools[index]
 		tools = append(tools, &copied)

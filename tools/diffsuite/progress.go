@@ -15,12 +15,13 @@ var stdout io.Writer = os.Stdout
 
 var (
 	statusEvery  = 15 * time.Second
-	tallyLine    = regexp.MustCompile(`flows passed|scenarios: [0-9]+ run`)
+	tallyLine    = regexp.MustCompile(`flows passed|scenarios: [0-9]+ run|worker: [0-9]+ checked`)
 	progressLine = map[string]*regexp.Regexp{
 		"api":     regexp.MustCompile(`[0-9]+ run`),
 		"visual":  regexp.MustCompile(`flows passed|step`),
 		"fuzzapi": regexp.MustCompile(`visits.*routes|requests`),
 		"fuzzui":  regexp.MustCompile(`visits.*routes`),
+		"worker":  regexp.MustCompile(`worker (fire|landed):`),
 	}
 )
 

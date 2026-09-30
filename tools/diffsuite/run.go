@@ -44,6 +44,7 @@ type stop struct {
 type tool struct {
 	name, command string
 	binary        string // the .bin/<binary> a default command runs, built before the suite starts
+	optIn         bool   // a default tool that runs only when -tools names it
 	dir           string // where continuous mode puts this run's log; empty means the suite's out
 	cmd           *exec.Cmd
 	stopLine      string

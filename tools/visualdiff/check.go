@@ -527,6 +527,15 @@ type checkOutcome struct {
 	text   string
 	passed map[string][]string
 	failed int
+	// verified counts passes with no baseline whose expects check data (see passLine).
+	verified int
+}
+
+func (outcome checkOutcome) verifiedNote() string {
+	if outcome.verified == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d verified not compared", outcome.verified)
 }
 
 // outcome is one line per flow: pass or fail, and how its screens compare with main.
@@ -548,12 +557,57 @@ func (results *flowResults) outcome(inputs checkOutcomeInputs) checkOutcome {
 			fmt.Fprintf(&out, "UNPROVEN %s · no expect held · %s\n", id, looks)
 		default:
 			outcome.passed[id] = held
-			fmt.Fprintf(&out, "PASS     %s (%d expects) · %s\n", id, len(held), looks)
+			line := passLine(passInputs{flow: inputs.flows[index], held: len(held), looks: looks})
+			if strings.HasPrefix(line, "VERIFIED") {
+				outcome.verified++
+			}
+			fmt.Fprintln(&out, line)
 		}
 	}
-	fmt.Fprintf(&out, "%d/%d flows passed in %s\n", len(inputs.flows)-outcome.failed, len(inputs.flows), inputs.took.Round(time.Second))
+	fmt.Fprintf(&out, "%d/%d flows passed%s in %s\n", len(inputs.flows)-outcome.failed, len(inputs.flows), outcome.verifiedNote(), inputs.took.Round(time.Second))
 	outcome.text = out.String()
 	return outcome
+}
+
+const noBaseline = "no baseline"
+
+// dataKeys make an expect step check data, not just that something is on screen.
+var dataKeys = []string{"hasText", "value", "count", "api", "url"}
+
+// dataExpects counts a flow's expect steps that check data.
+func dataExpects(flow Flow) int {
+	total := 0
+	for _, step := range flow.Steps {
+		if step.Action != ExpectAction {
+			continue
+		}
+		for _, key := range dataKeys {
+			if _, ok := step.With[key]; ok {
+				total++
+				break
+			}
+		}
+	}
+	return total
+}
+
+type passInputs struct {
+	flow  Flow
+	held  int
+	looks string
+}
+
+// passLine is a passing flow's line. With no baseline it is VERIFIED when an expect checked data.
+func passLine(in passInputs) string {
+	data := dataExpects(in.flow)
+	switch {
+	case in.looks != noBaseline:
+		return fmt.Sprintf("PASS     %s (%d expects) · %s", in.flow.ID, in.held, in.looks)
+	case data > 0:
+		return fmt.Sprintf("VERIFIED %s (%d expects, %d data) · verified, not compared", in.flow.ID, in.held, data)
+	default:
+		return fmt.Sprintf("PASS     %s (%d expects) · no baseline, presence only", in.flow.ID, in.held)
+	}
 }
 
 // looksLikeMain compares a flow's screens with main's baseline by its worst step.
@@ -566,7 +620,7 @@ func looksLikeMain(id string, held bool, diffs []Diff) string {
 	}
 	switch {
 	case !held || !diffed:
-		return "no baseline"
+		return noBaseline
 	case worst < NoiseRatio:
 		return "looks like main"
 	default:
