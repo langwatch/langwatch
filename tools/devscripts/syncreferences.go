@@ -10,6 +10,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/langwatch/langwatch/tools/internal/jsonc"
 )
 
 const (
@@ -48,6 +50,8 @@ type Project struct {
 	File       string
 	References []string
 	Undeduced  []string
+	// Current is the references the file carries today, normalised.
+	Current []string
 }
 
 func readConfig(path string) map[string]any {
@@ -55,7 +59,7 @@ func readConfig(path string) map[string]any {
 	if err != nil {
 		return map[string]any{}
 	}
-	return readJSONC(string(data))
+	return jsonc.Read(string(data))
 }
 
 func referencePaths(config map[string]any, key string) []string {
@@ -412,13 +416,13 @@ func (d *deriver) derivedProject(k kind) []Project {
 		derived = append(derived, normalise(extra))
 	}
 	references := unique(derived)
-	undeduced := []string{}
-	for _, current := range referencePaths(config, "references") {
-		if !slices.Contains(references, normalise(current)) {
-			undeduced = append(undeduced, normalise(current))
+	undeduced, current := []string{}, currentReferences(config)
+	for _, entry := range current {
+		if !slices.Contains(references, entry) {
+			undeduced = append(undeduced, entry)
 		}
 	}
-	return []Project{{File: k.file, References: references, Undeduced: undeduced}}
+	return []Project{{File: k.file, References: references, Undeduced: undeduced, Current: current}}
 }
 
 func (d *deriver) rootSolutionProject() []Project {
@@ -439,7 +443,15 @@ func (d *deriver) rootSolutionProject() []Project {
 	for _, extra := range referencePaths(config, "langwatchExtraReferences") {
 		derived = append(derived, normalise(extra))
 	}
-	return []Project{{File: solution, References: unique(derived), Undeduced: []string{}}}
+	return []Project{{File: solution, References: unique(derived), Undeduced: []string{}, Current: currentReferences(config)}}
+}
+
+func currentReferences(config map[string]any) []string {
+	current := []string{}
+	for _, entry := range referencePaths(config, "references") {
+		current = append(current, normalise(entry))
+	}
+	return current
 }
 
 func (d *deriver) kinds(member WorkspaceMember, isGroup bool, own string, buildTargets, dependencyTargets, consumerTargets []string) []kind {
@@ -530,7 +542,7 @@ func renderArray(references []string, indent, unit string) string {
 // RenderReferences replaces only the references array, keeping every other byte.
 func RenderReferences(text string, references []string) string {
 	unit := indentUnitOf(text)
-	if keyStart, valueStart, valueEnd, ok := referencesSpan(text); ok {
+	if keyStart, valueStart, valueEnd, ok := jsonc.ReferencesSpan(text); ok {
 		indent := lineIndentAt(text, keyStart)
 		return text[:valueStart] + renderArray(references, indent, unit) + text[valueEnd:]
 	}

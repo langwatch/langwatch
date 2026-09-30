@@ -1,13 +1,13 @@
-package devscripts
+package jsonc
 
 import (
 	"encoding/json"
 	"strings"
 )
 
-// stripJSONC drops comments and trailing commas so encoding/json can read a
+// Strip drops comments and trailing commas so encoding/json can read a
 // tsconfig, which TypeScript parses leniently.
-func stripJSONC(text string) string {
+func Strip(text string) string {
 	var sb strings.Builder
 	for i := 0; i < len(text); {
 		switch {
@@ -75,18 +75,22 @@ func skipTrivia(text string, i int) int {
 
 // skipValue returns the end of the JSON value starting at i.
 func skipValue(text string, i int) int {
-	if i >= len(text) {
+	switch {
+	case i >= len(text):
 		return i
-	}
-	if text[i] == '"' {
+	case text[i] == '"':
 		return skipString(text, i)
+	case text[i] == '{' || text[i] == '[':
+		return skipContainer(text, i)
 	}
-	if text[i] != '{' && text[i] != '[' {
-		for i < len(text) && !strings.ContainsRune(",}] \t\r\n/", rune(text[i])) {
-			i++
-		}
-		return i
+	for i < len(text) && !strings.ContainsRune(",}] \t\r\n/", rune(text[i])) {
+		i++
 	}
+	return i
+}
+
+// skipContainer returns the end of the object or array starting at i.
+func skipContainer(text string, i int) int {
 	depth := 0
 	for i < len(text) {
 		switch text[i] {
@@ -101,8 +105,7 @@ func skipValue(text string, i int) int {
 		case '{', '[':
 			depth++
 		case '}', ']':
-			depth--
-			if depth == 0 {
+			if depth--; depth == 0 {
 				return i + 1
 			}
 		}
@@ -111,45 +114,56 @@ func skipValue(text string, i int) int {
 	return i
 }
 
-// referencesSpan finds the top-level "references" property: where its key
+// member is one top-level property: its key, where the key starts, and its value's span.
+type member struct {
+	key                            string
+	keyStart, valueStart, valueEnd int
+}
+
+// memberAt reads the property whose key starts at i.
+func memberAt(text string, i int) (member, bool) {
+	if i >= len(text) || text[i] != '"' {
+		return member{}, false
+	}
+	m := member{keyStart: i}
+	keyEnd := skipString(text, i)
+	if json.Unmarshal([]byte(text[i:keyEnd]), &m.key) != nil {
+		return member{}, false
+	}
+	i = skipTrivia(text, keyEnd)
+	if i >= len(text) || text[i] != ':' {
+		return member{}, false
+	}
+	m.valueStart = skipTrivia(text, i+1)
+	m.valueEnd = skipValue(text, m.valueStart)
+	return m, true
+}
+
+// ReferencesSpan finds the top-level "references" property: where its key
 // starts, and where its value starts and ends. ok is false when absent.
-func referencesSpan(text string) (keyStart, valueStart, valueEnd int, ok bool) {
+func ReferencesSpan(text string) (keyStart, valueStart, valueEnd int, ok bool) {
 	i := skipTrivia(text, 0)
 	if i >= len(text) || text[i] != '{' {
 		return 0, 0, 0, false
 	}
-	i++
-	for {
-		i = skipTrivia(text, i)
-		if i >= len(text) || text[i] != '"' {
+	for i++; ; i++ {
+		m, found := memberAt(text, skipTrivia(text, i))
+		if !found {
 			return 0, 0, 0, false
 		}
-		keyEnd := skipString(text, i)
-		var key string
-		if json.Unmarshal([]byte(text[i:keyEnd]), &key) != nil {
+		if m.key == "references" {
+			return m.keyStart, m.valueStart, m.valueEnd, true
+		}
+		if i = skipTrivia(text, m.valueEnd); i >= len(text) || text[i] != ',' {
 			return 0, 0, 0, false
 		}
-		start := i
-		i = skipTrivia(text, keyEnd)
-		if i >= len(text) || text[i] != ':' {
-			return 0, 0, 0, false
-		}
-		i = skipTrivia(text, i+1)
-		end := skipValue(text, i)
-		if key == "references" {
-			return start, i, end, true
-		}
-		i = skipTrivia(text, end)
-		if i >= len(text) || text[i] != ',' {
-			return 0, 0, 0, false
-		}
-		i++
 	}
 }
 
-func readJSONC(text string) map[string]any {
+// Read parses a tsconfig-style JSONC object; anything unreadable is an empty object.
+func Read(text string) map[string]any {
 	var config map[string]any
-	if json.Unmarshal([]byte(stripJSONC(text)), &config) != nil || config == nil {
+	if json.Unmarshal([]byte(Strip(text)), &config) != nil || config == nil {
 		return map[string]any{}
 	}
 	return config

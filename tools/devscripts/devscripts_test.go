@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/internal/collate"
 )
 
 func writeTree(t testing.TB, root string, tree map[string]string) {
@@ -31,8 +33,8 @@ func run(t testing.TB, args ...string) (int, string, string) {
 
 func TestLocaleCompare(t *testing.T) {
 	for _, c := range localeCompareCases {
-		if got := localeCompare(c.a, c.b); got != c.want {
-			t.Errorf("localeCompare(%q, %q) = %d, want %d", c.a, c.b, got, c.want)
+		if got := collate.Compare(c.a, c.b); got != c.want {
+			t.Errorf("collate.Compare(%q, %q) = %d, want %d", c.a, c.b, got, c.want)
 		}
 	}
 }

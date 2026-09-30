@@ -21,6 +21,7 @@ const USAGE = `architecture-enforcer [options]
   --policies <id,id,...>   run only these registry ids
   --review-test-quality    run the test-quality review over changed test files alone
   --no-declarations        skip the declarations policy (it needs tsc -b to have run)
+  --findings-json          print each selected policy's findings as JSON, discovery excluded
   --help
 
 Exit codes: 0 clean, 1 findings, 2 bad arguments or a crash (a missing anchor file included).
@@ -33,6 +34,7 @@ const BOOLEAN_FLAGS = new Set([
   "--list-policies",
   "--review-test-quality",
   "--no-declarations",
+  "--findings-json",
   "--help",
   "-h",
 ]);
@@ -42,6 +44,7 @@ type CliOptions = {
   all: boolean;
   reviewTestQuality: boolean;
   declarations: boolean;
+  findingsJson: boolean;
   only?: readonly string[];
 };
 
@@ -119,6 +122,7 @@ export function parseArgv(argv: readonly string[]): ParseResult {
       all: flags.has("--all"),
       reviewTestQuality: flags.has("--review-test-quality"),
       declarations: !flags.has("--no-declarations"),
+      findingsJson: flags.has("--findings-json"),
       only: selected.length > 0 ? selected : void 0,
     },
   };
@@ -134,9 +138,28 @@ function testQualityFindings(
   }));
 }
 
+/** The Go front's delegate mode (tools/enforcer): findings by policy id, discovery excluded. */
+function findingsJson(options: CliOptions, snapshot: WorkspaceSnapshot): string {
+  const byPolicy = enabledPolicies(options).map((policy) => [
+    policy.id,
+    policy.run(snapshot).map((violation) => ({
+      ...violation,
+      file: relative(options.root, violation.file) || violation.file,
+    })),
+  ]);
+
+  return `${JSON.stringify(Object.fromEntries(byPolicy))}\n`;
+}
+
 function run(options: CliOptions): 0 | 1 {
   const changedFiles = changedSourceFiles(options.root);
   const snapshot = buildWorkspaceSnapshot({ root: options.root, changedFiles });
+
+  if (options.findingsJson) {
+    process.stdout.write(findingsJson(options, snapshot));
+
+    return 0;
+  }
 
   const findings = options.reviewTestQuality
     ? testQualityFindings(options, snapshot)

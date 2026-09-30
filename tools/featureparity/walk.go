@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -56,30 +55,6 @@ func walkRoots(roots []string, keep func(string) bool) []string {
 	for _, l := range lists {
 		out = append(out, l...)
 	}
-	return out
-}
-
-// parallelMap applies fn to every item on all cores and keeps the order.
-func parallelMap[T, R any](items []T, fn func(T) R) []R {
-	out := make([]R, len(items))
-	var next sync.Mutex
-	i := 0
-	var wg sync.WaitGroup
-	for range runtime.GOMAXPROCS(0) {
-		wg.Go(func() {
-			for {
-				next.Lock()
-				k := i
-				i++
-				next.Unlock()
-				if k >= len(items) {
-					return
-				}
-				out[k] = fn(items[k])
-			}
-		})
-	}
-	wg.Wait()
 	return out
 }
 

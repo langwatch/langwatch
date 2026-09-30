@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"unsafe"
+
+	"github.com/langwatch/langwatch/tools/internal/parallel"
 )
 
 var (
@@ -208,7 +210,7 @@ func collectBindings(repo string, l Lists) []Binding {
 	add(l.PythonRoots, pyTestFile.MatchString, pythonBindings)
 
 	var out []Binding
-	for _, bs := range parallelMap(jobs, func(j job) []Binding { return j.scan(rel(repo, j.path), readSource(j.path)) }) {
+	for _, bs := range parallel.Map(jobs, func(j job) []Binding { return j.scan(rel(repo, j.path), readSource(j.path)) }) {
 		out = append(out, bs...)
 	}
 	return out
@@ -229,7 +231,7 @@ func Analyze(repo string, l Lists) (Analysis, error) {
 	var bindings []Binding
 	done := make(chan struct{})
 	go func() { bindings = collectBindings(repo, l); close(done) }()
-	scenarios := parallelMap(features, func(f string) []Scenario { return ParseFeature(readSource(filepath.Join(repo, f))) })
+	scenarios := parallel.Map(features, func(f string) []Scenario { return ParseFeature(readSource(filepath.Join(repo, f))) })
 	<-done
 
 	byTitle := map[string][]BindingRef{}
