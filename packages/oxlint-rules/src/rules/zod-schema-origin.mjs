@@ -1,8 +1,8 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve, sep } from "node:path";
 
-import { parseProgram } from "../parse.mjs";
+import { parseFile } from "../parse.mjs";
 
 const modules = new Map();
 const factories = new Set(["object", "strictObject", "looseObject"]);
@@ -112,19 +112,18 @@ function indexExports(statement, indexed) {
 }
 
 function indexModule(filename) {
-  const stat = statSync(filename);
+  const { mtime, program, size } = parseFile(filename);
   const cached = modules.get(filename);
-  if (cached?.mtime === stat.mtimeMs && cached.size === stat.size) {
+  if (cached?.mtime === mtime && cached.size === size) {
     return cached;
   }
 
-  const program = parseProgram({ path: filename, text: readFileSync(filename, "utf8") });
   const indexed = {
     bindings: new Map(),
     exports: new Map(),
     stars: [],
-    mtime: stat.mtimeMs,
-    size: stat.size,
+    mtime,
+    size,
   };
   for (const statement of program.body) {
     indexImports(statement, indexed.bindings);

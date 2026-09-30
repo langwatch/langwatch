@@ -1,4 +1,3 @@
-import { childNodes } from "../ast.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // SonarSource cognitive complexity: a structural +1 per control-flow break,
@@ -6,23 +5,8 @@ import { defineRule } from "../define-rule.mjs";
 // `else if` take the +1 without the nesting penalty, boolean sequences and
 // recursion take +1 flat, and a nested function raises the nesting level for
 // everything inside it.
-const COGNITIVE_FUNCTION_TYPES = new Set([
-  "FunctionDeclaration",
-  "FunctionExpression",
-  "ArrowFunctionExpression",
-]);
-
 function isLogicalSequence(node) {
   return node.type === "LogicalExpression" && (node.operator === "&&" || node.operator === "||");
-}
-
-function isNestedFunction(node) {
-  let current = node.parent;
-  while (current) {
-    if (COGNITIVE_FUNCTION_TYPES.has(current.type)) return true;
-    current = current.parent;
-  }
-  return false;
 }
 
 function functionName(node) {
@@ -77,82 +61,6 @@ function describeConstruct(node) {
   return CONSTRUCT_LABELS[node.type] ?? "construct";
 }
 
-// Attribution is by the weight of a whole block, not the single node with the
-// largest delta: a block is the thing a reader can lift out.
-function note(tally, delta) {
-  tally.score += delta;
-  for (const block of tally.open) block.subtotal += delta;
-}
-
-function enter(tally, node) {
-  const block = { node, subtotal: 0 };
-  tally.blocks.push(block);
-  tally.open.push(block);
-}
-
-function leave(tally) {
-  tally.open.pop();
-}
-
-function walkNested(tally, node, { bodyNesting, nesting, owner }) {
-  for (const child of childNodes(node)) {
-    walkNode(tally, child, { nesting: child === node.body ? bodyNesting : nesting, owner });
-  }
-}
-
-// An `else if` continues the chain its head opened: the reader extracts all of it or none.
-function walkIf(tally, node, { isElseIf, nesting, owner }) {
-  if (!isElseIf) enter(tally, node);
-  note(tally, isElseIf ? 1 : 1 + nesting);
-  walkNode(tally, node.test, { nesting, owner });
-  walkNode(tally, node.consequent, { nesting: nesting + 1, owner });
-  walkElse(tally, node.alternate, { nesting, owner });
-  if (!isElseIf) leave(tally);
-
-  return true;
-}
-
-function walkElse(tally, alternate, { nesting, owner }) {
-  if (!alternate) return;
-  if (alternate.type === "IfStatement") {
-    walkIf(tally, alternate, { isElseIf: true, nesting, owner });
-    return;
-  }
-  note(tally, 1);
-  walkNode(tally, alternate, { nesting: nesting + 1, owner });
-}
-
-function walkConditional(tally, node, { nesting, owner }) {
-  enter(tally, node);
-  note(tally, 1 + nesting);
-  walkNode(tally, node.test, { nesting, owner });
-  walkNode(tally, node.consequent, { nesting: nesting + 1, owner });
-  walkNode(tally, node.alternate, { nesting: nesting + 1, owner });
-  leave(tally);
-
-  return true;
-}
-
-function walkSwitch(tally, node, { nesting, owner }) {
-  enter(tally, node);
-  note(tally, 1 + nesting);
-  walkNode(tally, node.discriminant, { nesting, owner });
-  for (const switchCase of node.cases) walkNode(tally, switchCase, { nesting: nesting + 1, owner });
-  leave(tally);
-
-  return true;
-}
-
-/** A loop or a catch: the construct scores, and only its body nests one deeper. */
-function walkLoop(tally, node, { nesting, owner }) {
-  enter(tally, node);
-  note(tally, 1 + nesting);
-  walkNested(tally, node, { bodyNesting: nesting + 1, nesting, owner });
-  leave(tally);
-
-  return true;
-}
-
 function flattenLogical(node, into = { leaves: [], operators: [] }) {
   if (!isLogicalSequence(node)) {
     into.leaves.push(node);
@@ -166,59 +74,97 @@ function flattenLogical(node, into = { leaves: [], operators: [] }) {
 }
 
 /** `a && b && c || d` is two sequences: +1 per run of one operator. */
-function walkLogical(tally, node, { nesting, owner }) {
-  if (!isLogicalSequence(node)) return false;
-  const { leaves, operators } = flattenLogical(node);
-  const sequences = operators.filter(
-    (operator, index) => index === 0 || operator !== operators[index - 1],
-  );
-  note(tally, sequences.length);
-  for (const leaf of leaves) walkNode(tally, leaf, { nesting, owner });
+function sequencesIn(node) {
+  const { operators } = flattenLogical(node);
 
-  return true;
+  return operators.filter((operator, index) => index === 0 || operator !== operators[index - 1])
+    .length;
 }
 
-function walkJump(tally, node) {
-  if (node.label) note(tally, 1);
+const RANGE_OF = (node) => ({ start: node.start, end: node.end });
 
-  return true;
-}
-
-function walkFunction(tally, node, { nesting, owner }) {
-  walkNested(tally, node, {
-    bodyNesting: nesting + 1,
-    nesting,
-    owner: functionName(node) ?? owner,
-  });
-
-  return true;
-}
-
-const WALKERS = {
-  ArrowFunctionExpression: walkFunction,
-  BreakStatement: walkJump,
-  CatchClause: walkLoop,
-  ConditionalExpression: walkConditional,
-  ContinueStatement: walkJump,
-  DoWhileStatement: walkLoop,
-  ForInStatement: walkLoop,
-  ForOfStatement: walkLoop,
-  ForStatement: walkLoop,
-  FunctionDeclaration: walkFunction,
-  FunctionExpression: walkFunction,
-  IfStatement: (tally, node, where) => walkIf(tally, node, { ...where, isElseIf: false }),
-  LogicalExpression: walkLogical,
-  SwitchStatement: walkSwitch,
-  WhileStatement: walkLoop,
+/** The parts of a construct that sit one level deeper; the rest of it scores at its own level. */
+const NESTED_SLOTS = {
+  CatchClause: (node) => [node.body],
+  ConditionalExpression: (node) => [node.consequent, node.alternate],
+  DoWhileStatement: (node) => [node.body],
+  ForInStatement: (node) => [node.body],
+  ForOfStatement: (node) => [node.body],
+  ForStatement: (node) => [node.body],
+  IfStatement: (node) => [
+    node.consequent,
+    node.alternate?.type === "IfStatement" ? null : node.alternate,
+  ],
+  SwitchStatement: (node) =>
+    node.cases.length > 0 ? [{ start: node.cases[0].start, end: node.end }] : [],
+  WhileStatement: (node) => [node.body],
 };
 
-/** Scores `node`; a walker that returns true has already walked the subtree. */
-function walkNode(tally, node, where) {
-  if (!node) return;
-  const walker = Object.hasOwn(WALKERS, node.type) ? WALKERS[node.type] : undefined;
-  if (walker?.(tally, node, where)) return;
-  if (node.type === "CallExpression" && isRecursiveCall(node, where.owner)) note(tally, 1);
-  for (const child of childNodes(node)) walkNode(tally, child, where);
+/** Constructs that score 1 plus their nesting and open a block a reader can lift out. */
+const BLOCK_TYPES = new Set(Object.keys(NESTED_SLOTS));
+
+function slotsOf(node) {
+  const slots = [];
+  for (const slot of NESTED_SLOTS[node.type](node)) if (slot) slots.push(RANGE_OF(slot));
+
+  return slots;
+}
+
+/**
+ * Scores one outermost function as the linter's traversal passes through it. Nesting is the
+ * number of open constructs whose nested part contains the node; a block stays open while the
+ * traversal is inside its range, so a note reaches every block around it.
+ */
+function createTally() {
+  return { blocks: [], frames: [], open: [], owners: [], score: 0, top: undefined };
+}
+
+function nestingAt(tally, node) {
+  let nesting = 0;
+  for (const frame of tally.frames) {
+    if (frame.slots.some((slot) => slot.start <= node.start && node.end <= slot.end)) nesting += 1;
+  }
+
+  return nesting;
+}
+
+function note(tally, delta) {
+  tally.score += delta;
+  for (const block of tally.open) block.subtotal += delta;
+}
+
+function scoreConstruct(tally, node) {
+  const isElseIf =
+    node.type === "IfStatement" &&
+    node.parent?.type === "IfStatement" &&
+    node.parent.alternate === node;
+  if (BLOCK_TYPES.has(node.type) && !isElseIf) {
+    const block = { node, subtotal: 0 };
+    tally.blocks.push(block);
+    tally.open.push(block);
+  }
+  const nesting = nestingAt(tally, node);
+  let delta = isElseIf ? 1 : 1 + nesting;
+  if (node.type === "IfStatement" && node.alternate && node.alternate.type !== "IfStatement")
+    delta += 1;
+  note(tally, delta);
+  tally.frames.push({ end: node.end, slots: slotsOf(node) });
+}
+
+function scoreOther(tally, node) {
+  if (node.type === "LogicalExpression") {
+    const parentIsSequence = node.parent && isLogicalSequence(node.parent);
+    if (isLogicalSequence(node) && !parentIsSequence) note(tally, sequencesIn(node));
+  } else if (node.type === "BreakStatement" || node.type === "ContinueStatement") {
+    if (node.label) note(tally, 1);
+  } else if (isRecursiveCall(node, tally.owners.at(-1))) {
+    note(tally, 1);
+  }
+}
+
+function prune(tally, node) {
+  while (tally.open.length > 0 && tally.open.at(-1).node.end <= node.start) tally.open.pop();
+  tally.frames = tally.frames.filter((frame) => frame.end > node.start);
 }
 
 /** The largest block that leaves something outside it; ties go to the one met first. */
@@ -230,21 +176,6 @@ function heaviestExtractable(blocks, score) {
   }
 
   return heaviest;
-}
-
-export function cognitiveComplexity(functionNode) {
-  const tally = { blocks: [], open: [], score: 0 };
-  walkNested(tally, functionNode, {
-    bodyNesting: 0,
-    nesting: 0,
-    owner: functionName(functionNode),
-  });
-  const { blocks, score } = tally;
-  const heaviest = heaviestExtractable(blocks, score);
-  // Under a third of the score, the report says "spread" rather than invent a target.
-  const concentrated = Boolean(heaviest) && heaviest.subtotal * 3 >= score;
-
-  return { blocks, concentrated, heaviest, score };
 }
 
 export const cognitiveComplexityRule = defineRule({
@@ -268,10 +199,14 @@ export const cognitiveComplexityRule = defineRule({
     },
   },
   create(context, file, { max }) {
-    const check = (node) => {
-      if (isNestedFunction(node)) return;
-      const { blocks, concentrated, heaviest, score: complexity } = cognitiveComplexity(node);
+    const tally = createTally();
+
+    const report = (node) => {
+      const { blocks, score: complexity } = tally;
       if (complexity <= max) return;
+      const heaviest = heaviestExtractable(blocks, complexity);
+      // Under a third of the score, the report says "spread" rather than invent a target.
+      const concentrated = Boolean(heaviest) && heaviest.subtotal * 3 >= complexity;
       context.report({
         node,
         messageId: concentrated ? "tooComplex" : "tooComplexSpread",
@@ -286,11 +221,48 @@ export const cognitiveComplexityRule = defineRule({
         },
       });
     };
+    const enterFunction = (node) => {
+      const owner = functionName(node) ?? tally.owners.at(-1);
+      if (tally.top) {
+        prune(tally, node);
+        tally.frames.push({ end: node.end, slots: [RANGE_OF(node.body)] });
+      } else {
+        Object.assign(tally, createTally(), { top: node });
+      }
+      tally.owners.push(owner);
+    };
+    const exitFunction = (node) => {
+      tally.owners.pop();
+      if (tally.top !== node) return;
+      report(node);
+      tally.top = undefined;
+    };
+    const scored = (score) => (node) => {
+      if (!tally.top) return;
+      prune(tally, node);
+      score(tally, node);
+    };
 
     return {
-      FunctionDeclaration: check,
-      FunctionExpression: check,
-      ArrowFunctionExpression: check,
+      ArrowFunctionExpression: enterFunction,
+      "ArrowFunctionExpression:exit": exitFunction,
+      BreakStatement: scored(scoreOther),
+      CallExpression: scored(scoreOther),
+      CatchClause: scored(scoreConstruct),
+      ConditionalExpression: scored(scoreConstruct),
+      ContinueStatement: scored(scoreOther),
+      DoWhileStatement: scored(scoreConstruct),
+      ForInStatement: scored(scoreConstruct),
+      ForOfStatement: scored(scoreConstruct),
+      ForStatement: scored(scoreConstruct),
+      FunctionDeclaration: enterFunction,
+      "FunctionDeclaration:exit": exitFunction,
+      FunctionExpression: enterFunction,
+      "FunctionExpression:exit": exitFunction,
+      IfStatement: scored(scoreConstruct),
+      LogicalExpression: scored(scoreOther),
+      SwitchStatement: scored(scoreConstruct),
+      WhileStatement: scored(scoreConstruct),
     };
   },
 });

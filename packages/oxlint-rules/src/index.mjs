@@ -10,16 +10,13 @@ import { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.m
 import { bannedVerbPrefixRule } from "./rules/banned-verb-prefix.rule.mjs";
 import { clickhouseNoVersionOrderLimitRule } from "./rules/clickhouse-no-version-order-limit.rule.mjs";
 import { clickhouseTenantIdRule } from "./rules/clickhouse-tenant-id.rule.mjs";
-import {
-  cognitiveComplexity,
-  cognitiveComplexityRule,
-} from "./rules/cognitive-complexity.rule.mjs";
+import { cognitiveComplexityRule } from "./rules/cognitive-complexity.rule.mjs";
 import {
   commentBlockAnalysis,
   commentBlockSizeRule,
   isCommentScannedPath,
 } from "./rules/comment-block-size.rule.mjs";
-import { conditionShape, conditionShapeRule } from "./rules/condition-shape.rule.mjs";
+import { conditionShapeRule } from "./rules/condition-shape.rule.mjs";
 import { conditionalTypeDepthRule } from "./rules/conditional-type-depth.rule.mjs";
 import { emDashInCopyRule } from "./rules/em-dash-in-copy.rule.mjs";
 import { enterpriseLicenseHeaderRule } from "./rules/enterprise-license-header.rule.mjs";
@@ -170,10 +167,8 @@ export {
   resetClassificationCache,
   walk,
   workspacePathOf,
-  cognitiveComplexity,
   commentBlockAnalysis,
   isCommentScannedPath,
-  conditionShape,
   bannedTestModelNamesRule,
   cognitiveComplexityRule,
   commentBlockSizeRule,

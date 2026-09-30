@@ -19,6 +19,8 @@ import { defineRule } from "../define-rule.mjs";
 
 export const MAX_COMMENT_COLUMNS = 100;
 
+const LONG_LINE = new RegExp(`[^\\r\\n]{${MAX_COMMENT_COLUMNS + 1}}`);
+
 const COMMENT_EXCLUDED_DIRECTORIES = new Set([
   ".git",
   ".next",
@@ -80,15 +82,18 @@ export function commentBlockAnalysis(context, program) {
   const source = context.sourceCode.text;
   const result = { blocks: [], columnOverflows: [] };
   const hasHeader = marksGeneratedHeader(source) || marksLicenseHeader(source);
-  if (!hasHeader) {
+  // Most files have no comment line wide enough to matter and no block to measure.
+  const mayOverflow = LONG_LINE.test(source);
+  const mayHaveBlock = mayContainReviewBlock(source);
+  if (!hasHeader && (mayOverflow || mayHaveBlock)) {
     const lines = source.split(/\r?\n/);
     const ranges = commentRangesOf(program);
-    if (mayContainReviewBlock(source)) {
+    if (mayHaveBlock) {
       result.blocks = collectCommentBlocks({ source, ranges })
         .map((block) => describeBlock(block, lines))
         .filter((block) => !block.exempt);
     }
-    result.columnOverflows = overlongCommentLines({ lines, ranges, source });
+    if (mayOverflow) result.columnOverflows = overlongCommentLines({ lines, ranges, source });
   }
 
   return result;

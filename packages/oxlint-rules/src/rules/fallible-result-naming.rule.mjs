@@ -1,9 +1,9 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve, sep } from "node:path";
 
 import { defineRule } from "../define-rule.mjs";
-import { parseProgram } from "../parse.mjs";
+import { parseFile } from "../parse.mjs";
 
 // A result names its absence contract (ADR-146): `get*` answers one or throws,
 // `find*` answers an array, a derivation may answer undefined, and nothing new
@@ -418,14 +418,13 @@ function indexProgram(program, { cwd, filename }) {
   return index;
 }
 
-// Parsed at most once per lint run and file version, as zod-schema-origin.mjs:115 does.
+// The parse is shared through parse.mjs; only the index built from it is cached here.
 function indexFile(filename, cwd) {
-  const stat = statSync(filename);
+  const { mtime, program, size } = parseFile(filename);
   const cached = indexedFiles.get(filename);
-  if (cached?.mtime === stat.mtimeMs && cached.size === stat.size) return cached.index;
-  const program = parseProgram({ path: filename, text: readFileSync(filename, "utf8") });
+  if (cached?.mtime === mtime && cached.size === size) return cached.index;
   const index = indexProgram(program, { cwd, filename });
-  indexedFiles.set(filename, { index, mtime: stat.mtimeMs, size: stat.size });
+  indexedFiles.set(filename, { index, mtime, size });
   return index;
 }
 

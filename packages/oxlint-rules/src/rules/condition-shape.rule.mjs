@@ -1,4 +1,3 @@
-import { walk } from "../ast.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A condition is readable at a glance or it is named. Each exceeded limit is
@@ -22,33 +21,20 @@ function chainDepth(node) {
   return 0;
 }
 
-/** The four measurements the rule reports, in one walk of the test expression. */
-export function conditionShape(test) {
-  const shape = { calls: 0, hops: 0, nestedTernary: false, operators: 0 };
-
-  walk(test, (node) => {
-    switch (node.type) {
-      case "MemberExpression":
-      case "OptionalMemberExpression":
-        shape.hops = Math.max(shape.hops, chainDepth(node));
-        break;
-      case "CallExpression":
-      case "OptionalCallExpression":
-        shape.calls += 1;
-        break;
-      case "LogicalExpression":
-        if (CONDITION_LOGICAL_OPERATORS.has(node.operator)) shape.operators += 1;
-        break;
-      case "ConditionalExpression":
-        shape.nestedTernary = true;
-        break;
-      default:
-        break;
-    }
-  });
-
-  return shape;
-}
+const MEASURED_TYPES = {
+  ConditionalExpression: (shape) => {
+    shape.nestedTernary = true;
+  },
+  CallExpression: (shape) => {
+    shape.calls += 1;
+  },
+  LogicalExpression: (shape, node) => {
+    if (CONDITION_LOGICAL_OPERATORS.has(node.operator)) shape.operators += 1;
+  },
+  MemberExpression: (shape, node) => {
+    shape.hops = Math.max(shape.hops, chainDepth(node));
+  },
+};
 
 const WHY = "A test nobody can read at a glance is where the wrong branch hides.";
 
@@ -106,21 +92,48 @@ export const conditionShapeRule = defineRule({
     maxOperators: { type: "integer", minimum: 0, default: 2 },
   },
   create(context, _file, limits) {
-    const check = (test) => {
-      if (!test) return;
+    // Conditions whose test the traversal is still inside, in source order. Every measured
+    // node lands in each of them, which is what walking a test's subtree did.
+    const open = [];
+    const found = [];
 
-      for (const [messageId, data] of exceededLimits(conditionShape(test), limits)) {
-        context.report({ node: test, messageId, data });
+    const measure = (node) => {
+      for (let index = open.length - 1; index >= 0; index -= 1) {
+        const { shape, test } = open[index];
+        if (test.end <= node.start) open.splice(index, 1);
+        else if (test.start <= node.start) MEASURED_TYPES[node.type](shape, node);
       }
     };
+    const begin = (testOf) => (node) => {
+      const test = testOf(node);
+      if (!test) return;
+      const shape = { calls: 0, hops: 0, nestedTernary: false, operators: 0 };
+      const entry = { shape, test };
+      open.push(entry);
+      found.push(entry);
+    };
+    const testOf = (node) => node.test;
 
     return {
-      ConditionalExpression: (node) => check(node.test),
-      DoWhileStatement: (node) => check(node.test),
-      ForStatement: (node) => check(node.test),
-      IfStatement: (node) => check(node.test),
-      SwitchStatement: (node) => check(node.discriminant),
-      WhileStatement: (node) => check(node.test),
+      CallExpression: measure,
+      ConditionalExpression(node) {
+        measure(node);
+        begin(testOf)(node);
+      },
+      DoWhileStatement: begin(testOf),
+      ForStatement: begin(testOf),
+      IfStatement: begin(testOf),
+      LogicalExpression: measure,
+      MemberExpression: measure,
+      SwitchStatement: begin((node) => node.discriminant),
+      WhileStatement: begin(testOf),
+      "Program:exit"() {
+        for (const { shape, test } of found) {
+          for (const [messageId, data] of exceededLimits(shape, limits)) {
+            context.report({ node: test, messageId, data });
+          }
+        }
+      },
     };
   },
 });

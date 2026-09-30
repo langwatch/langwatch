@@ -1,3 +1,5 @@
+import { readFileSync, statSync } from "node:fs";
+
 import { parseSync } from "oxc-parser";
 
 // The CLI's way into the same tree the linter walks. oxlint parses with oxc
@@ -20,4 +22,23 @@ export function parseProgram({ path, text }) {
     preserveParens: false,
     sourceType: "module",
   }).program;
+}
+
+const parsedFiles = new Map();
+
+/**
+ * The program of a file on disk, parsed once per process and file version. Every rule that
+ * reads an imported file shares this entry, so one file is never parsed twice.
+ * @param {string} filename Absolute path.
+ * @returns {{ program: object, mtime: number, size: number }}
+ */
+export function parseFile(filename) {
+  const stat = statSync(filename);
+  const cached = parsedFiles.get(filename);
+  if (cached?.mtime === stat.mtimeMs && cached.size === stat.size) return cached;
+  const program = parseProgram({ path: filename, text: readFileSync(filename, "utf8") });
+  const parsed = { mtime: stat.mtimeMs, program, size: stat.size };
+  parsedFiles.set(filename, parsed);
+
+  return parsed;
 }

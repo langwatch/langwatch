@@ -79,6 +79,14 @@ export function defineRule({
   }
 
   const defaults = defaultsFor(options);
+  // Options arrive as the same object for every file, so the merge is done once per object.
+  const merged = new WeakMap();
+  const optionsFor = (given) => {
+    if (!given) return defaults;
+    if (!merged.has(given)) merged.set(given, { ...defaults, ...given });
+
+    return merged.get(given);
+  };
   const schema = schemaFor(options);
 
   const rule = {
@@ -91,7 +99,7 @@ export function defineRule({
       const file = classify(context);
       if (applies && !applies(file)) return {};
 
-      return create(context, file, { ...defaults, ...context.options?.[0] });
+      return create(context, file, optionsFor(context.options?.[0]));
     },
   };
 
