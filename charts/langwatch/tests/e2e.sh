@@ -519,7 +519,7 @@ test_lwql() {
     # lwql_ro reader role and the approved views are exercised on the first pod
     # below and by the app's own suites.
     assert_eq "[$p] named collection lwql_postgres exists" \
-      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres_langwatch'")" "1"
     # The restricted identity, on this pod: authenticates, reads zero key-map
     # rows without a tenant capability (row policy default-deny), no admin surface.
     assert_eq "[$p] restricted identity authenticates" \
@@ -615,7 +615,7 @@ $provision_out"
   # deferred to #7387; the collection is dialable without them.)
   local bridge_out
   if bridge_out=$(ch_query "$pod" \
-      "SELECT count() FROM postgresql(lwql_postgres, table='lwql_annotations')" 2>&1); then
+      "SELECT count() FROM postgresql(lwql_postgres_langwatch, table='lwql_annotations')" 2>&1); then
     pass "lwql_postgres bridge reads PostgreSQL as lwql_ro (count=$bridge_out)"
   else
     fail "lwql_postgres bridge failed to read through the named collection — lwql_ro is likely absent or its password diverged from the collection's reader key:
@@ -754,7 +754,7 @@ test_lwql_replicas() {
       fail "[$p] expected the two LangWatchQL row policies, found ${pol:-0}"
     fi
     assert_eq "[$p] named collection lwql_postgres present" \
-      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres_langwatch'")" "1"
     assert_eq "[$p] restricted identity authenticates" \
       "$(kc exec "$p" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
   done
@@ -795,7 +795,7 @@ test_lwql_replicas() {
   assert_eq "scaled-up pod $new_pod carries langwatch_lwql in the users_xml store, no app action" \
     "$(ch_query "$new_pod" "SELECT storage FROM system.users WHERE name='langwatch_lwql'")" "users_xml"
   assert_eq "scaled-up pod $new_pod carries the lwql_postgres named collection" \
-    "$(ch_query "$new_pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+    "$(ch_query "$new_pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres_langwatch'")" "1"
   assert_eq "scaled-up pod $new_pod authenticates the restricted identity" \
     "$(kc exec "$new_pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
 

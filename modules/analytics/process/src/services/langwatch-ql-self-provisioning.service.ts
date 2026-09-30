@@ -40,7 +40,6 @@ const viewProvisioning = LangWatchQLViewProvisioningService.create();
 export const LWQL_SELF_PROVISION_DEFAULTS = {
   ...LWQL_CONNECTION_DEFAULTS,
   postgresReaderRole: LWQL_POSTGRES_READER_ROLE,
-  namedCollection: "lwql_postgres",
 } as const;
 
 /** The PostgreSQL endpoint the named collection dials, from `DATABASE_URL`. */
@@ -119,6 +118,12 @@ export class LangWatchQLSelfProvisioningService {
     return { requested: true, complete: true, connection, postgresReaderPassword, endpoint };
   }
 
+  /** Named collections are server-global: one per ClickHouse database, so stacks sharing a
+   * server never overwrite each other's. */
+  namedCollection({ names }: { names: LangWatchQLNames }): string {
+    return `lwql_postgres_${names.database}`;
+  }
+
   accessModelMode({ source }: { source: Record<string, string | undefined> }): LwqlAccessModelMode {
     return source.LWQL_ACCESS_MODEL_MODE === "sql" ? "sql" : "rendered";
   }
@@ -150,7 +155,7 @@ export class LangWatchQLSelfProvisioningService {
         `lwql self-provisioning: the LangWatchQL database ("${names.database}") must be the application's own ClickHouse database ("${sourceDatabase}")`,
       );
     }
-    const collection = LWQL_SELF_PROVISION_DEFAULTS.namedCollection;
+    const collection = this.namedCollection({ names });
     const definition = accessModelDefinition.build({
       names,
       passwordSha256Hex: createHash("sha256").update(restrictedPassword).digest("hex"),

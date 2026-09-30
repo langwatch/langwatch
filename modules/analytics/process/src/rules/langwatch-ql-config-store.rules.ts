@@ -182,13 +182,17 @@ export function clickHouseErrorSummary(error: unknown): ClickHouseErrorSummary {
   };
 }
 
-/** A statement's verb and object keywords (`CREATE ROW POLICY`), never its names or values. */
-export function statementKind(statement: string): string {
-  const tokens = statement
+function statementTokens(statement: string): string[] {
+  return statement
     .replace(/\bOR\s+REPLACE\b/gi, " ")
     .replace(/\bIF\s+(?:NOT\s+)?EXISTS\b/gi, " ")
     .trim()
     .split(/\s+/);
+}
+
+/** A statement's verb and object keywords (`CREATE ROW POLICY`), never its names or values. */
+export function statementKind(statement: string): string {
+  const tokens = statementTokens(statement);
   const verb = tokens[0]?.toUpperCase();
   if (verb === undefined || !/^[A-Z]+$/.test(verb)) return "UNKNOWN";
   if (verb === "GRANT" || verb === "REVOKE") return verb;
@@ -201,11 +205,39 @@ export function statementKind(statement: string): string {
   return [verb, ...objects].join(" ");
 }
 
+/** A whole token that is an identifier, optionally qualified or followed by a column list. */
+const LOGGABLE_NAME = /^([A-Za-z0-9_.`]+)(?:\(.*)?$/;
+
+/** The object a statement creates, alters or drops (`db.agents`); never a literal or a grantee. */
+export function findStatementTargets(statement: string): string[] {
+  const [verb, ...rest] = statementTokens(statement);
+  if (verb === undefined || /^(GRANT|REVOKE)$/i.test(verb)) return [];
+  const name = rest.find((token) => !STATEMENT_OBJECT_KEYWORDS.has(token.toUpperCase()));
+  const target = name === undefined ? undefined : LOGGABLE_NAME.exec(name)?.[1];
+  return target === undefined ? [] : [target];
+}
+
+const MISSING_OBJECT_PATTERNS: readonly RegExp[] = [
+  /Unknown table expression identifier '([A-Za-z0-9_.`]+)'/,
+  /Table ([A-Za-z0-9_.`]+) does(?:n't| not) exist/,
+  /There is no named collection `([A-Za-z0-9_]+)`/,
+];
+
+/** The tables or named collections a server failure names as missing: identifiers only. */
+export function findMissingObjects(error: unknown): string[] {
+  const message = error instanceof Error ? error.message : String(error);
+  return MISSING_OBJECT_PATTERNS.flatMap((pattern) => {
+    const name = pattern.exec(message)?.[1];
+    return name === undefined ? [] : [name];
+  });
+}
+
 export type ConfigStoreTolerance = { tolerated: true; code: number } | { tolerated: false };
 
 /**
- * 669/670/671 are tolerated for the named collection, and 495 only when the statement's own
- * target is an inventoried config-store entity. Anything else is fatal.
+ * 669/670/671 are tolerated only on a NAMED COLLECTION statement, and 495 only when the
+ * statement's own target is an inventoried config-store entity. Anything else is fatal: a 669
+ * on an engine table means the collection is absent, and every view over it would fail.
  */
 export function decideConfigStoreTolerance({
   error,
@@ -218,7 +250,11 @@ export function decideConfigStoreTolerance({
 }): ConfigStoreTolerance {
   const failure = readClickHouseFailure(error);
   if (failure.from === "client") return { tolerated: false };
-  if (NAMED_COLLECTION_CODES.has(failure.code)) return { tolerated: true, code: failure.code };
+  if (NAMED_COLLECTION_CODES.has(failure.code)) {
+    return statementKind(statement).endsWith("NAMED COLLECTION")
+      ? { tolerated: true, code: failure.code }
+      : { tolerated: false };
+  }
   if (failure.code !== CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY) {
     return { tolerated: false };
   }

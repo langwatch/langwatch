@@ -10,6 +10,8 @@ import {
   decideConfigStoreTolerance,
   type LwqlAccessModelIdentity,
   type LwqlAccessModelOwner,
+  findMissingObjects,
+  findStatementTargets,
   statementKind,
 } from "../../rules/langwatch-ql-config-store.rules.ts";
 import {
@@ -40,10 +42,17 @@ async function runClickHouseStatements({
       await client.command(statement);
     } catch (error) {
       const kind = statementKind(statement);
+      const targets = findStatementTargets(statement);
       const tolerance = decideConfigStoreTolerance({ error, statement, configStoreEntities });
       if (!tolerance.tolerated) {
         logger.error(
-          { error: clickHouseErrorSummary(error), statement: position, kind },
+          {
+            error: clickHouseErrorSummary(error),
+            statement: position,
+            kind,
+            targets,
+            missing: findMissingObjects(error),
+          },
           "lwql provisioning failed creating ClickHouse objects",
         );
         throw error;
@@ -51,7 +60,7 @@ async function runClickHouseStatements({
       const { code } = tolerance;
       skipped.push({ index: index + 1, code, kind });
       logger.warn(
-        { code, statement: position, kind },
+        { code, statement: position, kind, targets },
         "lwql provisioning skipped a statement whose entity is defined in the ClickHouse config store (read-only) and continued",
       );
     }

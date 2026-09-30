@@ -98,6 +98,30 @@ describe("the self-provisioned ClickHouse statements", () => {
   });
 });
 
+describe("given two stacks whose databases share one ClickHouse server", () => {
+  const statementsFor = (database: string) =>
+    selfProvisioning.clickHouseStatements({
+      names: { ...NAMES, database },
+      restrictedPassword: "pw",
+      sourceDatabase: database,
+      postgres: { ...POSTGRES, endpoint: { ...POSTGRES.endpoint, database } },
+    });
+
+  /** @scenario "Each ClickHouse database provisions its own named collection" */
+  it("gives each database its own named collection, and its engine tables read only that one", () => {
+    const [a, b] = [statementsFor("lw_a"), statementsFor("lw_b")];
+
+    expect(a).toContain("DROP NAMED COLLECTION IF EXISTS lwql_postgres_lw_a");
+    expect(b).toContain("DROP NAMED COLLECTION IF EXISTS lwql_postgres_lw_b");
+    expect(a.some((s) => s.includes("lwql_postgres_lw_b"))).toBe(false);
+    const engineTables = a.filter((s) => s.includes("ENGINE = PostgreSQL"));
+    expect(engineTables.length).toBeGreaterThan(0);
+    for (const table of engineTables) {
+      expect(table).toContain("ENGINE = PostgreSQL(lwql_postgres_lw_a,");
+    }
+  });
+});
+
 describe("when the self-provisioning environment is read", () => {
   it("is not requested without LWQL_CLICKHOUSE_PASSWORD", () => {
     expect(selfProvisioning.request({ source: {} })).toEqual({ requested: false });

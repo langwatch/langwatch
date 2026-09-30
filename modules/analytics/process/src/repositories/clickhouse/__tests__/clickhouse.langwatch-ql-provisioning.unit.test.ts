@@ -231,6 +231,76 @@ describe("runClickHouseStatements", () => {
     });
   });
 
+  describe("when an engine table fails because the named collection does not exist", () => {
+    const ENGINE_TABLE =
+      "CREATE TABLE IF NOT EXISTS lw.agents_pg (TenantId String) ENGINE = PostgreSQL(lwql_postgres, table='lwql_agents')";
+
+    /** @scenario "A missing named collection fails provisioning at the engine table that needs it" */
+    it("aborts at the engine table and logs the table and the missing collection", async () => {
+      logCalls.length = 0;
+      const ran: string[] = [];
+      const client = {
+        async command({ query }: { query: string }) {
+          if (query === ENGINE_TABLE) {
+            throw Object.assign(
+              new Error("Code: 669. DB::Exception: There is no named collection `lwql_postgres`."),
+              { code: String(CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST) },
+            );
+          }
+          ran.push(query);
+        },
+      };
+
+      await expect(
+        provisioning(client).runStatements({
+          statements: [ENGINE_TABLE, "CREATE OR REPLACE VIEW lw.agents AS SELECT 1"],
+        }),
+      ).rejects.toBeInstanceOf(Error);
+
+      expect(ran).toEqual([]);
+      expect(logCalls).toContainEqual([
+        expect.objectContaining({
+          kind: "CREATE TABLE",
+          targets: ["lw.agents_pg"],
+          missing: ["lwql_postgres"],
+        }),
+        "lwql provisioning failed creating ClickHouse objects",
+      ]);
+    });
+  });
+
+  describe("when a view fails because the table it reads does not exist", () => {
+    /** @scenario "A provisioning failure over a missing table names both objects" */
+    it("logs the view it was creating and the missing table", async () => {
+      logCalls.length = 0;
+      const client = {
+        async command() {
+          throw Object.assign(
+            new Error(
+              "Code: 60. DB::Exception: Unknown table expression identifier 'lw.agents_pg' in scope SELECT 1. (UNKNOWN_TABLE)",
+            ),
+            { code: "60" },
+          );
+        },
+      };
+
+      await expect(
+        provisioning(client).runStatements({
+          statements: ["CREATE OR REPLACE VIEW lw.agents\nSQL SECURITY INVOKER\nAS SELECT 1"],
+        }),
+      ).rejects.toBeInstanceOf(Error);
+
+      expect(logCalls).toContainEqual([
+        expect.objectContaining({
+          kind: "CREATE VIEW",
+          targets: ["lw.agents"],
+          missing: ["lw.agents_pg"],
+        }),
+        "lwql provisioning failed creating ClickHouse objects",
+      ]);
+    });
+  });
+
   describe("when a 495 targets an entity the config store does not own", () => {
     const CREATE_USER =
       "CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_password BY 'pw'";

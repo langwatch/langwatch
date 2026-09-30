@@ -262,6 +262,9 @@ func (s Stack) OverlayEnv() []string {
 			"LWQL_POSTGRES_READER_PASSWORD="+LWQLPostgresReaderPassword,
 			// ClickHouse runs in the VM, where DATABASE_URL's 127.0.0.1 is the VM itself.
 			"LWQL_POSTGRES_HOST="+ColimaHostAddress,
+			// No config store renders the access model here (ClickHouseUsersConfig grants
+			// the SQL rights instead), so the app writes it, named collection included.
+			"LWQL_ACCESS_MODEL_MODE=sql",
 		)
 	}
 	// Redis needs no per-slug database — REDIS_DB_INDEX above already partitions

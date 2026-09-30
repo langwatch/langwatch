@@ -44,7 +44,7 @@ export function lwqlAccessModelDefinitionFromSource(
     names,
     passwordSha256Hex: createHash("sha256").update(request.connection.password).digest("hex"),
     namedCollection: {
-      collection: LWQL_SELF_PROVISION_DEFAULTS.namedCollection,
+      collection: selfProvisioning.namedCollection({ names }),
       host: request.endpoint.host,
       port: request.endpoint.port,
       database: request.endpoint.database,

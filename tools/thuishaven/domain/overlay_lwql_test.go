@@ -23,6 +23,9 @@ func TestOverlayProvisionsLangWatchQLOnlyWhenBothStoresAreManaged(t *testing.T) 
 	if got := valueOf(env, "LWQL_POSTGRES_HOST"); got != "host.lima.internal" {
 		t.Errorf("LWQL_POSTGRES_HOST = %q, want the VM's route to the Mac, since ClickHouse dials Postgres from inside colima", got)
 	}
+	if got := valueOf(env, "LWQL_ACCESS_MODEL_MODE"); got != "sql" {
+		t.Errorf("LWQL_ACCESS_MODEL_MODE = %q, want sql: no config store renders lwql_postgres, so rendered mode leaves every engine table and view over it uncreated", got)
+	}
 	if got := valueOf(env, "DATABASE_URL"); !strings.Contains(got, "@127.0.0.1:") {
 		t.Errorf("DATABASE_URL = %q, want the app itself to keep dialing loopback", got)
 	}

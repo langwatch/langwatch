@@ -932,6 +932,32 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the run aborts rather than skipping the row policy
     And the same read-only error is skipped only when the inventoried policy is on the very table the statement targets
 
+  # Named collections are server-global. Two stacks on one ClickHouse (haven) each
+  # drop and recreate theirs at boot, so a shared name let the last booter repoint
+  # every other stack's engine tables at its own PostgreSQL database.
+  @unit
+  Scenario: Each ClickHouse database provisions its own named collection
+    Given two LangWatchQL databases on the same ClickHouse server
+    When the self-provisioning statements are rendered for each
+    Then each creates a named collection whose name carries its own database
+    And each database's PostgreSQL-engine tables read only through its own collection
+
+  # A 669 outside a NAMED COLLECTION statement means the collection is absent: the
+  # engine table was never created, and every view over it would fail later as
+  # UNKNOWN_TABLE, naming neither the table nor the collection.
+  @unit
+  Scenario: A missing named collection fails provisioning at the engine table that needs it
+    Given a PostgreSQL-engine table statement rejected because the named collection does not exist
+    When the config-store-tolerant runner executes the list
+    Then the run aborts at that statement rather than skipping it
+    And the failure is logged with the table it was creating and the collection it could not find
+
+  @unit
+  Scenario: A provisioning failure over a missing table names both objects
+    Given a view statement rejected because the table it reads does not exist
+    When the config-store-tolerant runner executes the list
+    Then the failure is logged with the view it was creating and the missing table
+
   # Issue #8258: the app owns the LangWatchQL access model on every distribution,
   # so the chart-managed ClickHouse renderer must render none of it — no
   # identity, profile, row policy or named collection — while still granting the
