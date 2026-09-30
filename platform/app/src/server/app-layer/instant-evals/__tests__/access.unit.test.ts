@@ -115,13 +115,17 @@ describe("given the flag is on for the project", () => {
 
 describe("given a project with no organization behind it", () => {
   describe("when a router resolves the organization it may not take from its input", () => {
-    it("throws rather than answering for nobody", async () => {
+    it("throws a handled not-found rather than answering for nobody", async () => {
       const prisma = {
         project: { findUnique: async () => null },
       } as unknown as PrismaClient;
       await expect(
         organizationOfProject({ prisma, projectId: "gone" }),
-      ).rejects.toThrow("project gone has no organization");
+      ).rejects.toMatchObject({
+        name: "NotFoundError",
+        code: "project_not_found",
+        httpStatus: 404,
+      });
     });
   });
 });

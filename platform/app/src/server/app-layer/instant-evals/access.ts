@@ -26,6 +26,7 @@
  * @see ../../../../specs/lwql/eval-functions.feature
  */
 
+import { NotFoundError } from "@langwatch/handled-error";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { featureFlagService } from "~/server/featureFlag";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
@@ -95,7 +96,9 @@ async function organizationOf({
 /**
  * The project's organization, for a caller that must not take it from its
  * input. A project the permission check let through always has one; a missing
- * row here is a project deleted between the check and this read.
+ * row here is a project deleted between the check and this read, which is a
+ * handled not-found like every other refusal this feature raises, not an
+ * internal failure.
  */
 export async function organizationOfProject({
   prisma,
@@ -106,7 +109,7 @@ export async function organizationOfProject({
 }): Promise<string> {
   const organizationId = await organizationOf({ prisma, projectId });
   if (!organizationId) {
-    throw new Error(`project ${projectId} has no organization`);
+    throw new NotFoundError("project_not_found", "Project", projectId);
   }
   return organizationId;
 }

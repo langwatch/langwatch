@@ -76,6 +76,12 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       And a later click leaves the first record in place
 
     @integration
+    Scenario: A second click against the database keeps the first record
+      Given an organization a member has switched Instant Evals on, stored in Postgres
+      When another member throws the switch later
+      Then the stored moment and member are still the first member's
+
+    @integration
     Scenario: A refused switch is a warning and the popover stays
       Given the enable popover is open
       When the server refuses the switch
