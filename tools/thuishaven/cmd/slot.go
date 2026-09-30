@@ -62,7 +62,7 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		if procs := domain.CheckGoMaxProcs(runtime.NumCPU(), os.Getenv("GOMAXPROCS"), pressure); procs != "" {
 			fmt.Printf("gomaxprocs=%s\n", procs)
 		}
-		width, widthSource := domain.UnitTestFullWidth(system.New().TotalMemory(), runtime.NumCPU(), os.Getenv("HAVEN_TEST_WORKERS"))
+		width, widthSource := domain.UnitTestFullWidth(system.New().TotalMemory(), runtime.NumCPU(), env.TestWorkers)
 		fmt.Printf("unit_test_full_width=%d source=%s\n", width, widthSource)
 		store := fileregistry.New(havenHome())
 		explainHolders(store)
@@ -195,6 +195,7 @@ func resolveSlotLimit(pressure domain.Pressure, env domain.CheckEnv) (int, strin
 func slotCheckEnv() domain.CheckEnv {
 	return domain.CheckEnv{
 		CheckSlots:  os.Getenv("CHECK_SLOTS"),
+		TestWorkers: devEnv("HAVEN_TEST_WORKERS"),
 		CI:          os.Getenv("CI"),
 		Claudecode:  os.Getenv("CLAUDECODE"),
 		HeldByQueue: heldByQueueAncestor(os.Getenv("CHECK_QUEUE_HELD")),

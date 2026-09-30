@@ -306,6 +306,18 @@ sized at creation), and the managed Redis gets a `maxmemory` ceiling
 loudly instead of paging the machine. `haven status` shows each service's
 current memory use, and the hub + dashboard show each stack's RAM footprint.
 
+**Machine limits.** `haven limits` prints the ClickHouse, observability and
+Redis memory caps, the colima VM's CPUs and memory, and the unit test worker
+count, each with its effective value and source (default, settings, .env or
+env). `haven limits set <name> <value>` / `unset <name>` (for example
+`clickhouse-memory-mb`, `colima-cpus`) edit `limits.json` in haven's home, and
+the hub's "Machine limits" panel does the same over `GET /api/limits` and
+`PUT`/`DELETE /api/limits/<name>`. Precedence is environment, then `.env`, then
+that file, then the computed default. ClickHouse and Redis pick a change up on
+the next `haven up`, the observability container when it is next recreated;
+haven never resizes a colima VM, so a VM change is applied with the printed
+`colima stop && colima start --cpu N --memory M`.
+
 **Playing a PR.** `haven play 4913` reviews a PR without letting it near your
 own stacks: a dedicated checkout under the haven home, dedicated database
 containers and volumes (play-scoped names, freshly allocated ports, never the

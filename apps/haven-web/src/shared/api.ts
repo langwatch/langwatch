@@ -59,9 +59,17 @@ export const getStackHome = async ({
   return { found: true, home: stackHomeSchema.parse(await response.json()) };
 };
 
-const post = async ({ path, body }: { path: string; body?: unknown }) =>
+const post = async ({
+  path,
+  body,
+  method = "POST",
+}: {
+  path: string;
+  body?: unknown;
+  method?: "POST" | "PUT" | "DELETE";
+}) =>
   fetch(path, {
-    method: "POST",
+    method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -70,11 +78,13 @@ const post = async ({ path, body }: { path: string; body?: unknown }) =>
 export const postAction = async ({
   path,
   body,
+  method,
 }: {
   path: string;
   body?: unknown;
+  method?: "POST" | "PUT" | "DELETE";
 }): Promise<string> => {
-  const response = await post({ path, body });
+  const response = await post({ path, body, method });
   const answer = actionAnswerSchema.safeParse(await response.json().catch(() => ({})));
   if (!answer.success) throw new Error(`${path} answered ${response.status}`);
   const { data } = answer;
@@ -91,5 +101,10 @@ export const revealApiKey = async ({ path }: { path: string }): Promise<string> 
 
 export const restartPath = ({ slug }: { slug: string }) =>
   `/api/stacks/${encodeURIComponent(slug)}/restart`;
+
+export const LIMITS_PATH = "/api/limits";
+
+export const limitPath = ({ name }: { name: string }) =>
+  `${LIMITS_PATH}/${encodeURIComponent(name)}`;
 
 export const START_PATH = "/api/worktrees/start";

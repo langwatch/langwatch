@@ -315,6 +315,16 @@ var baseTable = []commandSpec{
 		},
 	},
 	{
+		name:    "limits",
+		summary: "machine resource limits: show them, or set <name> <value> | unset <name>",
+		args:    "[set <name> <value> | unset <name>]",
+		maxArgs: 3,
+		flags: []flagSpec{
+			{long: "--json", summary: "machine-readable"},
+		},
+		run: runLimits,
+	},
+	{
 		name:    "mail",
 		summary: "read this worktree's caught email: address | list | get <id> | wait | clear",
 		args:    "<address|list|get|wait|clear> [id]",

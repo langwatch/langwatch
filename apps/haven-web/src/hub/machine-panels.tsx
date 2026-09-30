@@ -2,6 +2,7 @@ import { Grid, KeyValue, Link, Meter, Panel, Stack, Text } from "@langwatch/desi
 
 import type { Hub, Machine } from "../shared/contract.ts";
 import { formatBytes } from "../shared/format.ts";
+import { LimitsPanel } from "./limits-panel.tsx";
 
 const SHARED_SERVERS = ["clickhouse", "postgres", "redis", "containers"];
 
@@ -99,8 +100,11 @@ const SharedPanel = ({ shared }: { shared: Hub["shared"] }) => (
 );
 
 export const MachinePanels = ({ hub }: { hub: Hub }) => (
-  <Grid columns={2}>
-    <MemoryPanel machine={hub.machine} />
-    <SharedPanel shared={hub.shared} />
-  </Grid>
+  <Stack gap={4}>
+    <Grid columns={2}>
+      <MemoryPanel machine={hub.machine} />
+      <SharedPanel shared={hub.shared} />
+    </Grid>
+    <LimitsPanel />
+  </Stack>
 );

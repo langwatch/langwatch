@@ -155,6 +155,7 @@ func TestClickHouseLimitsEnvWiring(t *testing.T) {
 // "this laptop runs native ClickHouse, never provision one" is pinned next to
 // the CLICKHOUSE_URL it belongs with and travels into every new worktree.
 func TestResolveKnob(t *testing.T) {
+	noSettings := func() map[string]string { return nil }
 	dotenv := func() map[string]string {
 		return map[string]string{"LANGWATCH_HAVEN_CH": "0"}
 	}
@@ -163,7 +164,7 @@ func TestResolveKnob(t *testing.T) {
 	t.Run("given a knob set only in the dotenv layers", func(t *testing.T) {
 		t.Run("when resolving it", func(t *testing.T) {
 			t.Run("falls back to the dotenv value", func(t *testing.T) {
-				got, ok := resolveKnob("LANGWATCH_HAVEN_CH", unset, dotenv)
+				got, ok := resolveKnob("LANGWATCH_HAVEN_CH", knobLayers{lookup: unset, dotenv: dotenv, settings: noSettings})
 				if !ok || got != "0" {
 					t.Errorf(`got (%q, %v), want ("0", true)`, got, ok)
 				}
@@ -176,7 +177,7 @@ func TestResolveKnob(t *testing.T) {
 
 		t.Run("when resolving it", func(t *testing.T) {
 			t.Run("the process environment wins over the dotenv layers", func(t *testing.T) {
-				got, _ := resolveKnob("LANGWATCH_HAVEN_CH", exported, dotenv)
+				got, _ := resolveKnob("LANGWATCH_HAVEN_CH", knobLayers{lookup: exported, dotenv: dotenv, settings: noSettings})
 				if got != "1" {
 					t.Errorf("got %q, want %q; an export must override .env for a one-off run", got, "1")
 				}
@@ -189,7 +190,7 @@ func TestResolveKnob(t *testing.T) {
 
 		t.Run("when resolving it", func(t *testing.T) {
 			t.Run("reports it as set, so an explicit opt-out is not re-read from .env", func(t *testing.T) {
-				got, ok := resolveKnob("LANGWATCH_HAVEN_CH", emptyExport, dotenv)
+				got, ok := resolveKnob("LANGWATCH_HAVEN_CH", knobLayers{lookup: emptyExport, dotenv: dotenv, settings: noSettings})
 				if got != "" || !ok {
 					t.Errorf(`got (%q, %v), want ("", true)`, got, ok)
 				}
@@ -200,7 +201,7 @@ func TestResolveKnob(t *testing.T) {
 	t.Run("given a knob absent from both sources", func(t *testing.T) {
 		t.Run("when resolving it", func(t *testing.T) {
 			t.Run("reports it unset so the caller's default applies", func(t *testing.T) {
-				if _, ok := resolveKnob("LANGWATCH_HAVEN_NOPE", unset, dotenv); ok {
+				if _, ok := resolveKnob("LANGWATCH_HAVEN_NOPE", knobLayers{lookup: unset, dotenv: dotenv, settings: noSettings}); ok {
 					t.Error("an absent knob must not report as set")
 				}
 			})
@@ -215,7 +216,7 @@ func TestResolveKnob(t *testing.T) {
 					read = true
 					return nil
 				}
-				resolveKnob("LANGWATCH_HAVEN_CH", func(string) (string, bool) { return "1", true }, counting)
+				resolveKnob("LANGWATCH_HAVEN_CH", knobLayers{lookup: func(string) (string, bool) { return "1", true }, dotenv: counting, settings: noSettings})
 				if read {
 					t.Error("dotenv was loaded even though the environment answered")
 				}

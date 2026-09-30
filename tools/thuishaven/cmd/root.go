@@ -164,7 +164,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	// ceiling is explicit and per-profile, so neither container can quietly take
 	// the machine. Both containers are sized against this machine's RAM/CPU.
 	ram, cpus := sys.TotalMemory(), runtime.NumCPU()
-	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), domain.DefaultColimaLimits(ram, cpus), sup)
+	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), colimaLimits(ram, cpus), sup)
 	ch := clickhousedocker.New(rt, havenHome(), envOr("HAVEN_CH_IMAGE", domain.ClickHouseImage), clickHouseLimits())
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
 	rds := redisbrew.New(
@@ -177,7 +177,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		havenHome(),
 		envOr("HAVEN_OBS_IMAGE", domain.ObservabilityImage),
 		observabilityEndpoints(),
-		domain.DefaultObservabilityLimits(ram, cpus),
+		observabilityLimits(ram, cpus),
 	)
 
 	// The console floor haven imposes while the observability stack is up: default
@@ -276,6 +276,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				Restart: orch.RestartStackQuiet,
 				Start:   orch.StartWorktreeStack,
 			},
+			Limits: dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
 		}),
 		params:   app.UpParams{WorktreeDir: worktree, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
@@ -360,6 +361,27 @@ func clickHouseLimits() domain.ClickHouseLimits {
 		l.LightweightLogsEnabled = false
 	}
 	l.SystemLogTTLDays = envInt("HAVEN_CLICKHOUSE_LOG_TTL_DAYS", l.SystemLogTTLDays)
+	return l
+}
+
+// colimaLimits is the shape haven gives a VM it creates; the knobs are the
+// limits catalogue's, so a settings-file value reaches here through devEnv.
+func colimaLimits(ram uint64, cpus int) domain.ColimaLimits {
+	l := domain.DefaultColimaLimits(ram, cpus)
+	if n := envInt("HAVEN_COLIMA_CPUS", 0); n > 0 {
+		l.CPUs = n
+	}
+	if n := envInt("HAVEN_COLIMA_MEMORY_GIB", 0); n > 0 {
+		l.MemoryGiB = n
+	}
+	return l
+}
+
+func observabilityLimits(ram uint64, cpus int) domain.ObservabilityLimits {
+	l := domain.DefaultObservabilityLimits(ram, cpus)
+	if mb := envInt("LW_OBS_MEMORY_MB", 0); mb > 0 {
+		l.MemoryMB = mb
+	}
 	return l
 }
 
@@ -884,14 +906,14 @@ func runUpgrade(ctx context.Context, d deps, _ invocation) error {
 // them at once, and a seed flag would re-seed on every up. Keep this list and
 // the ENVIRONMENT section of help.go in step.
 func devEnv(key string) string {
-	v, _ := resolveKnob(key, os.LookupEnv, dotenvKnobs)
+	v, _ := resolveKnob(key, processKnobs())
 	return v
 }
 
 // dotenvLookup is devEnv's two-value form, for knobs that distinguish "set to
 // empty" from "not set at all".
 func dotenvLookup(key string) (string, bool) {
-	return resolveKnob(key, os.LookupEnv, dotenvKnobs)
+	return resolveKnob(key, processKnobs())
 }
 
 // shouldDisableGoogleDLP decides whether haven forces
@@ -909,19 +931,44 @@ func shouldDisableGoogleDLP(value string, isSet bool) bool {
 	return !isSet || strings.EqualFold(value, "true")
 }
 
+// knobLayers are the sources a knob resolves from, highest first. The dotenv
+// and settings layers are thunks so a file is never read when a layer above
+// already answers.
+type knobLayers struct {
+	lookup   func(string) (string, bool)
+	dotenv   func() map[string]string
+	settings func() map[string]string
+}
+
+// processKnobs is the real machine: the process environment, the operator's
+// .env, then the limits settings file.
+func processKnobs() knobLayers {
+	return knobLayers{lookup: os.LookupEnv, dotenv: dotenvKnobs, settings: settingsKnobs}
+}
+
 // resolveKnob is the precedence itself, kept pure so it can be tested without a
-// checkout on disk. dotenv is a thunk so the file is never read when the
-// process environment already answers.
-func resolveKnob(
-	key string,
-	lookup func(string) (string, bool),
-	dotenv func() map[string]string,
-) (string, bool) {
-	if v, ok := lookup(key); ok {
-		return v, true
-	}
-	v, ok := dotenv()[key]
+// checkout on disk: process env, then .env, then the limits settings file.
+func resolveKnob(key string, layers knobLayers) (string, bool) {
+	v, _, ok := resolveKnobSource(key, layers)
 	return v, ok
+}
+
+// resolveKnobSource is resolveKnob that also names the layer: env, .env or
+// settings. Only a catalog limit's knob reads the settings file, which also
+// keeps havenHome (where that file lives) from resolving through itself.
+func resolveKnobSource(key string, layers knobLayers) (string, string, bool) {
+	if v, ok := layers.lookup(key); ok {
+		return v, "env", true
+	}
+	if v, ok := layers.dotenv()[key]; ok {
+		return v, ".env", true
+	}
+	if domain.IsLimitEnv(key) {
+		if v, ok := layers.settings()[key]; ok {
+			return v, "settings", true
+		}
+	}
+	return "", "", false
 }
 
 // dotenvKnobs loads the dotenv layers once per process, from the workspace root

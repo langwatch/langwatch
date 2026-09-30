@@ -203,6 +203,15 @@ var envHelpText = `Environment variables.
                                  (writes fail loudly at the cap instead of the
                                  machine paging; 0 disables the cap).
 
+  Machine limits (also: haven limits [set <name> <value> | unset <name>])
+    Each is a knob below, and a settings file in haven's home holds what
+    "haven limits set" saves. Precedence: environment > .env > settings > default.
+    LW_OBS_MEMORY_MB             Observability container memory ceiling in MB.
+    HAVEN_COLIMA_CPUS            CPUs of a colima VM haven creates (never resizes one).
+    HAVEN_COLIMA_MEMORY_GIB      Memory of a colima VM haven creates, in GiB.
+    HAVEN_TEST_WORKERS=N         Machine-wide cap on unit test workers.
+    (also LANGWATCH_HAVEN_CH_MEMORY_MB and HAVEN_REDIS_MAXMEMORY_MB, above.)
+
   Containers, langy and observability
     HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on
                                  (default: default). A profile haven creates is

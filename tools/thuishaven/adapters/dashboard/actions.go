@@ -32,8 +32,14 @@ const maxActionBody = 4 << 10
 // not the other. A request with neither is refused rather than trusted, which
 // costs a curl user one header and costs an attacker the whole route.
 func guardAction(w http.ResponseWriter, r *http.Request) bool {
-	if r.Method != http.MethodPost {
-		http.Error(w, "this action accepts POST", http.StatusMethodNotAllowed)
+	return guardMethod(w, r, http.MethodPost)
+}
+
+// guardMethod is guardAction for an action that is not a POST: the same
+// same-page rule, with the one method the route takes.
+func guardMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		http.Error(w, "this action accepts "+method, http.StatusMethodNotAllowed)
 		return false
 	}
 	site := r.Header.Get("Sec-Fetch-Site")

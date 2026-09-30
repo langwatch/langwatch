@@ -27,6 +27,8 @@ type CheckEnv struct {
 	CheckSlots string // CHECK_SLOTS
 	CI         string // CI
 	Claudecode string // CLAUDECODE, set in every shell an agent runs
+	// TestWorkers is HAVEN_TEST_WORKERS as haven resolves it (env, .env, settings).
+	TestWorkers string
 	// HeldByQueue reports that CHECK_QUEUE_HELD names a live ancestor of this
 	// process that is itself one of the queue's wrappers: the queue spawned the
 	// run and already counted it. The caller resolves it, because the domain

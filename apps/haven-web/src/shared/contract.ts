@@ -140,6 +140,29 @@ export const logsSchema = z.object({
 });
 export type Logs = z.infer<typeof logsSchema>;
 
+export const limitSourceSchema = z.enum(["default", "settings", ".env", "env"]);
+
+export const limitSchema = z.object({
+  name: z.string(),
+  env: z.string(),
+  unit: z.string(),
+  value: z.number(),
+  default: z.number(),
+  source: limitSourceSchema,
+  min: z.number(),
+  max: z.number(),
+  allowZero: z.boolean(),
+  applies: z.string(),
+});
+export type Limit = z.infer<typeof limitSchema>;
+
+export const limitsSchema = z.object({
+  totalRamBytes: z.number(),
+  cpus: z.number(),
+  limits: z.array(limitSchema),
+});
+export type Limits = z.infer<typeof limitsSchema>;
+
 export const actionAnswerSchema = z.union([
   z.object({ message: z.string() }),
   z.object({ error: z.string() }),

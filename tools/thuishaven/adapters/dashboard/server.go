@@ -53,6 +53,9 @@ type Config struct {
 	// Actions are the lifecycle operations the page may take. Zero-valued means
 	// a dashboard you can only read, which is what it was before.
 	Actions Actions
+	// Limits reads and edits the machine resource limits. Zero-valued leaves
+	// the routes answering 501.
+	Limits Limits
 	// Naming reads a Host header as a stack's home and names a stopped
 	// stack's hosts; StackURL builds a routed URL through the live proxy.
 	Naming   domain.Naming
@@ -82,6 +85,9 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/stacks/{slug}/api-key", s.handleRevealAPIKey)
 	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
 	mux.HandleFunc("/api/worktrees/start", s.handleStart)
+	mux.HandleFunc("GET /api/limits", s.handleLimits)
+	mux.HandleFunc("PUT /api/limits/{name}", s.handleSetLimit)
+	mux.HandleFunc("DELETE /api/limits/{name}", s.handleUnsetLimit)
 	mux.HandleFunc("/v1/", s.handleTelemetry) // OTLP: /v1/traces, /v1/metrics, /v1/logs
 	mux.HandleFunc("/", s.handleIndex)
 	return mux

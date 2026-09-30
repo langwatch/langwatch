@@ -349,7 +349,7 @@ func (o *Orchestrator) slotState() slotState {
 // the cores being what the repository's vitest configs already ask for with
 // `maxWorkers: "50%"`.
 func (o *Orchestrator) fullWidth() (int, string) {
-	return domain.UnitTestFullWidth(o.sys.TotalMemory(), runtime.NumCPU(), os.Getenv("HAVEN_TEST_WORKERS"))
+	return domain.UnitTestFullWidth(o.sys.TotalMemory(), runtime.NumCPU(), o.cfg.CheckEnv.TestWorkers)
 }
 
 // narrowedWidth is how many workers a narrowed run actually gets, and the two

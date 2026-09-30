@@ -23,7 +23,7 @@ func killTree(pid int) {
 }
 
 // processParents maps every live pid to its parent, from `ps` (macOS has no /proc).
-// Its own short deadline: the caller's context is already cancelled by now.
+// Its own short deadline: the caller's context is already canceled by now.
 func processParents() map[int]int {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
