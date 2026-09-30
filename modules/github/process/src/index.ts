@@ -14,7 +14,7 @@ export {
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
 } from "./eventing/github-branch-recheck.process.ts";
-export { GithubApp, type GithubInfrastructure } from "./app/github.app.ts";
+export { GithubApp } from "./app/github.app.ts";
 export {
   githubServer,
   composeGithubApi,

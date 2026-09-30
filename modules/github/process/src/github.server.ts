@@ -31,8 +31,6 @@ import { GithubTokenCacheRedisRepository } from "./repositories/redis/redis.gith
 import { githubInstallRest } from "./transport/github-install.rest.ts";
 import { githubTrpcTransport } from "./transport/github.trpc.ts";
 
-export type { GithubInfrastructure } from "./app/github.app.ts";
-
 export const githubServer = defineServerModule("github")
   .withRepositories(githubRepositories)
   .withApp(GithubApp)

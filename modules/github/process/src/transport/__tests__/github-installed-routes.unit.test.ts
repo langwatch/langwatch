@@ -9,16 +9,27 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import { createApp } from "@langwatch/kernel";
+import { createApp, type ModuleSecretsScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { memoryStores, resolvedSecrets } from "@langwatch/process-stores";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { githubServer } from "../../github.server.ts";
 import { githubInstallRest } from "../github-install.rest.ts";
 
 const SESSION_COOKIE = "session=flow-owner";
+
+/** The install-state key from a chain over a fake environment, scoped as boot scopes it. */
+function githubSecrets(): ModuleSecretsScope {
+  const resolver = SecretsResolver.over(
+    SecretsChain.start({
+      environment: { CREDENTIALS_SECRET: "github-install-state-signing-key" },
+    }).withEnv(),
+  );
+  return (owner, declared) => resolver.scopeTo(owner, declared);
+}
 
 async function installedGithub(
   options: {
@@ -28,13 +39,10 @@ async function installedGithub(
 ) {
   const { signedInAs = "user-1", canManage = true } = options;
 
-  return createApp({ role: "api" })
+  return createApp({ role: "api", secrets: githubSecrets() })
     .withModules([githubServer])
     .withConfig({ github: { appId: undefined, host: undefined, appSlug: undefined } })
     .withStores(memoryStores())
-    .withMembers({
-      secrets: resolvedSecrets({ CREDENTIALS_SECRET: "github-install-state-signing-key" }),
-    })
     .provide({
       organization: createApiFixture<OrganizationApi>({ isMember: async () => true }),
       project: createApiFixture<ProjectApi>({}),
@@ -127,6 +135,29 @@ describe("given the github module installed over memory stores", () => {
 
         const response = await host.app.request(
           new Request("http://api.test/api/github/setup?installation_id=1"),
+        );
+
+        expect({ status: response.status, body: await response.text() }).toEqual({
+          status: 400,
+          body: expect.stringContaining("Invalid state or missing installation"),
+        });
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when GitHub calls the Setup URL with a state nobody signed", () => {
+    /** @scenario "the installed module answers the GitHub App Setup URL" */
+    it("answers 400, reading the signing key through the module's secret handle", async () => {
+      const runtime = await installedGithub();
+
+      try {
+        const host = restHost();
+        host.mount(githubInstallRest.router(), () => runtime.module(githubServer).provided);
+
+        const response = await host.app.request(
+          new Request("http://api.test/api/github/setup?installation_id=1&state=not-signed"),
         );
 
         expect({ status: response.status, body: await response.text() }).toEqual({

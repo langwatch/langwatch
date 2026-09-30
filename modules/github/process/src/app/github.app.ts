@@ -28,9 +28,8 @@ import {
   OrganizationApi,
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
-import { reads, type ProcessMembers } from "@langwatch/process-stores/members";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
-import { Secret } from "@langwatch/secrets";
+import { credentialsSecret, Secret, sessionSecret } from "@langwatch/secrets";
 
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
 import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
@@ -136,13 +135,9 @@ export interface GithubAppTokenCache {
   }): string;
 }
 
-export type GithubInfrastructure = Readonly<{
-  secrets: ProcessMembers["secrets"];
-}>;
-
 type GithubSetup = FeatureSetup<
   typeof GithubApp.dependencies,
-  GithubInfrastructure,
+  never,
   GithubServerConfig,
   GithubRepositories
 >;
@@ -206,7 +201,6 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
 export class GithubApp implements GithubApiContract {
-  static readonly reads = reads("secrets");
   static readonly contract = GithubApi;
   static readonly dependencies = {
     organizations: OrganizationApi,
@@ -220,6 +214,9 @@ export class GithubApp implements GithubApiContract {
   static readonly secrets = {
     privateKey: Secret.load("GITHUB_LANGY_PRIVATE_KEY", { optional: true }),
     webhookSecret: Secret.load("GITHUB_LANGY_WEBHOOK_SECRET", { optional: true }),
+    /** Main's install-state key: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
+    signingKey: credentialsSecret,
+    signingKeyFallback: sessionSecret,
   } as const;
 
   readonly #service: GithubApiContract;
@@ -372,11 +369,19 @@ export class GithubApp implements GithubApiContract {
     return ComposedGithubBranchDemand.create({ demand, host });
   }
 
-  static create({ repositories, members, config, dependencies }: GithubSetup): GithubApp {
+  static async create({
+    repositories,
+    secrets,
+    config,
+    dependencies,
+  }: GithubSetup): Promise<GithubApp> {
     const branchConfig = {
       appId: config.appId ?? "",
-      privateKey: members.secrets.find("GITHUB_LANGY_PRIVATE_KEY") ?? "",
+      privateKey: await secrets.into(GithubApp.secrets.privateKey, (value) => value ?? ""),
     };
+    const signingKey =
+      (await secrets.into(GithubApp.secrets.signingKey, (value) => value ?? "")) ||
+      (await secrets.into(GithubApp.secrets.signingKeyFallback, (value) => value ?? ""));
     const hostConfig = config.host === undefined ? {} : { hostConfig: { host: config.host } };
 
     return new GithubApp({
@@ -387,10 +392,11 @@ export class GithubApp implements GithubApiContract {
         config: {
           ...branchConfig,
           appSlug: config.appSlug ?? "",
-          webhookSecret: members.secrets.find("GITHUB_LANGY_WEBHOOK_SECRET") ?? "",
-          // Shares the deployment's one CREDENTIALS_SECRET with the secret
-          // module — both read it, neither owns it exclusively.
-          signingKey: members.secrets.find("CREDENTIALS_SECRET") ?? "",
+          webhookSecret: await secrets.into(
+            GithubApp.secrets.webhookSecret,
+            (value) => value ?? "",
+          ),
+          signingKey,
         },
         ...hostConfig,
       }),
