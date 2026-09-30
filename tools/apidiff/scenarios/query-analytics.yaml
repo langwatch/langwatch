@@ -1,0 +1,283 @@
+# Tenant query surfaces that read shared ClickHouse and cost money (coverage gap 2):
+# LangWatchQL (/api/v1/query), the analytics-sql family's saved charts
+# (/api/v1/projects/{projectId}/analytics/charts; main removed its raw SQL route in #7565)
+# and instant-evals (/api/v1/instant-evals, 7 operations). All are /api/v1-only on main.
+
+# ── /api/v1/query ───────────────────────────────────────────────────────────
+
+- id: query-run-reads-back-own-trace
+  endpoint: POST /api/v1/query
+  setup:
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdq{uid}", "spans": [{"type": "llm", "span_id": "vdqs{uid}", "trace_id": "vdq{uid}", "name": "vd-{uid}", "model": "gpt-5", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": "{nowMs-60000}", "finished_at": "{nowMs-59000}"}}]}, "expect": {"status": 200}}
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces WHERE TraceId = 'vdq{uid}' LIMIT 10"}}
+  expect: {"status": 200, "body": {"columns": "<any>", "rows": "<any>", "statistics": "<any>"}}
+  verify:
+    - {"request": "POST /api/v1/query", "body": {"sql": "SELECT TraceId FROM traces WHERE TraceId = 'vdq{uid}' LIMIT 10"}, "eventually": "60s", "expect": {"status": 200, "contains": "vdq{uid}", "path": "rows", "length": 1}}
+
+- id: query-run-no-limit-is-capped-not-refused
+  endpoint: POST /api/v1/query
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces"}}
+  expect: {"status": 200, "body": {"rows": "<any>"}}
+
+- id: query-run-refuses-no-key
+  endpoint: POST /api/v1/query
+  auth: none
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces LIMIT 1"}}
+  expect: {"status": 401}
+
+- id: query-run-refuses-unknown-key
+  endpoint: POST /api/v1/query
+  auth: none
+  request: {"path": "/api/v1/query", "headers": {"X-Auth-Token": "sk-lw-vd{uid}notarealkey"}, "body": {"sql": "SELECT TraceId FROM traces LIMIT 1"}}
+  expect: {"status": 401}
+
+- id: query-run-other-project-key-sees-nothing
+  endpoint: POST /api/v1/query
+  auth: project-b
+  setup:
+    - {"request": "POST /api/collector", "auth": "project", "body": {"trace_id": "vdq{uid}", "spans": [{"type": "llm", "span_id": "vdqs{uid}", "trace_id": "vdq{uid}", "name": "vd-{uid}", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": "{nowMs-60000}", "finished_at": "{nowMs-59000}"}}]}, "expect": {"status": 200}}
+    - {"request": "POST /api/v1/query", "auth": "project", "body": {"sql": "SELECT TraceId FROM traces WHERE TraceId = 'vdq{uid}' LIMIT 10"}, "eventually": "60s", "expect": {"status": 200, "contains": "vdq{uid}"}}
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId, TenantId FROM traces WHERE TraceId = 'vdq{uid}' LIMIT 10"}}
+  expect: {"status": 200, "path": "rows", "length": 0, "notContains": "vdq{uid}"}
+
+- id: query-run-tenant-filter-cannot-name-another-project
+  endpoint: POST /api/v1/query
+  setup:
+    - {"request": "POST /api/collector", "auth": "project-b", "body": {"trace_id": "vdqb{uid}", "spans": [{"type": "llm", "span_id": "vdqbs{uid}", "trace_id": "vdqb{uid}", "name": "vd-{uid}", "input": {"type": "text", "value": "vd secret {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": "{nowMs-60000}", "finished_at": "{nowMs-59000}"}}]}, "expect": {"status": 200}}
+    - {"request": "POST /api/v1/query", "auth": "project-b", "body": {"sql": "SELECT TraceId FROM traces WHERE TraceId = 'vdqb{uid}' LIMIT 10"}, "eventually": "60s", "expect": {"status": 200, "contains": "vdqb{uid}"}}
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId, TenantId FROM traces WHERE TenantId = '{projectIdB}' LIMIT 100"}}
+  expect: {"status": 200, "path": "rows", "length": 0, "notContains": ["vdqb{uid}", "{projectIdB}"]}
+
+- id: query-run-or-true-cannot-widen-tenant
+  endpoint: POST /api/v1/query
+  setup:
+    - {"request": "POST /api/collector", "auth": "project-b", "body": {"trace_id": "vdqb{uid}", "spans": [{"type": "llm", "span_id": "vdqbs{uid}", "trace_id": "vdqb{uid}", "name": "vd-{uid}", "input": {"type": "text", "value": "vd secret {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": "{nowMs-60000}", "finished_at": "{nowMs-59000}"}}]}, "expect": {"status": 200}}
+    - {"request": "POST /api/v1/query", "auth": "project-b", "body": {"sql": "SELECT TraceId FROM traces WHERE TraceId = 'vdqb{uid}' LIMIT 10"}, "eventually": "60s", "expect": {"status": 200, "contains": "vdqb{uid}"}}
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId, TenantId FROM traces WHERE TraceId = 'vdqb{uid}' OR 1 = 1 LIMIT 10000"}}
+  expect: {"status": 200, "notContains": ["vdqb{uid}", "{projectIdB}"]}
+
+- id: query-run-union-cannot-reach-another-project
+  endpoint: POST /api/v1/query
+  setup:
+    - {"request": "POST /api/collector", "auth": "project-b", "body": {"trace_id": "vdqb{uid}", "spans": [{"type": "llm", "span_id": "vdqbs{uid}", "trace_id": "vdqb{uid}", "name": "vd-{uid}", "input": {"type": "text", "value": "vd secret {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": "{nowMs-60000}", "finished_at": "{nowMs-59000}"}}]}, "expect": {"status": 200}}
+    - {"request": "POST /api/v1/query", "auth": "project-b", "body": {"sql": "SELECT TraceId FROM traces WHERE TraceId = 'vdqb{uid}' LIMIT 10"}, "eventually": "60s", "expect": {"status": 200, "contains": "vdqb{uid}"}}
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces WHERE TenantId = '{projectIdB}' LIMIT 10 UNION ALL SELECT TraceId FROM (SELECT TraceId FROM traces WHERE TraceId = 'vdqb{uid}') LIMIT 10"}}
+  expect: {"status": [200, 400], "notContains": "vdqb{uid}"}
+
+- id: query-run-app-function-cannot-read-another-projects-trace
+  endpoint: POST /api/v1/query
+  setup:
+    - {"request": "POST /api/collector", "auth": "project-b", "body": {"trace_id": "vdqb{uid}", "spans": [{"type": "llm", "span_id": "vdqbs{uid}", "trace_id": "vdqb{uid}", "name": "vd-{uid}", "input": {"type": "text", "value": "vd secret {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": "{nowMs-60000}", "finished_at": "{nowMs-59000}"}}]}, "expect": {"status": 200}}
+    - {"request": "POST /api/v1/query", "auth": "project-b", "body": {"sql": "SELECT TraceId FROM traces WHERE TraceId = 'vdqb{uid}' LIMIT 10"}, "eventually": "60s", "expect": {"status": 200, "contains": "vdqb{uid}"}}
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId, llm_messages('vdqb{uid}') AS leaked, trace_json('vdqb{uid}') AS whole FROM traces LIMIT 1"}}
+  expect: {"status": [200, 400, 422], "notContains": ["vd secret {uid}", "vdqbs{uid}"]}
+
+- id: query-run-refuses-system-tables
+  endpoint: POST /api/v1/query
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT name FROM system.tables LIMIT 5"}}
+  expect: {"status": 400, "body": {"code": "<any>"}, "notContains": "trace_summaries"}
+
+- id: query-run-refuses-limit-above-cap
+  endpoint: POST /api/v1/query
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces LIMIT 10001"}}
+  expect: {"status": 400, "body": {"code": "lwql_not_permitted"}, "contains": "LIMIT_TOO_HIGH"}
+
+- id: query-run-refuses-union-branch-without-limit
+  endpoint: POST /api/v1/query
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces UNION ALL SELECT TraceId FROM traces LIMIT 5"}}
+  expect: {"status": 400, "contains": "LIMIT_REQUIRED_PER_BRANCH"}
+
+- id: query-run-refuses-unparseable-sql
+  endpoint: POST /api/v1/query
+  request: {"path": "/api/v1/query", "body": {"sql": "SELEC TraceId FRM traces"}}
+  expect: {"status": 400, "body": {"code": "lwql_unparseable"}}
+
+- id: query-run-rejects-missing-sql
+  endpoint: POST /api/v1/query
+  request: {"path": "/api/v1/query", "body": {"parameters": {"a": 1}}}
+  expect: {"status": [400, 422]}
+
+- id: query-run-rejects-empty-sql
+  endpoint: POST /api/v1/query
+  request: {"path": "/api/v1/query", "body": {"sql": ""}}
+  expect: {"status": [400, 422]}
+
+- id: query-run-rejects-wrong-parameter-type
+  endpoint: POST /api/v1/query
+  request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces LIMIT 1", "parameters": {"a": {"nested": true}}}}
+  expect: {"status": [400, 422]}
+
+- id: query-schema-lists-views
+  endpoint: GET /api/v1/query/schema
+  request: {"path": "/api/v1/query/schema"}
+  expect: {"status": 200, "body": {"database": "<any>", "views": "<any>"}, "contains": "TenantId"}
+
+- id: query-schema-refuses-no-key
+  endpoint: GET /api/v1/query/schema
+  auth: none
+  request: {"path": "/api/v1/query/schema"}
+  expect: {"status": 401}
+
+- id: query-reference-describes-both-languages
+  endpoint: GET /api/v1/query/reference
+  request: {"path": "/api/v1/query/reference"}
+  expect: {"status": 200, "contains": "/api/v1/query"}
+
+- id: query-reference-refuses-no-key
+  endpoint: GET /api/v1/query/reference
+  auth: none
+  request: {"path": "/api/v1/query/reference"}
+  expect: {"status": 401}
+
+# ── /api/v1/projects/{projectId}/analytics/charts (analytics-sql family) ─────
+
+- id: query-charts-create-reads-back
+  endpoint: POST /api/v1/projects/{projectId}/analytics/charts
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts", "body": {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5", "parameters": {}}}}
+  capture: {"chartId": "id"}
+  expect: {"status": 201, "body": {"name": "vd-{uid}", "id": "<any>"}}
+  verify:
+    - {"request": "GET /api/v1/projects/{projectId}/analytics/charts/{chartId}", "expect": {"status": 200, "body": {"name": "vd-{uid}"}, "contains": "SELECT TraceId FROM traces LIMIT 5"}}
+    - {"request": "GET /api/v1/projects/{projectId}/analytics/charts", "expect": {"status": 200, "contains": "vd-{uid}"}}
+
+- id: query-charts-list-refuses-no-key
+  endpoint: GET /api/v1/projects/{projectId}/analytics/charts
+  auth: none
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts"}
+  expect: {"status": 401}
+
+- id: query-charts-list-refuses-another-projects-path
+  endpoint: GET /api/v1/projects/{projectId}/analytics/charts
+  setup:
+    - {"request": "GET /api/v1/projects/{projectIdB}/analytics/charts", "auth": "project-b", "expect": {"status": [200, 403]}}
+  request: {"path": "/api/v1/projects/{projectIdB}/analytics/charts"}
+  expect: {"status": [403, 404]}
+
+- id: query-charts-get-other-project-key-refused
+  endpoint: GET /api/v1/projects/{projectId}/analytics/charts/{chartId}
+  auth: project-b
+  setup:
+    - {"request": "POST /api/v1/projects/{projectId}/analytics/charts", "auth": "project", "body": {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5", "parameters": {}}}, "capture": {"chartId": "id"}, "expect": {"status": 201}}
+  request: {"path": "/api/v1/projects/{projectIdB}/analytics/charts/{chartId}"}
+  expect: {"status": [403, 404], "notContains": "vd-{uid}"}
+  verify:
+    - {"request": "GET /api/v1/projects/{projectId}/analytics/charts/{chartId}", "auth": "project-b", "expect": {"status": [403, 404], "notContains": "vd-{uid}"}}
+    - {"request": "GET /api/v1/projects/{projectId}/analytics/charts/{chartId}", "auth": "project", "expect": {"status": 200, "body": {"name": "vd-{uid}"}}}
+
+- id: query-charts-create-rejects-missing-name
+  endpoint: POST /api/v1/projects/{projectId}/analytics/charts
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts", "body": {"definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 5", "parameters": {}}}}
+  expect: {"status": [400, 422]}
+
+- id: query-charts-create-refuses-system-table-sql
+  endpoint: POST /api/v1/projects/{projectId}/analytics/charts
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts", "body": {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT name FROM system.tables LIMIT 5", "parameters": {}}}}
+  expect: {"status": 400}
+  verify:
+    - {"request": "GET /api/v1/projects/{projectId}/analytics/charts", "expect": {"status": 200, "notContains": "vd-{uid}"}}
+
+- id: query-charts-create-refuses-limit-above-cap
+  endpoint: POST /api/v1/projects/{projectId}/analytics/charts
+  request: {"path": "/api/v1/projects/{projectId}/analytics/charts", "body": {"name": "vd-{uid}", "definition": {"version": 1, "sql": "SELECT TraceId FROM traces LIMIT 10001", "parameters": {}}}}
+  expect: {"status": 400, "contains": "LIMIT_TOO_HIGH"}
+
+# ── /api/v1/instant-evals ────────────────────────────────────────────────────
+
+- id: query-instant-evals-estimate-prices-a-run
+  endpoint: POST /api/v1/instant-evals/estimate
+  request: {"path": "/api/v1/instant-evals/estimate", "body": {"target": "traces", "questions": [{"instructions": "Is the answer polite?"}], "limit": 1}}
+  expect: {"status": 200, "body": {"rows": "<any>", "priceUsd": "<any>", "isRowsCapped": "<any>"}}
+
+- id: query-instant-evals-create-reads-back
+  endpoint: POST /api/v1/instant-evals
+  shard: project
+  request: {"path": "/api/v1/instant-evals", "body": {"name": "vd-{uid}", "target": "traces", "questions": [{"instructions": "Is the answer polite?"}], "limit": 1}}
+  capture: {"runId": "id"}
+  expect: {"status": 202, "body": {"id": "<any>", "name": "vd-{uid}", "limit": 1}}
+  verify:
+    - {"request": "GET /api/v1/instant-evals/{runId}", "expect": {"status": 200, "body": {"name": "vd-{uid}"}}}
+    - {"request": "GET /api/v1/instant-evals", "expect": {"status": 200, "contains": "vd-{uid}"}}
+    - {"request": "GET /api/v1/instant-evals/{runId}/results", "expect": {"status": 200, "body": {"judgments": "<any>"}}}
+    - {"request": "GET /api/v1/instant-evals/{runId}/sample", "expect": {"status": 200, "body": {"rows": "<any>", "judgments": "<any>"}}}
+    - {"request": "POST /api/v1/instant-evals/{runId}/cancel", "expect": {"status": [200, 409]}}
+
+- id: query-instant-evals-list-refuses-no-key
+  endpoint: GET /api/v1/instant-evals
+  auth: none
+  request: {"path": "/api/v1/instant-evals"}
+  expect: {"status": 401}
+
+- id: query-instant-evals-create-refuses-no-key
+  endpoint: POST /api/v1/instant-evals
+  auth: none
+  request: {"path": "/api/v1/instant-evals", "body": {"target": "traces", "questions": [{"instructions": "Is the answer polite?"}], "limit": 1}}
+  expect: {"status": 401}
+
+- id: query-instant-evals-other-project-key-cannot-read-run
+  endpoint: GET /api/v1/instant-evals/{id}
+  auth: project-b
+  shard: project
+  setup:
+    - {"request": "POST /api/v1/instant-evals", "auth": "project", "body": {"name": "vd-{uid}", "target": "traces", "questions": [{"instructions": "Is the answer polite?"}], "limit": 1}, "capture": {"runId": "id"}, "expect": {"status": 202}}
+  request: {"path": "/api/v1/instant-evals/{runId}"}
+  expect: {"status": 404, "notContains": "vd-{uid}"}
+  verify:
+    - {"request": "GET /api/v1/instant-evals/{runId}/results", "auth": "project-b", "expect": {"status": 404}}
+    - {"request": "GET /api/v1/instant-evals/{runId}/sample", "auth": "project-b", "expect": {"status": 404, "notContains": "vd-{uid}"}}
+    - {"request": "POST /api/v1/instant-evals/{runId}/cancel", "auth": "project-b", "expect": {"status": 404}}
+    - {"request": "GET /api/v1/instant-evals", "auth": "project-b", "expect": {"status": 200, "notContains": "vd-{uid}"}}
+    - {"request": "GET /api/v1/instant-evals/{runId}", "auth": "project", "expect": {"status": 200, "body": {"name": "vd-{uid}"}}}
+
+- id: query-instant-evals-sql-cannot-name-another-project
+  endpoint: POST /api/v1/instant-evals/estimate
+  setup:
+    - {"request": "POST /api/collector", "auth": "project-b", "body": {"trace_id": "vdqb{uid}", "spans": [{"type": "llm", "span_id": "vdqbs{uid}", "trace_id": "vdqb{uid}", "name": "vd-{uid}", "input": {"type": "text", "value": "vd secret {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": "{nowMs-60000}", "finished_at": "{nowMs-59000}"}}]}, "expect": {"status": 200}}
+  request: {"path": "/api/v1/instant-evals/estimate", "body": {"sql": "SELECT TraceId, eval(llm_readable_trace(TraceId, 1000), 'Is the answer polite?') AS q1 FROM traces WHERE TenantId = '{projectIdB}' LIMIT 10", "limit": 10}}
+  expect: {"status": 200, "body": {"rows": 0}, "notContains": "vdqb{uid}"}
+
+- id: query-instant-evals-create-rejects-sql-and-target
+  endpoint: POST /api/v1/instant-evals
+  request: {"path": "/api/v1/instant-evals", "body": {"sql": "SELECT TraceId, eval(llm_readable_trace(TraceId, 1000), 'x') AS q1 FROM traces LIMIT 1", "target": "traces", "questions": [{"instructions": "x"}]}}
+  expect: {"status": [400, 422]}
+
+- id: query-instant-evals-create-rejects-zero-limit
+  endpoint: POST /api/v1/instant-evals
+  request: {"path": "/api/v1/instant-evals", "body": {"target": "traces", "questions": [{"instructions": "x"}], "limit": 0}}
+  expect: {"status": [400, 422]}
+
+- id: query-instant-evals-create-refuses-limit-above-row-cap
+  endpoint: POST /api/v1/instant-evals
+  request: {"path": "/api/v1/instant-evals", "body": {"name": "vd-{uid}", "target": "traces", "questions": [{"instructions": "x"}], "limit": 100001}}
+  expect: {"status": [400, 422]}
+  verify:
+    - {"request": "GET /api/v1/instant-evals", "expect": {"status": [200, 403], "notContains": "vd-{uid}"}}
+
+- id: query-instant-evals-estimate-rejects-unknown-target
+  endpoint: POST /api/v1/instant-evals/estimate
+  request: {"path": "/api/v1/instant-evals/estimate", "body": {"target": "everything", "questions": [{"instructions": "x"}]}}
+  expect: {"status": [400, 422]}
+
+- id: query-instant-evals-list-rejects-limit-above-100
+  endpoint: GET /api/v1/instant-evals
+  request: {"path": "/api/v1/instant-evals", "query": {"limit": 101}}
+  expect: {"status": [400, 422]}
+
+- id: query-instant-evals-list-rejects-half-cursor
+  endpoint: GET /api/v1/instant-evals
+  request: {"path": "/api/v1/instant-evals", "query": {"before": "2026-01-01T00:00:00Z"}}
+  expect: {"status": [400, 422]}
+
+- id: query-instant-evals-sample-rejects-n-above-ceiling
+  endpoint: GET /api/v1/instant-evals/{id}/sample
+  request: {"path": "/api/v1/instant-evals/vd-none-{uid}/sample", "query": {"n": 26}}
+  expect: {"status": [400, 422]}
+
+- id: query-instant-evals-results-rejects-limit-above-ceiling
+  endpoint: GET /api/v1/instant-evals/{id}/results
+  request: {"path": "/api/v1/instant-evals/vd-none-{uid}/results", "query": {"limit": 1001}}
+  expect: {"status": [400, 422]}
+
+- id: query-instant-evals-get-unknown-run-is-404
+  endpoint: GET /api/v1/instant-evals/{id}
+  request: {"path": "/api/v1/instant-evals/vd-none-{uid}"}
+  expect: {"status": 404}
