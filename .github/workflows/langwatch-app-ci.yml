@@ -1095,14 +1095,22 @@ jobs:
       # What IS lost: inline annotations on the diff. Findings now arrive as
       # job output rather than as review comments.
       #
-      # `lint:oxlint` is the same binary, config and path set that `pnpm lint`
-      # gives a contributor.
+      # `pnpm lint` is one cached Nx target per project plus the files outside
+      # every project. A PR lints what it affected (dependents included, since the
+      # cross-file rules can fail in a file the PR did not touch); a push runs all.
       # The Prisma client, the generated SDK types and the built SDK dist are
       # imports the type-aware rules resolve; without them they read as `any`.
       - uses: ./.github/actions/prepare-generated-files
 
       - name: Oxlint (blocking -- config errors included)
-        run: pnpm lint:oxlint
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null; then
+            node dev/nx/lint.mjs --base "$BASE"
+          else
+            node dev/nx/lint.mjs
+          fi
 
       # Type-aware rules per project, only where a change reached (ADR-150).
       # A global lint input changing, or a push, lints every project.

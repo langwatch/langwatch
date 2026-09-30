@@ -34,6 +34,7 @@
     "sync:references": "bash dev/scripts/devscripts.sh sync-references --write",
     "test:dev-scripts": "TZ=UTC node --test dev/scripts/__tests__/*.unit.test.mjs",
     "lint": "node dev/nx/lint.mjs",
+    "lint:changed": "node dev/nx/lint.mjs --changed",
     "lint:architecture": "pnpm lint:architecture:oxlint && pnpm --filter @langwatch/architecture-enforcer lint",
     "lint:architecture:oxlint": "oxlint --quiet --config .oxlintrc.architecture.jsonc .",
     "lint:oxlint": "oxlint --quiet --config .oxlintrc.jsonc .",
