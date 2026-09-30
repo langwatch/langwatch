@@ -75,7 +75,7 @@ export const readReplay = ({
   return readFileSync(file, "utf8")
     .split("\n")
     .filter((line) => line.trim() !== "")
-    .map((line) => ({ ...(JSON.parse(line) as CaptureMessage), side }))
+    .map((line) => ({ ...(JSON.parse(line) as CaptureMessage), type: "capture" as const, side }))
     .filter((capture) =>
       capture.kind === "route" ? routes.has(capture.key) : flows.has(capture.key),
     );
