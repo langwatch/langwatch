@@ -73,13 +73,25 @@ export function humanMetric(metric: string): string {
  * `groupBy` there are several, and they are summed — the chart is one line per
  * period, and a total is the only reading of several groups that is true
  * regardless of which groups happened to be present on a given day.
+ *
+ * A grouped bucket nests its measures under the dimension and then the group
+ * (`{ "metadata.model": { "gpt-5-mini": { "0/...": 7 } } }`), so objects are
+ * walked into rather than skipped.
  */
 function valueOf(bucket: AnalyticsBucket): number {
   let total = 0;
   for (const [key, raw] of Object.entries(bucket)) {
     if (key === "date") continue;
-    if (typeof raw === "number" && Number.isFinite(raw)) total += raw;
+    total += measureOf(raw);
   }
+  return total;
+}
+
+function measureOf(raw: unknown): number {
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return 0;
+  let total = 0;
+  for (const nested of Object.values(raw)) total += measureOf(nested);
   return total;
 }
 

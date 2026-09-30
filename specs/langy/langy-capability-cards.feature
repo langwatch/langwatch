@@ -35,6 +35,15 @@ Feature: Langy renders domain-capability cards for tool calls
     And the card offers an "Open in Analytics" link
 
   @integration
+  Scenario: A trace count split by model reads as a count of traces
+    Given the project has 7 traces, all on one model
+    When Langy counts the project's traces over the whole range, split by model
+    Then the metrics card is titled "Traces"
+    And its headline figure reads 7, captioned "traces"
+    And the model's own figure sits beside it, captioned by the model's name
+    And the card never shows the aggregation name or a count of result buckets
+
+  @integration
   Scenario: An evaluation run renders its result
     When Langy runs an experiment or suite and it completes
     Then Langy shows an evaluation-run card with the run outcome

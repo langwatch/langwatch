@@ -53,6 +53,26 @@ describe("toTimeseriesShape", () => {
         0.12000000000000001, 0.25,
       ]);
     });
+
+    it("sums the measures nested under a group-by dimension", () => {
+      const key = "0/metadata.trace_id/cardinality";
+      const shape = toTimeseriesShape({
+        currentPeriod: [
+          {
+            date: day("2026-07-15"),
+            "metadata.model": { "gpt-5": { [key]: 4 }, "gpt-5-mini": { [key]: 3 } },
+          },
+          {
+            date: day("2026-07-16"),
+            "metadata.model": { "gpt-5-mini": { [key]: 2 } },
+          },
+        ],
+        previousPeriod: [],
+        metric: "metadata.trace_id",
+      });
+
+      expect(shape?.series[0]?.points.map((p) => p.v)).toEqual([7, 2]);
+    });
   });
 
   describe("given a bucket with no date", () => {
