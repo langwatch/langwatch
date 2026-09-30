@@ -116,3 +116,32 @@ Feature: Signing up never strands an account
     When I sign up with "Joel.During@example.com"
     Then the account is stored with the lowercased address
     And a later sign-up for any casing of that address says it is already registered
+
+  # The sign-in at the end of a sign-up is refused on any web address other
+  # than the one the installation is set up for (NEXTAUTH_URL). The calls that
+  # start the sign-up and create the account apply the same check first, so a
+  # sign-up on the wrong address stops before anything is written, instead of
+  # leaving an account behind that a later sign-up calls "already registered".
+  @unit @integration
+  Scenario: A sign-up on a web address the installation is not set up for writes no account
+    Given the installation is set up for "http://localhost:5560"
+    And I opened the sign-up screen on "http://localhost:18560"
+    When I choose a password and create the account
+    Then the sign-up is refused with the "auth_invalid_origin" code
+    And no account and no password are written for my address
+    And the screen says LangWatch is set up for a different web address than the one I am using
+
+  @unit @integration
+  Scenario: A sign-up started on a web address the installation is not set up for issues nothing
+    Given the installation is set up for "http://localhost:5560"
+    And I opened the sign-up screen on "http://localhost:18560"
+    When I enter my email to start signing up
+    Then the request is refused with the "auth_invalid_origin" code
+    And no confirmation link is mailed and no address proof is issued
+    And the screen says LangWatch is set up for a different web address than the one I am using
+
+  @unit
+  Scenario: A sign-up request that names no web address is refused
+    When a request to create an account carries neither an Origin nor a Referer header
+    Then it is refused with the "auth_invalid_origin" code
+    And no account is written

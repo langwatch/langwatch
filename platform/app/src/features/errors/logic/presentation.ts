@@ -1954,6 +1954,16 @@ const presentations = {
     describe: () =>
       "Your address cannot be confirmed here until an administrator sets up an email provider.",
   },
+  // Also the words the sign-in screen shows for better-auth's own
+  // INVALID_ORIGIN (`pages/auth/authFailureMessage.ts`), so the two refusals
+  // read the same wherever they surface. Naming the concept ("origin",
+  // "trusted origins") would only help someone who already knows the answer;
+  // the address bar is the thing this reader can look at.
+  auth_invalid_origin: {
+    title:
+      "LangWatch is set up for a different web address than the one you are using",
+    describe: () => "Check the address and try again.",
+  },
   auth_direct_registration_unavailable: {
     title: "Accounts here are created by your identity provider",
     describe: () =>

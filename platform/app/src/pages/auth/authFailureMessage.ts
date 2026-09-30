@@ -72,12 +72,13 @@ export const isCredentialRejection = ({
   CREDENTIAL_REJECTION_KEYS.has(normalize(code) || normalize(message));
 
 /** The wording for each identifier worth naming beyond a credential rejection. */
+const KEYED_ALIASES: Record<string, string> = {
+  // better-auth's refusal and the sign-up procedures' own one are the same
+  // failure, so they share the registry's words.
+  invalid_origin: "auth_invalid_origin",
+};
+
 const KEYED_MESSAGES: Record<string, string> = {
-  // Naming the concept ("origin", "trusted origins") would only help someone
-  // who already knows the answer. The address bar is the thing this reader can
-  // actually look at.
-  invalid_origin:
-    "LangWatch is set up for a different web address than the one you are using. Check the address and try again.",
   user_already_exists:
     "An account with that email already exists. Try signing in instead.",
   email_not_verified: "Verify your email address before signing in.",
@@ -152,7 +153,7 @@ export const authFailureMessage = ({
   // "something went wrong on our side" by its own 5xx.
   const keyed =
     KEYED_MESSAGES[key] ??
-    registryMessage(key) ??
+    registryMessage(KEYED_ALIASES[key] ?? key) ??
     statusClassMessage(status, key);
   if (keyed) {
     return keyed;

@@ -5,6 +5,7 @@ import {
 } from "@langwatch/identity";
 import { getSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import type { PriorSession } from "~/server/app-layer/identity/prior-session.service";
 import {
   accountIdentifiers,
@@ -20,6 +21,7 @@ import {
   NoAddressToConfirmError,
 } from "~/server/auth/errors";
 import { getAuthRateLimitClientIp } from "~/server/auth/rate-limit-client-ip";
+import { assertAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import {
   InviteExpiredError,
   InviteNotFoundError,
@@ -227,6 +229,11 @@ export const authRouter = createTRPCRouter({
         "starts a signed-out visitor's own sign-up; no tenant scope exists before an account does",
     })
     .mutation(async ({ ctx, input }) => {
+      // A sign-up started on a foreign origin cannot be finished: the sign-in
+      // at its end is refused there. Saying so now beats mailing a link or
+      // issuing a proof for a sign-up that is bound to fail.
+      assertAllowedAuthOrigin({ req: ctx.req, baseUrl: env.NEXTAUTH_URL });
+
       const peerIp = getAuthRateLimitClientIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
         key: `auth.requestSignUpVerification:${peerIp}`,

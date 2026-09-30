@@ -15,13 +15,18 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
+import type { NextApiRequest } from "~/types/next-stubs";
 import { createInnerTRPCContext } from "../../trpc";
 import { userRouter } from "../user";
 
 // The raw env names an IdP; what this route keys off is the RESOLVED provider
 // below, so the two can disagree and that is the point of the coercion tests.
 vi.mock("../../../../env.mjs", () => ({
-  env: { NEXTAUTH_PROVIDER: "auth0", BASE_HOST: "http://localhost:5560" },
+  env: {
+    NEXTAUTH_PROVIDER: "auth0",
+    BASE_HOST: "http://localhost:5560",
+    NEXTAUTH_URL: "http://localhost:5560",
+  },
 }));
 
 const { rateLimitMock } = vi.hoisted(() => ({
@@ -122,8 +127,60 @@ describe("userRouter.register()", () => {
     isEmailUnconfiguredMock.mockReturnValue(false);
   });
 
-  const createCaller = () =>
-    userRouter.createCaller(createInnerTRPCContext({ session: null }));
+  /** A browser request carrying these headers, as the tRPC route hands it on. */
+  const requestWith = (headers: Record<string, string>) =>
+    ({ headers }) as unknown as NextApiRequest;
+
+  const createCaller = (
+    headers: Record<string, string> = { origin: "http://localhost:5560" },
+  ) =>
+    userRouter.createCaller(
+      createInnerTRPCContext({ session: null, req: requestWith(headers) }),
+    );
+
+  describe("when the browser is on a web address the installation is not set up for", () => {
+    /** @scenario "A sign-up on a web address the installation is not set up for writes no account" */
+    it("refuses with the invalid origin code before the proof is spent or the account written", async () => {
+      await expect(
+        createCaller({ origin: "http://localhost:18560" }).register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "unconfirmed-proof",
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        cause: { code: "auth_invalid_origin" },
+      });
+
+      expect(claimAddressProofMock).not.toHaveBeenCalled();
+      expect(claimUnconfirmedAddressProofMock).not.toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A sign-up request that names no web address is refused" */
+    it("refuses a request carrying neither an origin nor a referer", async () => {
+      await expect(
+        createCaller({}).register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "proof-1",
+        }),
+      ).rejects.toMatchObject({ cause: { code: "auth_invalid_origin" } });
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+
+    it("accepts a matching referer when the origin is absent", async () => {
+      await expect(
+        createCaller({
+          referer: "http://localhost:5560/auth/signup",
+        }).register({
+          email: "sam@acme.com",
+          password: "correct horse battery staple",
+          addressProof: "proof-1",
+        }),
+      ).resolves.toEqual({ id: "user-1" });
+    });
+  });
 
   describe("when registration succeeds", () => {
     it("answers with the id of the account that was opened", async () => {
