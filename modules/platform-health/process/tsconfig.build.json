@@ -59,6 +59,9 @@
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../suite/contract/tsconfig.build.json"
     },
     {

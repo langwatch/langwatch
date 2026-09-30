@@ -13,6 +13,7 @@ import {
 } from "@langwatch/platform-health-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
+import { Secret } from "@langwatch/secrets";
 import { SuiteApi } from "@langwatch/suite-contract";
 import { fromDate } from "@langwatch/time";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -37,7 +38,6 @@ export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
  * drilled in — absent where the deployment named no `BASE_HOST`.
  */
 type PlatformHealthMembers = Readonly<{
-  secrets: Readonly<{ find(key: string): string | undefined }>;
   publicBaseUrl: string | undefined;
 }>;
 
@@ -62,8 +62,12 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     /** The Langy canary sends one greeting turn as the key's owner and awaits its settlement. */
     langy: LangyApi,
   };
-  /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["secrets", "publicBaseUrl"] as const;
+  static readonly secrets = {
+    probeApiKey: Secret.load("PLATFORM_HEALTH_PROBE_API_KEY", { optional: true }),
+    apiKey: Secret.load("PLATFORM_HEALTH_API_KEY", { optional: true }),
+  };
+  /** The name is from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["publicBaseUrl"] as const;
 
   readonly #health: PlatformHealthService;
   readonly #key: PlatformHealthKeyService;
@@ -82,8 +86,16 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     this.#langyCanary = services.langyCanary;
   }
 
-  static create({ dependencies, members }: PlatformHealthSetup): PlatformHealthApp {
-    const probeApiKey = members.secrets.find("PLATFORM_HEALTH_PROBE_API_KEY") ?? "";
+  static async create({
+    dependencies,
+    members,
+    secrets,
+  }: PlatformHealthSetup): Promise<PlatformHealthApp> {
+    const probeApiKey = await secrets.into(
+      PlatformHealthApp.secrets.probeApiKey,
+      (value) => value ?? "",
+    );
+    const apiKey = await secrets.into(PlatformHealthApp.secrets.apiKey, (value) => value ?? "");
     const collaborators: SubsystemProbeCollaborators = {
       canaries: HttpSubsystemProbeChannel.create({ publicBaseUrl: members.publicBaseUrl ?? "" }),
       automation: () => ({
@@ -112,7 +124,7 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
         ),
       }),
       key: PlatformHealthKeyService.create({
-        apiKey: members.secrets.find("PLATFORM_HEALTH_API_KEY") ?? "",
+        apiKey,
       }),
       projectKeyed: ProjectKeyedProbeService.create({
         probes,
