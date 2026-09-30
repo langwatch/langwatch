@@ -510,4 +510,39 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       );
     });
   });
+
+  // The name detector reads some span kinds as first names, so under strict
+  // mode top-level spans stored `[PERSON]` as their kind. A known kind is a
+  // fixed word, so it is never submitted and is stored unchanged.
+  describe("given the span kind attribute", () => {
+    it.each([
+      "agent",
+      "workflow",
+      "llm",
+    ])("keeps the known kind %s and never submits it", async (value) => {
+      const { service, submitted, namesEverything } = makeService();
+      namesEverything();
+      const span = spanWith({
+        "langwatch.span.type": value,
+        "app.support_note": PROSE_THAT_MUST_BE_ANALYSED,
+      });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(submitted()).toContain(PROSE_THAT_MUST_BE_ANALYSED);
+      expect(submitted()).not.toContain(value);
+      expect(attr(span, "langwatch.span.type")).toBe(value);
+      expect(attr(span, "app.support_note")).toBe("[PERSON]");
+    });
+
+    it("still redacts a name written under the kind attribute", async () => {
+      const { service, namesEverything } = makeService();
+      namesEverything();
+      const span = spanWith({ "langwatch.span.type": "Jane Doe" });
+
+      await service.redactSpan(span, null, "STRICT", TENANT);
+
+      expect(attr(span, "langwatch.span.type")).toBe("[PERSON]");
+    });
+  });
 });
