@@ -73,6 +73,34 @@ export const automationTrpcTransport: TrpcRouterDeclaration<AutomationApi, typeo
       }),
     )
 
+    .procedure("getFireHistory")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) =>
+      app.listFireHistoryPage({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+        limit: input.limit,
+        cursor: input.cursor ?? null,
+      }),
+    )
+
+    // Main's wire is nullable; the operation answers zero or one row.
+    .procedure("getLatestEvaluation")
+    .withPermission("triggers:view")
+    .handle(async ({ app, input }) => {
+      const [latest] = await app.findLatestEvaluation({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+      });
+      return latest ?? null;
+    })
+
+    .procedure("getNextFiring")
+    .withPermission("triggers:view")
+    .handle(({ app, input }) =>
+      app.getNextFiring({ projectId: input.projectId, triggerId: input.triggerId }),
+    )
+
     .procedure("getRecentActivity")
     .withPermission("triggers:view")
     .handle(({ app, input }) =>

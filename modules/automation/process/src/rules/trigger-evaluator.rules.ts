@@ -1,4 +1,6 @@
 import type {
+  EvaluationSkipCode,
+  GraphTriggerEvaluationCondition,
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
 } from "@langwatch/automation-contract";
@@ -9,6 +11,8 @@ export function skippedGraphEvaluation(input: {
   projectId: string;
   reason: GraphTriggerEvaluationReason;
   detail: string;
+  skipCode: EvaluationSkipCode;
+  condition?: GraphTriggerEvaluationCondition;
 }): GraphTriggerEvaluationResult {
   return { ...input, status: "skipped" };
 }

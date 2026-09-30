@@ -25,8 +25,11 @@ import type {
   AutomationApiTestFireInput,
   AutomationApiToggleTriggerInput,
   AutomationApiUpdateTriggerFiltersInput,
+  AutomationApiTriggerScope,
   AutomationApiUpsertInput,
+  NextFiring,
   TriggerFirePage,
+  TriggerLatestEvaluation,
 } from "./automation.trpc-schemas.ts";
 import type { EmailSuppression, EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
 import type { CustomGraphNameRef } from "./custom-graph.ts";
@@ -150,6 +153,12 @@ export interface AutomationApi {
   deletePublicTrigger(input: { projectId: string; triggerId: string }): Promise<void>;
   /** One keyset page of an automation's fires, newest first; `trigger_not_found` on a miss. */
   getFireHistory(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage>;
+  /** Main's tRPC view read: the same page, but empty rather than refused on a miss. */
+  listFireHistoryPage(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage>;
+  /** The alert's latest recorded check: zero rows when it has never been evaluated. */
+  findLatestEvaluation(input: AutomationApiTriggerScope): Promise<TriggerLatestEvaluation[]>;
+  /** When the automation acts next; `trigger_not_found` on a miss. */
+  getNextFiring(input: AutomationApiTriggerScope): Promise<NextFiring>;
   /** Sends a stored automation's message to its own saved destination, capped per project. */
   testFireStoredTrigger(input: { projectId: string; triggerId: string }): Promise<TestFireResult>;
   delete(input: { triggerId: string; projectId: string }): Promise<void>;

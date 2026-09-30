@@ -277,3 +277,48 @@ export const automationApiFireHistoryInputSchema = z.object({
   cursor: triggerFireCursorSchema.nullable(),
 });
 export type AutomationApiFireHistoryInput = z.infer<typeof automationApiFireHistoryInputSchema>;
+
+/** The view's page of fires: main's tRPC bounds (at most 50, 20 by default), cursor optional. */
+export const automationApiFireHistoryTrpcInputSchema = z.object({
+  projectId: z.string(),
+  triggerId: z.string(),
+  limit: z.number().int().min(1).max(50).default(20),
+  cursor: z.object({ createdAt: z.coerce.date(), id: z.string().min(1) }).nullish(),
+});
+
+/**
+ * What an alert's latest check observed and decided; metadata only, no trace ids.
+ * Verdict and skip code read as plain strings, so a value a newer writer stored
+ * survives the read and the view degrades it to a plain "checked".
+ */
+export const triggerLatestEvaluationSchema = z.object({
+  triggerId: z.string(),
+  projectId: z.string(),
+  evaluatedAt: z.date(),
+  verdict: z.string(),
+  observedValue: z.number().nullable(),
+  threshold: z.number().nullable(),
+  operator: z.string().nullable(),
+  timePeriodMinutes: z.number().int().nullable(),
+  skipCode: z.string().nullable(),
+});
+export type TriggerLatestEvaluation = z.infer<typeof triggerLatestEvaluationSchema>;
+
+/** When an automation acts next: one answer per kind, paused answered first for all. */
+export const nextFiringSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("paused"),
+    subject: z.enum(["schedule", "alert", "automation"]),
+    /** Set when the platform paused it, null when a person switched it off. */
+    pausedReason: z.string().nullable(),
+  }),
+  z.object({ kind: z.literal("schedule"), nextRunAt: z.date().nullable() }),
+  z.object({
+    kind: z.literal("digest"),
+    cadence: notificationCadenceSchema,
+    windowClosesAt: z.date(),
+  }),
+  z.object({ kind: z.literal("immediate"), traceDebounceMs: z.number() }),
+  z.object({ kind: z.literal("alert"), sweepIntervalMs: z.number() }),
+]);
+export type NextFiring = z.infer<typeof nextFiringSchema>;

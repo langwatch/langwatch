@@ -32,6 +32,7 @@ import type { CustomGraphRepository } from "../repositories/custom-graph.reposit
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { SlackDestinationService } from "../services/slack-destination.service.ts";
+import type { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
 
 // Re-exported: several files in this module still import these names from
 // here rather than from where they are actually declared.
@@ -382,6 +383,8 @@ export type GraphTriggerEvaluationDeps = {
   logger: AutomationLogger;
   slackDestinations: SlackDestinationService;
   dispatchErrors: AutomationDispatchError;
+  /** Records what each check observed; never throws, so it cannot suppress an alert. */
+  latestEvaluations: Pick<TriggerLatestEvaluationService, "record">;
   clock: AutomationClock;
   baseHost: string;
 };

@@ -23,6 +23,7 @@ import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import { GraphAlertDispatchService } from "./graph-alert-dispatch.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import type { SlackDestinationService } from "./slack-destination.service.ts";
+import type { TriggerLatestEvaluationService } from "./trigger-latest-evaluation.service.ts";
 
 /**
  * Graph-alert dispatch: re-evaluate automations and send notifications via chosen
@@ -45,6 +46,7 @@ export class AutomationGraphActivityService implements AutomationGraphActivity {
     emailCaps: AutomationEmailCapService;
     logger: AutomationLogger;
     dispatchErrors: AutomationDispatchError;
+    latestEvaluations: Pick<TriggerLatestEvaluationService, "record">;
     baseHost: string;
     emailHourlyCap: number;
     tenantDailyCap: number;
@@ -69,6 +71,7 @@ export class AutomationGraphActivityService implements AutomationGraphActivity {
         logger: input.logger,
         slackDestinations: input.slackDestinations,
         dispatchErrors: input.dispatchErrors,
+        latestEvaluations: input.latestEvaluations,
         clock: input.clock,
         baseHost: input.baseHost,
       }),

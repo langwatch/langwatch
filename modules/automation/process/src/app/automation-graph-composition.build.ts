@@ -13,6 +13,10 @@ import {
   type GraphTriggerSentDatabase,
 } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import {
+  PrismaTriggerLatestEvaluationRepository,
+  type TriggerLatestEvaluationDatabase,
+} from "../repositories/prisma/prisma.trigger-latest-evaluation.repository.ts";
+import {
   PrismaTriggerRepository,
   type TriggerDatabase,
 } from "../repositories/prisma/prisma.trigger.repository.ts";
@@ -26,6 +30,7 @@ import type { AutomationSecretCrypto } from "../services/automation-slack-secret
 import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
 import type { AutomationEmailCapService } from "../services/email-cap.service.ts";
 import type { SlackDestinationService } from "../services/slack-destination.service.ts";
+import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
 import type {
   AutomationClock,
   AutomationDispatchError,
@@ -39,7 +44,8 @@ export type AutomationGraphActivityDatabase = TriggerDatabase &
   CustomGraphDatabase &
   GraphTriggerSentDatabase &
   EmailSuppressionDatabase &
-  WebhookDeliveryDatabase;
+  WebhookDeliveryDatabase &
+  TriggerLatestEvaluationDatabase;
 
 /** Graph delivery's Automation persistence, over its Prisma repositories. */
 export function composeAutomationGraphDelivery(input: {
@@ -95,6 +101,10 @@ export function composeAutomationGraphActivity(input: {
     emailCaps: input.emailCaps,
     logger: input.logger,
     dispatchErrors: input.dispatchErrors,
+    latestEvaluations: TriggerLatestEvaluationService.create({
+      repository: PrismaTriggerLatestEvaluationRepository.create(input.prisma),
+      logger: input.logger,
+    }),
     baseHost: input.baseHost,
     emailHourlyCap: input.emailHourlyCap,
     tenantDailyCap: input.tenantDailyCap,

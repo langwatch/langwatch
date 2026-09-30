@@ -267,6 +267,7 @@ const makeService = (
       slackConnections: createTestSlackConnections(),
       dispatchErrors: runtime.dispatchErrors,
       runaway: runtime.runaway,
+      latestEvaluations: { record: async () => undefined },
       clock,
       baseHost: runtime.baseHost,
     });

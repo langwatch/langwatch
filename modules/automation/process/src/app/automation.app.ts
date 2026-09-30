@@ -21,6 +21,9 @@ import {
   type AutomationApiUpdateTriggerFiltersInput,
   type AutomationApiUpsertInput,
   type AutomationApiFireHistoryInput,
+  type AutomationApiTriggerScope,
+  type NextFiring,
+  type TriggerLatestEvaluation,
   type AutomationRestCreateInput,
   type AutomationRestUpdateInput,
   type TriggerFirePage,
@@ -110,6 +113,7 @@ import { SlackConnectionMigrationService } from "../services/slack-connection-mi
 import { SlackDestinationService } from "../services/slack-destination.service.ts";
 import { TriggerFilterValidationService } from "../services/trigger-filter-validation.service.ts";
 import { AutomationGraphService } from "../services/trigger-graph.service.ts";
+import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
   type UnsubscribeTokenVerifier,
@@ -300,6 +304,7 @@ interface AutomationAppCollaborators {
   rules: AutomationRulesService;
   authoring: AutomationAuthoringService;
   publicApi: AutomationPublicApiService;
+  latestEvaluations: TriggerLatestEvaluationService;
   audit: AutomationAuditSink;
   limits: AutomationCallCounter;
   publicBaseUrl: string | undefined;
@@ -474,6 +479,10 @@ export class AutomationApp implements AutomationApi {
       },
       slots: members.persistCaps,
     });
+    const latestEvaluations = TriggerLatestEvaluationService.create({
+      repository: repositories.latestEvaluations,
+      logger: members.logger,
+    });
     const graph = AutomationGraphService.create({
       triggers: repositories.triggers,
       customGraphs: repositories.customGraphs,
@@ -485,6 +494,7 @@ export class AutomationApp implements AutomationApi {
       slackDestinations: members.slackDestinations,
       slackConnections: members.slackConnections,
       dispatchErrors: members.dispatchErrors,
+      latestEvaluations,
       runaway: members.runaway,
       clock: members.clock,
       baseHost: members.publicBaseUrl ?? "",
@@ -552,6 +562,7 @@ export class AutomationApp implements AutomationApi {
         limits: members.limits,
         logger: members.logger,
       }),
+      latestEvaluations,
       monitors: dependencies.monitors,
       audit: members.audit,
       limits: members.limits,
@@ -578,6 +589,7 @@ export class AutomationApp implements AutomationApi {
   #rules: AutomationRulesService;
   #authoring: AutomationAuthoringService;
   #publicApi: AutomationPublicApiService;
+  readonly #latestEvaluations: TriggerLatestEvaluationService;
   #monitors: MonitorApiContract;
   #audit: AutomationAuditSink;
   #limits: AutomationCallCounter;
@@ -594,6 +606,7 @@ export class AutomationApp implements AutomationApi {
     this.#rules = collaborators.rules;
     this.#authoring = collaborators.authoring;
     this.#publicApi = collaborators.publicApi;
+    this.#latestEvaluations = collaborators.latestEvaluations;
     this.#monitors = collaborators.monitors;
     this.#audit = collaborators.audit;
     this.#limits = collaborators.limits;
@@ -887,6 +900,18 @@ export class AutomationApp implements AutomationApi {
 
   getFireHistory(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
     return this.#publicApi.getFireHistory(input);
+  }
+
+  findLatestEvaluation(input: AutomationApiTriggerScope): Promise<TriggerLatestEvaluation[]> {
+    return this.#latestEvaluations.findByTriggerId(input);
+  }
+
+  getNextFiring(input: AutomationApiTriggerScope): Promise<NextFiring> {
+    return this.#automation.getNextFiring(input);
+  }
+
+  listFireHistoryPage(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
+    return this.#automation.listFireHistoryPage(input);
   }
 
   testFireStoredTrigger(input: { projectId: string; triggerId: string }): Promise<TestFireResult> {

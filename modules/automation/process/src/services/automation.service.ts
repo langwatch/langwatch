@@ -1,5 +1,9 @@
 import {
   createTriggerCommandSchema,
+  type AutomationApiFireHistoryInput,
+  type AutomationApiTriggerScope,
+  type NextFiring,
+  type TriggerFirePage,
   InvalidUnsubscribeTokenError,
   maskEmail,
   suppressEmailCommandSchema,
@@ -31,12 +35,14 @@ import {
 import { type Instant } from "@langwatch/time";
 
 import type { AutomationClock } from "../app/automation.members.ts";
+import { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "../eventing/graph-alert-sweep.process.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
+import { describeNextFiring } from "../rules/next-firing.rules.ts";
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
@@ -344,6 +350,26 @@ export class AutomationService {
 
   getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]> {
     return this.reportSchedules.getAll(input);
+  }
+
+  /** When the automation acts next; `trigger_not_found` on a miss. */
+  async getNextFiring(input: AutomationApiTriggerScope): Promise<NextFiring> {
+    const trigger = await this.getById(input);
+    const schedules =
+      trigger.triggerKind === "REPORT"
+        ? await this.getReportSchedules({ projectId: input.projectId })
+        : [];
+    return describeNextFiring({
+      trigger,
+      reportSchedule: schedules.find((schedule) => schedule.triggerId === trigger.id) ?? null,
+      now: this.clock.now(),
+      sweepIntervalMs: GRAPH_ALERT_SWEEP_INTERVAL_MS,
+    });
+  }
+
+  /** Main's view read: a page of fires, empty (not refused) for a trigger that is not there. */
+  listFireHistoryPage(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage> {
+    return this.history.listPageByTriggerId(input);
   }
 
   syncReportSchedule(input: {

@@ -52,6 +52,7 @@ export class GraphTriggerAlertDeliveryService {
       return skippedGraphEvaluation({
         ...plan.request,
         detail: "project not found",
+        skipCode: "subject_missing",
       });
     }
 

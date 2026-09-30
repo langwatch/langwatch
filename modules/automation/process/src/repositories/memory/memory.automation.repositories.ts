@@ -12,6 +12,7 @@ import { MemoryEmailSuppressionNameRepository } from "./memory.email-suppression
 import { MemoryEmailSuppressionRepository } from "./memory.email-suppression.repository.ts";
 import { MemoryGraphTriggerSentRepository } from "./memory.graph-trigger-sent.repository.ts";
 import { MemoryTriggerFireHistoryRepository } from "./memory.trigger-fire-history.repository.ts";
+import { MemoryTriggerLatestEvaluationRepository } from "./memory.trigger-latest-evaluation.repository.ts";
 import { MemoryTriggerRepository } from "./memory.trigger.repository.ts";
 import { MemoryWebhookDeliveryRepository } from "./memory.webhook-delivery.repository.ts";
 
@@ -28,6 +29,7 @@ export class MemoryAutomationRepositories {
     return {
       triggers: MemoryTriggerRepository.create(memory),
       history: MemoryTriggerFireHistoryRepository.create(memory),
+      latestEvaluations: MemoryTriggerLatestEvaluationRepository.create(),
       suppressions: MemoryEmailSuppressionRepository.create(memory),
       names: MemoryEmailSuppressionNameRepository.create(memory),
       customGraphs: MemoryCustomGraphRepository.create(memory),

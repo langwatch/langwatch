@@ -102,6 +102,7 @@ describe("createGraphTriggerActivityHandler", () => {
           }),
           logger: new SilentLogger(),
           dispatchErrors: new TestDispatchErrors(),
+          latestEvaluations: { record: async () => undefined },
           baseHost: "https://app.langwatch.test",
           emailHourlyCap: 100,
           tenantDailyCap: 10_000,

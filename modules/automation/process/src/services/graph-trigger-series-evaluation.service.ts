@@ -1,4 +1,8 @@
-import { aggregateSeriesValues, extractSeriesPoints } from "@langwatch/analytics-contract";
+import {
+  aggregateSeriesValues,
+  extractSeriesPoints,
+  isSeriesPercentageUnsupported,
+} from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult } from "@langwatch/automation-contract";
 
 import { GRAPH_TRIGGER_MAX_RESULT_ROWS } from "../app/automation.members.ts";
@@ -63,6 +67,9 @@ export class GraphTriggerSeriesEvaluationService {
         maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
       })) as TimeseriesResult;
     } catch (error) {
+      if (isSeriesPercentageUnsupported(error)) {
+        return this.percentageUnsupported(plan);
+      }
       if (!isTimeseriesResultTooLarge(error)) {
         throw error;
       }
@@ -82,8 +89,34 @@ export class GraphTriggerSeriesEvaluationService {
       return skippedGraphEvaluation({
         ...plan.request,
         detail: "timeseries result exceeds the row ceiling",
+        skipCode: "result_too_large",
       });
     }
+  }
+
+  /**
+   * A percentage of a per-entity measurement is refused by the query builder, and
+   * re-asking cannot change that: skip rather than redeliver forever. The series'
+   * metric rides in the log, since this is the one caller that knows which one.
+   */
+  private percentageUnsupported(plan: GraphEvaluationPlan): GraphTriggerEvaluationResult {
+    plan.request.deps.logger.error(
+      {
+        projectId: plan.request.projectId,
+        triggerId: plan.request.triggerId,
+        reason: plan.request.reason,
+        seriesName: plan.seriesName,
+        seriesMetric: plan.series.metric,
+        seriesAggregation: plan.series.aggregation,
+      },
+      "graph trigger evaluation skipped: series cannot be shown as a percentage",
+    );
+
+    return skippedGraphEvaluation({
+      ...plan.request,
+      detail: "series cannot be shown as a percentage",
+      skipCode: "series_percentage_unsupported",
+    });
   }
 
   private values(plan: GraphEvaluationPlan, result: TimeseriesResult): GraphSeriesEvaluation {
