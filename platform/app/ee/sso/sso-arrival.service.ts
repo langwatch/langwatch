@@ -104,11 +104,16 @@ export interface SsoJoinRequestsPort {
 }
 
 export interface SsoArrivalNotificationsPort {
+  /**
+   * Tells the admins somebody joined. `admissionId` names the grant a Full
+   * member's admission attached; a Developer holds no grant (ADR-143), so the
+   * membership row alone is the admission and the id is left out.
+   */
   joinedAutomatically(args: {
     organizationId: string;
     requesterUserId: string;
     domain: string;
-    admissionId: string;
+    admissionId?: string;
   }): Promise<void>;
   /** Tells the team somebody signed up through a domain rule. */
   announceSignup(args: {
