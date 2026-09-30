@@ -169,6 +169,12 @@ describe("governance cost tables keep data indefinitely by default", () => {
   // the reconciler gates on the union of both.
   const GOVERNANCE_COST_TABLES = [
     "governance_cost_rollup_1d",
+    "governance_cost_rollup_charges",
+    "governance_cost_rollup_restatement_index",
+  ] as const;
+  // The two tables the retention-days migration retrofitted; the charges table was born with it.
+  const RETROFITTED_TABLES = [
+    "governance_cost_rollup_1d",
     "governance_cost_rollup_restatement_index",
   ] as const;
 
@@ -230,7 +236,7 @@ describe("governance cost tables keep data indefinitely by default", () => {
         .filter((line) => line.trim() !== "" && !line.trimStart().startsWith("--"))
         .join("\n");
 
-    it.each(GOVERNANCE_COST_TABLES)(
+    it.each(RETROFITTED_TABLES)(
       "adds _retention_days to %s with DEFAULT 0, the keep-forever sentinel",
       (table) => {
         expect(executedSql()).toContain(
@@ -240,7 +246,7 @@ describe("governance cost tables keep data indefinitely by default", () => {
       },
     );
 
-    it.each(GOVERNANCE_COST_TABLES)(
+    it.each(RETROFITTED_TABLES)(
       "rewrites %s's TTL to the retention expression in the same migration",
       (table) => {
         expect(executedSql()).toContain(
@@ -255,7 +261,7 @@ describe("governance cost tables keep data indefinitely by default", () => {
     // commented-out `down` block; it may not survive anywhere that executes.
     it("leaves no executed statement that reinstalls the 13-month delete", () => {
       const sql = executedSql();
-      expect(sql.match(/MODIFY TTL/g) ?? []).toHaveLength(GOVERNANCE_COST_TABLES.length);
+      expect(sql.match(/MODIFY TTL/g) ?? []).toHaveLength(RETROFITTED_TABLES.length);
       expect(sql).not.toContain("INTERVAL 13 MONTH");
     });
   });

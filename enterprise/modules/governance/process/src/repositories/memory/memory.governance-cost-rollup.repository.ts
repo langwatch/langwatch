@@ -262,6 +262,32 @@ export class MemoryGovernanceCostRollupRepository extends GovernanceCostRollupRe
     return row ? [{ ...row }] : [];
   }
 
+  async findCellsForDay(input: {
+    tenantId: string;
+    day: string;
+    costSource: string;
+  }): Promise<GovernanceCostRollupRow[]> {
+    return [...this.rows.values()]
+      .filter(
+        (row) =>
+          row.TenantId === input.tenantId &&
+          row.Day === input.day &&
+          row.CostSource === input.costSource,
+      )
+      .map((row) => ({ ...row }));
+  }
+
+  async findLatestSummarizedOccurredAt(input: {
+    tenantId: string;
+    costSource: string;
+  }): Promise<number | null> {
+    const moments = [...this.rows.values()]
+      .filter((row) => row.TenantId === input.tenantId && row.CostSource === input.costSource)
+      .map((row) => row.LastEventOccurredAt);
+    const latest = Math.max(0, ...moments);
+    return latest > 0 ? latest : null;
+  }
+
   /** The restatement keys the index holds for a tenant, as main's index table records them. */
   findRestatementKeys({ tenantId }: { tenantId: string }): string[] {
     return [...(this.restatementIndex.get(tenantId) ?? [])].toSorted();

@@ -94,6 +94,33 @@ describe("given a provider that says too many requests were made", () => {
     ]);
   });
 
+  /** @scenario A refused key ends the run at once and the source keeps its schedule */
+  it("records a refused key as failed on the first attempt, without throwing to retry", async () => {
+    const { service, outcome } = pullService(() =>
+      Promise.reject(
+        new DispatchError({
+          message: "HTTP 401 (anthropic cost_report): key refused",
+          retryable: false,
+          customerMessage: "Anthropic refused this key. Check the admin key and its permissions.",
+        }),
+      ),
+    );
+
+    await expect(
+      service.execute({ tenantId: "project-1", attempt: 1, pull: pull() }),
+    ).resolves.toBeUndefined();
+
+    expect(outcome.failedCalls).toMatchObject([
+      {
+        sourceId: "source-1",
+        errorCode: PULL_REFUSED_ERROR_CODE,
+        error: "Anthropic refused this key. Check the admin key and its permissions.",
+        retryable: false,
+      },
+    ]);
+    expect(outcome.completedCalls).toEqual([]);
+  });
+
   it("pairs the refused code only with a sentence we wrote", async () => {
     const { service, outcome } = pullService(() =>
       Promise.reject(

@@ -16,6 +16,7 @@ import {
 type ClickHouseQuery = {
   query: string;
   query_params?: Record<string, unknown>;
+  tenantIds?: string[];
   format: "JSONEachRow";
 };
 
@@ -533,8 +534,10 @@ describe("PrismaActivityMonitorRepository rollups", () => {
         requestCount: 1,
       }),
     ]);
+    expect(clickhouse.queries[0]!.tenantIds).toEqual(["project-a", "project-b"]);
     expect(clickhouse.queries[0]!.query_params).toMatchObject({
-      tenantIds: ["project-a", "project-b"],
+      tenant0: "project-a",
+      tenant1: "project-b",
     });
     expect(prisma.project.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -20,6 +20,7 @@ import {
   nextCostRollupCheckAt,
 } from "../cost-rollup-watch.process.ts";
 import { PulledUsageEventingAdapter } from "../pulled-usage.pipeline.ts";
+import { rollupFold } from "./governance-cost-rollup.fixtures.ts";
 
 const TENANT = "project-governance-1";
 
@@ -472,11 +473,18 @@ describe("cost rollup watch mounting", () => {
     /** @scenario "A deployment that can compare but holds no summary mounts no check" */
     it("does not mount the check at all", () => {
       const withoutSummary = PulledUsageEventingAdapter.create({}).build();
+      const comparingWithoutSummary = PulledUsageEventingAdapter.create({
+        costRollupWatch: CostRollupWatchProcess.create(new UncalledComparer()),
+      }).build();
       const withSummary = PulledUsageEventingAdapter.create({
         costRollupWatch: CostRollupWatchProcess.create(new UncalledComparer()),
+        costRollup: rollupFold().projection,
       }).build();
 
       expect(withoutSummary.processManagers.has(COST_ROLLUP_WATCH_PROCESS_NAME)).toBe(false);
+      expect(comparingWithoutSummary.processManagers.has(COST_ROLLUP_WATCH_PROCESS_NAME)).toBe(
+        false,
+      );
       expect(withSummary.processManagers.has(COST_ROLLUP_WATCH_PROCESS_NAME)).toBe(true);
     });
   });

@@ -25,4 +25,10 @@ export abstract class RollupErasureRepository {
     rawActorId: string;
     pseudonymousActorId: string;
   }): Promise<void>;
+  /** Overwrites the actor id in the charge record, so the drift check files it under the pseudonym. */
+  abstract renameActorInCharges(input: {
+    tenantIds: string[];
+    rawActorId: string;
+    pseudonymousActorId: string;
+  }): Promise<void>;
 }

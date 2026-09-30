@@ -75,6 +75,7 @@ export const RETENTION_MANAGED_TABLES = Object.keys(
  */
 export const INDEFINITE_DEFAULT_RETENTION_TABLES = [
   "governance_cost_rollup_1d",
+  "governance_cost_rollup_charges",
   "governance_cost_rollup_restatement_index",
 ] as const;
 

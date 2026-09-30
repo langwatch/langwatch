@@ -200,6 +200,15 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 49,
   },
   {
+    table: "governance_cost_rollup_charges",
+    ttlColumn: "Day",
+    ttlColumnExpression: "toDateTime(Day)",
+    retentionTTLColumn: "Day",
+    retentionTTLColumnExpression: "toDateTime(Day)",
+    envVar: "CLICKHOUSE_COLD_STORAGE_GOVERNANCE_COST_ROLLUP_CHARGES_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  {
     table: "governance_cost_rollup_restatement_index",
     ttlColumn: "Day",
     ttlColumnExpression: "toDateTime(Day)",

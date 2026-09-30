@@ -35,6 +35,7 @@ export class PostgresGovernanceRepositories {
     GovernanceRepositories,
     | "activityMonitor"
     | "anomalySpend"
+    | "costCharges"
     | "costRollup"
     | "rollupErasure"
     | "ocsfEvents"

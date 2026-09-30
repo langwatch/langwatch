@@ -55,7 +55,7 @@ export type GovernanceCliBudgetStatus =
     }>;
 
 export type GovernanceCliPersonalProjectOutcome =
-  | Readonly<{ outcome: "resolved"; project: GovernanceCliProject & { apiKey: string } }>
+  | Readonly<{ outcome: "resolved"; project: GovernanceCliProject & { apiKey?: string } }>
   | Readonly<{ outcome: "failed" }>;
 
 export type GovernanceCliVirtualKeyOutcome =
@@ -245,7 +245,15 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
         displayEmail: person?.email,
       });
 
-      return { outcome: "resolved", project: workspace.project };
+      // The key is withheld, not the session refused, when this person cannot manage it.
+      const canManage = await this.members.permittedOnProject({
+        userId: caller.user_id,
+        projectId: workspace.project.id,
+        permission: "project:manage",
+      });
+      const { id, slug, name, apiKey } = workspace.project;
+
+      return { outcome: "resolved", project: { id, slug, name, ...(canManage ? { apiKey } : {}) } };
     } catch (err) {
       logger.error(
         { err, userId: caller.user_id },

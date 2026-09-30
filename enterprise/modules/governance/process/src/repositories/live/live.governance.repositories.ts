@@ -7,6 +7,7 @@ import {
   memberClickHouseResolver,
   memberGovernanceClickHouseResolver,
 } from "../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
+import { ClickHouseGovernanceCostChargeRepository } from "../clickhouse/clickhouse.governance-cost-charge.repository.ts";
 import { ClickHouseGovernanceCostRollupRepository } from "../clickhouse/clickhouse.governance-cost-rollup.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "../clickhouse/clickhouse.ocsf-events.repository.ts";
 import { ClickHouseRollupErasureRepository } from "../clickhouse/clickhouse.rollup-erasure.repository.ts";
@@ -36,6 +37,9 @@ export class LiveGovernanceRepositories {
         clickhouse: memberGovernanceClickHouseResolver(clickhouse),
       }),
       costRollup: ClickHouseGovernanceCostRollupRepository.create(
+        memberClickHouseResolver(clickhouse),
+      ),
+      costCharges: ClickHouseGovernanceCostChargeRepository.create(
         memberClickHouseResolver(clickhouse),
       ),
       ocsfEvents: ClickHouseOcsfEventsRepository.create(memberClickHouseResolver(clickhouse)),

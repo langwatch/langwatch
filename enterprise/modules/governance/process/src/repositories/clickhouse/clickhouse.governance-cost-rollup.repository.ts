@@ -514,6 +514,49 @@ export class ClickHouseGovernanceCostRollupRepository extends GovernanceCostRoll
     return (await result.json()).map(decodeRow);
   }
 
+  async findCellsForDay(input: {
+    tenantId: string;
+    day: string;
+    costSource: string;
+  }): Promise<GovernanceCostRollupRow[]> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query<Record<string, unknown>>({
+      query: `
+        SELECT
+          ${KEY_COLUMNS.join(",\n          ")},
+          ${LATEST_PAYLOAD_COLUMNS.join(",\n          ")}
+        FROM ${TABLE}
+        WHERE TenantId = {tenantid:String}
+          AND Day = {day:String}
+          AND CostSource = {costsource:String}
+        GROUP BY ${KEY_COLUMNS.join(", ")}
+        ORDER BY CostSource, Provider, Model, RawActorId, CurrencyCode
+      `,
+      query_params: { tenantid: input.tenantId, day: input.day, costsource: input.costSource },
+      format: "JSONEachRow",
+    });
+    return (await result.json()).map(decodeRow);
+  }
+
+  async findLatestSummarizedOccurredAt(input: {
+    tenantId: string;
+    costSource: string;
+  }): Promise<number | null> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query<Record<string, unknown>>({
+      query: `
+        SELECT max(LastEventOccurredAt) AS LatestOccurredAt
+        FROM ${TABLE}
+        WHERE TenantId = {tenantid:String}
+          AND CostSource = {costsource:String}
+      `,
+      query_params: { tenantid: input.tenantId, costsource: input.costSource },
+      format: "JSONEachRow",
+    });
+    const latest = int((await result.json())[0]?.LatestOccurredAt);
+    return latest > 0 ? latest : null;
+  }
+
   /** Main's index write: only keys the index has not recorded, keyed by tenant first. */
   private async recordRestatementKeys(row: GovernanceCostRollupRow): Promise<void> {
     const keys = restatementKeysOf(row.PulledItemsJson);

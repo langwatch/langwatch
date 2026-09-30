@@ -1245,6 +1245,11 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
 `storeEvents`/`getEventStore` call. Today's findings are a shrink-only list with a count per file,
 `tests/baselines/eventing-table-access.json`, held by the same ratchet as §5's peer cycles.
 
+A check that holds a summary against the facts it was folded from keeps its own record of those
+facts, a projection over the same events on its own pipeline, and never reads `event_log`:
+governance's cost drift check compares `governance_cost_rollup_charges` with
+`governance_cost_rollup_1d` (Alex, 2026-09-30).
+
 ---
 
 ## 8. Transports (REST + tRPC)

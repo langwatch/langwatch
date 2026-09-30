@@ -29,6 +29,7 @@ import type { GovernanceApp } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import type { CostRollupWatchProcess } from "./cost-rollup-watch.process.ts";
 import { COST_ROLLUP_WATCH_PROCESS_NAME } from "./cost-rollup-watch.process.ts";
+import type { GovernanceCostChargeMapProjection } from "./governance-cost-charge.projection.ts";
 import type { GovernanceCostRollupFoldProjection } from "./governance-cost-rollup.projection.ts";
 import type { PulledUsageLedgerProcess } from "./pulled-usage-ledger.process.ts";
 import { PULLED_USAGE_LEDGER_PROCESS_NAME } from "./pulled-usage-ledger.process.ts";
@@ -94,6 +95,7 @@ export class PulledUsageEventingAdapter {
     private readonly ledger: PulledUsageLedgerProcess | undefined,
     private readonly costRollupWatch: CostRollupWatchProcess | undefined,
     private readonly costRollup: GovernanceCostRollupFoldProjection | undefined,
+    private readonly costCharges: GovernanceCostChargeMapProjection | undefined,
   ) {}
 
   static create(
@@ -103,12 +105,15 @@ export class PulledUsageEventingAdapter {
       costRollupWatch?: CostRollupWatchProcess;
       /** Main's `governanceCostRollup` fold; the worker hosts it, the api constructs none. */
       costRollup?: GovernanceCostRollupFoldProjection;
+      /** The per-charge record the watch holds the fold against; worker-hosted like the fold. */
+      costCharges?: GovernanceCostChargeMapProjection;
     } = {},
   ): PulledUsageEventingAdapter {
     return new PulledUsageEventingAdapter(
       options.ledger,
       options.costRollupWatch,
       options.costRollup,
+      options.costCharges,
     );
   }
 
@@ -135,10 +140,14 @@ export class PulledUsageEventingAdapter {
     if (this.costRollup) {
       pipeline.withClickHouseFoldProjection(this.costRollup);
     }
+    if (this.costCharges) {
+      pipeline.withClickHouseMapProjection(this.costCharges);
+    }
     if (this.ledger) {
       pipeline.withProcessManager(PULLED_USAGE_LEDGER_PROCESS_NAME, this.ledger.processManager());
     }
-    if (this.costRollupWatch) {
+    // The watch compares against the summary this fold writes: without it, there is nothing to hold.
+    if (this.costRollupWatch && this.costRollup) {
       pipeline.withProcessManager(
         COST_ROLLUP_WATCH_PROCESS_NAME,
         this.costRollupWatch.processManager(),

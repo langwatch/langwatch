@@ -268,6 +268,11 @@ export class IdentityErasureService {
       rawActorId,
       pseudonymousActorId: pseudonym,
     });
+    await this.deps.rollupErasure.renameActorInCharges({
+      tenantIds,
+      rawActorId,
+      pseudonymousActorId: pseudonym,
+    });
 
     return { affectedDays, daysNotRebuilt, rebuiltFrom };
   }

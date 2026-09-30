@@ -18,6 +18,7 @@ import type { DepartmentRepository } from "./department.repository.ts";
 import type { DiscoveredAgentRepository } from "./discovered-agent.repository.ts";
 import type { DiscoveredPersonRepository } from "./discovered-person.repository.ts";
 import type { ErasedIdentifierSuppressionRepository } from "./erased-identifier-suppression.repository.ts";
+import type { GovernanceCostChargeRepository } from "./governance-cost-charge.repository.ts";
 import type { GovernanceCostRollupRepository } from "./governance-cost-rollup.repository.ts";
 import type {
   GovernanceOcsfExportRepository,
@@ -62,6 +63,8 @@ export interface GovernanceRepositories {
   readonly ingestionSources: IngestionSourceRepository;
   readonly ingestionTemplates: IngestionTemplateRepository;
   readonly costRollup: GovernanceCostRollupRepository;
+  /** The per-charge record the drift check holds the rollup against. */
+  readonly costCharges: GovernanceCostChargeRepository;
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
   /** The `governance_kpis` rows the spend-spike evaluator reads and the trace pull writes. */
   readonly anomalySpend: GovernanceClickHouseRepositories["anomalySpend"];

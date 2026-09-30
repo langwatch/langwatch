@@ -139,6 +139,19 @@ export abstract class GovernanceCostRollupRepository {
   /** The cell at its surviving version: one row, or none. */
   abstract findCellRows(cell: GovernanceCostRollupCellAddress): Promise<GovernanceCostRollupRow[]>;
 
+  /** Every cell of one day and lane at its surviving version: the comparison reads what the screen reads. */
+  abstract findCellsForDay(input: {
+    tenantId: string;
+    day: string;
+    costSource: string;
+  }): Promise<GovernanceCostRollupRow[]>;
+
+  /** The newest business moment any cell of the lane has folded, or null when it has folded nothing. */
+  abstract findLatestSummarizedOccurredAt(input: {
+    tenantId: string;
+    costSource: string;
+  }): Promise<number | null>;
+
   /** The pulled lane per day and provider, each cell at its surviving version. */
   abstract sumDaysByProvider(
     input: GovernanceCostRollupWindow,

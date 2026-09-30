@@ -85,6 +85,7 @@ describe("ClickHouseOcsfEventsRepository.findLatestSeatReports", () => {
       ]);
     });
 
+    /** @scenario A read carries no pool belonging to another tenant or another kind of record */
     it("scopes the read to the tenant and to seat reports alone", async () => {
       const { client, repository } = repositoryOver([]);
 
@@ -104,6 +105,7 @@ describe("ClickHouseOcsfEventsRepository.findLatestSeatReports", () => {
   });
 
   describe("when one pool's payload cannot be read", () => {
+    /** @scenario A pool whose recorded payload cannot be read costs only that pool */
     it("steps over it and keeps the rest of the licence list", async () => {
       // A pool nothing can be read from must not cost the tenant the pools
       // that can — the same rule the licence read itself follows.

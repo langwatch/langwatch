@@ -318,6 +318,7 @@ describe("ttlReconciler", () => {
         // in the customer retention cascade: their `_retention_days` defaults
         // to 0 (keep forever) rather than to a category-resolved day count.
         "governance_cost_rollup_1d",
+        "governance_cost_rollup_charges",
         "governance_cost_rollup_restatement_index",
       ]);
     });

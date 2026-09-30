@@ -88,6 +88,10 @@ type World = {
     permission: AuthzPermission;
   }) => Promise<boolean>;
   supportContact?: string | null;
+  ensurePersonalWorkspace?: () => Promise<{
+    team: { id: string };
+    project: { id: string; slug: string; name: string; apiKey: string };
+  }>;
   personalWorkspace?: {
     team: { id: string };
     project: { id: string; slug: string; name: string; apiKey: string };
@@ -161,8 +165,9 @@ function mountCli(world: World = {}) {
       supportContacts: () => ({
         findSupportContact: vi.fn().mockResolvedValue(world.supportContact ?? null),
       }),
-      ensurePersonalWorkspace: () =>
-        Promise.reject(new Error("not reachable through the CLI door")),
+      ensurePersonalWorkspace:
+        world.ensurePersonalWorkspace ??
+        (() => Promise.reject(new Error("not reachable through the CLI door"))),
       getPersonalWorkspace: vi.fn(async () => {
         if (!world.personalWorkspace) throw new TeamNotFoundError();
         return world.personalWorkspace;
@@ -581,6 +586,170 @@ describe("the CLI governance plane", () => {
           },
         ],
       });
+    });
+  });
+});
+
+const PERSONAL_WORKSPACE = {
+  team: { id: "team_personal" },
+  project: { id: "project_personal", slug: "bob", name: "Bob", apiKey: "lw-personal-key-secret" },
+};
+const OFFBOARDED = { isMember: vi.fn().mockResolvedValue(false) };
+
+describe("the CLI credential routes' tenancy boundary", () => {
+  describe("given a caller who can administer their own personal project", () => {
+    /** @scenario GET /api/auth/cli/personal-project returns the caller's personal project */
+    it("returns its id, slug, name and api_key", async () => {
+      const api = mountCli({ ensurePersonalWorkspace: async () => PERSONAL_WORKSPACE });
+
+      const response = await api.get("/api/auth/cli/personal-project");
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        project: {
+          id: "project_personal",
+          slug: "bob",
+          name: "Bob",
+          api_key: "lw-personal-key-secret",
+        },
+      });
+    });
+  });
+
+  describe("given a caller who cannot administer their own personal project", () => {
+    /** @scenario GET /api/auth/cli/personal-project withholds the key without breaking the session */
+    it("answers the identity alone, with no api_key, and does not revoke the session", async () => {
+      const api = mountCli({
+        ensurePersonalWorkspace: async () => PERSONAL_WORKSPACE,
+        permittedOnProject: vi.fn().mockResolvedValue(false),
+      });
+
+      const response = await api.get("/api/auth/cli/personal-project");
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        project: { id: "project_personal", slug: "bob", name: "Bob" },
+      });
+      expect(api.permittedOnProject).toHaveBeenCalledWith({
+        userId: USER_ID,
+        projectId: "project_personal",
+        permission: "project:manage",
+      });
+      expect(api.revoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a token issued before its user was removed from the organization", () => {
+    /** @scenario an offboarded user's pre-removal token cannot mint or return a personal key */
+    it("answers 403, creates no workspace, revokes the token and refuses it afterwards", async () => {
+      const ensure = vi.fn().mockResolvedValue(PERSONAL_WORKSPACE);
+      let revoked = () => false;
+      const api = mountCli({
+        organizations: OFFBOARDED,
+        ensurePersonalWorkspace: ensure,
+        verify: () =>
+          revoked()
+            ? Promise.reject(new OrganizationInvalidCredentialsError())
+            : Promise.resolve(HOLDER),
+      });
+      revoked = () => api.revoke.mock.calls.length > 0;
+
+      const first = await api.get("/api/auth/cli/personal-project");
+
+      expect(first.status).toBe(403);
+      expect(await first.text()).not.toContain(PERSONAL_WORKSPACE.project.apiKey);
+      expect(ensure).not.toHaveBeenCalled();
+      expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
+      const followUp = await api.get("/api/auth/cli/personal-project");
+      expect(followUp.status).toBe(401);
+    });
+  });
+
+  describe("given a token issued while the member was active, whose seat an admin then disabled", () => {
+    /** @scenario a disabled member's pre-disable token cannot mint or return a personal key */
+    it("answers 403, creates no workspace and revokes the presented token", async () => {
+      const ensure = vi.fn().mockResolvedValue(PERSONAL_WORKSPACE);
+      const api = mountCli({ organizations: OFFBOARDED, ensurePersonalWorkspace: ensure });
+
+      const response = await api.get("/api/auth/cli/personal-project");
+
+      expect(response.status).toBe(403);
+      expect(ensure).not.toHaveBeenCalled();
+      expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
+    });
+  });
+
+  describe("given a token for a user whose account is deactivated", () => {
+    /** @scenario a deactivated user's token cannot mint or return a personal key */
+    it("answers 403, creates no workspace and revokes the presented token", async () => {
+      const ensure = vi.fn().mockResolvedValue(PERSONAL_WORKSPACE);
+      const api = mountCli({
+        users: { findById: vi.fn().mockResolvedValue({ ...BOB, deactivatedAt: new Date(1) }) },
+        ensurePersonalWorkspace: ensure,
+      });
+
+      const response = await api.get("/api/auth/cli/personal-project");
+
+      expect(response.status).toBe(403);
+      expect(ensure).not.toHaveBeenCalled();
+      expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
+    });
+  });
+
+  describe("given a token whose user is not an active member of the token's organization", () => {
+    /** @scenario POST /api/auth/cli/project-key applies the same membership boundary */
+    it("answers 403, returns no project key and revokes the presented token", async () => {
+      const api = mountCli({ organizations: OFFBOARDED });
+
+      const response = await api.post("/api/auth/cli/project-key", { slug: PROJECT.slug });
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).not.toContain(PROJECT.apiKey);
+      expect(api.revoke).toHaveBeenCalledWith({ userId: USER_ID, tokenKeys: [TOKEN_KEY] });
+    });
+  });
+});
+
+describe("the CLI project-key route and personal projects", () => {
+  const PERSONAL = { ...PROJECT, slug: "bob", isPersonal: true, ownerUserId: USER_ID };
+
+  describe("given a project the caller cannot manage", () => {
+    /** @scenario the project-key endpoint refuses a project the caller cannot manage */
+    it("answers 403 and returns no key", async () => {
+      const api = mountCli({ permittedOnProject: vi.fn().mockResolvedValue(false) });
+
+      const response = await api.post("/api/auth/cli/project-key", { slug: PROJECT.slug });
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).not.toContain(PROJECT.apiKey);
+    });
+  });
+
+  describe("given the caller's own personal project slug", () => {
+    /** @scenario the project-key endpoint returns the caller's own personal project key */
+    it("returns the personal project's api key", async () => {
+      const api = mountCli({ projects: { findLiveBySlug: vi.fn().mockResolvedValue([PERSONAL]) } });
+
+      const response = await api.post("/api/auth/cli/project-key", { slug: "bob" });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ api_key: PROJECT.apiKey });
+    });
+  });
+
+  describe("given another user's personal project slug", () => {
+    /** @scenario the project-key endpoint refuses another user's personal project */
+    it("answers 400 personal_project_not_allowed and asks nothing of the permission model", async () => {
+      const other = { ...PERSONAL, ownerUserId: "user_2" };
+      const api = mountCli({ projects: { findLiveBySlug: vi.fn().mockResolvedValue([other]) } });
+
+      const response = await api.post("/api/auth/cli/project-key", { slug: "bob" });
+
+      const body = await response.text();
+      expect(response.status).toBe(400);
+      expect(body).toContain('"error":"personal_project_not_allowed"');
+      expect(body).not.toContain(PROJECT.apiKey);
+      expect(api.permittedOnProject).not.toHaveBeenCalled();
     });
   });
 });

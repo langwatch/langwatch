@@ -158,7 +158,7 @@ export class GovernanceCliService {
         id: resolved.project.id,
         slug: resolved.project.slug,
         name: resolved.project.name,
-        api_key: resolved.project.apiKey,
+        ...(resolved.project.apiKey === undefined ? {} : { api_key: resolved.project.apiKey }),
       },
     });
   }

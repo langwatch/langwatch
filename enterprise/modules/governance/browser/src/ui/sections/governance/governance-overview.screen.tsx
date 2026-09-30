@@ -1,7 +1,9 @@
 import { Badge, Box, Spacer, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
+import { api } from "../../../behavior/governance-api.ts";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+import { GuidedOnboardingOffer } from "../../../behavior/lent-guided-onboarding-offer.tsx";
 import { GovernanceHeroGround } from "../../../features/overview/ui/sections/governance-hero-ground.tsx";
 import {
   GovernanceHero,
@@ -17,8 +19,8 @@ import { withGovernanceSection } from "../../../ui/sections/governance-section-g
 
 /**
  * The overview: a greeting, the inline palette, the ways in, and the two
- * lists that fill once there is something in them. Reads nothing itself;
- * guards at the route, not the page.
+ * lists that fill once there is something in them. Reads only whether any
+ * source is connected, for the guided offer; guards at the route, not the page.
  */
 function GovernanceOverviewPage() {
   const host = useGovernanceHost();
@@ -30,6 +32,16 @@ function GovernanceOverviewPage() {
   const canManageSources = hasAnyPermission("ingestionSources:manage");
 
   const sample = useSampleMode();
+
+  // Governance is in use once any source is connected. A read the member may not make, or one
+  // that failed, is unknown: the cache keeps the last list through a failed refetch.
+  const canReadSources = hasAnyPermission("ingestionSources:view");
+  const sources = api.ingestionSources.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId && canReadSources, refetchOnWindowFocus: false },
+  );
+  const sourcesInUse =
+    canReadSources && !sources.isError && sources.data ? sources.data.length > 0 : null;
 
   // The Insights screen rides the billed-cost flag, the same way the section
   // rail decides whether to list it. Offering the button without the flag
@@ -57,6 +69,8 @@ function GovernanceOverviewPage() {
                 <GovernanceHero canManageSources={canManageSources} />
               </Box>
             </GovernanceHeroGround>
+
+            <GuidedOnboardingOffer space="governance" spaceInUse={sourcesInUse} />
           </VStack>
 
           <GovernanceHomeSections canSetUpInsights={canSetUpInsights} sample={sample.active} />

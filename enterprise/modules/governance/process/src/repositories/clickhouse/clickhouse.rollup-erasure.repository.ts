@@ -3,6 +3,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 
+import { GOVERNANCE_COST_CHARGE_TABLE } from "../governance-cost-charge.repository.ts";
 import { type ErasedRollupDay, RollupErasureRepository } from "../rollup-erasure.repository.ts";
 
 const logger = createLogger("langwatch:governance:rollup-erasure");
@@ -104,6 +105,38 @@ export class ClickHouseRollupErasureRepository extends RollupErasureRepository {
         logger.error(
           { error, tenantId },
           "Failed to overwrite the erased actor id in governance_cost_rollup_restatement_index — the erasure is incomplete for this tenant",
+        );
+        throw error;
+      }
+    }
+  }
+
+  async renameActorInCharges({
+    tenantIds,
+    rawActorId,
+    pseudonymousActorId,
+  }: {
+    tenantIds: string[];
+    rawActorId: string;
+    pseudonymousActorId: string;
+  }): Promise<void> {
+    for (const tenantId of tenantIds) {
+      try {
+        await this.clickhouse.command({
+          tenantId,
+          sql: `
+            ALTER TABLE ${GOVERNANCE_COST_CHARGE_TABLE}
+            UPDATE RawActorId = {pseudonymousActorId:String}
+            WHERE TenantId = {tenantId:String}
+              AND RawActorId = {rawActorId:String}
+          `,
+          params: { tenantId, rawActorId, pseudonymousActorId },
+          settings: { mutations_sync: "1" },
+        });
+      } catch (error) {
+        logger.error(
+          { error, tenantId },
+          `Failed to overwrite the erased actor id in ${GOVERNANCE_COST_CHARGE_TABLE}; the erasure is incomplete for this tenant`,
         );
         throw error;
       }

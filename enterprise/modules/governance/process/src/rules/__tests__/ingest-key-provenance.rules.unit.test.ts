@@ -117,6 +117,7 @@ describe("Governance receiver policy", () => {
     },
   );
 
+  /** @scenario Foreign OTLP traffic on a copilot_vscode key is dropped at the receiver */
   it.each(["traces", "metrics"] as const)(
     "filters foreign VS Code %s scopes and removes empty groups",
     (signal) => {

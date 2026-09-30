@@ -8,6 +8,7 @@ export type MemoryRollupActorRow = { tenantId: string; day: string; rawActorId: 
 export class MemoryRollupErasureRepository extends RollupErasureRepository {
   readonly rollupRows: MemoryRollupActorRow[] = [];
   readonly restatementRows: MemoryRollupActorRow[] = [];
+  readonly chargeRows: MemoryRollupActorRow[] = [];
 
   private constructor() {
     super();
@@ -47,6 +48,18 @@ export class MemoryRollupErasureRepository extends RollupErasureRepository {
     pseudonymousActorId: string;
   }): Promise<void> {
     for (const row of this.restatementRows) {
+      if (input.tenantIds.includes(row.tenantId) && row.rawActorId === input.rawActorId) {
+        row.rawActorId = input.pseudonymousActorId;
+      }
+    }
+  }
+
+  async renameActorInCharges(input: {
+    tenantIds: string[];
+    rawActorId: string;
+    pseudonymousActorId: string;
+  }): Promise<void> {
+    for (const row of this.chargeRows) {
       if (input.tenantIds.includes(row.tenantId) && row.rawActorId === input.rawActorId) {
         row.rawActorId = input.pseudonymousActorId;
       }

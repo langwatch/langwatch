@@ -87,7 +87,7 @@ export function encodeGovernanceCostRollupKey(cell: GovernanceCostRollupCell): s
   return `cost1d:${cell.tenantId}:${cell.day}:${cell.costSource}:${payload}`;
 }
 
-function isGovernanceCostSource(value: string): value is GovernanceCostSource {
+export function isGovernanceCostSource(value: string): value is GovernanceCostSource {
   return value === GOVERNANCE_COST_SOURCE.GATEWAY || value === GOVERNANCE_COST_SOURCE.PULLED;
 }
 

@@ -180,6 +180,8 @@ import { ssrfSafeFetch } from "../channels/http/http.governance-http.channel.ts"
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
+import { CostRollupWatchProcess } from "../eventing/cost-rollup-watch.process.ts";
+import { GovernanceCostChargeMapProjection } from "../eventing/governance-cost-charge.projection.ts";
 import { GovernanceCostRollupFoldProjection } from "../eventing/governance-cost-rollup.projection.ts";
 import { GovernanceCostRollupStore } from "../eventing/governance-cost-rollup.store.ts";
 import {
@@ -208,6 +210,7 @@ import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { AnthropicAdminPullerService } from "../services/anthropic-admin-puller.service.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
+import { CostRollupDayComparerService } from "../services/cost-rollup-day-comparer.service.ts";
 import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
 import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
@@ -962,7 +965,7 @@ export class GovernanceApp implements GovernanceRestApi {
     return this.pullLifecycle.reconcile({ findPullProcessKeys });
   }
 
-  /** pulled_usage_processing for this role: the worker also hosts main's `governanceCostRollup` fold. */
+  /** pulled_usage_processing per role; the worker hosts the rollup, its charges and the watch. */
   pulledUsagePipeline({
     participation,
   }: {
@@ -980,7 +983,17 @@ export class GovernanceApp implements GovernanceRestApi {
           }),
       },
     });
-    return PulledUsageEventingAdapter.create({ costRollup }).build();
+    const costCharges = GovernanceCostChargeMapProjection.create({
+      store: this.repositories.costCharges,
+      cells: costRollup,
+    });
+    const costRollupWatch = CostRollupWatchProcess.create(
+      CostRollupDayComparerService.create({
+        costRollup: this.repositories.costRollup,
+        costCharges: this.repositories.costCharges,
+      }),
+    );
+    return PulledUsageEventingAdapter.create({ costRollup, costCharges, costRollupWatch }).build();
   }
 
   connectPulledUsage(commands: EventingSenders): void {

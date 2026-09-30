@@ -146,7 +146,9 @@ export const governanceCliBudgetOverviewAnswers = {
   ...governanceCliRefusalAnswers,
 } as const;
 export const governanceCliPersonalProjectAnswers = {
-  200: z.object({ project: z.object({ ...cliProjectSchema.shape, api_key: z.string() }) }),
+  200: z.object({
+    project: z.object({ ...cliProjectSchema.shape, api_key: z.string().optional() }),
+  }),
   ...governanceCliRefusalAnswers,
 } as const;
 export const governanceCliVirtualKeyAnswers = {

@@ -35,7 +35,9 @@ const SUMMARY = {
   },
 };
 
-function mount(options: { permits?: (permission: string) => boolean } = {}) {
+function mount(
+  options: { permits?: (permission: string, scope: { tier: string; id: string }) => boolean } = {},
+) {
   const asked: string[] = [];
   const calls: unknown[] = [];
   const app = createApiFixture<GovernanceRestApi>({
@@ -161,7 +163,8 @@ describe("the governanceCost tRPC namespace", () => {
     expect([...asked].toSorted()).toEqual(["governance:view", "governanceCost:view"]);
   });
 
-  it("refuses spenders to a caller holding only the cost permission", async () => {
+  /** @scenario "The spender breakdown stays behind the identity screen's permission" */
+  it("refuses spenders to a caller holding only the cost permission, yet still answers the lanes", async () => {
     const { caller, calls } = mount({
       permits: (permission) => permission === "governanceCost:view",
     });
@@ -170,5 +173,34 @@ describe("the governanceCost tRPC namespace", () => {
       code: "FORBIDDEN",
     });
     expect(calls).toEqual([]);
+    await expect(caller.summary({ organizationId: "org_1" })).resolves.toEqual(SUMMARY);
+  });
+
+  /** @scenario "Viewing requires the organization-scoped governance cost permission" */
+  it("refuses every cost read to a member without governanceCost:view on the organization", async () => {
+    const { caller, calls, asked } = mount({ permits: () => false });
+    const window = { organizationId: "org_1" };
+
+    await expect(caller.summary(window)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.dailyByProvider(window)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.spendByModel(window)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(calls).toEqual([]);
+    expect(new Set(asked)).toEqual(new Set(["governanceCost:view"]));
+  });
+
+  /** @scenario "A grant on another organization does not open this organization's costs" */
+  it("asks the decision at the queried organization, so a grant elsewhere buys nothing here", async () => {
+    const { caller, calls } = mount({
+      permits: (permission, scope) =>
+        permission === "governanceCost:view" &&
+        scope.tier === "organization" &&
+        scope.id === "org_2",
+    });
+
+    await expect(caller.summary({ organizationId: "org_1" })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect(calls).toEqual([]);
+    await expect(caller.summary({ organizationId: "org_2" })).resolves.toEqual(SUMMARY);
   });
 });

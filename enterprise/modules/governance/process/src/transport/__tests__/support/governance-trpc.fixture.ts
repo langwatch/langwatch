@@ -9,16 +9,16 @@ export function governanceTrpcMembers({
   permits,
   asked,
 }: {
-  permits: (permission: string) => boolean;
+  permits: (permission: string, scope: { tier: string; id: string }) => boolean;
   asked: string[];
 }): TrpcRuntimeMembers<GovernanceTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
     authorization: {
       forRequest: () => ({
-        getDecision: async ({ permission }) => {
+        getDecision: async ({ permission, scope }) => {
           asked.push(permission);
-          return { permitted: permits(permission), organizationRole: null };
+          return { permitted: permits(permission, scope), organizationRole: null };
         },
         getProjectAnyDecision: async () => ({ permitted: false, organizationRole: null }),
         checkScopeLineage: async () => ({ kind: "consistent" }),

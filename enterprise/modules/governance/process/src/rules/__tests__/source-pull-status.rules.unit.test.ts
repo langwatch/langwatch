@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { PULL_REFUSED_ERROR_CODE } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
 import { sourcePullStatus } from "../source-pull-status.rules.ts";
@@ -38,6 +39,28 @@ describe("sourcePullStatus", () => {
       pullRun: failed("This source is disabled.", "pull_refused"),
     });
     expect(status.error).toBe("This source is disabled.");
+  });
+
+  /** @scenario The source health row says the key was refused */
+  it("shows the refused-key sentence and nothing the provider replied", () => {
+    const sentence = "Anthropic refused this key. Check the admin key and its permissions.";
+    const status = sourcePullStatus({
+      sourceType: "anthropic_admin",
+      cursor: null,
+      pullRun: failed(sentence, PULL_REFUSED_ERROR_CODE),
+    });
+    expect(status.outcome).toBe("failed");
+    expect(status.error).toBe(sentence);
+  });
+
+  /** @scenario A refusal with no customer sentence shows the generic failure text */
+  it("says only that the last pull failed when the refusal carries no sentence of ours", () => {
+    const status = sourcePullStatus({
+      sourceType: "anthropic_admin",
+      cursor: null,
+      pullRun: failed("", PULL_REFUSED_ERROR_CODE),
+    });
+    expect(status.error).toBe("The last pull failed.");
   });
 
   it("reads a billing cursor's watermark while more pages remain", () => {
