@@ -49,6 +49,7 @@
  */
 
 import { METADATA_SUBKEY_PREFIXES } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { spanTypesSchema } from "~/server/tracer/types";
 
 const HAS_LETTER = /[A-Za-z]/;
 const HAS_DIGIT = /\d/;
@@ -399,9 +400,38 @@ export function reservesModelOrToolName({
 }
 
 /**
+ * The attribute LangWatch SDKs write a span's kind into (`llm`, `tool`,
+ * `agent`, `workflow`, ...). The name/place pass reads some of those words as
+ * a first name, so under the strict level top-level spans stored `[PERSON]` as
+ * their type and lost their kind in the trace view.
+ */
+const SPAN_TYPE_ATTRIBUTE_KEY = "langwatch.span.type";
+
+/**
+ * Whether this attribute is the span kind carrying one of the known kinds.
+ *
+ * Gated on the exact list ({@link spanTypesSchema}), not on shape: the name is
+ * not a namespace anyone owns, and a known kind is a fixed word that cannot
+ * carry personal data, so it is safe to hold back from every pass. Anything
+ * else written under this name is analysed as usual.
+ */
+export function reservesSpanType({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): boolean {
+  return (
+    key.toLowerCase() === SPAN_TYPE_ATTRIBUTE_KEY &&
+    spanTypesSchema.safeParse(value).success
+  );
+}
+
+/**
  * Whether one attribute is held back from PII analysis altogether: reserved by
- * name as a trace address, or a value that is exclusively one opaque
- * identifier token.
+ * name as a trace address, a known span kind, or a value that is exclusively
+ * one opaque identifier token.
  *
  * A model or tool name is NOT held back here. It is still analysed for
  * everything except names and places ({@link reservesModelOrToolName}), so a
@@ -417,5 +447,9 @@ export function isHeldOutIdentifierAttribute({
   key: string;
   value: string;
 }): boolean {
-  return reservesTraceAddress({ key, value }) || isOpaqueIdentifierValue(value);
+  return (
+    reservesTraceAddress({ key, value }) ||
+    reservesSpanType({ key, value }) ||
+    isOpaqueIdentifierValue(value)
+  );
 }
