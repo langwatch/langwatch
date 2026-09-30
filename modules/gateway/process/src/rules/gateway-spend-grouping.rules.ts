@@ -4,6 +4,7 @@
  */
 
 import {
+  GATEWAY_MAX_EPOCH_MS,
   GatewaySpendGroupByUnstableError,
   type SpendBucket,
   type SpendGroupByKey,
@@ -99,6 +100,7 @@ export function assertGroupingIsWalkable({
   if (movable.length === 0) return;
   throw new GatewaySpendGroupByUnstableError({
     groupBy: movable,
-    settlesAtMs: toMs + settlementPolicy.graceMs(),
+    // A window ending past the last representable moment settles at that moment.
+    settlesAtMs: Math.min(toMs + settlementPolicy.graceMs(), GATEWAY_MAX_EPOCH_MS),
   });
 }

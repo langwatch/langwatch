@@ -154,6 +154,23 @@ describe("given a spend rollup grouping", () => {
       expect(meta.group_by).toEqual(["model", "bucket:hour"]);
       expect(meta.settles_at).toBe(new Date(LIVE_WINDOW_END + GRACE_MS).toISOString());
     });
+
+    it("refuses a window ending at the largest safe integer as a handled error", () => {
+      const refusal = refusalFrom(() =>
+        spendGrouping.assertGroupingIsWalkable({
+          keys: ["model"],
+          bucket: "none",
+          toMs: Number.MAX_SAFE_INTEGER,
+          nowMs: NOW,
+          allowUnstable: false,
+          settlementPolicy,
+        }),
+      );
+      expect(refusal).toMatchObject({
+        code: "gateway_spend_group_by_unstable",
+        meta: { settles_at: new Date(8_640_000_000_000_000).toISOString() },
+      });
+    });
   });
 
   describe("when a time zone is named", () => {

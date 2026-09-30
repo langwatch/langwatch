@@ -99,7 +99,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
 
   async update(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
     const row = await this.database.gatewayGuardrail.update({
-      where: { id: input.id },
+      where: { id: input.id, projectId: input.projectId },
       data: {
         name: input.name,
         description: input.description,
@@ -114,7 +114,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
 
   async archive(input: ArchiveGatewayGuardrailInput): Promise<void> {
     await this.database.gatewayGuardrail.update({
-      where: { id: input.id },
+      where: { id: input.id, projectId: input.projectId },
       data: { archivedAt: new Date(), updatedById: input.actorUserId },
     });
   }
