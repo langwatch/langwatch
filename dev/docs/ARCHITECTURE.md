@@ -1287,6 +1287,8 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
 - `GET /api/checkup` keeps the branch's `organization:view` guard; main answers any project key. The drift is
   accepted, since the checkup reads organisation-wide state (Alex, 2026-09-30).
+- tRPC is the browser's transport and REST is the API key's (Alex, 2026-09-30): a REST route the UI also reaches by
+  cookie (`/api/files`, `/api/user-avatar`) still answers a project key, as main's `dualAuth` did.
 - A key-authenticated door's actor carries the key's owner, set by the runtime's credential
   authentication, so no handler or module looks the owner up itself (Alex, 2026-09-25).
 - A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
