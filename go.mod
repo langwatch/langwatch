@@ -4,12 +4,21 @@ go 1.27.1
 
 // The root module spans the JS workspace; keep ./... and gopls out of it.
 ignore (
-	node_modules
-	dist
 	./apps
+	./charts
+	./dev
+	./docs
 	./enterprise
+	./mcp
 	./modules
 	./packages
+	./sdks/python
+	./sdks/typescript
+	./skills
+	./specs
+	coverage
+	dist
+	node_modules
 )
 
 require (
@@ -18,6 +27,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.43.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.32
 	github.com/aws/aws-sdk-go-v2/service/bedrockruntime v1.52.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.0
 	github.com/aws/smithy-go v1.27.5
 	github.com/bytedance/sonic v1.15.3
 	github.com/charmbracelet/bubbletea v1.3.10
@@ -34,11 +44,9 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/klauspost/compress v1.18.7
 	github.com/langwatch/langwatch/sdks/go v1.0.0
-	github.com/langwatch/langwatch/sdks/go/instrumentation/openai v0.0.0-20260904092957-9f95b667d18a
 	github.com/maximhq/bifrost/core v1.5.17
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.151.0
-	github.com/openai/openai-go v1.12.0
 	github.com/osteele/liquid v1.8.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
@@ -91,7 +99,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.14 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.33 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.22 // indirect
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.33.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.2 // indirect
@@ -152,7 +159,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.151.0 // indirect
-	github.com/openai/openai-go/v3 v3.50.0 // indirect
 	github.com/osteele/tuesday v1.0.4 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
