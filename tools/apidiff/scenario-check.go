@@ -70,6 +70,12 @@ func placeholderValue(name string, vars map[string]string) (string, bool) {
 func expandValue(value any, vars map[string]string) (any, error) {
 	switch typed := value.(type) {
 	case string:
+		// A value that is exactly {nowMs[±N]} is a number, so a JSON timestamp field gets one.
+		if name, ok := strings.CutPrefix(typed, "{nowMs"); ok && strings.HasSuffix(name, "}") && scenarioPlaceholder.FindString(typed) == typed {
+			if value, ok := placeholderValue(typed[1:len(typed)-1], vars); ok {
+				return strconv.ParseInt(value, 10, 64)
+			}
+		}
 		return expandText(typed, vars)
 	case []any:
 		out := make([]any, len(typed))

@@ -2295,7 +2295,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2349,7 +2349,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -2373,7 +2373,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_FINISHED",
-      "timestamp": 1790000001000,
+      "timestamp": "{nowMs+1000}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2412,7 +2412,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -2436,7 +2436,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2478,7 +2478,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -2502,7 +2502,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run2-{uid}",
@@ -2543,7 +2543,7 @@
     "method": "POST",
     "path": "/api/scenario-events",
     "body": {
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2582,7 +2582,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "NOT_AN_EVENT",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2621,7 +2621,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
       "scenarioSetId": "set-{uid}",
@@ -2659,7 +2659,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioSetId": "set-{uid}",
@@ -2736,7 +2736,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2791,7 +2791,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_FINISHED",
-      "timestamp": 1790000001000,
+      "timestamp": "{nowMs+1000}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2831,7 +2831,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2869,7 +2869,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2905,7 +2905,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2941,7 +2941,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -2999,7 +2999,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -3056,7 +3056,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -3114,7 +3114,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -3171,7 +3171,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -3229,7 +3229,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -3281,7 +3281,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3305,7 +3305,7 @@
     "path": "/api/scenario-events",
     "body": {
       "type": "SCENARIO_RUN_STARTED",
-      "timestamp": 1790000000000,
+      "timestamp": "{nowMs}",
       "batchRunId": "batch-{uid}",
       "scenarioId": "scen-{uid}",
       "scenarioRunId": "run-{uid}",
@@ -3353,7 +3353,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3451,7 +3451,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3473,7 +3473,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run2-{uid}",
@@ -3545,7 +3545,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3616,7 +3616,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3662,7 +3662,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3763,7 +3763,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3785,7 +3785,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_FINISHED",
-        "timestamp": 1790000001000,
+        "timestamp": "{nowMs+1000}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3860,7 +3860,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -3927,7 +3927,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -4002,7 +4002,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -4090,7 +4090,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",
@@ -4144,7 +4144,7 @@
       "request": "POST /api/scenario-events",
       "body": {
         "type": "SCENARIO_RUN_STARTED",
-        "timestamp": 1790000000000,
+        "timestamp": "{nowMs}",
         "batchRunId": "batch-{uid}",
         "scenarioId": "scen-{uid}",
         "scenarioRunId": "run-{uid}",

@@ -334,3 +334,17 @@ func TestScenarioPhaseHoldsAtVolume(t *testing.T) {
 		}
 	}
 }
+
+func TestAWholeNowMsPlaceholderExpandsToANumber(t *testing.T) {
+	value, err := expandValue(map[string]any{"at": "{nowMs-1000}", "label": "at {nowMs}"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := value.(map[string]any)
+	if _, ok := fields["at"].(int64); !ok {
+		t.Fatalf("at = %#v, want an int64", fields["at"])
+	}
+	if _, ok := fields["label"].(string); !ok {
+		t.Fatalf("label = %#v, want a string", fields["label"])
+	}
+}
