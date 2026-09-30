@@ -44,6 +44,7 @@ func liveBedrockOpenAICred(t *testing.T) (domain.Credential, string) {
 	}, model
 }
 
+// TestBedrockOpenAILive_Chat checks a plain chat answer through Dispatch.
 func TestBedrockOpenAILive_Chat(t *testing.T) {
 	cred, model := liveBedrockOpenAICred(t)
 	router := newTestRouter(t)
@@ -62,6 +63,7 @@ func TestBedrockOpenAILive_Chat(t *testing.T) {
 	}
 }
 
+// TestBedrockOpenAILive_ChatStreamWithTools checks a streamed tool call.
 func TestBedrockOpenAILive_ChatStreamWithTools(t *testing.T) {
 	cred, model := liveBedrockOpenAICred(t)
 	router := newTestRouter(t)
@@ -88,9 +90,9 @@ func TestBedrockOpenAILive_ChatStreamWithTools(t *testing.T) {
 	}
 }
 
-// The body shape Langy's pi harness sends on its chat-completions lane: a
-// system prompt, a finished tool round trip in the history, store:false,
-// stream_options and max_completion_tokens.
+// TestBedrockOpenAILive_LangyShapedTurn sends what Langy's pi harness sends on
+// its chat-completions lane: a system prompt, a finished tool round trip in
+// the history, store:false, stream_options and max_completion_tokens.
 func TestBedrockOpenAILive_LangyShapedTurn(t *testing.T) {
 	cred, model := liveBedrockOpenAICred(t)
 	router := newTestRouter(t)
@@ -111,18 +113,19 @@ func TestBedrockOpenAILive_LangyShapedTurn(t *testing.T) {
 	}
 	var sb strings.Builder
 	for it.Next(context.Background()) {
-		sb.Write(it.Chunk())
+		sb.WriteString(gjson.GetBytes(it.Chunk(), "choices.0.delta.content").String())
 	}
 	if err := it.Err(); err != nil && err != io.EOF {
 		t.Fatalf("stream error: %v", err)
 	}
 	out := sb.String()
-	t.Logf("stream tail: %s", out[max(0, len(out)-600):])
+	t.Logf("answer: %q", out)
 	if !strings.Contains(out, "3") && !strings.Contains(strings.ToLower(out), "three") {
 		t.Fatalf("expected the answer to count three files")
 	}
 }
 
+// TestBedrockOpenAILive_JSONSchema checks that a json_schema is enforced.
 func TestBedrockOpenAILive_JSONSchema(t *testing.T) {
 	cred, model := liveBedrockOpenAICred(t)
 	router := newTestRouter(t)
@@ -142,6 +145,7 @@ func TestBedrockOpenAILive_JSONSchema(t *testing.T) {
 	}
 }
 
+// TestBedrockOpenAILive_JSONSchemaStream checks that a streamed json_schema is enforced.
 func TestBedrockOpenAILive_JSONSchemaStream(t *testing.T) {
 	cred, model := liveBedrockOpenAICred(t)
 	router := newTestRouter(t)
