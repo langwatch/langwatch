@@ -34,6 +34,7 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
     validateLangWatchQL: (_input: LangWatchQLValidationInput) => ({
       parameters: [],
       appFunctions: [],
+      tables: [],
     }),
     executeLangWatchQL: async (
       _input: LangWatchQLExecuteInput,

@@ -69,6 +69,7 @@ class ScriptedAnalytics implements InstantEvalStatementValidator {
     return {
       parameters: this.options.parameters ?? [],
       appFunctions: this.options.appFunctions ?? [judged],
+      tables: [],
     };
   }
 

@@ -112,6 +112,8 @@ export interface LangWatchQLDeclaredParameter {
  * thrown, so this is the accepted shape and there is no other.
  */
 export interface LangWatchQLAcceptedStatement {
+  /** The catalogue tables the statement reads, qualified, subqueries and joins included. */
+  readonly tables: readonly string[];
   readonly parameters: readonly LangWatchQLDeclaredParameter[];
   /** The app-function calls the projection made, in projection order. */
   readonly appFunctions: readonly LangWatchQLAppFunctionCall[];
