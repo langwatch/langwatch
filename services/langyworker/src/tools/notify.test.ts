@@ -9,6 +9,7 @@ import {
   NOTIFY_MIN_GAP_MS,
   NOTIFY_SENT,
   NOTIFY_TOOL_NAME,
+  notifyLedgerFromEntries,
   notifyRefusal,
   OFFER_NOTIFICATIONS_TOOL_NAME,
   OFFER_REPEATED_PUSHBACK,
@@ -126,6 +127,53 @@ describe("the offer_notifications tool", () => {
       expect(first.content[0]?.text).toBe(OFFER_SHOWN);
 
       await expect(offer.execute("call-2", {})).rejects.toThrow(OFFER_REPEATED_PUSHBACK);
+    });
+  });
+});
+
+describe("notifyLedgerFromEntries", () => {
+  const toolResult = (toolName: string, timestamp: number, isError = false) => ({
+    type: "message",
+    id: `e-${timestamp}`,
+    parentId: null,
+    timestamp: new Date(timestamp).toISOString(),
+    message: {
+      role: "toolResult",
+      toolCallId: `call-${timestamp}`,
+      toolName,
+      content: [],
+      isError,
+      timestamp,
+    },
+  });
+
+  describe("given a worker that resumes a conversation", () => {
+    /** @scenario "Langy offers notifications only once per conversation" */
+    it("remembers the offer and the notifications its session already holds", () => {
+      const ledger = notifyLedgerFromEntries([
+        toolResult(OFFER_NOTIFICATIONS_TOOL_NAME, 1_000),
+        toolResult(NOTIFY_TOOL_NAME, 2_000),
+        toolResult(NOTIFY_TOOL_NAME, 3_000, true),
+        {
+          type: "model_change",
+          id: "m",
+          parentId: null,
+          timestamp: "",
+          provider: "p",
+          modelId: "m",
+        },
+      ] as never);
+
+      expect(ledger).toEqual({ offered: true, sentAt: [2_000] });
+    });
+
+    it("refuses a notification the restart would otherwise let through", async () => {
+      const ledger = notifyLedgerFromEntries([toolResult(NOTIFY_TOOL_NAME, 10_000)] as never);
+      const tools = registerTools({ ledger, now: () => 20_000 });
+
+      await expect(tools.notify.execute("c", { title: "Done", body: "All set." })).rejects.toThrow(
+        "Nothing was sent",
+      );
     });
   });
 });

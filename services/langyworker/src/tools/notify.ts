@@ -4,7 +4,7 @@
  * Spec: specs/langy/langy-notifications.feature
  */
 
-import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, InlineExtension, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
 export const NOTIFY_TOOL_NAME = "notify";
@@ -83,6 +83,21 @@ export type NotifyLedger = {
 
 export function createNotifyLedger(): NotifyLedger {
   return { sentAt: [], offered: false };
+}
+
+/**
+ * The ledger a resumed session already earned: every notification that went out and whether the
+ * offer was made, read off the session's own tool results so a restart resets neither.
+ */
+export function notifyLedgerFromEntries(entries: readonly SessionEntry[]): NotifyLedger {
+  const ledger = createNotifyLedger();
+  for (const entry of entries) {
+    if (entry.type !== "message" || entry.message.role !== "toolResult") continue;
+    if (entry.message.isError) continue;
+    if (entry.message.toolName === NOTIFY_TOOL_NAME) ledger.sentAt.push(entry.message.timestamp);
+    if (entry.message.toolName === OFFER_NOTIFICATIONS_TOOL_NAME) ledger.offered = true;
+  }
+  return ledger;
 }
 
 export function createNotifyExtension({
