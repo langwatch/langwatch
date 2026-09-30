@@ -90,7 +90,7 @@ flows:
           anonymous: "true"
       - action: fill
         with:
-          testId: signup-identifier
+          field: Email
           value: vd-auth-{uid}@mail.langwatch.localhost
           anonymous: "true"
       - action: click
@@ -193,7 +193,7 @@ flows:
           anonymous: "true"
       - action: fill
         with:
-          testId: signup-identifier
+          field: Email
           value: "{actor}"
           anonymous: "true"
       - action: click
@@ -363,12 +363,13 @@ flows:
 
   - id: cli-login-approve
     title: The device-login page shows the code, asks to confirm it, then approves the CLI
-    setup:
-      - post: /api/auth/cli/device-code
-        body: {}
-        as:
-          userCode: user_code
     steps:
+      - action: request
+        with:
+          path: /api/auth/cli/device-code
+          body: "{}"
+          field: user_code
+          as: userCode
       - action: go
         with:
           path: /cli/auth?user_code={userCode}
@@ -392,12 +393,13 @@ flows:
 
   - id: cli-login-deny
     title: Denying a device login shows the refusal and leaves no approve button
-    setup:
-      - post: /api/auth/cli/device-code
-        body: {}
-        as:
-          userCode: user_code
     steps:
+      - action: request
+        with:
+          path: /api/auth/cli/device-code
+          body: "{}"
+          field: user_code
+          as: userCode
       - action: go
         with:
           path: /cli/auth?user_code={userCode}

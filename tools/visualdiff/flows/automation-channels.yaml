@@ -13,6 +13,9 @@ flows:
       - action: click
         with:
           text: New automation
+      - action: expect
+        with:
+          testId: automation-name-input
       - action: fill
         with:
           field: Flag failing traces
@@ -60,6 +63,9 @@ flows:
       - action: click
         with:
           text: New automation
+      - action: expect
+        with:
+          testId: automation-name-input
       - action: fill
         with:
           field: Flag failing traces
@@ -110,14 +116,26 @@ flows:
       - action: go
         with:
           path: /{slug}/traces
+      - action: expect
+        with:
+          count: tbody[data-trace-id]
+          timeout: "30000"
       - action: type
         with:
           label: Search filters or type what you are looking for
           text: status:error
           submit: true
+      - action: expect
+        with:
+          count: tbody:not([data-row-variant="error"])
+          equals: '"0"'
+          timeout: "30000"
       - action: click
         with:
           label: Create an automation from the current filter
+      - action: expect
+        with:
+          testId: automation-name-input
       - action: fill
         with:
           field: Flag failing traces
@@ -172,6 +190,9 @@ flows:
       - action: click
         with:
           text: New automation
+      - action: expect
+        with:
+          testId: automation-name-input
       - action: fill
         with:
           field: Flag failing traces
@@ -221,6 +242,9 @@ flows:
       - action: click
         with:
           text: New automation
+      - action: expect
+        with:
+          testId: automation-name-input
       - action: fill
         with:
           field: Flag failing traces
@@ -269,6 +293,9 @@ flows:
       - action: click
         with:
           text: New automation
+      - action: expect
+        with:
+          testId: automation-name-input
       - action: fill
         with:
           field: Flag failing traces
@@ -320,6 +347,9 @@ flows:
       - action: click
         with:
           text: New automation
+      - action: expect
+        with:
+          testId: automation-name-input
       - action: fill
         with:
           field: Flag failing traces
@@ -354,6 +384,9 @@ flows:
       - action: click
         with:
           text: New automation
+      - action: expect
+        with:
+          testId: automation-name-input
       - action: fill
         with:
           field: Flag failing traces

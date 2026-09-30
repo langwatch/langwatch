@@ -7,10 +7,10 @@
 import { toaster } from "@langwatch/design-system/toaster";
 import {
   explainHandledError,
-  explainUnhandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/error-presentation/presentation";
 import {
+  readAuthoredMessageOfUnhandled,
   readEnvelopeTraceId,
   readHandledError,
 } from "@langwatch/error-presentation/read-handled-error";
@@ -117,9 +117,8 @@ export function resolveUiFailureCopy({
   return {
     title: title ?? (fallbackTitle || UNKNOWN_ERROR_PRESENTATION.title),
     description:
-      explainUnhandledError(error).description ||
-      description ||
-      UNKNOWN_ERROR_PRESENTATION.description,
+      readAuthoredMessageOfUnhandled(error) ??
+      (description || UNKNOWN_ERROR_PRESENTATION.description),
     docsUrl: void 0,
     traceId: readEnvelopeTraceId(error),
   };

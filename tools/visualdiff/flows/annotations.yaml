@@ -160,7 +160,7 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -169,7 +169,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -341,7 +341,7 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -350,7 +350,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -398,7 +398,7 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -407,7 +407,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/

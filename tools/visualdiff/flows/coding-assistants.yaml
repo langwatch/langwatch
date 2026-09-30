@@ -33,15 +33,15 @@ flows:
           path: /{slug}/sessions
       - action: expect
         with:
-          count: 'tbody tr:has-text("/Visual diff alpha session.*feat\/vd-alpha/s")'
+          count: 'tbody tr:has-text("Visual diff alpha session"):has-text("feat/vd-alpha")'
           min: '1'
       - action: expect
         with:
-          count: 'tbody tr:has-text("/Visual diff beta session.*feat\/vd-beta/s")'
+          count: 'tbody tr:has-text("Visual diff beta session"):has-text("feat/vd-beta")'
           min: '1'
       - action: expect
         with:
-          count: 'tbody tr:has-text("/Visual diff beta session.*vd-repo · main/s")'
+          count: 'tbody tr:has-text("Visual diff beta session"):has-text("vd-repo · main")'
           equals: '0'
 
   - id: coding-session-list-search-narrows
@@ -321,7 +321,7 @@ flows:
           text: /^\s*Token cost\s*$/
       - action: expect
         with:
-          count: 'tbody tr:has-text("/Visual diff alpha session.*\$0\.\d+/s")'
+          count: 'tbody tr:has-text("Visual diff alpha session"):has-text("$0.")'
           min: '1'
 
   - id: coding-personal-usage-card-links-to-sessions

@@ -23,13 +23,24 @@ export const summaries = (body: unknown): Summary[] => {
   });
 };
 
+/** The DOCTYPE and the logo are URLs in the markup, not links the message asks anyone to open. */
+const ASSET_LINK = /\.(dtd|png|jpe?g|gif|svg|webp)(\?.*)?$/i;
+
+/** firstLink is the first URL in a message body that is a page, not an asset. */
+export const firstLink = (links: unknown): string | undefined =>
+  Array.isArray(links)
+    ? links.find(
+        (link: unknown): link is string => typeof link === "string" && !ASSET_LINK.test(link),
+      )
+    : undefined;
+
 /** newest is the latest-received summary, if any. */
 export const newest = (summaries: readonly Summary[]): Summary | undefined =>
   summaries.toSorted((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))[0];
 
 /**
  * mail reads the newest message the side's mail sink caught for `to` (and `subject`, a
- * substring), waiting for it to arrive, and keeps its first link as `{mailLink}`, or as `as`.
+ * substring), waiting for it to arrive, and keeps its first page link as `{mailLink}`, or as `as`.
  */
 export const mail: Action = async (context) => {
   const { mailUrl } = context;
@@ -41,15 +52,20 @@ export const mail: Action = async (context) => {
   const deadline = Date.now() + MAIL_TIMEOUT_MILLIS;
   for (;;) {
     const listed = await request.get(`${mailUrl}/api/messages?${query}`, options);
-    const found = listed.ok() ? newest(summaries(await listed.json().catch(() => undefined))) : undefined;
+    const found = listed.ok()
+      ? newest(summaries(await listed.json().catch(() => undefined)))
+      : undefined;
     if (found !== undefined) {
       const message = await request.get(`${mailUrl}/api/messages/${found.id}`, options);
-      const link = readField({ body: await message.json().catch(() => undefined), path: "links.0" });
-      if (typeof link !== "string") throw new Error(`the message for ${query.get("to")} has no link`);
+      const link = firstLink(
+        readField({ body: await message.json().catch(() => undefined), path: "links" }),
+      );
+      if (link === undefined) throw new Error(`the message for ${query.get("to")} has no link`);
       context.values[context.args.as ?? "mailLink"] = link;
       return;
     }
-    if (Date.now() > deadline) throw new Error(`no mail for ${query} within ${MAIL_TIMEOUT_MILLIS}ms`);
+    if (Date.now() > deadline)
+      throw new Error(`no mail for ${query} within ${MAIL_TIMEOUT_MILLIS}ms`);
     await new Promise((resolve) => setTimeout(resolve, MAIL_POLL_MILLIS));
   }
 };

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { describeExpect, judgeCount } from "../flows/expect.ts";
 import { fixturePath } from "../flows/interactions.ts";
-import { newest, summaries } from "../flows/mail.ts";
+import { firstLink, newest, summaries } from "../flows/mail.ts";
 import { hasTarget, isTargeted } from "../flows/target.ts";
 import { fillArgs, fillValues, uidFor } from "../flows/values.ts";
 import { flowProject } from "../screens.ts";
@@ -80,7 +80,9 @@ describe("Feature: flows name elements by test id", () => {
     expect(describeExpect({ testIdPrefix: "row-", hasText: "VD" })).toBe(
       'testIdPrefix row- with text "VD" >= 1',
     );
-    expect(describeExpect({ api: "/api/x", status: "401", auth: "none" })).toBe("api /api/x status 401");
+    expect(describeExpect({ api: "/api/x", status: "401", auth: "none" })).toBe(
+      "api /api/x status 401",
+    );
     expect(describeExpect({ text: "Gone", equals: "0" })).toBe('text "Gone" == 0');
     expect(judgeCount({ found: 0, args: { equals: "0" } })).toBe("");
   });
@@ -100,6 +102,17 @@ describe("Feature: flows read mail and attach fixtures", () => {
     expect(newest(listed)?.id).toBe("new");
     expect(newest([])).toBeUndefined();
     expect(summaries("nothing")).toEqual([]);
+  });
+
+  it("keeps the first page link, not the DOCTYPE or a logo", () => {
+    const links = [
+      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd",
+      "https://app.langwatch.ai/images/logo.png",
+      "https://app.example.test/auth/reset-password?token=abc",
+    ];
+    expect(firstLink(links)).toBe("https://app.example.test/auth/reset-password?token=abc");
+    expect(firstLink([links[0]])).toBeUndefined();
+    expect(firstLink("nothing")).toBeUndefined();
   });
 
   /** @scenario An upload step attaches a file from the fixtures directory */

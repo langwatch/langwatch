@@ -1074,6 +1074,9 @@ flows:
       - action: click
         with:
           text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          text: vd-widget-a-{uid}
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
@@ -1100,6 +1103,9 @@ flows:
       - action: click
         with:
           text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          text: vd-widget-b-{uid}
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
