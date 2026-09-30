@@ -20,8 +20,11 @@ function build(
     enabled?: boolean;
     granted?: readonly string[];
     runSpans?: readonly Record<string, unknown>[];
+    tokenProjectId?: string;
+    tokenAgentId?: string | null;
   } = {},
 ) {
+  const createVoiceAgent = vi.fn(async () => ({ id: "agent_new" }));
   const asked: string[] = [];
   const audited: RecordAuditLogCommand[] = [];
   const runner = createApiFixture<VoiceTransportRunner>({
@@ -42,6 +45,8 @@ function build(
       scenarioId: "scenario_1",
       scenarioSetId: "set_1",
     }),
+    getVoiceAgentRow: async () => ({ id: "row_1", agentExternalId: "vendor_agent" }),
+    createVoiceAgent,
     signSessionToken: (payload) => `signed:${payload.projectId}`,
     now: () => 1_000,
     newSessionId: () => "session_1",
@@ -80,8 +85,8 @@ function build(
     },
     verifyToken: vi.fn(() => ({
       sessionId: "session_1",
-      projectId: "project_other",
-      agentId: null,
+      projectId: options.tokenProjectId ?? "project_other",
+      agentId: options.tokenAgentId === undefined ? null : options.tokenAgentId,
       agentExternalId: "vendor_agent",
       transport: "elevenlabs_convai" as const,
       exp: 2_000,
@@ -89,8 +94,18 @@ function build(
     maxDurationSeconds: 300,
   });
 
-  return { service, asked, recordings, audited };
+  return { service, asked, recordings, audited, createVoiceAgent };
 }
+
+const finish = {
+  projectId: "project_1",
+  sessionToken: "token",
+  transcript: [],
+  startedAt: 1,
+  endedAt: 2,
+  isCutAtLimit: false,
+  userId: "user_1",
+};
 
 const mint = {
   projectId: "project_1",
@@ -101,14 +116,39 @@ const mint = {
 
 describe("VoiceSessionService", () => {
   describe("given a project without the voice agents flag", () => {
+    /** @scenario "A mint request is refused with a 404 while the voice flag is off" */
     it("refuses as if the door did not exist", async () => {
       const { service } = build({ enabled: false });
 
       await expect(service.mint(mint)).rejects.toMatchObject({ code: "voice_agents_disabled" });
     });
+
+    /** @scenario "A finish request is refused with a 404 while the voice flag is off" */
+    it("refuses a finish the same way", async () => {
+      const { service } = build({ enabled: false });
+
+      await expect(service.finish(finish)).rejects.toMatchObject({
+        code: "voice_agents_disabled",
+        httpStatus: 404,
+      });
+    });
+
+    /** @scenario "The audio proxy is refused with a 404 while the voice flag is off" */
+    it("refuses the recording audio proxy the same way", async () => {
+      const { service } = build({ enabled: false });
+
+      await expect(
+        service.streamSessionAudio({
+          projectId: "project_1",
+          conversationId: "conv_1",
+          userId: "user_1",
+        }),
+      ).rejects.toMatchObject({ code: "voice_agents_disabled", httpStatus: 404 });
+    });
   });
 
   describe("given a mint that will create an agent", () => {
+    /** @scenario "Talk to it without agent-management rights and no saved row is refused" */
     it("asks for evaluations:manage on top of scenarios:create", async () => {
       const { service, asked } = build({ granted: ["scenarios:create"] });
 
@@ -116,6 +156,7 @@ describe("VoiceSessionService", () => {
       expect(asked).toEqual(["scenarios:create", "evaluations:manage"]);
     });
 
+    /** @scenario "Talk to it with agent-management rights mints an unsaved session" */
     it("signs a session bound to the project when both are granted", async () => {
       const { service } = build();
 
@@ -128,7 +169,51 @@ describe("VoiceSessionService", () => {
     });
   });
 
+  describe("given a mint against a saved agent row", () => {
+    /** @scenario "Talk to it against a saved agent needs only scenario rights" */
+    it("asks for scenarios:create alone and mints", async () => {
+      const { service, asked } = build({ granted: ["scenarios:create"] });
+
+      await expect(service.mint({ ...mint, agentRowId: "row_1" })).resolves.toMatchObject({
+        sessionToken: "signed:project_1",
+      });
+      expect(asked).toEqual(["scenarios:create"]);
+    });
+  });
+
+  describe("given a finish of an unsaved session by a member without agent management", () => {
+    /** @scenario "Finishing an unsaved session without agent-management rights is refused" */
+    it("refuses for evaluations:manage and creates no agent", async () => {
+      const { service, asked, createVoiceAgent } = build({
+        granted: ["scenarios:create"],
+        tokenProjectId: "project_1",
+      });
+
+      await expect(service.finish({ ...finish, name: "New agent" })).rejects.toMatchObject({
+        code: "project_permission_denied",
+      });
+      expect(asked).toEqual(["scenarios:create", "evaluations:manage"]);
+      expect(createVoiceAgent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a finish of a saved session by a member without agent management", () => {
+    /** @scenario "Talk to it against a saved agent needs only scenario rights" */
+    it("asks for scenarios:create alone", async () => {
+      const { service, asked } = build({
+        granted: ["scenarios:create"],
+        tokenProjectId: "project_1",
+        tokenAgentId: "agent_1",
+      });
+
+      await Promise.allSettled([service.finish(finish)]);
+
+      expect(asked).toEqual(["scenarios:create"]);
+    });
+  });
+
   describe("given a finish whose token names another project", () => {
+    /** @scenario "A session minted for one project cannot finish a call in another project" */
     it("refuses with voice_session_invalid before any permission probe", async () => {
       const { service, asked } = build();
 
