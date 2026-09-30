@@ -92,6 +92,9 @@ type scenarioRunner struct {
 	cancel    context.CancelFunc
 	// adminAbsent is set once probeAdminKey finds the instance-admin routes 404.
 	adminAbsent bool
+	// sessionSeeding is set when every side signed the seeded admin in after
+	// adminAbsent, so second organizations are made through that session.
+	sessionSeeding bool
 }
 
 // stop ends the run early: scenarios not started are dropped, and the ones in

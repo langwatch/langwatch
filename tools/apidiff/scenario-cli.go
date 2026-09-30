@@ -150,6 +150,7 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 	}
 	if options.DryRun {
 		fmt.Fprintf(progress, "scenarios: %d valid in %s, %d would run\n", len(loaded), options.Glob, len(items))
+		fmt.Fprintf(progress, "scenarios: %d would defer under SaaS with the seeded admin's session\n", countSaaSDeferred(items, options.Keys))
 		return exitEqual
 	}
 	runner := newScenarioRunner(ctx, options)

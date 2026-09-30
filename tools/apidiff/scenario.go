@@ -56,16 +56,18 @@ var (
 
 // scenario is one named request against one endpoint plus its checks.
 type scenario struct {
-	ID       string            `yaml:"id"`
-	Endpoint string            `yaml:"endpoint"`
-	Auth     string            `yaml:"auth"`
-	Shard    string            `yaml:"shard"`
-	Serial   bool              `yaml:"serial"` // run alone after the pool drains, in its own shard kind
-	Setup    []scenarioStep    `yaml:"setup"`
-	Request  scenarioRequest   `yaml:"request"`
-	Capture  map[string]string `yaml:"capture"`
-	Expect   scenarioExpect    `yaml:"expect"`
-	Verify   []scenarioStep    `yaml:"verify"`
+	ID       string `yaml:"id"`
+	Endpoint string `yaml:"endpoint"`
+	Auth     string `yaml:"auth"`
+	Shard    string `yaml:"shard"`
+	Serial   bool   `yaml:"serial"` // run alone after the pool drains, in its own shard kind
+	// SelfHosted marks a scenario the SaaS deployment does not serve; it is deferred there.
+	SelfHosted bool              `yaml:"selfHosted"`
+	Setup      []scenarioStep    `yaml:"setup"`
+	Request    scenarioRequest   `yaml:"request"`
+	Capture    map[string]string `yaml:"capture"`
+	Expect     scenarioExpect    `yaml:"expect"`
+	Verify     []scenarioStep    `yaml:"verify"`
 	// Teardown are request steps sent last, whatever the steps before them found,
 	// to remove what the scenario made on a shared org; their failures are not the scenario's.
 	Teardown []scenarioStep `yaml:"teardown"`
