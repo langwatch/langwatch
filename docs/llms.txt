@@ -176,6 +176,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Members and Teams](https://langwatch.ai/docs/platform/members-and-teams.md): Invite people to your organization, put them on teams, give them a role per team or per project, and remove their access.
 - [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project.
+- [Roles & access](https://langwatch.ai/docs/platform/roles-and-access.md): Roles say what you may do; grants say who holds a role, and where. How the two fit together, and why you cannot grant more than you hold.
 - [Single sign-on and provisioning](https://langwatch.ai/docs/platform/sso.md): Set up your identity provider, directory provisioning and sign-in policies in LangWatch.
 - [Move to your own identity provider](https://langwatch.ai/docs/platform/sso-update.md): Replace the single sign-on LangWatch set up for your organization with a connection you run yourself, without interrupting anybody's sign-in.
 - [API Keys](https://langwatch.ai/docs/platform/api-keys.md): Create and manage API keys in LangWatch. Use personal keys for development and AI assistants, or service keys for CI/CD and automation.
@@ -1137,9 +1138,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Update role](https://langwatch.ai/docs/api-reference/roles/update-role.md)
 - [Delete role](https://langwatch.ai/docs/api-reference/roles/delete-role.md)
 
+## Grants
+
+- [Overview](https://langwatch.ai/docs/api-reference/grants/overview.md): Grant a built-in or custom role to a user, a group or an API key at the organization, a team or a project. Grants replace role bindings.
+
 ## Role Bindings
 
-- [Overview](https://langwatch.ai/docs/api-reference/role-bindings/overview.md): Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project.
+- [Overview](https://langwatch.ai/docs/api-reference/role-bindings/overview.md): Deprecated: use the Grants API. Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project.
 - [List role bindings](https://langwatch.ai/docs/api-reference/role-bindings/list-role-bindings.md)
 - [Create role binding](https://langwatch.ai/docs/api-reference/role-bindings/create-role-binding.md)
 - [Update role binding](https://langwatch.ai/docs/api-reference/role-bindings/update-role-binding.md)
