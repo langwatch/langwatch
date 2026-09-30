@@ -18,6 +18,7 @@ import {
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
+import type { WebhookDeliveryDisposition } from "../../rules/webhook-delivery-contract.rules.ts";
 import {
   describeDestination,
   findUrlProblem,
@@ -395,6 +396,18 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
       },
     });
     return endpoint ? PrismaWebhookEndpointRepository.toView(endpoint) : null;
+  }
+
+  async getDeliveryDisposition(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDeliveryDisposition> {
+    const endpoint = await this.prisma.webhookEndpoint.findFirst({
+      where: { id: params.endpointId, organizationId: params.organizationId },
+    });
+    if (!endpoint || endpoint.archivedAt !== null) return { state: "gone" };
+    if (endpoint.status !== "ACTIVE") return { state: "paused" };
+    return { state: "deliverable", endpoint: PrismaWebhookEndpointRepository.toView(endpoint) };
   }
 
   /**

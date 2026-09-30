@@ -101,6 +101,12 @@ export type GatewaySpendProcessingEvent =
   | (Event<FailSpendCommandData> & { type: typeof GATEWAY_SPEND_FAILED_EVENT_TYPE })
   | (Event<SettleSpendCommandData> & { type: typeof GATEWAY_SPEND_SETTLED_EVENT_TYPE });
 
+/** Deleted (gone) and disabled (paused, the receiver is expected back) are different promises. */
+export type WebhookDeliveryDisposition =
+  | { state: "deliverable"; endpoint: WebhookEndpointView }
+  | { state: "paused" }
+  | { state: "gone" };
+
 export type WebhookDispatchResult = {
   verdict: "success" | "retryable" | "terminal";
   status: number | null;
@@ -115,6 +121,10 @@ export interface WebhookDeliveryEndpointService {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;
+  getDeliveryDisposition(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDeliveryDisposition>;
   findSigningSecrets(input: { organizationId: string; endpointId: string }): Promise<string[]>;
   getDestinationConfig(input: {
     organizationId: string;
@@ -138,18 +148,18 @@ export const WEBHOOK_DELIVERY_PROCESS_NAME = "webhookDelivery" as const;
 export const GOVERNANCE_EVENTS_PROCESS_NAME = "governanceEventsDelivery" as const;
 
 /**
- * The Stripe-shaped retry ladder. `attempt` is the 1-based attempt that
- * just failed: the delay to the next one. After the sixth failure the
- * cadence holds at 12h; 11 attempts keep the last retry inside 72h of the
- * first failure (1m + 5m + 30m + 2h + 6h + 12h + 4 * 12h = 68h36m).
+ * The Stripe-shaped retry ladder, holding at 4h: 11 attempts keep the last retry inside a day even
+ * at full +20% jitter (1m + 5m + 15m + 30m + 1h + 2h + 4h + 3 * 4h = 19h51m). Past that a batch
+ * parks as dead, kept until it delivers or an operator discards it.
  */
 export const WEBHOOK_RETRY_LADDER_MS: readonly number[] = [
   60_000,
   5 * 60_000,
+  15 * 60_000,
   30 * 60_000,
+  60 * 60_000,
   2 * 60 * 60_000,
-  6 * 60 * 60_000,
-  12 * 60 * 60_000,
+  4 * 60 * 60_000,
 ];
 export const WEBHOOK_SEND_MAX_ATTEMPTS = 11;
 

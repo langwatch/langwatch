@@ -46,11 +46,13 @@ export class WebhookBatchPlannerService {
     pending,
     outstanding,
     now,
+    traceCarrier,
   }: {
     organizationId: string;
     pending: readonly PendingEnvelope[];
     outstanding: number;
     now: number;
+    traceCarrier: Record<string, string>;
   }): {
     messages: NewOutboxMessage[];
     remaining: PendingEnvelope[];
@@ -75,7 +77,7 @@ export class WebhookBatchPlannerService {
           batchId,
           envelopes: batchEntries.map((entry) => entry.envelope),
         }),
-        traceCarrier: {},
+        traceCarrier,
       });
       inFlight++;
     }
@@ -84,16 +86,19 @@ export class WebhookBatchPlannerService {
   }
 
   /**
-   * Anything still buffered arms a wake: the coalescing deadline when the
-   * delay is holding it, a short recheck when the in-flight cap is.
+   * Anything still buffered arms a wake: the coalescing deadline when the delay holds it, and
+   * when the in-flight cap does, the soonest a laddered send is due again (`outstandingDueAt`),
+   * since a flat short recheck would rewrite the buffer row for hours shipping nothing.
    */
   findNextWakeAt({
     remaining,
     inFlight,
+    outstandingDueAt,
     now,
   }: {
     remaining: readonly PendingEnvelope[];
     inFlight: number;
+    outstandingDueAt: number | null;
     now: number;
   }): number | null {
     const oldest = remaining[0];
@@ -102,7 +107,7 @@ export class WebhookBatchPlannerService {
     }
 
     if (inFlight >= this.endpoint.maxInFlight) {
-      return now + WEBHOOK_FLUSH_RECHECK_MS;
+      return Math.max(outstandingDueAt ?? 0, now + WEBHOOK_FLUSH_RECHECK_MS);
     }
 
     return Math.max(this.deadlineFor(oldest), now + WEBHOOK_FLUSH_RECHECK_MS);

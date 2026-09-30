@@ -300,7 +300,17 @@ export class WebhookApp implements WebhookApiContract {
   };
   rollSecret: WebhookApiContract["rollSecret"] = (input) =>
     this.#dependencies.endpoints.rollSecret(input);
-  enable: WebhookApiContract["enable"] = (input) => this.#dependencies.endpoints.enable(input);
+  /** Re-enabling revives the batches that parked while paused; events that arrived during the
+   *  pause were never appended (a disabled endpoint subscribes to nothing), so replay covers those. */
+  enable: WebhookApiContract["enable"] = async (input) => {
+    const { endpoints, endpointStream } = this.#dependencies;
+    if (!endpointStream) {
+      throw new Error("webhook enable needs the process store its eventing build supplies");
+    }
+    const endpoint = await endpoints.enable(input);
+    await endpointStream.requeueParked(input);
+    return endpoint;
+  };
   disable: WebhookApiContract["disable"] = (input) => this.#dependencies.endpoints.disable(input);
   archive: WebhookApiContract["archive"] = (input) => this.#dependencies.endpoints.archive(input);
   findDeliverable: WebhookApiContract["findDeliverable"] = (input) =>

@@ -7,6 +7,7 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { Temporal, toDate } from "@langwatch/time";
 
+import { safeDiagnosticError } from "../../../process-manager/failureDiagnostic.ts";
 import type { JsonValue } from "../../../process-manager/json.ts";
 import type { ProcessRef } from "../../../process-manager/processManager.types.ts";
 import { deriveInboxKey } from "../../../process-manager/stores/inboxKey.ts";
@@ -22,6 +23,8 @@ import type {
   PersistedProcessInstance,
   ProcessCommit,
   ProcessStore,
+  ProcessTransaction,
+  TransactResult,
 } from "../../../process-manager/stores/processStore.types.ts";
 import type { EventingProcessPersistenceDatabase } from "../../process-persistence.database.ts";
 
@@ -46,6 +49,30 @@ function isProcessPersistencePrismaClient(
 }
 
 class DuplicateInboxRollback extends Error {}
+
+/** A commit or transaction before its read: `decide` sees the row the lock is holding. */
+type LockedWrite<State> = Omit<ProcessTransaction<State>, "apply"> & {
+  decide: (
+    existing: PersistedProcessInstance<State> | null,
+  ) =>
+    | { outcome: "revisionConflict" }
+    | ({ outcome: "write" } & ReturnType<ProcessTransaction<State>["apply"]>);
+};
+
+function toInstance<State>(
+  ref: ProcessRef,
+  row: ProcessManagerInstance,
+): PersistedProcessInstance<State> {
+  return {
+    ref,
+    tenantId: row.tenantId,
+    ...(row.userId === null ? {} : { userId: row.userId }),
+    state: row.state as State,
+    revision: row.revision,
+    nextWakeAt: row.nextWakeAt?.getTime() ?? null,
+    updatedAt: row.updatedAt.getTime(),
+  };
+}
 
 function refWhere(ref: ProcessRef) {
   return {
@@ -136,15 +163,7 @@ export class PrismaProcessStore implements ProcessStore {
       },
     });
     if (!row) return null;
-    return {
-      ref: params.ref,
-      tenantId: row.tenantId,
-      ...(row.userId === null ? {} : { userId: row.userId }),
-      state: row.state as State,
-      revision: row.revision,
-      nextWakeAt: row.nextWakeAt?.getTime() ?? null,
-      updatedAt: row.updatedAt.getTime(),
-    };
+    return toInstance<State>(params.ref, row);
   }
 
   async hasConsumedSource(params: { ref: ProcessRef; sourceEventId: string }): Promise<boolean> {
@@ -163,9 +182,35 @@ export class PrismaProcessStore implements ProcessStore {
   }
 
   async commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult> {
+    const { expectedRevision, state, nextWakeAt, messages, ...write } = commit;
+    return this.writeUnderLock<State>({
+      ...write,
+      decide: (existing) =>
+        (existing?.revision ?? 0) === expectedRevision
+          ? { outcome: "write", state, nextWakeAt, messages }
+          : { outcome: "revisionConflict" },
+    });
+  }
+
+  async transact<State = unknown>(transaction: ProcessTransaction<State>): Promise<TransactResult> {
+    const { apply, ...write } = transaction;
+    const result = await this.writeUnderLock<State>({
+      ...write,
+      decide: (existing) => ({ outcome: "write", ...apply(existing) }),
+    });
+    if (result.outcome === "revisionConflict") {
+      // Unreachable while the read sits inside the lock; firing means it no longer does.
+      throw safeDiagnosticError(
+        `process transact reported a revision conflict on ${write.ref.processName}/${write.ref.processKey}`,
+      );
+    }
+    return result;
+  }
+
+  private async writeUnderLock<State>(write: LockedWrite<State>): Promise<CommitResult> {
     try {
       return await this.#prisma.$transaction(
-        (tx) => this.commitWithinTransaction(tx, commit),
+        (tx) => this.commitWithinTransaction(tx, write),
         COMMIT_TRANSACTION_OPTIONS,
       );
     } catch (error) {
@@ -177,35 +222,34 @@ export class PrismaProcessStore implements ProcessStore {
   }
 
   /**
-   * The body of `commit`'s transaction: advisory lock, inbox dedup, CAS'd
-   * instance upsert, and outbox inserts. Named so its branching counts on its
-   * own rather than folding into `commit`'s complexity.
+   * The one write body behind `commit` and `transact`: advisory lock, inbox dedup, the instance
+   * read INSIDE the lock, the caller's decision on it, CAS'd upsert and outbox inserts.
    */
   private async commitWithinTransaction<State = unknown>(
     tx: Prisma.TransactionClient,
-    commit: ProcessCommit<State>,
+    write: LockedWrite<State>,
   ): Promise<CommitResult> {
     // This lock only serializes commits for the same process reference.
     // Revision remains an explicit compare-and-swap below; the lock also
-    // closes the absent-row race for the first commit.
+    // closes the absent-row race for the first write.
     await tx.$queryRaw`
           -- @tenancy: advisory-lock helper, key is process-ref-bounded
           WITH process_lock AS MATERIALIZED (
             SELECT pg_advisory_xact_lock(
-              hashtextextended(${refLockKey(commit.ref)}, 0)
+              hashtextextended(${refLockKey(write.ref)}, 0)
             )
           )
           SELECT 1 AS "acquired" FROM process_lock
         `;
 
-    if (commit.sourceEventId !== null) {
+    if (write.sourceEventId !== null) {
       const duplicate = await tx.processManagerInbox.findUnique({
         where: {
-          projectId: commit.ref.projectId,
+          projectId: write.ref.projectId,
           processName_projectId_sourceEventKey: {
-            processName: commit.ref.processName,
-            projectId: commit.ref.projectId,
-            sourceEventKey: deriveInboxKey(commit.sourceEventId),
+            processName: write.ref.processName,
+            projectId: write.ref.projectId,
+            sourceEventKey: deriveInboxKey(write.sourceEventId),
           },
         },
         select: { id: true },
@@ -213,20 +257,29 @@ export class PrismaProcessStore implements ProcessStore {
       if (duplicate) return { outcome: "duplicateEvent" as const };
     }
 
-    const existing = await tx.processManagerInstance.findUnique({
+    const row = await tx.processManagerInstance.findUnique({
       where: {
-        projectId: commit.ref.projectId,
-        processName_projectId_processKey: refWhere(commit.ref),
+        projectId: write.ref.projectId,
+        processName_projectId_processKey: refWhere(write.ref),
       },
-      select: { revision: true },
     });
+    const existing = row === null ? null : toInstance<State>(write.ref, row);
     const actualRevision = existing?.revision ?? 0;
-    if (actualRevision !== commit.expectedRevision) {
-      return {
-        outcome: "revisionConflict" as const,
-        actualRevision,
-      };
+    const decided = write.decide(existing);
+    if (decided.outcome === "revisionConflict") {
+      return { outcome: "revisionConflict" as const, actualRevision };
     }
+    const commit: ProcessCommit<State> = {
+      ref: write.ref,
+      tenantId: write.tenantId,
+      ...(write.userId === undefined ? {} : { userId: write.userId }),
+      sourceEventId: write.sourceEventId,
+      expectedRevision: actualRevision,
+      state: decided.state,
+      nextWakeAt: decided.nextWakeAt,
+      messages: decided.messages,
+      now: write.now,
+    };
 
     const revision = actualRevision + 1;
     const instanceData = {
@@ -446,6 +499,21 @@ export class PrismaProcessStore implements ProcessStore {
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
     return rows.map(toMessage);
+  }
+
+  async countPendingMessages(params: {
+    ref: ProcessRef;
+    intentType: string;
+  }): Promise<{ count: number; nextAttemptAt: number | null }> {
+    const aggregate = await this.#prisma.processManagerOutbox.aggregate({
+      where: { ...refWhere(params.ref), intentType: params.intentType, status: "pending" },
+      _count: { _all: true },
+      _min: { nextAttemptAt: true },
+    });
+    return {
+      count: aggregate._count._all,
+      nextAttemptAt: aggregate._min.nextAttemptAt?.getTime() ?? null,
+    };
   }
 
   async leaseDueMessages(params: {
@@ -706,22 +774,18 @@ export class PrismaProcessStore implements ProcessStore {
 
   async deleteDeadOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
-    // Dead rows carry no `deadAt`; `updatedAt` is stamped by the markFailed that retired them,
-    // so it IS the moment the row became a failure record. No new index: `dead` is a rare
-    // status, so the existing (status, nextAttemptAt, leasedUntil) index already makes this
-    // selective. `discarded` is reaped on the same window and by the same sweep.
+    // Only `discarded`, an operator's decision, is reaped, by the `updatedAt` its discard
+    // stamped. `dead` is undelivered work nobody agreed to lose: it stays until it delivers or
+    // is discarded (specs/ops/dead-letter-recovery.feature).
     return this.#prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "id" IN (
         SELECT "id" FROM "ProcessManagerOutbox"
-        WHERE "status" IN (
-            'dead'::"ProcessManagerOutboxStatus",
-            'discarded'::"ProcessManagerOutboxStatus"
-          )
+        WHERE "status" = 'discarded'::"ProcessManagerOutboxStatus"
           AND "updatedAt" < ${asDate(params.before)}
         LIMIT ${params.limit}
       )
-      -- @tenancy: process-manager retention sweep, dead outbox (system-owned maintenance)
+      -- @tenancy: process-manager retention sweep, discarded outbox (system-owned maintenance)
     `;
   }
 

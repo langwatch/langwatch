@@ -37,12 +37,23 @@ export interface DeliverOutcomeContext<Intent> {
   intent: (name: "deliver", key: string, payload: DeliverPayload) => Intent;
 }
 
-/** The delay before the attempt after the 1-based `attempt` that just failed. */
-export function retryDelayMs({ attempt }: { attempt: number }): number {
-  return (
+/** How far either side of its ladder step a retry may land: without it, deliveries that failed
+ *  together retry together at every rung. */
+const WEBHOOK_RETRY_JITTER = 0.2;
+
+/** The delay before the attempt after the 1-based `attempt` that just failed, jittered by `random`. */
+export function retryDelayMs({
+  attempt,
+  random,
+}: {
+  attempt: number;
+  random: () => number;
+}): number {
+  const step =
     WEBHOOK_RETRY_LADDER_MS[attempt - 1] ??
-    WEBHOOK_RETRY_LADDER_MS[WEBHOOK_RETRY_LADDER_MS.length - 1]!
-  );
+    WEBHOOK_RETRY_LADDER_MS[WEBHOOK_RETRY_LADDER_MS.length - 1]!;
+  const spread = step * WEBHOOK_RETRY_JITTER;
+  return Math.max(0, Math.round(step - spread + random() * spread * 2));
 }
 
 export function isEndpointStreamKey(processKey: string): boolean {

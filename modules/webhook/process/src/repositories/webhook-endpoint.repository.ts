@@ -7,6 +7,7 @@ import type {
 } from "@langwatch/webhook-contract";
 
 import type { WebhookId, WebhookSecret } from "../app/webhook.app.ts";
+import type { WebhookDeliveryDisposition } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../rules/webhook-destination.rules.ts";
 import type { WebhookEndpointConfiguration } from "../rules/webhook-endpoint-policy.rules.ts";
 
@@ -50,6 +51,11 @@ export interface WebhookEndpointRepository {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;
+  /** Whether a frozen batch may ship, and when it may not, whether the endpoint is gone or paused. */
+  getDeliveryDisposition(input: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookDeliveryDisposition>;
   getDestinationConfig(input: {
     organizationId: string;
     endpointId: string;
