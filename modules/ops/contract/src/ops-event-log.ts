@@ -11,11 +11,16 @@ export const opsDiscoverAggregatesInputSchema = z.object({
   tenantIds: z.array(z.string()).optional(),
 });
 
-export const opsSearchAggregatesInputSchema = z.object({
-  query: z.string(),
-  tenantId: z.string().optional(),
-  sinceMs: z.number().int().positive().optional(),
-});
+/** A search with neither a query nor a tenant would scan the whole event log. */
+export const opsSearchAggregatesInputSchema = z
+  .object({
+    query: z.string(),
+    tenantId: z.string().optional(),
+    sinceMs: z.number().int().positive().optional(),
+  })
+  .refine((input) => input.query.trim().length > 0 || Boolean(input.tenantId), {
+    message: "Enter a search query or pick at least one tenant before searching.",
+  });
 
 export const opsLoadAggregateEventsInputSchema = z.object({
   aggregateId: z.string(),

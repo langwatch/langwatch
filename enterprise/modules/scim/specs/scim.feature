@@ -2,6 +2,12 @@ Feature: Enterprise SCIM package boundary
   SCIM contracts and token verification are reusable outside the application.
 
   @unit
+  Scenario: The token list answers only the summary fields the settings page declares
+    Given an organization with one SCIM token
+    When the settings page lists the organization's tokens
+    Then each entry carries its id, connection, description, creation and last use, and no organization id
+
+  @unit
   Scenario: Token values are stored only as hashes
     When an organization generates a SCIM token
     Then the repository receives an HMAC-SHA256 digest keyed on the deployment secret rather than the token value

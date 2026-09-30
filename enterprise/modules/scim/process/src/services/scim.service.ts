@@ -198,8 +198,15 @@ export class ScimService extends ScimServiceContract {
     return { token, tokenId: stored.id, connectionId: input.connectionId };
   }
 
-  listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]> {
-    return this.repository.findTokens(input.organizationId);
+  async listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]> {
+    const tokens = await this.repository.findTokens(input.organizationId);
+    return tokens.map((token) => ({
+      id: token.id,
+      connectionId: token.connectionId,
+      description: token.description,
+      createdAt: token.createdAt,
+      lastUsedAt: token.lastUsedAt,
+    }));
   }
 
   async revokeToken(input: {

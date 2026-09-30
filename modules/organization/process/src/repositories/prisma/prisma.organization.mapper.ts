@@ -52,11 +52,19 @@ export function organizationUserFromRecord(record: OrganizationUserRecord): Orga
 
 export function userFromRecord(record: UserRecord): User {
   return {
-    ...record,
+    id: record.id,
+    name: record.name,
+    email: record.email,
+    emailVerified: record.emailVerified,
+    image: record.image,
+    pendingSsoSetup: record.pendingSsoSetup,
+    userHashKey: record.userHashKey,
+    twoFactorEnabled: record.twoFactorEnabled,
     createdAt: fromDate(record.createdAt),
     updatedAt: fromDate(record.updatedAt),
     lastLoginAt: record.lastLoginAt && fromDate(record.lastLoginAt),
     deactivatedAt: record.deactivatedAt && fromDate(record.deactivatedAt),
+    lastHomePath: record.lastHomePath,
     tracesExplorerTourDismissedAt:
       record.tracesExplorerTourDismissedAt && fromDate(record.tracesExplorerTourDismissedAt),
     passkeyNudgeDismissedAt:

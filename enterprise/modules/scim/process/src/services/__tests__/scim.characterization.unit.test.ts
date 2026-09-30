@@ -429,3 +429,33 @@ describe("SCIM characterization: provisioning invariants", () => {
     } satisfies Partial<ScimProtocolError>);
   });
 });
+
+describe("SCIM token list", () => {
+  /** @scenario "The token list answers only the summary fields the settings page declares" */
+  it("answers the summary fields alone, without the organization id", async () => {
+    const scim = service(
+      repository({
+        findTokens: vi.fn(async () => [
+          {
+            id: "token_1",
+            organizationId: "org_1",
+            connectionId: "connection_1",
+            description: "okta",
+            createdAt: now,
+            lastUsedAt: null,
+          },
+        ]),
+      }),
+    );
+
+    expect(await scim.listTokens({ organizationId: "org_1" })).toStrictEqual([
+      {
+        id: "token_1",
+        connectionId: "connection_1",
+        description: "okta",
+        createdAt: now,
+        lastUsedAt: null,
+      },
+    ]);
+  });
+});
