@@ -100,9 +100,7 @@ describe("given a turn that offered notifications and then kept working", () => 
 
       const card = screen.getByText(LANGY_NOTIFICATIONS_ENABLED_LINE);
       const reply = screen.getByText(CLOSING_REPLY);
-      expect(
-        card.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(card.compareDocumentPosition(reply) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 });
