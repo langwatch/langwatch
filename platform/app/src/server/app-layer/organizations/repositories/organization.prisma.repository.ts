@@ -1437,6 +1437,26 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // and personal project are never in either set, so the workspace that
       // is only theirs is untouched, with its traces and keys.
       if (role === OrganizationUserRole.DEVELOPER) {
+        // The team loop above reports a team the correction leaves without an
+        // admin; these rows never went through it, so the same question is
+        // asked here for every ADMIN row that is about to go. Reported, not
+        // refused: the decision was about one person's seat, and every shared
+        // team is still administered through an ORGANIZATION-scoped ADMIN.
+        for (const row of currentMemberships) {
+          if (row.role !== TeamUserRole.ADMIN) continue;
+          const adminsAfter = await projectAdminUserIdsWithoutDirectRole({
+            tx,
+            organizationId,
+            teamId: row.scopeId,
+            userId,
+          });
+          if (adminsAfter.size > 0) continue;
+          teamsLeftWithoutAdmin.push({
+            id: row.scopeId,
+            name:
+              (await teamNameFor({ tx, teamId: row.scopeId })) ?? row.scopeId,
+          });
+        }
         const sharedProjectRowIds = await sharedProjectBindingIds({
           tx,
           organizationId,

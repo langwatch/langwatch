@@ -177,6 +177,17 @@ describe("given a Full member on three shared teams, a shared project, and the o
     });
 
     /** @scenario Downgrading a Full member to Developer removes shared access */
+    it("names the shared teams the move leaves without an admin", async () => {
+      const result = await moveSoloUserTo(OrganizationUserRole.DEVELOPER);
+
+      const leftWithout = result.teamsLeftWithoutAdmin.map((t) => t.id).sort();
+      expect(leftWithout).toEqual(
+        [fixture.onlyAdminTeamId, fixture.alsoOnlyAdminTeamId].sort(),
+      );
+      expect(leftWithout).not.toContain(fixture.sharedWithAnotherAdminTeamId);
+    });
+
+    /** @scenario Downgrading a Full member to Developer removes shared access */
     it("deletes the organisation-wide row and the shared project row", async () => {
       await moveSoloUserTo(OrganizationUserRole.DEVELOPER);
 
