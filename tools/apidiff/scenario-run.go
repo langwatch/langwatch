@@ -46,6 +46,7 @@ type scenarioSide struct {
 	baseURL  string
 	mailURL  string
 	shared   *shardContext
+	runOrg   *shardContext // the run's own organization for project shards, when the admin key can make one
 	projects []*shardContext
 	orgs     []*shardContext
 	foreign  *shardContext

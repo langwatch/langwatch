@@ -188,6 +188,7 @@ func (runner *scenarioRunner) seed(needs scenarioNeeds) {
 		runner.seedShared(needs)
 		return
 	}
+	runner.seedRunOrgs(needs)
 	var group sync.WaitGroup
 	for _, side := range runner.sides {
 		side.projects = make([]*shardContext, needs.projects)
@@ -242,12 +243,42 @@ func succeeded(result rawResult) bool {
 	return result.status == http.StatusOK || result.status == http.StatusCreated
 }
 
-// seedProject makes one isolated project in the seeded organization.
+// seedRunOrgs makes the organization each side's project shards live in, one
+// per run, so they never add teams or projects to the seeded organization.
+// Without the instance admin key it cannot, and the shards fall back to it.
+func (runner *scenarioRunner) seedRunOrgs(needs scenarioNeeds) {
+	if needs.projects == 0 || runner.options.Keys.AdminKey == "" {
+		return
+	}
+	var group sync.WaitGroup
+	for _, side := range runner.sides {
+		group.Add(1)
+		go func() { defer group.Done(); side.runOrg = runner.seedOrg(side, runner.runOrgName()) }()
+	}
+	group.Wait()
+}
+
+func (runner *scenarioRunner) runOrgName() string { return "apidiff-run-" + runner.tag }
+
+// projectHome is the organization a side's project shards are made in: the
+// run's own, else the shared shard's (the tool organization, or the seeded one).
+func (side *scenarioSide) projectHome() *shardContext {
+	if side.runOrg != nil {
+		return side.runOrg
+	}
+	return side.shared
+}
+
+// seedProject makes one isolated project, with a team of its own, in the
+// side's project home.
 func (runner *scenarioRunner) seedProject(side *scenarioSide, index int) *shardContext {
-	orgKey := side.shared.keys.OrgKey
-	shard := &shardContext{keys: side.shared.keys, vars: map[string]string{"orgId": side.shared.vars["orgId"], "orgKey": orgKey}}
+	home := side.projectHome()
+	shard := &shardContext{keys: home.keys, vars: map[string]string{"orgId": home.vars["orgId"], "orgKey": home.keys.OrgKey}, err: home.err}
+	if home.err != "" {
+		return shard
+	}
 	name := fmt.Sprintf("apidiff-shard-%s-p%d", runner.tag, index)
-	created := runner.call(side, http.MethodPost, "/api/projects", orgKey, projectBody(name, ""))
+	created := runner.call(side, http.MethodPost, "/api/projects", home.keys.OrgKey, projectBody(name, ""))
 	runner.fileProject(shard, created)
 	return shard
 }
