@@ -78,6 +78,12 @@ Feature: The checkup page of a self-hosted install
     And the ClickHouse migrations row reads not checked
 
   @unit
+  Scenario: The ClickHouse migrations row asks goose about the ClickHouse this process uses
+    Given the process is configured with a ClickHouse URL
+    When the checkup reads the ClickHouse migration status
+    Then goose is asked for its status on that same ClickHouse
+
+  @unit
   Scenario: The usage report row reads the last report and its refusal
     Given the last usage report was refused with "usage_report_refused_413"
     When the checkup runs

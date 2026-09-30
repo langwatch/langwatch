@@ -234,6 +234,7 @@ import {
   type ProjectApi as ProjectApiContract,
   type SearchProjectsResult,
 } from "@langwatch/project-contract";
+import { storesOwner } from "@langwatch/process-stores/config";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -706,6 +707,8 @@ export class OpsApp implements OpsApi {
   static readonly config = opsConfig;
   static readonly secrets = {
     licensePrivateKey: licensingSecrets.licensePrivateKey,
+    /** The stores' own handle: goose reads migration status from the same ClickHouse. */
+    clickhouseUrl: storesOwner.secrets.clickhouse,
   } as const;
   static readonly publicConfig = opsBrowserConfig.project;
   static readonly reads = [
@@ -768,7 +771,12 @@ export class OpsApp implements OpsApi {
       },
       repositories: {
         postgres: PrismaPostgresHealthRepository.create(members.prisma),
-        clickhouse: ClickHouseClickHouseHealthRepository.create(members.clickhouse),
+        clickhouse: await setup.secrets.into(OpsApp.secrets.clickhouseUrl, (connectionUrl) =>
+          ClickHouseClickHouseHealthRepository.create({
+            clickhouse: members.clickhouse,
+            connectionUrl,
+          }),
+        ),
         redis: RedisRedisHealthRepository.create(members.redis),
       },
       channels: {
