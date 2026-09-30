@@ -11,7 +11,7 @@ flows:
           path: /{slug}/agent-testing
       - action: click
         with:
-          text: New Test Suite
+          testId: agent-testing-rail-new-suite
       - action: fill
         with:
           label: Test suite name
@@ -40,6 +40,7 @@ flows:
       - action: expect
         with:
           testId: case-row-vd-scenario-{uid}
+          timeout: "30000"
       - action: click
         with:
           label: Actions for vd-scenario-{uid}
@@ -70,13 +71,15 @@ flows:
           config:
             url: https://example.com/vd-agent-{uid}
             method: POST
+        as:
+          agentName: name
     steps:
       - action: go
         with:
           path: /{slug}/agent-testing
       - action: click
         with:
-          text: New Test Suite
+          testId: agent-testing-rail-new-suite
       - action: fill
         with:
           label: Test suite name
@@ -105,13 +108,23 @@ flows:
       - action: expect
         with:
           testId: case-row-vd-scenario-{uid}
+          timeout: "30000"
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          text: 1 scenario
+      - action: wait
+        with:
+          millis: "6000"
       - action: click
         with:
           text: Run suite
       - action: click
         with:
           selector: '[data-testid^="run-dialog-agent-"]'
-          text: vd-agent-{uid}
+          text: '{agentName}'
       - action: fill
         with:
           testId: run-dialog-name
@@ -126,6 +139,14 @@ flows:
         with:
           text: vd-suite-run-{uid}
           timeout: "30000"
+      - action: click
+        with:
+          text: vd-suite-run-{uid}
+      - action: expect
+        with:
+          testIdPrefix: run-result-row-
+          min: "1"
+          timeout: "120000"
       - action: go
         with:
           path: /{slug}/agent-testing
@@ -159,13 +180,15 @@ flows:
           config:
             url: https://example.com/vd-agent-{uid}
             method: POST
+        as:
+          agentName: name
     steps:
       - action: go
         with:
           path: /{slug}/agent-testing
       - action: click
         with:
-          text: New Test Suite
+          testId: agent-testing-rail-new-suite
       - action: fill
         with:
           label: Test suite name
@@ -194,13 +217,23 @@ flows:
       - action: expect
         with:
           testId: case-row-vd-scenario-{uid}
+          timeout: "30000"
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          text: 1 scenario
+      - action: wait
+        with:
+          millis: "6000"
       - action: click
         with:
           text: Run suite
       - action: click
         with:
           selector: '[data-testid^="run-dialog-agent-"]'
-          text: vd-agent-{uid}
+          text: '{agentName}'
       - action: fill
         with:
           testId: run-dialog-name
@@ -228,6 +261,7 @@ flows:
       - action: expect
         with:
           text: vd-scenario-{uid}
+          timeout: "60000"
       - action: click
         with:
           testIdPrefix: results-group-row-

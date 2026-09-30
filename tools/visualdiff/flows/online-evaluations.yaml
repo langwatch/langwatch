@@ -1,9 +1,7 @@
-# Online evaluation drawers the list and create flows never open: the evaluator chooser, the
-# evaluator settings drawer, the variable mapping dropdown, and the edit and create drawers at
-# trace and thread level. Copy comes from main's OnlineEvaluationDrawer and GuardrailsDrawer.
-# No flow calls a model. lingua/language_detection has one input, `output`: a trace-level
-# evaluation maps it by itself, a thread-level one leaves it unmapped (main only infers at trace
-# level), which is what raises the "needs mapping" warning and the Configure button.
+# Online evaluation drawers: chooser, evaluator settings, mapping dropdown, edit and create at
+# trace and thread level. lingua/language_detection maps `output` by itself at trace level and
+# leaves it unmapped at thread level (the "needs mapping" warning).
+# No flow calls a model.
 flows:
   - id: online-eval-choose-evaluator-list
     title: Select Evaluator opens the Choose Evaluator list with New Evaluator and the project's evaluators
@@ -196,6 +194,10 @@ flows:
       - action: go
         with:
           path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: "{monitorName}"
+          timeout: "30000"
       - action: click
         with:
           label: Actions for {monitorName}
@@ -249,6 +251,10 @@ flows:
       - action: go
         with:
           path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: "{monitorName}"
+          timeout: "30000"
       - action: click
         with:
           label: Actions for {monitorName}
@@ -297,6 +303,7 @@ flows:
       - action: expect
         with:
           text: New Guardrail
+          timeout: "30000"
       - action: expect
         with:
           text: Select an evaluator to use as a guardrail
