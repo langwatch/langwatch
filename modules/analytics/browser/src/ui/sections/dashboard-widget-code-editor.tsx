@@ -6,13 +6,15 @@
 
 import { Box } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import type { BeforeMount } from "@monaco-editor/react";
+import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 
-import { LW_GLOBAL_DTS } from "../../model/dashboard-widget/lw-global-types.ts";
-
-const LW_GLOBAL_DTS_URI = "file:///lw-global.d.ts";
+import { configureWidgetTypeScript, useWidgetRowTypes } from "../../behavior/lw-widget-monaco.ts";
+import {
+  type LwQueryColumnsByName,
+  lwQueryRowTypesDts,
+} from "../../model/dashboard-widget/lw-query-row-types.ts";
 
 const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
@@ -26,39 +28,22 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   folding: true,
 };
 
-/**
- * Monaco's TypeScript worker checks against an ambient lib that knows
- * nothing of this repo, so semantic validation is all false positives and
- * turned off. `jsx` must still be set or the parser rejects TSX outright.
- */
-const configureTypeScriptDefaults: BeforeMount = (monaco) => {
-  monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-    jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
-    allowNonTsExtensions: true,
-    allowJs: true,
-  });
-  monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-    noSemanticValidation: true,
-    noSyntaxValidation: false,
-  });
-
-  // Guard against re-registering on every mount (both the in-card Code view
-  // and the edit drawer call this) — addExtraLib would otherwise stack
-  // duplicate libs under the same content each time a pane mounts.
-  const alreadyRegistered =
-    monaco.languages.typescript.typescriptDefaults.getExtraLibs()[LW_GLOBAL_DTS_URI] !== undefined;
-  if (!alreadyRegistered) {
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(LW_GLOBAL_DTS, LW_GLOBAL_DTS_URI);
-  }
-};
-
 interface DashboardWidgetCodeEditorProps {
   value: string;
   onChange: (value: string) => void;
+  /** The columns each query returned on its last run; types `rows[0].<column>`. */
+  queryColumns: readonly LwQueryColumnsByName[];
 }
 
-export function DashboardWidgetCodeEditor({ value, onChange }: DashboardWidgetCodeEditorProps) {
+export function DashboardWidgetCodeEditor({
+  value,
+  onChange,
+  queryColumns,
+}: DashboardWidgetCodeEditorProps) {
   const { colorMode } = useColorMode();
+  const [mounted, setMounted] = useState<{ readonly monaco: Monaco }>();
+  const rowTypes = useMemo(() => lwQueryRowTypesDts({ queries: queryColumns }), [queryColumns]);
+  useWidgetRowTypes({ mounted, dts: rowTypes });
 
   return (
     <Suspense
@@ -75,7 +60,8 @@ export function DashboardWidgetCodeEditor({ value, onChange }: DashboardWidgetCo
         theme={colorMode === "dark" ? "vs-dark" : "vs"}
         onChange={(v: string | undefined) => onChange(v ?? "")}
         options={EDITOR_OPTIONS}
-        beforeMount={configureTypeScriptDefaults}
+        beforeMount={(instance) => configureWidgetTypeScript({ monaco: instance })}
+        onMount={(_editor, instance) => setMounted({ monaco: instance })}
       />
     </Suspense>
   );

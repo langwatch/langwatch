@@ -7,7 +7,7 @@
 import { Box, Button, Spacer, Tabs } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
@@ -143,6 +143,14 @@ function WidgetEditTabs({
   lastRuns: Record<string, QueryLastRun>;
   onRun: (query: DashboardWidgetQuery) => Promise<void>;
 }) {
+  const queryColumns = useMemo(
+    () =>
+      queries.flatMap((query) => {
+        const columns = lastRuns[query.name]?.result?.columns;
+        return columns ? [{ name: query.name, columns }] : [];
+      }),
+    [queries, lastRuns],
+  );
   return (
     <Tabs.Root
       value={activeTab}
@@ -188,7 +196,11 @@ function WidgetEditTabs({
           borderRadius="md"
           overflow="hidden"
         >
-          <DashboardWidgetCodeEditor value={code} onChange={onCodeChange} />
+          <DashboardWidgetCodeEditor
+            value={code}
+            onChange={onCodeChange}
+            queryColumns={queryColumns}
+          />
         </Box>
       </Tabs.Content>
 
