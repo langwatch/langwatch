@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -89,6 +90,9 @@ func (l *llm) dispatch(ctx context.Context, call dispatcher.Request) (*domain.Re
 			zap.String("model", call.Model),
 		)
 		return nil, err
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, fmt.Errorf("%w: model provider answered status %d", channels.ErrRateLimited, resp.StatusCode)
 	}
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("model provider answered status %d", resp.StatusCode)
