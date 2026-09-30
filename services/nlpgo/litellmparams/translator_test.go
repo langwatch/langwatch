@@ -1,4 +1,4 @@
-package litellm
+package litellmparams
 
 import (
 	"encoding/base64"

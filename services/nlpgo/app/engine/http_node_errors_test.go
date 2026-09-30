@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
@@ -44,7 +45,7 @@ func httpNode(url string) *dsl.Node {
 func TestRunHTTP_RefusedDestinationReportsItsOwnCode(t *testing.T) {
 	eng := New(Options{
 		HTTP: httpblock.New(httpblock.Options{
-			SSRF: httpblock.SSRFOptions{}, // local destinations refused
+			SSRF: ssrf.Options{}, // local destinations refused
 		}),
 	})
 
@@ -73,7 +74,7 @@ func TestRunHTTP_RecordsWhatTheEndpointAnswered(t *testing.T) {
 
 	eng := New(Options{
 		HTTP: httpblock.New(httpblock.Options{
-			SSRF: httpblock.SSRFOptions{AllowLocal: true},
+			SSRF: ssrf.Options{AllowLocal: true},
 		}),
 	})
 
@@ -105,7 +106,7 @@ func TestRunHTTP_KeepsTheUpstreamBodyOfANon2xx(t *testing.T) {
 
 	eng := New(Options{
 		HTTP: httpblock.New(httpblock.Options{
-			SSRF: httpblock.SSRFOptions{AllowLocal: true},
+			SSRF: ssrf.Options{AllowLocal: true},
 		}),
 	})
 

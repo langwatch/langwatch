@@ -124,3 +124,22 @@ func TestBlockTimeoutDefaultsMatchTodaysHardcodedValues(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluatorsConfigDefaultsAndEnvironmentNames(t *testing.T) {
+	t.Setenv("NLPGO_EVALUATORS_MAX_IN_FLIGHT_PER_PROJECT", "3")
+	t.Setenv("NLPGO_INTERNAL_SECRET", "internal-secret")
+
+	cfg, err := LoadConfig(t.Context())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Evaluators.MaxInFlightPerProject != 3 {
+		t.Errorf("Evaluators.MaxInFlightPerProject = %d, want 3 from NLPGO_EVALUATORS_MAX_IN_FLIGHT_PER_PROJECT", cfg.Evaluators.MaxInFlightPerProject)
+	}
+	if cfg.Evaluators.MaxInFlight != 64 || cfg.Evaluators.DeadlineSeconds != 270 || cfg.Evaluators.MaxBodyBytes != 16<<20 {
+		t.Errorf("Evaluators defaults = %+v, want contract.DefaultConfig()", cfg.Evaluators)
+	}
+	if cfg.EvaluatorsInternalSecret != "internal-secret" {
+		t.Error("EvaluatorsInternalSecret was not read from NLPGO_INTERNAL_SECRET")
+	}
+}

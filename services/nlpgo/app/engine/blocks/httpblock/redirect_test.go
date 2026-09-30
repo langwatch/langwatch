@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,7 +19,7 @@ import (
 
 func executorAllowing(srv *httptest.Server) *httpblock.Executor {
 	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
-	return httpblock.New(httpblock.Options{SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}}})
+	return httpblock.New(httpblock.Options{SSRF: ssrf.Options{AllowedHosts: []string{host}}})
 }
 
 func TestExecute_RefusesCrossOriginRedirectWithCredentials(t *testing.T) {

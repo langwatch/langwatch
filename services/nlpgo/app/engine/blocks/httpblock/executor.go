@@ -13,13 +13,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/blocktimeout"
 )
 
 // Executor runs a single HTTP block invocation.
 type Executor struct {
 	client      *http.Client
-	ssrf        SSRFOptions
+	ssrf        ssrf.Options
 	defaultTime time.Duration
 	maxBytes    int64
 }
@@ -27,7 +28,7 @@ type Executor struct {
 // Options configures an Executor.
 type Options struct {
 	Client           *http.Client // nil → http.DefaultClient with our SSRF policy
-	SSRF             SSRFOptions
+	SSRF             ssrf.Options
 	DefaultTimeout   time.Duration
 	MaxResponseBytes int64 // 0 → 4 MiB
 }
@@ -60,7 +61,7 @@ func New(opts Options) *Executor {
 		// caller-supplied Client takes responsibility for its own
 		// dial-time safety.
 		transport := http.DefaultTransport.(*http.Transport).Clone()
-		transport.DialContext = SafeDialer(opts.SSRF)
+		transport.DialContext = ssrf.SafeDialer(opts.SSRF)
 		opts.Client = &http.Client{Transport: transport}
 	}
 	if opts.DefaultTimeout == 0 {
@@ -131,7 +132,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	if req.URL == "" {
 		return nil, errors.New("httpblock: url required")
 	}
-	if err := CheckURL(req.URL, e.ssrf); err != nil {
+	if err := ssrf.CheckURL(req.URL, e.ssrf); err != nil {
 		return nil, err
 	}
 

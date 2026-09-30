@@ -12,6 +12,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo"
@@ -62,13 +63,13 @@ func Run(ctx context.Context, opts Options) error {
 
 	// One egress policy value, built once and shared by the HTTP block and
 	// the remote-attachment fetcher so the two can never drift apart.
-	ssrfOpts := httpblock.SSRFOptions{
+	ssrfOpts := ssrf.Options{
 		AllowedHosts:     allowedProxyHosts,
 		StrictPublicOnly: cfg.Engine.EgressStrictPublicOnly,
 		// BLOCK_LOCAL_HTTP_CALLS is the product-wide switch for reaching
 		// private networks, and this is where it reaches the workflow
 		// engine. It is read as a permission here because the block is
-		// spelled as one; see SSRFOptions.AllowLocal.
+		// spelled as one; see ssrf.Options.AllowLocal.
 		AllowLocal: !cfg.BlockLocalHTTPCalls,
 		Logger:     deps.Logger,
 	}
@@ -101,6 +102,22 @@ func Run(ctx context.Context, opts Options) error {
 	defer disp.Close()
 	llm := llmexecutor.New(dispatcheradapter.New(disp))
 	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
+
+	// The evaluator runtime calls models through the same dispatcher.
+	evaluatorsHandler, shutdownEvaluators, err := nlpgo.NewEvaluatorsHandler(ctx, nlpgo.EvaluatorsOptions{
+		Config:     cfg,
+		Deps:       deps,
+		Dispatcher: disp,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() {
+		flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownEvaluators(flushCtx)
+	}()
+	deps.Evaluators = evaluatorsHandler
 
 	// Playground proxy uses the SAME dispatcher (no second Bifrost
 	// process). It bridges the OpenAI-shape /go/proxy/v1/* surface
@@ -148,7 +165,7 @@ func resolveAllowedProxyHosts(cfg *nlpgo.Config) []string {
 // engineParts are the executors Run has already built for the engine.
 type engineParts struct {
 	http *httpblock.Executor
-	ssrf httpblock.SSRFOptions
+	ssrf ssrf.Options
 	code *codeblock.Executor
 	llm  *llmexecutor.Executor
 }
@@ -196,7 +213,7 @@ func newCodeExecutor(engineCfg nlpgo.EngineConfig, getenv func(string) string) (
 // newHTTPExecutor builds the HTTP-block executor from the operator-facing
 // engine config. `agent_type=http` nodes run through this same executor, so
 // NLPGO_ENGINE_HTTP_BLOCK_TIMEOUT_SECONDS bounds both.
-func newHTTPExecutor(engineCfg nlpgo.EngineConfig, ssrfOpts httpblock.SSRFOptions) *httpblock.Executor {
+func newHTTPExecutor(engineCfg nlpgo.EngineConfig, ssrfOpts ssrf.Options) *httpblock.Executor {
 	return httpblock.New(httpblock.Options{
 		SSRF:           ssrfOpts,
 		DefaultTimeout: resolveTimeoutSeconds(engineCfg.HTTPBlockTimeoutSeconds),

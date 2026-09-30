@@ -83,6 +83,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
@@ -910,7 +911,7 @@ func setupPatternStackWithUpstream(t *testing.T, llm *fakeLLMClient, langwatch h
 	t.Cleanup(lwSrv.Close)
 
 	httpExec := httpblock.New(httpblock.Options{
-		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{upstreamHost}},
+		SSRF: ssrf.Options{AllowedHosts: []string{upstreamHost}},
 	})
 	codeExec, err := codeblock.New(codeblock.Options{})
 	require.NoError(t, err)

@@ -6,9 +6,13 @@ package channels
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 )
+
+// ErrProviderNotConfigured means the tenant env holds no credentials for the model's provider.
+var ErrProviderNotConfigured = errors.New("model provider not configured")
 
 // LLMChannel calls models with the tenant's own credentials, per call.
 type LLMChannel interface {

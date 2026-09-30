@@ -1,5 +1,5 @@
 // Package llmexecutor implements services/nlpgo/app.LLMClient by combining
-// the litellm-shape translator (services/nlpgo/adapters/litellm) with a
+// the litellm-shape translator (pkg/litellmparams) with a
 // pluggable app.GatewayClient.
 //
 // The LLM block in Sarah's engine talks to this executor. The executor:
@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
+	"github.com/langwatch/langwatch/services/nlpgo/litellmparams"
 )
 
 // Header names llmexecutor sets on the GatewayRequest. The active
@@ -72,7 +72,7 @@ func (e *Executor) Execute(ctx context.Context, req app.LLMRequest) (*app.LLMRes
 	if resp.StatusCode/100 != 2 {
 		provider := req.Provider
 		if provider == "" {
-			provider, _ = litellm.SplitProviderModel(req.Model)
+			provider, _ = litellmparams.SplitProviderModel(req.Model)
 		}
 		return nil, &GatewayHTTPError{
 			StatusCode: resp.StatusCode,
@@ -280,7 +280,7 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	// split would yield provider "qwen".
 	provider := req.Provider
 	if provider == "" {
-		provider, _ = litellm.SplitProviderModel(req.Model)
+		provider, _ = litellmparams.SplitProviderModel(req.Model)
 	}
 	if provider == "" {
 		return app.GatewayRequest{}, fmt.Errorf("could not infer provider from model %q", req.Model)
@@ -298,8 +298,8 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	if !strings.HasPrefix(req.Model, provider+"/") {
 		prefixedModel = provider + "/" + req.Model
 	}
-	translatedModel := litellm.TranslateModelID(prefixedModel)
-	gatewayProvider := litellm.GatewayProviderForModel(provider)
+	translatedModel := litellmparams.TranslateModelID(prefixedModel)
+	gatewayProvider := litellmparams.GatewayProviderForModel(provider)
 
 	// Build the OpenAI-shape body. Empty-content messages are filtered
 	// before marshaling — Anthropic strictly rejects messages with empty
@@ -381,16 +381,16 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	}
 
 	// Apply the preserved post-DSPy behaviors.
-	litellm.NormalizeReasoningEffort(body)
+	litellmparams.NormalizeReasoningEffort(body)
 	// Floor max_tokens for any reasoning-enabled config — runs before
 	// ApplyReasoningOverrides so OpenAI reasoning models inherit the
 	// floor when the override migrates max_tokens → max_completion_tokens.
-	litellm.EnsureReasoningMaxTokens(body)
-	litellm.ApplyReasoningOverrides(translatedModel, body)
-	litellm.ClampAnthropicTemperature(provider, body)
+	litellmparams.EnsureReasoningMaxTokens(body)
+	litellmparams.ApplyReasoningOverrides(translatedModel, body)
+	litellmparams.ClampAnthropicTemperature(provider, body)
 
 	// Build inline credentials from litellm_params.
-	creds, err := litellm.FromLiteLLMParams(provider, req.LiteLLMParams)
+	creds, err := litellmparams.FromLiteLLMParams(provider, req.LiteLLMParams)
 	if err != nil {
 		return app.GatewayRequest{}, fmt.Errorf("translate litellm_params: %w", err)
 	}
@@ -528,7 +528,7 @@ func liftStructuredOutputToolArgs(toolCalls []app.ToolCall) (string, bool) {
 // from canonical OpenAI; the bare model id is what the custom endpoint
 // expects.
 func translatedModelOrInferred(translated, gatewayProvider, original string) string {
-	_, bareTranslated := litellm.SplitProviderModel(translated)
+	_, bareTranslated := litellmparams.SplitProviderModel(translated)
 	if bareTranslated != "" {
 		return bareTranslated
 	}

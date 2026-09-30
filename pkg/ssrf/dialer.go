@@ -1,4 +1,4 @@
-package httpblock
+package ssrf
 
 import (
 	"context"
@@ -10,12 +10,10 @@ import (
 	"time"
 
 	"go.uber.org/zap"
-
-	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
-// SSRFOptions tunes the destination policy for the HTTP block.
-type SSRFOptions struct {
+// Options tunes the dial-time egress policy for tenant-directed requests.
+type Options struct {
 	// AllowedHosts is the comma-separated allow-list (host:port pairs
 	// or bare hosts) that bypasses the private/loopback ban. Mirrors
 	// ALLOWED_PROXY_HOSTS on the Python side.
@@ -45,7 +43,7 @@ type SSRFOptions struct {
 	//
 	// Spelled as the permission rather than the prohibition so the zero value
 	// keeps refusing. The variable it comes from is named the other way round,
-	// so a field named for the prohibition would make an SSRFOptions{} that
+	// so a field named for the prohibition would make an Options{} that
 	// nobody filled in — a test, a new call site, a struct grown a field
 	// since — silently mean "reach anywhere on the private network". A
 	// security default is worth an inversion at the one place that resolves
@@ -63,7 +61,7 @@ type SSRFOptions struct {
 }
 
 // logger returns the configured logger or a no-op one.
-func (o SSRFOptions) logger() *zap.Logger {
+func (o Options) logger() *zap.Logger {
 	if o.Logger == nil {
 		return zap.NewNop()
 	}
@@ -88,36 +86,27 @@ var blockedHosts = map[string]struct{}{
 	"[::1]":     {},
 }
 
-// CheckURL returns nil if the URL is permitted; ErrSSRFBlocked otherwise.
+// CheckURL returns nil if the URL is permitted; ErrBlocked otherwise.
 //
 // CheckURL is the early/optimistic gate — it gives a clean error message
 // before we build the request. It is NOT the only line of defense:
 // SafeDialer re-runs the policy at dial time so that a host whose DNS
 // resolves to a public IP at check time but a private IP at dial time
 // (DNS rebinding) cannot slip past.
-func CheckURL(raw string, opts SSRFOptions) error {
+func CheckURL(raw string, opts Options) error {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return ErrSSRFBlocked
+		return ErrBlocked
 	}
 	host := strings.ToLower(u.Hostname())
-	if host == "" {
-		return ErrSSRFBlocked
-	}
 	allow, deny := hostPolicy(host, opts)
 	if deny {
-		return ErrSSRFBlocked
+		return ErrBlocked
 	}
 	if allow {
 		return nil
 	}
-	if ip := net.ParseIP(host); ip != nil {
-		if ipBlocked(ip, opts, host) {
-			return ErrSSRFBlocked
-		}
-		return nil
-	}
-	ips, err := resolveHost(host, opts)
+	ips, err := lookupIPs(host, opts)
 	if err != nil {
 		// DNS failed — let the actual request fail with a network
 		// error so the customer sees a real upstream message instead
@@ -126,7 +115,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	}
 	for _, ip := range ips {
 		if ipBlocked(ip, opts, host) {
-			return ErrSSRFBlocked
+			return ErrBlocked
 		}
 	}
 	return nil
@@ -138,56 +127,68 @@ func CheckURL(raw string, opts SSRFOptions) error {
 // otherwise resolve the host a second time inside the standard library
 // and could connect to a different IP than what CheckURL validated.
 //
-// allow-listed hosts skip the IP check entirely and are dialed via the
-// hostname (so the kernel resolver picks an address). The allow-list
-// is the customer-controlled escape hatch — same trust model as
-// CheckURL.
-func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string) (net.Conn, error) {
+// Allow-listed hosts skip the private-address check (the customer's
+// escape hatch, as in CheckURL), but cloud metadata is refused for every
+// host whatever the configuration.
+func SafeDialer(opts Options) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	base := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
 		}
-		host = strings.ToLower(host)
-		allow, deny := hostPolicy(host, opts)
-		if deny {
-			return nil, ErrSSRFBlocked
-		}
-		if allow {
-			return base.DialContext(ctx, network, addr)
-		}
-		var ips []net.IP
-		if ip := net.ParseIP(host); ip != nil {
-			ips = []net.IP{ip}
-		} else {
-			resolved, err := resolveHost(host, opts)
-			if err != nil {
-				return nil, err
-			}
-			ips = resolved
-		}
-		if len(ips) == 0 {
-			return nil, ErrSSRFBlocked
-		}
-		for _, ip := range ips {
-			if ipBlocked(ip, opts, host) {
-				return nil, ErrSSRFBlocked
-			}
+		ip, err := dialIP(strings.ToLower(host), opts)
+		if err != nil {
+			return nil, err
 		}
 		// Dial against the IP we just validated — net/http's internal
 		// resolver can't redirect us to an unchecked address.
-		return base.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))
+		return base.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
 	}
 }
 
-// ErrSSRFBlocked is returned when SSRF policy rejects a destination.
-var ErrSSRFBlocked = errors.New("ssrf_blocked")
+// dialIP returns the address SafeDialer may dial for host, or ErrBlocked.
+func dialIP(host string, opts Options) (net.IP, error) {
+	allow, deny := hostPolicy(host, opts)
+	if deny {
+		return nil, ErrBlocked
+	}
+	ips, err := lookupIPs(host, opts)
+	if err != nil {
+		return nil, err
+	}
+	if len(ips) == 0 {
+		return nil, ErrBlocked
+	}
+	for _, ip := range ips {
+		if isMetadata(ip) || (!allow && ipBlocked(ip, opts, host)) {
+			return nil, ErrBlocked
+		}
+	}
+	return ips[0], nil
+}
+
+// lookupIPs returns host itself when it is an IP literal, else its resolved addresses.
+func lookupIPs(host string, opts Options) ([]net.IP, error) {
+	if ip := net.ParseIP(host); ip != nil {
+		return []net.IP{ip}, nil
+	}
+	return resolveHost(host, opts)
+}
+
+// isMetadata reports a cloud metadata address, refused even for allow-listed hosts.
+func isMetadata(ip net.IP) bool {
+	addr, ok := netip.AddrFromSlice(ip)
+	return !ok || Classify(addr.Unmap()) == CategoryMetadata
+}
+
+// ErrBlocked is returned when SSRF policy rejects a destination.
+var ErrBlocked = errors.New("ssrf_blocked")
 
 // hostPolicy classifies a hostname against the static deny/allow
 // lists. Returns (allow, deny) — both false means "needs IP-level
 // check". Pulled out so CheckURL and SafeDialer apply the same rules.
-func hostPolicy(host string, opts SSRFOptions) (allow, deny bool) {
+func hostPolicy(host string, opts Options) (allow, deny bool) {
 	if host == "" {
 		return false, true
 	}
@@ -213,7 +214,7 @@ func hostPolicy(host string, opts SSRFOptions) (allow, deny bool) {
 // allowsLocal reports whether this policy permits the private/loopback set.
 // Strict egress overrides the permission: it means globally routable only,
 // and none of these addresses are globally routable.
-func allowsLocal(opts SSRFOptions) bool {
+func allowsLocal(opts Options) bool {
 	return opts.AllowLocal && !opts.StrictPublicOnly
 }
 
@@ -238,7 +239,7 @@ func allowsLocal(opts SSRFOptions) bool {
 // The AllowedHosts escape hatch bypasses this check entirely (see hostPolicy),
 // so an operator who does need one of these addresses has a way through
 // without widening the policy for every workflow.
-func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
+func ipBlocked(ip net.IP, opts Options, host string) bool {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
 		opts.logger().Warn("ssrf_refused",
@@ -256,12 +257,12 @@ func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 	// rather than "::ffff:100.64.0.1".
 	addr = addr.Unmap()
 
-	category := ssrf.Classify(addr)
-	if category == ssrf.CategoryMetadata {
+	category := Classify(addr)
+	if category == CategoryMetadata {
 		opts.logger().Warn("ssrf_refused",
 			zap.String("host", host),
 			zap.String("address", addr.String()),
-			zap.String("range", ssrf.Describe(addr)),
+			zap.String("range", Describe(addr)),
 			zap.String("reason", "cloud_metadata"),
 			zap.String("hint", "cloud instance metadata is never a permitted destination and cannot be allow-listed"),
 		)
@@ -275,14 +276,14 @@ func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 		opts.logger().Warn("ssrf_refused",
 			zap.String("host", host),
 			zap.String("address", addr.String()),
-			zap.String("range", ssrf.Describe(addr)),
+			zap.String("range", Describe(addr)),
 			zap.String("reason", "private_address"),
 			zap.String("hint", "this deployment blocks local destinations; add this host to ALLOWED_PROXY_HOSTS to reach it, or set BLOCK_LOCAL_HTTP_CALLS=false to permit them all"),
 		)
 		return true
 	}
 
-	if category == ssrf.CategoryGlobal {
+	if category == CategoryGlobal {
 		return false
 	}
 
@@ -291,7 +292,7 @@ func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 		opts.logger().Warn("ssrf_refused",
 			zap.String("host", host),
 			zap.String("address", addr.String()),
-			zap.String("range", ssrf.Describe(addr)),
+			zap.String("range", Describe(addr)),
 			zap.String("reason", "strict_public_only"),
 			zap.String("hint", "strict egress is enabled, so only globally routable addresses are permitted; add this host to ALLOWED_PROXY_HOSTS if it is an internal service you intend to reach"),
 		)
@@ -317,11 +318,11 @@ func legacyBlocked(addr netip.Addr) bool {
 // which internal destinations their workflows depend on, allow-list them, and
 // only then turn StrictPublicOnly on — instead of discovering the list from a
 // broken production workflow after an upgrade.
-func logWouldRefuse(opts SSRFOptions, host string, addr netip.Addr) {
+func logWouldRefuse(opts Options, host string, addr netip.Addr) {
 	opts.logger().Info("ssrf_permitted_non_public_address",
 		zap.String("host", host),
 		zap.String("address", addr.String()),
-		zap.String("range", ssrf.Describe(addr)),
+		zap.String("range", Describe(addr)),
 		zap.String("hint", "strict egress would refuse this address; allow-list this host via ALLOWED_PROXY_HOSTS before enabling strict egress, or leave it as-is to keep reaching it"),
 	)
 }
@@ -329,7 +330,7 @@ func logWouldRefuse(opts SSRFOptions, host string, addr netip.Addr) {
 // resolveHost looks up every address for host, falling back to the system
 // resolver when the options carry none. Tests inject their own resolver here to
 // exercise multi-answer and DNS-rebinding sequences without real DNS.
-func resolveHost(host string, opts SSRFOptions) ([]net.IP, error) {
+func resolveHost(host string, opts Options) ([]net.IP, error) {
 	r := opts.Resolver
 	if r == nil {
 		r = net.LookupIP

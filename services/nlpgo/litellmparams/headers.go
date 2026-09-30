@@ -1,18 +1,8 @@
-// Package gatewayproxy implements the /go/proxy/v1/* OpenAI-shape
-// pass-through that the LangWatch Prompt Playground uses today via the
-// Python LiteLLM proxy. The Go side reads the `x-litellm-*` credential
-// headers the TS app already sends, builds an in-process
-// domain.Credential, and forwards the call to the gateway dispatcher.
-//
-// Three TS callsites talk to /proxy/v1/*:
-//   - modules/model-provider/process/src/transport/api-rest/playground.api.ts
-//   - langwatch/src/server/modelProviders/model.factory.ts
-//   - modules/model-provider/process/src/services/model-provider-execution-handle.service.ts
-//
-// All three send the customer's provider credentials as
-// `x-litellm-<field>` headers. This file owns the header → Credential
-// mapping that lets nlpgo speak the same shape without LiteLLM.
-package gatewayproxy
+// The x-litellm-* header -> domain.Credential mapping the /go/proxy/v1/*
+// playground pass-through uses (services/nlpgo/adapters/httpapi/playground_proxy.go).
+// The TS app sends each litellm_params field as an `x-litellm-<field>` header.
+
+package litellmparams
 
 import (
 	"errors"
@@ -85,76 +75,13 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
 		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,
 		domain.ProviderDeepSeek:
-		cred.APIKey = h.Get(headerAPIKey)
-		if base := h.Get(headerAPIBase); base != "" {
-			cred.Extra["api_base"] = base
-		}
-		if provider == domain.ProviderOpenAI {
-			if org := h.Get(headerOrganization); org != "" {
-				cred.Extra["organization"] = org
-			}
-		}
-		if provider == domain.ProviderGemini {
-			// Both or neither — one without the other names no door, and
-			// the gateway's agent-platform detection requires the pair.
-			project := h.Get(headerGeminiProject)
-			location := h.Get(headerGeminiLocation)
-			if project != "" && location != "" {
-				cred.Extra["project_id"] = project
-				cred.Extra["region"] = location
-			}
-		}
+		apiKeyFromHeaders(h, &cred)
 	case domain.ProviderAzure:
-		cred.APIKey = h.Get(headerAPIKey)
-		// api_base carries the Azure resource endpoint and is required for
-		// routing; api_version is optional — when the provider has none
-		// configured we leave the key unset so the adapter can fall back to
-		// Bifrost's own default (an empty value here would defeat it). We
-		// don't validate at this layer — let the provider adapter surface a
-		// typed error if the customer has misconfigured.
-		if base := h.Get(headerAPIBase); base != "" {
-			cred.Extra["api_base"] = base
-		}
-		if ver := h.Get(headerAPIVersion); ver != "" {
-			cred.Extra["api_version"] = ver
-		}
-		if extra := h.Get(headerExtraHeaders); extra != "" {
-			cred.Extra["extra_headers"] = extra
-		}
-		if v := h.Get(headerUseAzureGW); v != "" {
-			cred.Extra["use_azure_gateway"] = v
-		}
-		// The control plane forwards an explicit Azure deployment name (when
-		// the deployment differs from the model id) as x-litellm-deployment.
-		// WithDeploymentSelfMap below honors it; default is deployment == model.
-		if dep := h.Get(headerDeployment); dep != "" {
-			cred.Extra["deployment"] = dep
-		}
+		azureFromHeaders(h, &cred)
 	case domain.ProviderBedrock:
-		// Bedrock uses AWS access keys, not api_key.
-		cred.Extra["aws_access_key_id"] = h.Get(headerAWSAccessKeyID)
-		cred.Extra["aws_secret_access_key"] = h.Get(headerAWSSecretAccessKey)
-		if v := h.Get(headerAWSSessionToken); v != "" {
-			cred.Extra["aws_session_token"] = v
-		}
-		if v := h.Get(headerAWSRegion); v != "" {
-			cred.Extra["aws_region_name"] = v
-		}
-		if v := h.Get(headerAWSRuntimeEndpoint); v != "" {
-			cred.Extra["aws_bedrock_runtime_endpoint"] = v
-		}
+		bedrockFromHeaders(h, &cred)
 	case domain.ProviderVertex:
-		// Vertex: no api_key. Service-account JSON is inline, project
-		// + location identify the GCP project.
-		if v := h.Get(headerVertexCredentials); v != "" {
-			cred.Extra["vertex_credentials"] = v
-		}
-		if v := h.Get(headerVertexProject); v != "" {
-			cred.Extra["vertex_project"] = v
-		}
-		if v := h.Get(headerVertexLocation); v != "" {
-			cred.Extra["vertex_location"] = v
-		}
+		vertexFromHeaders(h, &cred)
 	default:
 		// No inline credentials to map (see the comment above the switch).
 	}
@@ -167,6 +94,63 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 	cred = domain.WithDeploymentSelfMap(cred, BareModel(model))
 
 	return cred, nil
+}
+
+// apiKeyFromHeaders reads the plain api-key providers, plus OpenAI's
+// organization and Gemini's Agent Platform pair.
+func apiKeyFromHeaders(h http.Header, cred *domain.Credential) {
+	cred.APIKey = h.Get(headerAPIKey)
+	setExtra(cred.Extra, "api_base", h.Get(headerAPIBase))
+	if cred.ProviderID == domain.ProviderOpenAI {
+		setExtra(cred.Extra, "organization", h.Get(headerOrganization))
+	}
+	if cred.ProviderID == domain.ProviderGemini {
+		// Both or neither — one without the other names no door, and
+		// the gateway's agent-platform detection requires the pair.
+		project := h.Get(headerGeminiProject)
+		location := h.Get(headerGeminiLocation)
+		if project != "" && location != "" {
+			cred.Extra["project_id"] = project
+			cred.Extra["region"] = location
+		}
+	}
+}
+
+// azureFromHeaders reads Azure. api_version stays unset when absent so the
+// adapter falls back to Bifrost's default; x-litellm-deployment names an
+// explicit deployment, which WithDeploymentSelfMap honors.
+func azureFromHeaders(h http.Header, cred *domain.Credential) {
+	cred.APIKey = h.Get(headerAPIKey)
+	setExtra(cred.Extra, "api_base", h.Get(headerAPIBase))
+	setExtra(cred.Extra, "api_version", h.Get(headerAPIVersion))
+	setExtra(cred.Extra, "extra_headers", h.Get(headerExtraHeaders))
+	setExtra(cred.Extra, "use_azure_gateway", h.Get(headerUseAzureGW))
+	setExtra(cred.Extra, "deployment", h.Get(headerDeployment))
+}
+
+// bedrockFromHeaders reads AWS access keys, not api_key; the key pair is
+// always set, even empty.
+func bedrockFromHeaders(h http.Header, cred *domain.Credential) {
+	cred.Extra["aws_access_key_id"] = h.Get(headerAWSAccessKeyID)
+	cred.Extra["aws_secret_access_key"] = h.Get(headerAWSSecretAccessKey)
+	setExtra(cred.Extra, "aws_session_token", h.Get(headerAWSSessionToken))
+	setExtra(cred.Extra, "aws_region_name", h.Get(headerAWSRegion))
+	setExtra(cred.Extra, "aws_bedrock_runtime_endpoint", h.Get(headerAWSRuntimeEndpoint))
+}
+
+// vertexFromHeaders reads the inline service-account JSON plus project and
+// location; Vertex has no api_key.
+func vertexFromHeaders(h http.Header, cred *domain.Credential) {
+	setExtra(cred.Extra, "vertex_credentials", h.Get(headerVertexCredentials))
+	setExtra(cred.Extra, "vertex_project", h.Get(headerVertexProject))
+	setExtra(cred.Extra, "vertex_location", h.Get(headerVertexLocation))
+}
+
+// setExtra sets key only when value is non-empty.
+func setExtra(extra map[string]string, key, value string) {
+	if value != "" {
+		extra[key] = value
+	}
 }
 
 // ErrMissingProvider is returned when ParseCredentialFromHeaders can't

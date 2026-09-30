@@ -98,6 +98,7 @@ func newRouterDeps(in routerDepsInput) httpapi.RouterDeps {
 		InternalSecret:      in.Cfg.InternalSecret,
 		PlaygroundProxy:     in.Playground,
 		OTel:                in.Deps.OTel,
+		Evaluators:          in.Deps.Evaluators,
 		StreamHeartbeat:     resolveStreamHeartbeat(in.Cfg.Engine.StreamHeartbeatSeconds),
 		StreamIdleTimeout:   resolveStreamIdleTimeout(in.Cfg.Engine.StreamIdleTimeoutSeconds),
 	}

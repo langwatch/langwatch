@@ -13,6 +13,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
+	evaluators "github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 )
 
 // DefaultSandboxPython is the interpreter a code block runs on when nothing
@@ -48,6 +49,12 @@ type Config struct {
 
 	// Engine knobs surfaced to operators.
 	Engine EngineConfig `env:"NLPGO_ENGINE"`
+
+	// Evaluators configures the evaluator runtime (NLPGO_EVALUATORS_*).
+	Evaluators evaluators.Config `env:"NLPGO_EVALUATORS"`
+	// EvaluatorsInternalSecret is the bearer secret the evaluator runtime
+	// requires. Not required to boot: unset, the runtime refuses every request.
+	EvaluatorsInternalSecret string `env:"NLPGO_INTERNAL_SECRET"`
 }
 
 // EngineConfig surfaces engine knobs (timeouts, code-block sandbox).
@@ -82,7 +89,7 @@ type EngineConfig struct {
 	//
 	// Deliberately a dedicated egress knob rather than a general environment
 	// lookup inside the block: what an egress boundary refuses is deployment
-	// policy, so it is declared here and passed explicitly into SSRFOptions.
+	// policy, so it is declared here and passed explicitly into ssrf.Options.
 	// Nothing under app/engine/blocks reads the environment for it.
 	//
 	// Default false preserves the historical deny set, so a self-hosted
@@ -153,6 +160,7 @@ func defaultConfig() Config {
 			EvaluatorTimeoutSeconds:     720,
 			SandboxPython:               DefaultSandboxPython,
 		},
+		Evaluators: evaluators.DefaultConfig(),
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable
 			// from the default; resolved in LoadConfig.
