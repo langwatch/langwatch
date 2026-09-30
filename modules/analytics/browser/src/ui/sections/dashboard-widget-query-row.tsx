@@ -26,6 +26,7 @@ import {
   type EditableQueryName,
   useEditableQueryName,
 } from "../../behavior/use-editable-query-name.ts";
+import { useLwqlDiagnostics } from "../../behavior/use-lwql-diagnostics.ts";
 import { useLwqlSchema } from "../../behavior/use-lwql-schema.ts";
 import {
   type DashboardWidgetQuery,
@@ -87,6 +88,7 @@ export function DashboardWidgetQueryRow({
   const summary = runSummary(lastRun);
   const nameEdit = useEditableQueryName({ query, onChange });
   const schema = useLwqlSchema({ projectId });
+  const markers = useLwqlDiagnostics({ projectId, sql: query.sql });
   const parameters = useMemo(() => editorParameters(query.parameters), [query.parameters]);
 
   return (
@@ -143,6 +145,7 @@ export function DashboardWidgetQueryRow({
               >
                 <LwqlEditor
                   schema={schema}
+                  markers={markers}
                   value={query.sql}
                   onChange={(sql) => onChange({ ...query, sql })}
                   parameters={parameters}

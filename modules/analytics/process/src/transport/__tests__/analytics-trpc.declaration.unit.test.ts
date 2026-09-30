@@ -30,12 +30,13 @@ describe("given the analytics tRPC contract", () => {
 
 describe("given the workbench tRPC contract", () => {
   describe("when its members are read", () => {
-    it("declares the availability and schema reads and the one run mutation", () => {
+    it("declares the availability, schema and validate reads and the one run mutation", () => {
       expect(
         Object.entries(analyticsLwqlTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
         ["availability", "query"],
         ["schema", "query"],
+        ["validate", "query"],
         ["query", "mutation"],
       ]);
     });

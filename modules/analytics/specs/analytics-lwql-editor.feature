@@ -74,3 +74,49 @@ Feature: LangWatchQL is edited in one kit editor with its grammar, completion an
       Given an editor given a marker at a line and column
       When the editor is mounted
       Then the model carries that marker with its message and position
+
+  Rule: Diagnostics are the server's one parse
+
+    @unit
+    Scenario: A marker sits where the server reported the refusal
+      Given a refusal the server positioned at a line and column
+      When it is mapped to a marker
+      Then the marker carries the server's sentence at that line and column
+
+    @integration
+    Scenario: A refusal is marked at the server's position
+      Given the server refused the statement at a position
+      When typing settles
+      Then the editor is given a marker at that line and column
+
+    @integration
+    Scenario: A refused table is marked by name
+      Given a member who may not read a table
+      When they validate a statement reading it
+      Then the answer is a TABLE_NOT_ALLOWED violation naming the table at its position
+
+    @integration
+    Scenario: Validating a statement never executes it
+      Given a statement the server would run
+      When it is validated
+      Then the executor is not called
+
+    @integration
+    Scenario: Validation is gated exactly as the schema is
+      Given the workbench is not enabled for the project
+      When a statement is validated
+      Then the call is refused with the rollout error and nothing is validated
+
+    @integration
+    Scenario: A superseded validation answer is dropped
+      Given the statement was edited after it was refused
+      When the answer for the earlier text is all there is
+      Then no marker is drawn for the new text
+
+  Rule: Diagnostics fail open
+
+    @integration
+    Scenario: A failed validation clears the markers
+      Given markers drawn for an earlier statement
+      When validating the edited statement fails
+      Then the editor is given no markers

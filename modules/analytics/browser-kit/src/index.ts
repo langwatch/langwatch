@@ -14,3 +14,4 @@ export * from "./ui/sections/analytics/utils.ts";
 export * from "./ui/sections/lwql-editor.tsx";
 export type { LwqlParameter } from "./model/lwql-language/lwql-completion.ts";
 export type { LwqlEditorMarker } from "./model/lwql-language/lwql-marker.ts";
+export { lwqlMarkersFromViolations } from "./model/lwql-language/lwql-markers.ts";
