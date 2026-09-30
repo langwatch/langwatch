@@ -188,3 +188,26 @@ func TestConverse_JSONSchemaFollowsTheDeploymentMap(t *testing.T) {
 		t.Fatalf("want the schema under text.format, got %s", j)
 	}
 }
+
+// A streamed request keeps the schema and the thinking block: the stream input
+// carries the additional model fields the non-streaming input does.
+// @scenario "Structured output on an OpenAI model on Bedrock is enforced through Converse"
+func TestConverseStreamInput_KeepsAdditionalModelFields(t *testing.T) {
+	cred := domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"region": "eu-central-1"}}
+	req := &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: "global.openai.gpt-5.5",
+		Body:  []byte(`{"stream":true,"messages":[{"role":"user","content":"hi"}],"response_format":{"type":"json_schema","json_schema":{"name":"city","schema":{"type":"object"}}}}`),
+	}
+	input, _, err := (&BifrostRouter{}).buildConverseInput(context.Background(), req, mapProvider(cred), req.Model, cred)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	stream := converseStreamInput(input)
+	if stream.AdditionalModelRequestFields == nil {
+		t.Fatal("the stream input dropped the additional model fields")
+	}
+	if j := docJSON(t, stream.AdditionalModelRequestFields); gjson.GetBytes(j, "text.format.name").String() != "city" {
+		t.Fatalf("want the schema under text.format, got %s", j)
+	}
+}

@@ -141,3 +141,25 @@ func TestBedrockOpenAILive_JSONSchema(t *testing.T) {
 		t.Fatalf("want the answer under the schema's city key; body=%s", resp.Body)
 	}
 }
+
+func TestBedrockOpenAILive_JSONSchemaStream(t *testing.T) {
+	cred, model := liveBedrockOpenAICred(t)
+	router := newTestRouter(t)
+	it, err := router.DispatchStream(context.Background(), &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: model,
+		Body: []byte(`{"stream":true,"messages":[{"role":"user","content":"Capital of France? Answer as JSON."}],
+			"response_format":{"type":"json_schema","json_schema":{"name":"answer","strict":true,"schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"],"additionalProperties":false}}}}`),
+	}, cred)
+	if err != nil {
+		t.Fatalf("DispatchStream error: %v", err)
+	}
+	var sb strings.Builder
+	for it.Next(context.Background()) {
+		sb.WriteString(gjson.GetBytes(it.Chunk(), "choices.0.delta.content").String())
+	}
+	t.Logf("streamed text=%q", sb.String())
+	if gjson.Get(sb.String(), "city").String() == "" {
+		t.Fatalf("want the streamed answer under the schema's city key")
+	}
+}

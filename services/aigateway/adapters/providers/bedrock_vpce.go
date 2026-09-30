@@ -224,13 +224,7 @@ func (r *BifrostRouter) dispatchBedrockVPCEStream(
 		return nil, err
 	}
 
-	streamInput := &bedrockruntime.ConverseStreamInput{
-		ModelId:         input.ModelId,
-		Messages:        input.Messages,
-		System:          input.System,
-		InferenceConfig: input.InferenceConfig,
-		ToolConfig:      input.ToolConfig,
-	}
+	streamInput := converseStreamInput(input)
 
 	client := newBedrockRuntimeClient(cred, endpoint)
 	out, err := client.ConverseStream(ctx, streamInput)
@@ -244,6 +238,20 @@ func (r *BifrostRouter) dispatchBedrockVPCEStream(
 		model:         model,
 		paramsDropped: dropped,
 	}, nil
+}
+
+// converseStreamInput carries a built Converse request onto the streaming
+// API, additional model fields included: they hold the thinking block and the
+// structured-output schema.
+func converseStreamInput(input *bedrockruntime.ConverseInput) *bedrockruntime.ConverseStreamInput {
+	return &bedrockruntime.ConverseStreamInput{
+		ModelId:                      input.ModelId,
+		Messages:                     input.Messages,
+		System:                       input.System,
+		InferenceConfig:              input.InferenceConfig,
+		ToolConfig:                   input.ToolConfig,
+		AdditionalModelRequestFields: input.AdditionalModelRequestFields,
+	}
 }
 
 // buildConverseInput reuses the gateway's existing OpenAI->Bifrost parser and
