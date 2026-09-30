@@ -8,10 +8,12 @@ export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[]
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
   const graph = new Map<string, string[]>();
 
+  // devDependencies count: Nx orders `^typecheck` over them too (ADR-150).
   for (const pkg of packages) {
+    const edges = { ...pkg.manifest.devDependencies, ...manifestDependencies(pkg.manifest) };
     graph.set(
       pkg.name,
-      Object.keys(manifestDependencies(pkg.manifest)).filter((name) => byName.has(name)),
+      Object.keys(edges).filter((name) => byName.has(name)),
     );
   }
 

@@ -78,8 +78,8 @@ runs:
       if: inputs.install != ''
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
-        go-version-file: go.mod
-        cache-dependency-path: go.sum
+        go-version-file: go.work
+        cache-dependency-path: "*/go.sum"
 
     # node-gyp is no longer bundled on PATH under Node-24 + npm-11, so any
     # native-module install lifecycle script (e.g. node-pty's prebuild fallback

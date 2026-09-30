@@ -10,10 +10,10 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
-// Audio tokens on the customer span. domain.Usage carries them OUT of the
+// Audio tokens on the customer span. aitrace.Usage carries them OUT of the
 // prompt and completion totals so every consumer prices them at the audio
 // rate, and the span states them under their own attributes, disjoint from
 // the text totals exactly as the cache buckets are. An audio-native answer
@@ -21,17 +21,17 @@ import (
 
 // recordChatSpanForUsage runs the emitter's span lifecycle for a chat-shaped
 // request, which is the shape the empty-probe filter applies to.
-func recordChatSpanForUsage(t *testing.T, u domain.Usage) sdktrace.ReadOnlySpan {
+func recordChatSpanForUsage(t *testing.T, u aitrace.Usage) sdktrace.ReadOnlySpan {
 	t.Helper()
 	sr := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
 	e := &Emitter{tp: tp, tracer: tp.Tracer("test"), propagator: propagation.TraceContext{}}
 
-	ctx, _ := e.BeginSpan(context.Background(), "proj-test", domain.RequestTypeChat)
-	e.EndSpan(ctx, domain.AITraceParams{
-		ProviderID:  domain.ProviderOpenAI,
+	ctx, _ := e.BeginSpan(context.Background(), "proj-test", aitrace.RequestTypeChat)
+	e.EndSpan(ctx, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-realtime",
-		RequestType: domain.RequestTypeChat,
+		RequestType: aitrace.RequestTypeChat,
 		Usage:       u,
 	})
 
@@ -51,7 +51,7 @@ func hasDropMarker(span sdktrace.ReadOnlySpan) bool {
 
 /** @scenario A span states its audio tokens apart from its text tokens */
 func TestEmitter_AudioTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
-	span := recordChatSpanForUsage(t, domain.Usage{
+	span := recordChatSpanForUsage(t, aitrace.Usage{
 		PromptTokens:      200,
 		InputAudioTokens:  800,
 		CompletionTokens:  50,
@@ -82,7 +82,7 @@ func TestEmitter_AudioTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
 
 /** @scenario A span states its audio tokens apart from its text tokens */
 func TestEmitter_NoAudioTokens_LeavesTheAudioAttributesOff(t *testing.T) {
-	span := recordChatSpanForUsage(t, domain.Usage{
+	span := recordChatSpanForUsage(t, aitrace.Usage{
 		PromptTokens:     200,
 		CompletionTokens: 50,
 		TotalTokens:      250,
@@ -98,7 +98,7 @@ func TestEmitter_NoAudioTokens_LeavesTheAudioAttributesOff(t *testing.T) {
 func TestEmitter_AudioOnlyAnswer_IsNotDroppedAsAnEmptyProbe(t *testing.T) {
 	// An audio-native model answers entirely in audio tokens. Reading the
 	// completion total alone would see zero and drop a real answer.
-	span := recordChatSpanForUsage(t, domain.Usage{
+	span := recordChatSpanForUsage(t, aitrace.Usage{
 		PromptTokens:      0,
 		InputAudioTokens:  800,
 		CompletionTokens:  0,
@@ -109,7 +109,7 @@ func TestEmitter_AudioOnlyAnswer_IsNotDroppedAsAnEmptyProbe(t *testing.T) {
 }
 
 func TestEmitter_EmptyChatProbe_IsStillDropped(t *testing.T) {
-	span := recordChatSpanForUsage(t, domain.Usage{PromptTokens: 3})
+	span := recordChatSpanForUsage(t, aitrace.Usage{PromptTokens: 3})
 
 	assert.True(t, hasDropMarker(span), "a chat probe with no output still drops")
 }

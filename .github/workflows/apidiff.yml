@@ -79,8 +79,8 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'package.json'
               - '.npmrc'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.github/workflows/apidiff.yml'
 
   run:
@@ -109,8 +109,8 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       # apidiff installs and prepares each tree itself, once: this checkout
       # (-branch-dir) and the origin/main worktree it creates. This step only

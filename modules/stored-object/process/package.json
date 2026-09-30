@@ -27,7 +27,8 @@
   },
   "scripts": {
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run .integration.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",

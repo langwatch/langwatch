@@ -11,20 +11,20 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // recordSpanForParams runs the emitter's span lifecycle for arbitrary trace
 // params and returns the ended span via an in-memory recorder. The recorder
 // captures every ended span regardless of the drop marker (drop is enforced at
 // export, not at span-end), so tests can assert the marker directly.
-func recordSpanForParams(t *testing.T, params domain.AITraceParams) sdktrace.ReadOnlySpan {
+func recordSpanForParams(t *testing.T, params aitrace.AITraceParams) sdktrace.ReadOnlySpan {
 	t.Helper()
 	sr := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
 	e := &Emitter{tp: tp, tracer: tp.Tracer("test"), propagator: propagation.TraceContext{}}
 
-	ctx, _ := e.BeginSpan(context.Background(), "proj-test", domain.RequestTypeMessages)
+	ctx, _ := e.BeginSpan(context.Background(), "proj-test", aitrace.RequestTypeMessages)
 	e.EndSpan(ctx, params)
 
 	spans := sr.Ended()
@@ -54,8 +54,8 @@ func hasStringAttr(span sdktrace.ReadOnlySpan, key string) (string, bool) {
 // (HTTP status + error.type + Error span status) instead of being silently
 // dropped, so users can see the failed request in the trace list.
 func TestEmitter_UpstreamError_StampsStatusAndErrorType(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:         domain.ProviderAnthropic,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:         aitrace.ProviderAnthropic,
 		Model:              "claude-opus-4-7",
 		UpstreamStatusCode: 504,
 		UpstreamErrorType:  "provider_timeout",
@@ -80,14 +80,14 @@ func TestEmitter_UpstreamError_StampsStatusAndErrorType(t *testing.T) {
 // that return no usage and no assistant content. A successful zero-cost,
 // no-output span is marked for drop so it does not clutter the trace list.
 func TestEmitter_ZeroCostNoOutputSuccess_MarkedForDrop(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID: domain.ProviderAnthropic,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID: aitrace.ProviderAnthropic,
 		Model:      "claude-opus-4-7",
 		// Probes are /v1/messages calls; the suppression is gated to
 		// chat-shaped request types so audio and embeddings spans (which
 		// structurally never carry completion tokens) stay visible.
-		RequestType: domain.RequestTypeMessages,
-		Usage:       domain.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 0},
+		RequestType: aitrace.RequestTypeMessages,
+		Usage:       aitrace.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 0},
 		// no ResponseBody -> extractOutputMessages == ""
 	})
 
@@ -100,22 +100,22 @@ func TestEmitter_ZeroCostNoOutputSuccess_MarkedForDrop(t *testing.T) {
 // suppressed, even if one of the other signals is zero.
 func TestEmitter_RealGeneration_NotMarkedForDrop(t *testing.T) {
 	t.Run("has completion tokens", func(t *testing.T) {
-		span := recordSpanForParams(t, domain.AITraceParams{
-			ProviderID:  domain.ProviderAnthropic,
+		span := recordSpanForParams(t, aitrace.AITraceParams{
+			ProviderID:  aitrace.ProviderAnthropic,
 			Model:       "claude-opus-4-7",
-			RequestType: domain.RequestTypeMessages,
-			Usage:       domain.Usage{PromptTokens: 6, CompletionTokens: 8, CostMicroUSD: 0},
+			RequestType: aitrace.RequestTypeMessages,
+			Usage:       aitrace.Usage{PromptTokens: 6, CompletionTokens: 8, CostMicroUSD: 0},
 		})
 		_, dropped := hasBoolAttr(span, "langwatch.reserved.drop")
 		assert.False(t, dropped)
 	})
 
 	t.Run("has cost", func(t *testing.T) {
-		span := recordSpanForParams(t, domain.AITraceParams{
-			ProviderID:  domain.ProviderAnthropic,
+		span := recordSpanForParams(t, aitrace.AITraceParams{
+			ProviderID:  aitrace.ProviderAnthropic,
 			Model:       "claude-opus-4-7",
-			RequestType: domain.RequestTypeMessages,
-			Usage:       domain.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 1200},
+			RequestType: aitrace.RequestTypeMessages,
+			Usage:       aitrace.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 1200},
 		})
 		_, dropped := hasBoolAttr(span, "langwatch.reserved.drop")
 		assert.False(t, dropped, "a span that cost money must always be visible")

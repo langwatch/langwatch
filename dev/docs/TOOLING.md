@@ -53,16 +53,26 @@ Each layer is slower and sees more than the one before, so the cheap ones run
 first.
 
 ```
-  pnpm lint                 whole tree, no type info       seconds
-     |
+  pnpm lint                 per project, no type info,     the fast rules, cached
+     |                      + files outside projects     per project
+  pnpm lint:changed         only what you changed and      seconds after the first
+     |                      its dependents
+
   nx affected -t lint:types type-aware, per project,       cached per project
      |                      only what the change reached
-  pnpm lint:architecture    whole-tree policies            the slow one
+  pnpm lint:architecture    the enforcer's whole-tree      CI blocks on it; run it
+                            policies                       on demand
 ```
 
-`lint:types` isn't written in any `package.json`. A small plugin,
-`dev/nx/lint-types-plugin.mjs`, adds it to every workspace package, so the
-target can't drift or go missing on a new package.
+`lint` and `lint:types` aren't written in any `package.json`. A small plugin,
+`dev/nx/lint-plugin.mjs`, adds them to every workspace package, so the targets
+can't drift or go missing on a new package. `pnpm lint` (`dev/nx/lint.mjs`) runs
+`lint` for every project, then oxlint once over the files no project owns.
+`pnpm lint:changed` runs both for the uncommitted working copy plus the branch
+since its merge base, with dependents of every changed project. It can miss a
+finding that appears in an untouched file when the cause is something no Nx input
+names, and it never runs the enforcer, so `pnpm lint:architecture` stays the
+check before push. `pnpm lint:oxlint` is the plain whole-tree run, uncached.
 
 ## How the Nx cache knows it's stale
 
@@ -101,8 +111,35 @@ The dev scripts (`generate-modules`, `sync-references`, `ensure-built`) walk
 the whole tree on every start, so they need to be quick. `devscripts.sh` runs them with `go run` when Go is
 installed, or a prebuilt binary in Docker.
 
-Go work isn't put through Nx. Go's own build and test cache already hashes
-content and is shared across worktrees, so Nx would only add overhead.
+## Builds
+
+Every build is an Nx `build` target, JS and Go alike, cached and
+affected-aware:
+
+```bash
+pnpm exec nx run @langwatch/ui:build        # one package, deps first
+pnpm exec nx run haven:build                # .bin/haven/haven, consoles first
+pnpm exec nx run-many -t build -p tag:go    # every Go binary
+pnpm build:affected                         # only what your change reached
+```
+
+No Go module sits at the repository root: `go.work` ties `cmd`, `pkg`,
+`services` and `tools` (one module each) to the Go SDK and the ClickHouse
+operator. `dev/nx/go-plugin.mjs` makes each module a `go-<dir>` project
+(`test:go`, `lint:go`, run inside the module) and each `cmd/<name>` a project
+writing `.bin/<name>/<name>`. Edges follow each go.mod's in-repo requires and
+each main's imports, so a change reruns only the binaries that build on it; the
+rerun is an incremental `go build`, so that costs little. The hot paths (`devscripts.sh`,
+`make service`) stay on `go run`: Go's own cache is faster there than an Nx
+cache hit. [ADR-150](adr/150-nx-task-runner.md) has the numbers.
+
+Charts, generators and the repo-wide steps are targets too:
+
+```bash
+pnpm exec nx run-many -t helm:deps helm:lint helm:template -p tag:helm
+pnpm exec nx run workspace:build:types      # tsc -b; `pnpm build:types` calls it
+make herrgen lint-rules test-scripts        # each calls its cached Nx target
+```
 
 ## What "prepare" does
 
@@ -110,7 +147,8 @@ content and is shared across worktrees, so Nx would only add overhead.
 
 ```
   generate-modules  ->  modules/catalogue.json becomes the generated module lists
-  prisma:generate   ->  Prisma client (cached by Nx)
+  nx run-many       ->  prisma:generate, generate:langy-skills, generate:feature-map,
+                        generate:setup-skill-bodies, generate:evaluators (all cached)
   ensure-built      ->  rebuild the few packages that ship built output,
                         only if stale, through Nx so it's usually a cache hit
 ```
@@ -121,7 +159,8 @@ content and is shared across worktrees, so Nx would only add overhead.
 pnpm typecheck:affected      # typecheck only what your change reached
 pnpm test:affected           # same for tests
 pnpm lint:types:affected     # same for type-aware lint
-pnpm lint                    # fast whole-tree lint
+pnpm lint                    # fast lint, cached per project
+pnpm lint:changed            # the same for what you changed and its dependents
 pnpm lint:architecture       # whole-tree policies
 pnpm typecheck               # the whole lot, cold. Slow, and queues for a slot
 ```

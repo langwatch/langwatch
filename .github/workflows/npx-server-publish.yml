@@ -115,7 +115,7 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: "go.mod"
+          go-version-file: go.work
           cache: true
 
       # Build the aigateway monobinary for all 4 platforms and create a

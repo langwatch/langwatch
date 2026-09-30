@@ -187,15 +187,31 @@ func TestEnsureBuilt(t *testing.T) {
 			t.Error("lock left behind")
 		}
 	})
-	t.Run("builds through Nx when the workspace has it, so the shared cache can answer", func(t *testing.T) {
+	t.Run("asks Nx even when every entry is newer than src, since Nx hashes the inputs outside it", func(t *testing.T) {
 		root, calls := ensureBuiltFixture(t), fakePnpm(t)
 		writeTree(t, root, map[string]string{"node_modules/.bin/nx": ""})
-		if code := EnsureBuilt(root, []string{"langwatch"}, &bytes.Buffer{}); code != 0 {
+		stampFresh(t, root)
+		if code := EnsureBuilt(root, []string{"@langwatch/mail", "langwatch"}, &bytes.Buffer{}); code != 0 {
 			t.Fatalf("code %d", code)
 		}
 		got, _ := os.ReadFile(calls)
-		if want := "exec nx run langwatch:build --excludeTaskDependencies --outputStyle=static\n"; string(got) != want {
+		if want := "exec nx run-many -t build -p langwatch,@langwatch/ksuid,@langwatch/mail --outputStyle=static\n"; string(got) != want {
 			t.Errorf("pnpm calls = %q, want %q", got, want)
+		}
+		if exists(filepath.Join(root, "node_modules/.ensure-built.lock")) {
+			t.Error("lock left behind")
+		}
+	})
+	t.Run("fails and unlocks when the Nx build fails", func(t *testing.T) {
+		root := ensureBuiltFixture(t)
+		fakePnpm(t)
+		writeTree(t, root, map[string]string{"node_modules/.bin/nx": ""})
+		t.Setenv("FAKE_EXIT", "3")
+		if code := EnsureBuilt(root, nil, &bytes.Buffer{}); code != 1 {
+			t.Errorf("code %d", code)
+		}
+		if exists(filepath.Join(root, "node_modules/.ensure-built.lock")) {
+			t.Error("lock left behind")
 		}
 	})
 	t.Run("refuses an unknown target by name", func(t *testing.T) {

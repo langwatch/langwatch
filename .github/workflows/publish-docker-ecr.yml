@@ -201,8 +201,8 @@ jobs:
               - 'pkg/**'
               - 'services/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.github/workflows/publish-docker-ecr.yml'
             langwatch-langevals:
               - 'infra/docker/Dockerfile.langevals'
@@ -214,8 +214,8 @@ jobs:
               - 'pkg/**'
               - 'services/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.github/workflows/publish-docker-ecr.yml'
 
       - name: Select the images to build

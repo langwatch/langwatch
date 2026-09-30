@@ -19,9 +19,9 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/pkg/aitrace"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 const (
@@ -44,7 +44,7 @@ const (
 	attrOrgID = attribute.Key("langwatch.organization_id")
 )
 
-// Mirror tier values (ADR-061), mirroring services/langyagent/domain.MirrorTier.
+// Mirror tier values (ADR-061), mirroring services/langyagent/aitrace.MirrorTier.
 const (
 	mirrorTierContent    = "content"
 	mirrorTierStructural = "structural"
@@ -234,7 +234,7 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 // BeginSpan starts a customer-facing span that nests under the customer's
 // inbound traceparent. It returns an enriched context (carrying the open span)
 // and a W3C traceparent string representing the new span.
-func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType domain.RequestType) (context.Context, string) {
+func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType aitrace.RequestType) (context.Context, string) {
 	tp := TraceParent(ctx)
 	spanCtx := e.customerSpanContext(tp)
 
@@ -261,7 +261,7 @@ func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType domai
 
 // EndSpan retrieves the span started by BeginSpan, sets final attributes, and
 // ends it. If no span is found in context this is a no-op.
-func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
+func (e *Emitter) EndSpan(ctx context.Context, params aitrace.AITraceParams) {
 	span := activeSpanFrom(ctx)
 	if span == nil {
 		return
@@ -424,8 +424,8 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// tokens, so reading the completion field alone would drop a real answer
 	// as an empty probe.
 	answeredTokens := params.Usage.CompletionTokens + params.Usage.OutputAudioTokens
-	isProbeShape := params.RequestType == domain.RequestTypeChat ||
-		params.RequestType == domain.RequestTypeMessages
+	isProbeShape := params.RequestType == aitrace.RequestTypeChat ||
+		params.RequestType == aitrace.RequestTypeMessages
 	if !isError && isProbeShape && answeredTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
@@ -459,7 +459,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 // prefixed (the worker's own span). A model whose provider is unknown
 // (implicit resolution never fills it) or that already carries a path
 // segment is reported as requested.
-func canonicalModelID(provider domain.ProviderID, model string) string {
+func canonicalModelID(provider aitrace.ProviderID, model string) string {
 	if provider == "" || model == "" || strings.Contains(model, "/") {
 		return model
 	}
@@ -524,17 +524,17 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 // middleware-lifted header value wins (already sanitized), else the OpenAI
 // `user` body param on the request shapes that carry one. Both paths land in
 // SanitizeEndUserID so the stamped value is source-independent.
-func endUserID(ctx context.Context, params domain.AITraceParams) string {
+func endUserID(ctx context.Context, params aitrace.AITraceParams) string {
 	if id := EndUserID(ctx); id != "" {
 		return id
 	}
 	switch params.RequestType {
-	case domain.RequestTypeChat, domain.RequestTypeEmbeddings,
-		domain.RequestTypeResponses, domain.RequestTypeSpeech,
-		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+	case aitrace.RequestTypeChat, aitrace.RequestTypeEmbeddings,
+		aitrace.RequestTypeResponses, aitrace.RequestTypeSpeech,
+		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		return EndUserIDFromBody(params.RequestBody)
-	case domain.RequestTypeMessages, domain.RequestTypePassthrough,
-		domain.RequestTypeTranscription, domain.RequestTypeRealtimeSession:
+	case aitrace.RequestTypeMessages, aitrace.RequestTypePassthrough,
+		aitrace.RequestTypeTranscription, aitrace.RequestTypeRealtimeSession:
 		// No OpenAI-wire `user` field to read on these shapes: the Anthropic
 		// messages body carries attribution under metadata.user_id, passthrough
 		// bodies are provider-shaped and forwarded verbatim, transcription
@@ -564,27 +564,27 @@ func EndUserIDFromBody(body []byte) string {
 // the id survives even if a future middleware change stops forwarding the
 // header. Empty when the tool sends no per-conversation id on the gateway wire
 // (gemini-cli, which only emits its conversation id via direct OTLP / Path B).
-func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
+func clientSessionID(ctx context.Context, params aitrace.AITraceParams) string {
 	if id := ClientSessionID(ctx); id != "" {
 		return id
 	}
 	switch params.RequestType {
-	case domain.RequestTypeMessages:
+	case aitrace.RequestTypeMessages:
 		// claude-code: body.metadata.user_id is a JSON string carrying session_id.
 		if userID := gjson.GetBytes(params.RequestBody, "metadata.user_id").String(); userID != "" {
 			if sid := gjson.Get(userID, "session_id").String(); sid != "" {
 				return sid
 			}
 		}
-	case domain.RequestTypeResponses:
+	case aitrace.RequestTypeResponses:
 		// codex: body.prompt_cache_key is the per-session cache key == session id.
 		if sid := gjson.GetBytes(params.RequestBody, "prompt_cache_key").String(); sid != "" {
 			return sid
 		}
-	case domain.RequestTypeChat, domain.RequestTypeEmbeddings, domain.RequestTypePassthrough,
-		domain.RequestTypeSpeech, domain.RequestTypeTranscription,
-		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
-		domain.RequestTypeRealtimeSession:
+	case aitrace.RequestTypeChat, aitrace.RequestTypeEmbeddings, aitrace.RequestTypePassthrough,
+		aitrace.RequestTypeSpeech, aitrace.RequestTypeTranscription,
+		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit,
+		aitrace.RequestTypeRealtimeSession:
 		// No inline session id on these request shapes (audio and image bodies
 		// carry no session field at all, and a realtime mint's session id is
 		// the one the gateway itself hands back); the header lifted above
@@ -602,30 +602,30 @@ func jsonString(s string) string {
 	return string(b)
 }
 
-func extractInputMessages(body []byte, reqType domain.RequestType) string {
+func extractInputMessages(body []byte, reqType aitrace.RequestType) string {
 	if len(body) == 0 {
 		return ""
 	}
 	switch reqType {
-	case domain.RequestTypePassthrough:
+	case aitrace.RequestTypePassthrough:
 		// Gemini-native /v1beta bodies carry `contents` not `messages`.
 		// Convert to a synthetic chat-completion `messages` shape so the
 		// LangWatch trace viewer renders the conversation the same way
 		// it does for the OpenAI / Anthropic surfaces.
 		return geminiContentsAsMessages(body)
-	case domain.RequestTypeResponses:
+	case aitrace.RequestTypeResponses:
 		// OpenAI Responses API (used by codex): `input` is either a
 		// string (single user turn) OR an array of messages. Both shapes
 		// are normalised to a chat-style messages array so downstream
 		// rendering matches the other surfaces.
 		return responsesInputAsMessages(body)
-	case domain.RequestTypeMessages:
+	case aitrace.RequestTypeMessages:
 		// Anthropic /v1/messages: the system prompt lives in a
 		// top-level `system` field, not inside `messages`, so reading
 		// only `messages` drops it from the trace. Prepend it as a
 		// system message and keep the caller's messages verbatim.
 		return anthropicBodyAsMessages(body)
-	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+	case aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		// Images: the prompt is the meaningful input, rendered as a single
 		// user message so the trace viewer shows it like any chat. The source
 		// images of an edit stay out: they are megabytes of binary that no
@@ -634,7 +634,7 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
 		}
 		return ""
-	case domain.RequestTypeSpeech:
+	case aitrace.RequestTypeSpeech:
 		// TTS: the synthesized text is the meaningful input. Rendered as a
 		// single user message so the trace viewer shows it like any chat.
 		// Two field names because two wires reach this shape: the OpenAI one
@@ -842,7 +842,7 @@ func joinGeminiPartsText(parts gjson.Result) string {
 // then hands it here). For streamed bodies the JSON-first parse falls
 // through and the SSE walker reassembles the assistant text out of the
 // provider-native delta event shape.
-func extractOutputMessages(body []byte, reqType domain.RequestType) string {
+func extractOutputMessages(body []byte, reqType aitrace.RequestType) string {
 	if len(body) == 0 {
 		return ""
 	}
@@ -856,27 +856,27 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 	// stream extractor first for every type, then fall back to the
 	// single-object JSON shape for non-streamed (sync) responses.
 	switch reqType {
-	case domain.RequestTypeChat:
+	case aitrace.RequestTypeChat:
 		if out := openAIChatOutputFromSSE(body); out != "" {
 			return out
 		}
 		return openAIChatOutputFromJSON(body)
-	case domain.RequestTypeMessages:
+	case aitrace.RequestTypeMessages:
 		if out := anthropicOutputFromSSE(body); out != "" {
 			return out
 		}
 		return anthropicOutputFromJSON(body)
-	case domain.RequestTypeResponses:
+	case aitrace.RequestTypeResponses:
 		if out := responsesOutputFromSSE(body); out != "" {
 			return out
 		}
 		return responsesOutputFromJSON(body)
-	case domain.RequestTypePassthrough:
+	case aitrace.RequestTypePassthrough:
 		if out := geminiOutputFromSSE(body); out != "" {
 			return out
 		}
 		return geminiOutputFromJSON(body)
-	case domain.RequestTypeTranscription:
+	case aitrace.RequestTypeTranscription:
 		// STT: the transcript is the meaningful output. The response is the
 		// OpenAI transcription JSON; anything without a text field (or a
 		// non-JSON body) renders as empty rather than as raw bytes.
@@ -884,7 +884,7 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(t.String()))
 		}
 		return ""
-	case domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit:
+	case aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit:
 		// Images: the response body is base64 image data, megabytes of it,
 		// which must never land on a span. The model's rewritten prompt is
 		// the one renderable part, when the provider states one.

@@ -10,7 +10,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // Prompt-cache token telemetry: the customer span must carry the cache token
@@ -22,15 +22,15 @@ import (
 
 // recordSpanForUsage runs the emitter's span lifecycle for a given usage and
 // returns the recorded span, captured via an in-memory recorder.
-func recordSpanForUsage(t *testing.T, u domain.Usage) sdktrace.ReadOnlySpan {
+func recordSpanForUsage(t *testing.T, u aitrace.Usage) sdktrace.ReadOnlySpan {
 	t.Helper()
 	sr := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
 	e := &Emitter{tp: tp, tracer: tp.Tracer("test"), propagator: propagation.TraceContext{}}
 
-	ctx, _ := e.BeginSpan(context.Background(), "proj-test", domain.RequestTypeMessages)
-	e.EndSpan(ctx, domain.AITraceParams{
-		ProviderID: domain.ProviderAnthropic,
+	ctx, _ := e.BeginSpan(context.Background(), "proj-test", aitrace.RequestTypeMessages)
+	e.EndSpan(ctx, aitrace.AITraceParams{
+		ProviderID: aitrace.ProviderAnthropic,
 		Model:      "claude-opus-4-7",
 		Usage:      u,
 	})
@@ -51,7 +51,7 @@ func findIntAttr(span sdktrace.ReadOnlySpan, key string) (int64, bool) {
 
 // @scenario "A cached request records the cache-read and cache-write token counts on the span"
 func TestEmitter_CachedRequest_RecordsCacheTokens(t *testing.T) {
-	span := recordSpanForUsage(t, domain.Usage{
+	span := recordSpanForUsage(t, aitrace.Usage{
 		PromptTokens:        37651, // provider total, includes cached tokens
 		CompletionTokens:    12,
 		TotalTokens:         37663,
@@ -70,7 +70,7 @@ func TestEmitter_CachedRequest_RecordsCacheTokens(t *testing.T) {
 
 // @scenario "The fresh input-token count excludes cached tokens"
 func TestEmitter_FreshInputExcludesCacheTokens(t *testing.T) {
-	span := recordSpanForUsage(t, domain.Usage{
+	span := recordSpanForUsage(t, aitrace.Usage{
 		PromptTokens:        37651,
 		CompletionTokens:    12,
 		TotalTokens:         37663,
@@ -86,7 +86,7 @@ func TestEmitter_FreshInputExcludesCacheTokens(t *testing.T) {
 
 // @scenario "A request with no cache activity records no cache tokens"
 func TestEmitter_NoCacheActivity_RecordsNoCacheTokens(t *testing.T) {
-	span := recordSpanForUsage(t, domain.Usage{
+	span := recordSpanForUsage(t, aitrace.Usage{
 		PromptTokens:     100,
 		CompletionTokens: 20,
 		TotalTokens:      120,
@@ -112,7 +112,7 @@ func TestEmitter_HourLongCacheWrite_RecordsTheLifetime(t *testing.T) {
 	// Equal values would let an emitter that wrote the total into the hour-long
 	// attr pass, which is the mistake most worth catching: it would price
 	// short-lived writes at twice the input rate.
-	span := recordSpanForUsage(t, domain.Usage{
+	span := recordSpanForUsage(t, aitrace.Usage{
 		PromptTokens:          36299,
 		CompletionTokens:      210,
 		TotalTokens:           36509,
@@ -132,7 +132,7 @@ func TestEmitter_HourLongCacheWrite_RecordsTheLifetime(t *testing.T) {
 
 // @scenario "A cache write whose lifetime the provider did not state is left unqualified"
 func TestEmitter_UnstatedCacheWriteLifetime_RecordsNoHourLongAttr(t *testing.T) {
-	span := recordSpanForUsage(t, domain.Usage{
+	span := recordSpanForUsage(t, aitrace.Usage{
 		PromptTokens:        36299,
 		CompletionTokens:    210,
 		TotalTokens:         36509,
@@ -155,7 +155,7 @@ func TestEmitter_UnstatedCacheWriteLifetime_RecordsNoHourLongAttr(t *testing.T) 
 func TestEmitter_HourLongWriteWithNoNormalizedTotal_LeavesFreshInputExcludingIt(t *testing.T) {
 	// What the raw-forward lane hands over: the normalized struct carried no
 	// cache-write count, the body said 17854 of the writes bought an hour.
-	usage := domain.Usage{
+	usage := aitrace.Usage{
 		PromptTokens:          36299,
 		CompletionTokens:      210,
 		TotalTokens:           36509,

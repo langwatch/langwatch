@@ -104,9 +104,17 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
-      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-      - run: helm repo add langwatch https://langwatch.github.io/langwatch
-      - run: helm dependency build .
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/workspace"
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: chart
+      # Adds the repositories, builds the dependencies, then lints and renders
+      # the smoke preset for every chart; each is cached by chart content.
+      - name: "helm deps, lint and smoke render"
+        working-directory: .
+        run: pnpm exec nx run-many -t helm:deps helm:lint helm:template --projects "tag:helm" --outputStyle=static
 
       # `set +e` is deliberate and load-bearing. Actions runs `run:` steps with
       # `-e` already on, and `set -uo pipefail` does not clear it — so without
@@ -252,11 +260,14 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
-      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-      - run: helm repo add langwatch https://langwatch.github.io/langwatch
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "@langwatch/platform-api... @langwatch/langy-browser..."
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: chart
+      - name: Build chart dependencies
+        run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
       - name: Generate required files
         run: pnpm start:prepare:files && pnpm ensure:built
       # The integration config's globalSetup runs ClickHouse migrations via

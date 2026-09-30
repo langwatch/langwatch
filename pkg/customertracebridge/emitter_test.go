@@ -15,9 +15,9 @@ import (
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/langwatch/langwatch/pkg/aitrace"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
-	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 func TestParseTraceparent_valid(t *testing.T) {
@@ -190,12 +190,12 @@ func TestEmitter_WireResourceIsOriginMarkerOnly(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
-	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeChat)
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", aitrace.RequestTypeChat)
 	// Real usage, or EndSpan classifies the span as a zero-cost probe and the
 	// drop filter keeps it off the wire entirely.
-	e.EndSpan(spanCtx, domain.AITraceParams{
+	e.EndSpan(spanCtx, aitrace.AITraceParams{
 		Model: "gpt-test",
-		Usage: domain.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
+		Usage: aitrace.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
 	})
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 
@@ -242,7 +242,7 @@ func TestEmitter_CustomerTraceNeverAdoptsInternalTrace(t *testing.T) {
 	internalTraceID := internalSpan.SpanContext().TraceID().String()
 
 	t.Run("without a customer traceparent the span is a new root", func(t *testing.T) {
-		_, traceparent := e.BeginSpan(internalCtx, "proj-1", domain.RequestTypeChat)
+		_, traceparent := e.BeginSpan(internalCtx, "proj-1", aitrace.RequestTypeChat)
 		require.NotContains(t, traceparent, internalTraceID,
 			"the customer span adopted the gateway's internal trace id")
 	})
@@ -251,7 +251,7 @@ func TestEmitter_CustomerTraceNeverAdoptsInternalTrace(t *testing.T) {
 		customerTrace := "4bf92f3577b34da6a3ce929d0e0e4736"
 		ctxWithTP := WithTraceParent(internalCtx,
 			"00-"+customerTrace+"-00f067aa0ba902b7-01")
-		_, traceparent := e.BeginSpan(ctxWithTP, "proj-1", domain.RequestTypeChat)
+		_, traceparent := e.BeginSpan(ctxWithTP, "proj-1", aitrace.RequestTypeChat)
 		require.Contains(t, traceparent, customerTrace,
 			"the customer span must continue the customer's own trace")
 		require.NotContains(t, traceparent, internalTraceID)
@@ -291,13 +291,13 @@ func TestEmitter_SpeechSpanIsNotSuppressedAsProbe(t *testing.T) {
 	// A successful TTS call: zero completion tokens, zero provider-reported
 	// cost, binary response body so no extractable output. The character
 	// count is the usage measure the cost pipeline prices TTS by.
-	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeSpeech)
-	e.EndSpan(spanCtx, domain.AITraceParams{
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", aitrace.RequestTypeSpeech)
+	e.EndSpan(spanCtx, aitrace.AITraceParams{
 		Model:        "gpt-4o-mini-tts",
-		RequestType:  domain.RequestTypeSpeech,
+		RequestType:  aitrace.RequestTypeSpeech,
 		RequestBody:  []byte(`{"model":"gpt-4o-mini-tts","voice":"nova","input":"hello"}`),
 		ResponseBody: []byte{0xff, 0xf3, 0x00, 0x01},
-		Usage:        domain.Usage{InputChars: 5},
+		Usage:        aitrace.Usage{InputChars: 5},
 	})
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 
@@ -380,12 +380,12 @@ func TestEmitter_TranscriptionSpanCarriesAudioSeconds(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
-	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeTranscription)
-	e.EndSpan(spanCtx, domain.AITraceParams{
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", aitrace.RequestTypeTranscription)
+	e.EndSpan(spanCtx, aitrace.AITraceParams{
 		Model:        "scribe_v1",
-		RequestType:  domain.RequestTypeTranscription,
+		RequestType:  aitrace.RequestTypeTranscription,
 		ResponseBody: []byte(`{"text":"hello world"}`),
-		Usage:        domain.Usage{AudioSeconds: 4.2},
+		Usage:        aitrace.Usage{AudioSeconds: 4.2},
 	})
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 
@@ -426,11 +426,11 @@ func TestEmitter_ZeroChatProbeStaysSuppressed(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
-	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeChat)
-	e.EndSpan(spanCtx, domain.AITraceParams{
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", aitrace.RequestTypeChat)
+	e.EndSpan(spanCtx, aitrace.AITraceParams{
 		Model:       "gpt-test",
-		RequestType: domain.RequestTypeChat,
-		Usage:       domain.Usage{},
+		RequestType: aitrace.RequestTypeChat,
+		Usage:       aitrace.Usage{},
 	})
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 

@@ -121,6 +121,25 @@ export const parseShard = (value: string | undefined): { index: number; total: n
   return { index, total };
 };
 
+/**
+ * Parses `PACKAGE_SUITES_ONLY`, the JSON list of projects a pull request reaches
+ * (from `nx show projects --affected`). Absent means every package; a malformed
+ * value is an error, never a silent whole run or an empty one.
+ */
+export const parseOnly = (value: string | undefined): Set<string> | undefined => {
+  if (value === undefined || value.trim() === "") return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    parsed = undefined;
+  }
+  if (!Array.isArray(parsed) || !parsed.every((name) => typeof name === "string")) {
+    throw new Error(`PACKAGE_SUITES_ONLY is not a JSON list of project names: '${value}'.`);
+  }
+  return new Set(parsed);
+};
+
 /** Round-robin over the sorted list, so every package lands on exactly one shard. */
 export const shardOf = <T>(items: readonly T[], shard: { index: number; total: number }): T[] =>
   items.filter((_, position) => position % shard.total === shard.index - 1);
@@ -237,9 +256,19 @@ if (isEntrypoint()) {
     console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
-  const assigned = shardOf(discovered, shard);
+  let only: Set<string> | undefined;
+  try {
+    only = parseOnly(process.env.PACKAGE_SUITES_ONLY);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  // Narrowed after the stale-register check, which has to see every package.
+  const reached = only ? discovered.filter((pkg) => only.has(pkg.name)) : discovered;
+  if (only) console.log(`Affected by this change: ${reached.length} of ${discovered.length}.`);
+  const assigned = shardOf(reached, shard);
   console.log(
-    `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${discovered.length} packages.`,
+    `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages.`,
   );
   // Serial on purpose. Each suite is its own vitest with its own worker pool,
   // so several at once oversubscribe a 4-core runner and turn real results into

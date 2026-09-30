@@ -35,8 +35,8 @@ version: 2
 #     minimum-release-age / exclude-newer gate, which is a deliberate
 #     supply-chain safeguard and is intentionally left in place.
 #
-#   - gomod: one entry per go.mod (the repo has no Go workspace file tying
-#     them together, and each sibling SDK module is tagged and released
+#   - gomod: one entry per go.mod (Dependabot scans modules, not go.work,
+#     and each sibling SDK module is tagged and released
 #     independently — see the Go SDK module-tags convention). Grouped the same
 #     way as the JS/Python ecosystems: minor+patch together, majors individual.
 #   - docker: one entry per directory that actually contains a Dockerfile.
@@ -193,11 +193,62 @@ updates:
           - "minor"
           - "patch"
 
-  # One entry per go.mod. There is no Go workspace file tying these together,
-  # and the sibling SDK modules under sdks/go/instrumentation/* are tagged and
-  # released independently, so each needs its own scan.
+  # One entry per go.mod. Dependabot scans a module, not the go.work tying
+  # them together, and the sibling SDK modules under sdks/go/instrumentation/*
+  # are tagged and released independently, so each needs its own scan.
   - package-ecosystem: "gomod"
-    directory: "/"
+    directory: "/cmd"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "gomod"
+    directory: "/pkg"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "gomod"
+    directory: "/services"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 50
+    cooldown:
+      default-days: 8
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "gomod"
+    directory: "/tools"
     schedule:
       interval: "weekly"
       day: "monday"

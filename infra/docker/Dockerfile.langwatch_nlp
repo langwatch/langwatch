@@ -14,10 +14,15 @@ WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 ARG TARGETOS
 ARG TARGETARCH
-# Monorepo: sdks/go is in-tree, resolved via `replace ... => ./sdks/go` in the
-# root go.mod, so its go.mod must be present before `go mod download`.
-COPY go.mod go.sum ./
-COPY sdks/go/go.mod sdks/go/go.sum ./sdks/go/
+# Monorepo: go.work loads only when every module it uses has its go.mod, so
+# all of them land before `go mod download`. Mirrors Dockerfile.go_service.
+COPY go.work go.work.sum ./
+COPY cmd/go.* cmd/
+COPY pkg/go.* pkg/
+COPY services/go.* services/
+COPY tools/go.* tools/
+COPY sdks/go/go.* sdks/go/
+COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     go mod download
 COPY cmd/ cmd/

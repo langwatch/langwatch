@@ -31,9 +31,9 @@ import (
 	"strings"
 )
 
-// herrImportSuffix locates, relative to the module path, the package whose
-// Code/RegisterStatus calls are read. Joining it to the module read from go.mod
-// means a fork or a module rename needs no edit here.
+// herrImportSuffix locates, relative to the repository's import path, the
+// package whose Code/RegisterStatus calls are read. Joining it to the path read
+// from pkg/go.mod means a fork or a module rename needs no edit here.
 const herrImportSuffix = "pkg/herr"
 
 // Declaration is one `Name = herr.Code("code")` const in the tree.
@@ -317,14 +317,17 @@ func localNameFor(imports map[string]string, importPath string) (string, error) 
 
 var modulePattern = regexp.MustCompile(`(?m)^module\s+(\S+)\s*$`)
 
+// readModulePath returns the repository's import path. No module sits at the
+// root, so it is the pkg module's path without its /pkg.
 func readModulePath(root string) (string, error) {
-	raw, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	goMod := filepath.Join(root, "pkg", "go.mod")
+	raw, err := os.ReadFile(goMod)
 	if err != nil {
-		return "", fmt.Errorf("read go.mod: %w", err)
+		return "", fmt.Errorf("read pkg/go.mod: %w", err)
 	}
 	match := modulePattern.FindSubmatch(raw)
-	if match == nil {
-		return "", fmt.Errorf("no module path in %s", filepath.Join(root, "go.mod"))
+	if match == nil || !strings.HasSuffix(string(match[1]), "/pkg") {
+		return "", fmt.Errorf("no module path ending in /pkg in %s", goMod)
 	}
-	return string(match[1]), nil
+	return strings.TrimSuffix(string(match[1]), "/pkg"), nil
 }

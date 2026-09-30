@@ -27,8 +27,15 @@ FROM --platform=$BUILDPLATFORM golang:1.27.1-bookworm AS builder
 WORKDIR /src
 
 # Cache go module downloads in a layer that only invalidates when go.mod/
-# go.sum changes — the rest of the source tree is a churnier input.
-COPY go.mod go.sum ./
+# go.sum changes — the rest of the source tree is a churnier input. go.work
+# loads only when every module it uses has its go.mod, so all of them land.
+COPY go.work go.work.sum ./
+COPY cmd/go.* cmd/
+COPY pkg/go.* pkg/
+COPY services/go.* services/
+COPY tools/go.* tools/
+COPY sdks/go/go.* sdks/go/
+COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 COPY sdks/go ./sdks/go
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \

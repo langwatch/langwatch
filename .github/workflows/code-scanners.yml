@@ -79,8 +79,8 @@ jobs:
             # keeps this filter correct when a new Go root appears.
             go:
               - '**/*.go'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'go.work'
               - 'go.work.sum'
               - '.github/workflows/code-scanners.yml'
@@ -225,8 +225,8 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       # BLOCKING, on the same "clean baseline earns a gate" rule the oxlint
       # rules in this branch follow. The baseline is zero as of the go.mod bump

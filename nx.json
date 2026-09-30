@@ -5,8 +5,7 @@
     "sharedGlobals": [
       "{workspaceRoot}/tsconfig.base.json",
       "{workspaceRoot}/tsconfig.shared.json",
-      "{workspaceRoot}/pnpm-workspace.yaml",
-      "{workspaceRoot}/pnpm-lock.yaml"
+      "{workspaceRoot}/pnpm-workspace.yaml"
     ],
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
@@ -20,22 +19,139 @@
     "lintGlobals": [
       "sharedGlobals",
       "{workspaceRoot}/.oxlintrc.jsonc",
-      "{workspaceRoot}/packages/oxlint-rules/**/*"
-    ]
+      "{workspaceRoot}/packages/oxlint-rules/**/*",
+      "{workspaceRoot}/packages/architecture-enforcer/oxlint*",
+      "{workspaceRoot}/modules/catalogue.json",
+      "{workspaceRoot}/modules/*/*/package.json",
+      "{workspaceRoot}/enterprise/modules/*/*/package.json",
+      "{workspaceRoot}/docs/api-reference/openapiLangWatch.json"
+    ],
+    "jsBuild": [
+      {
+        "runtime": "node --version"
+      },
+      "npmDeps"
+    ],
+    "go": [
+      "{projectRoot}/**/*",
+      "{workspaceRoot}/go.work",
+      "{workspaceRoot}/go.work.sum",
+      "{workspaceRoot}/*/go.{mod,sum}",
+      "{workspaceRoot}/infra/clickhouse-serverless/go.{mod,sum}",
+      "{workspaceRoot}/sdks/go/go.{mod,sum}",
+      {
+        "runtime": "go version"
+      },
+      {
+        "env": "GOFLAGS"
+      },
+      {
+        "env": "GOOS"
+      },
+      {
+        "env": "GOARCH"
+      },
+      {
+        "env": "CGO_ENABLED"
+      },
+      {
+        "env": "GOEXPERIMENT"
+      },
+      {
+        "externalDependencies": []
+      }
+    ],
+    "goBuild": ["go", "!{projectRoot}/**/*_test.go"],
+    "npmDeps": [
+      {
+        "externalDependencies": []
+      }
+    ],
+    "testReads": []
   },
-  "plugins": ["./dev/nx/lint-types-plugin.mjs"],
+  "plugins": [
+    "./dev/nx/lint-plugin.mjs",
+    "./dev/nx/go-plugin.mjs",
+    "./dev/nx/npm-deps-plugin.mjs",
+    "./dev/nx/helm-plugin.mjs",
+    "./dev/nx/workspace-plugin.mjs",
+    "./dev/nx/test-reads-plugin.mjs"
+  ],
   "targetDefaults": {
-    "typecheck": {
-      "cache": true,
-      "inputs": ["default", "^production"],
-      "outputs": ["{projectRoot}/dist"]
-    },
+    "typecheck": [
+      {
+        "cache": true,
+        "dependsOn": ["^typecheck", "^build", "^prisma:generate"],
+        "inputs": [
+          "default",
+          "^production",
+          "npmDeps",
+          {
+            "externalDependencies": ["typescript"]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/dist/**/*.d.ts",
+          "{projectRoot}/dist/**/*.d.ts.map",
+          "{projectRoot}/dist/**/*.tsbuildinfo",
+          "{projectRoot}/dist/**/*.json"
+        ]
+      },
+      {
+        "filter": {
+          "projects": [
+            "@langwatch/ui",
+            "@langwatch/server",
+            "@langwatch/scenario-child",
+            "@langwatch/langyworker"
+          ]
+        },
+        "outputs": [
+          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
+          "{projectRoot}/dist/tsconfig.test.tsbuildinfo"
+        ]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/prisma-client"]
+        },
+        "dependsOn": ["^typecheck", "^build", "prisma:generate"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/mail"]
+        },
+        "outputs": [
+          "{projectRoot}/dist/typecheck",
+          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
+          "{projectRoot}/dist/tsconfig.preview.tsbuildinfo"
+        ]
+      },
+      {
+        "filter": {
+          "projects": ["langwatch"]
+        },
+        "dependsOn": ["^typecheck", "^build", "^prisma:generate", "build"],
+        "outputs": [
+          "{projectRoot}/dist/src",
+          "{projectRoot}/dist/__tests__",
+          "{projectRoot}/dist/*.config.*",
+          "{projectRoot}/dist/test-setup.*",
+          "{projectRoot}/dist/package.json",
+          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo"
+        ]
+      }
+    ],
     "build": [
       {
         "cache": true,
         "dependsOn": ["^build"],
-        "inputs": ["production", "^production"],
-        "outputs": ["{projectRoot}/dist"]
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": [
+          "{projectRoot}/dist",
+          "!{projectRoot}/dist/typecheck",
+          "!{projectRoot}/dist/tsconfig.{typecheck,test,preview}.tsbuildinfo"
+        ]
       },
       {
         "filter": {
@@ -56,9 +172,118 @@
           "{workspaceRoot}/modules/scenario/contract/src/evaluator-attachments.ts",
           "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
           "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
-          "{workspaceRoot}/packages/redaction/src/**/*"
+          "{workspaceRoot}/packages/redaction/src/**/*",
+          "jsBuild"
         ],
-        "outputs": ["{projectRoot}/dist", "{projectRoot}/src/internal/generated"]
+        "outputs": [
+          "{projectRoot}/dist",
+          "!{projectRoot}/dist/src",
+          "!{projectRoot}/dist/__tests__",
+          "!{projectRoot}/dist/*.config.*",
+          "!{projectRoot}/dist/test-setup.*",
+          "!{projectRoot}/dist/package.json",
+          "!{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
+          "{projectRoot}/src/internal/generated"
+        ]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/ksuid"]
+        },
+        "outputs": [
+          "{projectRoot}/dist",
+          "!{projectRoot}/dist/**/*.d.ts.map",
+          "!{projectRoot}/dist/*.tsbuildinfo"
+        ]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/scenario-child"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild",
+          {
+            "env": "EMIT_META"
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/dist",
+          "!{projectRoot}/dist/typecheck",
+          "!{projectRoot}/dist/tsconfig.{typecheck,test,preview}.tsbuildinfo"
+        ]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/haven-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/tools/thuishaven/adapters/dashboard/web/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/idpsim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/idpsim/web/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/mailsim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/mailsim/web/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/llmsim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/llmsim/web/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/storagesim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/storagesim/web/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/voicesim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/voicesim/web/dist"]
+      },
+      {
+        "filter": {
+          "plugin": "./dev/nx/go-plugin.mjs"
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": [
+          "goBuild",
+          "^goBuild",
+          {
+            "dependentTasksOutputFiles": "**/*"
+          }
+        ],
+        "outputs": ["{workspaceRoot}/.bin/{projectName}/{projectName}"]
       }
     ],
     "prisma:generate": {
@@ -68,24 +293,65 @@
         "{projectRoot}/prisma.config.ts",
         "{projectRoot}/scripts/generate-table-catalogue.mjs",
         "{projectRoot}/package.json",
-        "sharedGlobals"
+        "sharedGlobals",
+        "npmDeps"
       ],
       "outputs": ["{projectRoot}/src/generated", "{projectRoot}/src/table-catalogue.ts"]
     },
-    "test": {
-      "cache": true,
-      "inputs": ["default", "^production"],
-      "outputs": []
-    },
+    "test": [
+      {
+        "cache": true,
+        "dependsOn": ["^build", "^prisma:generate"],
+        "inputs": [
+          "default",
+          "^production",
+          "npmDeps",
+          "testReads",
+          {
+            "externalDependencies": ["vitest"]
+          }
+        ],
+        "outputs": []
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/prisma-client"]
+        },
+        "dependsOn": ["^build", "prisma:generate"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/test-harness"]
+        },
+        "cache": false
+      }
+    ],
     "test:unit": {
       "cache": true,
-      "inputs": ["default", "^production"],
+      "dependsOn": ["^build", "^prisma:generate"],
+      "inputs": [
+        "default",
+        "^production",
+        "npmDeps",
+        "testReads",
+        {
+          "externalDependencies": ["vitest"]
+        }
+      ],
       "outputs": []
     },
     "lint": [
       {
         "cache": true,
-        "inputs": ["default", "lintGlobals"],
+        "inputs": [
+          "default",
+          "^production",
+          "lintGlobals",
+          {
+            "externalDependencies": ["oxlint"]
+          },
+          "npmDeps"
+        ],
         "outputs": []
       },
       {
@@ -97,11 +363,113 @@
     ],
     "lint:types": {
       "cache": true,
-      "inputs": ["default", "^production", "lintGlobals"],
+      "dependsOn": ["^build", "^prisma:generate"],
+      "inputs": [
+        "default",
+        "^production",
+        "lintGlobals",
+        "npmDeps",
+        {
+          "externalDependencies": ["oxlint", "oxlint-tsgolint"]
+        }
+      ],
       "outputs": []
+    },
+    "lint:go": {
+      "cache": true,
+      "inputs": ["go", "^go", "{workspaceRoot}/.golangci.yml", "{workspaceRoot}/Makefile"],
+      "outputs": []
+    },
+    "test:go": {
+      "cache": false
+    },
+    "generate:langy-skills": {
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/scripts/**/*",
+        "{workspaceRoot}/infra/docker/Dockerfile.langyagent",
+        "{workspaceRoot}/skills/_lib/frontmatter.ts",
+        "{workspaceRoot}/skills/_compiled/native/**/*",
+        {
+          "runtime": "node --version"
+        },
+        "npmDeps"
+      ],
+      "outputs": ["{projectRoot}/src/model/shared/langy/langySkills.generated.json"]
+    },
+    "generate:feature-map": {
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/scripts/**/*",
+        "{workspaceRoot}/feature-map.json",
+        {
+          "runtime": "node --version"
+        }
+      ],
+      "outputs": ["{projectRoot}/src/model/shared/langy/feature-map.generated.json"]
+    },
+    "generate:setup-skill-bodies": {
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/scripts/**/*",
+        "{workspaceRoot}/skills/_compiled/native/**/*",
+        "^production",
+        {
+          "runtime": "node --version"
+        },
+        "npmDeps"
+      ],
+      "outputs": ["{projectRoot}/src/rules/setup-skill-bodies.rules.ts"]
+    },
+    "generate:evaluators": {
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/services/langevals/ts-integration/evaluators.generated.ts",
+        "{projectRoot}/package.json"
+      ],
+      "outputs": ["{projectRoot}/src/evaluators.generated.ts"]
+    },
+    "generate": {
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/copy-types.sh",
+        "{projectRoot}/scripts/**/*",
+        "{projectRoot}/package.json",
+        "{workspaceRoot}/feature-map.json",
+        "{workspaceRoot}/skills/**/*",
+        "{workspaceRoot}/specs/api-reference/openapi-document.json",
+        "{workspaceRoot}/services/langevals/ts-integration/evaluators.generated.ts",
+        "{workspaceRoot}/modules/evaluator/contract/src/evaluators.native.ts",
+        "{workspaceRoot}/modules/model-provider/contract/src/catalog/model-catalog.json",
+        "{workspaceRoot}/modules/scenario/contract/src/evaluator-attachments.ts",
+        "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
+        "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
+        "{workspaceRoot}/packages/redaction/src/**/*",
+        {
+          "runtime": "node --version"
+        },
+        "npmDeps"
+      ],
+      "outputs": ["{projectRoot}/src/internal/generated"]
+    },
+    "herrgen": {
+      "cache": true,
+      "inputs": [
+        "go",
+        "^go",
+        "{workspaceRoot}/packages/error-presentation/src/**/*",
+        "{workspaceRoot}/packages/handled-error/src/**/*"
+      ],
+      "outputs": ["{workspaceRoot}/packages/error-presentation/src/codes.generated.ts"]
     }
   },
   "parallel": 4,
   "maxCacheSize": "10GB",
-  "analytics": false
+  "analytics": false,
+  "pluginsConfig": {
+    "@nx/js": {
+      "analyzeSourceFiles": false,
+      "projectsAffectedByDependencyUpdates": "auto"
+    }
+  }
 }

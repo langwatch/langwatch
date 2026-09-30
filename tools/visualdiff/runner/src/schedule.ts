@@ -145,9 +145,9 @@ export interface FlowOrder {
 }
 
 /**
- * orderFlows sorts flows into FlowOrder, in configured order. Read-only flows join the routes;
- * the rest share the page pool once routes are done (a `{uid}` keeps them apart); a `serial`
- * flow runs alone at the end.
+ * orderFlows sorts flows into FlowOrder, keeping the configured order in each. Flows that only
+ * look join the routes; the rest run across the page pool once the routes are done (`{uid}`
+ * keeps what they create apart); a flow that declares `serial` runs alone at the end.
  */
 export const orderFlows = (flows: readonly PlanFlow[]): FlowOrder => {
   const alone = (flow: PlanFlow): boolean => flow.serial === true;

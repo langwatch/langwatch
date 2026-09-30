@@ -116,11 +116,14 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/mcp-server..."
+          install: "@langwatch/mcp-server... @langwatch/workspace"
+
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: mcp
 
       - name: Build
-        working-directory: mcp/typescript
-        run: pnpm run build
+        run: pnpm exec nx run @langwatch/mcp-server:build --outputStyle=static
 
       # The vendored scenario package the scenario tests load resolves
       # `langwatch` to the workspace SDK, whose exports point at its dist.

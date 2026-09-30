@@ -257,6 +257,7 @@ jobs:
           --filter "@langwatch/ui..."
           --filter "langwatch-e2e-tests"
           --filter "@langwatch/tasks..."
+          --filter "@langwatch/workspace"
 
       # No Playwright browser/ffmpeg download: the tests launch the runner's
       # preinstalled Google Chrome via channel (E2E_BROWSER_CHANNEL below) and
@@ -265,8 +266,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built
@@ -283,8 +284,12 @@ jobs:
 
       # The browser bundle only. apps/api and apps/worker run from source
       # through node and have no build of their own.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: e2e
+
       - name: Build browser bundle
-        run: pnpm run build:types && NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
+        run: pnpm exec nx run workspace:build:types --outputStyle=static && pnpm exec nx run @langwatch/ui:build --outputStyle=static
 
       - name: Run E2E tests
         env:

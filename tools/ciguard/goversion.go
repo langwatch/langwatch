@@ -60,28 +60,20 @@ func goDirective(text string) string {
 	return ""
 }
 
-// GoVersion reports every place that disagrees with the root go.mod.
+// GoVersion reports every place that disagrees with go.work, the version
+// every workspace module shares (there is no module at the repository root).
 func GoVersion(repoRoot string) ([]string, error) {
-	rootModule, err := os.ReadFile(filepath.Join(repoRoot, "go.mod"))
-	if err != nil {
-		return nil, fmt.Errorf("read go.mod: %w", err)
-	}
-
-	want := goDirective(string(rootModule))
-	if want == "" {
-		return []string{"go.mod has no parseable `go` directive"}, nil
-	}
-
-	var problems []string
-
 	work, err := os.ReadFile(filepath.Join(repoRoot, "go.work"))
 	if err != nil {
 		return nil, fmt.Errorf("read go.work: %w", err)
 	}
-	if got := goDirective(string(work)); got != want {
-		problems = append(problems, fmt.Sprintf(
-			"go.work says %s, go.mod says %s — the workspace and the root module must agree", got, want))
+
+	want := goDirective(string(work))
+	if want == "" {
+		return []string{"go.work has no parseable `go` directive"}, nil
 	}
+
+	var problems []string
 
 	modules, err := goChildModules(repoRoot, want)
 	if err != nil {
@@ -103,8 +95,8 @@ func GoVersion(repoRoot string) ([]string, error) {
 	return append(problems, images...), nil
 }
 
-// goChildModules compares every non-root go.mod against the version it is
-// supposed to track — the root module's, or its family's floor.
+// goChildModules compares every go.mod against the version it is supposed to
+// track — go.work's, or its family's floor.
 //
 // Without this the guard read the root module and nothing else, so
 // infra/clickhouse-serverless/go.mod could drift straight back to 1.26.1
@@ -153,7 +145,7 @@ type expectation struct {
 func expectationFor(repoRoot, path, rootVersion string) (expectation, bool, error) {
 	family, isInFamily := moduleFamily(path)
 	if !isInFamily {
-		return expectation{version: rootVersion, authority: "go.mod"}, true, nil
+		return expectation{version: rootVersion, authority: "go.work"}, true, nil
 	}
 
 	authority := family + "go.mod"
@@ -225,9 +217,7 @@ func childModulePaths(repoRoot string) ([]string, error) {
 		if relErr != nil {
 			return relErr
 		}
-		if rel != "go.mod" {
-			paths = append(paths, filepath.ToSlash(rel))
-		}
+		paths = append(paths, filepath.ToSlash(rel))
 
 		return nil
 	})
@@ -370,11 +360,11 @@ func checkGolangImage(path, tag, want string) []string {
 		// the image quietly stops matching the module without any file
 		// changing.
 		return []string{fmt.Sprintf(
-			"%s uses golang:%s, a floating tag — pin the patch so the image is built with the toolchain go.mod asks for", path, tag)}
+			"%s uses golang:%s, a floating tag — pin the patch so the image is built with the toolchain go.work asks for", path, tag)}
 	}
 
 	if version != want {
-		return []string{fmt.Sprintf("%s builds with Go %s, go.mod says %s", path, version, want)}
+		return []string{fmt.Sprintf("%s builds with Go %s, go.work says %s", path, version, want)}
 	}
 
 	return nil

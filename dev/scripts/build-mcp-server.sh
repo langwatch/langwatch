@@ -1,5 +1,5 @@
 #!/bin/bash
-# Silent wrapper around `pnpm --filter @langwatch/mcp-server run build`.
+# Silent wrapper around `nx run @langwatch/mcp-server:build`.
 # Called from `pnpm run start:prepare:files` — the full tsup + esbuild
 # output is noise in that context. Prints one line with the elapsed time,
 # or the full captured output on failure.
@@ -44,7 +44,7 @@ if [ ! -e "$mcp_tsup" ]; then
   fi
 fi
 
-if ! output=$(pnpm --silent --filter @langwatch/mcp-server run build 2>&1); then
+if ! output=$(pnpm exec nx run @langwatch/mcp-server:build --outputStyle=static 2>&1); then
   printf 'FAILED\n'
   printf '%s\n' "$output"
   exit 1

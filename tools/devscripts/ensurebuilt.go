@@ -114,7 +114,7 @@ func buildOne(root string, target buildTarget, stderr io.Writer) error {
 	}
 	defer os.RemoveAll(lock)
 	fmt.Fprintf(stderr, "ensure-built: building %s (%s missing or stale)\n", target.name, target.entry)
-	args := buildArgs(root, target.name)
+	args := []string{"--filter", target.name, "build"}
 	cmd := exec.CommandContext(context.Background(), "pnpm", args...)
 	cmd.Dir, cmd.Stdout, cmd.Stderr = root, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -131,23 +131,52 @@ func buildOne(root string, target buildTarget, stderr io.Writer) error {
 	return nil
 }
 
-// buildArgs runs the build through Nx when the workspace has it, so a build some
-// other checkout already made is restored from the shared cache (ADR-150); a
-// tree installed without the root devDependencies builds directly.
-func buildArgs(root, name string) []string {
-	if exists(filepath.Join(root, "node_modules", ".bin", "nx")) {
-		return []string{"exec", "nx", "run", name + ":build", "--excludeTaskDependencies", "--outputStyle=static"}
+// buildWithNx hands the whole set to Nx, which hashes every input a build reads
+// (the SDK copies files from outside its package, which no mtime of src/ sees),
+// orders ksuid before mail through ^build, and restores a build any checkout
+// already made (ADR-150). Parallel predev hooks queue on one workspace lock.
+func buildWithNx(root string, selected []buildTarget, stderr io.Writer) int {
+	names := make([]string, 0, len(selected))
+	for _, target := range selected {
+		names = append(names, target.name)
 	}
-	return []string{"--filter", name, "build"}
+	defer lockWorkspace(filepath.Join(root, "node_modules", ".ensure-built.lock"))()
+	args := []string{"exec", "nx", "run-many", "-t", "build", "-p", strings.Join(names, ","), "--outputStyle=static"}
+	cmd := exec.CommandContext(context.Background(), "pnpm", args...)
+	cmd.Dir, cmd.Stdout, cmd.Stderr = root, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(stderr, "ensure-built: pnpm %s: %v\n", strings.Join(args, " "), err)
+		return 1
+	}
+	return 0
 }
 
-// EnsureBuilt builds each requested (default all) dist that is missing or
-// older than its sources, one builder at a time per package.
+// lockWorkspace waits for a holder to finish, clearing a lock a killed run left,
+// and returns the release; a lock it never took is left alone.
+func lockWorkspace(lock string) func() {
+	if info, err := os.Stat(lock); err == nil && time.Since(info.ModTime()) > staleLock {
+		_ = os.RemoveAll(lock)
+	}
+	for i := 0; i < lockPolls; i++ {
+		if os.Mkdir(lock, 0o755) == nil {
+			return func() { _ = os.RemoveAll(lock) }
+		}
+		time.Sleep(lockInterval)
+	}
+	return func() {}
+}
+
+// EnsureBuilt builds each requested (default all) dist through Nx when the
+// workspace has it; without Nx, each that is missing or older than its sources,
+// one builder at a time per package.
 func EnsureBuilt(root string, requested []string, stderr io.Writer) int {
 	selected, unknown := selectTargets(requested)
 	if len(unknown) > 0 {
 		fmt.Fprintf(stderr, "ensure-built: no such target: %s\n", strings.Join(slices.Compact(unknown), ", "))
 		return 1
+	}
+	if exists(filepath.Join(root, "node_modules", ".bin", "nx")) {
+		return buildWithNx(root, selected, stderr)
 	}
 	for _, target := range selected {
 		if err := buildOne(root, target, stderr); err != nil {

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   discover,
+  parseOnly,
   parseRegister,
   parseShard,
   runPackage,
@@ -277,6 +278,31 @@ void describe("given the job is split into shards", () => {
       assert.throws(() => parseShard("0/4"));
       assert.throws(() => parseShard("5/4"));
       assert.throws(() => parseShard("two"));
+    });
+  });
+});
+
+void describe("given the list of projects a pull request reaches", () => {
+  void describe("when the list is present", () => {
+    /** @scenario "A pull request runs only the suites its change reaches" */
+    void it("keeps exactly the named packages", () => {
+      const only = parseOnly('["@fix/reached","@fix/also"]');
+      assert.deepEqual([...(only ?? [])], ["@fix/reached", "@fix/also"]);
+    });
+  });
+
+  void describe("when there is no list", () => {
+    /** @scenario "Without an affected list every suite runs" */
+    void it("narrows nothing", () => {
+      assert.equal(parseOnly(undefined), undefined);
+      assert.equal(parseOnly(""), undefined);
+    });
+  });
+
+  void describe("when the list is malformed", () => {
+    void it("is an error, never a silent whole or empty run", () => {
+      assert.throws(() => parseOnly("not json"), /PACKAGE_SUITES_ONLY/);
+      assert.throws(() => parseOnly('{"a":1}'), /PACKAGE_SUITES_ONLY/);
     });
   });
 });

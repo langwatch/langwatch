@@ -11,7 +11,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // End-user attribution on the customer span: the middleware-lifted header id
@@ -27,7 +27,7 @@ import (
 func recordSpanForParamsCtx(
 	t *testing.T,
 	wrap func(context.Context) context.Context,
-	params domain.AITraceParams,
+	params aitrace.AITraceParams,
 ) sdktrace.ReadOnlySpan {
 	t.Helper()
 	sr := tracetest.NewSpanRecorder()
@@ -48,12 +48,12 @@ func TestEmitter_EndUser_HeaderWinsOverBodyParam(t *testing.T) {
 		func(ctx context.Context) context.Context {
 			return WithEndUserID(ctx, "header-user")
 		},
-		domain.AITraceParams{
-			ProviderID:  domain.ProviderOpenAI,
+		aitrace.AITraceParams{
+			ProviderID:  aitrace.ProviderOpenAI,
 			Model:       "gpt-5",
-			RequestType: domain.RequestTypeChat,
+			RequestType: aitrace.RequestTypeChat,
 			RequestBody: []byte(`{"model":"gpt-5","user":"body-user"}`),
-			Usage:       domain.Usage{CompletionTokens: 3},
+			Usage:       aitrace.Usage{CompletionTokens: 3},
 		})
 
 	got, ok := hasStringAttr(span, AttrEndUserID)
@@ -63,12 +63,12 @@ func TestEmitter_EndUser_HeaderWinsOverBodyParam(t *testing.T) {
 
 // @scenario "The OpenAI user body param attributes the request when no header is sent"
 func TestEmitter_EndUser_BodyParamFallback(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:  domain.ProviderOpenAI,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-5",
-		RequestType: domain.RequestTypeChat,
+		RequestType: aitrace.RequestTypeChat,
 		RequestBody: []byte(`{"model":"gpt-5","user":"acme-user-42"}`),
-		Usage:       domain.Usage{CompletionTokens: 3},
+		Usage:       aitrace.Usage{CompletionTokens: 3},
 	})
 
 	got, ok := hasStringAttr(span, AttrEndUserID)
@@ -80,12 +80,12 @@ func TestEmitter_EndUser_BodyParamFallback(t *testing.T) {
 func TestEmitter_EndUser_MessagesShapeHasNoBodyFallback(t *testing.T) {
 	// Anthropic-wire metadata.user_id is a session carrier for claude-code,
 	// not end-user attribution; only the headers attribute this shape.
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:  domain.ProviderAnthropic,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderAnthropic,
 		Model:       "claude-sonnet-5",
-		RequestType: domain.RequestTypeMessages,
+		RequestType: aitrace.RequestTypeMessages,
 		RequestBody: []byte(`{"model":"claude-sonnet-5","metadata":{"user_id":"not-attribution"}}`),
-		Usage:       domain.Usage{CompletionTokens: 3},
+		Usage:       aitrace.Usage{CompletionTokens: 3},
 	})
 
 	_, ok := hasStringAttr(span, AttrEndUserID)
@@ -94,12 +94,12 @@ func TestEmitter_EndUser_MessagesShapeHasNoBodyFallback(t *testing.T) {
 
 // @scenario "A request with no end user carries no attribution attribute"
 func TestEmitter_EndUser_AbsentWhenNoSource(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:  domain.ProviderOpenAI,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-5",
-		RequestType: domain.RequestTypeChat,
+		RequestType: aitrace.RequestTypeChat,
 		RequestBody: []byte(`{"model":"gpt-5"}`),
-		Usage:       domain.Usage{CompletionTokens: 3},
+		Usage:       aitrace.Usage{CompletionTokens: 3},
 	})
 
 	_, ok := hasStringAttr(span, AttrEndUserID)
@@ -108,12 +108,12 @@ func TestEmitter_EndUser_AbsentWhenNoSource(t *testing.T) {
 
 // @scenario "The body user param is sanitized like the headers"
 func TestEmitter_EndUser_BodyParamSanitized(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:  domain.ProviderOpenAI,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-5",
-		RequestType: domain.RequestTypeChat,
+		RequestType: aitrace.RequestTypeChat,
 		RequestBody: []byte("{\"model\":\"gpt-5\",\"user\":\"  evil\\u0000\\u0007user  \"}"),
-		Usage:       domain.Usage{CompletionTokens: 3},
+		Usage:       aitrace.Usage{CompletionTokens: 3},
 	})
 
 	got, ok := hasStringAttr(span, AttrEndUserID)
@@ -128,11 +128,11 @@ func TestEmitter_RequestMetadata_Stamped(t *testing.T) {
 		func(ctx context.Context) context.Context {
 			return WithRequestMetadataJSON(ctx, echo)
 		},
-		domain.AITraceParams{
-			ProviderID:  domain.ProviderOpenAI,
+		aitrace.AITraceParams{
+			ProviderID:  aitrace.ProviderOpenAI,
 			Model:       "gpt-5",
-			RequestType: domain.RequestTypeChat,
-			Usage:       domain.Usage{CompletionTokens: 3},
+			RequestType: aitrace.RequestTypeChat,
+			Usage:       aitrace.Usage{CompletionTokens: 3},
 		})
 
 	got, ok := hasStringAttr(span, AttrRequestMetadata)
@@ -142,11 +142,11 @@ func TestEmitter_RequestMetadata_Stamped(t *testing.T) {
 
 // @scenario "No metadata header means no reserved metadata attribute"
 func TestEmitter_RequestMetadata_AbsentByDefault(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:  domain.ProviderOpenAI,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-5",
-		RequestType: domain.RequestTypeChat,
-		Usage:       domain.Usage{CompletionTokens: 3},
+		RequestType: aitrace.RequestTypeChat,
+		Usage:       aitrace.Usage{CompletionTokens: 3},
 	})
 
 	_, ok := hasStringAttr(span, AttrRequestMetadata)

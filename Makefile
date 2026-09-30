@@ -2,7 +2,7 @@
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
 .PHONY: dogfood-langy-local
-.PHONY: herrgen herrgen-check
+.PHONY: herrgen herrgen-check test-scripts-run lint-rules-run
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-slot go-lint-changed
 .PHONY: _dev-up-deprecation-warning
 
@@ -138,7 +138,7 @@ DEV_ENV_FILE ?= .env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@case "$(svc)" in mailsim|idpsim|storagesim|voicesim|llmsim) test -f services/$(svc)/web/dist/index.html \
-		|| pnpm --silent --filter @langwatch/$(svc)-web build || echo "$(svc)-web did not build; its console names the fix" ;; esac
+		|| pnpm exec nx run @langwatch/$(svc)-web:build --outputStyle=static || echo "$(svc)-web did not build; its console names the fix" ;; esac
 	@_snap=$$(export -p) && \
 		{ test -f $(DEV_ENV_FILE) \
 			&& set -a && . $(DEV_ENV_FILE) && set +a \
@@ -201,6 +201,9 @@ refresh-dev-s3:
 # git / docker / external CLIs against the real filesystem and need
 # fixtures.
 test-scripts:
+	@pnpm exec nx run workspace:test:scripts --outputStyle=static
+
+test-scripts-run:
 	@if ! command -v bats >/dev/null 2>&1; then \
 		echo "ERROR: bats not installed. Install with:" >&2; \
 		echo "  macOS:  brew install bats-core" >&2; \
@@ -219,7 +222,7 @@ test-scripts:
 # drift check, and go-ci.yaml's `generated` job calls this same target, so what
 # CI runs and what you run cannot drift apart.
 herrgen:
-	@go run ./cmd/herrgen
+	@pnpm exec nx run go-cmd:herrgen --outputStyle=static
 
 herrgen-check:
 	@go run ./cmd/herrgen -check
@@ -240,6 +243,9 @@ GOLANGCI_VERSION := v2.13.2
 SEMGREP := $(shell if command -v semgrep >/dev/null 2>&1 && semgrep --version 2>/dev/null | grep -q "$(SEMGREP_VERSION)"; then echo semgrep; else echo "uvx --from semgrep==$(SEMGREP_VERSION) semgrep"; fi)
 
 lint-rules:
+	@pnpm exec nx run workspace:lint:rules --outputStyle=static
+
+lint-rules-run:
 	@echo "==> semgrep (dev/lint/semgrep/langwatch.yml)"
 	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error --exclude platform .
 
@@ -256,14 +262,16 @@ lint-rules-test:
 # which is why "run the Go checks before pushing" quietly stopped happening.
 # Always resolve the pinned version rather than trusting PATH.
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
-GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/mailsim/... ./services/nlpgo/... ./services/storagesim/... ./services/voicesim/... ./services/llmsim/... ./pkg/... ./cmd/... ./tools/...
+# The workspace modules golangci-lint covers (go.work also holds the SDK and the
+# ClickHouse operator, linted by their own workflows). Each runs in its module.
+GO_LINT_MODULES ?= cmd pkg services tools
 
 # golangci-lint reads package export data through whatever `go` it finds, and
 # the pinned linter (built with Go 1.25, upstream ships "latest-1") cannot
-# read the format a Go newer than go.mod's emits. CI never sees this because
-# it installs from go-version-file: go.mod; a laptop ahead of the repo does.
-# Pinning GOTOOLCHAIN to go.mod's version makes both environments identical.
-GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
+# read the format a Go newer than go.work's emits. CI never sees this because
+# it installs from go-version-file: go.work; a laptop ahead of the repo does.
+# Pinning GOTOOLCHAIN to go.work's version makes both environments identical.
+GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.work)
 
 # A slot bounds how many runs, not how many cores each takes: locally the linter
 # and its `go list` builds get 2 cores, CI (CI=true) every core. Override: GO_LINT_JOBS=8.
@@ -277,19 +285,24 @@ GO_LINT_ENV := env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) GOMAXPROCS=$(GO_LINT_JOBS) GO
 # edits, not the whole tree, and is not the cost this queue exists for.
 go-lint-slot:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
-	@$(HAVEN) slot run --label golangci-lint --timeout 10m -- $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners $(GO_LINT_PKGS)
+	@$(HAVEN) slot run --label golangci-lint --timeout 10m -- sh -c 'rc=0; for m in $(GO_LINT_MODULES); do \
+		(cd "$$m" && $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners ./...) || rc=1; done; exit $$rc'
 
 go-lint: go-lint-slot
 
 # Lints only the packages of uncommitted .go edits (untracked included) and
-# reports only issues on those lines; it never diffs against a branch.
+# reports only issues on those lines; it never diffs against a branch. Each
+# module's packages are linted from inside that module, in one slot.
 go-lint-changed:
-	@pkgs=$$( { git diff --name-only HEAD -- '*.go'; git ls-files -o --exclude-standard -- '*.go'; } \
+	@dirs=$$( { git diff --name-only HEAD -- '*.go'; git ls-files -o --exclude-standard -- '*.go'; } \
 		| grep -E '^(services/(aigateway|idpsim|langyagent|llmsim|mailsim|nlpgo|storagesim|voicesim)|pkg|cmd|tools)/' | grep -v '/testdata/' \
-		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "./$$d"; done); \
-	if [ -z "$$pkgs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
-	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$pkgs" | wc -l | tr -d ' ') packages)"; \
-	$(HAVEN) slot run --label golangci-lint --timeout 10m -- $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners --new-from-rev=HEAD $$pkgs
+		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "$$d"; done); \
+	if [ -z "$$dirs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
+	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$dirs" | wc -l | tr -d ' ') packages)"; \
+	$(HAVEN) slot run --label golangci-lint --timeout 10m -- sh -c 'rc=0; for m in $(GO_LINT_MODULES); do \
+		pkgs=$$(echo "$$0" | sed -n "s#^$$m/#./#p"); [ -z "$$pkgs" ] && continue; \
+		(cd "$$m" && $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners --new-from-rev=HEAD $$pkgs) || rc=1; \
+	done; exit $$rc' "$$dirs"
 
 # Stop all services
 down:

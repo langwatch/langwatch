@@ -19,7 +19,7 @@ per rule).
 - **The plugin registry is one map.** `rules` in
   `packages/oxlint-rules/src/index.mjs` keys each rule by the name its
   `defineRule` declaration carries. Adding a rule is the rule file, its entry
-  there, and one `"langwatch/<name>": "error"` line in the architecture config,
+  there, and one `"langwatch/<name>": "error"` line in the plugin config,
   plus its test, its `specs/tooling/lint-<name>.feature` and a decision row in
   an ADR (the lint-rule-records guard fails without the last two).
 - **Every rule is `error` or absent.** Lint runs with `--quiet`, so a `warn`
@@ -29,9 +29,14 @@ per rule).
   registry does not hold.
 - **No baseline, no per-file exemption.** A rule the repository does not enforce
   is off by name. An override names a category of path, never a list of files.
-- **`pnpm lint` is oxlint only.** architecture-enforcer runs as
-  `pnpm lint:architecture`, outside `pnpm lint` until the tree is clean; CI runs
-  the policies already at zero by id.
+- **`pnpm lint` is the fast oxlint layer, cached per project.** It is `nx run-many -t lint`
+  (the `lint` target `dev/nx/lint-plugin.mjs` infers, inputs in `nx.json`) plus one run over
+  the files outside every project; `pnpm lint:changed` lints what changed with its
+  dependents, and `pnpm lint:oxlint` is the plain whole-tree run. A file a cross-file
+  rule reads from outside its project belongs in `lintGlobals`.
+  `pnpm lint:architecture` is the enforcer alone; CI runs the policies already at
+  zero by id. Every oxlint rule is in the fast layer: `comment-block-size`, once 46% of
+  plugin time, costs about 3% of user CPU since its 2026-09-30 rewrite.
 - **The reference is generated.** `pnpm --filter @langwatch/architecture-enforcer docs`
   rewrites `dev/docs/lint-rules.md`; CI runs `docs:check` and fails when it is
   stale.

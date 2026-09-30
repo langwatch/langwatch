@@ -327,7 +327,7 @@ func TestInstallPrereqsWithNothingChosenInstallsNothing(t *testing.T) {
 	}
 }
 
-// fakeRepoRoot writes a Makefile pinning golangci-lint and a go.mod naming a
+// fakeRepoRoot writes a Makefile pinning golangci-lint and a go.work naming a
 // toolchain, so golangciPin has real files to read instead of a hand-built
 // string. The parsing itself lives in domain and is unit-tested there; this
 // exercises the app layer's own file lookup.
@@ -338,9 +338,9 @@ func fakeRepoRoot(t *testing.T, pinnedVersion, goVersion string) string {
 	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte(makefile), 0o644); err != nil {
 		t.Fatalf("writing fake Makefile: %v", err)
 	}
-	goMod := "module example.com/fake\n\ngo " + goVersion + "\n"
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644); err != nil {
-		t.Fatalf("writing fake go.mod: %v", err)
+	goWork := "go " + goVersion + "\n\nuse ./fake\n"
+	if err := os.WriteFile(filepath.Join(dir, "go.work"), []byte(goWork), 0o644); err != nil {
+		t.Fatalf("writing fake go.work: %v", err)
 	}
 	return dir
 }

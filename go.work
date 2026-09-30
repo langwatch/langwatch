@@ -1,12 +1,15 @@
 go 1.27.1
 
-// Monorepo Go workspace. Ties the root module together with the in-tree
-// SDK and the ClickHouse operator so local builds resolve them without
-// relying on the `replace` directives (which stay in go.mod for Docker /
-// non-workspace builds). Example/e2e modules under sdks/go keep their own
+// Monorepo Go workspace. No module sits at the repository root: cmd, pkg,
+// services and tools are one module each, beside the SDK and the ClickHouse
+// operator. The `replace` directives in each go.mod serve Docker and other
+// non-workspace builds. Example/e2e modules under sdks/go keep their own
 // relative `replace => ../` and are intentionally left out of the workspace.
 use (
-	.
+	./cmd
 	./infra/clickhouse-serverless
+	./pkg
 	./sdks/go
+	./services
+	./tools
 )

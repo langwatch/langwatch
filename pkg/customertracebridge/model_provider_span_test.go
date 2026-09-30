@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // The dispatched provider's ModelProvider row id must land on the customer
@@ -19,12 +19,12 @@ import (
 // provider that actually served the request"), contract §4.5.
 
 func TestEmitter_ModelProviderID_StampedOnSpan(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:      domain.ProviderOpenAI,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:      aitrace.ProviderOpenAI,
 		Model:           "gpt-5-mini",
 		VirtualKeyID:    "vk_1",
 		ModelProviderID: "mp_01HZX",
-		Usage:           domain.Usage{CompletionTokens: 5},
+		Usage:           aitrace.Usage{CompletionTokens: 5},
 	})
 
 	got, ok := hasStringAttr(span, AttrModelProviderID)
@@ -36,11 +36,11 @@ func TestEmitter_ModelProviderID_StampedOnSpan(t *testing.T) {
 // provider to attribute; the attribute must be absent so the fold debits
 // unfiltered budgets only instead of guessing a vendor.
 func TestEmitter_NoModelProviderID_NoAttribute(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:   domain.ProviderOpenAI,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:   aitrace.ProviderOpenAI,
 		Model:        "gpt-5-mini",
 		VirtualKeyID: "vk_1",
-		Usage:        domain.Usage{CompletionTokens: 5},
+		Usage:        aitrace.Usage{CompletionTokens: 5},
 	})
 
 	_, ok := hasStringAttr(span, AttrModelProviderID)

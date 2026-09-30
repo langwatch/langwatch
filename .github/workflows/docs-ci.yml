@@ -59,8 +59,8 @@ jobs:
               - 'pkg/docsscan/**'
               - 'tools/docscheck/**'
               - 'cmd/docscheck/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               # docscheck holds the release the docs name against the chart's
               # appVersion, so bumping the chart without touching the docs is
               # exactly the drift this job has to catch.
@@ -158,8 +158,8 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       - name: Check docs structure
         run: go run ./cmd/docscheck

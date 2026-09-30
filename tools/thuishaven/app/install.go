@@ -162,7 +162,7 @@ func (o *Orchestrator) probePortless() domain.Found {
 
 // probeGolangciLint tells a pinned golangci-lint apart from any other one on
 // PATH: the pinned release cannot read export data from a Go newer than
-// go.mod's, so a v1.64.8 binary answering "found" satisfies nothing and
+// go.work's, so a v1.64.8 binary answering "found" satisfies nothing and
 // refuses the repo's v2 config, so the report has to say outdated, not
 // installed.
 func (o *Orchestrator) probeGolangciLint(ctx context.Context) domain.Found {
@@ -190,7 +190,7 @@ func (o *Orchestrator) probeGolangciLint(ctx context.Context) domain.Found {
 }
 
 // golangciPin reads the version and toolchain golangci-lint is pinned to,
-// straight from the Makefile and go.mod, never a second copy of either
+// straight from the Makefile and go.work, never a second copy of either
 // constant in Go code. ok is false when either file is missing or either
 // line does not have the shape haven expects, which the caller treats as
 // unprobeable rather than a crash.
@@ -206,11 +206,11 @@ func (o *Orchestrator) golangciPin() (version, toolchain string, ok bool) {
 	if version == "" {
 		return "", "", false
 	}
-	goMod, err := os.ReadFile(filepath.Join(o.cfg.RepoRoot, "go.mod"))
+	goWork, err := os.ReadFile(filepath.Join(o.cfg.RepoRoot, "go.work"))
 	if err != nil {
 		return "", "", false
 	}
-	toolchain = domain.ParseGoToolchain(string(goMod))
+	toolchain = domain.ParseGoToolchain(string(goWork))
 	if toolchain == "" {
 		return "", "", false
 	}
@@ -236,7 +236,7 @@ func golangciVersionOutput(ctx context.Context, path string) string {
 func (o *Orchestrator) installGolangciLint(ctx context.Context) error {
 	version, toolchain, ok := o.golangciPin()
 	if !ok {
-		return fmt.Errorf("could not read the pinned golangci-lint version from the Makefile and go.mod: is this a langwatch checkout?")
+		return fmt.Errorf("could not read the pinned golangci-lint version from the Makefile and go.work: is this a langwatch checkout?")
 	}
 	command := fmt.Sprintf("env GOTOOLCHAIN=%s go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v%s", toolchain, version)
 	return o.prereqTools().Install(ctx, command)

@@ -314,6 +314,8 @@ jobs:
       # non-empty set.
       apps: ${{ steps.guard.outputs.apps }}
       narrowed: ${{ steps.pick.outputs.narrowed }}
+      # Only on a narrowed pull request; empty means package-suites runs all.
+      projects: ${{ steps.pick.outputs.projects }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -368,9 +370,10 @@ jobs:
 
           # Inputs that belong to everything. The graph hashes these globally
           # rather than as edges, so a change here is not "affected" in the
-          # per-project sense and must be handled by name.
+          # per-project sense and must be handled by name. The lockfile is not
+          # one: Nx diffs it per package (projectsAffectedByDependencyUpdates).
           if git diff --name-only "$BASE" HEAD | grep -qE \
-            '^(pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|packages/prisma-client/prisma/|\.github/)'; then
+            '^(pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|packages/prisma-client/prisma/|\.github/)'; then
             echo "apps=$ALL" >> "$GITHUB_OUTPUT"
             echo "narrowed=false" >> "$GITHUB_OUTPUT"
             echo "A global input changed — running all three applications." >> "$GITHUB_STEP_SUMMARY"
@@ -414,6 +417,7 @@ jobs:
 
           echo "apps=$PICKED" >> "$GITHUB_OUTPUT"
           echo "narrowed=true" >> "$GITHUB_OUTPUT"
+          echo "projects=$RAW" >> "$GITHUB_OUTPUT"
 
       # continue-on-error above means a failed step still arrives here with
       # empty outputs. Nothing downstream may read an empty matrix, so the
@@ -858,7 +862,7 @@ jobs:
   # also calls, so the two lanes are exact complements and no file can go
   # missing from CI. See specs/ci/integration-test-lanes.feature.
   package-suites:
-    needs: changes
+    needs: [changes, affected]
     if: needs.changes.outputs.relevant == 'true'
     env:
       BUILD_TIME: "true"
@@ -986,15 +990,15 @@ jobs:
       # silently unenforced. REQUIRE_HELM_TESTS below turns a skip into a
       # failure, so this setup can never quietly rot.
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
-      - name: Add chart dependency repositories
-        run: |
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo add langwatch https://langwatch.github.io/langwatch
+      - name: Build chart dependencies
+        run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
 
       - name: Run every workspace package suite
         env:
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          # A pull request runs the suites its change reaches; main runs all.
+          PACKAGE_SUITES_ONLY: ${{ needs.affected.outputs.projects }}
         run: node --experimental-strip-types .github/scripts/run-package-suites.ts
 
   lint:
@@ -1057,17 +1061,11 @@ jobs:
       - name: Lint rule reference is current (blocking)
         run: pnpm --filter @langwatch/architecture-enforcer docs:check
 
-      # The enforcer's ported policies run in Go (cmd/enforcer via
-      # dev/scripts/enforcer.sh); without Go the TS CLI reports the same, slower.
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      # The architecture-enforcer policies that read zero findings on this tree,
-      # named one by one; a policy joins the list when its findings reach zero.
-      # `declarations` is left out because it reads the output of `tsc -b`.
-      - name: Architecture policies held at zero (blocking)
+      # `pnpm lint:architecture` in CI: the architecture-enforcer policies that
+      # read zero findings on this tree, named one by one; a policy joins the
+      # list when its findings reach zero. `declarations` is left out because
+      # it reads the output of `tsc -b`.
+      - name: Architecture lint (blocking)
         run: >-
           pnpm --filter @langwatch/architecture-enforcer lint --
           --no-declarations
@@ -1102,23 +1100,34 @@ jobs:
       # What IS lost: inline annotations on the diff. Findings now arrive as
       # job output rather than as review comments.
       #
-      # `lint:oxlint` is the same binary, config and path set that `pnpm lint`
-      # gives a contributor.
+      # `pnpm lint` is one cached Nx target per project plus the files outside
+      # every project. A PR lints what it affected (dependents included, since the
+      # cross-file rules can fail in a file the PR did not touch); a push runs all.
       # The Prisma client, the generated SDK types and the built SDK dist are
       # imports the type-aware rules resolve; without them they read as `any`.
       - uses: ./.github/actions/prepare-generated-files
 
       - name: Oxlint (blocking -- config errors included)
-        run: pnpm lint:oxlint
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null; then
+            node dev/nx/lint.mjs --base "$BASE"
+          else
+            node dev/nx/lint.mjs
+          fi
 
       # Type-aware rules per project, only where a change reached (ADR-150).
-      # A global lint input changing, or a push, lints every project.
+      # A global lint input changing, or a push, lints every project. Nx diffs
+      # the lockfile per package, but oxlint is a root tool no project reaches,
+      # so a lockfile change that moves it still lints everything.
       - name: Oxlint type-aware, affected projects (blocking)
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ -n "$BASE" ] && git cat-file -e "$BASE" 2>/dev/null && ! git diff --name-only "$BASE" HEAD \
-            | grep -qE '^(\.oxlintrc\.jsonc|packages/oxlint-rules/|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|dev/nx/)'; then
+            | grep -qE '^(\.oxlintrc\.jsonc|packages/oxlint-rules/|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|dev/nx/)' \
+            && ! git diff "$BASE" HEAD -- pnpm-lock.yaml | grep -qE '^[-+].*oxlint'; then
             pnpm exec nx affected -t lint:types --base="$BASE" --head=HEAD
           else
             pnpm exec nx run-many -t lint:types
@@ -1311,6 +1320,7 @@ jobs:
           --filter "@langwatch/platform-api..."
           --filter "@langwatch/worker..."
           --filter "@langwatch/ui..."
+          --filter "@langwatch/workspace"
 
       # build:types reads the generated Prisma client and the SDK's
       # declarations, so the generated files and the four dist-resolving
@@ -1318,8 +1328,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # Before the first nx call, so prepare's tasks read and fill it too.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: build
 
       - name: Prepare files
         run: pnpm start:prepare:files && pnpm ensure:built
@@ -1328,7 +1343,7 @@ jobs:
       # node. What is built here is the browser bundle the API process serves,
       # plus every workspace dependency that has a build of its own.
       - name: Build
-        run: pnpm run build:types && pnpm --filter "@langwatch/ui..." run build
+        run: pnpm run build:types && pnpm exec nx run @langwatch/ui:build --outputStyle=static
 
       # A successful `vite build` only proves the bundle compiles, not that it
       # boots. Serve the built output and load it in a headless browser to

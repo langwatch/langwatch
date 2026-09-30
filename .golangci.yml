@@ -6,7 +6,7 @@ run:
   # Pin analysis target to the Go version golangci-lint v2.13.2 is built
   # with (1.27). Without this, lint refuses to analyze code whose go.mod
   # targets a newer Go than the linter's own build toolchain. Bump this,
-  # GOLANGCI_VERSION in the Makefile and go.mod's floor together.
+  # GOLANGCI_VERSION in the Makefile and go.work's floor together.
   go: "1.27"
 
 linters:
@@ -142,6 +142,12 @@ linters:
       - common-false-positives
       - std-error-handling
 
+    paths:
+      - node_modules
+      - \.claude
+      - \.worktrees
+      - dist
+
     rules:
       # Tests: relax rules that trade readability for strictness.
       #
@@ -244,3 +250,6 @@ formatters:
     paths:
       - vendor
       - node_modules
+      - \.claude
+      - \.worktrees
+      - dist

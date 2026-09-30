@@ -306,3 +306,10 @@ Feature: Feature package boundary lint
     When the repository lint command runs
     Then architecture lint checks every discovered feature surface
     And any violation causes the command to exit non-zero
+
+  @unit @architecture
+  Scenario: A cycle through a devDependency is a package cycle
+    Given one workspace package depends on a second
+    And the second declares the first as a devDependency
+    When architecture lint checks the fixture workspace
+    Then it reports a package cycle, because Nx orders tasks over devDependencies too
