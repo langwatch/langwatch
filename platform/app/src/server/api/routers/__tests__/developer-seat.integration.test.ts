@@ -224,10 +224,15 @@ describe("given a Full member on three shared teams, a shared project, and the o
             ],
           },
         },
-        select: { revokedAt: true, scopeId: true },
+        select: { revokedAt: true, revokedReason: true, scopeId: true },
       });
       expect(revoked.length).toBeGreaterThanOrEqual(5);
       expect(revoked.every((row) => row.revokedAt !== null)).toBe(true);
+      expect(
+        revoked.every(
+          (row) => row.revokedReason === "seat changed to Developer",
+        ),
+      ).toBe(true);
     });
 
     /** @scenario Downgrading a Full member to Developer removes shared access */
