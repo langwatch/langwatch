@@ -32,6 +32,7 @@ import type {
   AuthzManagedBindingRow,
 } from "../../repositories/authz-binding.repository.ts";
 import { AuthzBindingWriterService } from "../authz-binding-writer.service.ts";
+import { permissiveGrantGuards, TEST_CALLER } from "./support/grant-guards.stub.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const MEMBER_ID = "user_member";
@@ -251,6 +252,7 @@ function world(options: { seat?: OrganizationRole } = {}) {
   });
 
   const writer = AuthzBindingWriterService.create({
+    permissions: permissiveGrantGuards,
     bindings: store.bindings(),
     ledger: store.ledger(),
     newBindingId: () => store.newBindingId(),
@@ -263,6 +265,7 @@ function world(options: { seat?: OrganizationRole } = {}) {
       organizationId: ORGANIZATION_ID,
       userId: MEMBER_ID,
       actor: ACTOR,
+      caller: TEST_CALLER,
       ...batch,
     });
 

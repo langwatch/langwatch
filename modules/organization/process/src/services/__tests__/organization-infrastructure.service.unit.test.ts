@@ -247,6 +247,11 @@ class RecordingGrants extends AuthzGrantsService {
   readonly updateBinding = unsupported<AuthzGrantsService["updateBinding"]>();
   readonly deleteBinding = unsupported<AuthzGrantsService["deleteBinding"]>();
   readonly applyMemberBindings = unsupported<AuthzGrantsService["applyMemberBindings"]>();
+  readonly listGrants = unsupported<AuthzGrantsService["listGrants"]>();
+  readonly getGrant = unsupported<AuthzGrantsService["getGrant"]>();
+  readonly createGrant = unsupported<AuthzGrantsService["createGrant"]>();
+  readonly changeGrantRole = unsupported<AuthzGrantsService["changeGrantRole"]>();
+  readonly revokeGrant = unsupported<AuthzGrantsService["revokeGrant"]>();
   readonly invalidateOrganization = unsupported<AuthzGrantsService["invalidateOrganization"]>();
 
   constructor(private readonly failure?: Error) {

@@ -1,7 +1,15 @@
 import { z } from "zod";
 
 import { grantsLedgerActorSchema } from "./authz-grant.events.ts";
-import { organizationRoleSchema, roleBindingScopeTypeSchema, teamUserRoleSchema } from "./authz.ts";
+import {
+  authzPrincipalRefSchema,
+  organizationRoleSchema,
+  roleBindingScopeTypeSchema,
+  teamUserRoleSchema,
+} from "./authz.ts";
+
+/** Whose permissions bound what a write may grant (the key or person asking). */
+const callerSchema = authzPrincipalRefSchema;
 
 const nullableTextSchema = z.string().nullable();
 
@@ -142,6 +150,7 @@ export const authzCreateBindingInputSchema = authzBindingWriteSchema.safeExtend(
   groupId: z.string().min(1).optional(),
   apiKeyId: z.string().min(1).optional(),
   actor: grantsLedgerActorSchema,
+  caller: callerSchema,
   /** When the binding stops granting; a moment already passed is refused. */
   expiresAt: z.date().optional(),
 });
@@ -157,6 +166,7 @@ export const authzUpdateBindingInputSchema = z
     role: teamUserRoleSchema,
     customRoleId: z.string().min(1).optional(),
     actor: grantsLedgerActorSchema,
+    caller: callerSchema,
   })
   .strict();
 export type AuthzUpdateBindingInput = z.infer<typeof authzUpdateBindingInputSchema>;
@@ -177,6 +187,7 @@ export const authzApplyMemberBindingsInputSchema = z
     bindingIdsToDelete: z.array(z.string().min(1)),
     bindingsToCreate: z.array(authzBindingWriteSchema),
     actor: grantsLedgerActorSchema,
+    caller: callerSchema,
   })
   .strict();
 export type AuthzApplyMemberBindingsInput = z.infer<typeof authzApplyMemberBindingsInputSchema>;

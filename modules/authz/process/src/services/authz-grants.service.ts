@@ -41,6 +41,14 @@ import {
   type GrantRole,
   type GrantableAuthzScopeRef,
   scopeOrganizationId,
+  type AuthzChangeGrantRoleInput,
+  type AuthzCreateGrantInput,
+  type AuthzGetGrantInput,
+  type AuthzListGrantsInput,
+  type AuthzRevokeGrantByIdInput,
+  type Grant,
+  type GrantPage,
+  type GrantRevoked,
 } from "@langwatch/authz-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -52,8 +60,12 @@ import type {
   BindingPrincipalWhere,
   RoleBindingWrite,
 } from "../repositories/authz-grant.repository.ts";
-import { AuthzBindingWriterService } from "./authz-binding-writer.service.ts";
+import {
+  AuthzBindingWriterService,
+  type AuthzBindingWriterPermissions,
+} from "./authz-binding-writer.service.ts";
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
+import { AuthzGrantManagementService } from "./authz-grant-management.service.ts";
 import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
 
 /**
@@ -68,6 +80,8 @@ export type AuthzGrantsServiceOptions = {
   epoch: AuthzEpochRepository;
   newBindingId: () => string;
   bindings: AuthzBindingRepository;
+  /** The permission side's reads the writer's guards need (escalation, limit, last admin). */
+  permissions: AuthzBindingWriterPermissions;
 };
 
 type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "actor" | "where"> & {
@@ -98,12 +112,19 @@ const RESOURCE_SCOPE_REJECTION =
 
 export class AuthzGrantsService extends AuthzGrantsServiceContract {
   static create(options: AuthzGrantsServiceOptions): AuthzGrantsService {
+    const bindingWriter = AuthzBindingWriterService.create({
+      bindings: options.bindings,
+      ledger: options.ledger,
+      newBindingId: options.newBindingId,
+      permissions: options.permissions,
+    });
+
     return new AuthzGrantsService({
       options,
-      bindingWriter: AuthzBindingWriterService.create({
-        bindings: options.bindings,
-        ledger: options.ledger,
-        newBindingId: options.newBindingId,
+      bindingWriter,
+      grantManagement: AuthzGrantManagementService.create({
+        writer: bindingWriter,
+        permissions: options.permissions,
       }),
       offboarding: AuthzOffboardingService.create(options.repository),
       guards: AuthzGrantGuardsService.create({ repository: options.repository }),
@@ -112,23 +133,27 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
 
   private readonly options: AuthzGrantsServiceOptions;
   private readonly bindingWriter: AuthzBindingWriterService;
+  private readonly grantManagement: AuthzGrantManagementService;
   private readonly offboarding: AuthzOffboardingService;
   private readonly guards: AuthzGrantGuardsService;
 
   private constructor({
     options,
     bindingWriter,
+    grantManagement,
     offboarding,
     guards,
   }: {
     options: AuthzGrantsServiceOptions;
     bindingWriter: AuthzBindingWriterService;
+    grantManagement: AuthzGrantManagementService;
     offboarding: AuthzOffboardingService;
     guards: AuthzGrantGuardsService;
   }) {
     super();
     this.options = options;
     this.bindingWriter = bindingWriter;
+    this.grantManagement = grantManagement;
     this.offboarding = offboarding;
     this.guards = guards;
   }
@@ -400,6 +425,26 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
 
   applyMemberBindings(args: AuthzApplyMemberBindingsInput): Promise<AuthzBindingMutationSuccess> {
     return this.bindingWriter.applyMemberBindings(args);
+  }
+
+  listGrants(args: AuthzListGrantsInput): Promise<GrantPage> {
+    return this.grantManagement.list(args);
+  }
+
+  getGrant(args: AuthzGetGrantInput): Promise<Grant> {
+    return this.grantManagement.get(args);
+  }
+
+  createGrant(args: AuthzCreateGrantInput): Promise<Grant> {
+    return this.grantManagement.create(args);
+  }
+
+  changeGrantRole(args: AuthzChangeGrantRoleInput): Promise<Grant> {
+    return this.grantManagement.changeRole(args);
+  }
+
+  revokeGrant(args: AuthzRevokeGrantByIdInput): Promise<GrantRevoked> {
+    return this.grantManagement.revoke(args);
   }
 
   private bindingRow({

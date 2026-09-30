@@ -17,6 +17,7 @@ import {
   type BindingPrincipalWhere,
   DuplicateBindingError,
 } from "../repositories/authz-grant.repository.ts";
+import { permissiveGrantGuards } from "../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
@@ -101,6 +102,7 @@ const WRITE_ACTOR = { type: "user", id: "admin-1" } as const;
 function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger()) {
   const epoch = new StubAuthzEpoch();
   const service = AuthzGrantsService.create({
+    permissions: permissiveGrantGuards,
     repository,
     ledger,
     epoch,

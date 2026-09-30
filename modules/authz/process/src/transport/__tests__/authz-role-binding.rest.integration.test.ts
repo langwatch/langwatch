@@ -104,6 +104,7 @@ function world({ rows = [] as AuthzManagedOrganizationBinding[] } = {}) {
       bindRestMiddleware(roleBindingRestFacts, () => ({
         organizationId: ORGANIZATION_ID,
         actor: { type: "user" as const, id: "user-owner" },
+        caller: { type: "apiKey" as const, id: "key-1" },
       })),
     ],
   });

@@ -18,9 +18,19 @@ import type { RestDoorCredential, RestTransportDeclaration } from "./declaration
 import type { IdempotentRunner } from "./idempotency.ts";
 import { isRestCredentialBinding, type RestTransportMiddlewareBinding } from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
-import { createRestRuntime, type RestAuditSink, type RestIdentity } from "./runtime.ts";
+import {
+  createRestRuntime,
+  type RestAuditSink,
+  type RestDeprecationLog,
+  type RestIdentity,
+} from "./runtime.ts";
 
 const restErrorLogger = createLogger("langwatch:api:rest");
+
+/** One warning per deprecated route per process: an operator sees a superseded door in use. */
+const restDeprecationLog: RestDeprecationLog = {
+  deprecatedRouteCalled: (route) => restErrorLogger.warn(route, "Deprecated REST route called"),
+};
 import { SessionKeyIdentity } from "./session-key-identity.ts";
 
 /** Every credential kind a family may name, except the three a module binds for itself. */
@@ -101,6 +111,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       ...(this.options.idempotency ? { idempotency: this.options.idempotency } : {}),
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
       audit: this.options.audit,
+      deprecationLog: restDeprecationLog,
     }).mount(declaration, {
       app,
       onError: (error, context) => {

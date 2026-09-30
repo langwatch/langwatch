@@ -31,6 +31,10 @@ import {
   grantRowToFact,
 } from "../repositories/prisma/prisma.authz-grant.mapper.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
+import {
+  permissiveGrantGuards,
+  TEST_CALLER,
+} from "../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzBindingWriterService } from "../services/authz-binding-writer.service.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
@@ -94,6 +98,7 @@ function grantsService() {
   const epoch = new StubAuthzEpoch();
   const ledger = compatibilityLedger();
   const service = AuthzGrantsService.create({
+    permissions: permissiveGrantGuards,
     repository,
     ledger,
     epoch,
@@ -127,6 +132,7 @@ function bindingWriter() {
   bindings.findOrganizationRole.mockResolvedValue("MEMBER");
   const ledger = compatibilityLedger();
   const writer = AuthzBindingWriterService.create({
+    permissions: permissiveGrantGuards,
     bindings,
     ledger,
     newBindingId: () => "rb_new",
@@ -139,6 +145,7 @@ function bindingWriter() {
       scopeType: "TEAM",
       scopeId: TEAM,
       actor: { type: "user", id: "admin_1" },
+      caller: TEST_CALLER,
       ...(expiresAt ? { expiresAt } : {}),
     });
   return { create, ledger };
