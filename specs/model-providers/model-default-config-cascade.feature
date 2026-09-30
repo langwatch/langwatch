@@ -389,3 +389,12 @@ Feature: Model default config cascade
     # screen readers reach it the same way as any model id. Storing the
     # sentinel as a delete is what keeps the absence-equals-inherit
     # contract from leaking into the UI layer.
+
+  @unit
+  Scenario: A default-models write queued behind another in the organization is not aborted
+    Given a default-models write waits on the organization's advisory lock
+    When the write opens its transaction
+    Then the transaction timeout outlasts the lock queue
+    And the pool wait is budgeted separately
+    # Prisma's 5s timeout turned a write that only had to wait its turn into
+    # an unknown 500 (main budgeted timeout 20s, maxWait 10s).
