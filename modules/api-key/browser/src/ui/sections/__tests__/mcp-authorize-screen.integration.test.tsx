@@ -126,3 +126,11 @@ describe("given a request that names the asking application", () => {
     expect(screen.getByText(/Cursor is asking to use your LangWatch project/)).toBeInTheDocument();
   });
 });
+
+describe("given a reader with more than one project", () => {
+  it("draws the lent project switcher inside the consent card", () => {
+    const host = hostWith({ projectSwitcher: <button type="button">Project A</button> });
+    renderWithAuthorizeHost(<McpAuthorize />, host);
+    expect(screen.getByRole("button", { name: "Project A" })).toBeInTheDocument();
+  });
+});

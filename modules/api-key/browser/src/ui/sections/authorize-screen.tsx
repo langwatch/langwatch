@@ -1,16 +1,24 @@
-// /authorize: copy project API key. No DashboardLayout (chrome route draws it above). Key asked
-// by name; trackEvent("api_key_copy") is app's.
+// /authorize: copy the project API key on a standalone branded card; the host lends the
+// switcher. Signed out, it sends the reader to sign in and back, as main's DashboardLayout did.
 
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuthorizeHost } from "../../model/authorize-host.ts";
 import { CopyInput } from "../elements/copy-input.tsx";
 
 export default function Authorize() {
   const host = useAuthorizeHost();
+  const status = host.sessionStatus();
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (status !== "unauthenticated") return;
+    host.replace(`/auth/signin?callbackUrl=${encodeURIComponent("/authorize")}`);
+  }, [status, host]);
+
+  if (status !== "authenticated") return null;
 
   return (
     <BrandedCardPage>

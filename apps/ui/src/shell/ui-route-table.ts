@@ -251,6 +251,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // Spec: specs/langy/langy-mount-scope.feature
   { path: "/cli/auth", page: "pages/cli/auth" },
 
+  // Key and MCP consent: standalone branded cards, the project switcher lent
+  // into the card by the api-key host mount rather than drawn by the chrome.
+  { path: "/authorize", page: "pages/authorize" },
+  { path: "/mcp/authorize", page: "pages/mcp/authorize" },
+
   // The published workflow chat is a chromeless page, as it was on main: one
   // full-height card with the wordmark, no header, sidebar or Langy panel.
   { path: "/:project/chat/:workflow", page: "pages/[project]/chat/[workflow]" },
@@ -264,10 +269,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       // Outside it the landing screen threw for want of a host, which is how a
       // signed-in reader met an error page at the front door.
       { path: "/", page: "pages/index" },
-      // Both draw the project switcher the chrome hosts, as main wrapped them
-      // in DashboardLayout; outside the chrome they lost header and sidebar.
-      { path: "/authorize", page: "pages/authorize" },
-      { path: "/mcp/authorize", page: "pages/mcp/authorize" },
       // Settings, wrapped in the same Langy layout as the project routes
       // (keyed by the AMBIENT project), so the panel survives hopping between
       // a project page and settings instead of vanishing.
