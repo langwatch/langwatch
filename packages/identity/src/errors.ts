@@ -888,6 +888,32 @@ export class SsoDomainProofLapsedError extends SsoAssertionRefusedError {
 }
 
 /**
+ * An account already exists at the asserted address, its address was never
+ * confirmed, and this sign-in cannot vouch for it.
+ *
+ * A connection links onto such an account only when it has verified the
+ * address's domain AND the identity provider asserts the address is verified:
+ * the domain proof is what makes the provider's word enough. This is the
+ * refusal for every other case, so the reader learns the account exists and
+ * which of the two to fix, instead of better-auth's "account not linked".
+ * It names nothing about the account beyond what the reader asserted.
+ */
+export class SsoExistingAccountUnconfirmedError extends SsoAssertionRefusedError {
+  constructor(detail: string) {
+    super(
+      "sso_existing_account_unconfirmed",
+      "sso_existing_account_unconfirmed",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        reasons: [new Error(detail)],
+      },
+    );
+    this.name = "SsoExistingAccountUnconfirmedError";
+  }
+}
+
+/**
  * A join-request refusal (D12).
  *
  * One of these is deliberately INDISTINGUISHABLE across several causes, and

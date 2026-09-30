@@ -5,15 +5,26 @@ import type {
   SSOUserResolution,
   SSOUserResolutionInput,
 } from "@better-auth/sso";
+import { extractEmailDomain } from "@ee/sso/matching";
+import { rowToConnection } from "@ee/sso/sso-connection-projection.prisma.repository";
 import {
   LIVE_IDENTIFIER_STATES,
+  normalizeDomain,
   normalizeIdentifierValue,
+  qualifySsoDomainOwnership,
+  SsoExistingAccountUnconfirmedError,
 } from "@langwatch/identity";
 
 import type { Prisma } from "~/generated/prisma/client";
 
 const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
+const UNCONFIRMED = {
+  action: "reject",
+  code: new SsoExistingAccountUnconfirmedError(
+    "an unconfirmed account exists and this sign-in cannot vouch for it",
+  ).code,
+} as const;
 
 /** Selects existing users for admitted SAML or connection-owned SCIM assertions. */
 export class PrismaScimSsoUsers {
@@ -39,27 +50,33 @@ export class PrismaScimSsoUsers {
 
     if (await this.#isDirectoryInactive(database, input)) return REFUSE;
 
-    // SAML supplies a signed email attribute, without an OIDC verification flag.
-    // The caller has already admitted that assertion through the domain gate.
-    if (input.protocol === "oidc" && !input.providerUser.emailVerified) {
-      return CONTINUE;
-    }
-
     const email = normalizeIdentifierValue(input.providerUser.email);
     const candidates = await database.user.findMany({
       where: { email: { equals: email, mode: "insensitive" } },
-      select: { id: true, emailVerified: true, deactivatedAt: true },
+      select: {
+        id: true,
+        emailVerified: true,
+        deactivatedAt: true,
+        signupConfirmationPending: true,
+      },
       take: 2,
     });
     if (candidates.length > 1) return REFUSE;
     const user = candidates[0];
     if (!user) return CONTINUE;
+
+    // SAML supplies a signed email attribute, without an OIDC verification flag.
+    // The caller has already admitted that assertion through the domain gate.
+    if (input.protocol === "oidc" && !input.providerUser.emailVerified) {
+      return this.#resolveUnvouchedAddress(database, input, user);
+    }
+
     if (user.emailVerified) {
       return this.#resolveVerifiedSamlUser(database, input, user);
     }
 
     if (!(await this.#directoryOwns(database, input.providerId, user.id))) {
-      return CONTINUE;
+      return this.#resolveUnconfirmedUser(database, input, user);
     }
 
     if (
@@ -145,6 +162,106 @@ export class PrismaScimSsoUsers {
     // Native linking rechecks the exact issuer/subject owner and provider.
     // A signed SAML attribute proves this assertion, not local email status.
     return { action: "link", userId, profile: "preserve" };
+  }
+
+  /**
+   * An OIDC provider that does not assert the address is verified, for an
+   * address an account already holds. better-auth refuses the link either
+   * way; an unconfirmed account this connection's directory does not own gets
+   * the named refusal instead of "account not linked".
+   */
+  async #resolveUnvouchedAddress(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+    user: { id: string; emailVerified: boolean },
+  ): Promise<SSOUserResolution> {
+    if (user.emailVerified) return CONTINUE;
+    if (await this.#directoryOwns(database, input.providerId, user.id)) {
+      return CONTINUE;
+    }
+    return UNCONFIRMED;
+  }
+
+  /**
+   * An existing account whose address was never confirmed, asserted by an
+   * OIDC provider that says the address is verified.
+   *
+   * On an installation that does not send email a password sign-up can never
+   * confirm its address, so better-auth's own rule (link only onto a confirmed
+   * address) refuses every such account, the registrant's setup test sign-in
+   * included. The link is authorized by the domain instead: this connection
+   * has verified the address's domain (DNS record, HTTPS file or licence), so
+   * the organization controls every address on it, and its identity provider
+   * is vouching for this one. An account on that domain that never proved its
+   * inbox is vouched for by the same owner, so linking it hands nobody's
+   * account to anybody else. Without the proof, or without the provider's
+   * word, the link stays refused (ADR-027).
+   *
+   * A sign-up still waiting for its emailed confirmation is left to that
+   * confirmation: its password was chosen by whoever filled the form, and the
+   * email is what proves that was the address's owner.
+   */
+  async #resolveUnconfirmedUser(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+    user: {
+      id: string;
+      deactivatedAt: Date | null;
+      signupConfirmationPending: boolean;
+    },
+  ): Promise<SSOUserResolution> {
+    if (input.protocol !== "oidc") return CONTINUE;
+    if (user.deactivatedAt) return REFUSE;
+    if (user.signupConfirmationPending) return UNCONFIRMED;
+    if (!(await this.#connectionProvesDomainOf(database, input))) {
+      return UNCONFIRMED;
+    }
+
+    const email = normalizeIdentifierValue(input.providerUser.email);
+    const conflict = await database.identifier.findFirst({
+      where: {
+        userId: { not: user.id },
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: [
+          { value: { equals: email, mode: "insensitive" } },
+          {
+            issuer: input.accountKey.issuer,
+            providerAccountId: input.accountKey.accountId,
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    if (conflict) return REFUSE;
+
+    // Inside the callback transaction, so a link that fails afterwards rolls
+    // this back with it. better-auth confirms the address itself on the links
+    // it makes, and skips that for a user selected here.
+    await database.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true },
+    });
+    return { action: "link", userId: user.id, profile: "preserve" };
+  }
+
+  /** Whether this connection holds a qualified proof for the asserted
+   *  address's domain. A lapsed or incomplete proof does not count. */
+  async #connectionProvesDomainOf(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+  ): Promise<boolean> {
+    const raw = extractEmailDomain(input.providerUser.email);
+    if (!raw) return false;
+    const row = await database.ssoConnection.findUnique({
+      where: { id: input.providerId },
+    });
+    if (!row) return false;
+    return (
+      qualifySsoDomainOwnership({
+        state: rowToConnection(row),
+        domain: normalizeDomain(raw),
+      }).status === "QUALIFIED"
+    );
   }
 
   /**
