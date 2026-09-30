@@ -31,7 +31,6 @@ import type {
 } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "./experiment-run-command-dispatcher.service.ts";
-import { ExperimentRunRegistrationService } from "./experiment-run-registration.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
@@ -152,11 +151,10 @@ export class ExperimentWorkbenchPipelineRunService {
   }
 
   /**
-   * A polled run: started, left to the worker, and answered once its poller can read it, as main
-   * registered it first. A refusal is the run's failure, whose code the poller reads (wire note 6).
+   * A polled run: its command sent and its start recorded, then answered at once; a poll before the
+   * worker folds it reads the start (spec section 7). A refusal is the run's failure (wire note 6).
    */
   async startRun(run: PipelineRunStart): Promise<void> {
-    const { runId, experimentId } = run.start;
     try {
       await this.runs.ownership.assertConnectedAgentsRunnable({
         agents: [...run.data.loadedAgents.values()],
@@ -164,13 +162,13 @@ export class ExperimentWorkbenchPipelineRunService {
       });
     } catch (error) {
       await this.#failBeforeStart({ run, error });
-      await this.#registration().awaitRegistered({ runId, experimentId });
+      await this.#recordStart({ run });
       return;
     }
 
     await this.runs.commands.startExperimentRun(run.start);
     await this.#carryBoard({ run });
-    await this.#registration().awaitRegistered({ runId, experimentId });
+    await this.#recordStart({ run });
   }
 
   /** The run's frames in `seq` order, a redelivered one dropped, until the run ends. */
@@ -233,8 +231,11 @@ export class ExperimentWorkbenchPipelineRunService {
     });
   }
 
-  #registration(): ExperimentRunRegistrationService {
-    return ExperimentRunRegistrationService.create({ folds: this.runs.folds });
+  async #recordStart({ run }: { run: PipelineRunStart }): Promise<void> {
+    const { tenantId, runId, experimentId, total, occurredAt } = run.start;
+    await this.runs.folds.recordRunStart({
+      start: { projectId: tenantId, runId, experimentId, total, startedAt: occurredAt },
+    });
   }
 
   /** The board cells the page carried into the run, recorded as the run's and never streamed. */

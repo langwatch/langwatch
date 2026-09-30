@@ -38,7 +38,6 @@ import { ExperimentExecutionDataService } from "./experiment-execution-data.serv
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type { ExperimentRunCommandDispatcherService } from "./experiment-run-command-dispatcher.service.ts";
 import { ExperimentRunPlanService } from "./experiment-run-plan.service.ts";
-import { ExperimentRunRegistrationService } from "./experiment-run-registration.service.ts";
 import type { ExperimentRunErrorReporting } from "./experiment-run-results-writer.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
@@ -96,7 +95,7 @@ export class WorkflowEvaluationService {
     return new WorkflowEvaluationService(dependencies);
   }
 
-  /** Refuses what it can, sends the run to the worker, and answers once its poller can read it. */
+  /** Refuses what it can, sends the run to the worker and records its start, then answers. */
   async request(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
     this.#refuseRead();
     const baseUrl = this.#baseUrl();
@@ -113,9 +112,10 @@ export class WorkflowEvaluationService {
       scope: input.rowIndices ? { type: "rows", rowIndices: input.rowIndices } : { type: "full" },
     });
 
+    const occurredAt = nowInstant().epochMilliseconds;
     await this.dependencies.requests.requestWorkflowEvaluation({
       tenantId: input.projectId,
-      occurredAt: nowInstant().epochMilliseconds,
+      occurredAt,
       runId,
       experimentId: experiment.id,
       experimentSlug: experiment.slug,
@@ -128,9 +128,16 @@ export class WorkflowEvaluationService {
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.rowIndices ? { rowIndices: input.rowIndices } : {}),
     });
-    await ExperimentRunRegistrationService.create({
-      folds: this.dependencies.folds,
-    }).awaitRegistered({ runId, experimentId: experiment.id });
+    // Answered once the command is written; a poll before the worker folds it reads this start.
+    await this.dependencies.folds.recordRunStart({
+      start: {
+        projectId: input.projectId,
+        runId,
+        experimentId: experiment.id,
+        total,
+        startedAt: occurredAt,
+      },
+    });
 
     return {
       runId,

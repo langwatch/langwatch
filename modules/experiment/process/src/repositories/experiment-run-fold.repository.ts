@@ -102,6 +102,16 @@ export const experimentRunProgressStateSchema = z.object({
   ...foldTimestampsShape,
 });
 
+/** A polled run's start as the api answered it, read until the progress fold holds the run. */
+export const experimentRunStartRecordSchema = experimentRunProgressStateSchema.pick({
+  projectId: true,
+  runId: true,
+  experimentId: true,
+  total: true,
+  startedAt: true,
+});
+
+export type ExperimentRunStartRecord = z.infer<typeof experimentRunStartRecordSchema>;
 export type ExperimentRunPlanFoldState = z.infer<typeof experimentRunPlanFoldStateSchema>;
 export type ExperimentRunTargetOutput = z.infer<typeof experimentRunTargetOutputSchema>;
 export type ExperimentRunEvaluatorScore = z.infer<typeof experimentRunEvaluatorScoreSchema>;
@@ -118,4 +128,7 @@ export abstract class ExperimentRunFoldRepository {
     runId: string;
   }): Promise<FoldStateRead<ExperimentRunProgressState>>;
   abstract writeProgress(input: { state: ExperimentRunProgressState }): Promise<void>;
+  /** Kept beside the progress fold, so a poll before the worker folds the run reads it running. */
+  abstract recordRunStart(input: { start: ExperimentRunStartRecord }): Promise<void>;
+  abstract findRunStart(input: { runId: string }): Promise<ExperimentRunStartRecord[]>;
 }

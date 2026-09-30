@@ -4,6 +4,7 @@ import {
   ExperimentRunFoldRepository,
   type ExperimentRunPlanFoldState,
   type ExperimentRunProgressState,
+  type ExperimentRunStartRecord,
 } from "../experiment-run-fold.repository.ts";
 
 /** The run's folds in this process's memory, for tests and a deployment without Redis. */
@@ -14,6 +15,7 @@ export class MemoryExperimentRunFoldRepository extends ExperimentRunFoldReposito
 
   private readonly plans = new Map<string, ExperimentRunPlanFoldState>();
   private readonly progress = new Map<string, ExperimentRunProgressState>();
+  private readonly starts = new Map<string, ExperimentRunStartRecord>();
 
   private constructor() {
     super();
@@ -45,6 +47,16 @@ export class MemoryExperimentRunFoldRepository extends ExperimentRunFoldReposito
   writeProgress({ state }: { state: ExperimentRunProgressState }): Promise<void> {
     this.progress.set(state.runId, state);
     return Promise.resolve();
+  }
+
+  recordRunStart({ start }: { start: ExperimentRunStartRecord }): Promise<void> {
+    this.starts.set(start.runId, start);
+    return Promise.resolve();
+  }
+
+  findRunStart({ runId }: { runId: string }): Promise<ExperimentRunStartRecord[]> {
+    const start = this.starts.get(runId);
+    return Promise.resolve(start === undefined ? [] : [start]);
   }
 }
 

@@ -1467,6 +1467,8 @@ A run's live frames are published from its progress fold, which assigns each fra
 counts, so a reconnect's replay and the live stream cannot disagree; its events carry every detail a
 frame shows (an evaluator's error type, traceback, domain error, raw response and cost currency) as
 additive fields, never a side channel (Alex, 2026-09-28).
+A polled run start or workflow evaluation answers 200 the moment its command is written, never waiting
+on the worker; it records the run's start beside the fold, so an early poll reads `running` (Alex, 2026-09-30).
 An operator's projection replay runs as a worker process-manager intent, never in a request: the api
 takes the Redis replay lock, records the run and sends `requestProjectionReplay` on ops'
 `ops_projection_replay`; the intent awaits the whole run, fenced by the lock holder, so a delivery
