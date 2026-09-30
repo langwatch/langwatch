@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { UiAgentTypeSelectorDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { ArrowLeft, Cable, Code, Globe, Workflow } from "lucide-react";
+import { ArrowLeft, Cable, Code, Globe, Mic, Workflow } from "lucide-react";
 
 import { useAgentTypeSelection } from "../../behavior/use-agent-type-selection.ts";
 import type { NewAgentType } from "../../model/new-agent-drawer.ts";
@@ -21,6 +21,12 @@ const agentTypes: {
     icon: Globe,
     title: "HTTP Agent",
     description: "Connect to an external API endpoint to process requests",
+  },
+  {
+    type: "voice",
+    icon: Mic,
+    title: "Voice Agent",
+    description: "Test a voice agent hosted on ElevenLabs: talk to it or send a simulated caller",
   },
   {
     type: "code",
@@ -79,13 +85,15 @@ export function AgentTypeSelectorDrawer({
 
             <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
               <ConnectFromCodeCard onClick={selection.connectFromCode} />
-              {agentTypes.map((agentType) => (
-                <AgentTypeCard
-                  key={agentType.type}
-                  {...agentType}
-                  onClick={() => selection.select(agentType.type)}
-                />
-              ))}
+              {agentTypes
+                .filter((agentType) => agentType.type !== "voice" || selection.voiceEnabled)
+                .map((agentType) => (
+                  <AgentTypeCard
+                    key={agentType.type}
+                    {...agentType}
+                    onClick={() => selection.select(agentType.type)}
+                  />
+                ))}
             </VStack>
           </VStack>
         </Drawer.Body>

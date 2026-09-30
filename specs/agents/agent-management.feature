@@ -187,6 +187,18 @@ Feature: Agent management
       | Code Agent     | code     | Create a Python code executor  |
       | Workflow Agent | workflow | Use an existing workflow       |
 
+  Scenario: The new agent flow offers a Voice Agent while the flag is on
+    Given the release_voice_agents_enabled flag is on
+    When the AgentTypeSelectorDrawer opens
+    Then I see a "Voice Agent" option between "HTTP Agent" and "Code Agent"
+    When I select "Voice Agent"
+    Then the AgentVoiceEditorDrawer opens
+
+  Scenario: The new agent flow hides the Voice Agent while the flag is off
+    Given the release_voice_agents_enabled flag is off
+    When the AgentTypeSelectorDrawer opens
+    Then I do not see a "Voice Agent" option
+
   Scenario: Selecting type navigates to appropriate editor
     Given the AgentTypeSelectorDrawer is open
     When I select "Code Agent"

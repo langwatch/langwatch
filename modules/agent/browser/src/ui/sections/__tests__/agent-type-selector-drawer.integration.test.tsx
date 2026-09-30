@@ -3,9 +3,17 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const drawer = vi.hoisted(() => ({ openDrawer: vi.fn(), closeDrawer: vi.fn() }));
+
+vi.mock(
+  "../../../behavior/agent-api.ts",
+  async () =>
+    (
+      await import("../../../features/voice-editor/ui/sections/__tests__/voice-editor-doubles.test-helpers.tsx")
+    ).agentApiDouble,
+);
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ ...drawer, canGoBack: false, goBack: vi.fn() }),
@@ -17,10 +25,21 @@ afterAll(() => {
   vi.resetModules();
 });
 const { AgentTypeSelectorDrawer } = await import("../agent-type-selector-drawer.tsx");
+const { voiceState } =
+  await import("../../../features/voice-editor/ui/sections/__tests__/voice-editor-doubles.test-helpers.tsx");
+const { VoiceTestHost, resetVoiceState } =
+  await import("../../../features/voice-editor/ui/sections/__tests__/voice-editor.test-helpers.tsx");
+const { AgentManagementHostProvider } = await import("../../../model/agent-management-host.ts");
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <ChakraProvider value={defaultSystem}>
+    <AgentManagementHostProvider value={new VoiceTestHost()}>
+      {children}
+    </AgentManagementHostProvider>
+  </ChakraProvider>
 );
+
+beforeEach(resetVoiceState);
 
 afterEach(() => {
   cleanup();
@@ -63,6 +82,39 @@ describe("AgentTypeSelectorDrawer", () => {
     fireEvent.click(screen.getByTestId("agent-type-workflow"));
 
     expect(onSelect).toHaveBeenCalledWith("workflow");
+  });
+
+  describe("given the release_voice_agents_enabled flag", () => {
+    /** @scenario "The new agent flow offers a Voice Agent while the flag is on" */
+    it("offers a Voice Agent card between HTTP and Code while it is on", () => {
+      renderDrawer();
+
+      expect(screen.getByText("Voice Agent")).toBeTruthy();
+      const types = screen.getAllByTestId(/^agent-type-[a-z]+$/).map((card) => card.dataset.testid);
+      expect(types).toEqual([
+        "agent-type-connected",
+        "agent-type-http",
+        "agent-type-voice",
+        "agent-type-code",
+        "agent-type-workflow",
+      ]);
+    });
+
+    /** @scenario "The new agent flow offers a Voice Agent while the flag is on" */
+    it("opens the voice editor when the Voice Agent card is chosen", () => {
+      render(<AgentTypeSelectorDrawer open />, { wrapper: Wrapper });
+      fireEvent.click(screen.getByTestId("agent-type-voice"));
+
+      expect(drawer.openDrawer).toHaveBeenCalledWith("agentVoiceEditor");
+    });
+
+    /** @scenario "The new agent flow hides the Voice Agent while the flag is off" */
+    it("hides the Voice Agent card while it is off", () => {
+      voiceState.flagOn = false;
+      renderDrawer();
+
+      expect(screen.queryByTestId("agent-type-voice")).toBeNull();
+    });
   });
 
   describe("given the connect-from-code choice leads the list", () => {

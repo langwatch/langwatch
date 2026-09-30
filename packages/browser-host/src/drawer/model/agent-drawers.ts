@@ -10,7 +10,7 @@ import type { WireOf } from "@langwatch/api/web";
 import type { ReactNode } from "react";
 
 /** The kinds of agent a caller can start from agent's type selector. */
-export type UiNewAgentType = "code" | "workflow" | "http";
+export type UiNewAgentType = "code" | "workflow" | "http" | "voice";
 
 /** What a caller hands agent's type selector drawer. */
 export type UiAgentTypeSelectorDrawerProps = {
