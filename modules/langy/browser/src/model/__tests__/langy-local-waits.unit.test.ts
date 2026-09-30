@@ -6,6 +6,7 @@ import {
   langyQuestionWaitsByToolCall,
   mergeLangyWaitStatus,
   routeLangyChoiceAnswer,
+  routeLangyQuestionRefusal,
   toolCallIdOfQuestionBlock,
 } from "../langy-local-waits.ts";
 
@@ -334,6 +335,39 @@ describe("routeLangyChoiceAnswer", () => {
       expect(routeLangyChoiceAnswer({ blockId: "b-1", waits })).toEqual({
         kind: "message",
       });
+    });
+  });
+});
+
+describe("routeLangyQuestionRefusal", () => {
+  describe("given a wait that ended with no answer", () => {
+    /** @scenario "A late answer starts the next turn as my message" */
+    it("sends the answer as the next user message", () => {
+      expect(
+        routeLangyQuestionRefusal({ code: "langy_wait_expired", meta: { outcome: "expired" } }),
+      ).toEqual({ kind: "message" });
+      expect(routeLangyQuestionRefusal({ code: "langy_wait_expired", meta: {} })).toEqual({
+        kind: "message",
+      });
+    });
+  });
+
+  describe("given a wait that was already answered", () => {
+    /** @scenario "A second answer to an already answered question starts no turn" */
+    it("settles the card as answered and sends nothing", () => {
+      expect(
+        routeLangyQuestionRefusal({
+          code: "langy_wait_expired",
+          meta: { outcome: "answered", source: "panel" },
+        }),
+      ).toEqual({ kind: "answered" });
+    });
+  });
+
+  describe("given any other failure", () => {
+    it("reports the failure and sends nothing", () => {
+      expect(routeLangyQuestionRefusal({ code: "internal_error" })).toEqual({ kind: "failed" });
+      expect(routeLangyQuestionRefusal(null)).toEqual({ kind: "failed" });
     });
   });
 });
