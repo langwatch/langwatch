@@ -264,6 +264,11 @@ GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/ma
 # Pinning GOTOOLCHAIN to go.mod's version makes both environments identical.
 GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
 
+# A slot bounds how many runs, not how many cores each takes: locally the linter
+# and its `go list` builds get 2 cores, CI (CI=true) every core. Override: GO_LINT_JOBS=8.
+GO_LINT_JOBS ?= $(if $(CI),$(shell getconf _NPROCESSORS_ONLN),2)
+GO_LINT_ENV := env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) GOMAXPROCS=$(GO_LINT_JOBS) GOFLAGS="$(GOFLAGS) -p=$(GO_LINT_JOBS)"
+
 # golangci-lint saturates cores the same way a whole-tree typecheck does, so it
 # takes a slot from the same machine-wide counter (`haven slot run`) before it
 # runs, and queues behind a typecheck already running rather than piling onto
@@ -271,7 +276,7 @@ GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
 # edits, not the whole tree, and is not the cost this queue exists for.
 go-lint-slot:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
-	@$(HAVEN) slot run --label golangci-lint --timeout 10m -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --allow-serial-runners $(GO_LINT_PKGS)
+	@$(HAVEN) slot run --label golangci-lint --timeout 10m -- $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners $(GO_LINT_PKGS)
 
 go-lint: go-lint-slot
 
@@ -283,7 +288,7 @@ go-lint-changed:
 		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "./$$d"; done); \
 	if [ -z "$$pkgs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
 	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$pkgs" | wc -l | tr -d ' ') packages)"; \
-	$(HAVEN) slot run --label golangci-lint --timeout 10m -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --allow-serial-runners --new-from-rev=HEAD $$pkgs
+	$(HAVEN) slot run --label golangci-lint --timeout 10m -- $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners --new-from-rev=HEAD $$pkgs
 
 # Stop all services
 down:

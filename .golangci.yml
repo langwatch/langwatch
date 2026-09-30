@@ -142,6 +142,12 @@ linters:
       - common-false-positives
       - std-error-handling
 
+    paths:
+      - node_modules
+      - \.claude
+      - \.worktrees
+      - dist
+
     rules:
       # Tests: relax rules that trade readability for strictness.
       #
@@ -244,3 +250,6 @@ formatters:
     paths:
       - vendor
       - node_modules
+      - \.claude
+      - \.worktrees
+      - dist

@@ -6,10 +6,19 @@ go 1.27.1
 ignore (
 	node_modules
 	dist
+	coverage
 	./apps
+	./charts
+	./dev
+	./docs
 	./enterprise
+	./mcp
 	./modules
 	./packages
+	./sdks/python
+	./sdks/typescript
+	./skills
+	./specs
 )
 
 require (
