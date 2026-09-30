@@ -110,7 +110,6 @@
     "@langchain/langgraph": ">=0.4.0 <1.0.0",
     "@langchain/openai": ">=0.6.0 <1.0.0",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/langy-contract": "workspace:*",
     "@opentelemetry/sdk-trace-web": "catalog:",
     "@types/debug": "catalog:",
     "@types/js-yaml": "catalog:",

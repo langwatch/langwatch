@@ -2,12 +2,12 @@
  * What the trace feature's tRPC transports answer, stated once in the
  * contract via `withOutput` rather than implied by a handler's return.
  */
-import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 import { derivedTraceEventSchema } from "./trace-derived-event.ts";
 import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";
+import { evaluationRunDataSchema } from "./trace-evaluation.schemas.ts";
 import {
   chatMessageSchema,
   errorCaptureSchema,

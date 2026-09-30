@@ -243,6 +243,7 @@ export const eSBatchEvaluationTargetRESTSchema = z.object({
 
 export type ESBatchEvaluationTargetREST = z.infer<typeof eSBatchEvaluationTargetRESTSchema>;
 
+// Duplicate in evaluation-contract (evaluation-rest.schemas.ts); keep in step.
 export const eSBatchEvaluationRESTParamsSchema = z.object({
   ...eSBatchEvaluationSchema.partial().omit({
     project_id: true,

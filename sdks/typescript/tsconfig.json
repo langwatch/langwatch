@@ -64,9 +64,6 @@
   "references": [
     {
       "path": "../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/langy/contract/tsconfig.build.json"
     }
   ]
 }

@@ -30,7 +30,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/experiment-contract": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -3,9 +3,9 @@
  * These live in the contract rather than beside the ClickHouse-backed service that builds them
  * because they are what the trace transport PUBLISHES.
  */
-import { evaluationSummarySchema } from "@langwatch/evaluation-contract";
 import { z } from "zod";
 
+import { evaluationSummarySchema } from "./trace-evaluation.schemas.ts";
 import {
   eventMetricValuesSchema,
   facetValueAggregatesSchema,

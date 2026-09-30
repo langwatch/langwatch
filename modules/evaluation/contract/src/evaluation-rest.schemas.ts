@@ -3,7 +3,76 @@
  * wire schemas those doors publish stay beside their declaration; these are the
  * shapes the operations themselves take.
  */
-import type { ESBatchEvaluationRESTParams } from "@langwatch/experiment-contract";
+import { z } from "zod";
+
+const batchTargetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(["prompt", "agent", "evaluator", "workflow", "custom"]).optional(),
+  prompt_id: z.string().optional().nullable(),
+  prompt_version: z.number().optional().nullable(),
+  agent_id: z.string().optional().nullable(),
+  evaluator_id: z.string().optional().nullable(),
+  model: z.string().optional().nullable(),
+  metadata: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .optional()
+    .nullable(),
+});
+
+// Copy of experiment-contract's eSBatchEvaluationRESTParamsSchema; keep in step.
+const batchEvaluationRESTParamsSchema = z.object({
+  experiment_id: z.string().optional().nullable(),
+  experiment_slug: z.string().optional().nullable(),
+  run_id: z.string(),
+  workflow_id: z.string().optional().nullable(),
+  workflow_version_id: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
+  progress: z.number().optional().nullable(),
+  total: z.number().optional().nullable(),
+  targets: z.array(batchTargetSchema).optional().nullable(),
+  dataset: z
+    .array(
+      z.object({
+        index: z.number(),
+        target_id: z.string().optional().nullable(),
+        entry: z.record(z.string(), z.unknown()),
+        predicted: z.record(z.string(), z.unknown()).optional(),
+        cost: z.number().optional().nullable(),
+        duration: z.number().optional().nullable(),
+        error: z.string().optional().nullable(),
+        trace_id: z.string().optional().nullable(),
+      }),
+    )
+    .optional(),
+  evaluations: z
+    .array(
+      z.object({
+        evaluator: z.string(),
+        name: z.string().optional().nullable(),
+        target_id: z.string().optional().nullable(),
+        status: z.enum(["processed", "skipped", "error"]),
+        index: z.number(),
+        duration: z.number().optional().nullable(),
+        inputs: z.record(z.string(), z.unknown()).optional(),
+        score: z.number().optional().nullable(),
+        label: z.string().optional().nullable(),
+        passed: z.boolean().optional().nullable(),
+        details: z.string().optional().nullable(),
+        cost: z.number().optional().nullable(),
+      }),
+    )
+    .optional(),
+  timestamps: z
+    .object({
+      created_at: z.number().optional().nullable(),
+      finished_at: z.number().optional().nullable(),
+      stopped_at: z.number().optional().nullable(),
+    })
+    .optional(),
+});
+
+type ESBatchEvaluationRESTParams = z.infer<typeof batchEvaluationRESTParamsSchema>;
 
 /**
  * What the evaluator runtime is handed. Two arms: a built-in evaluator takes
