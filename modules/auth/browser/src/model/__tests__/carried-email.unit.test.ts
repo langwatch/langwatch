@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   forgetCarriedEmail,
   forgotPasswordHref,
+  readCarriedAddressProof,
   readCarriedEmail,
   signUpHref,
 } from "../carried-email.ts";
@@ -48,6 +49,21 @@ describe("given an address carried between the front door's two screens", () => 
       window.history.replaceState(null, "", signUpHref({ callbackUrl: "/", email }));
 
       expect(readCarriedEmail()).toBe(email);
+    });
+  });
+
+  describe("when the sign-up link carries an unconfirmed address proof", () => {
+    it("keeps the proof in the fragment beside the address, never in the query", () => {
+      const href = signUpHref({ callbackUrl: "/", email: "a@b.com", addressProof: "p-1" });
+
+      expect(href).toBe("/auth/signup?callbackUrl=%2F#email=a%40b.com&proof=p-1");
+      window.history.replaceState(null, "", href);
+      expect(readCarriedEmail()).toBe("a@b.com");
+      expect(readCarriedAddressProof()).toBe("p-1");
+    });
+
+    it("carries no proof without the address it stands for", () => {
+      expect(signUpHref({ email: null, addressProof: "p-1" })).toBe("/auth/signup");
     });
   });
 
