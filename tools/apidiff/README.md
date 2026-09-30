@@ -642,6 +642,15 @@ whose name starts with `_` are skipped by the default glob. A scenario that
 held on both sides still fails as FAIL-diff when the two main responses differ
 after normalization. Exit code: 2 if any ERROR (the harness could not
 measure, including a 429), else 1 if anything is not PASS, else 0.
+
+Under SaaS the instance-admin routes answer 404 (`instanceAdminDoor`), so the
+admin key is unusable. The phase probes `GET /api/organizations` with the key
+once per side; on a 404 it logs one line, drops the key, seeds through the
+no-key path and defers every scenario that needs it (`shard: org`, auth
+`admin`, `org-c`, `org-c-org`). They are listed by id on a `deferred:
+self-hosted pass` line, are not in the tally and are not failures. A 401 or 403
+keeps the key. The list of what a later non-SaaS pass must cover is kept in
+the run notes, not here.
 `scenarios.jsonl` lands in the run directory (`-run-dir` in the standalone
 mode).
 

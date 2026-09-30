@@ -87,11 +87,11 @@ func TestAFailBetweenErrorsNeitherCountsNorResets(t *testing.T) {
 }
 
 func TestARefusedRunOrganizationStopsBeforeAnyScenario(t *testing.T) {
-	server := httptest.NewServer(http.NotFoundHandler())
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) { writer.WriteHeader(http.StatusInternalServerError) }))
 	t.Cleanup(server.Close)
 	options := scenarioOptions{MaxErrors: 50, Keys: Keys{ProjectKey: "key", OrgKey: "org", AdminKey: "admin"}}
 	code, report := runPhase(t, server.URL, options, 5, shardProject)
-	if code != exitError || !strings.Contains(report, "apidiff: stopping: setup failed: stack: seed organization: status 404") {
+	if code != exitError || !strings.Contains(report, "apidiff: stopping: setup failed: stack: seed organization: status 500") {
 		t.Fatalf("code %d:\n%s", code, report)
 	}
 	if strings.Contains(report, "scenarios: 5 run") {

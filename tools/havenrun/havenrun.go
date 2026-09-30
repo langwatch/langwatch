@@ -192,10 +192,11 @@ type LaneStatus struct {
 	Listening bool   `json:"listening"`
 }
 
-// ServiceItem is one routed service's hostname.
+// ServiceItem is one routed service's hostname and loopback port.
 type ServiceItem struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
+	Port int    `json:"port"`
 }
 
 // ServiceURL returns the routed URL haven allocated for a named service (for

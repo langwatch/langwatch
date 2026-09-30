@@ -76,6 +76,11 @@ func runScenariosSubcommand(ctx context.Context, args []string, out streams) int
 	if runDir == "" {
 		runDir = filepath.Join(".apidiff", "scenarios-"+time.Now().Format("20060102-150405"))
 	}
+	if probe.a != "" && probe.b != "" {
+		if err := rememberHavenOrigins(ctx, probe.a, probe.b); err != nil {
+			fmt.Fprintln(out.stderr, "scenarios: haven origins:", err)
+		}
+	}
 	if probe.a != "" && probe.b == "" {
 		filled, err := fillHavenCredentials(ctx, probe.a, &probe.keys)
 		if err != nil {
@@ -130,6 +135,12 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 	}
 	runner := newScenarioRunner(ctx, options)
 	defer runner.cancel()
+	runner.probeAdminKey()
+	items, deferred := runner.deferAdminScenarios(items)
+	if len(items) == 0 {
+		writeDeferred(report, deferred)
+		return exitEqual
+	}
 	fmt.Fprintf(progress, "scenarios: %d selected, %d in flight per side, %d shards per kind\n", len(items), runner.options.Concurrency, options.Shards)
 	seeded := time.Now()
 	needs := needsOf(items, options.Shards)
@@ -147,6 +158,7 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 	phaseDone(progress, "scenarios", started)
 	timing := scenarioTiming{Wall: time.Since(started), Requests: runner.requests.Load(), Waits: time.Duration(runner.waitNanos.Load()), Workers: runner.options.Concurrency}
 	writeScenarioReport(report, results, timing)
+	writeDeferred(report, deferred)
 	if target, err := writeScenariosJSONL(options.RunDir, results); err != nil {
 		fmt.Fprintln(progress, "scenarios.jsonl:", err)
 	} else if target != "" {

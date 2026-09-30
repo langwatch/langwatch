@@ -87,6 +87,8 @@ type scenarioRunner struct {
 	streak    *diffkit.Streak
 	stopped   atomic.Bool
 	cancel    context.CancelFunc
+	// adminAbsent is set once probeAdminKey finds the instance-admin routes 404.
+	adminAbsent bool
 }
 
 // stop ends the run early: scenarios not started are dropped, and the ones in

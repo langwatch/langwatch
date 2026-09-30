@@ -37,22 +37,10 @@ var havenCredentialKeys = map[string]havenCredential{
 // origin, the only Origin its sign-in trusts. No haven, or no stack serving
 // the URL, fills nothing: the flags stay the way to name a key.
 func fillHavenCredentials(ctx context.Context, baseURL string, keys *Keys) ([]string, error) {
-	if !havenrun.OnPath() {
-		return nil, nil
-	}
-	statusOut, err := exec.CommandContext(ctx, havenrun.Command, havenrun.StatusArgs()...).Output() //nolint:gosec // fixed haven binary and arguments
-	if err != nil {
-		return nil, fmt.Errorf("haven status: %w", err)
-	}
-	status, err := havenrun.ParseStatus(statusOut)
-	if err != nil {
+	stack, found, err := havenStackServing(ctx, baseURL)
+	if err != nil || !found {
 		return nil, err
 	}
-	stack, found := stackServing(status, baseURL)
-	if !found {
-		return nil, nil
-	}
-	rememberAppOrigin(baseURL, stack)
 	slug := stack.Slug
 	command := exec.CommandContext(ctx, havenrun.Command, "env", "--json", "--reveal") //nolint:gosec // fixed haven binary and arguments
 	command.Env = append(os.Environ(), "LANGWATCH_SLUG="+slug)
@@ -105,25 +93,62 @@ func bearerStatus(ctx context.Context, target, token string) int {
 	return response.StatusCode
 }
 
-// stackServing finds the stack whose API loopback port or routed app origin
-// is baseURL's.
+// havenStackServing finds the haven stack serving baseURL and records its app
+// origin, so a sign-in posted to any of its ports sends the origin it trusts.
+// No haven, or no stack serving the URL, finds nothing.
+func havenStackServing(ctx context.Context, baseURL string) (havenrun.StackStatus, bool, error) {
+	if !havenrun.OnPath() {
+		return havenrun.StackStatus{}, false, nil
+	}
+	statusOut, err := exec.CommandContext(ctx, havenrun.Command, havenrun.StatusArgs()...).Output() //nolint:gosec // fixed haven binary and arguments
+	if err != nil {
+		return havenrun.StackStatus{}, false, fmt.Errorf("haven status: %w", err)
+	}
+	status, err := havenrun.ParseStatus(statusOut)
+	if err != nil {
+		return havenrun.StackStatus{}, false, err
+	}
+	stack, found := stackServing(status, baseURL)
+	if found {
+		rememberAppOrigin(baseURL, stack)
+	}
+	return stack, found, nil
+}
+
+// rememberHavenOrigins records the app origin of each haven stack serving one
+// of the URLs; a URL no stack serves keeps the loopback fallback.
+func rememberHavenOrigins(ctx context.Context, urls ...string) error {
+	for _, baseURL := range urls {
+		if _, _, err := havenStackServing(ctx, baseURL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// stackServing finds the stack whose API port, a service's port (the UI dev
+// server's, say) or routed origin is baseURL's.
 func stackServing(status havenrun.Status, baseURL string) (havenrun.StackStatus, bool) {
 	target, err := url.Parse(baseURL)
 	if err != nil {
 		return havenrun.StackStatus{}, false
 	}
 	for _, stack := range status.Stacks {
-		if (target.Port() != "" && target.Port() == strconv.Itoa(stack.APIPort)) || routesHost(stack, target.Host) {
+		if (target.Port() != "" && target.Port() == strconv.Itoa(stack.APIPort)) || servesTarget(stack, target) {
 			return stack, true
 		}
 	}
 	return havenrun.StackStatus{}, false
 }
 
-// routesHost reports whether one of the stack's routed services is host.
-func routesHost(stack havenrun.StackStatus, host string) bool {
+// servesTarget reports whether one of the stack's services is target, by
+// routed host or by loopback port.
+func servesTarget(stack havenrun.StackStatus, target *url.URL) bool {
 	for _, service := range stack.Services {
-		if routed, err := url.Parse(service.URL); err == nil && service.URL != "" && routed.Host == host {
+		if service.Port != 0 && strconv.Itoa(service.Port) == target.Port() {
+			return true
+		}
+		if routed, err := url.Parse(service.URL); err == nil && service.URL != "" && routed.Host == target.Host {
 			return true
 		}
 	}
