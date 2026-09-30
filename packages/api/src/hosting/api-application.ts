@@ -10,7 +10,7 @@ import { ClientAddress } from "../policy/client-address.ts";
 import type { SecurityHeaders } from "../policy/security-headers.ts";
 import type { RestHost } from "../rest/host.ts";
 import { canonicalErrorAnswer } from "../rest/response.ts";
-import { TrpcHost } from "../trpc/host.ts";
+import { TrpcHost, type TrpcRequestContext } from "../trpc/host.ts";
 import { SseLane } from "../trpc/sse.ts";
 import { mountApiDiscovery } from "./api-discovery.ts";
 import type { HttpFailureAnswer } from "./http-mux.ts";
@@ -78,18 +78,28 @@ export const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAn
 function trpcLanes(trpc: TrpcHost): Hono {
   const app = new Hono();
 
-  app.all(`${TrpcHost.path}/*`, (context) =>
-    fetchRequestHandler({
-      endpoint: TrpcHost.path,
-      req: context.req.raw,
-      router: trpc.router,
-      createContext: async () => {
-        const address = ClientAddress.resolvedFor(context.req.raw);
+  app.all(`${TrpcHost.path}/*`, async (context) => {
+    const request = context.req.raw;
+    let resolved: Promise<TrpcRequestContext> | undefined;
+    const createContext = () => {
+      const address = ClientAddress.resolvedFor(request);
+      resolved ??= trpc.context({ request, ...(address ? { address } : {}) });
+      return resolved;
+    };
 
-        return trpc.context({ request: context.req.raw, ...(address ? { address } : {}) });
-      },
-    }),
-  );
+    // The session version rides every answer; session and reference reads revalidate
+    // by content (ADR-164).
+    const versionHeaders = await trpc.sessionVersionHeaders({ context: createContext });
+    const response = await fetchRequestHandler({
+      endpoint: TrpcHost.path,
+      req: request,
+      router: trpc.router,
+      createContext,
+    });
+    for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
+
+    return trpc.revalidate({ request, response, context: createContext });
+  });
 
   const sse = SseLane.create({
     members: {

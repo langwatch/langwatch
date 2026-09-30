@@ -63,11 +63,10 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 
   /** A peer subscriber (§9): a live consumer of another pipeline's events, on its own lane. */
   registerEventSubscriber(subscriber: EventSubscriberDefinition<EventType>): void {
-    if (
-      this.eventSubscribers.has(subscriber.name) ||
-      this.subscribers.has(subscriber.name) ||
-      this.mapSubscriberEntries.has(subscriber.name)
-    ) {
+    const isEventSubscriber = this.eventSubscribers.has(subscriber.name);
+    const isSubscriber = this.subscribers.has(subscriber.name);
+    const isMapSubscriber = this.mapSubscriberEntries.has(subscriber.name);
+    if (isEventSubscriber || isSubscriber || isMapSubscriber) {
       throw new ConfigurationError(
         "ProjectionRegistry",
         `Subscriber "${subscriber.name}" already registered`,

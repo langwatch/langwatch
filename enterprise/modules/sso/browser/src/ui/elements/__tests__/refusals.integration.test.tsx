@@ -93,6 +93,7 @@ describe("given a read that failed", () => {
 });
 
 describe("given an organization that cannot set single sign-on up yet", () => {
+  /** @scenario "A licence activated while the installation is running takes effect at the next restart" */
   it("says why and what would change it, for each reason", () => {
     const { rerenderWithSsoHost } = renderWithSsoHost(
       <AvailabilityRefusalNotice refusal="not_opted_in" />,

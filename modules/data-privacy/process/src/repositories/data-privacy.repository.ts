@@ -18,6 +18,16 @@ export interface DataPrivacyPolicyRepository {
     personalOnly: boolean;
     config: DataPrivacyConfig;
   }): Promise<DataPrivacyPolicy>;
+  /**
+   * Replaces one rule with what `merge` makes of the stored config (undefined when none is
+   * stored), atomically, so a concurrent write is never lost between the read and the write.
+   */
+  mergeConfigForScope(input: {
+    organizationId: string;
+    scope: DataPrivacyScope;
+    personalOnly: boolean;
+    merge: (config: DataPrivacyConfig | undefined) => DataPrivacyConfig;
+  }): Promise<DataPrivacyPolicy>;
   deleteForScope(input: {
     organizationId: string;
     scope: DataPrivacyScope;

@@ -770,7 +770,7 @@ export async function resolveSsoUser({
     /** We log our own failure because nobody else will: the plugin discards
      *  this error and answers `SSO_USER_RESOLUTION_FAILED` to the customer. */
     logger.error(
-      { error, providerId: input.providerId, email: input.providerUser.email },
+      { error, providerId: input.providerId },
       "deciding whether a single sign-on account may be linked threw; the plugin will answer SSO_USER_RESOLUTION_FAILED and discard this error",
     );
     throw error;

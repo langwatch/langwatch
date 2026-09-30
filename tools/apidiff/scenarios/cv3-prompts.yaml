@@ -1,0 +1,47 @@
+# CV3: prompt version lifecycle as one chain: create, a second version, a tag on the first,
+# restore the first as a third version, read every step back, then delete and read the 404.
+# The single-step versions of each call live in simulations.yaml; this is the chain.
+
+- id: cv3-prompts-version-tag-restore-delete-chain
+  endpoint: POST /api/prompts/{id}/versions/{versionId}/restore
+  auth: project
+  shard: project
+  setup:
+    - request: POST /api/prompts/tags
+      body: { name: "cv3tag-{uid}" }
+      expect: { status: 201 }
+    - request: POST /api/prompts
+      body:
+        handle: "cv3-{uid}"
+        prompt: "You are the first version"
+        model: openai/gpt-4o-mini
+        messages: [{ role: user, content: hello }]
+      capture: { promptId: id }
+      expect: { status: [200, 201] }
+    - request: PUT /api/prompts/{promptId}
+      body: { prompt: "You are the second version", commitMessage: v2, model: openai/gpt-4o-mini }
+      expect: { status: 200, body: { version: 2 } }
+    - request: GET /api/prompts/cv3-{uid}/versions
+      capture: { firstVersionId: "1.versionId" }
+      expect: { status: 200, length: 2, path: "" }
+    - request: PUT /api/prompts/{promptId}/tags/cv3tag-{uid}
+      body: { versionId: "{firstVersionId}" }
+      expect: { status: 200, body: { tag: "cv3tag-{uid}", versionId: "{firstVersionId}" } }
+  request:
+    path: /api/prompts/cv3-{uid}/versions/{firstVersionId}/restore
+    body: {}
+  expect:
+    status: 200
+    body: { prompt: "You are the first version", version: 3 }
+  verify:
+    - request: GET /api/prompts/cv3-{uid}
+      eventually: 10s
+      expect: { status: 200, body: { prompt: "You are the first version", version: 3 } }
+    - request: GET /api/prompts/cv3-{uid}/versions
+      eventually: 10s
+      expect: { status: 200, length: 3, path: "" }
+    - request: DELETE /api/prompts/cv3-{uid}
+      expect: { status: 200 }
+    - request: GET /api/prompts/cv3-{uid}
+      eventually: 10s
+      expect: { status: 404 }

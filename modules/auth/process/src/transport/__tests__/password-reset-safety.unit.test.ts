@@ -11,7 +11,8 @@ describe("the deployment's password reset", () => {
   describe("when a reset completes", () => {
     /** A password someone else knew is only really replaced once the sessions
      *  it opened are gone; leaving them live keeps the thief signed in.
-     *  @scenario A successful reset revokes all of the user's existing sessions */
+     *  @scenario A successful reset revokes all of the user's existing sessions
+     *  @scenario Resetting a password still ends every session */
     it("ends every browser session the user had", async () => {
       const revokeAllBrowserSessions = vi.fn().mockResolvedValue(undefined);
       const auth = betterAuthTransportFor({}, { auth: { revokeAllBrowserSessions } as never });

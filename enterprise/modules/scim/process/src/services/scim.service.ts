@@ -218,7 +218,14 @@ export class ScimService extends ScimServiceContract {
       throw new ScimTokenNotFoundError(input.tokenId);
     }
 
-    if (token?.connectionId) {
+    // Rotation keeps the sync live: it ends only with the connection's last token.
+    const liveTokenIds = token?.connectionId
+      ? await this.repository.findTokenIdsForConnection({
+          organizationId: input.organizationId,
+          connectionId: token.connectionId,
+        })
+      : [];
+    if (token?.connectionId && liveTokenIds.length === 0) {
       await this.lifecycle.revoked({
         organizationId: input.organizationId,
         connectionId: token.connectionId,

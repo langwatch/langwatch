@@ -20,9 +20,12 @@ import {
   GatewayCacheRuleNotFoundError,
   type GatewayRequestCredential,
   GatewaySpendSourceUnavailableError,
+  type GatewayVirtualKeyRecord,
   type GatewayVirtualKeySnakeDto,
+  VirtualKeyNotFoundError,
   virtualKeyBudgetInputSchema,
 } from "@langwatch/gateway-contract";
+import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -69,6 +72,8 @@ const wireBody = z.object({
   meta: z.record(z.string(), z.unknown()).optional(),
   spent_usd: z.string().optional(),
   requests: z.number().optional(),
+  data: z.array(z.object({ id: z.string() })).optional(),
+  next_cursor: z.string().nullable().optional(),
   window: z.object({ from: z.number(), to: z.number() }).optional(),
 });
 
@@ -317,6 +322,99 @@ describe("the gateway platform family's public wire", () => {
       const answer = await mount()("GET", "/virtual-keys?limit=500");
 
       expect([answer.status, answer.body.code]).toEqual([422, "validation_error"]);
+    });
+  });
+
+  describe("given more virtual keys than fit in one page", () => {
+    const rows = ["vk_5", "vk_4", "vk_3", "vk_2", "vk_1"].map(
+      (id, index): GatewayVirtualKeyRecord => ({
+        ...virtualKeyRow(),
+        id,
+        createdAt: Temporal.Instant.fromEpochMilliseconds(1_760_000_000_000 - index * 1_000),
+      }),
+    );
+
+    /** The store's keyset read: newest first, strictly after the cursor's row. */
+    const getVirtualKeyPage = async ({
+      limit,
+      cursor,
+    }: {
+      limit: number;
+      cursor: { createdAt: Instant; id: string } | null;
+    }) =>
+      rows
+        .filter(
+          (row) =>
+            cursor === null || row.createdAt.epochMilliseconds < cursor.createdAt.epochMilliseconds,
+        )
+        .slice(0, limit);
+
+    const pagedKeys = () =>
+      mount({
+        getVirtualKeyPage,
+        visibleToProjectCredential: ({ virtualKeys }) => [...virtualKeys],
+        toVirtualKeySnakeDtos: async ({ virtualKeys }) =>
+          virtualKeys.map((row) => ({ ...virtualKeyDto, id: row.id })),
+      });
+
+    /** @scenario An unbounded list is walked by cursor without loss or repeats */
+    /** @scenario Every unbounded list takes the same page controls */
+    it("collects exactly the single-page list by following next_cursor", async () => {
+      const call = pagedKeys();
+      const whole = await call("GET", "/virtual-keys?limit=50");
+      const walked: string[] = [];
+      let cursor: string | null | undefined;
+      do {
+        const page = await call("GET", `/virtual-keys?limit=2${cursor ? `&cursor=${cursor}` : ""}`);
+        walked.push(...(page.body.data ?? []).map((row) => row.id));
+        cursor = page.body.next_cursor;
+      } while (cursor);
+
+      expect(whole.body.next_cursor).toBeNull();
+      expect(walked).toEqual((whole.body.data ?? []).map((row) => row.id));
+      expect(new Set(walked).size).toBe(walked.length);
+      expect(walked).toHaveLength(rows.length);
+    });
+  });
+
+  describe("given a scope_type filter on the budget list", () => {
+    /** @scenario A filtered list pages on rows returned, not rows examined */
+    it("hands the filter and the page size to the same query", async () => {
+      const listBudgetPageWithHealth = vi.fn().mockResolvedValue({
+        budgets: [],
+        spendAvailable: true,
+        scopeReach: new Map(),
+      });
+      const answer = await mount({
+        authorizeKeyCaller: async () => ({
+          organizationId: ORGANIZATION_ID,
+          actor: { kind: "legacyProjectKey" },
+          actorUserId: `svc_${PROJECT_ID}`,
+        }),
+        listBudgetPageWithHealth,
+        groupMemberCounts: async () => new Map(),
+      })("GET", "/budgets?scope_type=project&limit=3");
+
+      expect(answer.status).toBe(200);
+      expect(listBudgetPageWithHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ scopeTypes: ["PROJECT"], limit: 3 }),
+      );
+    });
+  });
+
+  describe("given a key id that does not exist", () => {
+    /** @scenario Spend for an unknown key is a 404, not a zero */
+    it("answers 404 and never reads a spend figure", async () => {
+      const getVirtualKeySpend = vi.fn();
+      const answer = await mount({
+        getVisibleVirtualKeyForProjectCredential: async () => {
+          throw new VirtualKeyNotFoundError();
+        },
+        getVirtualKeySpend,
+      })("GET", "/virtual-keys/vk_missing/spend");
+
+      expect(answer.status).toBe(404);
+      expect(getVirtualKeySpend).not.toHaveBeenCalled();
     });
   });
 

@@ -54,6 +54,8 @@ export interface ManagementRequestParams {
   body?: unknown;
   /** Query parameters. Undefined values are left off the URL entirely. */
   query?: Record<string, string | number | boolean | undefined>;
+  /** Extra request headers, e.g. `Idempotency-Key`. */
+  headers?: Record<string, string>;
   /** Caller's own deadline; without one the default timeout applies. */
   signal?: AbortSignal;
 }
@@ -87,6 +89,7 @@ export const createManagementRequest = ({
     method,
     body,
     query,
+    headers,
     signal,
   }: ManagementRequestParams): Promise<T> => {
     const response = await langwatchFetch(`${endpoint}${path}${buildQueryString(query)}`, {
@@ -94,6 +97,7 @@ export const createManagementRequest = ({
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
+        ...headers,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       signal: signal ?? AbortSignal.timeout(MANAGEMENT_REQUEST_TIMEOUT_MS),

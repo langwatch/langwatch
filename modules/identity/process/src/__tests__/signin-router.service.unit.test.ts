@@ -179,6 +179,7 @@ describe("SignInRouterService", () => {
     });
 
     /** @scenario "A domain no connection answers for is still decided by the legacy columns" */
+    /** @scenario An organization signing in through the mounted provider today is still sent to it */
     it("uses the legacy domain when no connection is projected", async () => {
       const { service, findLegacyConnectionForDomain } = build({
         projectedByDomain: null,
@@ -187,10 +188,26 @@ describe("SignInRouterService", () => {
 
       const decision = await service.route({ identifier: "sam@acme.com" });
 
+      expect(decision.outcome).toBe("redirect_to_connection");
       expect(decision.reasonCode).toBe("domain_routed");
       expect(findLegacyConnectionForDomain).toHaveBeenCalledWith({
         domain: "acme.com",
       });
+    });
+  });
+
+  describe("when a legacy-routed address is typed in mixed case with a plus tag", () => {
+    /** @scenario Their address routes however they happened to type it */
+    it("still redirects to the connection its domain names", async () => {
+      const { service, findLegacyConnectionForDomain } = build({
+        projectedByDomain: null,
+        legacyByDomain: ACME,
+      });
+
+      const decision = await service.route({ identifier: "Sam.J+News@ACME.com" });
+
+      expect(findLegacyConnectionForDomain).toHaveBeenCalledWith({ domain: "acme.com" });
+      expect(decision.outcome).toBe("redirect_to_connection");
     });
   });
 

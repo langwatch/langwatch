@@ -1,6 +1,7 @@
 "use client";
 
 import { passkeyClient } from "@better-auth/passkey/client";
+import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
 import { looksLikeSsoConnectionId } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
@@ -384,6 +385,8 @@ export const signOut = async (opts?: {
   // Clear module-level session cache so the next useSession mount
   // doesn't serve stale data after logout.
   _cachedSession = null;
+  // The reads persisted to disk were this user's; the next one never sees them.
+  await clearPersistedUiQueries();
 
   if (opts?.redirect === false) {
     // Programmatic logout without redirect. The caller is responsible for

@@ -8,6 +8,8 @@ export const ROLE_KSUID_RESOURCE = "customrole";
 export const ROLE_KIND = {
   CUSTOM: "custom",
   SYSTEM_API_KEY: "system_api_key",
+  /** `admin`, `member` and `viewer`: in every organization, never stored, changed or deleted. */
+  BUILT_IN: "built_in",
 } as const;
 export const roleKindSchema = z.enum(ROLE_KIND);
 export type RoleKind = z.infer<typeof roleKindSchema>;
@@ -23,8 +25,9 @@ export const roleSchema = z
     description: z.string().nullable(),
     permissions: z.array(z.string()),
     kind: roleKindSchema,
-    createdAt: z.date(),
-    updatedAt: z.date(),
+    /** Null on a built-in role, which has no definition moment. */
+    createdAt: z.date().nullable(),
+    updatedAt: z.date().nullable(),
   })
   .strict();
 export type Role = z.infer<typeof roleSchema>;

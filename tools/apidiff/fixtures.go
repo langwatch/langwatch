@@ -56,7 +56,7 @@ const (
 // gate are compared rather than refused alike. release_custom_chart_playground
 // is not forced: it turns the saved-chart routes off in the project it
 // reaches, so a flag-store rule targets it at the widget project alone.
-var forcedFeatureFlags = "release_lwql_workbench,release_instant_evals,release_langy_enabled,release_langy_api_key_turns_enabled,release_trace_media_extraction"
+var forcedFeatureFlags = "release_lwql_workbench,release_instant_evals,release_langy_enabled,release_langy_api_key_turns_enabled,release_trace_media_extraction,self_serve_sso"
 
 // widgetFlagSQL targets the custom-chart playground at the widget project
 // through the flag store both layouts read (identical FeatureFlag columns).

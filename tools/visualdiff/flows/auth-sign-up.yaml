@@ -13,7 +13,7 @@ flows:
           anonymous: first
       - action: fill
         with:
-          testId: signup-identifier
+          field: Email
           value: vd-reopen-{uid}@mail.langwatch.localhost
           anonymous: first
       - action: click

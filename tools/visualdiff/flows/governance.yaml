@@ -237,7 +237,7 @@ flows:
           min: "1"
       - action: expect
         with:
-          count: 'tbody tr:has-text("/VD Source {uid}.*Awaiting first event/s")'
+          count: 'tbody tr:has-text("VD Source {uid}"):has-text("Awaiting first event")'
           min: "1"
       - action: go
         with:

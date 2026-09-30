@@ -74,6 +74,28 @@ describe("command-registry", () => {
       expect(settings?.path).toBe("/settings");
     });
 
+    it("points the folded settings pages at the Directory tab they became", () => {
+      const pathOf = (id: string) => navigationCommands.find((cmd) => cmd.id === id)?.path;
+      expect(pathOf("nav-settings-members")).toBe("/settings/directory");
+      expect(pathOf("nav-settings-teams")).toBe("/settings/directory?tab=teams");
+      expect(pathOf("nav-settings-projects")).toBe("/settings/directory?tab=teams");
+      expect(pathOf("nav-settings-groups")).toBe("/settings/directory?tab=groups");
+    });
+
+    it("offers the settings pages main lists", () => {
+      const ids = navigationCommands.map((cmd) => cmd.id);
+      for (const id of [
+        "nav-settings-directory",
+        "nav-settings-provisioning",
+        "nav-settings-access",
+        "nav-settings-api-keys",
+        "nav-settings-security",
+        "nav-settings-profile",
+      ]) {
+        expect(ids).toContain(id);
+      }
+    });
+
     it("keeps both evaluation workflows in top-level navigation", () => {
       const ids = topLevelNavigationCommands.map((command) => command.id);
       expect(ids).toContain("nav-online-evaluations");

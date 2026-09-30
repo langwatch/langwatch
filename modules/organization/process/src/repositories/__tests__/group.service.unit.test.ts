@@ -1,5 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import { DuplicateBindingError, type AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   GroupRoleNotAssignableError,
   GroupRoleScopeError,
@@ -276,23 +276,24 @@ describe("OrganizationService groups", () => {
     });
   });
 
-  it("maps an AuthZ duplicate to the stable group conflict", async () => {
-    const { service } = buildService({
-      grantsFailure: new DuplicateBindingError(),
+  /** @scenario "A group bound twice to the same role and scope holds both bindings" */
+  it("writes an identical group binding rather than refusing it", async () => {
+    const { service, grants } = buildService();
+
+    await service.addGroupBinding({
+      organizationId: "org_1",
+      groupId: "group_1",
+      binding: {
+        role: "MEMBER",
+        scopeType: "TEAM",
+        scopeId: "team_1",
+      },
+      actor: { type: "user", id: "actor_1" },
     });
 
-    await expect(
-      service.addGroupBinding({
-        organizationId: "org_1",
-        groupId: "group_1",
-        binding: {
-          role: "MEMBER",
-          scopeType: "TEAM",
-          scopeId: "team_1",
-        },
-        actor: { type: "user", id: "actor_1" },
-      }),
-    ).rejects.toMatchObject({ code: "role_binding_already_exists" });
+    expect(grants.attachBindings).toHaveBeenCalledWith(
+      expect.objectContaining({ onDuplicate: "attach" }),
+    );
   });
 
   it("returns group persistence and AuthZ bindings through one service", async () => {

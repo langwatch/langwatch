@@ -21,8 +21,8 @@ import {
   type AnnotationScoresSuccessNotice,
 } from "../model/annotation-scores-host.ts";
 
-/** The name the editor answers to in the address, unchanged from the monolith. */
-const ANNOTATION_SCORE_EDITOR_DRAWER = "annotationScoreEditor";
+/** The name the editor answers to in the address, as registered in annotation.web.ts. */
+const ANNOTATION_SCORE_EDITOR_DRAWER = "addOrEditAnnotationScore";
 
 class CapabilityAnnotationScoresHost extends AnnotationScoresHostApi {
   constructor(

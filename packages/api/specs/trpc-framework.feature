@@ -65,6 +65,26 @@ Feature: tRPC framework boundary
     And the caller receives the refusal, not an internal server error
 
   @unit
+  Scenario: A database with no connection to give is a retryable service-unavailable over tRPC
+    Given a procedure whose store could not get a Postgres connection or start a transaction in time
+    When the client calls that procedure
+    Then the call fails as SERVICE_UNAVAILABLE carrying the handled 503, marked retryable with its wait
+
+  @integration
+  Scenario: The process policy logs and spans a busy database as a handled 503
+    Given a procedure behind the process policy whose store could not get a Postgres connection in time
+    When the client calls that procedure
+    Then it is answered as the handled 503 service_unavailable
+    And it is not reported to the exception reporter as an unhandled fault
+
+  @unit
+  Scenario: A live subscription whose store has no connection to give ends with the handled 503
+    Given a subscription whose store could not get a Postgres connection in time
+    When the stream is being served
+    Then the error frame carries the handled service_unavailable, marked retryable
+    And the failure is logged with that handled code as a platform fault
+
+  @unit
   Scenario: A slow call is raised without burying the log
     Given a call succeeds slower than its budget
     When it is recorded

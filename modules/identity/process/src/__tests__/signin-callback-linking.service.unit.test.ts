@@ -255,6 +255,22 @@ describe("the SSO callback's linking decision", () => {
       expect(directory.provisionUser).not.toHaveBeenCalled();
     });
 
+    /** @scenario Each answer says whether an arrival is provisioned */
+    it.each([
+      { arrivalPolicy: "admit", provisions: true },
+      { arrivalPolicy: "request", provisions: true },
+      { arrivalPolicy: "refuse", provisions: false },
+    ] as const)(
+      "provisions the arrival: $provisions when the answer is $arrivalPolicy",
+      async ({ arrivalPolicy, provisions }) => {
+        const { service, directory } = build();
+
+        await service.complete({ ...ASSERTION, arrivalPolicy }).catch(() => undefined);
+
+        expect(directory.provisionUser).toHaveBeenCalledTimes(provisions ? 1 : 0);
+      },
+    );
+
     /** @scenario "An arrival on a connection that asks keeps the account and waits" */
     it("keeps the account and leaves them waiting when the connection asks", async () => {
       const { service, directory } = build();

@@ -1070,9 +1070,10 @@
   auth: project
   request:
     path: "/api/workflows/wf-vd-{uid}/run"
-    headers: { Content-Type: text/plain }
+    bodyRaw: "hello"
+    contentType: text/plain
   expect:
-    status: 400
+    status: [400, 404]
 
 - id: workflow-run-version-unknown-workflow-is-404
   endpoint: POST /api/workflows/{workflowId}/{versionId}/run

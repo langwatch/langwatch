@@ -171,12 +171,16 @@ func TestEveryScreenIsCapturedOncePerEdition(t *testing.T) {
 		t.Fatalf("passes = %v, want enterprise then free", editions)
 	}
 	updates := fake.matching("UPDATE")
-	if len(updates) != 2 {
-		t.Fatalf("the enterprise pass runs on the seeded license and the free pass clears it on both stacks; updates = %v", updates)
+	if len(updates) != 4 {
+		t.Fatalf("the free pass clears the license on both stacks and the run restores it after; updates = %v", updates)
 	}
-	for _, update := range updates {
-		if !strings.Contains(update, "license = NULL") || !strings.Contains(update, SeededOrganizationID) {
-			t.Errorf("free pass ran %q", update)
+	for index, update := range updates {
+		want := "license = NULL"
+		if index >= 2 {
+			want = "license = 'signed-enterprise-license'"
+		}
+		if !strings.Contains(update, want) || !strings.Contains(update, SeededOrganizationID) {
+			t.Errorf("update %d ran %q, want %s", index, update, want)
 		}
 	}
 }

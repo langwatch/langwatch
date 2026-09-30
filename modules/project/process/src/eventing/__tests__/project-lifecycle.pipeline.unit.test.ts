@@ -84,7 +84,7 @@ function createdListener(heard: (data: ProjectCreatedEventData) => Promise<void>
     .withPeerSubscriber("heard", {
       eventType: PROJECT_CREATED_EVENT_TYPE,
       data: projectCreatedEventDataSchema,
-      handle: heard,
+      handle: (data) => heard(data),
     })
     .build();
 }

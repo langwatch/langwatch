@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// 0 is the indefinite sentinel (INDEFINITE_RETENTION_DAYS): the row is kept, never aged out.
+const retentionDaysSchema = z.number().int().nonnegative().optional();
+
 export const executeEvaluationCommandSchema = z.object({
   projectId: z.string(),
   traceId: z.string(),
@@ -20,7 +23,7 @@ export const executeEvaluationCommandSchema = z.object({
 export const upsertEvaluationRunCommandSchema = z.object({
   tenantId: z.string(),
   data: z.unknown(),
-  retentionDays: z.number().int().positive().optional(),
+  retentionDays: retentionDaysSchema,
 });
 
 export type ExecuteEvaluationCommand = z.infer<typeof executeEvaluationCommandSchema>;

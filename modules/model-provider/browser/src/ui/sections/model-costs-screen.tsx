@@ -23,12 +23,7 @@ import {
 function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: boolean }) {
   return (
     <Table.Cell padding={0}>
-      <Text
-        justifyContent="space-between"
-        paddingX={4}
-        marginX={2}
-        color={isCustom ? "green.500" : undefined}
-      >
+      <Text whiteSpace="nowrap" paddingX={4} marginX={2} color={isCustom ? "green.500" : undefined}>
         {rate?.toLocaleString("fullwide", {
           useGrouping: false,
           maximumSignificantDigits: 20,
@@ -71,29 +66,20 @@ export default function ModelCostsScreen() {
           <Text>Add New Model</Text>
         </PageLayout.HeaderButton>
       </PageLayout.Header>
-      <VStack width="full" gap={0} align="start" paddingTop={4}>
-        <Table.Root
-          variant="line"
-          width="full"
-          maxWidth="100%"
-          wordBreak="break-all"
-          style={{ tableLayout: "fixed" }}
-        >
+      <VStack width="full" gap={0} align="start" paddingTop={4} overflowX="auto">
+        <Table.Root variant="line" width="full" maxWidth="100%">
           <Table.Header width="full">
             <Table.Row width="full">
-              {/* The seven rate columns share what these two leave. A rate runs to
-                  nine decimal places and breaks mid-number when its column is
-                  narrow, so the identifying columns give up some width to keep
-                  the prices readable. */}
-              <Table.ColumnHeader width="15%">Model name</Table.ColumnHeader>
-              <Table.ColumnHeader width="15%">Regex match rule</Table.ColumnHeader>
-              <Table.ColumnHeader>Input cost</Table.ColumnHeader>
-              <Table.ColumnHeader>Output cost</Table.ColumnHeader>
-              <Table.ColumnHeader>Cache read</Table.ColumnHeader>
-              <Table.ColumnHeader>Cache write (5 minutes)</Table.ColumnHeader>
-              <Table.ColumnHeader>Cache write (1 hour)</Table.ColumnHeader>
-              <Table.ColumnHeader>Image input</Table.ColumnHeader>
-              <Table.ColumnHeader>Image output</Table.ColumnHeader>
+              {/* Rates run to nine decimals: headers and values never wrap. */}
+              <Table.ColumnHeader minWidth="200px">Model name</Table.ColumnHeader>
+              <Table.ColumnHeader minWidth="200px">Regex match rule</Table.ColumnHeader>
+              <Table.ColumnHeader whiteSpace="nowrap">Input cost</Table.ColumnHeader>
+              <Table.ColumnHeader whiteSpace="nowrap">Output cost</Table.ColumnHeader>
+              <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
+              <Table.ColumnHeader whiteSpace="nowrap">Cache write (5 minutes)</Table.ColumnHeader>
+              <Table.ColumnHeader whiteSpace="nowrap">Cache write (1 hour)</Table.ColumnHeader>
+              <Table.ColumnHeader whiteSpace="nowrap">Image input</Table.ColumnHeader>
+              <Table.ColumnHeader whiteSpace="nowrap">Image output</Table.ColumnHeader>
               <Table.ColumnHeader width="64px" padding={1} />
             </Table.Row>
           </Table.Header>
@@ -112,7 +98,7 @@ export default function ModelCostsScreen() {
             {llmModelCosts.data?.map(toLLMModelCostRow).map((row) => (
               <Table.Row key={row.model} width="full">
                 <Table.Cell>
-                  <Text truncate color={row.updatedAt ? "green.500" : undefined}>
+                  <Text truncate maxWidth="280px" color={row.updatedAt ? "green.500" : undefined}>
                     {row.model}
                   </Text>
                 </Table.Cell>
@@ -120,6 +106,7 @@ export default function ModelCostsScreen() {
                   <HStack justifyContent="space-between" paddingX={4} marginX={2} maxWidth="100%">
                     <Code
                       truncate
+                      maxWidth="280px"
                       color={row.updatedAt ? "green.500" : undefined}
                       height="32px"
                       lineHeight="22px"

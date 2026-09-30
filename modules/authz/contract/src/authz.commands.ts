@@ -246,7 +246,9 @@ export const authzAttachBindingsInputSchema = z
     bindings: z.array(authzLedgerBindingAttachSchema),
     actor: grantsLedgerActorSchema,
     source: authzLedgerWriteSourceSchema.optional(),
-    onDuplicate: z.enum(["reject", "skip"]),
+    /** `attach` writes every binding, identical ones included (bindings are
+     *  never unique); `skip` leaves out one the principal already holds. */
+    onDuplicate: z.enum(["attach", "skip"]),
     commandId: z.string().min(1).optional(),
     occurredAtMs: z.number().int().nonnegative().optional(),
     awaitProjection: z.boolean().optional(),

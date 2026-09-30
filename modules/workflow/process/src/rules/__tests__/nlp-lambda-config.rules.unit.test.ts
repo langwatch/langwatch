@@ -6,9 +6,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildStudioLambdaConfig } from "../nlp-lambda-config.rules.ts";
 import {
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
+  buildStudioLambdaConfig,
   buildStudioLambdaEnvironment,
   clampCodeBlockTimeoutSeconds,
   type StudioLambdaFleetFields,

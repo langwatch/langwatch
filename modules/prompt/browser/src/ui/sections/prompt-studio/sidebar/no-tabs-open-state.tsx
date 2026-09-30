@@ -1,4 +1,5 @@
-import { Center, EmptyState, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Center, EmptyState, Spacer, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { LuFileText } from "react-icons/lu";
 
 import { AddPromptButton } from "./add-prompt-button.tsx";
@@ -10,10 +11,10 @@ import { AddPromptButton } from "./add-prompt-button.tsx";
 export function NoTabsOpenState() {
   return (
     <VStack width="full" height="full">
-      <HStack width="full" paddingTop="18px" paddingRight="12px">
+      <PageLayout.Header withBorder={false}>
         <Spacer />
         <AddPromptButton />
-      </HStack>
+      </PageLayout.Header>
       <Center width="full" height="full" bg="bg.panel">
         <EmptyState.Root>
           <EmptyState.Content>

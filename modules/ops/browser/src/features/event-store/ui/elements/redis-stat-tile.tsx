@@ -42,6 +42,7 @@ export function RedisStatTile({ data }: { data: RedisData }) {
   return (
     <Stat.Root
       borderRadius="md"
+      flexShrink={0}
       padding={2}
       data-testid="redis-stat-tile"
       data-warning={memoryWarning || cpuWarning ? "true" : "false"}

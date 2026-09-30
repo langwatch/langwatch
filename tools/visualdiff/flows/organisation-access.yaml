@@ -632,3 +632,46 @@ flows:
       - action: expect
         with:
           text: Waiting for single sign-on
+
+  # Directory gates the Departments tab and the per-row department select on the governance flag
+  # (seeded on) AND at least one department existing, on main and on the branch alike. The seed
+  # holds none, so both stacks draw the bare Directory until this runs. Serial, so no other
+  # Directory flow sees a department. Unrun: first run proves the selectors.
+  - id: directory-departments-appear-once-one-exists
+    title: Create a department, then the Directory offers the Departments tab and a department select on each person
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /governance/people?tab=departments&add=1
+      - action: expect
+        with:
+          text: Department name
+          timeout: "15000"
+      - action: type
+        with:
+          placeholder: Engineering
+          text: VD Directory Dept {uid}
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: expect
+        with:
+          text: Department created
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: Departments
+          timeout: "15000"
+      - action: expect
+        with:
+          text: Unassigned
+      - action: go
+        with:
+          path: /settings/directory?tab=departments
+      - action: expect
+        with:
+          text: VD Directory Dept {uid}
+          timeout: "15000"

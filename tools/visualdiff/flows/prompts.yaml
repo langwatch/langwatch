@@ -424,3 +424,96 @@ flows:
         with:
           testId: source-mapping-tag
           hasText: input
+
+  # Editor states the prod comparison could not judge: a saved prompt's chat with a model reply and
+  # its controls, and the editor with Langy docked beside it. The reply needs the stack's llmsim.
+  - id: prompt-editor-chat-reply-controls
+    title: Send a chat message from the saved prompt's editor and find the model reply with its message controls
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Repeat the input back exactly and nothing else: {{input}}"
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-preply-{uid}
+      - action: click
+        with:
+          text: "/^Save$/"
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-preply-{uid}
+      - action: type
+        with:
+          placeholder: "Type your message here"
+          text: "hello-{uid}"
+          submit: "true"
+      - action: expect
+        with:
+          text: hello-{uid}
+      - action: expect
+        with:
+          count: .copilotKitAssistantMessage
+          timeout: "60000"
+      - action: expect
+        with:
+          count: .copilotKitMessageControlButton
+          min: "2"
+          timeout: "30000"
+
+  - id: prompt-editor-with-langy-docked
+    title: Open Langy beside a saved prompt's editor and find both the assistant and the editor's controls
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Repeat the input back exactly and nothing else: {{input}}"
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-planggy-{uid}
+      - action: click
+        with:
+          text: "/^Save$/"
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-planggy-{uid}
+      - action: click
+        with:
+          label: Open Langy assistant
+      - action: expect
+        with:
+          label: Langy assistant
+      - action: expect
+        with:
+          count: '[data-langy-composer] textarea'
+      - action: expect
+        with:
+          text: /^\s*Deploy\s*$/

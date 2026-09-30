@@ -32,6 +32,7 @@ import type {
   AuthzManagedBindingRow,
 } from "../../repositories/authz-binding.repository.ts";
 import { AuthzBindingWriterService } from "../authz-binding-writer.service.ts";
+import { permissiveGrantGuards, TEST_CALLER } from "./support/grant-guards.stub.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const MEMBER_ID = "user_member";
@@ -134,6 +135,8 @@ class MemberAccessStore {
       hasBindingsForUser: async () => false,
       hasLegacySharedTeamMembership: async () => false,
       findGroupMembers: async () => [],
+      findOrganizationUserIds: async () => [],
+      findGrantPrincipals: async () => [],
       findUserGroups: async () => [],
       isGroupInOrganization: async () => true,
       isApiKeyInOrganization: async () => true,
@@ -165,12 +168,7 @@ class MemberAccessStore {
             scopeId: binding.scopeId,
           };
           const identity = identityOf(candidate);
-          if (this.rows.some((row) => identityOf(row) === identity)) {
-            if (onDuplicate === "reject") {
-              throw Object.assign(new Error("duplicate"), {
-                code: "role_binding_already_exists",
-              });
-            }
+          if (onDuplicate === "skip" && this.rows.some((row) => identityOf(row) === identity)) {
             duplicates.push(binding.bindingId);
             continue;
           }
@@ -254,6 +252,7 @@ function world(options: { seat?: OrganizationRole } = {}) {
   });
 
   const writer = AuthzBindingWriterService.create({
+    permissions: permissiveGrantGuards,
     bindings: store.bindings(),
     ledger: store.ledger(),
     newBindingId: () => store.newBindingId(),
@@ -266,6 +265,7 @@ function world(options: { seat?: OrganizationRole } = {}) {
       organizationId: ORGANIZATION_ID,
       userId: MEMBER_ID,
       actor: ACTOR,
+      caller: TEST_CALLER,
       ...batch,
     });
 

@@ -4,9 +4,15 @@
  * annotation and project mount today.
  */
 
+import { planTrpc } from "@langwatch/entitlement-contract";
+import { organizationTrpc } from "@langwatch/organization-contract";
 import { defineWebModule } from "@langwatch/ui-kernel";
 
+import { organizationApi } from "./behavior/organization-api.ts";
+
 export const organizationWeb = defineWebModule("organization")
+  // The api reads plan.getActivePlan too, so the plan's tier travels with it.
+  .withApi(organizationApi, { contracts: [organizationTrpc, planTrpc] })
   .withHosts({
     requires: ["OrganizationHostApi"],
     mounts: {

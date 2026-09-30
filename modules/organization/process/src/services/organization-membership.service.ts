@@ -26,6 +26,7 @@ import {
   type User,
   CannotRemoveLastAdminError,
   CannotRemoveSelfError,
+  MemberSeatLimitReachedError,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import slugify from "slugify";
@@ -49,6 +50,7 @@ import type {
   OrganizationMembershipRepository,
   OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
+import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
 
 /**
@@ -662,22 +664,30 @@ export class OrganizationMembershipService {
     const { organizationId, userId, role, actingUser } = params;
     let teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
 
-    if (role !== undefined) {
-      const result = await this.roles.changeMemberRole({
-        organizationId,
-        userId,
-        role,
-        currentUserId: actingUser?.id ?? null,
-        ...(actingUser ? { planUser: actingUser } : {}),
-      });
-      teamsLeftWithoutAdmin = [...result.teamsLeftWithoutAdmin];
-    } else {
-      await this.roles.setMemberDisabled({
-        organizationId,
-        userId,
-        disabled: params.disabled === true,
-        actingUser,
-      });
+    try {
+      if (role !== undefined) {
+        const result = await this.roles.changeMemberRole({
+          organizationId,
+          userId,
+          role,
+          currentUserId: actingUser?.id ?? null,
+          ...(actingUser ? { planUser: actingUser } : {}),
+        });
+        teamsLeftWithoutAdmin = [...result.teamsLeftWithoutAdmin];
+      } else {
+        await this.roles.setMemberDisabled({
+          organizationId,
+          userId,
+          disabled: params.disabled === true,
+          actingUser,
+        });
+      }
+    } catch (error) {
+      // The management surface's one wire code for "no seat left", as main's rethrowSeatLimit.
+      const refusal = readSeatRefusal(error);
+      if (refusal.kind === "other") throw error;
+      const { limit } = refusal;
+      throw new MemberSeatLimitReachedError({ meta: limit });
     }
 
     return { ...(await this.getMember({ organizationId, userId })), teamsLeftWithoutAdmin };

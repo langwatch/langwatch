@@ -90,31 +90,31 @@ const RetractPulledUsageCommand = defineCommand({
   makeJobId: (data) => pulledUsageRetractionKey(data),
 });
 
-export class PulledUsageEventingAdapter {
-  private constructor(
-    private readonly ledger: PulledUsageLedgerProcess | undefined,
-    private readonly costRollupWatch: CostRollupWatchProcess | undefined,
-    private readonly costRollup: GovernanceCostRollupFoldProjection | undefined,
-    private readonly costCharges: GovernanceCostChargeMapProjection | undefined,
-  ) {}
+type AdapterOptions = {
+  ledger?: PulledUsageLedgerProcess;
+  /** Absent in a deployment with no cost summary to check. */
+  costRollupWatch?: CostRollupWatchProcess;
+  /** Main's `governanceCostRollup` fold; the worker hosts it, the api constructs none. */
+  costRollup?: GovernanceCostRollupFoldProjection;
+  /** The per-charge record the watch holds the fold against; worker-hosted like the fold. */
+  costCharges?: GovernanceCostChargeMapProjection;
+};
 
-  static create(
-    options: {
-      ledger?: PulledUsageLedgerProcess;
-      /** Absent in a deployment with no cost summary to check. */
-      costRollupWatch?: CostRollupWatchProcess;
-      /** Main's `governanceCostRollup` fold; the worker hosts it, the api constructs none. */
-      costRollup?: GovernanceCostRollupFoldProjection;
-      /** The per-charge record the watch holds the fold against; worker-hosted like the fold. */
-      costCharges?: GovernanceCostChargeMapProjection;
-    } = {},
-  ): PulledUsageEventingAdapter {
-    return new PulledUsageEventingAdapter(
-      options.ledger,
-      options.costRollupWatch,
-      options.costRollup,
-      options.costCharges,
-    );
+export class PulledUsageEventingAdapter {
+  private readonly ledger: PulledUsageLedgerProcess | undefined;
+  private readonly costRollupWatch: CostRollupWatchProcess | undefined;
+  private readonly costRollup: GovernanceCostRollupFoldProjection | undefined;
+  private readonly costCharges: GovernanceCostChargeMapProjection | undefined;
+
+  private constructor({ ledger, costRollupWatch, costRollup, costCharges }: AdapterOptions) {
+    this.ledger = ledger;
+    this.costRollupWatch = costRollupWatch;
+    this.costRollup = costRollup;
+    this.costCharges = costCharges;
+  }
+
+  static create(options: AdapterOptions = {}): PulledUsageEventingAdapter {
+    return new PulledUsageEventingAdapter(options);
   }
 
   static commandHandlers(): {
@@ -146,7 +146,7 @@ export class PulledUsageEventingAdapter {
     if (this.ledger) {
       pipeline.withProcessManager(PULLED_USAGE_LEDGER_PROCESS_NAME, this.ledger.processManager());
     }
-    // The watch compares against the summary this fold writes: without it, there is nothing to hold.
+    // The watch compares against the summary this fold writes: without it, nothing is held.
     if (this.costRollupWatch && this.costRollup) {
       pipeline.withProcessManager(
         COST_ROLLUP_WATCH_PROCESS_NAME,

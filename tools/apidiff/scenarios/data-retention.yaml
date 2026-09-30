@@ -43,6 +43,13 @@
         scope: { scopeType: PROJECT, scopeId: "{projectId}" }
         category: traces
       expect: { status: [200, 403] }
+  teardown:
+    - request: POST /api/trpc/dataRetention.removeForScope
+      auth: session
+      body:
+        projectId: "{projectId}"
+        scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+        category: traces
 
 - id: retention-set-off-menu-value-refused-on-paid-plan
   endpoint: POST /api/trpc/dataRetention.setForScope
@@ -57,6 +64,13 @@
       retentionDays: 364
   expect:
     status: [200, 400, 403]
+  teardown:
+    - request: POST /api/trpc/dataRetention.removeForScope
+      auth: session
+      body:
+        projectId: "{projectId}"
+        scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+        category: traces
 
 - id: retention-keep-forever-refused-for-non-operator
   endpoint: POST /api/trpc/dataRetention.setForScope
@@ -71,6 +85,13 @@
       retentionDays: 0
   expect:
     status: [200, 403]
+  teardown:
+    - request: POST /api/trpc/dataRetention.removeForScope
+      auth: session
+      body:
+        projectId: "{projectId}"
+        scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+        category: traces
 
 - id: retention-set-rejects-unknown-category
   endpoint: POST /api/trpc/dataRetention.setForScope

@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -27,15 +28,34 @@ type Config struct {
 	Addr string
 	// Stack is the haven stack slug the console names (ANALYTICSSIM_STACK, may be empty).
 	Stack string
+	// MaxRecords is how many records the ring keeps (ANALYTICSSIM_MAX_RECORDS, default 5000).
+	MaxRecords int
+	// MaxRawBytes is the largest raw body kept per record; a bigger one is
+	// replaced by a size marker (ANALYTICSSIM_MAX_RAW_BYTES, default 65536).
+	MaxRawBytes int
+	// Seed loads sample PostHog and Customer.io records at start (ANALYTICSSIM_SEED=1).
+	Seed bool
 }
 
 // LoadConfig reads analyticssim's configuration from the environment.
 func LoadConfig() Config {
-	cfg := Config{Addr: os.Getenv("ANALYTICSSIM_ADDR"), Stack: os.Getenv("ANALYTICSSIM_STACK")}
+	cfg := Config{
+		Addr: os.Getenv("ANALYTICSSIM_ADDR"), Stack: os.Getenv("ANALYTICSSIM_STACK"),
+		MaxRecords:  envInt("ANALYTICSSIM_MAX_RECORDS", 5000),
+		MaxRawBytes: envInt("ANALYTICSSIM_MAX_RAW_BYTES", 64<<10),
+		Seed:        os.Getenv("ANALYTICSSIM_SEED") == "1",
+	}
 	if cfg.Addr == "" {
 		cfg.Addr = ":5596"
 	}
 	return cfg
+}
+
+func envInt(key string, fallback int) int {
+	if n, err := strconv.Atoi(os.Getenv(key)); err == nil && n > 0 {
+		return n
+	}
+	return fallback
 }
 
 // maxBody bounds one provider call; session recordings are the largest.
@@ -56,7 +76,16 @@ func NewServer(cfg Config) *Server {
 }
 
 func newServer(cfg Config, bundle fs.FS) *Server {
-	s := &Server{cfg: cfg, now: time.Now, console: newConsole(bundle)}
+	if cfg.MaxRecords < 1 {
+		cfg.MaxRecords = 5000
+	}
+	if cfg.MaxRawBytes < 1 {
+		cfg.MaxRawBytes = 64 << 10
+	}
+	s := &Server{cfg: cfg, records: newStore(cfg.MaxRecords, cfg.MaxRawBytes), now: time.Now, console: newConsole(bundle)}
+	if cfg.Seed {
+		s.records.add(seedRecords(), s.now())
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	// PostHog: posthog-node's batch, posthog-js's capture paths, and the legacy ones.
@@ -119,7 +148,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
@@ -238,7 +267,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		scheme = "https"
 	}
 	writeJSON(w, http.StatusOK, consoleStatus{
-		Stack: s.cfg.Stack, Records: len(s.records.list(Filter{})), BaseURL: scheme + "://" + r.Host,
+		Stack: s.cfg.Stack, Records: s.records.count(), BaseURL: scheme + "://" + r.Host,
 	})
 }
 

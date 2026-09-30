@@ -1,0 +1,116 @@
+# CV3: gateway keys, webhooks and usage that start from a key or endpoint made in the flow's own
+# setup, so none reads a seeded key that may have gone stale. Every name ends in {uid}.
+flows:
+  - id: cv3-gateway-virtual-key-page-opens-active
+    title: A fresh virtual key opens on its own page and the API reads it back active
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-cv3vk-{uid}
+        as:
+          vkId: virtual_key.id
+          vkName: virtual_key.name
+    steps:
+      - action: go
+        with:
+          path: /gateway/virtual-keys/{vkId}
+      - action: expect
+        with:
+          text: "{vkName}"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/gateway/v1/virtual-keys/{vkId}
+          field: virtual_key.status
+          equals: active
+      - action: go
+        with:
+          path: /gateway/virtual-keys
+      - action: expect
+        with:
+          text: "{vkName}"
+          role: row
+          name: "{vkName}"
+
+  - id: cv3-gateway-usage-screen-for-a-fresh-key
+    title: The usage screen opens filtered to a key made in setup and shows its filter and title
+    setup:
+      - post: /api/gateway/v1/virtual-keys
+        body:
+          name: vd-cv3usage-{uid}
+        as:
+          vkId: virtual_key.id
+    steps:
+      - action: go
+        with:
+          path: /gateway/usage?vk={vkId}
+      - action: expect
+        with:
+          testId: usage-key-filter
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Usage
+
+  - id: cv3-gateway-webhook-disable-enable-delete
+    title: Create a webhook endpoint, disable it, enable it again, delete it and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: https://example.com/vd-cv3-{uid}
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          text: example.com/vd-cv3-{uid}
+          timeout: "20000"
+      - action: click
+        with:
+          selector: 'tr:has-text("example.com/vd-cv3-{uid}") [data-testid="webhook-row-actions"]'
+      - action: click
+        with:
+          testId: webhook-menu-disable
+      - action: expect
+        with:
+          count: 'tr:has-text("example.com/vd-cv3-{uid}") [data-testid^="webhook-disabled-"]'
+          min: "1"
+      - action: click
+        with:
+          selector: 'tr:has-text("example.com/vd-cv3-{uid}") [data-testid="webhook-row-actions"]'
+      - action: click
+        with:
+          testId: webhook-menu-enable
+      - action: expect
+        with:
+          count: 'tr:has-text("example.com/vd-cv3-{uid}") [data-testid^="webhook-disabled-"]'
+          equals: "0"
+      - action: click
+        with:
+          selector: 'tr:has-text("example.com/vd-cv3-{uid}") [data-testid="webhook-row-actions"]'
+      - action: click
+        with:
+          testId: webhook-menu-delete
+      - action: click
+        with:
+          text: Delete endpoint
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          text: example.com/vd-cv3-{uid}
+          equals: "0"

@@ -1,0 +1,246 @@
+# Datasets journeys the first file leaves out: the list search, the undo after a delete, a cancelled
+# delete, removing a column, and the replicate dialog. Test ids and labels are the ones the datasets
+# screens draw. Every name a flow makes ends in {uid}. Unrun until a check.
+flows:
+  - id: cv2-dataset-list-search-narrows-rows
+    title: Search the dataset list by name and see only the matching dataset
+    setup:
+      - post: /api/dataset
+        body:
+          name: "vd-cv2-dsfind-{uid}"
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          keptName: name
+      - post: /api/dataset
+        body:
+          name: "vd-cv2-dsother-{uid}"
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          otherName: name
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/datasets"
+      - action: fill
+        with:
+          testId: datasets-search
+          value: "dsfind-{uid}"
+      - action: expect
+        with:
+          text: "{keptName}"
+          timeout: "20000"
+      - action: expect
+        with:
+          text: "{otherName}"
+          equals: "0"
+
+  - id: cv2-dataset-delete-undo-restores
+    title: Delete a dataset, press Undo in the notice and find it in the list and the API again
+    setup:
+      - post: /api/dataset
+        body:
+          name: "vd-cv2-dsundo-{uid}"
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          dsName: name
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/datasets"
+      - action: fill
+        with:
+          testId: datasets-search
+          value: "{dsName}"
+      - action: expect
+        with:
+          text: "{dsName}"
+      - action: click
+        with:
+          label: "Actions for {dsName}"
+      - action: click
+        with:
+          text: Delete dataset
+      - action: fill
+        with:
+          field: /Type .?delete.? to confirm/
+          value: delete
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: expect
+        with:
+          text: "Dataset {dsName} deleted"
+      - action: click
+        with:
+          text: /^\s*Undo\s*$/
+      - action: expect
+        with:
+          text: Dataset restored
+      - action: go
+        with:
+          path: "/{slug}/datasets"
+      - action: fill
+        with:
+          testId: datasets-search
+          value: "{dsName}"
+      - action: expect
+        with:
+          text: "{dsName}"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: "{dsName}"
+
+  - id: cv2-dataset-delete-cancel-keeps-dataset
+    title: Open the delete confirmation, cancel it and find the dataset still listed after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: "vd-cv2-dskeep-{uid}"
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          dsName: name
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/datasets"
+      - action: fill
+        with:
+          testId: datasets-search
+          value: "{dsName}"
+      - action: expect
+        with:
+          text: "{dsName}"
+      - action: click
+        with:
+          label: "Actions for {dsName}"
+      - action: click
+        with:
+          text: Delete dataset
+      - action: expect
+        with:
+          testId: delete-dataset-confirmation
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Cancel\s*$/
+      - action: go
+        with:
+          path: "/{slug}/datasets"
+      - action: fill
+        with:
+          testId: datasets-search
+          value: "{dsName}"
+      - action: expect
+        with:
+          text: "{dsName}"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: "{dsName}"
+
+  - id: cv2-dataset-edit-columns-remove-column
+    title: Remove a column through Edit columns and find only the kept column after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: "vd-cv2-dsdrop-{uid}"
+          columnTypes:
+            - name: vd_keep
+              type: string
+            - name: vd_drop
+              type: string
+        as:
+          dsId: id
+          dsSlug: slug
+      - post: /api/dataset/{dsSlug}/records
+        body:
+          entries:
+            - vd_keep: vd kept cell
+              vd_drop: vd dropped cell
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/datasets/{dsId}"
+      - action: expect
+        with:
+          text: vd dropped cell
+      - action: click
+        with:
+          testId: edit-columns
+      - action: expect
+        with:
+          text: Edit Dataset
+      - action: click
+        with:
+          selector: '[aria-label="Remove column"] >> nth=-1'
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          api: /api/dataset/{dsSlug}
+          field: columnTypes
+          contains: vd_keep
+          timeout: "20000"
+      - action: go
+        with:
+          path: "/{slug}/datasets/{dsId}"
+      - action: expect
+        with:
+          text: vd kept cell
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd dropped cell
+          equals: "0"
+
+  - id: cv2-dataset-replicate-dialog-opens
+    title: Open Replicate to another project from a dataset's menu and cancel out of it
+    setup:
+      - post: /api/dataset
+        body:
+          name: "vd-cv2-dscopy-{uid}"
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          dsName: name
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/datasets"
+      - action: fill
+        with:
+          testId: datasets-search
+          value: "{dsName}"
+      - action: expect
+        with:
+          text: "{dsName}"
+      - action: click
+        with:
+          label: "Actions for {dsName}"
+      - action: click
+        with:
+          text: Replicate to another project
+      - action: expect
+        with:
+          text: Replicate Dataset
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Cancel\s*$/
+      - action: expect
+        with:
+          text: Replicate Dataset
+          equals: "0"

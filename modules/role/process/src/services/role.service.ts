@@ -61,7 +61,8 @@ export class RoleService {
     if (name?.startsWith(RESERVED_ROLE_NAME_PREFIX)) throw new RoleReservedNameError();
   }
 
-  /** Refuses a name another role in the same organization already holds. */
+  /** Refuses a name another live role in the organization holds. A deleted
+   *  role's compat row is gone, so its name is free, as the live-only index says. */
   async assertNameAvailable(input: {
     organizationId: string;
     name: string;

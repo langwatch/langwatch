@@ -34,3 +34,33 @@ describe("given a reader who may hold the project's API key", () => {
     });
   });
 });
+
+describe("given a reader with more than one project", () => {
+  describe("when the page opens", () => {
+    it("draws the lent project switcher inside the card", () => {
+      renderWithAuthorizeHost(
+        <Authorize />,
+        new FakeAuthorizeHost({
+          apiKey: "sk-lw-123",
+          projectSwitcher: <button type="button">Project A</button>,
+        }),
+      );
+
+      expect(screen.getByRole("button", { name: "Project A" })).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a signed-out reader", () => {
+  describe("when the page opens", () => {
+    it("sends them to sign in and back to /authorize, showing no key", () => {
+      const host = new FakeAuthorizeHost({ status: "unauthenticated", apiKey: "sk-lw-123" });
+      renderWithAuthorizeHost(<Authorize />, host);
+
+      expect(host.moves).toEqual([
+        { kind: "replace", to: "/auth/signin?callbackUrl=%2Fauthorize" },
+      ]);
+      expect(screen.queryByTestId("copy-input-api-key")).toBeNull();
+    });
+  });
+});

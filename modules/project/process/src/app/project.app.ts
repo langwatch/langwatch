@@ -1,6 +1,10 @@
 import { ApiKeyApi, type ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import {
+  DataPrivacyApi,
+  type DataPrivacyPiiRedactionLevel,
+} from "@langwatch/data-privacy-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { LangyApi } from "@langwatch/langy-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -83,6 +87,8 @@ type ProjectDependencies = Readonly<{
   trace: typeof TraceApi;
   auditLog: typeof AuditLogApi;
   langy: typeof LangyApi;
+  /** Owns the project's PII level, which `/api/projects` reads and writes by name. */
+  dataPrivacy: typeof DataPrivacyApi;
 }>;
 type ProjectSetup = FeatureSetup<
   ProjectDependencies,
@@ -125,6 +131,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     trace: TraceApi,
     auditLog: AuditLogApi,
     langy: LangyApi,
+    dataPrivacy: DataPrivacyApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["encryption", "logger"] as const;
@@ -136,6 +143,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
   readonly #langy: LangyApi;
+  readonly #dataPrivacy: DataPrivacyApi;
   readonly #encryption: ProjectProcessMembers["encryption"];
   readonly #logger: ProjectProcessMembers["logger"];
   readonly #requests = ProjectRequestService.create({
@@ -152,6 +160,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     authorization,
     trace,
     langy,
+    dataPrivacy,
     encryption,
     logger,
   }: {
@@ -162,6 +171,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     authorization: AuthzApi;
     trace: TraceApi;
     langy: LangyApi;
+    dataPrivacy: DataPrivacyApi;
     encryption: ProjectProcessMembers["encryption"];
     logger: ProjectProcessMembers["logger"];
   }) {
@@ -172,6 +182,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     this.#authorization = authorization;
     this.#trace = trace;
     this.#langy = langy;
+    this.#dataPrivacy = dataPrivacy;
     this.#encryption = encryption;
     this.#logger = logger;
   }
@@ -201,6 +212,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
       authorization: dependencies.authorization,
       trace: dependencies.trace,
       langy: dependencies.langy,
+      dataPrivacy: dependencies.dataPrivacy,
       encryption: members.encryption,
       logger: members.logger,
     });
@@ -363,6 +375,17 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     input: Readonly<{ apiKeyId: string; organizationId: string }>,
   ): Promise<ApiKeyVisibleProjects> {
     return this.#apiKeys.resolveVisibleProjects(input);
+  }
+
+  getPiiRedactionLevel(input: { projectId: string }): Promise<DataPrivacyPiiRedactionLevel> {
+    return this.#dataPrivacy.getPiiRedactionLevel(input);
+  }
+
+  setPiiRedactionLevel(input: {
+    projectId: string;
+    level: DataPrivacyPiiRedactionLevel;
+  }): Promise<void> {
+    return this.#dataPrivacy.setPiiRedactionLevel(input);
   }
 
   /**

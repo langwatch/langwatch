@@ -81,3 +81,24 @@ describe("defineTrpcContract", () => {
     });
   });
 });
+
+describe("defineTrpcContract cache policy", () => {
+  describe("given a read declared with a cache tier and one declared without", () => {
+    const contract = defineTrpcContract("organization")
+      .query("getAll", { cache: { tier: "session", persist: true } })
+      .withInput(z.object({}))
+      .withOutput(z.array(z.string()))
+
+      .query("getMemberById")
+      .withInput(z.object({ id: z.string() }))
+      .build();
+
+    it("carries the declared policy on the member", () => {
+      expect(contract.members.getAll.cache).toEqual({ tier: "session", persist: true });
+    });
+
+    it("leaves an undeclared read without one", () => {
+      expect("cache" in contract.members.getMemberById).toBe(false);
+    });
+  });
+});

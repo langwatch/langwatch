@@ -60,7 +60,7 @@ import {
 /** An evaluator as the drawer holds one: off a query, so its instants are strings. */
 type WireEvaluatorWithFields = WireOf<EvaluatorWithFields>;
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { MappingState, TRACE_MAPPINGS } from "@langwatch/dataset-contract";
+import type { MappingState } from "@langwatch/dataset-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -70,61 +70,13 @@ import { StepRadio } from "../../elements/evaluations/step-button.tsx";
 import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
 
 const evaluatorSettingsSchema = z.record(z.string(), z.json());
+import { autoInferMappings } from "../../../model/evaluations/auto-infer-mappings.ts";
 import { deserializeMappingStateToUI } from "../../../model/evaluations/deserialize-mapping-state-to-ui.ts";
 import { serializeMappingsToMappingState } from "../../../model/evaluations/serialize-mappings-to-mapping-state.ts";
 
 export type EvaluationLevel = "trace" | "thread" | null;
 
 export type OnlineEvaluationDrawerProps = UiOnlineEvaluationDrawerProps;
-
-/** Auto-inferred mappings for standard evaluator fields */
-const AUTO_INFER_MAPPINGS: Record<string, keyof typeof TRACE_MAPPINGS> = {
-  input: "input",
-  output: "output",
-  contexts: "contexts",
-  "contexts.string_list": "contexts.string_list",
-};
-/**
- * Get all field identifiers from an evaluator.
- * Fields are pre-computed by the API for both built-in and workflow evaluators.
- */
-function getEvaluatorFieldIds(evaluator: WireEvaluatorWithFields | null | undefined): string[] {
-  if (!evaluator?.fields) return [];
-  return evaluator.fields.map((f) => f.identifier);
-}
-
-/**
- * Auto-infer mappings for standard fields (both required and optional).
- * This ensures that common fields like input/output are pre-filled.
- */
-function autoInferMappings(
-  allFields: string[],
-  level: EvaluationLevel,
-): Record<string, UIFieldMapping> {
-  const mappings: Record<string, UIFieldMapping> = {};
-  const sourceId = level === "trace" ? "trace" : "thread";
-
-  for (const field of allFields) {
-    const autoMapping = AUTO_INFER_MAPPINGS[field];
-    if (autoMapping && level === "trace") {
-      mappings[field] = {
-        type: "source",
-        sourceId,
-        path: [autoMapping],
-      };
-    }
-    // For thread level, auto-map "input" to "traces"
-    if (field === "input" && level === "thread") {
-      mappings[field] = {
-        type: "source",
-        sourceId,
-        path: ["traces"],
-      };
-    }
-  }
-
-  return mappings;
-}
 
 // Module-level state to persist across drawer navigation (component unmounts/remounts)
 let onlineEvaluationDrawerState: {
@@ -282,7 +234,6 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   });
 
   // Compute all fields from the evaluator (pre-computed by API for both built-in and workflow)
-  const allFields = useMemo(() => getEvaluatorFieldIds(selectedEvaluator), [selectedEvaluator]);
 
   // Use shared validation logic (same as evaluations v3)
   // Fields include required/optional flag from the API
@@ -393,11 +344,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       if (!details.value) return;
       const newLevel = details.value as EvaluationLevel;
       form.setValue("level", newLevel);
-      const newMappings = mappingsForLevel({ selectedEvaluator, allFields, level: newLevel });
+      const newMappings = mappingsForLevel({ selectedEvaluator, level: newLevel });
       setMappings(newMappings);
       persistDrawerStatePatch({ level: newLevel, mappings: newMappings });
     },
-    [selectedEvaluator, allFields, form],
+    [selectedEvaluator, form],
   );
 
   // Track whether preconditions are expanded (user clicked "Add precondition")
@@ -1189,7 +1140,7 @@ function useLoadIntoDrawer({
     if (lastAutoInferredEvaluatorRef.current === selectedEvaluator.id) return;
     if (Object.keys(mappings).length > 0) return;
     lastAutoInferredEvaluatorRef.current = selectedEvaluator.id;
-    const autoMappings = autoInferMappings(getEvaluatorFieldIds(selectedEvaluator), level);
+    const autoMappings = autoInferMappings({ evaluator: selectedEvaluator, level });
     setMappings(autoMappings);
     persistDrawerStatePatch({ mappings: autoMappings });
   }, [selectedEvaluator, level, mappings, setMappings]);
@@ -1202,7 +1153,7 @@ function useLoadIntoDrawer({
     markDirty(); // User created and selected a new evaluator
     if (!name) form.setValue("name", evaluator.name);
     // Auto-infer mappings using pre-computed fields from the API
-    const autoMappings = autoInferMappings(getEvaluatorFieldIds(evaluator), level);
+    const autoMappings = autoInferMappings({ evaluator, level });
     setMappings(autoMappings);
     // Clear the pending evaluator ID
     persistDrawerStatePatch({
@@ -1315,7 +1266,7 @@ function useEvaluatorFlow({
       setSelectedEvaluator(evaluator);
       setHasUnsavedChanges(true);
       if (!name) form.setValue("name", newName);
-      const autoMappings = autoInferMappings(getEvaluatorFieldIds(evaluator), level);
+      const autoMappings = autoInferMappings({ evaluator, level });
       setMappings(autoMappings);
       onlineEvaluationDrawerState = {
         level,
@@ -1494,14 +1445,12 @@ function useDrawerQueries({
 /** Trace and thread levels map from different sources, so mappings are replaced, not merged. */
 function mappingsForLevel({
   selectedEvaluator,
-  allFields,
   level,
 }: {
   selectedEvaluator: WireEvaluatorWithFields | null;
-  allFields: string[];
   level: EvaluationLevel;
 }): Record<string, UIFieldMapping> {
-  return selectedEvaluator ? autoInferMappings(allFields, level) : {};
+  return selectedEvaluator ? autoInferMappings({ evaluator: selectedEvaluator, level }) : {};
 }
 
 type MonitorPayload = ReturnType<typeof monitorPayload>;

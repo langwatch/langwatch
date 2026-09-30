@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 /** Integration lane for *.integration.test.ts; needs Postgres at DATABASE_URL. */
 export default defineConfig({
   test: {
+    fsModuleCache: true,
     environment: "node",
     include: ["src/**/*.integration.test.ts"],
     fileParallelism: false,

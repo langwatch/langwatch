@@ -15,6 +15,8 @@ import { resolver, type DescribeRouteOptions, type ResponsesWithResolver } from 
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z, type ZodType } from "zod";
 
+import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // The request-context keys every layer of the transport reads off.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -557,12 +559,13 @@ export function requestTraceIds(c: Context): {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * A family's `onError`, with a handled refusal's `meta.retryAfterMs` rendered as `Retry-After`
- * in whole seconds (ARCHITECTURE.md §8). The body and status are the family's, untouched, and a
- * `Retry-After` the answer already carries, the rate limiter's included, is kept.
+ * A family's `onError`, handed a busy database as the handled 503, with a handled refusal's
+ * `meta.retryAfterMs` rendered as `Retry-After` in whole seconds (ARCHITECTURE.md §8). One
+ * the answer already carries, the rate limiter's too, is kept.
  */
 export function withRetryAfter(onError: ErrorHandler): ErrorHandler {
-  return async (error, c) => {
+  return async (raised, c) => {
+    const error = isDatabaseBusy(raised) ? new DatabaseBusyError() : raised;
     const answer = await onError(error, c);
     const waitMs = HandledError.isHandled(error) ? error.meta.retryAfterMs : undefined;
 
@@ -759,6 +762,8 @@ export function canonicalErrorFor(
       traceIds,
     );
   }
+
+  if (isDatabaseBusy(error)) return handledErrorEnvelope(new DatabaseBusyError(), traceIds);
 
   if (isUniqueViolation(error)) {
     return {

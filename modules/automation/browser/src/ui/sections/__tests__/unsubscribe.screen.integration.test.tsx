@@ -136,6 +136,7 @@ describe("given a link the server refuses", () => {
     expect(screen.getByRole("heading", { name: "Link not valid" })).toBeDefined();
     expect(container.querySelector("svg")).not.toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByRole("link", { name: "Go to LangWatch" }).getAttribute("href")).toBe("/");
   });
 });
 

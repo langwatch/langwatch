@@ -35,6 +35,7 @@ export default defineConfig({
     ],
   },
   test: {
+    fsModuleCache: true,
     environment: "node",
     include: ["src/**/*.integration.test.ts"],
     fileParallelism: false,

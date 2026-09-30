@@ -164,4 +164,23 @@ describe("EvaluatorListDrawer", () => {
       });
     });
   });
+
+  describe("when every evaluator the project has is hidden from this list", () => {
+    /** @scenario "The empty state distinguishes no evaluators from all hidden" */
+    it("says every evaluator is already attached, with no create-first prompt", async () => {
+      renderDrawer({ hiddenEvaluatorIds: ["evaluator-1", "evaluator-2"] });
+
+      expect(await screen.findByText("Every evaluator is already attached")).toBeInTheDocument();
+      expect(screen.queryByTestId("create-first-evaluator-button")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when some evaluators are hidden from this list", () => {
+    it("lists only the rest", async () => {
+      renderDrawer({ hiddenEvaluatorIds: ["evaluator-1"] });
+
+      await screen.findByText("Custom Scorer");
+      expect(screen.queryByText("Exact Match")).not.toBeInTheDocument();
+    });
+  });
 });

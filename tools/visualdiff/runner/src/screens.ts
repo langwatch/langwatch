@@ -144,7 +144,7 @@ export interface RouteTimings {
 /** Lanes give each pooled job a page in a context of its own, as many at once as the
  * throttle allows. */
 export interface Lanes {
-  open: () => Promise<Side>;
+  open: (options?: { live?: boolean }) => Promise<Side>;
   width: number;
   throttle: Throttle;
 }
@@ -198,7 +198,7 @@ export const takeFlow = async ({
   lanes: Lanes;
   collect: Collect;
 }): Promise<Take> => {
-  const side = await lanes.open();
+  const side = await lanes.open({ live: true });
   const held: CaptureMessage[] = [];
   try {
     const { crashed, millis } = await captureFlow({
@@ -345,6 +345,22 @@ interface FlowWalk {
   everyStep: boolean;
 }
 
+/** guestSide answers the anonymous page a step asks for, opened once; else the flow side. */
+const guestSide = async ({
+  step,
+  side,
+  guests,
+}: {
+  step: PlanStep;
+  side: Side;
+  guests: Map<string, Side>;
+}): Promise<Side> => {
+  const guest = step.with?.anonymous;
+  if (guest === undefined || guest === "false") return side;
+  if (!guests.has(guest)) guests.set(guest, await side.openAnonymous());
+  return guests.get(guest) ?? side;
+};
+
 /** runStep runs one flow step, photographing it as the mode asks; it answers the step's error. */
 const runStep = async ({
   walk,
@@ -394,11 +410,7 @@ const runStep = async ({
   let error = "";
   try {
     if (project.missing !== "") throw new Error(project.missing);
-    const guest = step.with?.anonymous;
-    if (guest !== undefined && guest !== "false") {
-      if (!guests.has(guest)) guests.set(guest, await side.openAnonymous());
-      active = guests.get(guest) ?? side;
-    }
+    active = await guestSide({ step, side, guests });
     await resolveAction(step.action)({
       side: active,
       slug: project.slug,

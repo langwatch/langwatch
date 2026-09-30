@@ -203,6 +203,7 @@ describe("sso connection guards", () => {
     });
 
     /** @scenario "Ops approval and rejection are both recorded and recoverable" */
+    /** @scenario "A rejected claim says why, and the domain can be claimed again" */
     it("records a rejection's note and leaves the domain re-claimable", async () => {
       const rejected = await run(() =>
         guards.rejectDomainClaim({

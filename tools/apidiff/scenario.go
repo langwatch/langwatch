@@ -56,16 +56,18 @@ var (
 
 // scenario is one named request against one endpoint plus its checks.
 type scenario struct {
-	ID       string            `yaml:"id"`
-	Endpoint string            `yaml:"endpoint"`
-	Auth     string            `yaml:"auth"`
-	Shard    string            `yaml:"shard"`
-	Serial   bool              `yaml:"serial"` // run alone after the pool drains, in its own shard kind
-	Setup    []scenarioStep    `yaml:"setup"`
-	Request  scenarioRequest   `yaml:"request"`
-	Capture  map[string]string `yaml:"capture"`
-	Expect   scenarioExpect    `yaml:"expect"`
-	Verify   []scenarioStep    `yaml:"verify"`
+	ID       string `yaml:"id"`
+	Endpoint string `yaml:"endpoint"`
+	Auth     string `yaml:"auth"`
+	Shard    string `yaml:"shard"`
+	Serial   bool   `yaml:"serial"` // run alone after the pool drains, in its own shard kind
+	// SelfHosted marks a scenario the SaaS deployment does not serve; it is deferred there.
+	SelfHosted bool              `yaml:"selfHosted"`
+	Setup      []scenarioStep    `yaml:"setup"`
+	Request    scenarioRequest   `yaml:"request"`
+	Capture    map[string]string `yaml:"capture"`
+	Expect     scenarioExpect    `yaml:"expect"`
+	Verify     []scenarioStep    `yaml:"verify"`
 	// Teardown are request steps sent last, whatever the steps before them found,
 	// to remove what the scenario made on a shared org; their failures are not the scenario's.
 	Teardown []scenarioStep `yaml:"teardown"`
@@ -187,7 +189,7 @@ type scenarioMail struct {
 }
 
 // scenarioExpect is what a response must hold: a status, a body subset, text
-// it does or does not contain, and the length of the value at Path.
+// it does or does not contain, the length of the value at Path, and headers.
 type scenarioExpect struct {
 	Status      intList    `yaml:"status"`
 	Body        any        `yaml:"body"`
@@ -195,11 +197,13 @@ type scenarioExpect struct {
 	NotContains stringList `yaml:"notContains"`
 	Path        string     `yaml:"path"`
 	Length      *int       `yaml:"length"`
+	// Headers maps a response header's name to text its value must contain.
+	Headers map[string]string `yaml:"headers"`
 }
 
 func (expect scenarioExpect) empty() bool {
 	return len(expect.Status) == 0 && expect.Body == nil && len(expect.Contains) == 0 &&
-		len(expect.NotContains) == 0 && expect.Length == nil
+		len(expect.NotContains) == 0 && expect.Length == nil && len(expect.Headers) == 0
 }
 
 type intList []int

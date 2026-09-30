@@ -1567,14 +1567,16 @@ export default function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMod
 
   if (stored.error) {
     return (
-      <VStack align="start" padding={8} gap={2}>
-        <Text fontSize="xl" fontWeight="bold">
-          Graph not found
-        </Text>
-        <Text color="fg.muted">
-          The graph you are looking for does not exist or you do not have access to it.
-        </Text>
-      </VStack>
+      <>
+        <PageLayout.Header>
+          <PageLayout.Heading>Graph not found</PageLayout.Heading>
+        </PageLayout.Header>
+        <PageLayout.Container>
+          <Text color="fg.muted">
+            The graph you are looking for does not exist or you do not have access to it.
+          </Text>
+        </PageLayout.Container>
+      </>
     );
   }
 

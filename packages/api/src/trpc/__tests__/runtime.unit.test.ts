@@ -327,6 +327,36 @@ describe("a mounted contract procedure", () => {
       expect(unknown.data.traceId).toBe("trace-1");
     });
   });
+
+  describe("given the database has no connection to give", () => {
+    /** @scenario "A database with no connection to give is a retryable service-unavailable over tRPC" */
+    it.each(["P2024", "P2028"])("fails %s as a retryable SERVICE_UNAVAILABLE", async (code) => {
+      const { runtime } = harness();
+      const app: ReviewApi = { read: async () => ({ id: "annotation-1", comment: "" }) };
+
+      const declaration = reviewRouter({
+        getById: async () => {
+          throw Object.assign(new Error("Unable to start a transaction in the given time"), {
+            code,
+          });
+        },
+      });
+
+      const call = runtime
+        .mount(declaration, () => app)
+        .createCaller({ actor: { id: "reviewer-1" } })
+        .getById({ projectId: "project-1", id: "annotation-1" });
+
+      await expect(call).rejects.toMatchObject({
+        code: "SERVICE_UNAVAILABLE",
+        cause: { code: "service_unavailable", httpStatus: 503, retryable: true },
+      });
+      expect((await onTheWire(call)).data.error).toMatchObject({
+        code: "service_unavailable",
+        meta: { retryAfterMs: 1000 },
+      });
+    });
+  });
 });
 
 /** The wire shape a failed call arrives in, through the process's own formatter. */

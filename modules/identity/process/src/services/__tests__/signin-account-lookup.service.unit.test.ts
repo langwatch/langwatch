@@ -6,6 +6,7 @@ import {
   emptyIdentityHeads,
   type IdentifierFact,
   IdentityIdentifierNotFoundError,
+  type SignInMethod,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
@@ -13,6 +14,7 @@ import { IdentityHeadsRepository } from "../../repositories/identity-heads.repos
 import { MemoryIdentitySignInAccountsRepository } from "../../repositories/memory/memory.identity-signin-accounts.repository.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { SignInAccountLookupService } from "../signin-account-lookup.service.ts";
+import { SignInRouterService } from "../signin-router.service.ts";
 
 /** Only the two reads the lookup makes; the rest of the port is unreachable here. */
 class SeededHeads extends IdentityHeadsRepository {
@@ -221,6 +223,49 @@ describe("SignInAccountLookupService", () => {
         hasPassword: true,
         providerIds: ["okta"],
       });
+    });
+  });
+
+  describe("when the router is asked about a legacy account that holds a password", () => {
+    const PASSWORD: SignInMethod = { id: "password", kind: "password", connectionId: null };
+
+    /** @scenario "An unlatched legacy account with a password offers password sign-in" */
+    it("offers the password with the account_methods reason, and never sends it to sign-up", async () => {
+      const lookup = lookupOver({
+        latched: new Set(),
+        legacy: {
+          userId: "user_sam",
+          methods: { hasPassword: true, hasPasskey: false, providerIds: [], connectionIds: [] },
+          auth0Subjects: [],
+        },
+      });
+      const router = SignInRouterService.create({
+        domains: {
+          findConnectionsForDomain: async () => [],
+          findActiveConnections: async () => [],
+        },
+        legacy: {
+          findLegacyConnectionForDomain: async () => null,
+          findLegacyActiveConnections: async () => [],
+        },
+        policy: {
+          resolvePolicy: async () => ({
+            defaultMethods: [PASSWORD],
+            localMethods: [PASSWORD],
+            federationLicensed: true,
+            selfHosted: true,
+          }),
+        },
+        breakGlass: { allow: async () => false },
+        accounts: lookup,
+        recorder: { decided: () => undefined },
+      });
+
+      const decision = await router.route({ identifier: ADDRESS });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.reasonCode).toBe("account_methods");
+      expect(decision.methodSet).toEqual([PASSWORD]);
     });
   });
 });

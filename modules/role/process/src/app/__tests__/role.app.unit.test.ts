@@ -1,5 +1,5 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
-import { PermissionDeniedError } from "@langwatch/authz-contract";
+import type { AuthzApi, AuthzDefineRoleInput } from "@langwatch/authz-contract";
+import { AuthzGrantNotConfirmedError, PermissionDeniedError } from "@langwatch/authz-contract";
 import { OrganizationNotFoundForTeamError } from "@langwatch/organization-contract";
 import {
   OrgExclusivePermissionScopeError,
@@ -84,6 +84,75 @@ describe("given a caller defining a custom role", () => {
         ),
       ).rejects.toMatchObject({ code: "custom_role_name_taken" });
       expect(defineRole).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/** A ledger whose projection lands each definition before the write answers. */
+const projectingInto = (roles: MemoryRoleRepository) =>
+  vi.fn(async (input: AuthzDefineRoleInput) => {
+    roles.save(
+      role({
+        id: input.roleId,
+        organizationId: input.organizationId,
+        name: input.name,
+        permissions: input.permissions,
+      }),
+    );
+  });
+
+const reviewerCreate = {
+  role: { organizationId: ORGANIZATION_ID, name: "Reviewer", permissions: ["traces:view"] },
+};
+
+describe("given a caller creating a role and reading it straight back", () => {
+  describe("when the creation answers", () => {
+    /** @scenario "A created role is readable as soon as its creation answers" */
+    it("has waited for the projection, so the read finds the role", async () => {
+      const roles = MemoryRoleRepository.create();
+      const defineRole = projectingInto(roles);
+      const { app } = createRoleTestApp({ roles, permissions: { defineRole } });
+
+      const created = await app.createRole(reviewerCreate, CALLER);
+
+      expect(defineRole).toHaveBeenCalledWith(expect.objectContaining({ requireProjection: true }));
+      await expect(
+        app.getRoleInOrganization({ roleId: created.id, organizationId: ORGANIZATION_ID }),
+      ).resolves.toMatchObject({ id: created.id, name: "Reviewer" });
+    });
+  });
+
+  describe("when the projection does not land the role in time", () => {
+    /** @scenario "A role creation the projection cannot confirm in time is refused" */
+    it("fails with the handled grant-not-confirmed error", async () => {
+      const { app } = createRoleTestApp({
+        permissions: {
+          defineRole: async () => {
+            throw new AuthzGrantNotConfirmedError();
+          },
+        },
+      });
+
+      await expect(app.createRole(reviewerCreate, CALLER)).rejects.toBeInstanceOf(
+        AuthzGrantNotConfirmedError,
+      );
+    });
+  });
+
+  describe("when a second role asks for the name the first one took", () => {
+    /** @scenario "A second role with a name already taken is refused with a conflict" */
+    it("refuses the second with the name-taken conflict", async () => {
+      const roles = MemoryRoleRepository.create();
+      const defineRole = projectingInto(roles);
+      const { app } = createRoleTestApp({ roles, permissions: { defineRole } });
+
+      await app.createRole(reviewerCreate, CALLER);
+
+      await expect(app.createRole(reviewerCreate, CALLER)).rejects.toMatchObject({
+        code: "custom_role_name_taken",
+        httpStatus: 409,
+      });
+      expect(defineRole).toHaveBeenCalledTimes(1);
     });
   });
 });

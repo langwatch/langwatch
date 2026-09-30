@@ -34,6 +34,7 @@ vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
+import { installAuthErrorExplainer } from "../../../model/error-presentation.ts";
 import ResetPassword from "../reset-password-screen.tsx";
 
 const setToken = (token: string | null) => {
@@ -206,6 +207,42 @@ describe("ResetPassword page", () => {
         name: /request a new reset link/i,
       });
       expect(retry.getAttribute("href")).toBe("/auth/forgot-password");
+    });
+  });
+
+  describe("when the reset endpoint refuses the password itself", () => {
+    let restoreExplainer: () => void;
+
+    beforeEach(() => {
+      restoreExplainer = installAuthErrorExplainer((error) =>
+        error.code === "identity_password_rejected"
+          ? { title: "That password wasn't accepted", description: "Choose a longer one." }
+          : null,
+      );
+    });
+
+    afterEach(() => restoreExplainer());
+
+    /** @scenario A refused reset says why in words from the registry */
+    it("shows the registered copy, never the code or the raw message, and leaves the form live", async () => {
+      mockResetPassword.mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: "identity_password_rejected",
+          httpStatus: 400,
+          meta: {},
+          tips: [],
+          message: "raw server wording",
+        },
+      });
+      setToken("tok_good");
+      const { container } = renderPage();
+      fillAndSubmit({ container, password: "newsecret123", confirm: "newsecret123" });
+
+      expect(await screen.findByText("That password wasn't accepted")).toBeTruthy();
+      expect(container.textContent).not.toContain("identity_password_rejected");
+      expect(container.textContent).not.toContain("raw server wording");
+      expect(container.querySelector('input[type="password"]')).toBeTruthy();
     });
   });
 

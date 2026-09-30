@@ -56,12 +56,19 @@ describe("PostgresAuthzAdapter", () => {
       now: () => 1_755_000_000_000,
     }).build();
 
-    expect(Object.keys(built).toSorted()).toEqual(["authz", "grants", "migration", "pipeline"]);
+    expect(Object.keys(built).toSorted()).toEqual([
+      "authz",
+      "grants",
+      "migration",
+      "pipeline",
+      "sessionVersions",
+    ]);
     expect(built.authz).toBeInstanceOf(AuthzServiceContract);
     expect(built.grants).toBeInstanceOf(AuthzGrantsServiceContract);
     expect(built.pipeline.metadata.name).toBe(AUTHZ_GRANT_PIPELINE_NAME);
     expect([...built.pipeline.mapProjections.keys()]).toEqual(["authzGrantsWrite"]);
     expect([...built.pipeline.eventSubscribers.keys()]).toEqual(["auditTrail"]);
+    expect([...built.pipeline.mapSubscribers.keys()]).toEqual(["sessionVersion"]);
     expect(built.migration.name).toBe(AUTHZ_ENGINE_MIGRATION_NAME);
     expect(dispatcher.calls).toBe(0);
     expect(auditLog.createMany).not.toHaveBeenCalled();

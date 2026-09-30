@@ -60,6 +60,7 @@ Feature: The unsubscribe landing page
       When the recipient opens it
       Then they are told the link is invalid or expired
       And nothing is offered to confirm
+      And a link back to LangWatch is offered
       And an address with no token asks the server nothing
 
     @unit

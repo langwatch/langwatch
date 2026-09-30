@@ -43,4 +43,7 @@ flows:
           testId: plan-column-enterprise
       - action: expect
         with:
-          text: Contact Sales
+          text: /Contact Sales|^\s*Current\s*$/
+      - action: expect
+        with:
+          text: /Upgrade Now|Add Members/

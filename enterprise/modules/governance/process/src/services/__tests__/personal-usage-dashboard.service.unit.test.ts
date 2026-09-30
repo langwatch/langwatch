@@ -63,9 +63,15 @@ function build(
     internalProject?: InternalProject | null;
   } = {},
 ) {
-  const personalUsageSummary = vi.fn(async (_: PersonalUsageQueryInput) => summary);
-  const personalUsageDailyBuckets = vi.fn(async (_: PersonalUsageQueryInput) => buckets);
-  const personalUsageBreakdownByModel = vi.fn(async (_: PersonalUsageQueryInput) => breakdown);
+  const personalUsageSummary = vi.fn<(input: PersonalUsageQueryInput) => Promise<typeof summary>>(
+    async () => summary,
+  );
+  const personalUsageDailyBuckets = vi.fn<
+    (input: PersonalUsageQueryInput) => Promise<typeof buckets>
+  >(async () => buckets);
+  const personalUsageBreakdownByModel = vi.fn<
+    (input: PersonalUsageQueryInput) => Promise<typeof breakdown>
+  >(async () => breakdown);
   const getPersonalWorkspace = vi.fn(async () => {
     const workspace = options.workspace === undefined ? personalWorkspace : options.workspace;
     if (!workspace) throw new TeamNotFoundError();

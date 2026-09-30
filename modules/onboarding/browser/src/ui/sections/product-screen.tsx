@@ -61,7 +61,6 @@ export const ProductScreen: React.FC = () => {
         title={currentScreen.heading}
         subTitle={currentScreen.subHeading}
         loading={delayedLoading}
-        compressedHeader
         widthVariant={currentScreen.widthVariant ?? "narrow"}
         showBackButton={canGoBack}
         onBack={() => navigation.prevScreen()}

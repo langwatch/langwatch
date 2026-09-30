@@ -78,6 +78,25 @@ describe("a declared tenant set", () => {
     });
   });
 
+  describe("when the statement reads through a table alias", () => {
+    it("accepts `t.TenantId IN (...)` bound to the declared set", async () => {
+      const { client, isolated, connection } = fixture();
+
+      try {
+        await client.query({
+          tenantId: "project-a",
+          tenantIds: ["project-a", "project-b"],
+          sql: "SELECT 1 FROM simulation_runs AS t WHERE t.TenantId IN ({tenant0:String}, {tenant1:String})",
+          params: { tenant0: "project-a", tenant1: "project-b" },
+        });
+
+        expect(isolated.queries).toHaveLength(1);
+      } finally {
+        await connection.closeOnce();
+      }
+    });
+  });
+
   describe("when the statement binds something other than the declared set", () => {
     /** @scenario "A declared tenant set must be exactly what the statement binds" */
     it("refuses an outside tenant, a left-out tenant and a disjunction before any statement runs", async () => {

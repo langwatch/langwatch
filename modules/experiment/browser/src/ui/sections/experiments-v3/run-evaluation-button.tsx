@@ -110,7 +110,8 @@ export const RunEvaluationButton = ({ disabled = false }: RunEvaluationButtonPro
     >
       <Button
         size="sm"
-        variant="outline"
+        colorPalette="blue"
+        variant="solid"
         onClick={handleClick}
         disabled={disabled || isAborting}
         data-testid="run-evaluation-button"

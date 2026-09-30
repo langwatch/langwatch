@@ -1390,6 +1390,7 @@ const RETRY_RESTAGE_LUA =
   BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
+  WATER_LEVEL_HELPER_LUA +
   `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
@@ -1410,13 +1411,14 @@ local newStagedJobId        = ARGV[4]
 local dispatchAfterMs       = tonumber(ARGV[5])
 local jobDataJson           = ARGV[6]
 local retryTtlSec           = tonumber(ARGV[7])
--- Tenant in-flight ZSET key prefix (soft-cap). Keeps this group's slot
--- expiry score aligned with the activeKey TTL across backoff retries so an
--- in-flight retry's slot doesn't lapse out of the live count.
+-- Tenant in-flight ZSET key prefix (soft-cap). A group in backoff frees its
+-- slot; DISPATCH takes a slot again when the retry actually runs.
 local tenantCountKeyPrefix  = ARGV[8]
 local nowMs                 = tonumber(ARGV[9])
 local attempt               = ARGV[10]
 local attemptTtlSec         = tonumber(ARGV[11])
+-- Static operator soft-cap, as COMPLETE_LUA reads it. 0 = cap disabled.
+local staticCap             = tonumber(ARGV[12]) or 0
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
@@ -1470,15 +1472,19 @@ addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 --    assumption that this line still guards it.
 redis.call("SET", activeKey, newStagedJobId, "EX", retryTtlSec)
 
--- 5. Bump this slot's expiry score in lockstep with the activeKey TTL so the
--- soft cap stays accurate during backoff windows. XX (below) only updates an
--- existing slot, so we never re-create a slot COMPLETE_LUA legitimately freed.
+-- 5. A group waiting out its backoff runs nothing, so it frees its tenant slot
+--    and unparks into the headroom, exactly as COMPLETE_LUA does. The active key
+--    above still locks the group, so its jobs keep their order (ARCHITECTURE §9).
 if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then
-    -- Bump this slot's expiry to the backoff window so an in-flight retry keeps
-    -- its tenant slot. XX = only if still in-flight, never re-create a freed slot.
-    redis.call("ZADD", tenantCountKeyPrefix .. string.sub(groupId, 1, slashPos - 1), "XX", nowMs + retryTtlSec * 1000, groupId)
+    tenantActiveRemove(tenantCountKeyPrefix, string.sub(groupId, 1, slashPos - 1), groupId)
+  end
+  if staticCap > 0 then
+    local tenantCap = effectiveCap(parkKeyPrefixOf(readyKey), staticCap)
+    local tenantId = parkTenantOf(groupId)
+    local active = tenantActiveCount(tenantCountKeyPrefix, tenantId, nowMs)
+    unparkUpTo(readyKey, tenantId, tenantCap - active)
   end
 end
 
@@ -2196,7 +2202,7 @@ export class GroupStagingScripts {
 
   /**
    * Re-stage a job with a future dispatch score, keeping the active key alive
-   * for FIFO ordering; TTL matches the backoff, so it decays naturally — fully Redis-driven.
+   * for FIFO ordering and freeing the tenant slot; TTL matches the backoff.
    * @returns true if re-staged, false if stale (active key doesn't match)
    */
   async retryRestage({
@@ -2242,6 +2248,7 @@ export class GroupStagingScripts {
       String(nowInstant().epochMilliseconds),
       String(attempt),
       String(attemptTtlSec),
+      String(this.tenantConcurrencyCap),
     );
 
     return result === 1;

@@ -295,7 +295,7 @@ export function headerSignature(
  */
 export function filterMaskedApiKeys(customKeys: Record<string, string>): Record<string, string> {
   return Object.fromEntries(
-    Object.entries(customKeys).filter(([_, value]) => value !== MASKED_KEY_PLACEHOLDER),
+    Object.entries(customKeys).filter(([, value]) => value !== MASKED_KEY_PLACEHOLDER),
   );
 }
 

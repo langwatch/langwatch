@@ -146,6 +146,10 @@ the rest stays contained, flattened, in its module (Alex, 2026-09-29).
 contract imports no framework and no other half. Another module imports only
 the owner's **contract** and names the owner's `*Api` token; nobody imports
 another module's service, repository, or browser package.
+A declared dependency is an edge even when nothing imports it: a contract's `package.json` names no raw
+client or process runtime (`eventing`, `group-queue`, `prisma-client`, `clickhouse-client`, `redis-client`,
+`process-*`), and the package-cycle check walks every workspace package, `packages/*` included. The
+`manifests` and `cycles` policies refuse both (2026-09-30).
 
 ### 3.1 The contract
 
@@ -221,6 +225,8 @@ cross-language wire and is documented as such (Alex, 2026-09-29).
 In module code a scope travels as a named parameter, never through `AsyncLocalStorage` (framework
 trace-context propagation in `packages/observability` is the exception; identity's birth
 ceremony threads its scope explicitly) (Alex, 2026-09-29).
+The caller's `Authorization` is such a parameter: `authorization` passes from route to `*Api` op to service to
+repository, never ambient (Alex, 2026-09-30; [ADR-166](adr/166-grant-scoped-data-access.md)).
 
 **An implementation never sees a raw client.** No prisma, no redis, no
 clickhouse in any `*Module` class. Raw clients cross into a module in exactly
@@ -771,6 +777,9 @@ list is deleted.
 `gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) are listed
 temporarily (Alex, 2026-09-30): hosted judging moves to instant-eval, and the guardrail check's owner is
 revisited later.
+`project -> data-privacy` is listed too (Alex, 2026-09-30): `/api/projects/{id}` carries `piiRedactionLevel`
+through `DataPrivacyApi.getPiiRedactionLevel`/`setPiiRedactionLevel`, which merge the level into the
+project-scope rule and read `custom` as `STRICT`.
 
 **Registry resolution ends at `ModuleApp.create`.** Inside the module,
 `create()` is the composition root: internal services are built explicitly
@@ -1184,6 +1193,10 @@ refuses writes, other models and raw SQL, and logs each read at info with `{ mod
 action }` and no row data. Its live repository registry resolves it by requiring the
 `operatorReads` member (`operatorReads.into(handle, build)`); the memory twin needs none.
 Spec: `specs/server/operator-reads.feature`.
+Every store call carries an `Authorization` (Alex, 2026-09-30; [ADR-166](adr/166-grant-scoped-data-access.md)):
+`store.as(authorization, { reads })` adds the tenant and any shared condition to the query, Postgres accepts
+`own` grants only and ClickHouse span, trace and log reads accept `own` and `shared`; the guard's exceptions are
+a shrink-only baseline and Postgres RLS is deferred.
 
 **Main's byte intakes stay for now** (Alex, 2026-09-30). The user avatar and AI tool icon
 data URLs, the deprecated multipart dataset routes, bug-report transcripts and inline scenario
@@ -1264,6 +1277,12 @@ facts, a projection over the same events on its own pipeline, and never reads `e
 governance's cost drift check compares `governance_cost_rollup_charges` with
 `governance_cost_rollup_1d` (Alex, 2026-09-30).
 
+**Uniqueness is the exception** (Alex, 2026-09-30): a custom role's name is unique among live roles
+only (a partial index, so a deleted role frees its name); a grant or role binding carries no
+uniqueness at all, so the same principal, role and scope may be bound twice within the limits, and a
+re-assertion that must stay idempotent asks the ledger to `skip` rather than being refused.
+`/api/grants` succeeds `/api/role-bindings` (deprecated, same rows): nobody grants or writes into a role more than they hold at that scope, one authz rule every door reaches (Alex, 2026-09-30).
+
 ---
 
 ## 8. Transports (REST + tRPC)
@@ -1304,6 +1323,8 @@ governance's cost drift check compares `governance_cost_rollup_charges` with
 - The REST framework maps what no feature can know in advance, once, in `canonicalErrorFor`: an escaped ZodError
   is the 422, a Postgres data exception (SQLSTATE 22, such as a NUL byte) is the 422, and an unchecked unique
   violation is the 409 `conflict`. A failure a feature can know is still its own HandledError (Alex, 2026-09-30).
+  Prisma running out of Postgres connections (P2024, P2028) is the retryable 503 `DatabaseBusyError` with
+  `Retry-After`, promoted the same way by tRPC's `handledErrors` (Alex, 2026-09-30).
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
@@ -1462,6 +1483,8 @@ A run's live frames are published from its progress fold, which assigns each fra
 counts, so a reconnect's replay and the live stream cannot disagree; its events carry every detail a
 frame shows (an evaluator's error type, traceback, domain error, raw response and cost currency) as
 additive fields, never a side channel (Alex, 2026-09-28).
+A polled run start or workflow evaluation answers 200 the moment its command is written, never waiting
+on the worker; it records the run's start beside the fold, so an early poll reads `running` (Alex, 2026-09-30).
 An operator's projection replay runs as a worker process-manager intent, never in a request: the api
 takes the Redis replay lock, records the run and sends `requestProjectionReplay` on ops'
 `ops_projection_replay`; the intent awaits the whole run, fenced by the lock holder, so a delivery
@@ -1527,7 +1550,9 @@ a type error.
 
 Worker semantics: delivery is at-least-once, so subscribers are idempotent;
 ordering is per aggregate via the group queue, so one poisoned aggregate
-retries with backoff without blocking neighbours; projections fold from the
+retries with backoff without blocking neighbours; a group waiting out its backoff frees its tenant
+soft-cap slot and keeps its active lock, so its order holds while it runs nothing (Alex, 2026-09-30);
+projections fold from the
 same ordered stream; every consumer registers drain-first on the server.
 The hand-off from an append to its projections, subscribers and process managers is durable: a
 lane that cannot be staged is recorded in the process store's outbox and re-driven, a fold or state
@@ -1554,6 +1579,9 @@ detects a crossing after its own debit lands and records it with `recordBudgetCr
 names). A subscriber there hands each fact to `WebhookApi.requestGatewayEventDelivery`, and webhook
 builds and delivers the envelope. A failed detection throws and the debit is re-driven. That is
 safe because the ledger insert skips any budget the request has already debited.
+Each destination kind owns its sending (Alex, 2026-09-30; [ADR-167](adr/167-outbound-delivery.md)):
+producers call the kind's `requestDelivery`; retry, dead-letter and redrive are the outbox's; SSRF
+and the outbound proxy are egress's.
 
 Group membership history is organization's fact, not authz's (Alex, 2026-09-30). Organization
 records a member added to a group, a member removed and a group deleted as events on its own
@@ -1647,6 +1675,12 @@ How a screen is laid out (titles, header actions, containers, drawers, empty and
 states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4.
 
 **An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
+
+**A read's cache tier is declared on its contract** (Alex, 2026-09-30): `.query(name, { cache: { tier: "live" | "session" | "reference", persist } })`, applied by browser-host through `setQueryDefaults`; the session tier is invalidated by a newer `x-lw-session-version` or a 403 and revalidated by ETag, never by a call site's `staleTime`. ADR-164, specs/ui/browser-query-caching.feature.
+
+**The session version is authz's, per user, and a contract's tiers travel with its browser Api** (Alex, 2026-09-30): `AuthzApi.getSessionVersion({ userId })` backs `x-lw-session-version`, and a browser declaration states `.withApi(api, { contracts })`. ADR-164.
+
+**A session or reference read revalidates by a content ETag** (Alex, 2026-09-30): the tRPC host hashes an unbatched GET's 200 body into `"<userId>.<sha256>"` with `Cache-Control: private, no-cache` and `Vary: Cookie`, and answers a matching `If-None-Match` with a bodyless 304; no read opts in and no write bumps for it. ADR-164.
 
 A surface too wide for a typed hook calls a procedure by PATH through the
 shell's `UiRpc`, and the answer is published under the key the typed hook

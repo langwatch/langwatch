@@ -122,12 +122,8 @@ function CacheRulesPage() {
         <PageLayout.Header>
           <PageLayout.Heading>Cache Rules</PageLayout.Heading>
           <Spacer />
-          {canCreate && (
-            <PageLayout.HeaderButton
-              variant="solid"
-              colorPalette="orange"
-              onClick={() => setCreateOpen(true)}
-            >
+          {canCreate && !showRulesEmpty && (
+            <PageLayout.HeaderButton onClick={() => setCreateOpen(true)}>
               <Plus size={14} /> New rule
             </PageLayout.HeaderButton>
           )}
@@ -211,12 +207,7 @@ function CacheRulesEmptyState({
       icon={<Zap size={32} />}
     >
       {canCreate && (
-        <PageLayout.HeaderButton
-          variant="solid"
-          colorPalette="orange"
-          onClick={onCreate}
-          marginTop={4}
-        >
+        <PageLayout.HeaderButton onClick={onCreate} marginTop={4}>
           <Plus size={14} /> New rule
         </PageLayout.HeaderButton>
       )}
@@ -381,7 +372,9 @@ function ActionBadge({
   const tone = modeTone(modeEnum);
   return (
     <HStack gap={1}>
-      <Badge colorPalette={tone}>{modeEnum.toLowerCase()}</Badge>
+      <Badge colorPalette={tone} textTransform="capitalize">
+        {modeEnum.toLowerCase()}
+      </Badge>
       {typeof a.ttl === "number" && (
         <Text fontSize="xs" color="fg.muted">
           ttl {a.ttl}s

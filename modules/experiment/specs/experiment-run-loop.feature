@@ -420,18 +420,29 @@ Feature: An experiment run executes on its pipeline
     And the run is completed failed carrying the refusal's code for the poller
 
   @integration
-  Scenario: A polled saved run answers once its poller can read it
-    Given a saved workbench and a worker that folds the run's start
+  Scenario: A polled saved run answers as soon as its start command is written
+    Given a saved workbench and a worker that has not folded the run's start
     When the run is started by slug without accepting events
-    Then it answers only once the run's progress fold holds it
-    And a poll straight after the answer reads the run running
+    Then it answers 200 with the run id at once, the start sent once
+    And a poll straight after the answer reads the run running with no progress and its planned total
 
   @integration
-  Scenario: A started run the worker does not register in time is refused as unavailable
-    Given a saved workbench and a worker that does not fold the start within the bounded wait
-    When the run is started by slug without accepting events
-    Then the start is sent once
-    And it answers 503 as main did for an unavailable backend, the error coded service_unavailable
+  Scenario: A started run the worker has not folded is not readable by another project
+    Given a run started by slug that the worker has not folded
+    When another project polls it or asks to abort it
+    Then each is refused as run_not_found and nothing is stopped
+
+  @integration
+  Scenario: A started run the worker has not folded can be aborted by its own project
+    Given a run started by slug that the worker has not folded
+    When its own project asks to abort it
+    Then the run's stop flag is set and the abort is sent under the run's experiment
+
+  @integration
+  Scenario: A started run the worker has since folded is polled from its fold
+    Given a run started by slug whose progress fold now holds its progress
+    When it is polled by its runId
+    Then it answers the fold's progress, not the recorded start
 
   @unit
   Scenario: A polled run refused before its start polls failed with its planned total

@@ -18,6 +18,21 @@ describe("ClientAddress behind a trusted proxy", () => {
   });
 });
 
+describe("ClientAddress behind a trusted proxy chain", () => {
+  /** @scenario A trusted proxy's chain resolves to the rightmost hop it did not write */
+  it("resolves the rightmost hop no trusted proxy wrote, past a client-supplied one", () => {
+    const addresses = ClientAddress.fromTrustedProxies({ addresses: ["10.0.0.0/8"] });
+
+    const resolved = addresses.of({
+      header: (name) =>
+        name === "x-forwarded-for" ? "203.0.113.66, 198.51.100.7, 10.0.0.2" : undefined,
+      socketAddress: "10.0.0.1",
+    });
+
+    expect(resolved).toBe("198.51.100.7");
+  });
+});
+
 describe("ClientAddress with no declared proxies", () => {
   const addresses = ClientAddress.classifyByAddress();
   const from = ({

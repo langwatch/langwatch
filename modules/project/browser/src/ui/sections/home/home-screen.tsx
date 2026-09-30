@@ -7,7 +7,7 @@ import { LuCalendarClock } from "react-icons/lu";
 // recents headings render the real face on every home — including the one
 // where no Langy surface mounts.
 import { homeApi } from "../../../behavior/home-api.ts";
-import { PendingJoinRequests } from "../../../behavior/lent-peers.tsx";
+import { GuidedOnboardingOffer, PendingJoinRequests } from "../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { safeReturnToPath } from "../../../model/project-switch.ts";
 import { DocsGuides } from "./components/docs-guides.tsx";
@@ -58,6 +58,10 @@ export function HomePage() {
             {/* Above every composition: whoever can answer a join request sees the
                 wait wherever the home opens. Organization draws nothing for anyone else. */}
             <PendingJoinRequests />
+
+            {/* The Langy home carries the offer inside its hero, under the ask field;
+                the classic home carries it here, under the header. */}
+            {composition === "classic" && <ClassicGuidedOffer />}
 
             {composition === "undecided" && <HomeCompositionSkeleton />}
             {composition === "langy" && <LangyHome />}
@@ -133,6 +137,13 @@ function ConsideringLangWatch() {
       </chakra.a>
     </HStack>
   );
+}
+
+/** The guided offer for the classic home: hidden until the project's reach says it is new. */
+function ClassicGuidedOffer() {
+  const reach = useProjectReach();
+  const spaceInUse = reach.isLoading ? null : !reach.isNewProject;
+  return <GuidedOnboardingOffer space="project" spaceInUse={spaceInUse} />;
 }
 
 /**

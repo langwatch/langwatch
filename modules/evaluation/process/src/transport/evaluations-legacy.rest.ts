@@ -385,7 +385,7 @@ async function logBatchResults({
   try {
     params = eSBatchEvaluationRESTParamsSchema.parse(body);
   } catch (error) {
-    logger.error({ error, payloadSize, projectId }, "invalid log_results data received");
+    logger.warn({ error, payloadSize, projectId }, "invalid log_results data received");
 
     return answer({ error: sentenceFor(error) }, 400);
   }
@@ -502,7 +502,7 @@ async function evaluateDataset({
   let data: EvaluationDispatchData;
 
   try {
-    data = getEvaluatorDataForParams(checkType, params.data as Record<string, unknown>);
+    data = getEvaluatorDataForParams(checkType, params.data ?? {});
 
     if (!evaluator.requiredFields.every((field: string) => field in data.data)) {
       return answer(

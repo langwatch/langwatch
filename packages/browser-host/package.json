@@ -78,6 +78,18 @@
       "types": "./dist/fetch-sse.d.ts",
       "default": "./src/fetch-sse.ts"
     },
+    "./cache-tiers": {
+      "types": "./dist/cache-tiers.d.ts",
+      "default": "./src/cache-tiers.ts"
+    },
+    "./session-version": {
+      "types": "./dist/session-version.d.ts",
+      "default": "./src/session-version.ts"
+    },
+    "./query-persistence": {
+      "types": "./dist/query-persistence.d.ts",
+      "default": "./src/query-persistence.ts"
+    },
     "./query-retry": {
       "types": "./dist/query-retry.d.ts",
       "default": "./src/query-retry.ts"
@@ -209,9 +221,12 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@microsoft/fetch-event-source": "^2.0.1",
+    "@tanstack/query-async-storage-persister": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "@tanstack/react-query-persist-client": "catalog:",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
+    "idb-keyval": "catalog:",
     "lucide-react": "catalog:",
     "posthog-js": "catalog:",
     "qs": "catalog:",

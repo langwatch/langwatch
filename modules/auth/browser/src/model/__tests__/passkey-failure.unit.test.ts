@@ -9,6 +9,7 @@ import {
 
 describe("given a passkey ceremony that resolved with a refusal", () => {
   describe("when the server refused the credential", () => {
+    /** @scenario A passkey nobody holds is refused without telling anyone anything */
     it("names the credential refusal for a 400", () => {
       expect(passkeyFailure(400)).toEqual({ error: "identity_passkey_not_recognized" });
     });

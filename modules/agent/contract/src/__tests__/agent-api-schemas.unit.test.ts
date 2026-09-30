@@ -70,6 +70,16 @@ describe("the Agents create schemas", () => {
     });
   });
 
+  describe("given a connected agent create body with no SDK declaration", () => {
+    /** @scenario "A connected agent cannot be created by hand" */
+    it("passes the schema, so the service can refuse it as register-only", () => {
+      const body = { name: "Support", type: "connected", config: {} };
+
+      expect(createAgentRequestSchema.validate(body)).toBe(true);
+      expect(rpcCreateSchema.validate({ ...body, projectId: "project-1" })).toBe(true);
+    });
+  });
+
   describe("given a config that belongs to another agent type", () => {
     /** @scenario "Contract schemas define both API interfaces" */
     it("is refused by both interfaces, because the create schema is type-specific", () => {

@@ -64,6 +64,15 @@ const reasonDetailLines = (domain: LangWatchHandledErrorShape): [string, string]
   return details;
 };
 
+/** A list of words, such as `missingPermissions`, reads as a comma list, not JSON. */
+const renderMetaValue = (value: unknown): string => {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value.join(", ");
+  }
+  return JSON.stringify(value) ?? "";
+};
+
 /** `code` / `trace id` / meta keys, aligned into a dim block under `Details:`. */
 const detailLines = (domain: LangWatchHandledErrorShape): string[] => {
   const details: [string, string][] = [["code", domain.code]];
@@ -83,7 +92,7 @@ const detailLines = (domain: LangWatchHandledErrorShape): string[] => {
   // the very identifiers the user is reading the error to find.
   for (const [key, value] of Object.entries(domain.meta)) {
     if (value === null || value === undefined) continue;
-    const rendered = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
+    const rendered = renderMetaValue(value);
     if (!rendered) continue;
     details.push([key, rendered]);
   }

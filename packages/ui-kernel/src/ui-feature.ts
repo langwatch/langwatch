@@ -10,6 +10,7 @@ import type {
   UiSessionSource,
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import type { SessionVersionWatch } from "@langwatch/browser-host/session-version";
 import type {
   UiFeatureApiBinding,
   UiFeatureApiProvider,
@@ -56,6 +57,8 @@ export type UiFeatureInstall = {
   capabilities?: UiCapabilityInstall;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
+  /** The watch that transport's fetch reports session versions to (ADR-164). */
+  sessionVersions?: SessionVersionWatch;
   /**
    * The live session this application reads for itself — pass `useBrowserUiSession` to
    * serve the reader, the scope and the permissions from the deployment.

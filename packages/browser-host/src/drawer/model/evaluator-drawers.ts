@@ -96,6 +96,7 @@ export type UiEvaluatorListDrawerProps = {
   onSelect?: (evaluator: WireOf<EvaluatorWithFields>) => void;
   onCreateNew?: () => void;
   filterEvaluatorType?: string;
+  hiddenEvaluatorIds?: string[];
   title?: string;
   createLabel?: string;
   itemLabel?: string;

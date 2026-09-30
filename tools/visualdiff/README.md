@@ -333,7 +333,9 @@ Any argument may hold `{uid}` (unique per run and flow, equal on both sides),
 `{slug}`, `{isolatedSlug}`, a seeded fixture (`{dataset}`, `{graph}`, `{monitor}`,
 `{errorTrace}`, `{conversation}`, `{bugReport}`, `{virtualKey}`, ...) or a value a
 `capture` or `mail` step stored earlier. The seed also writes rows into the
-dataset, an error trace, and a two-turn conversation. haven starts each stack
+dataset, an error trace, and a two-turn conversation, and a lived-in catalogue
+(`seed_catalogue.go`): four named dashboards, workflows with emoji icons, connected agents
+with a host label or an owner, and an Engineering department holding the admin. haven starts each stack
 with `release_ui_agent_testing_v2_enabled`, `release_custom_chart_playground`,
 `release_langy_enabled` and `release_voice_agents_enabled` forced on (`FEATURE_FLAG_FORCE_ENABLE`); a root `.env` that sets the variable wins.
 

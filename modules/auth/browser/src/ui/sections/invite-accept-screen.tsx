@@ -3,6 +3,7 @@ import { Text } from "@chakra-ui/react";
 import { useRouter } from "../../behavior/use-route.ts";
 import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
+import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 import { InviteLanding } from "./invite-landing.tsx";
 
@@ -36,6 +37,7 @@ function IncompleteInviteLink() {
       <Text fontSize="13.5px" lineHeight="1.65" color="fg.muted" data-testid="invite-incomplete">
         Nothing has been accepted, and nothing expires while you sort it out.
       </Text>
+      <SecondaryActionLink href="/auth/signin" label="Go to sign in" />
     </AuthCard>
   );
 }

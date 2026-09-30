@@ -69,6 +69,18 @@ describe("the custom dashboards list", () => {
     api.sent = [];
   });
 
+  it("shows each dashboard's name on one line with the full name as a tooltip", () => {
+    const long = "Quarterly cost and quality review for the enterprise accounts";
+    mount([
+      { id: "dash_8f2a", name: long },
+      { id: "dash_9b3c", name: "Costs" },
+    ]);
+    const label = screen.getByText(long);
+    expect(label).toHaveAttribute("title", long);
+    expect(label).toHaveStyle({ textOverflow: "ellipsis", whiteSpace: "nowrap" });
+    expect(screen.queryByText("dash_8f2a")).toBeNull();
+  });
+
   it("offers move up and down only where there is room, and delete only with more than one", async () => {
     const user = mount(THREE);
     await openMenuOf(user, "Overview");

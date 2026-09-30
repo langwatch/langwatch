@@ -295,7 +295,7 @@ interface DraggableTabTriggerProps extends BoxProps {
  */
 export const TAB_MIN_WIDTH = "88px";
 /** A lone tab does not stretch across an empty strip. */
-export const TAB_MAX_WIDTH = "180px";
+export const TAB_MAX_WIDTH = "240px";
 
 /**
  * DraggableBrowserTabTrigger component

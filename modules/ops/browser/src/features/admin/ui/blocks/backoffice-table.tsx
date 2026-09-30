@@ -49,7 +49,7 @@ export function BackofficeTable({
         <Spacer />
         {createAction}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start">
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
         {searchInput ?? (
           <Input
             value={searchValue}

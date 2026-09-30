@@ -28,6 +28,7 @@ const (
 	CodingAlphaTitle    = "Visual diff alpha session"
 	CodingBetaTitle     = "Visual diff beta session"
 	CodingAlphaTool     = "Bash"
+	codingAlphaTraceID  = "5c0d1a6e0000000000000000000000a1"
 	claudeEventsScope   = "com.anthropic.claude_code.events"
 	langwatchHookScope  = "langwatch.coding_agent.hook"
 	sessionContextEvent = "langwatch.session_context"
@@ -61,9 +62,9 @@ func codingSessionLogs(now int64) []map[string]any {
 			"vcs.repository.owner": CodingRepoOwner, "vcs.repository.name": CodingRepoName,
 			"vcs.ref.head.name": CodingAlphaBranch, "langwatch.session.name": CodingAlphaTitle,
 		}),
-		logRecord(now-8*minute, "claude_code.user_prompt", CodingSessionAlpha, map[string]any{
+		inTrace(logRecord(now-8*minute, "claude_code.user_prompt", CodingSessionAlpha, map[string]any{
 			"prompt": "Make the visual diff seed deterministic", "prompt_length": 39, "prompt.id": "vd-prompt-1",
-		}),
+		}), codingAlphaTraceID),
 		logRecord(now-7*minute, "claude_code.api_request", CodingSessionAlpha, map[string]any{
 			"model": "claude-sonnet-4-20250514", "input_tokens": 1200, "output_tokens": 340,
 			"cache_read_tokens": 800, "cache_creation_tokens": 100, "cost_usd": 0.012,
@@ -96,18 +97,20 @@ func codingSessionSpans(now int64) []map[string]any {
 	start := (now - 7*60_000) * 1_000_000
 	toolStart := start + 2_500_000_000
 	tool := map[string]any{
-		"traceId": "5c0d1a6e0000000000000000000000a1", "spanId": "5c0d1a6e000000a2", "name": "claude_code.tool",
+		"traceId": codingAlphaTraceID, "spanId": "5c0d1a6e000000a2", "name": "claude_code.tool",
 		"kind": 1, "startTimeUnixNano": strconv.FormatInt(toolStart, 10), "endTimeUnixNano": strconv.FormatInt(toolStart+800_000_000, 10),
 		"attributes": []map[string]any{
-			otlpAttribute("session.id", CodingSessionAlpha), otlpAttribute("tool_name", CodingAlphaTool),
+			otlpAttribute("session.id", CodingSessionAlpha), otlpAttribute("langwatch.thread.id", CodingSessionAlpha),
+			otlpAttribute("tool_name", CodingAlphaTool),
 			otlpAttribute("duration_ms", 800),
 		},
 	}
 	span := map[string]any{
-		"traceId": "5c0d1a6e0000000000000000000000a1", "spanId": "5c0d1a6e000000a1", "name": "claude_code.llm_request",
+		"traceId": codingAlphaTraceID, "spanId": "5c0d1a6e000000a1", "name": "claude_code.llm_request",
 		"kind": 1, "startTimeUnixNano": strconv.FormatInt(start, 10), "endTimeUnixNano": strconv.FormatInt(start+2_100_000_000, 10),
 		"attributes": []map[string]any{
-			otlpAttribute("session.id", CodingSessionAlpha), otlpAttribute("model", "claude-sonnet-4-20250514"),
+			otlpAttribute("session.id", CodingSessionAlpha), otlpAttribute("langwatch.thread.id", CodingSessionAlpha),
+			otlpAttribute("model", "claude-sonnet-4-20250514"),
 			otlpAttribute("input_tokens", 1200), otlpAttribute("output_tokens", 340), otlpAttribute("cost_usd", 0.012),
 		},
 	}
@@ -133,6 +136,12 @@ func logRecord(atMs int64, event, sessionID string, attributes map[string]any) m
 		"timeUnixNano": strconv.FormatInt(atMs*1_000_000, 10), "severityNumber": 9, "severityText": "INFO",
 		"eventName": event, "attributes": list,
 	}
+}
+
+// inTrace attaches a log record to a trace, so the receiver files it beside the spans.
+func inTrace(record map[string]any, traceID string) map[string]any {
+	record["traceId"] = traceID
+	return record
 }
 
 // otlpLogs wraps records in one OTLP/HTTP JSON logs request under one scope.

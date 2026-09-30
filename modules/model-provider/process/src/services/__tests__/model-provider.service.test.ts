@@ -208,6 +208,10 @@ class Authorization extends AuthzService {
     return this.notUsed();
   }
 
+  findPermissionsBeyondCaller(): Promise<never> {
+    return this.notUsed();
+  }
+
   checkScopeLineage(): Promise<never> {
     return this.notUsed();
   }

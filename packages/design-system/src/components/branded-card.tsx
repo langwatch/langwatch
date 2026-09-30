@@ -1,8 +1,8 @@
 /**
- * The standalone branded card: wordmark, centred title and intro, a body, over the soft
- * brand ground. Presentational only; the sign-in doors and the pages a link lands on share it.
+ * The standalone branded page: one brand ground held to the viewport, one glass card on it.
+ * Every page a link or a command line lands on uses these two, with no page-level overrides.
  */
-import { Box, Card, Container, Flex, Heading, Text, VStack } from "@chakra-ui/react";
+import { Box, Card, Flex, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { AmbientGround } from "./ambient-ground.tsx";
@@ -11,23 +11,59 @@ import { FullLogo } from "./full-logo.tsx";
 /** Hooks a host stylesheet addresses: `data-*` attributes and nothing else. */
 type DataAttributes = Record<`data-${string}`, string | boolean>;
 
-/** The page under a card: the brand ground, with the card centred over it. */
-export function BrandedCardPage({ children }: { children: ReactNode }) {
+/** How wide the card stands from `sm` up: a message or form, a list-heavy step, a wide step. */
+const CARD_WIDTHS = { narrow: "408px", wide: "560px", full: "1200px" } as const;
+
+/** The sign-in doors' glass: a translucent pane, a soft hairline and one lift. */
+const GLASS = {
+  bg: { base: "rgba(255, 255, 255, 0.3)", _dark: "rgba(10, 10, 12, 0.54)" },
+  border: { base: "rgba(20, 20, 23, 0.09)", _dark: "rgba(255, 255, 255, 0.1)" },
+  shadow: {
+    base: "inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(255, 255, 255, 0.5), 0 24px 48px -20px rgba(20, 20, 23, 0.28)",
+    _dark: "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px -24px rgba(0, 0, 0, 0.65)",
+  },
+  /** While anything on the card holds focus, the glass warms with the brand's light. */
+  focusShadow: {
+    base: "inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(255, 255, 255, 0.5), 0 24px 48px -20px rgba(20, 20, 23, 0.28), 0 0 56px -14px rgba(245, 107, 26, 0.28)",
+    _dark:
+      "inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px -24px rgba(0, 0, 0, 0.65), 0 0 56px -14px rgba(255, 138, 61, 0.22)",
+  },
+} as const;
+
+/**
+ * The ground sticks to the viewport, so it never slides or stretches, and stays inside the
+ * page's own box. A short card centres; a tall one starts 48px down and the page scrolls.
+ */
+export function BrandedCardPage({
+  ground,
+  children,
+}: {
+  /** A ground that moves with its page (the sign-in doors'); the ambient ground otherwise. */
+  ground?: ReactNode;
+  children: ReactNode;
+}) {
   return (
-    <Box position="relative" minHeight="100vh" width="full" overflowX="hidden" bg="bg">
-      <Box position="absolute" inset={0} overflow="hidden" pointerEvents="none" zIndex={0}>
-        <AmbientGround />
+    <Box position="relative" isolation="isolate" minHeight="100dvh" width="full">
+      <Box
+        position="sticky"
+        top={0}
+        zIndex={-1}
+        height="100dvh"
+        marginBottom="-100dvh"
+        overflow="hidden"
+        pointerEvents="none"
+        bg="bg"
+        aria-hidden="true"
+      >
+        {ground ?? <AmbientGround />}
       </Box>
       <Flex
-        position="relative"
-        zIndex={1}
         direction="column"
         align="center"
-        justify={{ base: "flex-start", md: "center" }}
-        minHeight="100vh"
+        minHeight="100dvh"
         width="full"
         paddingX={{ base: 0, sm: 4 }}
-        paddingBottom={10}
+        paddingY={{ base: 0, sm: 12 }}
       >
         {children}
       </Flex>
@@ -35,11 +71,15 @@ export function BrandedCardPage({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Logo, centred title and intro, then the body. A paragraph set straight in the body is
+ * centred with the heading; fields and controls keep their own alignment.
+ */
 export function BrandedCard({
   title,
   intro,
   footer,
-  className,
+  size = "narrow",
   cardAttributes,
   logoAttributes,
   bodyAttributes,
@@ -50,25 +90,32 @@ export function BrandedCard({
   intro?: string;
   /** Small print under the body. */
   footer?: ReactNode;
-  /** A host stylesheet's class for the card surface; it then owns the glass. */
-  className?: string;
+  size?: keyof typeof CARD_WIDTHS;
   cardAttributes?: DataAttributes;
   logoAttributes?: DataAttributes;
   bodyAttributes?: DataAttributes;
   children?: ReactNode;
 }) {
   return (
-    <Container
-      maxW={{ base: "100%", sm: "408px" }}
-      paddingX={{ base: 0, sm: 2 }}
-      marginY={{ base: 6, md: "8vh" }}
+    <Flex
+      direction="column"
+      width="full"
+      maxWidth={{ base: "100%", sm: CARD_WIDTHS[size] }}
+      flex={{ base: "1", sm: "none" }}
+      marginY={{ base: 0, sm: "auto" }}
     >
       <Card.Root
-        className={className}
+        flex="1"
         width="full"
-        {...(className ? {} : { bg: "bg.panel/85", backdropFilter: "blur(18px)" })}
+        bg={GLASS.bg}
+        backdropFilter="blur(26px) saturate(1.35)"
+        borderColor={GLASS.border}
         borderWidth={{ base: 0, sm: "1px" }}
         borderRadius={{ base: 0, sm: "14px" }}
+        boxShadow={GLASS.shadow}
+        transition="box-shadow 420ms ease"
+        _focusWithin={{ boxShadow: GLASS.focusShadow }}
+        _motionReduce={{ transition: "none" }}
         {...cardAttributes}
       >
         <Card.Header paddingTop="34px" paddingX="32px" paddingBottom={0}>
@@ -103,7 +150,13 @@ export function BrandedCard({
         </Card.Header>
         <Card.Body paddingX="32px" paddingTop={children ? "22px" : "16px"} paddingBottom="32px">
           {children ? (
-            <VStack width="full" align="stretch" gap="14px" {...bodyAttributes}>
+            <VStack
+              width="full"
+              align="stretch"
+              gap="14px"
+              css={{ "& > p": { textAlign: "center", textWrap: "pretty" } }}
+              {...bodyAttributes}
+            >
               {children}
             </VStack>
           ) : null}
@@ -114,6 +167,6 @@ export function BrandedCard({
           ) : null}
         </Card.Body>
       </Card.Root>
-    </Container>
+    </Flex>
   );
 }

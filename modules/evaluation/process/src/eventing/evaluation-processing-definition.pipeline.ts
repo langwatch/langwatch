@@ -37,6 +37,11 @@ import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "./evaluation-run.projection.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
+/**
+ * Main's CIO_SYNC_DEBOUNCE_TTL_MS: an evaluation's completed and reported events tell
+ * nurturing once.
+ */
+const LIFECYCLE_COMPLETED_DEDUP_TTL_MS = 300_000;
 
 /** evaluation_processing as registered, its four commands named so their senders are typed. */
 export type EvaluationProcessingPipeline = StaticPipelineDefinition<
@@ -121,6 +126,8 @@ export class EvaluationProcessingPipelineAdapter {
       .withProjectionSubscriber("lifecycleCompleted", {
         fold: "evaluationRun",
         events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
+        dedupId: (event) => `${event.tenantId}:${event.aggregateId}`,
+        ttl: LIFECYCLE_COMPLETED_DEDUP_TTL_MS,
         handler: async (event, context) => {
           await this.deps.lifecycle?.completed({
             projectId: context.tenantId,

@@ -39,6 +39,7 @@ export type AuthzMemoryCutoverRow = {
  */
 export class AuthzMemoryStore {
   readonly epochs = new Map<string, number>();
+  readonly sessionVersions = new Map<string, number>();
   readonly cutovers = new Map<string, AuthzMemoryCutoverRow>();
   readonly admissions: AuthzMemoryAdmissionRow[] = [];
   readonly admissionGrants: AuthzMemoryAdmissionGrantRow[] = [];
@@ -59,6 +60,7 @@ export class AuthzMemoryStore {
 
   reset(): void {
     this.epochs.clear();
+    this.sessionVersions.clear();
     this.cutovers.clear();
     this.organizationRoles.clear();
     for (const rows of [

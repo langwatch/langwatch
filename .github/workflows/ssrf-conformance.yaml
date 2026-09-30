@@ -68,4 +68,4 @@ jobs:
       # both sides in one log instead of making you re-run to see the second.
       - name: TypeScript half of the corpus
         if: ${{ !cancelled() }}
-        run: pnpm --filter @langwatch/egress test:unit -- src/ssrf
+        run: pnpm --filter @langwatch/egress test src/ssrf

@@ -14,6 +14,10 @@ import {
   MANAGEMENT_API_VERSION,
   NotFoundError,
 } from "@langwatch/api/rest";
+import type {
+  DataPrivacyApi,
+  DataPrivacyPiiRedactionLevel,
+} from "@langwatch/data-privacy-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import {
   PersonalProjectProtectedError,
@@ -28,7 +32,7 @@ import {
   projectRestParamsSchema,
   projectRestRegenerateApiKeyInputSchema,
   projectRestPageSchema,
-  projectRestSchema,
+  projectRestDetailSchema,
   projectRestUpdateSchema,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
@@ -54,13 +58,13 @@ const PROJECT_NOT_FOUND: Readonly<{ status: 404; description: string }> = {
 
 /**
  * What the management door reaches: flat operations `ProjectApp` serves via
- * `implements ProjectManagementApi`, so an unsupplied member fails the build
- * — not the first request. Two reads mirror {@link ProjectApi}; five are this door's own.
+ * `implements ProjectManagementApi`, so an unsupplied member fails the build.
+ * Reads mirror {@link ProjectApi} and {@link DataPrivacyApi}; five are its own.
  */
-export interface ProjectManagementApi extends Pick<
-  ProjectApi,
-  "listByOrganization" | "findWithTeam"
-> {
+export interface ProjectManagementApi
+  extends
+    Pick<ProjectApi, "listByOrganization" | "findWithTeam">,
+    Pick<DataPrivacyApi, "getPiiRedactionLevel" | "setPiiRedactionLevel"> {
   /**
    * Provisions a project in this organization. Distinct from
    * `ProjectApi.create` because a management credential may be a service key
@@ -218,21 +222,26 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .get("/:id", "getProject")
   .withParams(projectRestParamsSchema)
   .withPermission("project:view", { at: "route", param: "projectId", field: "id" })
-  .withOutput(projectRestSchema)
+  .withOutput(projectRestDetailSchema)
   .withDocs({
     summary: "Get a project",
     description: "Get a project by ID, including its API key. Requires project:view permission.",
     errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS, PROJECT_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }) =>
-    projectResponse(await projectInOrganization({ app, id: input.id, organizationId: scope.id })),
-  )
+  .handle(async ({ app, input, scope }) => {
+    const project = await projectInOrganization({ app, id: input.id, organizationId: scope.id });
+
+    return {
+      ...projectResponse(project),
+      piiRedactionLevel: await app.getPiiRedactionLevel({ projectId: project.id }),
+    };
+  })
 
   .patch("/:id", "updateProject")
   .withParams(projectRestParamsSchema)
   .withInput(projectRestUpdateSchema)
   .withPermission("project:update", { at: "route", param: "projectId", field: "id" })
-  .withOutput(projectRestSchema)
+  .withOutput(projectRestDetailSchema)
   .withDocs({
     summary: "Update a project",
     description:
@@ -243,20 +252,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       PROJECT_NOT_FOUND,
     ],
   })
-  .handle(async ({ app, input, scope }) =>
-    projectResponse(
-      await app.updateInOrganization({
-        projectId: input.id,
-        organizationId: scope.id,
-        data: {
-          ...(input.name !== undefined && { name: input.name }),
-          ...(input.language !== undefined && { language: input.language }),
-          ...(input.framework !== undefined && { framework: input.framework }),
-          ...(input.teamId !== undefined && { teamId: input.teamId }),
-        },
-      }),
-    ),
-  )
+  .handle(({ app, input, scope }) => updateProject({ app, input, organizationId: scope.id }))
 
   .delete("/:id", "archiveProject")
   .withParams(projectRestParamsSchema)
@@ -396,6 +392,43 @@ async function provisionProject({
 
     throw error;
   }
+}
+
+/** The update, then the PII level if one was sent, answering the level read back. */
+async function updateProject({
+  app,
+  input,
+  organizationId,
+}: {
+  app: ProjectManagementApi;
+  input: Readonly<{
+    id: string;
+    name?: string | undefined;
+    language?: string | undefined;
+    framework?: string | undefined;
+    teamId?: string | undefined;
+    piiRedactionLevel?: DataPrivacyPiiRedactionLevel | undefined;
+  }>;
+  organizationId: string;
+}) {
+  const project = await app.updateInOrganization({
+    projectId: input.id,
+    organizationId,
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.language !== undefined && { language: input.language }),
+      ...(input.framework !== undefined && { framework: input.framework }),
+      ...(input.teamId !== undefined && { teamId: input.teamId }),
+    },
+  });
+  if (input.piiRedactionLevel !== undefined) {
+    await app.setPiiRedactionLevel({ projectId: project.id, level: input.piiRedactionLevel });
+  }
+
+  return {
+    ...projectResponse(project),
+    piiRedactionLevel: await app.getPiiRedactionLevel({ projectId: project.id }),
+  };
 }
 
 /** The archive refusals, as the status codes this family answers with. */

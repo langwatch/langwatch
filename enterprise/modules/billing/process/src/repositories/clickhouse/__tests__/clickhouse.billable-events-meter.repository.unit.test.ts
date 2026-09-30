@@ -2,7 +2,6 @@ import {
   ClickHouseQueryClient,
   type InsertRequest,
   type QueryDriver,
-  type QueryRequest,
   type QueryResult,
 } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
@@ -23,7 +22,7 @@ function record() {
 class RecordingDriver implements QueryDriver {
   readonly inserts: InsertRequest[] = [];
 
-  async execute<Row>(_: QueryRequest): Promise<QueryResult<Row>> {
+  async execute<Row>(): Promise<QueryResult<Row>> {
     return { rows: [] };
   }
 
@@ -31,7 +30,7 @@ class RecordingDriver implements QueryDriver {
     this.inserts.push(request);
   }
 
-  async command(_: QueryRequest): Promise<void> {
+  async command(): Promise<void> {
     throw new Error("This meter test did not expect a ClickHouse command");
   }
 }

@@ -151,7 +151,6 @@ export class LicensePurchaseService {
     logger.info(
       {
         licenseId: licenseData.licenseId,
-        email,
         seats: quantity,
         expiresAt: licenseData.expiresAt,
       },
@@ -180,7 +179,7 @@ export class LicensePurchaseService {
       ...(unlockedFeatures ? { unlockedFeatures } : {}),
     });
     logger.info(
-      { email, licenseId: licenseData.licenseId },
+      { licenseId: licenseData.licenseId },
       "[licensePurchaseHandler] License email sent",
     );
     await this.delivery.notifyLicensePurchase({

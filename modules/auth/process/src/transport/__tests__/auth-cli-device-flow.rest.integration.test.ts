@@ -475,6 +475,7 @@ describe("given a CLI starting a device login", () => {
     }
 
     describe("when the project's key is rotated before the CLI polls", () => {
+      /** @scenario project-login exchange returns a key rotated after approval */
       it("answers the key the project holds now, not the one the approval saw", async () => {
         const world = deviceFlowWorld();
         world.project = liveProject({ apiKey: "sk-lw-at-approval" });
@@ -495,6 +496,7 @@ describe("given a CLI starting a device login", () => {
     });
 
     describe("when the person stops administering the project before the CLI polls", () => {
+      /** @scenario project-login exchange rechecks administration after approval */
       it("answers a fatal access_denied and discloses no key", async () => {
         const world = deviceFlowWorld();
         world.project = liveProject();
@@ -512,6 +514,32 @@ describe("given a CLI starting a device login", () => {
 
         expect(JSON.parse(body)).toMatchObject({ error: "access_denied" });
         expect(body).not.toContain("sk-lw-shared");
+
+        const polled = await api.post("/api/auth/cli/exchange", { device_code: grant.device_code });
+
+        expect(polled.status).toBe(408);
+      });
+    });
+
+    describe("when the person's seat is disabled before the CLI polls", () => {
+      /** @scenario project-login exchange denies a member whose seat was disabled after approval */
+      it("answers a fatal access_denied, discloses no key and consumes the code", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const { api, grant } = await approvedProjectKeyGrant(world);
+
+        world.activeMembership = false;
+
+        const exchanged = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+        const body = await exchanged.text();
+        const polled = await api.post("/api/auth/cli/exchange", { device_code: grant.device_code });
+
+        expect(exchanged.status).toBe(410);
+        expect(JSON.parse(body)).toMatchObject({ error: "access_denied" });
+        expect(body).not.toContain("sk-lw-shared");
+        expect(polled.status).toBe(408);
       });
     });
 
@@ -549,6 +577,188 @@ describe("given a CLI starting a device login", () => {
     });
   });
 
+  describe("when a member approves a project-key device code", () => {
+    async function pendingProjectKeyCode(api: ReturnType<typeof mount>) {
+      return (await (
+        await api.post("/api/auth/cli/device-code", { credential_type: "project_api_key" })
+      ).json()) as { device_code: string; user_code: string };
+    }
+
+    const approveProject = (
+      api: ReturnType<typeof mount>,
+      grant: { user_code: string },
+      projectId: string,
+    ) =>
+      api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        project_id: projectId,
+      });
+
+    /** @scenario project-login approval rejects another user's personal project id */
+    it("refuses another user's personal project by name and discloses no key", async () => {
+      const world = deviceFlowWorld();
+      world.project = liveProject({
+        id: "project-theirs",
+        isPersonal: true,
+        ownerUserId: "somebody-else",
+        apiKey: "sk-lw-theirs",
+      });
+      const api = mount(world);
+      const grant = await pendingProjectKeyCode(api);
+
+      const approved = await approveProject(api, grant, "project-theirs");
+      const body = await approved.text();
+
+      expect(approved.status).toBe(400);
+      expect(JSON.parse(body)).toMatchObject({ error: "personal_project_not_allowed" });
+      expect(body).not.toContain("sk-lw-theirs");
+    });
+
+    /** @scenario project-login approval honours the caller's own explicitly picked personal project */
+    it("honours the caller's own personal project, whose key the exchange then returns", async () => {
+      const world = deviceFlowWorld();
+      world.project = liveProject({
+        id: "project-mine",
+        isPersonal: true,
+        ownerUserId: USER_ID,
+        apiKey: "sk-lw-mine",
+      });
+      const api = mount(world);
+      const grant = await pendingProjectKeyCode(api);
+
+      const approved = await approveProject(api, grant, "project-mine");
+      const exchanged = await api.post("/api/auth/cli/exchange", {
+        device_code: grant.device_code,
+      });
+
+      expect(approved.status).toBe(200);
+      await expect(exchanged.json()).resolves.toMatchObject({
+        kind: "api_key",
+        api_key: "sk-lw-mine",
+      });
+    });
+
+    /** @scenario project-login approval returns the shared project's key */
+    it("approves a shared project, whose key the exchange then returns", async () => {
+      const world = deviceFlowWorld();
+      world.project = liveProject();
+      const api = mount(world);
+      const grant = await pendingProjectKeyCode(api);
+
+      const approved = await approveProject(api, grant, "project-shared");
+      const exchanged = await api.post("/api/auth/cli/exchange", {
+        device_code: grant.device_code,
+      });
+
+      expect(approved.status).toBe(200);
+      await expect(approved.json()).resolves.toMatchObject({
+        kind: "api_key",
+        project: { id: "project-shared" },
+      });
+      await expect(exchanged.json()).resolves.toMatchObject({ api_key: "sk-lw-shared" });
+    });
+
+    /** @scenario project-login approval denies a project the caller cannot manage */
+    it("refuses a shared project the caller does not administer and discloses no key", async () => {
+      const world = deviceFlowWorld();
+      world.project = liveProject();
+      world.administersProject = false;
+      const api = mount(world);
+      const grant = await pendingProjectKeyCode(api);
+
+      const approved = await approveProject(api, grant, "project-shared");
+      const body = await approved.text();
+
+      expect(approved.status).toBe(403);
+      expect(JSON.parse(body)).toMatchObject({ error: "forbidden" });
+      expect(body).not.toContain("sk-lw-shared");
+    });
+
+    /** @scenario owning a personal project does not replace project administration */
+    it("still refuses the caller's own personal project when they cannot manage it", async () => {
+      const world = deviceFlowWorld();
+      world.project = liveProject({
+        id: "project-mine",
+        isPersonal: true,
+        ownerUserId: USER_ID,
+        apiKey: "sk-lw-mine",
+      });
+      world.administersProject = false;
+      const api = mount(world);
+      const grant = await pendingProjectKeyCode(api);
+
+      const approved = await approveProject(api, grant, "project-mine");
+      const body = await approved.text();
+
+      expect(approved.status).toBe(403);
+      expect(JSON.parse(body)).toMatchObject({ error: "forbidden" });
+      expect(body).not.toContain("sk-lw-mine");
+    });
+
+    /** @scenario project-login approval denies a member whose seat has been disabled */
+    it("refuses a member whose seat an admin disabled and discloses no key", async () => {
+      const world = deviceFlowWorld();
+      world.project = liveProject();
+      world.activeMembership = false;
+      const api = mount(world);
+      const grant = await pendingProjectKeyCode(api);
+
+      const approved = await approveProject(api, grant, "project-shared");
+      const body = await approved.text();
+
+      expect(approved.status).toBe(403);
+      expect(JSON.parse(body)).toMatchObject({ error: "forbidden" });
+      expect(body).not.toContain("sk-lw-shared");
+    });
+  });
+
+  describe("when a member approves a device-session code", () => {
+    const approveDeviceSession = async (world: ReturnType<typeof deviceFlowWorld>) => {
+      const api = mount(world);
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        user_code: string;
+      };
+
+      return api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        key_selection: organizationKey,
+      });
+    };
+
+    /** @scenario device-session approval succeeds on a default installation */
+    it("is not refused by the governance gate when the flag cannot be read", async () => {
+      const world = deviceFlowWorld({ governanceFlag: () => Promise.reject(new Error("no flag")) });
+
+      const approved = await approveDeviceSession(world);
+
+      expect(approved.status).toBe(200);
+      expect(world.mintedKeys).toEqual([]);
+    });
+
+    /** @scenario device-session approval is refused when governance is disabled */
+    it("refuses with governance_required when the organization switched governance off", async () => {
+      const world = deviceFlowWorld({ governanceFlag: () => Promise.resolve(false) });
+
+      const approved = await approveDeviceSession(world);
+
+      expect(approved.status).toBe(403);
+      await expect(approved.json()).resolves.toMatchObject({ error: "governance_required" });
+      expect(world.mintedKeys).toEqual([]);
+    });
+
+    /** @scenario device-session approval succeeds when governance is enabled */
+    it("approves without minting any key when governance is enabled", async () => {
+      const world = deviceFlowWorld({ governanceFlag: () => Promise.resolve(true) });
+
+      const approved = await approveDeviceSession(world);
+
+      expect(approved.status).toBe(200);
+      expect(world.mintedKeys).toEqual([]);
+    });
+  });
+
   /**
    * The exclusive redemption claim. The poll window paces polls, not this: a
    * redemption slower than the window leaves the record readable by the next
@@ -559,6 +769,7 @@ describe("given a CLI starting a device login", () => {
       world.store.keys().filter((key) => key.includes("claim:"));
 
     describe("when the redemption succeeds", () => {
+      /** @scenario A successful exchange keeps its claim until it expires on its own */
       it("leaves the claim standing, so a slower concurrent poll cannot redeem it again", async () => {
         const world = deviceFlowWorld();
         const api = mount(world);
@@ -582,6 +793,7 @@ describe("given a CLI starting a device login", () => {
     });
 
     describe("when the redemption bought nothing", () => {
+      /** @scenario A refused exchange releases the claim so the CLI can retry */
       it("gives the claim back, so the CLI's next poll is not told to slow down", async () => {
         const world = deviceFlowWorld();
         const api = mount(world);
@@ -894,6 +1106,8 @@ function deviceFlowWorld(
       permissions: string[];
     };
     signedIn?: boolean;
+    /** What the governance flag answers; enabled when unset. */
+    governanceFlag?: () => Promise<boolean>;
     publicBaseUrl?: string | undefined;
   } = {},
 ) {
@@ -1026,7 +1240,8 @@ function deviceFlowWorld(
         },
       }),
     canManageProject: () => Promise.resolve(world.administersProject),
-    featureFlags: () => ({ isEnabled: () => Promise.resolve(true) }) as never,
+    featureFlags: () =>
+      ({ isEnabled: overrides.governanceFlag ?? (() => Promise.resolve(true)) }) as never,
     publicBaseUrl: () =>
       "publicBaseUrl" in overrides ? overrides.publicBaseUrl : "https://app.test",
   };

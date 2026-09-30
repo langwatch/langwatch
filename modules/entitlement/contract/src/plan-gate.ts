@@ -10,7 +10,8 @@ export function assertEnterprisePlanType({
   errorMessage: string;
 }): void {
   if (!isEnterpriseTier(planType)) {
-    throw new EnterprisePlanRequiredError(errorMessage);
+    // Main answered these tRPC gates FORBIDDEN; REST and setup gates answer 402.
+    throw new EnterprisePlanRequiredError(errorMessage, 403);
   }
 }
 

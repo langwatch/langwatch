@@ -1,3 +1,5 @@
+# The runner freezes Date.now(), so the list's default window ends before a note made mid-run;
+# the address names an absolute range, which main's period selector reads too.
 # Annotations beyond the trace drawer flows in observability.yaml: an annotation posted over REST shows in
 # the annotations list, score metrics in settings, and editing a queue. Every step uses selectors main and
 # the branch share (form labels, button words, aria labels, a table row's text). Unrun.
@@ -15,7 +17,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/annotations/all
+          path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
       - action: expect
         with:
           text: "{noteText}"
@@ -26,7 +28,7 @@ flows:
           contains: '"isThumbsUp":true'
       - action: go
         with:
-          path: /{slug}/annotations/all
+          path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
       - action: expect
         with:
           text: "{noteText}"
@@ -160,7 +162,7 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -169,7 +171,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -341,7 +343,7 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -350,7 +352,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -398,7 +400,7 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/
@@ -407,7 +409,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: button[aria-pressed]
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
       - action: click
         with:
           label: /^Description/

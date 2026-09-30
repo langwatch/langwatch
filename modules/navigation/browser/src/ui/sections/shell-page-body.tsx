@@ -7,7 +7,6 @@ import {
   Alert,
   Box,
   Button,
-  Container,
   HStack,
   Spacer,
   type StackProps,
@@ -84,9 +83,15 @@ function readerMayOpenThePage({
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
 
 /** Form pages read at main's Profile measure; tables and lists keep the wider one. */
-const FORM_PAGES = ["/settings", "/settings/profile", "/settings/security"];
+const FORM_PAGES = ["/settings", "/settings/profile", "/settings/security", "/settings/checkup"];
 const FORM_MEASURE = "820px";
 const TABLE_MEASURE = "1280px";
+
+/** Authentication's section rail takes the full width; forms read narrow, tables wide. */
+function measureOf(pathname: string): string {
+  if (isPathUnder({ pathname, base: "/settings/authentication" })) return "100%";
+  return FORM_PAGES.includes(pathname) ? FORM_MEASURE : TABLE_MEASURE;
+}
 
 /**
  * Settings pages are read at a measure, as main's SettingsLayout framed them;
@@ -98,23 +103,29 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
     isPathUnder({ pathname, base: "/settings" }) ||
     MEASURED_OPS_PAGES.some((item) => isPathUnder({ pathname, base: item.href }));
   if (!isMeasured) return <>{children}</>;
-  const isFullBleed = isPathUnder({ pathname, base: "/settings/authentication" });
-  const measure = FORM_PAGES.includes(pathname) ? FORM_MEASURE : TABLE_MEASURE;
+  const measure = measureOf(pathname);
   return (
-    <Container
-      maxWidth={isFullBleed ? "full" : measure}
-      padding={4}
-      paddingBottom={16}
-      height="full"
+    <Box
+      data-page-measure={measure}
+      flex={1}
       minHeight={0}
       overflowY="auto"
-      flex={1}
-      // The container already insets the page; a header inside it starts at
-      // the same edge as the body, so title, divider and content line up.
-      css={{ "& [data-page-header]": { paddingInline: 0 } }}
+      paddingBottom={16}
+      // The header spans the card like every page's and its title starts where
+      // every page's does; its actions and every block under it stop at the measure.
+      // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
+      css={{
+        "--page-end": `max(var(--chakra-spacing-6), calc(100% - ${measure} + var(--chakra-spacing-6)))`,
+        "& [data-page-header]": { paddingInlineEnd: "var(--page-end)" },
+        "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
+          width: "calc(100% - var(--chakra-spacing-6) - var(--page-end))",
+          marginInlineStart: "var(--chakra-spacing-6)",
+          marginInlineEnd: "var(--page-end)",
+        },
+      }}
     >
       {children}
-    </Container>
+    </Box>
   );
 }
 

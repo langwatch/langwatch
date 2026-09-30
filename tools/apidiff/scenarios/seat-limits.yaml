@@ -8,9 +8,14 @@
 # lite allowance under 50, and an organization already past its full seats refuses first as
 # members, so limitType is asserted present, not by value.
 
+# selfHosted: a fresh SaaS org is on the Free plan and this needs the Enterprise management API.
 - id: lim-invites-beyond-lite-seats-is-refused
+  selfHosted: true
   endpoint: POST /api/organization/invites
   auth: org
+  # An organization of its own, so no other scenario's members or invites are in the count.
+  shard: org
+  serial: true
   request:
     path: /api/organization/invites
     body:

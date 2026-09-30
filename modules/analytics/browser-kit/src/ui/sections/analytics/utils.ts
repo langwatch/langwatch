@@ -8,7 +8,7 @@ export const filterOutEmptyFilters = (
     return {} as Record<FilterField, FilterParam>;
   }
   return Object.fromEntries(
-    Object.entries(filters).filter(([_, f]) => {
+    Object.entries(filters).filter(([, f]) => {
       if (f == null) return false;
       if (typeof f === "string") return !!f;
       if (Array.isArray(f)) return f.length > 0;

@@ -323,6 +323,7 @@ flows:
             evaluatorType: langevals/exact_match
         as:
           evaluatorId: id
+          evaluatorName: name
     steps:
       - action: go
         with:
@@ -358,7 +359,7 @@ flows:
           timeout: "20000"
       - action: expect
         with:
-          text: 'vd-wfev-{uid}'
+          text: '{evaluatorName}'
       - action: drag
         with:
           fromSelector: '.react-flow__handle[data-nodeid="llm_call"][data-handleid="outputs.output"]'
@@ -667,3 +668,179 @@ flows:
           text: Export Workflow
           contains: '"llm_call"'
           filename: '/^workflow--vd-wfexp-.*\.json$/'
+
+  # Studio and dialog states the prod comparison could not judge. Labels are main's: the create
+  # dialog (NewWorkflowModal), the components rail (NodeSelectionPanel) and the properties panels.
+  # The loading state is too brief to hold an expect on; the canvas flow passes through it.
+  - id: workflow-create-dialog-offers-three-starts
+    title: New Workflow opens the create dialog with Blank, Custom Evaluator and From Export
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: expect
+        with:
+          text: Create new workflow
+      - action: expect
+        with:
+          testId: new-workflow-card-blank
+          hasText: Blank
+      - action: expect
+        with:
+          testId: new-workflow-card-custom_evaluator
+          hasText: Custom Evaluator
+      - action: expect
+        with:
+          testId: new-workflow-card-import
+          hasText: From Export
+
+  - id: workflow-studio-canvas-and-components-rail
+    title: A new blank workflow opens its canvas with entry, LLM and end nodes and the components rail
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfcanvas-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="end"]
+      - action: expect
+        with:
+          url: /studio/
+      - action: expect
+        with:
+          text: /^Components$/
+      - action: expect
+        with:
+          text: /^Prompt$/
+      - action: expect
+        with:
+          text: /^Code$/
+      - action: expect
+        with:
+          text: /^HTTP Call$/
+      - action: expect
+        with:
+          text: /^If\/Else$/
+      - action: expect
+        with:
+          text: /^Agent$/
+      - action: expect
+        with:
+          text: /^Evaluator$/
+
+  - id: workflow-studio-entry-node-panel
+    title: Select the entry node and read its properties panel, inputs, dataset and Go to end node
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfentry-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: click
+        with:
+          selector: .react-flow__node[data-id="entry"]
+      - action: expect
+        with:
+          text: /^Entry point$/
+          min: "2"
+      - action: expect
+        with:
+          text: Workflow Outputs
+      - action: expect
+        with:
+          text: Go to end node
+      - action: expect
+        with:
+          testId: attach-dataset-button
+
+  - id: workflow-studio-http-node-panel
+    title: Drop an HTTP Call node, open its properties and read the Body, Auth, Headers and Test tabs
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfhttp-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: drag
+        with:
+          fromSelector: xpath=//*[@draggable="true"][.//text()[normalize-space()="HTTP Call"]]
+          toSelector: .react-flow__pane
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "4"
+          timeout: "20000"
+      - action: click
+        with:
+          selector: '.react-flow__node:has-text("HTTP Call")'
+      - action: expect
+        with:
+          text: Request Body Template
+          timeout: "15000"
+      - action: expect
+        with:
+          text: /^Body$/
+      - action: expect
+        with:
+          text: /^Auth$/
+      - action: expect
+        with:
+          text: /^Headers$/
+      - action: expect
+        with:
+          text: /^Test$/

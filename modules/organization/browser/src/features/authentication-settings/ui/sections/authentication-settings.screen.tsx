@@ -40,14 +40,19 @@ export default function AuthenticationSettingsScreen() {
   }
 
   return (
-    <SectionNavigationFrame
-      label="Authentication"
-      links={AUTHENTICATION_LINKS}
-      activeHref="/settings/authentication"
-      onNavigate={(href) => host.navigate(href)}
-    >
-      <AuthenticationSettings host={host} organizationId={organizationId} />
-    </SectionNavigationFrame>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Authentication</PageLayout.Heading>
+      </PageLayout.Header>
+      <SectionNavigationFrame
+        label="Authentication"
+        links={AUTHENTICATION_LINKS}
+        activeHref="/settings/authentication"
+        onNavigate={(href) => host.navigate(href)}
+      >
+        <AuthenticationSettings host={host} organizationId={organizationId} />
+      </SectionNavigationFrame>
+    </>
   );
 }
 
@@ -63,50 +68,45 @@ export function AuthenticationSettings({
   const organizationName = host.organization()?.name;
 
   return (
-    <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Authentication</PageLayout.Heading>
-      </PageLayout.Header>
-      <VStack align="stretch" gap={5} width="full" paddingTop={4}>
-        <Text color="fg.muted">
-          {organizationName
-            ? `Manage sign-in, provisioning, and security policies for ${organizationName}.`
-            : "Manage sign-in, provisioning, and security policies for your organization."}
-        </Text>
+    <VStack align="stretch" gap={5} width="full" paddingTop={4}>
+      <Text color="fg.muted">
+        {organizationName
+          ? `Manage sign-in, provisioning, and security policies for ${organizationName}.`
+          : "Manage sign-in, provisioning, and security policies for your organization."}
+      </Text>
 
-        {cards.length > 0 && (
-          <VStack align="stretch" gap={4} width="full">
-            <VStack align="stretch" gap={1}>
-              <Heading size="sm">Sign-in and provisioning</Heading>
-              <Text color="fg.muted" fontSize="sm">
-                Connect your identity provider for single sign-on and directory sync.
-              </Text>
-            </VStack>
-            <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4} width="full">
-              {cards.map(({ key, Card }) => (
-                <Suspense key={key} fallback={<Skeleton height="220px" width="full" />}>
-                  <Card organizationId={organizationId} canReadMembership={canReadMembership} />
-                </Suspense>
-              ))}
-            </SimpleGrid>
-          </VStack>
-        )}
-
-        <VStack align="stretch" gap={4} paddingTop={2}>
+      {cards.length > 0 && (
+        <VStack align="stretch" gap={4} width="full">
           <VStack align="stretch" gap={1}>
-            <Heading size="sm">Organization policies</Heading>
+            <Heading size="sm">Sign-in and provisioning</Heading>
             <Text color="fg.muted" fontSize="sm">
-              Manage who can join and how accounts stay secure. These policies also apply when your
-              organization uses password sign-in.
+              Connect your identity provider for single sign-on and directory sync.
             </Text>
           </VStack>
-          <OrganizationPolicyCard
-            host={host}
-            organizationId={organizationId}
-            canManage={canReadMembership}
-          />
+          <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4} width="full">
+            {cards.map(({ key, Card }) => (
+              <Suspense key={key} fallback={<Skeleton height="220px" width="full" />}>
+                <Card organizationId={organizationId} canReadMembership={canReadMembership} />
+              </Suspense>
+            ))}
+          </SimpleGrid>
         </VStack>
+      )}
+
+      <VStack align="stretch" gap={4} paddingTop={2}>
+        <VStack align="stretch" gap={1}>
+          <Heading size="sm">Organization policies</Heading>
+          <Text color="fg.muted" fontSize="sm">
+            Manage who can join and how accounts stay secure. These policies also apply when your
+            organization uses password sign-in.
+          </Text>
+        </VStack>
+        <OrganizationPolicyCard
+          host={host}
+          organizationId={organizationId}
+          canManage={canReadMembership}
+        />
       </VStack>
-    </>
+    </VStack>
   );
 }

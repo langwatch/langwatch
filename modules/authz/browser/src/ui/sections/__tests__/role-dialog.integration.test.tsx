@@ -2,7 +2,6 @@
  * @vitest-environment jsdom
  *
  * Writing a role, with the answer on screen while you write it (main's RoleDialog suite).
- *
  * Spec: specs/identity/org-access-cluster.feature
  */
 import { cleanup, screen, within } from "@testing-library/react";

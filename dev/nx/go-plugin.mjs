@@ -79,7 +79,8 @@ export const createDependencies = (_options, context) => {
   const edges = [];
   for (const [project, files] of Object.entries(context.fileMap.projectFileMap)) {
     const isModule = modules.some((module) => module.project === project);
-    if (!isModule && !context.projects[project]?.tags?.includes("go")) continue;
+    const tags = context.projects[project]?.tags;
+    if (!isModule && !tags?.includes("go")) continue;
     for (const { file } of files) {
       const read = isModule
         ? basename(file) === "go.mod"

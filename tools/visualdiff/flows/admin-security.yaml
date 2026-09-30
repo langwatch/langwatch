@@ -2,53 +2,9 @@
 # content with expect and, where the page saves something, changes one field, saves, reloads
 # and expects the saved value. Most of these pages carry no data-testid on the branch; steps
 # use role, label, placeholder or text, and the missing ids are listed in the lane handoff.
+# Deferred: needs cloud-ops. ops-licenses, ops-subscriptions and ops-cloud-bug-reports-and-installs
+# need LANGWATCH_CLOUD_OPS and a licence key the check stack lacks (/ops/backoffice/**).
 flows:
-  - id: ops-licenses
-    title: Ops licence registry lists its table, search and issue form
-    steps:
-      - action: go
-        with:
-          path: /ops/backoffice/licenses
-      - action: expect
-        with:
-          text: Licenses
-      - action: expect
-        with:
-          text: New license
-      - action: type
-        with:
-          placeholder: Search by customer, email or license id
-          text: zz-no-such-customer-{uid}
-      - action: expect
-        with:
-          text: zz-no-such-customer-{uid}
-          equals: "0"
-      - action: click
-        with:
-          text: New license
-      - action: expect
-        with:
-          text: Contact email
-
-  - id: ops-subscriptions
-    title: Ops subscriptions list shows its columns and opens the new subscription form
-    steps:
-      - action: go
-        with:
-          path: /ops/backoffice/subscriptions
-      - action: expect
-        with:
-          text: Subscriptions
-      - action: expect
-        with:
-          text: Stripe ID
-      - action: click
-        with:
-          text: New subscription
-      - action: expect
-        with:
-          text: Start date
-
   - id: settings-audit-log
     title: Audit log lists entries and narrows by action
     steps:
@@ -388,25 +344,6 @@ flows:
       - action: expect
         with:
           text: The Foundry
-
-  - id: ops-cloud-bug-reports-and-installs
-    title: The bug reports list and the self-hosted installs list draw their title and columns
-    steps:
-      - action: go
-        with:
-          path: /ops/backoffice/bug-reports
-      - action: expect
-        with:
-          text: Bug Reports
-      - action: expect
-        with:
-          text: Received
-      - action: go
-        with:
-          path: /ops/backoffice/self-hosted-instances
-      - action: expect
-        with:
-          text: Self-hosted installs
 
   - id: settings-email-suppressions
     title: Email suppressions lists who unsubscribed, or says there are none

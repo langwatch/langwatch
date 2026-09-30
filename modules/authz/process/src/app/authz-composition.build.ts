@@ -25,6 +25,8 @@ import type { AuthzGrantWriteDatabase } from "../repositories/eventing/eventing.
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
+import { AuthzMemoryStore } from "../repositories/memory/authz-memory.store.ts";
+import { MemoryAuthzSessionVersionRepository } from "../repositories/memory/memory.authz-session-version.repository.ts";
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import {
@@ -49,12 +51,14 @@ import {
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
 import type { AuthzEpochRedis } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import { RedisAuthzEpochRepository } from "../repositories/redis/redis.authz-epoch.repository.ts";
+import { RedisAuthzSessionVersionRepository } from "../repositories/redis/redis.authz-session-version.repository.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import type {
   AuthzGrantsCommandDispatcher,
   AuthzGrantsCommandSenders,
 } from "../services/authz-grants-command-dispatcher.service.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
+import { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import { AuthzService, type AuthzServiceOptions } from "../services/authz.service.ts";
 
 /**
@@ -97,6 +101,7 @@ export type AuthzPipeline = AuthzGrantPipeline;
 export type PostgresAuthzBuild = Readonly<{
   authz: AuthzServiceContract;
   grants: AuthzGrantsServiceContract;
+  sessionVersions: AuthzSessionVersionService;
   pipeline: AuthzPipeline;
   migration: SystemMigration;
 }>;
@@ -242,11 +247,21 @@ export class PostgresAuthzAdapter {
       newBindingId: this.options.newBindingId,
       ledger,
       bindings: bindingRepository,
+      permissions: authz,
+    });
+
+    const { redis } = this.options;
+    const sessionVersions = AuthzSessionVersionService.create({
+      versions: redis
+        ? RedisAuthzSessionVersionRepository.create({ redis })
+        : MemoryAuthzSessionVersionRepository.create({ memory: AuthzMemoryStore.create() }),
+      bindings: bindingRepository,
     });
 
     const pipeline = EventingAuthzAdapter.build({
       authzGrantsWriteStore: PrismaAuthzProjectionRepository.create(database),
       authzAuditTrailStore: PrismaAuthzAuditRepository.create(database),
+      sessionVersions,
     });
     const migration = LegacyImportAuthzGrantMigration.create({
       store: PrismaAuthzMigrationRepository.create(database),
@@ -254,7 +269,7 @@ export class PostgresAuthzAdapter {
       now: this.options.now ?? Date.now,
     });
 
-    return { authz, grants, pipeline, migration };
+    return { authz, grants, sessionVersions, pipeline, migration };
   }
 }
 

@@ -87,7 +87,7 @@ export const userTrpc = defineTrpcContract("user")
 
   // Whether to render admin-only surfaces. NOT an authorization gate: every
   // operator route asks the same question again on the server.
-  .query("isAdmin")
+  .query("isAdmin", { cache: { tier: "session" } })
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiIsAdminSchema)
 

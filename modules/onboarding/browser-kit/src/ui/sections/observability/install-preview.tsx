@@ -22,7 +22,7 @@ export function InstallPreview({ install }: InstallPreviewProps): React.ReactEle
   const tabItems: { key: string; title: string; code: string }[] = [];
 
   if (install) {
-    Object.entries(install).forEach(([_, value]) => {
+    Object.values(install).forEach((value) => {
       Object.entries(value as Record<string, string>).forEach(([key, val]) => {
         tabItems.push({ key: key, title: key, code: val });
       });

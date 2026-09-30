@@ -38,6 +38,7 @@ export const annotationWeb = defineWebModule("annotation")
       path: "/:project/annotations",
       within: "project",
       label: "Annotations",
+      requires: "annotations:view",
       load: annotationList("inbox"),
     },
     "pages/[project]/annotations/all": {
@@ -67,6 +68,7 @@ export const annotationWeb = defineWebModule("annotation")
       path: "/settings/annotation-scores",
       within: "settings",
       label: "Annotation Scores",
+      requires: "annotations:view",
       load: () => import("./ui/sections/annotation-scores-screen.tsx"),
     },
   })

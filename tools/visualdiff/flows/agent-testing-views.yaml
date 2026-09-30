@@ -1,0 +1,311 @@
+# Agent Testing views the prod comparison could not judge: the scenario edit drawer's header
+# controls and Caller voice chip, its recent-run menu, results grouped by scenario, and a run's
+# settings block and grid view. Labels and test ids are main's (CaseModalParts, RecentRunsMenu,
+# GroupByTabs, RunPlanDetailHeader, ViewModeToggle). Runs point at an address that need not answer.
+flows:
+  - id: sim-scenario-edit-drawer-header-and-caller-voice
+    title: Open a scenario for edit and find the recent-run and history controls, then add the Caller voice block from its chip
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: agent-testing-rail-new-suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+          timeout: "30000"
+      - action: click
+        with:
+          label: Actions for vd-scenario-{uid}
+      - action: click
+        with:
+          text: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          testId: recent-runs-trigger
+          hasText: Open recent run
+      - action: expect
+        with:
+          testId: case-modal-history
+      - action: click
+        with:
+          text: /^Caller voice$/
+      - action: expect
+        with:
+          testId: case-caller-voice-block
+
+  - id: sim-scenario-edit-drawer-recent-run-menu
+    title: Run a scenario, reopen it for edit and open its recent-run menu
+    setup:
+      - post: /api/agents
+        body:
+          name: vd-agent-{uid}
+          type: http
+          config:
+            url: https://example.com/vd-agent-{uid}
+            method: POST
+        as:
+          agentName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: agent-testing-rail-new-suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+          timeout: "30000"
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          text: 1 scenario
+      - action: wait
+        with:
+          millis: "6000"
+      - action: click
+        with:
+          text: Run suite
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: '{agentName}'
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-suite-run-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: expect
+        with:
+          text: vd-suite-run-{uid}
+          timeout: "30000"
+      - action: click
+        with:
+          text: vd-suite-run-{uid}
+      - action: expect
+        with:
+          testIdPrefix: run-result-row-
+          min: "1"
+          timeout: "120000"
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: click
+        with:
+          label: Actions for vd-scenario-{uid}
+      - action: click
+        with:
+          text: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          count: 'button[data-testid="recent-runs-trigger"]:not([disabled])'
+          timeout: "90000"
+      - action: click
+        with:
+          testId: recent-runs-trigger
+      - action: expect
+        with:
+          testId: recent-runs-list
+
+  - id: sim-results-by-scenario-run-settings-and-grid
+    title: Group results by scenario and expand a group, then open a run's settings block and switch it to the grid view
+    setup:
+      - post: /api/agents
+        body:
+          name: vd-agent-{uid}
+          type: http
+          config:
+            url: https://example.com/vd-agent-{uid}
+            method: POST
+        as:
+          agentName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: agent-testing-rail-new-suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+          timeout: "30000"
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          text: 1 scenario
+      - action: wait
+        with:
+          millis: "6000"
+      - action: click
+        with:
+          text: Run suite
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: '{agentName}'
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-suite-run-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: expect
+        with:
+          testId: results-group-by
+          hasText: Scenario
+          timeout: "30000"
+      - action: click
+        with:
+          selector: '[data-testid="results-group-by"] [data-part="item"]'
+          hasText: /^Scenario$/
+      - action: expect
+        with:
+          testIdPrefix: results-group-row-
+          min: "1"
+          timeout: "90000"
+      - action: expect
+        with:
+          text: vd-scenario-{uid}
+          timeout: "60000"
+      - action: click
+        with:
+          testIdPrefix: results-group-row-
+      - action: expect
+        with:
+          testIdPrefix: results-group-expanded-
+          min: "1"
+      - action: click
+        with:
+          selector: '[data-testid="results-group-by"] [data-part="item"]'
+          hasText: /^Run plan$/
+      - action: click
+        with:
+          text: vd-suite-run-{uid}
+      - action: expect
+        with:
+          testId: agent-testing-run-plan-detail
+      - action: expect
+        with:
+          testIdPrefix: run-result-row-
+          min: "1"
+          timeout: "60000"
+      - action: click
+        with:
+          testId: run-settings-toggle
+      - action: expect
+        with:
+          testId: run-settings-block
+      - action: expect
+        with:
+          testId: run-settings-started
+      - action: expect
+        with:
+          testId: run-settings-repeat
+      - action: expect
+        with:
+          testId: run-settings-judge
+      - action: click
+        with:
+          label: Grid, watch the conversations
+      - action: expect
+        with:
+          testIdPrefix: run-result-row-
+          equals: "0"
+      - action: expect
+        with:
+          text: vd-scenario-{uid}

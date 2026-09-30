@@ -297,6 +297,7 @@ describe("HostedServicesService.setBudget", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
+  /** @scenario A customer lowers its own cap */
   it("moves the cap to the cent and answers the maximum it may reach", async () => {
     const { service, caps } = harness({});
 

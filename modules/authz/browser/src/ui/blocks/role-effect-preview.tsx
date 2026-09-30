@@ -36,7 +36,7 @@ export function RoleEffectPreview({
   const scopeType: ScopeTriadType = previewScope[0]?.scopeType ?? "ORGANIZATION";
 
   const { inForce, inert } = useMemo(() => {
-    const sorted = [...permissions].sort();
+    const sorted = [...permissions].toSorted();
     return {
       inForce: sorted.filter((permission) => permissionTakesEffectAt({ permission, scopeType })),
       inert: sorted.filter((permission) => !permissionTakesEffectAt({ permission, scopeType })),

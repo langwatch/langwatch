@@ -250,6 +250,66 @@ function contractCases(backend: Backend): void {
       ).resolves.toHaveLength(1);
     });
   });
+
+  describe("when a rule is merged", () => {
+    /** @scenario "The memory and Postgres privacy rule repositories answer alike" */
+    it("hands the merge nothing and writes what it answers when no rule is stored", async () => {
+      const repository = backend.repository();
+      const seen: (DataPrivacyConfig | undefined)[] = [];
+
+      const written = await repository.mergeConfigForScope({
+        organizationId: acme(),
+        scope: project(),
+        personalOnly: false,
+        merge: (config) => {
+          seen.push(config);
+          return DROP_INPUT;
+        },
+      });
+
+      expect(seen).toEqual([undefined]);
+      expect(written).toMatchObject({ organizationId: acme(), ...project(), config: DROP_INPUT });
+    });
+
+    it("hands the merge the stored config and replaces it with the answer", async () => {
+      const repository = backend.repository();
+      await repository.upsertForScope({
+        organizationId: acme(),
+        scope: project(),
+        personalOnly: false,
+        config: DROP_INPUT,
+      });
+
+      await repository.mergeConfigForScope({
+        organizationId: acme(),
+        scope: project(),
+        personalOnly: false,
+        merge: (config) => ({ ...config, pii: { level: "strict" } }),
+      });
+
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual([
+        expect.objectContaining({ config: { ...DROP_INPUT, pii: { level: "strict" } } }),
+      ]);
+    });
+
+    it("writes nothing when the merge throws", async () => {
+      const repository = backend.repository();
+
+      await expect(
+        repository.mergeConfigForScope({
+          organizationId: acme(),
+          scope: project(),
+          personalOnly: false,
+          merge: () => {
+            throw new Error("refused");
+          },
+        }),
+      ).rejects.toThrow("refused");
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual(
+        [],
+      );
+    });
+  });
 }
 
 describe("given the memory data privacy repository", () => {

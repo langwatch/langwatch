@@ -209,13 +209,26 @@ export class PrismaDashboardRepository
   }
 
   async updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void> {
+    // Writes only the rows whose position moved: a swap in a long list is two updates, not one
+    // per dashboard, which kept a large project's reorder inside the transaction's time limit.
     await this.transaction(async (transaction) => {
-      for (const [order, dashboardId] of input.dashboardIds.entries()) {
-        await transaction.dashboard.update({
-          where: { id: dashboardId, projectId: input.projectId },
-          data: { order },
-        });
-      }
+      const current = await transaction.dashboard.findMany({
+        where: { id: { in: input.dashboardIds }, projectId: input.projectId },
+        select: { id: true, order: true },
+      });
+      const orderById = new Map(current.map((row) => [row.id, row.order]));
+      await Promise.all(
+        input.dashboardIds.flatMap((dashboardId, order) =>
+          orderById.get(dashboardId) === order
+            ? []
+            : [
+                transaction.dashboard.update({
+                  where: { id: dashboardId, projectId: input.projectId },
+                  data: { order },
+                }),
+              ],
+        ),
+      );
     });
   }
 

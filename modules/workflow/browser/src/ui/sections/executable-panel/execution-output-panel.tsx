@@ -210,7 +210,7 @@ const renderExecutionOutputs = (executionState: ExecutionState, nodeType?: strin
   }
 
   return Object.entries(executionState.outputs)
-    .filter(([_, value]) => value !== null)
+    .filter(([, value]) => value !== null)
     .map(([identifier, value]) => {
       const isFail =
         (nodeType === "evaluator" && identifier === "passed" && value === false) ||

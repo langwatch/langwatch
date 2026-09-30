@@ -3,7 +3,7 @@
 //
 // Usage: devscripts [-cpuprofile file] [-memprofile file] <subcommand> [args]
 //
-// The behaviour lives in tools/devscripts; this is only the process shell.
+// The subcommands live in tools/devscripts; this is only the process shell.
 package main
 
 import (

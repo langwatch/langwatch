@@ -96,6 +96,81 @@ describe("platform health REST family", () => {
     expect(checkAll).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
   });
 
+  /** @scenario "A request with the wrong key runs no probe" */
+  it("refuses a key that is not this deployment's before running a probe", async () => {
+    const checkAll = vi.fn(async () => healthyReport);
+    const hono = mount(
+      createApiFixture<PlatformHealthCapability>({
+        acceptsKey: (key) => key === "monitor-key",
+        checkAll,
+      }),
+    );
+
+    const response = await hono.request("/api/v1/platform-health", {
+      headers: { authorization: "Bearer not-the-key" },
+    });
+
+    expect(response.status).toBe(401);
+    expect(checkAll).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Each subsystem is reachable on its own path" */
+  it("probes only the subsystem the path names and answers with it", async () => {
+    const checkAll = vi.fn(async () => healthyReport);
+    const checkOne = vi.fn(async () => healthyReport);
+    const hono = mount(
+      createApiFixture<PlatformHealthCapability>({
+        acceptsKey: () => true,
+        checkAll,
+        checkOne,
+      }),
+    );
+
+    const response = await hono.request("/api/v1/platform-health/collector", {
+      headers: { authorization: "Bearer monitor-key" },
+    });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).checks[0].name).toBe("collector");
+    expect(checkOne).toHaveBeenCalledWith("collector", expect.objectContaining({}));
+    expect(checkAll).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A subsystem this platform does not have is not found" */
+  it("answers 404 for a subsystem name the platform does not have", async () => {
+    const checkOne = vi.fn(async () => healthyReport);
+    const hono = mount(
+      createApiFixture<PlatformHealthCapability>({ acceptsKey: () => true, checkOne }),
+    );
+
+    const response = await hono.request("/api/v1/platform-health/nonexistent", {
+      headers: { authorization: "Bearer monitor-key" },
+    });
+
+    expect(response.status).toBe(404);
+    expect(checkOne).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "One broken subsystem makes the whole answer a failure" */
+  it("answers 503 when the report says the platform is unhealthy", async () => {
+    const hono = mount(
+      createApiFixture<PlatformHealthCapability>({
+        acceptsKey: () => true,
+        checkAll: async () => ({
+          ...healthyReport,
+          status: "unhealthy" as const,
+          checks: [{ name: "collector" as const, status: "unhealthy" as const, durationMs: 4 }],
+        }),
+      }),
+    );
+
+    const response = await hono.request("/api/v1/platform-health", {
+      headers: { authorization: "Bearer monitor-key" },
+    });
+
+    expect(response.status).toBe(503);
+  });
+
   it.each(["/api/health/langy", "/api/health/scenarios"])(
     "does not revive retired tenant canary route %s",
     async (path) => {

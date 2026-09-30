@@ -46,3 +46,15 @@ Feature: An evaluation run folds and executes deterministically
     Given a run that has already been folded from its started event
     When its completed event is folded
     Then the run's status, score and pass state reflect the completion
+
+  @unit
+  Scenario: A tenant kept indefinitely is stamped with the indefinite sentinel, not refused
+    Given a tenant whose retention policy resolves to 0, meaning keep forever
+    When the evaluation run and analytics rows are written
+    Then each write accepts the 0 retention and stamps it on the row
+
+  @unit
+  Scenario: A negative or fractional retention is refused by name
+    Given a write carrying a retention that is negative or not a whole number of days
+    When it is validated
+    Then it is refused and nothing is written

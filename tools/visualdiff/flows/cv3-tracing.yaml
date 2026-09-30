@@ -1,0 +1,114 @@
+# CV3: trace share and CSV export over traces made in the flow's own setup, so no flow shares or
+# exports a seeded trace another flow also touches. Trace ids end in {uid}.
+flows:
+  - id: cv3-trace-share-made-over-api-opens-anonymously-then-revoked
+    title: Share a fresh trace over the API, read its link in the dialog, open it with no session, unshare and see it denied
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-cv3sh-{uid}
+          spans:
+            - type: llm
+              span_id: vd-cv3sh-span-{uid}
+              trace_id: vd-cv3sh-{uid}
+              name: vd-cv3sh-call
+              model: gpt-5
+              vendor: openai
+              input:
+                type: text
+                value: vd cv3 question {uid}
+              output:
+                type: text
+                value: vd cv3 answer {uid}
+              timestamps:
+                started_at: 1790723307541
+                finished_at: 1790723308041
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-cv3sh-{uid}
+          contains: vd cv3 answer {uid}
+          timeout: "60000"
+      - action: request
+        with:
+          path: /api/trace/vd-cv3sh-{uid}/share
+          body: "{}"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-cv3sh-{uid}
+      - action: click
+        with:
+          label: Share trace
+      - action: capture
+        with:
+          selector: 'p:has-text("/share/")'
+          as: shareToken
+          match: /share/([A-Za-z0-9_-]+)
+      - action: go
+        with:
+          path: /share/{shareToken}
+          anonymous: "true"
+      - action: expect
+        with:
+          text: vd cv3 answer {uid}
+          anonymous: "true"
+          timeout: "20000"
+      - action: request
+        with:
+          path: /api/trace/vd-cv3sh-{uid}/unshare
+          body: "{}"
+      - action: go
+        with:
+          path: /share/{shareToken}
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Create a free account
+          anonymous: "true"
+
+  - id: cv3-trace-export-csv-carries-a-fresh-trace
+    title: Export the traces list as CSV after sending a new trace and find its id in the downloaded file
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-cv3csv-{uid}
+          spans:
+            - type: llm
+              span_id: vd-cv3csv-span-{uid}
+              trace_id: vd-cv3csv-{uid}
+              name: vd-cv3csv-call
+              model: gpt-5
+              vendor: openai
+              input:
+                type: text
+                value: vd cv3 csv question {uid}
+              output:
+                type: text
+                value: vd cv3 csv answer {uid}
+              timestamps:
+                started_at: 1790723307541
+                finished_at: 1790723308041
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-cv3csv-{uid}
+          contains: vd cv3 csv answer {uid}
+          timeout: "60000"
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          count: tbody[data-trace-id="vd-cv3csv-{uid}"]
+          timeout: "30000"
+      - action: click
+        with:
+          label: Export traces
+      - action: expect
+        with:
+          text: Export Traces
+      - action: download
+        with:
+          selector: 'button:text-is("Export")'
+          contains: vd-cv3csv-{uid}
+          filename: '/\.csv$/'

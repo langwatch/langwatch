@@ -5,7 +5,7 @@ import { createTenantId, EventUtils } from "@langwatch/eventing";
 import type { FindOrCreateWorkflowExperimentInput } from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type {
@@ -154,7 +154,7 @@ function buildService(
   overrides: {
     workflows?: Record<string, FakeWorkflow>;
     rowBound?: number;
-    /** A worker that never folds the request, so the api's wait for it runs out. */
+    /** A worker that has not folded the request by the time the api answers. */
     workerIdle?: boolean;
   } = {},
 ) {
@@ -307,7 +307,7 @@ describe("WorkflowEvaluationService.request", () => {
     });
 
     /** @scenario The evaluation runs on the worker under the run id it answered with */
-    it("sends it under the same id, and answers once the poller reads it running", async () => {
+    it("sends it under the same id, which the poller reads running once folded", async () => {
       const { service, sent, folds } = buildService();
 
       const started = await service.request(baseInput);
@@ -328,21 +328,24 @@ describe("WorkflowEvaluationService.request", () => {
     });
   });
 
-  describe("given a worker that does not fold the request in time", () => {
-    /** @scenario "A requested evaluation the worker does not register in time is refused as unavailable" */
-    it("refuses with service_unavailable once the bounded wait runs out", async () => {
-      vi.useFakeTimers();
-      try {
-        const { service, sent } = buildService({ workerIdle: true });
+  describe("given a worker that has not folded the request yet", () => {
+    /** @scenario "A requested evaluation answers as soon as its request command is written" */
+    it("answers at once with the run's start recorded for the poller", async () => {
+      const { service, sent, folds } = buildService({ workerIdle: true });
 
-        const answered = service.request(baseInput).catch((error: unknown) => error);
-        await vi.advanceTimersByTimeAsync(5_000);
+      const started = await service.request(baseInput);
 
-        expect(await answered).toMatchObject({ code: "service_unavailable", httpStatus: 503 });
-        expect(sent).toHaveLength(1);
-      } finally {
-        vi.useRealTimers();
-      }
+      expect(sent).toHaveLength(1);
+      expect((await folds.readRunProgress({ runId: started.runId })).kind).toBe("empty");
+      expect(await folds.findRunStart({ runId: started.runId })).toEqual([
+        {
+          projectId: PROJECT_ID,
+          runId: started.runId,
+          experimentId: "experiment_1",
+          total: 3,
+          startedAt: expect.any(Number),
+        },
+      ]);
     });
   });
 

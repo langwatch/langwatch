@@ -1,9 +1,11 @@
 # Agent testing across agent kinds: run a scenario against a code and a workflow agent, a
-# suite of several scenarios, and the AI-drafted scenario. Handles are main's own (run dialog,
+# suite of several scenarios. Handles are main's own (run dialog,
 # case rows, verdict panel). Tunnel agents are not scripted: the devTunnel marker is written by
 # `langwatch agent dev`, the UI cannot create one, and agents-dev-tunnel.yaml (apidiff) proves it.
 # The voice agent's run needs an ElevenLabs agent; agents.yaml proves its create and reload.
-# The AI draft runs against llmsim when the stack is up with +llm, else the seeded provider.
+# Deferred: sim-scenario-ai-draft-saves needs release_ui_agent_testing_v2_enabled off. The AI draft
+# lives on the scenario library, which main redirects to Agent Testing while the flag the check
+# stack forces on is set; Agent Testing's case modal has no AI draft on either side.
 flows:
   - id: sim-run-scenario-code-agent
     title: Create a code agent, run one scenario against it and read its verdict
@@ -310,45 +312,3 @@ flows:
         with:
           testId: run-verdict-panel
           timeout: "240000"
-
-  - id: sim-scenario-ai-draft-saves
-    title: Draft a scenario with AI from the library, save it and find it after a reload
-    steps:
-      - action: go
-        with:
-          path: /{slug}/simulations/scenarios
-      - action: click
-        with:
-          text: New Scenario
-      - action: expect
-        with:
-          text: Create new scenario
-      - action: type
-        with:
-          placeholder: Explain your agent, its goals and what behavior you want to test.
-          text: vd-{uid} a refund desk agent. Test an angry customer who was charged twice.
-      - action: click
-        with:
-          text: /^\s*Draft with AI\s*$/
-      - action: expect
-        with:
-          text: Save and Run
-          timeout: "90000"
-      - action: click
-        with:
-          text: Save and Run
-      - action: click
-        with:
-          text: Save without running
-      - action: expect
-        with:
-          text: Save and Run
-          equals: "0"
-          timeout: "30000"
-      - action: go
-        with:
-          path: /{slug}/simulations/scenarios
-      - action: expect
-        with:
-          api: /api/scenarios
-          min: "1"

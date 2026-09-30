@@ -1,6 +1,7 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
+import { cachePlanFor, unbatchedCachePaths } from "@langwatch/browser-host/cache-tiers";
 import type {
   UiDeployment,
   UiFeedback,
@@ -10,6 +11,7 @@ import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { applyFeatureFlagOverridesFromSearch } from "@langwatch/browser-host/feature-flag-overrides";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
+import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import {
   createUiFeatureApiClient,
   type UiFeatureApiBinding,
@@ -140,6 +142,7 @@ class BrowserUiShell extends UiShell {
     apis,
     drawers,
     transport,
+    sessionVersions,
     hosts,
     rootCapabilities,
   }: {
@@ -150,6 +153,7 @@ class BrowserUiShell extends UiShell {
     apis: readonly UiFeatureApiBinding[];
     drawers: UiDrawerRegistry;
     transport: UiFeatureApiTransport;
+    sessionVersions: SessionVersionWatch;
     hosts: readonly UiModuleHostMount[];
     rootCapabilities: UiRootCapabilities;
   }): BrowserUiShell {
@@ -164,6 +168,7 @@ class BrowserUiShell extends UiShell {
           apis,
           hosts,
           transport,
+          sessionVersions,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
           session: browserUiCapabilitiesHook(rootCapabilities),
@@ -234,9 +239,18 @@ class BrowserUiShell extends UiShell {
 export async function startUi(): Promise<void> {
   const served = readPublicAppConfig(document);
   const config = parseUiFeatureConfig(served);
+  // Session and reference reads travel unbatched, and every answer's session version
+  // reaches the watch the shell invalidates the session tier from (ADR-164).
+  const cachePlan = cachePlanFor({
+    contracts: webModules.flatMap((module) => module.installation.apiContracts ?? []),
+  });
+  const sessionVersions = SessionVersionWatch.create();
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
-  const transport = createUiFeatureApiClient();
+  const transport = createUiFeatureApiClient({
+    fetch: sessionVersionFetch({ watch: sessionVersions }),
+    unbatchedPaths: unbatchedCachePaths({ plan: cachePlan }),
+  });
   const rootCapabilities = await loadUiRootCapabilities();
   const installed = await createUi({ document, mount: "root" })
     .withModules(webModules)
@@ -255,6 +269,7 @@ export async function startUi(): Promise<void> {
       apis: installedModuleApis(installed.modules),
       drawers: installedModuleDrawers(installed.modules),
       transport,
+      sessionVersions,
       hosts: installedModuleHostMounts(installed.modules),
       rootCapabilities,
     }),

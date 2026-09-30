@@ -1,5 +1,6 @@
 import type {
   OrganizationRole,
+  PrincipalKind,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/authz-contract";
@@ -35,6 +36,12 @@ export type AuthzAssignableRoleRow = {
   permissions: unknown;
 };
 
+/** Who a grant was attached to, revoked or not. */
+export type AuthzGrantPrincipalRow = {
+  grantId: string;
+  principal: { type: PrincipalKind; id: string | null };
+};
+
 export type AuthzUserGroupRow = {
   groupId: string;
   group: {
@@ -66,6 +73,14 @@ export abstract class AuthzBindingRepository {
     organizationId: string;
     groupIds: readonly string[];
   }): Promise<{ groupId: string; userId: string }[]>;
+
+  abstract findOrganizationUserIds(input: { organizationId: string }): Promise<string[]>;
+
+  /** Revoked grants included: a revocation's subscriber needs whom it took access from. */
+  abstract findGrantPrincipals(input: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<AuthzGrantPrincipalRow[]>;
 
   abstract findUserGroups(input: {
     organizationId: string;

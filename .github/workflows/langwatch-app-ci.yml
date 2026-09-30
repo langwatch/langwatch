@@ -999,7 +999,17 @@ jobs:
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
           # A pull request runs the suites its change reaches; main runs all.
           PACKAGE_SUITES_ONLY: ${{ needs.affected.outputs.projects }}
-        run: node --experimental-strip-types .github/scripts/run-package-suites.ts
+          # The hook records what each cached suite reads outside its package (ADR-150).
+          TEST_READS_OUT: ${{ runner.temp }}/test-reads
+        run: |
+          export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require $GITHUB_WORKSPACE/dev/nx/test-reads-hook.cjs"
+          node --experimental-strip-types .github/scripts/run-package-suites.ts
+
+      # A read outside what the test cache key hashes replays a stale pass once that file
+      # changes; this names the `reads` row that closes it. Runs after a red suite too.
+      - name: Check suites declare what they read outside their package
+        if: ${{ !cancelled() }}
+        run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
 
   lint:
     needs: changes
@@ -1406,6 +1416,9 @@ jobs:
 
       - name: Test run-package-suites.ts
         run: node --test --experimental-strip-types .github/scripts/run-package-suites.test.ts
+
+      - name: Test check-test-reads.ts
+        run: node --test --experimental-strip-types .github/scripts/check-test-reads.test.ts
 
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh

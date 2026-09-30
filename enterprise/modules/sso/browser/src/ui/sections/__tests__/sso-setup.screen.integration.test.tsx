@@ -20,6 +20,7 @@ const { state } = vi.hoisted(() => ({
     breakGlassInvalidated: 0,
     grants: [] as unknown[],
     candidates: [] as unknown[],
+    polls: [] as ({ enabled?: boolean; refetchInterval?: number | false } | undefined)[],
   },
 }));
 
@@ -53,12 +54,18 @@ vi.mock("../../../behavior/sso-api.ts", () => {
       }),
       ssoSetup: {
         getSetup: {
-          useQuery: () => ({
-            data: state.view,
-            isLoading: state.isLoading,
-            isError: state.isError,
-            error: state.error,
-          }),
+          useQuery: (
+            _input: unknown,
+            options?: { enabled?: boolean; refetchInterval?: number | false },
+          ) => {
+            state.polls.push(options);
+            return {
+              data: state.view,
+              isLoading: state.isLoading,
+              isError: state.isError,
+              error: state.error,
+            };
+          },
         },
         getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
         getMigrationProgress: {
@@ -386,6 +393,35 @@ describe("the single sign-on setup page", () => {
         },
       ]);
       expect(state.invalidated).toBe(1);
+    });
+
+    /** @scenario "An accepted activation refreshes until the connection is shown as active" */
+    it("reads again while activation settles, refuses a second press, and stops once it is ACTIVE", () => {
+      const ready = {
+        domainProved: true,
+        testSignIn: { done: true },
+        breakGlass: { inPlace: true, liveCount: 1 },
+        arrivalsDecided: true,
+        ready: true,
+        activated: false,
+      };
+      state.view = setupView({ goLive: ready });
+      const { rerenderWithSsoHost } = renderWithSsoHost(<SsoSetupScreen />);
+
+      fireEvent.click(screen.getByTestId("connection-go-live-activate"));
+
+      expect(screen.getByRole("status").textContent).toContain("Activation accepted");
+      expect(screen.getByTestId("connection-go-live-activate")).toHaveProperty("disabled", true);
+      expect(state.polls.at(-1)).toEqual({ enabled: true, refetchInterval: 1_000 });
+
+      state.view = setupView({
+        connection: connectionView({ state: "ACTIVE" }),
+        goLive: { ...ready, activated: true },
+      });
+      rerenderWithSsoHost(<SsoSetupScreen />);
+
+      expect(state.polls.at(-1)).toEqual({ enabled: false, refetchInterval: false });
+      expect(screen.queryByText(/Activation accepted/)).toBeNull();
     });
 
     /** @scenario "Going live with all three preconditions met turns the connection on" */

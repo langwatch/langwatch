@@ -329,6 +329,7 @@ function legacySsoAccess(auth: AuthApi): SsoLegacyAccessRetirement {
 function joinMemberships(organizations: OrganizationApi): JoinMembership {
   return {
     isMember: (args) => organizations.isMember(args),
+    memberOrganizationIds: (args) => organizations.memberOrganizationIds(args),
     // The approving admin, or the policy that approved: the grant is audited to them.
     attachDefaultMembership: async ({ userId, organizationId, commandId, approvedByUserId }) => {
       await organizations.createMembership({
@@ -480,7 +481,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       users: setup.repositories.users,
       identity,
       isLatched,
-      clock: { now: () => Date.now(), newCommandId: newIdentityCommandId },
+      clock: { now: () => nowInstant().epochMilliseconds, newCommandId: newIdentityCommandId },
     });
     const newbornSweep = IdentityNewbornReconciliationService.create({
       newborns: setup.repositories.newborn,

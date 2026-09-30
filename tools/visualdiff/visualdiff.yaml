@@ -165,13 +165,17 @@ routes:
   - /governance/tool-catalog
   - /governance/users
   - /ops
-  - /ops/backoffice
-  - /ops/backoffice/bug-reports
-  - /ops/backoffice/organizations
-  - /ops/backoffice/projects
-  - /ops/backoffice/sso-connections
-  - /ops/backoffice/subscriptions
-  - /ops/backoffice/users
+  - /ops/cloud
+  - /ops/cloud/subscriptions
+  - /ops/cloud/licenses
+  - /ops/cloud/self-hosted-instances
+  - /ops/cloud/bug-reports
+  - /ops/users
+  - /ops/organizations
+  - /ops/projects
+  - /ops/sso-connections
+  - /ops/identity-lookup
+  - /ops/directory-sync
   - /ops/blobs
   - /ops/dejaview
   - /ops/event-sourcing
@@ -228,10 +232,6 @@ routes:
   - /settings/directory
   - /settings/profile
   - /settings/security
-  - /ops/backoffice/directory-sync
-  - /ops/backoffice/identity-lookup
-  - /ops/backoffice/licenses
-  - /ops/backoffice/self-hosted-instances
   - /auth/join
   - /auth/sso-test-complete
   - /authorize

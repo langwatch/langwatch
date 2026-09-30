@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   API_KEYS_AND_SECRETS_DETECTION,
@@ -9,6 +10,7 @@ import {
   evaluatorDisplayName,
   evaluatorSchema,
   evaluatorTypeSchema,
+  createEvaluatorInputSchema,
   getEvaluatorDefaultSettings,
   findEvaluatorDefinitions,
   isNativeEvaluatorType,
@@ -63,6 +65,17 @@ describe("evaluator contract", () => {
       embeddings_model: "provider/embed",
     });
   });
+
+  it.each(["lingua/language_detection", "langevals/exact_match"])(
+    "creates %s from its bare body with defaults the row can store as JSON",
+    (evaluatorType) => {
+      const body = { name: "vd", config: { evaluatorType } };
+      const defaults = getEvaluatorDefaultSettings(AVAILABLE_EVALUATORS[evaluatorType]);
+
+      expect(createEvaluatorInputSchema.validate(body)).toBe(true);
+      expect(z.json().validate({ ...body.config, settings: defaults })).toBe(true);
+    },
+  );
 
   /** @scenario "Evaluator vocabulary has one portable source" */
   it("keeps code evaluator defaults and display names in the portable vocabulary", () => {

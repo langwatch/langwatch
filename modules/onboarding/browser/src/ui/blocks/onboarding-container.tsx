@@ -1,18 +1,15 @@
-import { Box, Center, Container, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Box, IconButton } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Link } from "@langwatch/browser-host/link";
+import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { OnboardingMeshBackground } from "@langwatch/onboarding-browser-kit";
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
-import { FullLogo } from "../elements/icons/full-logo.tsx";
 import SpookyScarySkeleton from "../elements/spooky-scary-skeleton.tsx";
 
 const MotionBox = motion.create(Box);
-const MotionCenter = motion.create(Center);
-const MotionText = motion.create(Text);
 
 interface OnboardingContainerProps extends React.PropsWithChildren {
   /** The surface this chrome's events happened on, named by the flow above it. */
@@ -20,21 +17,15 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   loading?: boolean;
   title: string;
   subTitle?: string;
-  compressedHeader?: boolean;
   /** `guided` is the guided variant's card width, wide enough for any company name. */
   widthVariant?: "narrow" | "guided" | "full";
   showBackButton?: boolean;
   onBack?: () => void;
   skipHref?: string;
-  /** Render the logo inside the card, above the title, instead of floating above it. */
-  isLogoInside?: boolean;
 }
 
-/** The card width each narrow variant holds from `md` up. */
-const CARD_WIDTHS = { narrow: "540px", guided: "560px", full: "540px" } as const;
-
-const insideLogoTopPadding = (compressedHeader: boolean | undefined) =>
-  compressedHeader ? "8vh" : "14vh";
+/** The branded card size each step width stands at. */
+const CARD_SIZES = { narrow: "wide", guided: "wide", full: "full" } as const;
 
 export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   children,
@@ -42,67 +33,16 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   title,
   subTitle,
   loading,
-  compressedHeader,
   widthVariant = "narrow",
   showBackButton,
   onBack,
   skipHref,
-  isLogoInside,
 }) => {
   const analytics = useUiAnalytics();
   const host = useOnboardingHost();
-  const isFullWidth = widthVariant === "full";
-
-  const titleBlock = (
-    <VStack gap={1.5} align="center" textAlign="center" w="full">
-      <AnimatePresence mode="wait">
-        <MotionText
-          key={title}
-          textStyle="xl"
-          fontWeight="600"
-          color="fg"
-          letterSpacing="-0.01em"
-          lineHeight="1.3"
-          initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-        >
-          {title}
-        </MotionText>
-      </AnimatePresence>
-      <AnimatePresence mode="wait">
-        {subTitle && (
-          <MotionText
-            key={subTitle}
-            textStyle="sm"
-            color="fg.muted"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-          >
-            {subTitle}
-          </MotionText>
-        )}
-      </AnimatePresence>
-    </VStack>
-  );
 
   return (
-    // "stable both-edges" keeps the reserved scrollbar gutter symmetric so
-    // the logo/card column stays visually centered even with always-visible
-    // scrollbars (one-edge "stable" shifted everything left).
-    <Box
-      w="full"
-      minH="100dvh"
-      bg="bg.page"
-      position="relative"
-      style={{ scrollbarGutter: "stable both-edges" }}
-      overflowY="auto"
-    >
-      <OnboardingMeshBackground />
-
+    <BrandedCardPage>
       {showBackButton && onBack && (
         <MotionBox
           position="fixed"
@@ -200,60 +140,9 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         </MotionBox>
       )}
 
-      {/* Logo (floating above the card unless isLogoInside) */}
-      {!isLogoInside && (
-        <MotionCenter
-          pt={compressedHeader ? "6vh" : "10vh"}
-          pb={compressedHeader ? "2vh" : "4vh"}
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        >
-          <FullLogo width={150} />
-        </MotionCenter>
-      )}
-
-      {/* Content */}
-      <Container
-        width="full"
-        mx="auto"
-        pt={isLogoInside ? insideLogoTopPadding(compressedHeader) : undefined}
-        pb={16}
-        maxW={
-          isFullWidth
-            ? { base: "100%", "2xl": "1440px" }
-            : { base: "100%", md: CARD_WIDTHS[widthVariant] }
-        }
-        px={isFullWidth ? { base: 5, md: 10 } : { base: 4, md: 0 }}
-        {...(isFullWidth ? { fluid: true } : {})}
-      >
-        <MotionBox
-          bg="bg.panel"
-          borderRadius="16px"
-          border="1px solid"
-          borderColor="border.subtle"
-          boxShadow="sm"
-          px={{ base: 5, md: isFullWidth ? 8 : 7 }}
-          py={{ base: 6, md: 8 }}
-          initial={{ opacity: 0, y: 16, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            duration: 0.5,
-            ease: [0.16, 1, 0.3, 1],
-            delay: 0.1,
-          }}
-        >
-          <VStack gap={isFullWidth ? 8 : 6} align="stretch" w="full">
-            {isLogoInside && (
-              <Center pt={1}>
-                <FullLogo width={130} />
-              </Center>
-            )}
-            {titleBlock}
-            {loading ? <SpookyScarySkeleton loading /> : children}
-          </VStack>
-        </MotionBox>
-      </Container>
-    </Box>
+      <BrandedCard title={title} intro={subTitle} size={CARD_SIZES[widthVariant]}>
+        {loading ? <SpookyScarySkeleton loading /> : children}
+      </BrandedCard>
+    </BrandedCardPage>
   );
 };

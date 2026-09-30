@@ -7,6 +7,8 @@ import { ledgerActorFor, type LedgerActor } from "@langwatch/actor";
 import {
   AuthzApi,
   bindingScopeCanGrantPermission,
+  builtInRoleIdSchema,
+  builtinRolePermissions,
   newAuthzBindingId,
   PermissionDeniedError,
   type AuthzAccessBreakdownOutput,
@@ -17,7 +19,9 @@ import {
   type AuthzDeleteBindingInput,
   type AuthzListManagedBindingsForOrganizationOutput,
   type AuthzListManagedBindingsForUserOutput,
+  type AuthzPrincipalRef,
   type AuthzUpdateBindingInput,
+  type BuiltInRoleId,
 } from "@langwatch/authz-contract";
 import {
   assertEnterprisePlanType,
@@ -35,7 +39,9 @@ import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import {
   OrgExclusivePermissionScopeError,
   RoleApi,
+  RoleExceedsCallerPermissionsError,
   RoleInUseError,
+  RoleIsBuiltInError,
   RoleNotAssignableError,
   RoleTeamNotFoundError,
   RoleUserNotTeamMemberError,
@@ -105,22 +111,35 @@ export class RoleApp implements RoleApi {
 
   // ── custom roles ───────────────────────────────────────────────────────────
 
-  /** Every custom role defined in the organization, as the ledger projects them. */
-  async listRoles(input: { organizationId: string }): Promise<Role[]> {
-    const roles = await this.#permissions.listUserCreatedRoles(input);
+  /** The built-in roles, then the custom ones the ledger projects, narrowed by `builtIn`. */
+  async listRoles(input: { organizationId: string; builtIn?: boolean }): Promise<Role[]> {
+    const builtIn =
+      input.builtIn === false
+        ? []
+        : builtInRoleIdSchema.options.map((roleId) =>
+            builtInRole({ roleId, organizationId: input.organizationId }),
+          );
+    if (input.builtIn === true) return builtIn;
 
-    return roles.map((role) =>
-      roleSchema.parse({
-        id: role.id,
-        organizationId: role.organizationId,
-        name: role.name,
-        description: role.description,
-        permissions: permissionsOf(role.permissions),
-        kind: ROLE_KIND.CUSTOM,
-        createdAt: role.createdAt,
-        updatedAt: role.updatedAt,
-      }),
-    );
+    const roles = await this.#permissions.listUserCreatedRoles({
+      organizationId: input.organizationId,
+    });
+
+    return [
+      ...builtIn,
+      ...roles.map((role) =>
+        roleSchema.parse({
+          id: role.id,
+          organizationId: role.organizationId,
+          name: role.name,
+          description: role.description,
+          permissions: permissionsOf(role.permissions),
+          kind: ROLE_KIND.CUSTOM,
+          createdAt: role.createdAt,
+          updatedAt: role.updatedAt,
+        }),
+      ),
+    ];
   }
 
   /** One custom role, for a caller who may view the organization that owns it. */
@@ -131,8 +150,13 @@ export class RoleApp implements RoleApi {
     return role;
   }
 
-  /** One custom role inside an organization the credential already resolved. */
-  getRoleInOrganization(input: { roleId: string; organizationId: string }): Promise<Role> {
+  /** A built-in id, or one custom role inside an organization the credential resolved. */
+  async getRoleInOrganization(input: { roleId: string; organizationId: string }): Promise<Role> {
+    const builtIn = builtInRoleIdSchema.safeParse(input.roleId);
+    if (builtIn.success) {
+      return builtInRole({ roleId: builtIn.data, organizationId: input.organizationId });
+    }
+
     return this.#roles.getInOrganization(input);
   }
 
@@ -140,6 +164,11 @@ export class RoleApp implements RoleApi {
   async createRole(input: { role: RoleCreate }, by: RoleCaller): Promise<Role> {
     this.#roles.assertNameAllowed(input.role.name);
     await this.#assertCustomRolesAllowed({ organizationId: input.role.organizationId });
+    await this.#assertWithinCaller({
+      organizationId: input.role.organizationId,
+      added: input.role.permissions,
+      by,
+    });
     await this.#roles.assertNameAvailable({
       organizationId: input.role.organizationId,
       name: input.role.name,
@@ -155,7 +184,7 @@ export class RoleApp implements RoleApi {
       permissions: input.role.permissions,
       kind: ROLE_KIND.CUSTOM,
       actor: actorOf(by),
-      requireProjection: false,
+      requireProjection: true,
     });
 
     const now = toDate(nowInstant());
@@ -189,6 +218,7 @@ export class RoleApp implements RoleApi {
     input: { roleId: string; organizationId: string; changes: RoleUpdate },
     by: RoleCaller,
   ): Promise<Role> {
+    assertNotBuiltIn(input.roleId);
     const role = await this.#roles.getInOrganization({
       roleId: input.roleId,
       organizationId: input.organizationId,
@@ -210,6 +240,7 @@ export class RoleApp implements RoleApi {
     input: { roleId: string; organizationId: string },
     by: RoleCaller,
   ): Promise<RoleWriteAcknowledged> {
+    assertNotBuiltIn(input.roleId);
     await this.#roles.getInOrganization(input);
 
     return this.#delete(input, by);
@@ -335,18 +366,18 @@ export class RoleApp implements RoleApi {
 
   /** Binds a user or a group to a role at one scope. */
   createBinding(
-    input: Omit<AuthzCreateBindingInput, "actor">,
+    input: Omit<AuthzCreateBindingInput, "actor" | "caller">,
     by: RoleCaller,
   ): Promise<AuthzCreateBindingOutput> {
-    return this.#permissions.createBinding({ ...input, actor: actorOf(by) });
+    return this.#permissions.createBinding({ ...input, actor: actorOf(by), caller: callerOf(by) });
   }
 
   /** Changes the role an existing binding grants. */
   updateBinding(
-    input: Omit<AuthzUpdateBindingInput, "actor">,
+    input: Omit<AuthzUpdateBindingInput, "actor" | "caller">,
     by: RoleCaller,
   ): Promise<AuthzCreateBindingOutput> {
-    return this.#permissions.updateBinding({ ...input, actor: actorOf(by) });
+    return this.#permissions.updateBinding({ ...input, actor: actorOf(by), caller: callerOf(by) });
   }
 
   /** Removes one binding by id. */
@@ -362,10 +393,14 @@ export class RoleApp implements RoleApi {
    * cannot leave them holding some of the old bindings and none of the new.
    */
   applyMemberBindings(
-    input: Omit<AuthzApplyMemberBindingsInput, "actor">,
+    input: Omit<AuthzApplyMemberBindingsInput, "actor" | "caller">,
     by: RoleCaller,
   ): Promise<AuthzBindingMutationSuccess> {
-    return this.#permissions.applyMemberBindings({ ...input, actor: actorOf(by) });
+    return this.#permissions.applyMemberBindings({
+      ...input,
+      actor: actorOf(by),
+      caller: callerOf(by),
+    });
   }
 
   // ── the checks and writes the operations above share ───────────────────────
@@ -393,6 +428,29 @@ export class RoleApp implements RoleApi {
     });
     const personalName = personalTeam?.name ?? personalProject?.team.name;
     if (personalName) throw new PersonalWorkspaceNotManagedHereError(personalName);
+  }
+
+  /**
+   * A role never gains a permission its writer lacks on the organization. Only ADDED ones are
+   * asked, so a role may keep what its writer cannot grant; widening a role the writer holds
+   * is refused the same way, since holding it cannot supply what they lacked.
+   */
+  async #assertWithinCaller({
+    organizationId,
+    added,
+    by,
+  }: {
+    organizationId: string;
+    added: readonly string[];
+    by: RoleCaller;
+  }): Promise<void> {
+    const missing = await this.#permissions.findPermissionsBeyondCaller({
+      organizationId,
+      caller: callerOf(by),
+      scope: { type: "organization", id: organizationId },
+      permissions: [...added],
+    });
+    if (missing.length > 0) throw new RoleExceedsCallerPermissionsError(missing);
   }
 
   /** Whether the organization's plan carries custom roles. */
@@ -427,6 +485,12 @@ export class RoleApp implements RoleApi {
 
   async #write(current: Role, changes: RoleUpdate, by: RoleCaller): Promise<Role> {
     this.#roles.assertNameAllowed(changes.name);
+    const kept = new Set(current.permissions);
+    await this.#assertWithinCaller({
+      organizationId: current.organizationId,
+      added: (changes.permissions ?? []).filter((permission) => !kept.has(permission)),
+      by,
+    });
     const name = changes.name ?? current.name;
     if (name !== current.name) {
       await this.#roles.assertNameAvailable({
@@ -444,7 +508,7 @@ export class RoleApp implements RoleApi {
       name,
       ...(description === null ? {} : { description }),
       permissions,
-      kind: current.kind,
+      kind: ROLE_KIND.CUSTOM,
       actor: actorOf(by),
     });
 
@@ -562,6 +626,37 @@ export class RoleApp implements RoleApi {
  */
 function actorOf(by: RoleCaller): LedgerActor {
   return ledgerActorFor({ userId: by.id, fallback: "managementApi" });
+}
+
+/** Whose permissions bound a write: the key it arrived on, else the person. */
+function callerOf(by: RoleCaller): AuthzPrincipalRef {
+  if (by.apiKeyId) return { type: "apiKey", id: by.apiKeyId };
+  if (by.id) return { type: "user", id: by.id };
+
+  return { type: "anonymous" };
+}
+
+function assertNotBuiltIn(roleId: string): void {
+  if (builtInRoleIdSchema.validate(roleId)) throw new RoleIsBuiltInError(roleId);
+}
+
+const BUILT_IN_ROLE_NAME: Readonly<Record<BuiltInRoleId, string>> = {
+  admin: "Admin",
+  member: "Member",
+  viewer: "Viewer",
+};
+
+function builtInRole(input: { roleId: BuiltInRoleId; organizationId: string }): Role {
+  return {
+    id: input.roleId,
+    organizationId: input.organizationId,
+    name: BUILT_IN_ROLE_NAME[input.roleId],
+    description: null,
+    permissions: [...builtinRolePermissions(input.roleId)],
+    kind: ROLE_KIND.BUILT_IN,
+    createdAt: null,
+    updatedAt: null,
+  };
 }
 
 function permissionsOf(value: unknown): string[] {

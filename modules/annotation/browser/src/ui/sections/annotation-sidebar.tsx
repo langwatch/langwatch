@@ -140,7 +140,7 @@ export function AnnotationSidebar({
     <HStack align="start" width="full" height="full" gap={0} position="relative">
       <VStack
         align="start"
-        paddingY={4}
+        paddingBottom={4}
         borderRightWidth="1px"
         borderColor="border.emphasized"
         fontSize="12.5px"
@@ -148,7 +148,14 @@ export function AnnotationSidebar({
         height="full"
         gap={0.5}
       >
-        <Text fontSize="14px" fontWeight="semibold" paddingX={3} paddingY={1.5}>
+        <Text
+          fontSize="14px"
+          fontWeight="semibold"
+          paddingX={3}
+          height="48px"
+          display="flex"
+          alignItems="center"
+        >
           Annotations
         </Text>
         <VStack paddingX={2} gap={0.5} width="full">

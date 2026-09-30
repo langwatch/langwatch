@@ -472,3 +472,219 @@ flows:
         with:
           testId: target-optimize-menu-item
           timeout: "15000"
+
+  # Workbench states the prod comparison could not judge. Chips, popovers and summaries carry no test
+  # ids on main, so they are found by their text. Evaluator results come from lingua/language_detection
+  # through langevals (`haven up +langevals +llm`); without it the chip ends in an error status.
+  - id: experiment-workbench-prompt-and-evaluator-chips
+    title: Open a workbench holding a prompt and an evaluator and find the target header, the evaluator chip and Run
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-chipev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+      - post: /api/experiments
+        body:
+          name: vd-expchip-{uid}
+          state:
+            <<: *runnableState
+            name: vd-expchip-{uid}
+            evaluators:
+              - id: evaluator-1
+                evaluatorType: lingua/language_detection
+                dbEvaluatorId: "{evaluatorId}"
+                inputs: [{ identifier: output, type: str }]
+                mappings:
+                  test-data:
+                    target-1:
+                      output: { type: source, source: target, sourceId: target-1, sourceField: output }
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: expect
+        with:
+          testId: target-header-button
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd-chipev-{uid}
+          min: "3"
+      - action: expect
+        with:
+          text: vd row alpha
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+
+  - id: experiment-workbench-evaluator-chip-result-popover
+    title: Run the workbench, open a row's evaluator chip and read its result with Rerun, Run on all rows, Edit Configuration and Remove
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-popev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+      - post: /api/experiments
+        body:
+          name: vd-exppop-{uid}
+          state:
+            <<: *runnableState
+            name: vd-exppop-{uid}
+            evaluators:
+              - id: evaluator-1
+                evaluatorType: lingua/language_detection
+                dbEvaluatorId: "{evaluatorId}"
+                inputs: [{ identifier: output, type: str }]
+                mappings:
+                  test-data:
+                    target-1:
+                      output: { type: source, source: target, sourceId: target-1, sourceField: output }
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: click
+        with:
+          testId: run-evaluation-button
+      - action: expect
+        with:
+          testIdPrefix: latency-
+          min: "3"
+          timeout: "90000"
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+          timeout: "60000"
+      - action: click
+        with:
+          selector: 'button:has-text("vd-popev-{uid}")'
+      - action: expect
+        with:
+          text: /^Status:$/
+          timeout: "30000"
+      - action: expect
+        with:
+          text: /^Processed$/
+      - action: expect
+        with:
+          text: /^Rerun$/
+      - action: expect
+        with:
+          text: /^Run on all rows$/
+      - action: expect
+        with:
+          text: /^Edit Configuration$/
+      - action: expect
+        with:
+          text: /^Remove from Workbench$/
+
+  - id: experiment-workbench-target-summary-popover
+    title: Run the workbench, hover the target's summary and read its rows, latency and execution time
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-expsum-{uid}
+          state:
+            <<: *runnableState
+            name: vd-expsum-{uid}
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: click
+        with:
+          testId: run-evaluation-button
+      - action: expect
+        with:
+          testIdPrefix: latency-
+          min: "3"
+          timeout: "90000"
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+          timeout: "60000"
+      - action: hover
+        with:
+          selector: 'text=/^3\/3$/'
+      - action: expect
+        with:
+          text: /^Rows$/
+      - action: expect
+        with:
+          text: /^Avg Latency$/
+      - action: expect
+        with:
+          text: /^Execution Time$/
+
+  - id: experiment-results-page-run-summary
+    title: Open an SDK experiment's results and read its run, evaluator column, answers and the compare and export controls
+    setup:
+      - post: /api/experiment/init
+        body:
+          experiment_slug: vd-expsdk-{uid}
+          experiment_name: vd-expsdk-{uid}
+          experiment_type: BATCH_EVALUATION_V2
+        as:
+          expSlug: slug
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-run-sdk
+          progress: 2
+          total: 2
+          dataset:
+            - index: 0
+              entry: { question: vd sdk question alpha }
+              predicted: { answer: vd sdk answer alpha }
+              cost: 0.001
+              duration: 120
+            - index: 1
+              entry: { question: vd sdk question beta }
+              predicted: { answer: vd sdk answer beta }
+              cost: 0.002
+              duration: 140
+          evaluations:
+            - { evaluator: vd-exact, name: Exact match, status: processed, index: 0, score: 1, passed: true }
+            - { evaluator: vd-exact, name: Exact match, status: processed, index: 1, score: 0, passed: false }
+          timestamps:
+            created_at: 1790726400000
+            finished_at: 1790726405000
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/{expSlug}
+      - action: expect
+        with:
+          testId: run-item-vd-run-sdk
+          timeout: "30000"
+      - action: expect
+        with:
+          text: vd sdk answer alpha
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd sdk answer beta
+      - action: expect
+        with:
+          text: Exact match
+      - action: expect
+        with:
+          text: Export to CSV
+      - action: expect
+        with:
+          testId: compare-button

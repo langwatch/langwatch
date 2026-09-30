@@ -47,7 +47,7 @@ export function AutomaticJoinsNotice({ joins }: { joins: AutomaticJoin[] }) {
 }
 
 /** Spelled out, never abbreviated: "24 Aug 2026", not "24/08". */
-function formatDay(date: Date | string): string {
+function formatDay(date: string): string {
   return readableDate(date).toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",

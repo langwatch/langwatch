@@ -82,15 +82,17 @@ export class JoinRequestsService {
 
     const matched = await this.deps.candidates.findCandidateOrganizations({ domain });
     // Never the ones they are already in: being offered the organization you
-    // are standing in reads as the product not knowing who you are.
-    const organizations = [];
-    for (const organization of matched) {
-      const already = await this.deps.membership.isMember({
+    // are standing in reads as the product not knowing who you are. One read
+    // for every candidate, since a large domain matches a hundred or more.
+    const already = new Set(
+      await this.deps.membership.memberOrganizationIds({
         userId,
-        organizationId: organization.organizationId,
-      });
-      if (!already) organizations.push(organization);
-    }
+        organizationIds: matched.map((organization) => organization.organizationId),
+      }),
+    );
+    const organizations = matched.filter(
+      (organization) => !already.has(organization.organizationId),
+    );
     const decision = resolveJoinLookup({
       email: verifiedEmail,
       verified: true,

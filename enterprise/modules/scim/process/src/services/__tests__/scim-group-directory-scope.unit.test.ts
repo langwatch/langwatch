@@ -59,6 +59,7 @@ function repositoryOver(groups: ScimGroupRecord[]) {
       async (input: { organizationId: string; connectionId: string | null; externalId: string }) =>
         groups.find(
           (candidate) =>
+            candidate.organizationId === input.organizationId &&
             candidate.externalId === input.externalId &&
             candidate.connectionId === input.connectionId,
         ) ?? null,
@@ -198,6 +199,7 @@ describe("a group belongs to the connection that pushed it", () => {
     });
 
     /** @scenario "Two connections each carry their own group of the same name" */
+    /** @scenario Concrete SCIM tokens keep sibling groups outside their reads */
     it("lets another connection push its own group of the same name", async () => {
       const { repository, created } = repositoryOver([
         group({ id: "group-1", name: "Engineering", externalId: "okta-grp-1", connectionId: OKTA }),
@@ -216,6 +218,63 @@ describe("a group belongs to the connection that pushed it", () => {
       expect(created).toEqual([
         { name: "Engineering", connectionId: ENTRA, externalId: "entra-grp-9" },
       ]);
+    });
+  });
+
+  describe("when directories reuse one external identifier", () => {
+    const push = ({
+      repository,
+      connectionId,
+      displayName,
+      externalId = "shared-1",
+    }: {
+      repository: ScimDirectoryRepository;
+      connectionId: string | null;
+      displayName: string;
+      externalId?: string;
+    }) =>
+      serviceOver(repository).createGroup({
+        organizationId: ORGANIZATION,
+        connectionId,
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+          displayName,
+          externalId,
+        },
+      });
+
+    /** @scenario Group external identifiers belong to their directory namespace */
+    it("keeps each directory, the legacy namespace and other organizations apart", async () => {
+      const { repository, created } = repositoryOver([
+        group({ id: "group-1", name: "One", externalId: "shared-1", connectionId: OKTA }),
+        group({ id: "group-2", name: "Legacy", externalId: "shared-1", connectionId: null }),
+        group({
+          id: "group-3",
+          organizationId: "org-2",
+          name: "Elsewhere",
+          externalId: "other-org-1",
+          connectionId: null,
+        }),
+      ]);
+
+      await push({ repository, connectionId: ENTRA, displayName: "Two" });
+      await push({
+        repository,
+        connectionId: null,
+        displayName: "Three",
+        externalId: "other-org-1",
+      });
+
+      expect(created.map((made) => [made.connectionId, made.externalId])).toEqual([
+        [ENTRA, "shared-1"],
+        [null, "other-org-1"],
+      ]);
+      await expect(
+        push({ repository, connectionId: OKTA, displayName: "Four" }),
+      ).rejects.toBeInstanceOf(ScimProtocolError);
+      await expect(
+        push({ repository, connectionId: null, displayName: "Five" }),
+      ).rejects.toBeInstanceOf(ScimProtocolError);
     });
   });
 
@@ -256,6 +315,50 @@ describe("a group belongs to the connection that pushed it", () => {
       });
 
       expect(found.id).toBe("group-1");
+    });
+  });
+
+  describe("when a token lists the organization's groups", () => {
+    /** @scenario Legacy SCIM tokens retain organization-wide group reads */
+    it("lets a token belonging to no connection see legacy and connection-owned groups", async () => {
+      const { repository } = repositoryOver([
+        group({ id: "group-1", name: "Engineering", connectionId: null }),
+        group({ id: "group-2", name: "Design", connectionId: ENTRA }),
+      ]);
+      const service = serviceOver(repository);
+
+      const listed = await service.listGroups({ organizationId: ORGANIZATION, connectionId: null });
+      const named = await service.listGroups({
+        organizationId: ORGANIZATION,
+        connectionId: null,
+        filter: 'displayName eq "Design"',
+      });
+
+      expect(listed.Resources.map((row) => row.id).toSorted()).toEqual(["group-1", "group-2"]);
+      expect(named.Resources.map((row) => row.id)).toEqual(["group-2"]);
+      expect(repository.listGroups).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: ORGANIZATION }),
+      );
+    });
+
+    /** @scenario Concrete SCIM tokens keep sibling groups outside their reads */
+    it("lets a connection's token see only its own groups and legacy ones", async () => {
+      const { repository } = repositoryOver([
+        group({ id: "group-1", name: "Engineering", connectionId: null }),
+        group({ id: "group-2", name: "Design", connectionId: ENTRA }),
+        group({ id: "group-3", name: "Sales", connectionId: OKTA }),
+      ]);
+      const service = serviceOver(repository);
+
+      const listed = await service.listGroups({ organizationId: ORGANIZATION, connectionId: OKTA });
+      const sibling = await service.listGroups({
+        organizationId: ORGANIZATION,
+        connectionId: OKTA,
+        filter: 'displayName eq "Design"',
+      });
+
+      expect(listed.Resources.map((row) => row.id).toSorted()).toEqual(["group-1", "group-3"]);
+      expect(sibling.totalResults).toBe(0);
     });
   });
 

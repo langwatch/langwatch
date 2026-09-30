@@ -79,6 +79,7 @@ describe("a hosted call on the gateway's control plane", () => {
     });
   });
 
+  /** @scenario A caller cannot name another customer's key in its request */
   it("keeps a key or organization the payload names inside the payload", async () => {
     const getHostedUsage = vi.fn().mockResolvedValue({
       services: ["instant_evals"],

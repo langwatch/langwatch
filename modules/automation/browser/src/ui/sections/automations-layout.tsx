@@ -3,7 +3,7 @@
  * alerts, schedules), on the design system's shared section rail.
  */
 
-import { Box, Container } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import {
   SectionNavigationFrame,
   type SectionNavigationLink,
@@ -49,17 +49,15 @@ export function AutomationsLayout({
   const active = AUTOMATION_SECTIONS.find((item) => item.section === section);
 
   return (
-    <Box width="full" padding={4} data-testid="section-navigation-layout">
-      <Container maxW="1600px" paddingX={0} data-testid="section-navigation-container">
-        <SectionNavigationFrame
-          label="Automations"
-          links={links}
-          activeHref={`${basePath}${active?.suffix ?? ""}`}
-          onNavigate={(href) => host.navigate(href)}
-        >
-          <Box data-testid="section-navigation-content">{children}</Box>
-        </SectionNavigationFrame>
-      </Container>
+    <Box width="full" padding={4} paddingBottom={16} data-testid="section-navigation-layout">
+      <SectionNavigationFrame
+        label="Automations"
+        links={links}
+        activeHref={`${basePath}${active?.suffix ?? ""}`}
+        onNavigate={(href) => host.navigate(href)}
+      >
+        <Box data-testid="section-navigation-content">{children}</Box>
+      </SectionNavigationFrame>
     </Box>
   );
 }

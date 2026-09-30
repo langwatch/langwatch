@@ -15,7 +15,6 @@ import {
   type LucideIcon,
   MoreVertical,
   Pencil,
-  PhoneCall,
   Play,
   RefreshCw,
   Trash2,
@@ -33,7 +32,7 @@ export const agentTypeIcons: Record<AgentType, LucideIcon> = {
   http: Globe,
   workflow: Workflow,
   connected: Bot,
-  voice: PhoneCall,
+  voice: Mic,
 };
 
 export const agentTypeLabels: Record<AgentType, string> = {
@@ -42,7 +41,7 @@ export const agentTypeLabels: Record<AgentType, string> = {
   http: "HTTP",
   workflow: "Workflow",
   connected: "Connected",
-  voice: "Voice",
+  voice: "Voice agent",
 };
 
 /** The class that keeps a click inside the card menu out of the card click. */
@@ -199,7 +198,7 @@ export function AgentCard({
               )}
               {agent.type === "workflow" && onOpenWorkflow && (
                 <Menu.Item value="open-workflow" onClick={onOpenWorkflow}>
-                  <ExternalLink aria-hidden="true" size={14} /> Open workflow
+                  <ExternalLink aria-hidden="true" size={14} /> Open Workflow
                 </Menu.Item>
               )}
               {isCopiedAgent && onSyncFromSource && (

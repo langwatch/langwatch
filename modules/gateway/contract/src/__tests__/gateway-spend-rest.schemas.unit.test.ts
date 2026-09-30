@@ -21,19 +21,16 @@ describe("an inverted window", () => {
   /** @scenario An inverted window is refused on both reads */
   it("is refused by the rollups and by the events read alike", () => {
     expect(summaries(INVERTED).success).toBe(false);
-    expect(gatewaySpendEventsQuerySchema.safeParse(INVERTED).success).toBe(false);
-    expect(gatewaySpendEventsQuerySchema.safeParse(WINDOW).success).toBe(true);
+    expect(gatewaySpendEventsQuerySchema.validate(INVERTED)).toBe(false);
+    expect(gatewaySpendEventsQuerySchema.validate(WINDOW)).toBe(true);
   });
 
   it("is refused by a replay, as is a window past seven days", () => {
     const base = { endpoint_id: "we_1" };
 
-    expect(gatewaySpendReplayBodySchema.safeParse({ ...base, from: 2000, to: 1000 }).success).toBe(
-      false,
-    );
+    expect(gatewaySpendReplayBodySchema.validate({ ...base, from: 2000, to: 1000 })).toBe(false);
     expect(
-      gatewaySpendReplayBodySchema.safeParse({ ...base, from: 1000, to: 1000 + 8 * 86_400_000 })
-        .success,
+      gatewaySpendReplayBodySchema.validate({ ...base, from: 1000, to: 1000 + 8 * 86_400_000 }),
     ).toBe(false);
   });
 });
@@ -55,9 +52,7 @@ describe("the filters of the two reads", () => {
 describe("the in-flight status", () => {
   /** @scenario The rollups refuse a status they can only answer with zero */
   it("is served by the events read and refused by the rollups, naming the status field", () => {
-    expect(gatewaySpendEventsQuerySchema.safeParse({ ...WINDOW, status: "admitted" }).success).toBe(
-      true,
-    );
+    expect(gatewaySpendEventsQuerySchema.validate({ ...WINDOW, status: "admitted" })).toBe(true);
 
     const refused = summaries({ status: "admitted" });
     expect(refused.success).toBe(false);

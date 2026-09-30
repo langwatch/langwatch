@@ -7,6 +7,7 @@ import { useOpsOverlay } from "../../../behavior/ops-overlays.ts";
 import { OpsBlobsDrawer } from "../../../features/blob-store/ui/sections/ops-blobs-drawer.tsx";
 import { ConnectionStatusIndicator } from "../../../features/event-store/ui/elements/connection-status-indicator.tsx";
 import { OpsDashboardContent } from "../../../features/event-store/ui/sections/ops-dashboard-content.tsx";
+import { HandledErrorAlert } from "../../elements/ops-handled-error-alert.tsx";
 
 /** Whether the page is reading a live snapshot, still waiting, or cut off. */
 function describeSnapshotConnection({
@@ -47,9 +48,14 @@ export default function OpsDashboardScreen() {
         />
       </PageLayout.Header>
       <PageLayout.Container>
-        {data ? (
-          <OpsDashboardContent data={data} />
-        ) : (
+        {data && <OpsDashboardContent data={data} />}
+        {!data && snapshot.isError && (
+          <HandledErrorAlert
+            error={snapshot.error}
+            fallbackTitle="The ops dashboard could not load"
+          />
+        )}
+        {!data && !snapshot.isError && (
           <VStack gap={3} align="stretch" aria-label="Loading metrics">
             <Skeleton height="96px" />
             <Skeleton height="240px" />

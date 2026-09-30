@@ -52,11 +52,33 @@ describe("given a connection with no proved domain", () => {
   });
 });
 
+describe("given a connection whose domain claim is awaiting proof", () => {
+  /** @scenario "A claimed connection cannot confirm arrivals before its domain is verified" */
+  it("disables every arrival choice and says to verify a domain first", () => {
+    renderSection({ connectionState: "CLAIMED" });
+
+    for (const answer of ["admit", "request", "refuse"]) {
+      expect(screen.getByTestId(`arrivals-${answer}`)).toHaveProperty("disabled", true);
+    }
+    expect(screen.getByRole("status").textContent).toContain("Verify a domain");
+  });
+});
+
 describe("given a connection whose domain is proved", () => {
   it("recommends one answer out loud rather than by its position", () => {
     renderSection();
 
     expect(screen.getByTestId("arrivals-recommended")).toBeTruthy();
+    expect(screen.getByText("They join, on a domain you verified")).toBeTruthy();
+  });
+
+  /** @scenario "The journey asks who the connection lets in" */
+  it("offers the three answers, the widest saying it rests on the domain proof", () => {
+    renderSection();
+
+    for (const answer of ["admit", "request", "refuse"]) {
+      expect(screen.getByTestId(`arrivals-${answer}`)).toHaveProperty("disabled", false);
+    }
     expect(screen.getByText("They join, on a domain you verified")).toBeTruthy();
   });
 

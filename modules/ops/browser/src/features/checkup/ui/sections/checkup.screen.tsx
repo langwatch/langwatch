@@ -3,7 +3,8 @@
  * and exactly what it sends. The same rows print from `langwatch doctor`.
  * Spec: specs/self-hosting/checkup/checkup.feature
  */
-import { Box, Heading, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Skeleton, Text, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
 import { useCheckupScreen } from "../../behavior/use-checkup-screen.ts";
 import { useCheckupHost } from "../../model/checkup-host.ts";
@@ -15,16 +16,18 @@ export default function CheckupScreen() {
   const organizationId = useCheckupHost().organizationId();
 
   return (
-    <Box paddingX={{ base: 4, md: 6 }} paddingY={4} width="full" maxWidth="820px">
-      <VStack align="start" gap={1} paddingBottom={{ base: 5, md: 6 }}>
-        <Heading size="lg">Checkup</Heading>
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Checkup</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack align="stretch" gap={6} width="full" paddingTop={4}>
         <Text color="fg.muted">
           Whether this install is correctly wired, what is broken and how to fix it, and exactly
           what it sends to LangWatch.
         </Text>
+        {organizationId ? <CheckupSettings organizationId={organizationId} /> : null}
       </VStack>
-      {organizationId ? <CheckupSettings organizationId={organizationId} /> : null}
-    </Box>
+    </>
   );
 }
 

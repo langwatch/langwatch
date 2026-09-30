@@ -42,6 +42,12 @@ bucket. Go services only fetch presigned URLs over plain HTTP.
 - `aws-chunked` bodies are decoded; `x-amz-decoded-content-length` is required.
 - CORS for `STORAGESIM_CORS_ORIGINS` (preflights are unauthenticated, as on S3).
 
+## Locks and seed
+
+Object reads and writes take one of 64 striped locks chosen by the object's file
+name, so load on one key does not block another. `STORAGESIM_SEED=1` stores
+`seed/hello.txt` and `seed/sample.json` in the `langwatch` bucket at start.
+
 ## Never executable
 
 Objects are files named by the SHA-256 of `bucket/key`, written 0600 through a

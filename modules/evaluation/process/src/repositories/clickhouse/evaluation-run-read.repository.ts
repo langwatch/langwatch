@@ -217,17 +217,26 @@ export class EvaluationRunClickHouseReadRepository {
     }
   }
 
-  async countRuns(input: { tenantId: string }): Promise<number> {
-    validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.countRuns");
-    const client = await this.options.resolveClient(input.tenantId);
+  /**
+   * One read for the whole organization, routed by its first project
+   * (gateway-spend-events precedent).
+   */
+  async countOrganizationRuns(input: { tenantIds: readonly string[] }): Promise<number> {
+    const tenantIds = [...new Set(input.tenantIds)];
+    const [routingTenant] = tenantIds;
+    if (routingTenant === undefined) return 0;
+    validateTenant(routingTenant, "EvaluationRunClickHouseReadRepository.countOrganizationRuns");
+    const placeholders = tenantIds.map((_, i) => `{tenant${i}:String}`).join(", ");
+    const client = await this.options.resolveClient(routingTenant);
     const result = await client.query({
       query: `
-        SELECT uniqExact(EvaluationId) AS Total
+        SELECT uniqExact(TenantId, EvaluationId) AS Total
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE TenantId IN (${placeholders})
       `,
-      query_params: { tenantId: input.tenantId },
+      query_params: Object.fromEntries(tenantIds.map((id, i) => [`tenant${i}`, id])),
       format: "JSONEachRow",
+      tenantIds,
     });
     const [row] = await result.json<{ Total: number | string }>();
 

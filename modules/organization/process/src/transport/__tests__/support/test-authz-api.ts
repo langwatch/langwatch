@@ -4,7 +4,6 @@
  * else refuses by name, so unexpected authorization access fails loudly here.
  */
 import {
-  DuplicateBindingError,
   type AuthzAccessBinding,
   type AuthzApi,
   type AuthzAttachBindingsInput,
@@ -125,8 +124,7 @@ export class TestAuthzApi implements AuthzApi {
           row.customRoleId === binding.customRoleId,
       );
 
-      if (existing) {
-        if (args.onDuplicate === "reject") throw new DuplicateBindingError();
+      if (existing && args.onDuplicate === "skip") {
         duplicates.push(binding.bindingId);
         continue;
       }
@@ -232,6 +230,7 @@ export class TestAuthzApi implements AuthzApi {
   getAccessBreakdown = unsupported<AuthzApi["getAccessBreakdown"]>("getAccessBreakdown");
   isOnEngine = unsupported<AuthzApi["isOnEngine"]>("isOnEngine");
   findEngineCutoverAt = unsupported<AuthzApi["findEngineCutoverAt"]>("findEngineCutoverAt");
+  getSessionVersion = unsupported<AuthzApi["getSessionVersion"]>("getSessionVersion");
   attach = unsupported<AuthzApi["attach"]>("attach");
   update = unsupported<AuthzApi["update"]>("update");
   revoke = unsupported<AuthzApi["revoke"]>("revoke");
@@ -251,6 +250,14 @@ export class TestAuthzApi implements AuthzApi {
   updateRoleBinding = unsupported<AuthzApi["updateRoleBinding"]>("updateRoleBinding");
   deleteBinding = unsupported<AuthzApi["deleteBinding"]>("deleteBinding");
   applyMemberBindings = unsupported<AuthzApi["applyMemberBindings"]>("applyMemberBindings");
+  listGrants = unsupported<AuthzApi["listGrants"]>("listGrants");
+  getGrant = unsupported<AuthzApi["getGrant"]>("getGrant");
+  createGrant = unsupported<AuthzApi["createGrant"]>("createGrant");
+  changeGrantRole = unsupported<AuthzApi["changeGrantRole"]>("changeGrantRole");
+  revokeGrant = unsupported<AuthzApi["revokeGrant"]>("revokeGrant");
+  findPermissionsBeyondCaller = unsupported<AuthzApi["findPermissionsBeyondCaller"]>(
+    "findPermissionsBeyondCaller",
+  );
   retireDirectoryGrants = unsupported<AuthzApi["retireDirectoryGrants"]>("retireDirectoryGrants");
   findDirectoryCausedChanges = unsupported<AuthzApi["findDirectoryCausedChanges"]>(
     "findDirectoryCausedChanges",

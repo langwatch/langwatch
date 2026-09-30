@@ -150,10 +150,10 @@ describe("guardrails page", () => {
       expect(screen.getByText("Pre (request)")).toBeInTheDocument();
       expect(screen.getByText("PII check")).toBeInTheDocument();
       expect(screen.getByText("pii-check")).toBeInTheDocument();
-      expect(screen.getByText("fail closed")).toBeInTheDocument();
+      expect(screen.getByText("Fail closed")).toBeInTheDocument();
       expect(screen.getByText("Post (response)")).toBeInTheDocument();
       expect(screen.getByText("ev-gone")).toBeInTheDocument();
-      expect(screen.getByText("fail open")).toBeInTheDocument();
+      expect(screen.getByText("Fail open")).toBeInTheDocument();
       expect(screen.getAllByRole("button", { name: /Edit/ })).toHaveLength(2);
     });
 

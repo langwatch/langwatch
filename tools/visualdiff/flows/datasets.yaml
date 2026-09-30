@@ -602,3 +602,56 @@ flows:
         with:
           testId: dataset-row-count
           hasText: /^1 /
+
+  - id: dataset-state-rows-toolbar-and-edit-drawer
+    title: A dataset made in the flow shows its rows with the toolbar, and Edit columns opens the Edit Dataset drawer
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-dsstate-{uid}
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          dsId: id
+          dsSlug: slug
+      - post: /api/dataset/{dsSlug}/records
+        body:
+          entries:
+            - input: vd state cell one {uid}
+            - input: vd state cell two {uid}
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^2 /
+      - action: expect
+        with:
+          text: vd state cell one {uid}
+      - action: expect
+        with:
+          testId: dataset-row-search
+      - action: expect
+        with:
+          testId: download-csv
+      - action: expect
+        with:
+          testId: add-rows-from-csv
+      - action: expect
+        with:
+          testId: edit-columns
+      - action: expect
+        with:
+          testId: run-experiment-from-dataset
+      - action: click
+        with:
+          testId: edit-columns
+      - action: expect
+        with:
+          text: Edit Dataset
+      - action: expect
+        with:
+          count: '[role="dialog"]'

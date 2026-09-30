@@ -9,8 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -135,8 +137,12 @@ func seedCheckStack(ctx context.Context, stack Stack, booted bool, times *checkT
 	keyFile := marker + ".key"
 	key := seedKey(stack)
 	if recorded, err := os.ReadFile(marker); err == nil && !booted && key != "" && readKey(keyFile) == key { // #nosec G304 -- the tool's own run directory.
-		fmt.Fprintf(stderr, "check: %s is already seeded\n", stack.HavenSlug)
-		return ReadSeededMarker(recorded)["candidate"], nil
+		fixtures := ReadSeededMarker(recorded)["candidate"]
+		if seedStands(ctx, stack.APIURL(), fixtures) {
+			fmt.Fprintf(stderr, "check: %s is already seeded\n", stack.HavenSlug)
+			return fixtures, nil
+		}
+		fmt.Fprintf(stderr, "check: %s lost its recorded seed (isolated key or dataset gone), seeding again\n", stack.HavenSlug)
 	}
 	recordKey(keyFile, "")
 	started := time.Now()
@@ -160,8 +166,29 @@ func seedCheckStack(ctx context.Context, stack Stack, booted bool, times *checkT
 	return result.Fixtures, err
 }
 
+// seedGone is the answer a stack gives a fixture it no longer holds.
+var seedGone = regexp.MustCompile(`answered 40[134]:`)
+
+// seedStands is false when the stack refuses the recorded isolated project's key or
+// no longer holds the seeded dataset, as after a data reset. A probe that fails any
+// other way (a timeout under load) keeps the record, so load never forces a reseed.
+func seedStands(ctx context.Context, apiURL string, fixtures map[string]string) bool {
+	probes := []postSpec{{url: apiURL + "/api/dataset/" + SeedDatasetSlug, key: DefaultProjectKey, method: http.MethodGet}}
+	if key := fixtures[FixtureIsolatedKey]; key != "" {
+		probes = append(probes, postSpec{url: apiURL + "/api/dataset", key: key, method: http.MethodGet})
+	}
+	client := seedClient()
+	for _, probe := range probes {
+		_, err := postReading(ctx, client, probe)
+		if err != nil && seedGone.MatchString(err.Error()) {
+			return false
+		}
+	}
+	return true
+}
+
 // seedSources are the files whose change changes what a seed writes.
-var seedSources = []string{"seed.go", "seed_flow.go", "seed_entities.go"}
+var seedSources = []string{"seed.go", "seed_flow.go", "seed_entities.go", "seed_catalogue.go"}
 
 // seedKey names a stack's database and the seed code that filled it, or "" when unreadable.
 func seedKey(stack Stack) string {

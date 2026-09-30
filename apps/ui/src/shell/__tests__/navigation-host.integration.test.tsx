@@ -228,8 +228,26 @@ describe("the application chrome", () => {
     );
   });
 
+  describe("when the session has settled but the graph has not answered", () => {
+    /** @scenario The workspace is still resolving while the organization graph is read */
+    it("reports the workspace as still resolving", async () => {
+      class PendingRpc extends GraphRpc {
+        override query(): Promise<unknown> {
+          return new Promise(() => void 0);
+        }
+      }
+
+      renderChrome({ ...CAPABILITIES, rpc: new PendingRpc() });
+
+      await waitFor(() => expect(screen.getByTestId("probe")).toBeTruthy());
+      expect(screen.getByTestId("probe").getAttribute("data-loading")).toBe("true");
+      expect(screen.getByTestId("probe").getAttribute("data-organizations")).toBe("0");
+    });
+  });
+
   describe("when the graph has answered but the session and scope have not settled", () => {
     /** @scenario "A project address is not called missing while its scope is still settling" */
+    /** @scenario The workspace is still resolving while the session is */
     it("reports the workspace as still resolving rather than a project that is not there", async () => {
       renderChrome({ ...CAPABILITIES, scope: new SettlingScope(), session: new SettlingSession() });
 
@@ -241,6 +259,7 @@ describe("the application chrome", () => {
       expect(probe.getAttribute("data-loading")).toBe("true");
     });
 
+    /** @scenario A workspace whose graph has answered has resolved */
     it("reports the workspace resolved once they have", async () => {
       renderChrome();
 
@@ -284,7 +303,6 @@ describe("the application chrome", () => {
   });
 
   describe("when the workspace read is refused", () => {
-    /** @scenario "A refused workspace read offers a retry instead of loading forever" */
     it("says the workspace could not be opened and offers to try again", async () => {
       class RefusingRpc extends GraphRpc {
         override query(): Promise<unknown> {

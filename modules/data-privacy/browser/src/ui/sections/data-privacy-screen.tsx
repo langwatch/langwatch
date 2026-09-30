@@ -136,7 +136,7 @@ function DataPrivacyPage({ host, projectId }: { host: DataPrivacyHostApi; projec
             currentProjectId={projectId}
           />
         )}
-        {canWrite && (
+        {canWrite && snapshot?.rules.length !== 0 && (
           <PageLayout.HeaderButton variant="solid" colorPalette="blue" onClick={openAdd}>
             Add privacy rule
           </PageLayout.HeaderButton>

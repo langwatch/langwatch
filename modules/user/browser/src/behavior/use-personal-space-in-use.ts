@@ -2,11 +2,9 @@ import { api } from "./personal-workspace-api.ts";
 import { useCurrentUser, useOrganizationTeamProject } from "./personal-workspace-session.ts";
 
 /**
- * Whether the personal home already has something in it: a personal key, or any usage this
- * month. Both reads are the ones the page itself runs, with the same input, so the query cache
- * answers them. Null while unknown (loading, failed, or not yet in), which keeps the guided
- * offer hidden: the cache keeps the last answer through a failed refetch, so a read that
- * failed has answered nothing.
+ * Whether the personal home has a personal key or any usage this month, answered by the page's
+ * own reads through the query cache. Null while unknown (loading, failed), which keeps the
+ * guided offer hidden.
  * @see specs/home/guided-onboarding-offer.feature
  */
 export function usePersonalSpaceInUse(): boolean | null {

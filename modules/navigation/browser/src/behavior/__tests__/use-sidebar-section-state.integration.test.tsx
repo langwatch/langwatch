@@ -24,6 +24,16 @@ describe("useSidebarSectionState", () => {
     expect(result.current.isExpanded).toBe(true);
   });
 
+  it("starts from the remembered preference, with no collapsed first paint", () => {
+    window.localStorage.setItem("langwatch:main-sidebar-section:build:expanded:v1", "true");
+
+    const { result } = renderHook(() =>
+      useSidebarSectionState({ id: "build", defaultExpanded: false }),
+    );
+
+    expect(result.current.isExpanded).toBe(true);
+  });
+
   it("restoreAll falls back to the remembered preference", () => {
     const { result, rerender } = renderHook(() =>
       useSidebarSectionState({ id: "build", defaultExpanded: false }),

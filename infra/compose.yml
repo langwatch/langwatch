@@ -2,7 +2,6 @@ services:
   app:
     image: langwatch/langwatch:latest
     environment:
-      SKIP_ENV_VALIDATION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
       CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
       # This compose stack runs a plain ClickHouse with no backups, so
@@ -35,7 +34,6 @@ services:
     command: ["pnpm", "run", "start"]
     working_dir: /app/apps/worker
     environment:
-      SKIP_ENV_VALIDATION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
       CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
       # This compose stack runs a plain ClickHouse with no backups, so

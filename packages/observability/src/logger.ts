@@ -260,19 +260,48 @@ function createNodeLogger({
 }
 
 function buildTransport(configuration: ResolvedLoggerConfiguration): DestinationStream {
-  const targets: pino.TransportTargetOptions[] = [
-    buildConsoleTransport({
-      usePretty: configuration.format === "pretty",
-      level: configuration.consoleLevel,
-      isOtelExportEnabled: configuration.otelExportEnabled,
-    }),
-  ];
+  const consoleTarget = buildConsoleTransport({
+    usePretty: configuration.format === "pretty",
+    level: configuration.consoleLevel,
+    isOtelExportEnabled: configuration.otelExportEnabled,
+  });
+  const consoleStream = transportOrStdout({ target: consoleTarget, fallback: process.stdout });
+  if (!configuration.otelExportEnabled) return consoleStream;
 
-  if (configuration.otelExportEnabled) {
-    targets.push(buildOtelTransport(configuration));
-  }
+  // One worker per target, filtered here: pino's in-worker multistream compares
+  // each threshold with the record's `level`, a string under our label formatter,
+  // so every line was dropped.
+  const otel = buildOtelTransport(configuration);
+  return pino.multistream([
+    { level: consoleTarget.level, stream: consoleStream },
+    { level: otel.level, stream: transportOrStdout({ target: otel, fallback: null }) },
+  ]);
+}
 
-  return pino.transport({ targets });
+/**
+ * One target's worker; when it fails, one stderr line, then its lines go to
+ * `fallback`. `emit` carries pino's config message, which a target such as the
+ * OTel transport waits for before it takes a single line.
+ */
+function transportOrStdout({
+  target,
+  fallback,
+}: {
+  target: pino.TransportTargetOptions;
+  fallback: DestinationStream | null;
+}): DestinationStream & { emit(event: string, ...args: unknown[]): boolean } {
+  const transport = pino.transport({ targets: [target] });
+  let failed = false;
+  transport.on("error", (error: unknown) => {
+    if (failed) return;
+    failed = true;
+    const next = fallback ? "writing its lines to stdout" : "dropping its lines";
+    console.error(`pino transport ${target.target} failed, ${next}:`, error);
+  });
+  return {
+    write: (line) => (failed ? fallback?.write(line) : transport.write(line)),
+    emit: (event, ...args) => transport.emit(event, ...args),
+  };
 }
 
 // `service` is constant for the process and only exists so fluent-bit can

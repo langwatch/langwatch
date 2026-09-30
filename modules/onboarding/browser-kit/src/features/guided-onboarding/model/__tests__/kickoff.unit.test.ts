@@ -62,6 +62,7 @@ describe("the guided onboarding kickoff", () => {
       expect(brief.split("\n")).toContain("Provider: none connected yet");
     });
 
+    /** @scenario "The brief names the key the tour minted, by its reveal id" */
     it("carries the virtual key reveal instruction when the tour minted one", () => {
       const brief = buildGuidedKickoffBrief({
         input: {
@@ -76,9 +77,57 @@ describe("the guided onboarding kickoff", () => {
       );
     });
 
+    /** @scenario "The brief's data lines end on their values" */
+    it("writes every line after the opener as a label, a colon and its value, with no sentence stop", () => {
+      const [, ...data] = buildGuidedKickoffBrief({ input: KICKOFF }).split("\n");
+
+      expect(data.length).toBeGreaterThan(0);
+      for (const line of data) {
+        expect(line).toMatch(/^[^:]+: \S.*$/);
+        expect(line.endsWith(".")).toBe(false);
+      }
+    });
+
+    /** @scenario "The brief names the instance's gateway" */
+    it("carries the gateway address, or says none is configured, and never names a hosted gateway", () => {
+      const served = buildGuidedKickoffBrief({ input: KICKOFF }).split("\n");
+      const unserved = buildGuidedKickoffBrief({
+        input: { ...KICKOFF, gatewayUrl: undefined },
+      }).split("\n");
+
+      expect(served).toContain("Gateway: https://gateway.acme.example/v1");
+      expect(unserved).toContain("Gateway: none configured on this instance");
+      expect([...served, ...unserved].join("\n")).not.toMatch(/hosted|gateway\.langwatch/i);
+    });
+
+    /** @scenario "The brief names the key the tour minted, by its reveal id" */
+    it("says no key was minted when the tour minted none", () => {
+      const brief = buildGuidedKickoffBrief({ input: KICKOFF });
+
+      expect(brief.split("\n")).toContain("Virtual key: none minted by the tour");
+      expect(brief).not.toContain("secret_snippet");
+    });
+
     it("prefixes a continuation line when continuing an existing conversation", () => {
       const brief = buildGuidedKickoffBrief({ input: KICKOFF, continuing: true });
       expect(brief.split("\n")[0]).toBe("Let's set up Evals & LLM Ops then.");
+    });
+
+    /** @scenario "A queued kickoff for an attached conversation continues that conversation" */
+    it("opens the brief with the path's continuation line for an attached conversation", () => {
+      const plan = planGuidedKickoffSend({
+        kickoff: { ...KICKOFF, path: "gateway", conversationId: "conv_1" },
+        organizationId: "org_1",
+      });
+
+      expect(plan.brief.split("\n")[0]).toBe("Let's set up Gateway then.");
+    });
+
+    /** @scenario "A queued kickoff with no attached conversation starts a fresh one" */
+    it("opens the brief with the opener alone when there is no conversation to continue", () => {
+      const plan = planGuidedKickoffSend({ kickoff: KICKOFF, organizationId: "org_1" });
+
+      expect(plan.brief.split("\n")[0]).toBe("Guided onboarding kickoff.");
     });
   });
 
@@ -92,6 +141,31 @@ describe("the guided onboarding kickoff", () => {
       const settledPart = guidedKickoffPartOf(settled!);
       expect(settledPart?.provider).toBe("Anthropic");
       expect(settledPart?.providerModel).toBe("claude");
+    });
+
+    /** @scenario "The settled Virtual key line tells Langy what to do with the reveal" */
+    it("settles the Virtual key line from the stored key, or to none minted", () => {
+      const parts = buildGuidedKickoffParts({ input: KICKOFF });
+      const textOf = (settled: unknown[] | null) => JSON.stringify(settled);
+      const withKey = textOf(
+        settleGuidedKickoffParts({
+          parts,
+          facts: guidedKickoffStateFactsOf({
+            virtualKeyName: "onboarding-key",
+            virtualKeyPreview: "vk-lw-abc",
+            virtualKeyRevealId: "reveal-1",
+          }),
+        }),
+      );
+      const withoutKey = textOf(
+        settleGuidedKickoffParts({ parts, facts: guidedKickoffStateFactsOf({}) }),
+      );
+
+      expect(withKey).toContain(
+        "Virtual key: onboarding-key is live (preview vk-lw-abc, reveal id reveal-1). Show it with secret_snippet using this reveal id. Do not list, ask or create keys.",
+      );
+      expect(withoutKey).toContain("Virtual key: none minted by the tour");
+      expect(withoutKey).not.toContain("secret_snippet");
     });
 
     it("returns null when the parts carry no kickoff", () => {

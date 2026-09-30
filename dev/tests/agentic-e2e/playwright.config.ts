@@ -27,7 +27,8 @@ const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
 const IS_CI = !!process.env.CI;
 
 /* Lean headless Chromium: no GPU, no anti-aliasing, no /dev/shm, capped V8 heap.
- * Leaves out --single-process/--no-zygote: they crash Chromium once a test opens a second context. */
+ * Leaves out --single-process/--no-zygote: they crash Chromium once a test opens a second
+ * context. */
 const CHROMIUM_ARGS = [
   "--disable-gpu",
   "--disable-canvas-aa",

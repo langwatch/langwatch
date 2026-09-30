@@ -1,6 +1,5 @@
 /** Invitation ceremony: non-fatal paths preserve membership as durable outcome. */
 
-import { HandledError } from "@langwatch/handled-error";
 import {
   SignedInAddressRequiredError,
   InviteAlreadyAcceptedError,
@@ -11,8 +10,6 @@ import {
   MemberSeatLimitReachedError,
   OrganizationNotFoundError,
   isOrganizationApiCustomRole,
-  type LimitType,
-  limitTypeSchema,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationApiInviteScope,
   type OrganizationCaller,
@@ -26,7 +23,6 @@ import {
   type OrganizationUserRole,
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
-import { z } from "zod";
 
 import type {
   OrganizationInvitations,
@@ -34,15 +30,9 @@ import type {
   OrganizationPlanGate,
   OrganizationSignals,
 } from "../app/organization.members.ts";
+import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
 import type { InviteCreationThrottleService } from "./invite-creation-throttle.service.ts";
 import type { OrganizationLifecycleNoticeService } from "./organization-lifecycle-notice.service.ts";
-
-/** The allowance a seat refusal carries in its `meta`. */
-const seatLimitMetaSchema = z.object({
-  limitType: limitTypeSchema,
-  current: z.number(),
-  max: z.number(),
-});
 
 /** What the ceremony needs beside the invitation service itself. */
 export interface OrganizationInvitationDoorDependencies {
@@ -256,8 +246,9 @@ export class OrganizationInvitationDoorService {
     } catch (error) {
       if (error instanceof OrganizationNotFoundError) throw error;
 
-      const limit = extractSeatLimit(error);
-      if (!limit) throw error;
+      const refusal = readSeatRefusal(error);
+      if (refusal.kind === "other") throw error;
+      const { limit } = refusal;
 
       // Told, not just refused: an organization that has run out of seats is
       // something its administrators act on, and the refusal itself only
@@ -342,19 +333,6 @@ export class OrganizationInvitationDoorService {
       });
     }
   }
-}
-
-/** The seat facts behind a refusal, whichever layer raised it. */
-function extractSeatLimit(
-  error: unknown,
-): Readonly<{ limitType: LimitType; current: number; max: number }> | null {
-  if (!HandledError.isHandled(error)) return null;
-  if (error.code !== "resource_limit_exceeded" && error.code !== "member_seat_limit_reached") {
-    return null;
-  }
-
-  const meta = seatLimitMetaSchema.safeParse(error.meta);
-  return meta.success ? meta.data : null;
 }
 
 function inviteOnWire(invite: OrganizationInvite): OrganizationInviteCreated["invite"] {

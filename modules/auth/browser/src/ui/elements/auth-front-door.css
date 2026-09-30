@@ -51,22 +51,11 @@
 	   `.text-gradient`. Not a colour token - Chakra's `colors` namespace holds
 	   colours, and this is a paint. */
   --lw-front-door-accent-gradient: linear-gradient(100deg, #2563eb 0%, #d9531e 100%);
-  /* The card's shadow: three stacked layers, which `shadows` could hold but
-	   only by splitting one effect across two token systems. It stays here,
-	   beside the glass it belongs to. */
-  --lw-front-door-card-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
-    0 24px 48px -20px rgba(20, 20, 23, 0.28);
 }
 
 .dark {
   /* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
   --lw-front-door-accent-gradient: linear-gradient(100deg, #5fa3ff 0%, #ffa24d 100%);
-  /* Dark glass is smoked, not clear, so the type always has a dark floor
-	   under it - a clear film over a bright warp left the words fighting the
-	   light behind them. */
-  --lw-front-door-card-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px -24px rgba(0, 0, 0, 0.65);
 }
 
 /*
@@ -277,41 +266,6 @@
   .lw-front-door-primary:hover,
   .lw-front-door-primary:active {
     transform: none;
-  }
-}
-
-/* The card: glass over the ground. The blur is what makes it glass — the
-   ground's colour moves through it rather than stopping at it. And the card
-   answers being used: while anything on it holds focus, the glass warms with
-   a slow breath of the brand's light, so clicking into a field feels like
-   the surface noticed. */
-.lw-front-door-card {
-  background: var(--chakra-colors-front-door-card-bg) !important;
-  border-color: var(--chakra-colors-front-door-card-border) !important;
-  box-shadow: var(--lw-front-door-card-shadow);
-  /* Recalibrated from 18px / 1.9 / brightness(1.04). That mix let the
-	   ground's blue bloom come through so hot that the card's top half read
-	   as a different surface than its bottom — a band, not glass. More blur
-	   softens the ground's internal edges as they cross the card, the tamer
-	   saturation stops amplifying them, and the deeper card floor (see
-	   `cardBg` in frontDoorTheme.ts) evens the whole pane so the ground
-	   reads as light behind the glass rather than shapes stuck to it. */
-  -webkit-backdrop-filter: blur(26px) saturate(1.35);
-  backdrop-filter: blur(26px) saturate(1.35);
-  transition:
-    box-shadow 420ms ease,
-    border-color 420ms ease;
-}
-
-.lw-front-door-card:focus-within {
-  box-shadow:
-    var(--lw-front-door-card-shadow),
-    0 0 56px -14px var(--chakra-colors-front-door-glow);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lw-front-door-card {
-    transition: none;
   }
 }
 

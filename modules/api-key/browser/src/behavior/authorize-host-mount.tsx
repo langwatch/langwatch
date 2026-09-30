@@ -4,8 +4,13 @@
  * ARCHITECTURE.md §10.1.
  */
 
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
-import { useMemo, type ReactNode } from "react";
+import {
+  useUiCapabilities,
+  useUiDeclarations,
+  useUiScope,
+} from "@langwatch/browser-host/capabilities";
+import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
+import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import {
@@ -40,6 +45,7 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
       navigate: (to: string) => void;
       replace: (to: string) => void;
       projectApiKey: string | undefined;
+      Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
       succeeded: (notice: AuthorizeSuccessNotice) => void;
       failed: (failure: AuthorizeFailureNotice) => void;
     },
@@ -76,9 +82,15 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
     return this.deps.projectApiKey;
   }
 
-  /** No switcher is mounted below the root layout; the port says null is an answer. */
+  /** The switcher project lends by declaration (ARCHITECTURE §10), drawn inside the card. */
   projectSwitcher(): ReactNode {
-    return null;
+    const { Switcher } = this.deps;
+    if (!Switcher) return null;
+    return (
+      <Suspense fallback={null}>
+        <Switcher />
+      </Suspense>
+    );
   }
 
   authorizeMcpClient(request: McpAuthorizeRequest): Promise<McpAuthorizeAnswer> {
@@ -112,6 +124,12 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     projectId: activeScope.projectId ?? void 0,
   });
   const sessionActor = session.currentUser();
+  const declarations = useUiDeclarations();
+  // `lazy` once per declaration, never per render, so the switcher is not remounted.
+  const Switcher = useMemo(() => {
+    const [lent] = declarations.declared("projectSwitcher");
+    return lent ? lazy(lent.capability.load) : void 0;
+  }, [declarations]);
 
   const host = useMemo(
     () =>
@@ -127,10 +145,11 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
         navigate: (to) => navigation.navigate(to),
         replace: (to) => navigation.replace(to),
         projectApiKey: graph.activeProject?.project.apiKey ?? void 0,
+        Switcher,
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
       }),
-    [activeScope.projectId, graph, sessionActor, session, location, navigation, feedback],
+    [activeScope.projectId, graph, sessionActor, session, location, navigation, feedback, Switcher],
   );
 
   return <AuthorizeHostProvider value={host}>{children}</AuthorizeHostProvider>;

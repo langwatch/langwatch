@@ -27,12 +27,12 @@ function isEnterpriseFeature(value: string): value is EnterpriseFeature {
 export class EnterprisePlanRequiredError extends HandledError {
   declare readonly code: "enterprise_plan_required";
 
-  constructor(featureOrMessage: string) {
+  constructor(featureOrMessage: string, httpStatus: 402 | 403 = 402) {
     const feature = isEnterpriseFeature(featureOrMessage) ? featureOrMessage : undefined;
     const message = feature ? ENTERPRISE_FEATURE_ERRORS[feature] : featureOrMessage;
 
     super("enterprise_plan_required", message, {
-      httpStatus: 403,
+      httpStatus,
       ...(feature ? { meta: { feature } } : {}),
       fault: "customer",
       ...remediation("enterprise_plan_required"),

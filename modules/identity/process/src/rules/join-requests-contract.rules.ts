@@ -76,6 +76,8 @@ export interface JoinMembership {
     approvedByUserId: string | null;
   }) => Promise<void>;
   isMember(args: { userId: string; organizationId: string }): Promise<boolean>;
+  /** Which of these organizations the person is already in, in one read. */
+  memberOrganizationIds(args: { userId: string; organizationIds: string[] }): Promise<string[]>;
 }
 
 /** The domains a person has said "no thanks" to being offered; the user module keeps them. */

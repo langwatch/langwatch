@@ -139,6 +139,73 @@ describe("Server", () => {
     });
   });
 
+  describe("given a contribution on the door that throws", () => {
+    describe("when it is asked", () => {
+      /** @scenario "A door handler fails" */
+      it("answers 500 and reports the handler by name", async () => {
+        const server = await startServer();
+        server.with({
+          path: "/boom",
+          handle: () => {
+            throw new Error("boom");
+          },
+        });
+        await server.listen();
+
+        const response = await fetchFrom(server, "/boom");
+
+        expect(response.status).toBe(500);
+        expect(logger.error).toHaveBeenCalledWith(
+          expect.objectContaining({ handler: "/boom" }),
+          expect.any(String),
+        );
+      });
+    });
+  });
+
+  describe("given an application that composed no handler", () => {
+    describe("when the server is asked to serve it", () => {
+      /** @scenario "A mounted transport is not a door handler" */
+      it("refuses, naming the application", async () => {
+        const server = await startServer();
+
+        expect(() =>
+          server.serve({ name: "orphan-app", start: () => undefined, stop: () => undefined }),
+        ).toThrow(/"orphan-app"/);
+      });
+    });
+  });
+
+  describe("given a serving process that has begun shutting down", () => {
+    describe("when a request arrives for a mounted transport", () => {
+      /** @scenario "The door refuses new work while draining" */
+      it("refuses it with 503 while /healthz still answers", async () => {
+        const server = await startServer();
+        let releaseDrain: () => void = () => undefined;
+        const drainStarted = new Promise<void>((resolve) => {
+          releaseDrain = resolve;
+        });
+        server.with({ name: "slow drain", stop: () => drainStarted, drain: true });
+        await server.serve({
+          name: "api",
+          start: () => undefined,
+          stop: () => undefined,
+          handler: (_request: http.IncomingMessage, response: http.ServerResponse) => {
+            response.writeHead(200).end("served");
+          },
+        });
+
+        void server.close();
+        const refused = await fetchFrom(server, "/api/things");
+        const health = await fetchFrom(server, "/healthz");
+
+        expect(refused.status).toBe(503);
+        expect(health.status).toBe(200);
+        releaseDrain();
+      });
+    });
+  });
+
   describe("given the fluent chain", () => {
     describe("when a component is mounted with .with()", () => {
       /** @scenario ".with() returns the server so calls chain" */

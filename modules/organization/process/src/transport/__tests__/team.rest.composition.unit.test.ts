@@ -640,8 +640,8 @@ describe("given the teams REST family over the application the composition build
       expect(permissions.teamMemberIds(SHARED_TEAM_ID)).not.toContain(OUTSIDER_ID);
     });
 
-    /** @scenario Granting a role a member already holds names the code */
-    it("refuses a role the member already holds", async () => {
+    /** @scenario Granting a role a member already holds is written again */
+    it("writes a role the member already holds again", async () => {
       const { app } = application();
       const { send } = mountTeamsRestApplication(app);
 
@@ -654,8 +654,7 @@ describe("given the teams REST family over the application the composition build
         body: { userId: COLLEAGUE_ID, role: "MEMBER" },
       });
 
-      expect(response.status).toBe(409);
-      expect((await refusalOf(response)).code).toBe("team_member_already_added");
+      expect(response.ok).toBe(true);
     });
 
     /** @scenario Refuses to add a member to a personal team */

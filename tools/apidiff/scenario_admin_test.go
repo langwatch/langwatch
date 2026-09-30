@@ -142,3 +142,55 @@ func TestServicePortsFindTheStackBehindTheUIPort(t *testing.T) {
 		t.Fatal("an unserved port must match nothing")
 	}
 }
+
+// selfHostedYAML adds a scenario the SaaS deployment does not serve.
+const selfHostedYAML = adminMixYAML + `- id: self-hosted-only
+  endpoint: GET /api/checkup
+  selfHosted: true
+  request: { path: /api/checkup }
+  expect: { status: 200 }
+`
+
+// sessionStack is a SaaS stack: the admin routes 404, the seeded admin signs
+// in, and an organization is made and keyed through tRPC.
+func sessionStack(t *testing.T) string {
+	t.Helper()
+	reply := map[string]string{
+		"/api/trpc/organization.createAndAssign": `{"result":{"data":{"organization":{"id":"org-1"},"team":{"id":"team-1"}}}}`,
+		"/api/trpc/apiKey.create":                `{"result":{"data":{"token":"org-token"}}}`,
+		"/api/projects":                          `{"id":"project-1","serviceApiKey":"project-token"}`,
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch body, known := reply[request.URL.Path]; {
+		case request.URL.Path == "/api/organizations":
+			writer.WriteHeader(http.StatusNotFound)
+		case request.URL.Path == "/api/auth/sign-in/email":
+			http.SetCookie(writer, &http.Cookie{Name: "session", Value: "admin"})
+		case known && request.Method == http.MethodPost:
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(body))
+		default:
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{}`))
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server.URL
+}
+
+func TestSaaSSeedsSecondOrganizationsThroughTheAdminSession(t *testing.T) {
+	var report bytes.Buffer
+	options := scenarioOptions{
+		Progress: &report, A: sessionStack(t), Timeout: 2 * time.Second, Concurrency: 1, Shards: 1, RunDir: t.TempDir(),
+		Glob: writeScenarioYAML(t, selfHostedYAML), Keys: Keys{ProjectKey: "key", OrgKey: "org", AdminKey: "admin"},
+	}
+	code := runScenarioPhase(context.Background(), options, &report, &report)
+	if code != exitEqual {
+		t.Fatalf("code %d:\n%s", code, report.String())
+	}
+	for _, want := range []string{"through the seeded admin's session", "scenarios: 2 run: 2 PASS", "2 deferred: self-hosted pass", "needs-admin-key, self-hosted-only"} {
+		if !strings.Contains(report.String(), want) {
+			t.Errorf("report lacks %q:\n%s", want, report.String())
+		}
+	}
+}

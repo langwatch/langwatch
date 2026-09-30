@@ -58,7 +58,13 @@ func Recapture(ctx context.Context, request RecaptureRequest, streams Streams) (
 	plan.Flows = selectFlows(plan.Flows, request.Flows)
 	plan.FailFast = false
 	if len(plan.Stacks) > 0 {
-		if err := newEditionSwitch(request.Deps.Run, request.Deps.Environ, "").Set(ctx, request.Edition, plan.Stacks); err != nil {
+		switcher := newEditionSwitch(request.Deps.Run, request.Deps.Environ, "")
+		defer func() {
+			if err := switcher.Restore(context.WithoutCancel(ctx), plan.Stacks); err != nil {
+				fmt.Fprintf(streams.Err, "recapture: enterprise not restored: %v\n", err)
+			}
+		}()
+		if err := switcher.Set(ctx, request.Edition, plan.Stacks); err != nil {
 			return RecaptureResult{}, fmt.Errorf("recapture: %w", err)
 		}
 	}

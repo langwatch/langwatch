@@ -91,6 +91,28 @@ describe("sign-in refusals", () => {
   });
 });
 
+describe("a refused credential", () => {
+  /** @scenario "A refused credential still refuses in one way" */
+  it("refuses a wrong password and an unheld address with one code and one body", async () => {
+    const post = refusalHarness();
+    await post("/sign-up/email", HOLDER);
+
+    const wrongPassword = await post("/sign-in/email", {
+      email: HOLDER.email,
+      password: "wrong-guess-1",
+    });
+    const unheldAddress = await post("/sign-in/email", {
+      email: "nobody@company.test",
+      password: "wrong-guess-1",
+    });
+
+    expect(wrongPassword.status).toBe(unheldAddress.status);
+    const refusal = await wrongPassword.json();
+    expect(refusal).toMatchObject({ code: "identity_sign_in_refused" });
+    expect(await unheldAddress.json()).toEqual(refusal);
+  });
+});
+
 describe("sign-up refusals", () => {
   /** @scenario "Signing up with an address already registered is refused as email_already_registered" */
   it("answers a taken address under email_already_registered", async () => {

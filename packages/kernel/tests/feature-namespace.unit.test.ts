@@ -63,6 +63,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   "enterprise-ops": "enterprise-ops",
   governance: "governance",
   licensing: "licensing",
+  nurturing: "nurturings",
   "managed-provider": "managed-providers",
   saas: "saas",
   scim: "scim",

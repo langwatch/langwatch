@@ -11,25 +11,24 @@ import {
   VStack,
   VisuallyHidden,
 } from "@chakra-ui/react";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type {
   FeatureFlagRules,
   OperatorFeatureFlag as StoredOperatorFeatureFlag,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
-
-import { readableDate } from "../../model/display-formatters.ts";
-
-/** One flag as the BROWSER receives it: `updatedAt` arrives as an ISO string. */
-export type OperatorFeatureFlag = Omit<StoredOperatorFeatureFlag, "updatedAt"> & {
-  updatedAt: string | null;
-};
-import { Switch } from "@langwatch/design-system/switch";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { format } from "@langwatch/time";
 import { Settings2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { summarizeTargeting, targetingLabel } from "../../model/targeting-summary.ts";
 import { FeatureFlagRulesDialog } from "./feature-flag-rules-dialog.tsx";
+
+/** One flag as the BROWSER receives it: `updatedAt` arrives as an ISO string. */
+export type OperatorFeatureFlag = Omit<StoredOperatorFeatureFlag, "updatedAt"> & {
+  updatedAt: string | null;
+};
 
 /**
  * The catalogue as the BROWSER receives it. The contract types `updatedAt`
@@ -316,11 +315,11 @@ function FlagRow({
           </Text>
         ) : (
           <VStack align="start" gap={0}>
-            <Text fontSize="xs">
-              {row.updatedAt ? readableDate(row.updatedAt).toLocaleString() : ""}
+            <Text fontSize="xs" whiteSpace="nowrap">
+              {row.updatedAt ? format(row.updatedAt, "dd/MM/yyyy HH:mm:ss") : ""}
             </Text>
-            <HStack gap={2}>
-              <Text fontSize="xs" color="fg.muted">
+            <HStack gap={2} flexWrap="nowrap">
+              <Text fontSize="xs" color="fg.muted" truncate maxWidth="160px">
                 {row.lastEditedBy ?? "unknown"}
               </Text>
               {canManage && (
@@ -328,6 +327,9 @@ function FlagRow({
                   variant="plain"
                   size="xs"
                   paddingX={0}
+                  height="auto"
+                  minWidth="auto"
+                  flexShrink={0}
                   disabled={pending}
                   onClick={() => void clear()}
                 >

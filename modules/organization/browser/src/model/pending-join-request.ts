@@ -17,5 +17,5 @@ export interface AutomaticJoin {
   joinRequestId: string;
   name: string;
   domain: string;
-  joinedAt: Date | string | null;
+  joinedAt: string | null;
 }

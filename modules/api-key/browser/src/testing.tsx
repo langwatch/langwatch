@@ -219,6 +219,7 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
       query?: Readonly<Record<string, string | undefined>>;
       answer?: McpAuthorizeAnswer | Error;
       apiKey?: string;
+      projectSwitcher?: ReactNode;
     } = {},
   ) {
     super();
@@ -253,7 +254,7 @@ export class FakeAuthorizeHost extends AuthorizeHostApi {
   }
 
   projectSwitcher(): ReactNode {
-    return null;
+    return this.options.projectSwitcher ?? null;
   }
 
   authorizeMcpClient(request: McpAuthorizeRequest): Promise<McpAuthorizeAnswer> {

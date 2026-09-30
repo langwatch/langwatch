@@ -16,6 +16,44 @@ Feature: Custom role service
     Then the role application refuses before anything is written
 
   @unit
+  Scenario: A created role is readable as soon as its creation answers
+    When the caller creates a role
+    Then the role application waits for the role to be projected before answering
+    And a read straight after the answer finds the role
+
+  @unit
+  Scenario: A role creation the projection cannot confirm in time is refused
+    Given the role projection does not land the role within the wait
+    When the caller creates a role
+    Then the creation fails with the handled grant-not-confirmed error
+    And no created role is answered
+
+  @unit
+  Scenario: A second role with a name already taken is refused with a conflict
+    Given a role creation has answered for a name
+    When the caller creates another role with the same name
+    Then the role application refuses with the name-taken conflict
+
+  @unit
+  Scenario: A role definition whose name another live role holds cannot stall the fold
+    Given another live role in the organization holds the name
+    When the fold projects a definition carrying that name
+    Then the definition is skipped rather than failing on the unique name
+    And no compatibility role row is written for it
+
+  @unit
+  Scenario: A deleted role's name can be taken by a new role
+    Given a role in the organization was deleted
+    When a new role is defined with the deleted role's name
+    Then the name is free, because a role name is unique among live roles only
+
+  @unit
+  Scenario: A redelivered role definition does not bring back a deleted role
+    Given the role head is deleted
+    When an older definition of the role is delivered again
+    Then no compatibility role row is written for it
+
+  @unit
   Scenario: A role is requested from another organization
     When a caller gets, updates, or removes it through an organization-scoped operation
     Then the role application throws the same not-found error as for an absent role

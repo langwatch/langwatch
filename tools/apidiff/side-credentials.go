@@ -214,21 +214,28 @@ func (engine *probeEngine) adminEmailsFor(baseURL string) []string {
 // exchange, so a scenario's re-login cannot revoke it.
 const cliFixtureDeviceLabel = "apidiff-fixture"
 
-// mintCLISession signs the seeded admin in on one side and walks the device
-// flow the CLI uses (device-code, approve, exchange), filing the browser
-// session and the minted access token into that side's credentials.
-func (engine *probeEngine) mintCLISession(baseURL string, credentials sideCredentials) {
+// signInAdmin files the seeded admin's browser session into credentials and
+// says whether the sign-in worked.
+func (engine *probeEngine) signInAdmin(baseURL string, credentials sideCredentials) bool {
 	origin := browserOrigin(baseURL)
 	for _, email := range engine.adminEmailsFor(baseURL) {
 		signIn := engine.fixtureRequest(fixtureCall{method: http.MethodPost, url: baseURL + "/api/auth/sign-in/email",
 			headers: map[string]string{"Origin": origin}, body: map[string]any{"email": email, "password": seededAdminPassword}})
 		if cookie := cookieHeader(signIn.header); signIn.status == http.StatusOK && cookie != "" {
 			credentials[credSessionCookie] = cookie
-			break
+			return true
 		}
 		engine.progress("fixture sign-in %s as %s: %d\n", baseURL, email, signIn.status)
 	}
-	if credentials[credSessionCookie] == "" {
+	return false
+}
+
+// mintCLISession signs the seeded admin in on one side and walks the device
+// flow the CLI uses (device-code, approve, exchange), filing the browser
+// session and the minted access token into that side's credentials.
+func (engine *probeEngine) mintCLISession(baseURL string, credentials sideCredentials) {
+	origin := browserOrigin(baseURL)
+	if !engine.signInAdmin(baseURL, credentials) && credentials[credSessionCookie] == "" {
 		return
 	}
 	device := engine.fixtureRequest(fixtureCall{method: http.MethodPost, url: baseURL + "/api/auth/cli/device-code", body: map[string]any{}})

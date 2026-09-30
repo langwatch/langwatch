@@ -1,18 +1,11 @@
 /**
- * `/onboarding/:team/project` — the first project a new organization creates.
+ * `/onboarding/:team/project` — the first project a new organization creates, on the same
+ * branded card as the sign-in doors: centred on a wide screen, full bleed on a phone.
  */
 
-import {
-  Button,
-  Field,
-  Heading,
-  HStack,
-  Input,
-  NativeSelect,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Field, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
 import { type ProjectFormData, TechStackSelector } from "@langwatch/onboarding-browser-kit";
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
@@ -21,8 +14,24 @@ import { api } from "../../../behavior/onboarding-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../../behavior/use-required-session.ts";
 import { getSafeReturnToPath } from "../../../model/get-safe-return-to-path.ts";
+import { useOnboardingHost } from "../../../model/onboarding-host.ts";
 import ErrorPage from "../../../ui/elements/compat/next-error.tsx";
-import { SetupLayout } from "../../../ui/elements/setup-layout.tsx";
+
+/** The sign-in doors' label voice: small mono capitals. Reaches the tech stack's labels too. */
+const FIELD_LABELS = {
+  "& [data-scope=field][data-part=label]": {
+    fontFamily: "mono",
+    fontSize: "11px",
+    fontWeight: "normal",
+    textTransform: "uppercase",
+    letterSpacing: "0.14em",
+    color: "fg.muted",
+    marginBottom: "4px",
+  },
+} as const;
+
+/** 16px on a phone: anything smaller makes iOS zoom in when the field takes focus. */
+const FIELD_TEXT = { base: "16px", md: "14px" } as const;
 
 function submitButtonLabel({ isSuccess, isPending }: { isSuccess: boolean; isPending: boolean }) {
   if (isSuccess) return "Created";
@@ -32,6 +41,7 @@ function submitButtonLabel({ isSuccess, isPending }: { isSuccess: boolean; isPen
 
 export default function ProjectOnboarding() {
   useRequiredSession();
+  const host = useOnboardingHost();
 
   const form = useForm<ProjectFormData>({
     defaultValues: {
@@ -103,66 +113,92 @@ export default function ProjectOnboarding() {
   }
 
   return (
-    <SetupLayout>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <VStack gap={4} alignItems="left">
-          <Heading as="h1" fontSize="x-large">
-            Create New Project
-          </Heading>
-          <Text paddingBottom={4} fontSize="14px">
-            You can set up separate projects for each service or LLM feature of your application
-            (for example, one for your ChatBot, another for that Content Generation feature).
-            <br />
-          </Text>
-          <Field.Root>
-            <Field.Label>Project Name</Field.Label>
-            <Input
-              data-testid="onboarding-project-name"
-              {...form.register("name", { required: true })}
-            />
-          </Field.Root>
-          {teams.data?.some((team) => team.projects.length > 0) && (
-            <>
-              <Field.Root>
-                <Field.Label>Team</Field.Label>
-                <NativeSelect.Root>
-                  <NativeSelect.Field {...form.register("teamId", { required: true })}>
-                    {teams.data?.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                    <option value="NEW">(+) Create new team</option>
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              </Field.Root>
-              {teamId === "NEW" && (
+    <BrandedCardPage>
+      <BrandedCard
+        title="Create New Project"
+        intro="You can set up separate projects for each service or LLM feature of your application (for example, one for your ChatBot, another for that Content Generation feature)."
+        footer={
+          <Button
+            variant="plain"
+            size="xs"
+            color="fg.muted"
+            _hover={{ color: "fg" }}
+            onClick={() => host.signOut()}
+          >
+            Sign out
+          </Button>
+        }
+      >
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <VStack gap="18px" align="stretch" css={FIELD_LABELS}>
+            <Field.Root>
+              <Field.Label>Project Name</Field.Label>
+              <Input
+                size="lg"
+                fontSize={FIELD_TEXT}
+                borderRadius="10px"
+                data-testid="onboarding-project-name"
+                {...form.register("name", { required: true })}
+              />
+            </Field.Root>
+            {teams.data?.some((team) => team.projects.length > 0) && (
+              <>
                 <Field.Root>
-                  <Field.Label>New Team Name</Field.Label>
-                  <Input {...form.register("newTeamName", { required: true })} />
+                  <Field.Label>Team</Field.Label>
+                  <NativeSelect.Root size="lg">
+                    <NativeSelect.Field
+                      fontSize={FIELD_TEXT}
+                      borderRadius="10px"
+                      {...form.register("teamId", { required: true })}
+                    >
+                      {teams.data?.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                      <option value="NEW">(+) Create new team</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
                 </Field.Root>
-              )}
-            </>
-          )}
-          <TechStackSelector
-            form={form}
-            language={form.watch("language")}
-            framework={form.watch("framework")}
-          />
-          {createProject.error && <p>Something went wrong!</p>}
-          <HStack width="full">
+                {teamId === "NEW" && (
+                  <Field.Root>
+                    <Field.Label>New Team Name</Field.Label>
+                    <Input
+                      size="lg"
+                      fontSize={FIELD_TEXT}
+                      borderRadius="10px"
+                      {...form.register("newTeamName", { required: true })}
+                    />
+                  </Field.Root>
+                )}
+              </>
+            )}
+            <TechStackSelector
+              form={form}
+              language={form.watch("language")}
+              framework={form.watch("framework")}
+            />
+            {createProject.error && (
+              <Text role="alert" fontSize="12.5px" color="fg.error">
+                Something went wrong!
+              </Text>
+            )}
             <Button
               colorPalette="orange"
               type="submit"
+              width="full"
+              minHeight="44px"
+              fontWeight={600}
+              borderRadius="full"
               data-testid="onboarding-project-submit"
               disabled={createProject.isPending || createProject.isSuccess}
             >
               {submitButtonLabel(createProject)}
             </Button>
-          </HStack>
-        </VStack>
-      </form>
-    </SetupLayout>
+          </VStack>
+        </form>
+      </BrandedCard>
+    </BrandedCardPage>
   );
 }

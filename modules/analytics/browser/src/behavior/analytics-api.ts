@@ -13,6 +13,7 @@ import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/ap
 import type {
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
+  dashboardWidgetTrpcRowSchema,
   graphDetailSchema,
   graphListItemSchema,
 } from "@langwatch/dashboard-contract";
@@ -28,6 +29,7 @@ type DashboardSummaryRow = WireOf<z.infer<typeof dashboardTrpcSummarySchema>>;
 type DashboardRow = WireOf<z.infer<typeof dashboardTrpcRowSchema>>;
 type GraphListItem = WireOf<z.infer<typeof graphListItemSchema>>;
 type GraphDetail = WireOf<z.infer<typeof graphDetailSchema>>;
+type DashboardWidgetRow = WireOf<z.infer<typeof dashboardWidgetTrpcRowSchema>>;
 
 /** The project every analytics procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -250,7 +252,7 @@ type BorrowedProcedures = {
     };
   };
   dashboardWidgets: {
-    list: { query: { input: ProjectScope; output: unknown[] } };
+    list: { query: { input: ProjectScope; output: DashboardWidgetRow[] } };
     create: {
       mutation: {
         input: ProjectScope & {
@@ -276,7 +278,7 @@ type BorrowedProcedures = {
     };
     batchUpdateLayouts: {
       mutation: {
-        input: ProjectScope & { layouts: ({ graphId: string } & Record<string, unknown>)[] };
+        input: ProjectScope & { layouts: ChartGridPlacement[] };
         output: { success: true };
       };
     };

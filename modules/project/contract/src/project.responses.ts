@@ -7,6 +7,7 @@
 // Checked against real answers in development and test; production returns
 // the handler's own value.
 
+import { dataPrivacyPiiRedactionLevelSchema } from "@langwatch/data-privacy-contract";
 import { z } from "zod";
 
 /** A project was provisioned; the slug is what the caller navigates to. */
@@ -71,6 +72,12 @@ export const projectRestSchema = z
   })
   .strict();
 export type ProjectRest = z.infer<typeof projectRestSchema>;
+
+/** One project as its own GET and PATCH answer it: the listing's shape plus its PII level. */
+export const projectRestDetailSchema = projectRestSchema.safeExtend({
+  piiRedactionLevel: dataPrivacyPiiRedactionLevelSchema,
+});
+export type ProjectRestDetail = z.infer<typeof projectRestDetailSchema>;
 
 /** A page of them, with the count the caller pages through. */
 export const projectRestPageSchema = z
