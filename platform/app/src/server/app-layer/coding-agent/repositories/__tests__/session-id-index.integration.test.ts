@@ -83,10 +83,10 @@ interface SessionFixture {
 }
 
 /** One call, one part. Which rows share a part decides what the primary key can prune. */
-async function insertSessions({ sessions }: { sessions: SessionFixture[] }) {
+async function insertSessions({ fixtures }: { fixtures: SessionFixture[] }) {
   await ch.insert({
     table: "coding_agent_sessions",
-    values: sessions.map((session) => ({
+    values: fixtures.map((session) => ({
       TenantId: session.tenantId,
       SessionId: session.sessionId,
       SessionKeySource: "session_id",
@@ -167,7 +167,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
       // would make two parts, each with a single-point range that the primary
       // key could exclude on its own.
       await insertSessions({
-        sessions: [
+        fixtures: [
           {
             tenantId,
             sessionId: BRACKET_LOW,
@@ -183,7 +183,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
         ],
       });
       await insertSessions({
-        sessions: [
+        fixtures: [
           {
             tenantId,
             sessionId: FAR_SESSION,
@@ -241,7 +241,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
       // must not disturb which version wins.
       const updatedAt = new Date("2026-03-09T00:00:01.000Z");
       await insertSessions({
-        sessions: [
+        fixtures: [
           {
             tenantId,
             sessionId,
@@ -252,7 +252,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
         ],
       });
       await insertSessions({
-        sessions: [
+        fixtures: [
           {
             tenantId,
             sessionId,
@@ -274,7 +274,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
     it("keeps the lookup scoped to the requesting tenant", async () => {
       const sessionId = `${tag}-shared`;
       await insertSessions({
-        sessions: [
+        fixtures: [
           {
             tenantId: tenantIdFor("c"),
             sessionId,
@@ -285,7 +285,7 @@ describe("given the coding_agent_sessions SessionId skip-index", () => {
         ],
       });
       await insertSessions({
-        sessions: [
+        fixtures: [
           {
             tenantId: tenantIdFor("d"),
             sessionId,
