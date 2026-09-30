@@ -764,6 +764,9 @@ failed: <cause>` (exit 2): the shared or run organization could not be made
   to measure throughput. YAML: quote any flow-mapping value that contains a
   `{placeholder}`.
 
+Scenario files keep one scenario per line in flow style, with authored comments, so
+`.oxfmtrc.json` leaves `tools/apidiff/scenarios/` out of formatting.
+
 ## Persistent worktrees and caches
 
 A run reuses what the last one left, the way visualdiff does
