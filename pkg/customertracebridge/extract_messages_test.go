@@ -17,12 +17,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 func TestExtractInputMessages_RequestTypeResponses_stringInput(t *testing.T) {
 	body := []byte(`{"input":"hello world","model":"gpt-5.5"}`)
-	got := extractInputMessages(body, domain.RequestTypeResponses)
+	got := extractInputMessages(body, aitrace.RequestTypeResponses)
 	assert.JSONEq(t, `[{"role":"user","content":"hello world"}]`, got)
 }
 
@@ -34,7 +34,7 @@ func TestExtractInputMessages_RequestTypeResponses_arrayInput(t *testing.T) {
 		],
 		"model":"gpt-5.5"
 	}`)
-	got := extractInputMessages(body, domain.RequestTypeResponses)
+	got := extractInputMessages(body, aitrace.RequestTypeResponses)
 	require.NotEmpty(t, got, "responses array input must flatten to messages")
 	assert.Contains(t, got, `"role":"system"`)
 	assert.Contains(t, got, `"role":"user"`)
@@ -43,13 +43,13 @@ func TestExtractInputMessages_RequestTypeResponses_arrayInput(t *testing.T) {
 
 func TestExtractInputMessages_RequestTypeResponses_missing(t *testing.T) {
 	body := []byte(`{"model":"gpt-5.5"}`)
-	assert.Empty(t, extractInputMessages(body, domain.RequestTypeResponses))
+	assert.Empty(t, extractInputMessages(body, aitrace.RequestTypeResponses))
 }
 
 // @scenario "The captured input includes Responses API instructions"
 func TestExtractInputMessages_RequestTypeResponses_prependsInstructionsAsSystem(t *testing.T) {
 	body := []byte(`{"instructions":"You are codex.","input":"hello world","model":"gpt-5.5"}`)
-	got := extractInputMessages(body, domain.RequestTypeResponses)
+	got := extractInputMessages(body, aitrace.RequestTypeResponses)
 	assert.JSONEq(t, `[{"role":"system","content":"You are codex."},{"role":"user","content":"hello world"}]`, got)
 }
 
@@ -57,7 +57,7 @@ func TestExtractInputMessages_RequestTypeResponses_prependsInstructionsAsSystem(
 func TestExtractInputMessages_RequestTypeMessages_prependsStringSystem(t *testing.T) {
 	body := []byte(`{"model":"claude-sonnet-4-5","system":"You are a helpful bot.",` +
 		`"messages":[{"role":"user","content":"hi"}]}`)
-	got := extractInputMessages(body, domain.RequestTypeMessages)
+	got := extractInputMessages(body, aitrace.RequestTypeMessages)
 	assert.JSONEq(t, `[{"role":"system","content":"You are a helpful bot."},{"role":"user","content":"hi"}]`, got)
 }
 
@@ -69,7 +69,7 @@ func TestExtractInputMessages_RequestTypeMessages_flattensBlockArraySystem(t *te
 		`"system":[{"type":"text","text":"You are a helpful bot.","cache_control":{"type":"ephemeral"}},` +
 		`{"type":"text","text":"Answer in French."}],` +
 		`"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
-	got := extractInputMessages(body, domain.RequestTypeMessages)
+	got := extractInputMessages(body, aitrace.RequestTypeMessages)
 	assert.JSONEq(t, `[{"role":"system","content":"You are a helpful bot.\nAnswer in French."},`+
 		`{"role":"user","content":[{"type":"text","text":"hi"}]}]`, got)
 }
@@ -77,7 +77,7 @@ func TestExtractInputMessages_RequestTypeMessages_flattensBlockArraySystem(t *te
 func TestExtractInputMessages_RequestTypeMessages_keepsMessagesVerbatimWithoutSystem(t *testing.T) {
 	body := []byte(`{"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"},` +
 		`{"role":"assistant","content":[{"type":"text","text":"hello"}]}]}`)
-	got := extractInputMessages(body, domain.RequestTypeMessages)
+	got := extractInputMessages(body, aitrace.RequestTypeMessages)
 	assert.JSONEq(t, `[{"role":"user","content":"hi"},{"role":"assistant","content":[{"type":"text","text":"hello"}]}]`, got)
 }
 
@@ -88,7 +88,7 @@ func TestExtractOutputMessages_RequestTypeResponses_syncJSON(t *testing.T) {
 		],
 		"model":"gpt-5.5"
 	}`)
-	got := extractOutputMessages(body, domain.RequestTypeResponses)
+	got := extractOutputMessages(body, aitrace.RequestTypeResponses)
 	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
@@ -107,7 +107,7 @@ func TestExtractOutputMessages_RequestTypeResponses_streamingSSE_completed(t *te
 		`data: {"type":"response.completed","response":{"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"PONG"}]}]}}`,
 		``,
 	}, "\n"))
-	got := extractOutputMessages(body, domain.RequestTypeResponses)
+	got := extractOutputMessages(body, aitrace.RequestTypeResponses)
 	// Prefer the completed snapshot's final shape — must match the sync case verbatim.
 	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
@@ -123,7 +123,7 @@ func TestExtractOutputMessages_RequestTypeResponses_streamingSSE_deltasOnly(t *t
 		`data: {"type":"response.output_text.delta","delta":"NG"}`,
 		``,
 	}, "\n"))
-	got := extractOutputMessages(body, domain.RequestTypeResponses)
+	got := extractOutputMessages(body, aitrace.RequestTypeResponses)
 	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
@@ -149,7 +149,7 @@ func TestExtractOutputMessages_RequestTypeMessages_streamingSSE(t *testing.T) {
 		`data: {"type":"message_stop"}`,
 		``,
 	}, "\n"))
-	got := extractOutputMessages(body, domain.RequestTypeMessages)
+	got := extractOutputMessages(body, aitrace.RequestTypeMessages)
 	assert.JSONEq(t, `[{"role":"assistant","content":[{"type":"text","text":"PONG"}]}]`, got)
 }
 
@@ -165,7 +165,7 @@ func TestExtractOutputMessages_RequestTypeChat_streamingSSE(t *testing.T) {
 		`data: [DONE]`,
 		``,
 	}, "\n"))
-	got := extractOutputMessages(body, domain.RequestTypeChat)
+	got := extractOutputMessages(body, aitrace.RequestTypeChat)
 	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
@@ -179,16 +179,16 @@ func TestExtractOutputMessages_RequestTypePassthrough_geminiStreamingSSE(t *test
 		`data: {"candidates":[{"content":{"parts":[{"text":"NG"}],"role":"model"}}]}`,
 		``,
 	}, "\n"))
-	got := extractOutputMessages(body, domain.RequestTypePassthrough)
+	got := extractOutputMessages(body, aitrace.RequestTypePassthrough)
 	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
 func TestExtractOutputMessages_emptyBody_returnsEmpty(t *testing.T) {
-	for _, rt := range []domain.RequestType{
-		domain.RequestTypeChat,
-		domain.RequestTypeMessages,
-		domain.RequestTypeResponses,
-		domain.RequestTypePassthrough,
+	for _, rt := range []aitrace.RequestType{
+		aitrace.RequestTypeChat,
+		aitrace.RequestTypeMessages,
+		aitrace.RequestTypeResponses,
+		aitrace.RequestTypePassthrough,
 	} {
 		assert.Empty(t, extractOutputMessages(nil, rt), "rt=%s", rt)
 		assert.Empty(t, extractOutputMessages([]byte{}, rt), "rt=%s", rt)
@@ -200,19 +200,19 @@ func TestExtractOutputMessages_RequestTypeMessages_syncJSON_unchanged(t *testing
 	// returning the same wrapped form so traces emitted before the SSE
 	// walker don't reshape under the swap.
 	body := []byte(`{"content":[{"type":"text","text":"hello"}],"role":"assistant"}`)
-	got := extractOutputMessages(body, domain.RequestTypeMessages)
+	got := extractOutputMessages(body, aitrace.RequestTypeMessages)
 	assert.JSONEq(t, `[{"role":"assistant","content":[{"type":"text","text":"hello"}]}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypeChat_syncJSON_unchanged(t *testing.T) {
 	body := []byte(`{"choices":[{"message":{"role":"assistant","content":"hello"}}]}`)
-	got := extractOutputMessages(body, domain.RequestTypeChat)
+	got := extractOutputMessages(body, aitrace.RequestTypeChat)
 	assert.JSONEq(t, `[{"role":"assistant","content":"hello"}]`, got)
 }
 
 func TestExtractOutputMessages_RequestTypePassthrough_syncJSON_unchanged(t *testing.T) {
 	body := []byte(`{"candidates":[{"content":{"parts":[{"text":"hello"}]}}]}`)
-	got := extractOutputMessages(body, domain.RequestTypePassthrough)
+	got := extractOutputMessages(body, aitrace.RequestTypePassthrough)
 	assert.JSONEq(t, `[{"role":"assistant","content":"hello"}]`, got)
 }
 
@@ -236,7 +236,7 @@ func TestWalkSSEData_skipsDoneAndComments(t *testing.T) {
 
 func TestExtractInputMessages_SpeechCarriesTTSText(t *testing.T) {
 	body := []byte(`{"model":"elevenlabs/eleven_flash_v2","voice":"nova","input":"Hello there, how can I help?"}`)
-	got := extractInputMessages(body, domain.RequestTypeSpeech)
+	got := extractInputMessages(body, aitrace.RequestTypeSpeech)
 	want := `[{"role":"user","content":"Hello there, how can I help?"}]`
 	if got != want {
 		t.Fatalf("speech input = %q, want %q", got, want)
@@ -244,14 +244,14 @@ func TestExtractInputMessages_SpeechCarriesTTSText(t *testing.T) {
 }
 
 func TestExtractInputMessages_SpeechWithoutInputIsEmpty(t *testing.T) {
-	if got := extractInputMessages([]byte(`{"model":"x"}`), domain.RequestTypeSpeech); got != "" {
+	if got := extractInputMessages([]byte(`{"model":"x"}`), aitrace.RequestTypeSpeech); got != "" {
 		t.Fatalf("speech input without text = %q, want empty", got)
 	}
 }
 
 func TestExtractOutputMessages_TranscriptionCarriesTranscript(t *testing.T) {
 	body := []byte(`{"text":"The quick brown fox jumps over the lazy dog.","duration":2.3}`)
-	got := extractOutputMessages(body, domain.RequestTypeTranscription)
+	got := extractOutputMessages(body, aitrace.RequestTypeTranscription)
 	want := `[{"role":"assistant","content":"The quick brown fox jumps over the lazy dog."}]`
 	if got != want {
 		t.Fatalf("transcription output = %q, want %q", got, want)
@@ -259,7 +259,7 @@ func TestExtractOutputMessages_TranscriptionCarriesTranscript(t *testing.T) {
 }
 
 func TestExtractOutputMessages_SpeechBinaryStaysEmpty(t *testing.T) {
-	if got := extractOutputMessages([]byte{0xff, 0xf3, 0x01, 0x02}, domain.RequestTypeSpeech); got != "" {
+	if got := extractOutputMessages([]byte{0xff, 0xf3, 0x01, 0x02}, aitrace.RequestTypeSpeech); got != "" {
 		t.Fatalf("speech output = %q, want empty (binary audio)", got)
 	}
 }
@@ -271,13 +271,13 @@ func TestExtractOutputMessages_SpeechBinaryStaysEmpty(t *testing.T) {
 // needs no re-encoding.)
 func TestExtractedMessagesAreValidJSONWithControlChars(t *testing.T) {
 	speech := []byte("{\"model\":\"m\",\"input\":\"line one\\u000bline two\"}")
-	in := extractInputMessages(speech, domain.RequestTypeSpeech)
+	in := extractInputMessages(speech, aitrace.RequestTypeSpeech)
 	if !json.Valid([]byte(in)) {
 		t.Fatalf("speech input with control char is not valid JSON: %s", in)
 	}
 
 	stt := []byte("{\"text\":\"tab\\u000bseparated\"}")
-	out := extractOutputMessages(stt, domain.RequestTypeTranscription)
+	out := extractOutputMessages(stt, aitrace.RequestTypeTranscription)
 	if !json.Valid([]byte(out)) {
 		t.Fatalf("transcription output with control char is not valid JSON: %s", out)
 	}

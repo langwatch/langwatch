@@ -5,7 +5,13 @@
 # `go mod download` is skipped on purpose: the binary imports no module.
 FROM golang:1.27.1-alpine AS devscripts
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY go.work go.work.sum ./
+COPY cmd/go.* cmd/
+COPY pkg/go.* pkg/
+COPY services/go.* services/
+COPY tools/go.* tools/
+COPY sdks/go/go.* sdks/go/
+COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 COPY cmd/devscripts ./cmd/devscripts
 COPY tools/devscripts ./tools/devscripts
 RUN --mount=type=cache,target=/root/.cache/go-build \

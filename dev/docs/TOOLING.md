@@ -123,10 +123,13 @@ pnpm exec nx run-many -t build -p tag:go    # every Go binary
 pnpm build:affected                         # only what your change reached
 ```
 
-`dev/nx/go-plugin.mjs` makes one project per `cmd/<name>`, writing
-`.bin/<name>/<name>`, and a `go` project for the module (`test:go`,
-`lint:go`). A Go input change reruns every binary; the rerun is an incremental
-`go build`, so that costs little. The hot paths (`devscripts.sh`,
+No Go module sits at the repository root: `go.work` ties `cmd`, `pkg`,
+`services` and `tools` (one module each) to the Go SDK and the ClickHouse
+operator. `dev/nx/go-plugin.mjs` makes each module a `go-<dir>` project
+(`test:go`, `lint:go`, run inside the module) and each `cmd/<name>` a project
+writing `.bin/<name>/<name>`. Edges follow each go.mod's in-repo requires and
+each main's imports, so a change reruns only the binaries that build on it; the
+rerun is an incremental `go build`, so that costs little. The hot paths (`devscripts.sh`,
 `make service`) stay on `go run`: Go's own cache is faster there than an Nx
 cache hit. [ADR-150](adr/150-nx-task-runner.md) has the numbers.
 

@@ -51,8 +51,8 @@ on:
       - "services/aigateway/**"
       - "pkg/**"
       - "cmd/**"
-      - "go.mod"
-      - "go.sum"
+      - "*/go.mod"
+      - "*/go.sum"
       - "modules/gateway/**"
       - "enterprise/modules/governance/process/src/eventing/gateway-debit.process.ts"
       - "apps/api/src/app/api-gateway*.composition.ts"
@@ -195,8 +195,8 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       # node-pty is in the app's closure via mcp-server and falls back to
       # `node-gyp rebuild` on linux, so the install runs through the shared

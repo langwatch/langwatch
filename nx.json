@@ -33,17 +33,12 @@
       "npmDeps"
     ],
     "go": [
-      "{workspaceRoot}/**/*.go",
-      "{workspaceRoot}/**/go.mod",
-      "{workspaceRoot}/**/go.sum",
+      "{projectRoot}/**/*",
       "{workspaceRoot}/go.work",
       "{workspaceRoot}/go.work.sum",
-      "{workspaceRoot}/cmd/**/*",
-      "{workspaceRoot}/pkg/**/*",
-      "{workspaceRoot}/services/**/*",
-      "{workspaceRoot}/tools/**/*",
-      "{workspaceRoot}/infra/clickhouse-serverless/**/*",
-      "{workspaceRoot}/sdks/go/**/*",
+      "{workspaceRoot}/*/go.{mod,sum}",
+      "{workspaceRoot}/infra/clickhouse-serverless/go.{mod,sum}",
+      "{workspaceRoot}/sdks/go/go.{mod,sum}",
       {
         "runtime": "go version"
       },
@@ -66,6 +61,7 @@
         "externalDependencies": []
       }
     ],
+    "goBuild": ["go", "!{projectRoot}/**/*_test.go"],
     "npmDeps": [
       {
         "externalDependencies": []
@@ -254,8 +250,8 @@
         "cache": true,
         "dependsOn": ["^build"],
         "inputs": [
-          "go",
-          "!{workspaceRoot}/**/*_test.go",
+          "goBuild",
+          "^goBuild",
           {
             "dependentTasksOutputFiles": "**/*"
           }
@@ -354,7 +350,7 @@
     },
     "lint:go": {
       "cache": true,
-      "inputs": ["go", "{workspaceRoot}/.golangci.yml", "{workspaceRoot}/Makefile"],
+      "inputs": ["go", "^go", "{workspaceRoot}/.golangci.yml", "{workspaceRoot}/Makefile"],
       "outputs": []
     },
     "test:go": {
@@ -433,6 +429,7 @@
       "cache": true,
       "inputs": [
         "go",
+        "^go",
         "{workspaceRoot}/packages/error-presentation/src/**/*",
         "{workspaceRoot}/packages/handled-error/src/**/*"
       ],

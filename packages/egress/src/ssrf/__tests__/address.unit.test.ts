@@ -8,17 +8,17 @@ import { blocked, type Category, classify, isPublicAddress } from "../address.ts
 
 /**
  * The corpus is the single source of truth shared with the Go pkg/ssrf tests.
- * Locating it by walking up to go.mod (rather than a fixed ../../../ path) keeps
+ * Locating it by walking up to go.work (rather than a fixed ../../../ path) keeps
  * this test from breaking if the package is ever moved.
  */
 function repoRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
   while (dir !== dirname(dir)) {
-    const goModPath = join(dir, "go.mod");
-    if (existsSync(goModPath)) return dir;
+    const goWorkPath = join(dir, "go.work");
+    if (existsSync(goWorkPath)) return dir;
     dir = dirname(dir);
   }
-  throw new Error("could not locate repo root (no go.mod found while walking up)");
+  throw new Error("could not locate repo root (no go.work found while walking up)");
 }
 
 interface AddressVector {

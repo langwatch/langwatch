@@ -7,57 +7,6 @@ import (
 	"strings"
 )
 
-// ProviderID identifies a model provider (e.g. "openai", "anthropic", "azure").
-type ProviderID string
-
-const (
-	ProviderOpenAI    ProviderID = "openai"
-	ProviderAnthropic ProviderID = "anthropic"
-	ProviderAzure     ProviderID = "azure"
-	ProviderBedrock   ProviderID = "bedrock"
-	ProviderVertex    ProviderID = "vertex"
-	ProviderGemini    ProviderID = "gemini"
-	// XAI, Groq, and Cerebras are Bifrost-native providers routed with a
-	// plain API key (see mapProvider / credentialToBifrostKey defaults).
-	ProviderXAI      ProviderID = "xai"
-	ProviderGroq     ProviderID = "groq"
-	ProviderCerebras ProviderID = "cerebras"
-	// DeepSeek is not in Bifrost's ModelProvider enum. Its API is
-	// OpenAI-compatible, so the gateway routes it through Bifrost's vLLM
-	// (openai-compat) provider with DeepSeek's public endpoint as the
-	// default base URL.
-	ProviderDeepSeek ProviderID = "deepseek"
-	// Voyage is direct-API only. Bifrost has no Voyage ModelProvider
-	// enum; the gateway proxies Voyage embeddings via a thin direct
-	// HTTP path. Voyage's wire format is OpenAI-compatible so no body
-	// translation is needed. Voyage ships embeddings only; chat,
-	// messages, and responses calls against a Voyage credential land
-	// on a clean unsupported-request-type error.
-	ProviderVoyage ProviderID = "voyage"
-	// Custom is any OpenAI-compatible endpoint the customer hosts
-	// themselves (vLLM, LiteLLM proxy, ...). Requires a base URL; the
-	// API key is optional (many self-hosted servers run unauthenticated).
-	ProviderCustom ProviderID = "custom"
-	// ElevenLabs is a Bifrost-native provider (enum value "elevenlabs",
-	// plain API key). It ships speech (TTS) and transcription (STT) only;
-	// chat-family calls against an ElevenLabs credential surface the
-	// provider's reject directly, same policy as Anthropic embeddings.
-	ProviderElevenLabs ProviderID = "elevenlabs"
-	// ProviderLangWatch is another LangWatch gateway reached as an upstream
-	// provider: a connected self-hosted install forwarding OpenAI-compatible
-	// calls to LangWatch-managed models with its license token as the
-	// credential. Both sides speak the same wire, so the gateway proxies
-	// directly (no Bifrost enum). See adapters/providers/langwatch.go and
-	// ADR-139 section 8.
-	ProviderLangWatch ProviderID = "langwatch"
-	// OpenAICodex is the user's own ChatGPT subscription, reached through
-	// OpenAI's codex backend (chatgpt.com/backend-api/codex) with an OAuth
-	// access token instead of an API key. Responses-API + SSE only; the
-	// gateway proxies directly (no Bifrost enum) and refreshes a 401'd
-	// token once via the control plane. See adapters/providers/codex.go.
-	ProviderOpenAICodex ProviderID = "openai_codex"
-)
-
 // NormalizeProviderID maps the provider spellings that reach the gateway
 // onto the canonical ProviderID constants above.
 //

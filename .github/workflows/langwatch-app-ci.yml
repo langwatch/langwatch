@@ -1328,8 +1328,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       # Before the first nx call, so prepare's tasks read and fill it too.
       - uses: ./.github/actions/nx-cache

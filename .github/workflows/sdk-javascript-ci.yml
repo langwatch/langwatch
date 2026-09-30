@@ -300,8 +300,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       - name: Prepare LangWatch files
         working-directory: .
@@ -352,7 +352,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version-file: go.work
 
       - name: Build the Go service binary and the scenario child bundle
         working-directory: .

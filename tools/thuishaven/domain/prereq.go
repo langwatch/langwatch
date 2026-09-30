@@ -234,7 +234,7 @@ var Prereqs = []Prereq{{
 	}},
 }, {
 	// The trap this entry exists to name: golangci-lint's pinned release
-	// cannot read export data from a Go newer than go.mod's, and a
+	// cannot read export data from a Go newer than go.work's, and a
 	// golangci-lint at any OTHER version satisfies nothing either, however
 	// installed it looks. A v1.64.8 binary on PATH bit exactly that: it read
 	// as installed and refused the repo's v2 config.
@@ -244,15 +244,15 @@ var Prereqs = []Prereq{{
 	Requirement: PrereqOptional,
 	After:       []string{"go"},
 	Detail: "The pinned linter cannot read export data from a Go newer than\n" +
-		"    go.mod's, so haven installs the pinned version itself and `make\n" +
-		"    go-lint` runs it under go.mod's own toolchain, and a newer system Go on\n" +
+		"    go.work's, so haven installs the pinned version itself and `make\n" +
+		"    go-lint` runs it under go.work's own toolchain, and a newer system Go on\n" +
 		"    its own cannot make this work, and neither can a golangci-lint\n" +
 		"    already on PATH at a different version.",
 	Candidates: []Candidate{{
 		Key:      "golangci-lint",
 		Label:    "golangci-lint",
 		Internal: true,
-		Install:  "GOTOOLCHAIN=<go.mod's go> go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@<pinned>",
+		Install:  "GOTOOLCHAIN=<go.work's go> go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@<pinned>",
 	}},
 }, {
 	Key:         "portless",
@@ -642,7 +642,7 @@ const (
 // PlanGolangci decides that, given whether a binary resolved, the pinned
 // version read from the Makefile ("" when it could not be read), and the
 // version the binary itself reported ("" when it would not say). Pure, so the
-// decision is testable with no golangci-lint, no Makefile and no go.mod
+// decision is testable with no golangci-lint, no Makefile and no go.work
 // attached.
 func PlanGolangci(resolved bool, pinned, version string) GolangciAction {
 	if !resolved {
@@ -685,12 +685,12 @@ func ParseGolangciVersion(makefile string) string {
 	return ""
 }
 
-// ParseGoToolchain pulls the `go ` directive out of go.mod's text, as the
+// ParseGoToolchain pulls the `go ` directive out of go.work's text, as the
 // GOTOOLCHAIN value golangci-lint must run under: the pinned linter cannot
-// read export data from a Go newer than go.mod declares. "" when the line is
+// read export data from a Go newer than go.work declares. "" when the line is
 // missing.
-func ParseGoToolchain(goMod string) string {
-	for _, line := range strings.Split(goMod, "\n") {
+func ParseGoToolchain(goWork string) string {
+	for _, line := range strings.Split(goWork, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 2 && fields[0] == "go" {
 			return "go" + fields[1]

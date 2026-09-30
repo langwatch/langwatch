@@ -46,9 +46,9 @@ function findRepoRoot(): string | null {
   }
   let dir = dirname(here);
   for (let i = 0; i < 6; i++) {
-    const hasGoMod = existsSync(join(dir, "go.mod"));
+    const hasGoWork = existsSync(join(dir, "go.work"));
     const hasServiceCmd = existsSync(join(dir, "cmd", "service"));
-    if (hasGoMod && hasServiceCmd) return dir;
+    if (hasGoWork && hasServiceCmd) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;

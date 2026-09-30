@@ -1,4 +1,4 @@
-package domain
+package aitrace
 
 // The input a request is charged the plain input rate for. Providers report a
 // prompt total that already holds the cached tokens, and every pricing path

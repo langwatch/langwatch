@@ -54,16 +54,18 @@ export function ensureNlpgoBinary({
     path.join(REPO_ROOT, "cmd", "service"),
     path.join(REPO_ROOT, "pkg"),
     // The engine imports github.com/langwatch/langwatch/sdks/go/prompts, and
-    // the root go.mod `replace`s that path to ./sdks/go — so the SDK compiles
+    // go.work resolves that path to ./sdks/go — so the SDK compiles
     // into this binary from the working tree, and a change there changes it.
     path.join(REPO_ROOT, "sdks", "go"),
   ];
-  // Module and workspace files live at the repo root, outside every tree above.
-  // A dependency bump, a `replace` retarget or a go.work edit changes what
-  // compiles without touching one .go file under those trees.
+  // The services and cmd modules' go.mod/go.sum sit outside the trees above, as
+  // does go.work: a dependency bump, a `replace` retarget or a go.work edit
+  // changes what compiles without touching one .go file under those trees.
   const watchFiles = [
-    path.join(REPO_ROOT, "go.mod"),
-    path.join(REPO_ROOT, "go.sum"),
+    path.join(REPO_ROOT, "services", "go.mod"),
+    path.join(REPO_ROOT, "services", "go.sum"),
+    path.join(REPO_ROOT, "cmd", "go.mod"),
+    path.join(REPO_ROOT, "cmd", "go.sum"),
     path.join(REPO_ROOT, "go.work"),
     path.join(REPO_ROOT, "go.work.sum"),
   ];

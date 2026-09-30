@@ -52,8 +52,8 @@ jobs:
               - 'services/nlpgo/**'
               - 'cmd/service/**'
               - 'pkg/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.github/workflows/langwatch-nlp-ci.yml'
 
   docker-build:

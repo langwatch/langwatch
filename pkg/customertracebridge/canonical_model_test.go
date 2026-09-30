@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // The platform carries the provider-prefixed model id end to end (selectors,
@@ -20,7 +20,7 @@ func TestEndSpan_CanonicalModelID(t *testing.T) {
 	t.Run("stamps the provider-prefixed id resolution stripped", func(t *testing.T) {
 		p := baseParams()
 		p.Model = "claude-haiku-4-5"
-		p.ProviderID = domain.ProviderAnthropic
+		p.ProviderID = aitrace.ProviderAnthropic
 		ingest := emitWith(t, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", p)
 
 		spans := ingest.spansByProject(t)["proj-customer"]
@@ -43,10 +43,10 @@ func TestEndSpan_CanonicalModelID(t *testing.T) {
 
 	t.Run("never double-prefixes an already-prefixed model", func(t *testing.T) {
 		assert.Equal(t, "openai_codex/gpt-5.6-terra",
-			canonicalModelID(domain.ProviderID("openai_codex"), "openai_codex/gpt-5.6-terra"))
+			canonicalModelID(aitrace.ProviderID("openai_codex"), "openai_codex/gpt-5.6-terra"))
 	})
 
 	t.Run("reports an empty model as empty", func(t *testing.T) {
-		assert.Empty(t, canonicalModelID(domain.ProviderAnthropic, ""))
+		assert.Empty(t, canonicalModelID(aitrace.ProviderAnthropic, ""))
 	})
 }

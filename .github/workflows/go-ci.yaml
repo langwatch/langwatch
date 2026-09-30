@@ -73,8 +73,8 @@ jobs:
               - 'sdks/go/**'
               - 'infra/clickhouse-serverless/**'
               - 'packages/handled-error/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - '.golangci.yml'
               - '.github/workflows/go-ci.yaml'
             ciguards:
@@ -95,8 +95,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       - uses: ./.github/actions/go-build-cache
       - run: go mod verify
       - run: go build ./cmd/... ./tools/thuishaven/... ./tools/openapidiff/... ./tools/apidiff/...
@@ -114,8 +114,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       - run: go test ./tools/ciguard/...
       - run: go run ./cmd/ciguard
 
@@ -128,8 +128,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       # `race` keeps this cache separate from the plain one: race-instrumented
       # objects are compiled differently, and restoring the wrong set would
       # rebuild everything anyway. This is where the rotating key pays for
@@ -167,8 +167,8 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       # tools/thuishaven is deliberately absent here while it is present in the
       # build, test and vet jobs. Measured at v2.11.4 it carries 231 pre-existing
       # findings: misspell 75 (US spelling enforced against prose written in
@@ -250,8 +250,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       # `go vet` type-checks everything it inspects, so it benefits from the
       # same build cache as `build`. Plain, not `race`: it compiles the same
       # objects `build` does.
@@ -278,8 +278,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
       # Through the Makefile, so the check CI runs and the check a developer
       # runs cannot drift apart.
       - run: make herrgen-check

@@ -49,7 +49,7 @@ const reads = {
   "@langwatch/evaluation-process": ["charts/langwatch/**/*", "docs/self-hosting/**/*"],
   "@langwatch/auth-process": ["charts/langwatch/**/*", "docs/self-hosting/**/*"],
   "@langwatch/ops-process": ["docs/self-hosting/**/*", "docs/ai-gateway/**/*", "docs/docs.json"],
-  "@langwatch/egress": ["specs/webhooks/**/*", "pkg/ssrf/testdata/**/*", "go.mod"],
+  "@langwatch/egress": ["specs/webhooks/**/*", "pkg/ssrf/testdata/**/*", "go.work"],
   "@langwatch/langy-browser": ["services/langyagent/**/*", "infra/docker/Dockerfile.langyagent"],
   "@langwatch/langy-contract": ["services/langyagent/**/*"],
   "@langwatch/enterprise-billing-process": ["docs/pricing/**/*", "docs/pricing.mdx"],

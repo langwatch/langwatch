@@ -160,38 +160,6 @@ func GeminiSurface() Surface {
 	return Surface{Name: "/v1beta", Providers: []ProviderID{ProviderGemini, ProviderVertex}}
 }
 
-// RequestType classifies the inbound endpoint.
-type RequestType string
-
-const (
-	RequestTypeChat       RequestType = "chat"
-	RequestTypeMessages   RequestType = "messages"
-	RequestTypeEmbeddings RequestType = "embeddings"
-	RequestTypeResponses  RequestType = "responses"
-	// RequestTypePassthrough routes the body verbatim to the provider's
-	// native HTTP endpoint. Used for Gemini-native /v1beta paths where
-	// the inbound shape (Google GenAI SDK, gemini-cli) doesn't match any
-	// of the OpenAI/Anthropic-family schemas Bifrost exposes through its
-	// typed entry points.
-	RequestTypePassthrough RequestType = "passthrough"
-	// RequestTypeSpeech is POST /v1/audio/speech (OpenAI-wire TTS). The
-	// response body is binary audio, not JSON.
-	RequestTypeSpeech RequestType = "speech"
-	// RequestTypeTranscription is POST /v1/audio/transcriptions
-	// (OpenAI-wire multipart STT).
-	RequestTypeTranscription RequestType = "transcription"
-	// RequestTypeImageGeneration is POST /v1/images/generations
-	// (OpenAI-wire image generation). Non-streaming only.
-	RequestTypeImageGeneration RequestType = "image_generation"
-	// RequestTypeImageEdit is POST /v1/images/edits (OpenAI-wire multipart
-	// image edit). Non-streaming only.
-	RequestTypeImageEdit RequestType = "image_edit"
-	// RequestTypeRealtimeSession mints a vendor session credential for a
-	// realtime voice socket the gateway does not carry (ADR-097). Its spend
-	// record is admitted here and closed later, by the vendor's own report.
-	RequestTypeRealtimeSession RequestType = "realtime_session"
-)
-
 // RequestMetadata holds extracted fields for policy evaluation (guardrails, blocked patterns).
 type RequestMetadata struct {
 	ToolNames          []string

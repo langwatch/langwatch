@@ -14,16 +14,16 @@ import (
 	"github.com/langwatch/langwatch/tools/ciguard"
 )
 
-// agreeingRepo is the smallest tree the go-version guard reads: a root
-// module, a workspace, one Dockerfile and one workflow, all in agreement.
+// agreeingRepo is the smallest tree the go-version guard reads: a workspace,
+// one module in it, one Dockerfile and one workflow, all in agreement.
 func agreeingRepo(t *testing.T, overrides map[string]string) string {
 	t.Helper()
 
 	files := map[string]string{
-		"go.mod":                       "module x\n\ngo 1.26.5\n",
-		"go.work":                      "go 1.26.5\n\nuse (\n\t.\n)\n",
+		"pkg/go.mod":                   "module x\n\ngo 1.26.5\n",
+		"go.work":                      "go 1.26.5\n\nuse (\n\t./pkg\n)\n",
 		"infra/docker/Dockerfile.svc":  "FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine AS build\n",
-		".github/workflows/go-ci.yaml": "jobs:\n  build:\n    steps:\n      - uses: actions/setup-go@v7\n        with:\n          go-version-file: go.mod\n",
+		".github/workflows/go-ci.yaml": "jobs:\n  build:\n    steps:\n      - uses: actions/setup-go@v7\n        with:\n          go-version-file: go.work\n",
 	}
 	maps.Copy(files, overrides)
 
@@ -45,15 +45,15 @@ func TestGoVersionAcceptsAnAgreeingRepo(t *testing.T) {
 	assert.Empty(t, problems)
 }
 
-// @scenario "The workspace and the root module must agree"
-func TestGoVersionReportsAWorkspaceOnADifferentVersion(t *testing.T) {
+// @scenario "Every workspace module agrees with go.work"
+func TestGoVersionReportsAWorkspaceModuleOnADifferentVersion(t *testing.T) {
 	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
-		"go.work": "go 1.26.1\n",
+		"pkg/go.mod": "module x\n\ngo 1.26.1\n",
 	}))
 
 	require.NoError(t, err)
 	require.Len(t, problems, 1)
-	assert.Contains(t, problems[0], "go.work says 1.26.1")
+	assert.Contains(t, problems[0], "pkg/go.mod declares Go 1.26.1, go.work says 1.26.5")
 }
 
 // @scenario "A Dockerfile built with a different Go than the module fails the check"
@@ -64,7 +64,7 @@ func TestGoVersionReportsADockerfileOnADifferentPatch(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, problems, 1)
-	assert.Contains(t, problems[0], "builds with Go 1.26.1, go.mod says 1.26.5")
+	assert.Contains(t, problems[0], "builds with Go 1.26.1, go.work says 1.26.5")
 }
 
 // @scenario "A floating Go base image fails the check"

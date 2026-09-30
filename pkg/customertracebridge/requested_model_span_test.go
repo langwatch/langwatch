@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // gen_ai.request.model carries the model that was dispatched, so a request a
@@ -18,12 +18,12 @@ import (
 // recordSpanForParams comes from emitter_error_suppress_test.go.
 
 func TestEmitter_RequestedModel_StampedOnSpan(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:     domain.ProviderOpenAI,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:     aitrace.ProviderOpenAI,
 		Model:          "gpt-5.6-sol",
 		RequestedModel: "complex",
 		VirtualKeyID:   "vk_1",
-		Usage:          domain.Usage{CompletionTokens: 5},
+		Usage:          aitrace.Usage{CompletionTokens: 5},
 	})
 
 	got, ok := hasStringAttr(span, AttrRequestedModel)
@@ -39,11 +39,11 @@ func TestEmitter_RequestedModel_StampedOnSpan(t *testing.T) {
 // Most requests name the model they get. Stamping the same value twice would
 // make the attribute mean nothing when it is present.
 func TestEmitter_NoRequestedModel_NoAttribute(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID:   domain.ProviderOpenAI,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID:   aitrace.ProviderOpenAI,
 		Model:        "gpt-5.6-sol",
 		VirtualKeyID: "vk_1",
-		Usage:        domain.Usage{CompletionTokens: 5},
+		Usage:        aitrace.Usage{CompletionTokens: 5},
 	})
 
 	_, ok := hasStringAttr(span, AttrRequestedModel)

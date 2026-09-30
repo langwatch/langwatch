@@ -35,7 +35,7 @@ func tree(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
 	all := map[string]string{
-		"go.mod":                                 "module example.com/repo\n\ngo 1.26\n",
+		"pkg/go.mod":                             "module example.com/repo/pkg\n\ngo 1.26\n",
 		"services/nlpgo/app/engine/nodeerror.go": nodeErrorDeclaration,
 	}
 	for path, source := range files {
@@ -1399,13 +1399,13 @@ func assertKeysAscendingInOutput(t *testing.T, run int, rendered string, codes [
 	}
 }
 
-func TestParseFailsWithoutAGoModAtTheRoot(t *testing.T) {
+func TestParseFailsWithoutThePkgModule(t *testing.T) {
 	root := t.TempDir()
 	// Named for what it asserts. It used to be called
 	// TestParseSkipsDirectoriesOutsideAnyModule, which described a walk-level
-	// skip that could never fire — `Parse` reads the root's go.mod first, so a
-	// root without one never reaches the walk at all.
+	// skip that could never fire — `Parse` reads pkg/go.mod first, so a root
+	// without one never reaches the walk at all.
 	if _, _, err := herrgen.Parse(root, io.Discard); err == nil {
-		t.Fatal("Parse() error = nil, want a missing-go.mod failure")
+		t.Fatal("Parse() error = nil, want a missing pkg/go.mod failure")
 	}
 }

@@ -32,8 +32,8 @@ on:
       - "services/aigateway/**"
       - "pkg/**"
       - "cmd/**"
-      - "go.mod"
-      - "go.sum"
+      - "*/go.mod"
+      - "*/go.sum"
       - "infra/docker/Dockerfile.go_service"
       - ".github/workflows/go-services.yaml"
       # from `chart`
@@ -90,8 +90,8 @@ jobs:
               - 'services/aigateway/**'
               - 'pkg/**'
               - 'cmd/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.go_service'
               - '.github/workflows/go-services.yaml'
             chart:
@@ -118,8 +118,8 @@ jobs:
               - 'pkg/**'
               - 'cmd/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.langyagent'
               - 'sdks/typescript/**'
               - 'packages/langy/**'

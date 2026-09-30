@@ -192,22 +192,21 @@ outside their project, to the `web/dist` their Go package embeds, so each has a
 filtered entry naming that directory. `scenario-child` hashes `EMIT_META`,
 which adds files to its output. Builds hash `node --version`.
 
-**Go is inferred, not declared.** `dev/nx/go-plugin.mjs` makes the root Go
-module project `go` (`test:go`, `lint:go`) and every `cmd/<name>` main package
-(plus `infra/clickhouse-serverless/cmd/*`) a project whose `build` is
-`go build -o .bin/<name>/<name> ./cmd/<name>`. Its inputs (named input `go`)
-are deliberately coarse: every `*.go` file, every `go.mod`/`go.sum`, `go.work`,
-and every file under the Go trees (`cmd`, `pkg`, `services`, `tools`,
-`infra/clickhouse-serverless`, `sdks/go`), so a `//go:embed` file is always
-hashed; plus `go version` and the `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`
-and `GOEXPERIMENT` env. A miss costs one incremental `go build`, so breadth is
-cheap and a missing input is not. `nx affected` reaches every binary on any
-Go change through those inputs (see "no project owns the root"). `haven` and
+**Go is inferred, not declared.** `dev/nx/go-plugin.mjs` makes every
+`cmd/<name>` main package (plus `infra/clickhouse-serverless/cmd/*`) a project
+whose `build` is `go build -o .bin/<name>/<name> ./cmd/<name>`, and each module
+`go.work` uses a project (see "no project owns the root"). Named input `go` is
+every file in the project, so a `//go:embed` file is always hashed, plus
+`go.work`, `go.work.sum`, every workspace module's `go.mod`/`go.sum` (the
+workspace picks one version of each dependency across all of them), `go
+version` and the `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS` and `GOEXPERIMENT`
+env. A `build` hashes `goBuild` (that without `_test.go`) for itself and every
+project it depends on. A miss costs one incremental `go build`. `haven` and
 `service` also depend on the consoles they embed, build them first and hash
 their output. A new binary that embeds
 a console must be added to the plugin's `consoles` map. `@nx-go/nx-go` and
-`@naxodev/gonx` model one module per project; this repository is one module
-with many mains, so a twenty-line plugin fits better.
+`@naxodev/gonx` model one module per project with no mains inside it; these
+modules hold several mains each, so a short plugin fits better.
 
 `test:go` is not cached. Go's test cache already records every file and
 environment variable a test reads, which no Nx input declaration can match,
@@ -260,7 +259,7 @@ evaluators) each declare exact inputs and outputs in `nx.json`.
 and outputs read from the solution's references so `sync:references` keeps
 them true; it depends on the SDK build because the referenced packages import
 its declarations. `lint:rules` (semgrep) and `test:scripts` (bats) run the
-Makefile recipes, as `lint:go` does; `herrgen` is a target of `go`. The
+Makefile recipes, as `lint:go` does; `herrgen` is a target of `go-tools`. The
 Makefile targets of the same names call Nx.
 
 ## Amendment, 2026-09-30: cache correctness
@@ -281,17 +280,21 @@ cycle that once made `^typecheck` unusable fails lint rather than Nx.
 
 ## Amendment, 2026-09-30: no project owns the root
 
-**Affected follows inputs, not the root.** Project `go` was rooted at `.`, so
-it owned every root file nothing else did (the lockfile, `README.md`,
-`.github/`) and, through each binary's implicit dependency on it, marked all
-the Go projects affected on any of them. `go` is now rooted at `pkg/` and the
-binaries no longer depend on it. Nx marks a project touched when a changed file
-matches a `{workspaceRoot}` input of any of its targets, so every `build`,
-`lint:go` and `herrgen` that hashes the `go` named input is reached by exactly
-the files it hashes: a Go change still reaches `go` and every binary, while the
-`Makefile`, `.golangci.yml` or a `handled-error` source reach only `go`.
-`workspace` stays at `dev/nx`; its `lint:rules` hashes the whole tree, so any
-change reaches it, and nothing depends on it. The root carries no project.
+**No Go module at the root.** The root module is four, `cmd`, `pkg`,
+`services` and `tools` (import paths unchanged), tied by `go.work` to the SDK
+and the ClickHouse operator; each go.mod keeps a `replace` per in-repo module
+for builds without the workspace. Each module is project `go-<dir>` (`test:go`
+and `lint:go` run inside it; `go-tools` also has `herrgen`). The plugin's
+`createDependencies` draws an edge for each in-repo `require` in a go.mod and
+each in-repo import in a main, so a `pkg` change reaches everything, a
+`services` change reaches `tools` (thuishaven bundles the simulators), `cmd`
+and the binaries importing either, and a `tools` change leaves `service` alone.
+The module graph is acyclic: `pkg` imports nothing in-repo, so the types the
+customer trace bridge shares with the gateway live in `pkg/aitrace`, aliased
+by `services/aigateway/domain`. A `README.md`, lockfile or `.github/` change
+touches no Go project, because none is rooted at `.` and no Go input names
+them. `workspace` stays at `dev/nx`; its `lint:rules` hashes the whole tree, so
+any change reaches it, and nothing depends on it. The root carries no project.
 
 ## References
 

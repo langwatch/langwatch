@@ -11,16 +11,16 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // Image tokens on the customer span, and what an image span may carry as
-// content. domain.Usage keeps the image counts OUT of the text totals so every
+// content. aitrace.Usage keeps the image counts OUT of the text totals so every
 // consumer prices them at the image rate, and the response body, which is
 // base64 pixels, never lands on a span.
 
 // recordImageSpan runs the emitter's span lifecycle for an image request.
-func recordImageSpan(t *testing.T, params domain.AITraceParams) sdktrace.ReadOnlySpan {
+func recordImageSpan(t *testing.T, params aitrace.AITraceParams) sdktrace.ReadOnlySpan {
 	t.Helper()
 	sr := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr))
@@ -36,11 +36,11 @@ func recordImageSpan(t *testing.T, params domain.AITraceParams) sdktrace.ReadOnl
 
 /** @scenario A span states its image tokens apart from its text tokens */
 func TestEmitter_ImageTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
-	span := recordImageSpan(t, domain.AITraceParams{
-		ProviderID:  domain.ProviderOpenAI,
+	span := recordImageSpan(t, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-image-2",
-		RequestType: domain.RequestTypeImageGeneration,
-		Usage: domain.Usage{
+		RequestType: aitrace.RequestTypeImageGeneration,
+		Usage: aitrace.Usage{
 			PromptTokens:      14,
 			OutputImageTokens: 196,
 			ImageCount:        1,
@@ -66,11 +66,11 @@ func TestEmitter_ImageTokens_AreStatedApartFromTheTextTotals(t *testing.T) {
 
 /** @scenario A span states its image tokens apart from its text tokens */
 func TestEmitter_ImageEdit_StatesTheInputImageTokens(t *testing.T) {
-	span := recordImageSpan(t, domain.AITraceParams{
-		ProviderID:  domain.ProviderOpenAI,
+	span := recordImageSpan(t, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-image-2",
-		RequestType: domain.RequestTypeImageEdit,
-		Usage: domain.Usage{
+		RequestType: aitrace.RequestTypeImageEdit,
+		Usage: aitrace.Usage{
 			PromptTokens:      20,
 			InputImageTokens:  320,
 			OutputImageTokens: 1568,
@@ -88,11 +88,11 @@ func TestEmitter_ImageEdit_StatesTheInputImageTokens(t *testing.T) {
 }
 
 func TestEmitter_NoImageTokens_LeavesTheImageAttributesOff(t *testing.T) {
-	span := recordImageSpan(t, domain.AITraceParams{
-		ProviderID:  domain.ProviderOpenAI,
+	span := recordImageSpan(t, aitrace.AITraceParams{
+		ProviderID:  aitrace.ProviderOpenAI,
 		Model:       "gpt-5-mini",
-		RequestType: domain.RequestTypeChat,
-		Usage:       domain.Usage{PromptTokens: 200, CompletionTokens: 50},
+		RequestType: aitrace.RequestTypeChat,
+		Usage:       aitrace.Usage{PromptTokens: 200, CompletionTokens: 50},
 	})
 
 	_, hasInput := findIntAttr(span, AttrGenAIUsageInputImageTokens)
@@ -108,15 +108,15 @@ func TestExtractInputMessages_ImageRoutesCarryThePrompt(t *testing.T) {
 	body := []byte(`{"model":"gpt-image-2","prompt":"a red bicycle on a beach"}`)
 	want := `[{"role":"user","content":"a red bicycle on a beach"}]`
 
-	for _, reqType := range []domain.RequestType{
-		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
+	for _, reqType := range []aitrace.RequestType{
+		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit,
 	} {
 		assert.Equal(t, want, extractInputMessages(body, reqType), "request type %s", reqType)
 	}
 }
 
 func TestExtractInputMessages_ImageWithoutPromptIsEmpty(t *testing.T) {
-	assert.Empty(t, extractInputMessages([]byte(`{"model":"gpt-image-2"}`), domain.RequestTypeImageGeneration))
+	assert.Empty(t, extractInputMessages([]byte(`{"model":"gpt-image-2"}`), aitrace.RequestTypeImageGeneration))
 }
 
 /** @scenario An image span carries the prompt and never the pixels */
@@ -124,8 +124,8 @@ func TestExtractOutputMessages_ImageBodyNeverReachesTheSpan(t *testing.T) {
 	// A megabyte of base64 pixels, the shape a real answer has.
 	body := []byte(`{"created":1,"data":[{"b64_json":"` + strings.Repeat("A", 1<<20) + `"}]}`)
 
-	for _, reqType := range []domain.RequestType{
-		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
+	for _, reqType := range []aitrace.RequestType{
+		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit,
 	} {
 		assert.Empty(t, extractOutputMessages(body, reqType), "request type %s", reqType)
 	}
@@ -135,17 +135,17 @@ func TestExtractOutputMessages_ImageRevisedPromptIsRendered(t *testing.T) {
 	body := []byte(`{"created":1,"data":[{"b64_json":"AAAA","revised_prompt":"a red bicycle, side view"}]}`)
 	want := `[{"role":"assistant","content":"a red bicycle, side view"}]`
 
-	assert.Equal(t, want, extractOutputMessages(body, domain.RequestTypeImageGeneration))
+	assert.Equal(t, want, extractOutputMessages(body, aitrace.RequestTypeImageGeneration))
 }
 
 /** @scenario An image call attributes its end user like chat does */
 func TestEndUserID_ImageRoutesReadTheOpenAIUserField(t *testing.T) {
 	body := []byte(`{"model":"gpt-image-2","prompt":"a bicycle","user":"customer-42"}`)
 
-	for _, reqType := range []domain.RequestType{
-		domain.RequestTypeImageGeneration, domain.RequestTypeImageEdit,
+	for _, reqType := range []aitrace.RequestType{
+		aitrace.RequestTypeImageGeneration, aitrace.RequestTypeImageEdit,
 	} {
-		got := endUserID(context.Background(), domain.AITraceParams{
+		got := endUserID(context.Background(), aitrace.AITraceParams{
 			RequestType: reqType,
 			RequestBody: body,
 		})
