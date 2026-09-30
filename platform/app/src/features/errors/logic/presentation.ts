@@ -3011,6 +3011,11 @@ const presentations = {
     describe: () =>
       "People who already sign in this way are unaffected, but it can't vouch for a new account until the record is published again. Ask whoever manages single sign-on to republish it.",
   },
+  sso_existing_account_unconfirmed: {
+    title: "An account with this address already exists",
+    describe: () =>
+      "Its address was never confirmed, so single sign-on can't be added to it yet. Sign in the way you did before, or ask whoever manages single sign-on to verify your organization's domain.",
+  },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",
     describe: () =>

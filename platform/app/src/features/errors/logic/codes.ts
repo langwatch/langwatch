@@ -529,6 +529,7 @@ export const APP_ERROR_CODES = [
   "sso_domain_proof_expired",
   "sso_domain_proof_lapsed",
   "sso_domain_proof_not_found",
+  "sso_existing_account_unconfirmed",
   "sso_issuer_unreachable",
   "sso_license_required",
   "sso_saml_metadata_invalid",
