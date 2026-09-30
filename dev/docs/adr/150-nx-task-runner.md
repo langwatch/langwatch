@@ -168,6 +168,56 @@ relative import that escapes its package (`packageEscape`, `unownedEscape`) and
 an `@langwatch/*` import its `package.json` does not declare
 (`undeclaredDependency`). A cached pass is trusted on that basis and no other.
 
+## Amendment, 2026-09-30: builds go through Nx, Go included
+
+**Every build is a cached Nx `build` target.** The JS builds keep their
+package.json scripts; `targetDefaults.build` gives each its real outputs. The
+three consoles Go embeds (`haven-web`, `idpsim-web`, `mailsim-web`) write
+outside their project, to the `web/dist` their Go package embeds, so each has a
+filtered entry naming that directory. `scenario-child` hashes `EMIT_META`,
+which adds files to its output. Builds hash `node --version`.
+
+**Go is inferred, not declared.** `dev/nx/go-plugin.mjs` makes the root Go
+module project `go` (`test:go`, `lint:go`) and every `cmd/<name>` main package
+(plus `infra/clickhouse-serverless/cmd/*`) a project whose `build` is
+`go build -o .bin/<name>/<name> ./cmd/<name>`. Its inputs (named input `go`)
+are deliberately coarse: every `*.go` file, every `go.mod`/`go.sum`, `go.work`,
+and every file under the Go trees (`cmd`, `pkg`, `services`, `tools`,
+`infra/clickhouse-serverless`, `sdks/go`), so a `//go:embed` file is always
+hashed; plus `go version` and the `GOOS`, `GOARCH`, `CGO_ENABLED`, `GOFLAGS`
+and `GOEXPERIMENT` env. A miss costs one incremental `go build`, so breadth is
+cheap and a missing input is not. Each binary implicitly depends on `go`,
+which owns every Go file no other project owns, so `nx affected` reaches every
+binary on any Go change. `haven` and `service` also depend on the consoles
+they embed, build them first and hash their output. A new binary that embeds
+a console must be added to the plugin's `consoles` map. `@nx-go/nx-go` and
+`@naxodev/gonx` model one module per project; this repository is one module
+with many mains, so a twenty-line plugin fits better.
+
+`test:go` is not cached. Go's test cache already records every file and
+environment variable a test reads, which no Nx input declaration can match,
+and several suites read the working tree. `lint:go` is cached (sources,
+`.golangci.yml`, and the Makefile that pins the linter).
+
+**Where Go stays on `go`.** A cache hit costs about 1.5 s with the daemon and
+4-7 s without; a `go build` no-op costs about 1.4 s and `go run` from Go's
+executable cache about 0.4 s (indicative, busy machine). So the hot paths keep
+Go's own cache: `devscripts.sh` (`go run`), `make service` (`go run`, which
+also avoids concurrent restores overwriting a running binary), and
+`make service-watch` (air owns the rebuild loop). `make haven` and
+`make haven-web` go through Nx.
+
+**The lockfile no longer busts every cache.** A `nx:run-script` target without
+an `externalDependencies` input hashes every external package, and
+`sharedGlobals` named `pnpm-lock.yaml` outright, so any lockfile change missed
+every task. Each target default now names its root-installed tool
+(`typescript`, `vitest`, `oxlint`, none for builds) and the lockfile is gone
+from `sharedGlobals`; the npm nodes a project reaches through its declared
+dependencies are still hashed. `pluginsConfig["@nx/js"]` sets
+`projectsAffectedByDependencyUpdates` to `auto`, so `affected` follows the
+packages a lockfile change touched, and keeps `analyzeSourceFiles` off, as it
+was.
+
 ## References
 
 - Related ADRs: [076](./076-single-pnpm-workspace.md) (single pnpm workspace),

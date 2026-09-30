@@ -18,7 +18,7 @@
 #   make haven install       # go install the binary + check the machine's prerequisites
 #   make haven up            # start this worktree's stack
 #   make haven status        # every stack + shared-server health, one shot
-#   make haven               # build .bin/haven/haven (no subcommand)
+#   make haven               # build .bin/haven/haven and its consoles through Nx
 
 .PHONY: haven haven-web observability observability-connect observability-logs \
         observability-status observability-down
@@ -66,7 +66,7 @@ endif
 # already done.
 haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
-	@mkdir -p .bin/haven && go build -o .bin/haven/haven $(HAVEN_PKG) && echo "built .bin/haven/haven"
+	@pnpm exec nx run haven:build --outputStyle=static && echo "built .bin/haven/haven"
 else ifeq ($(strip $(HAVEN_ARGS)),install)
 	@$(MAKE) --no-print-directory haven-web || echo "haven-web did not build; the hub and stack homes will name 'make haven-web' until it does"
 	@go install $(HAVEN_PKG)
@@ -80,7 +80,7 @@ endif
 # runs it first; a console that fails to build (--no-bail keeps the others)
 # serves a page naming this target instead.
 haven-web:
-	@pnpm --no-bail --filter @langwatch/haven-web --filter @langwatch/mailsim-web --filter @langwatch/idpsim-web build
+	@pnpm exec nx run-many -t build -p @langwatch/haven-web @langwatch/mailsim-web @langwatch/idpsim-web --outputStyle=static
 
 # =============================================================================
 # LOCAL OBSERVABILITY STACK (owned by haven — one capped container on colima)

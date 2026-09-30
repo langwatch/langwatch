@@ -101,8 +101,24 @@ The dev scripts (`generate-modules`, `sync-references`, `ensure-built`) walk
 the whole tree on every start, so they need to be quick. `devscripts.sh` runs them with `go run` when Go is
 installed, or a prebuilt binary in Docker.
 
-Go work isn't put through Nx. Go's own build and test cache already hashes
-content and is shared across worktrees, so Nx would only add overhead.
+## Builds
+
+Every build is an Nx `build` target, JS and Go alike, cached and
+affected-aware:
+
+```bash
+pnpm exec nx run @langwatch/ui:build        # one package, deps first
+pnpm exec nx run haven:build                # .bin/haven/haven, consoles first
+pnpm exec nx run-many -t build -p tag:go    # every Go binary
+pnpm build:affected                         # only what your change reached
+```
+
+`dev/nx/go-plugin.mjs` makes one project per `cmd/<name>`, writing
+`.bin/<name>/<name>`, and a `go` project for the module (`test:go`,
+`lint:go`). A Go input change reruns every binary; the rerun is an incremental
+`go build`, so that costs little. The hot paths (`devscripts.sh`,
+`make service`) stay on `go run`: Go's own cache is faster there than an Nx
+cache hit. [ADR-150](adr/150-nx-task-runner.md) has the numbers.
 
 ## What "prepare" does
 

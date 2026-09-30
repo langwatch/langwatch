@@ -5,8 +5,7 @@
     "sharedGlobals": [
       "{workspaceRoot}/tsconfig.base.json",
       "{workspaceRoot}/tsconfig.shared.json",
-      "{workspaceRoot}/pnpm-workspace.yaml",
-      "{workspaceRoot}/pnpm-lock.yaml"
+      "{workspaceRoot}/pnpm-workspace.yaml"
     ],
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
@@ -21,20 +20,68 @@
       "sharedGlobals",
       "{workspaceRoot}/.oxlintrc.jsonc",
       "{workspaceRoot}/packages/oxlint-rules/**/*"
+    ],
+    "jsBuild": [
+      {
+        "runtime": "node --version"
+      },
+      {
+        "externalDependencies": []
+      }
+    ],
+    "go": [
+      "{workspaceRoot}/**/*.go",
+      "{workspaceRoot}/**/go.mod",
+      "{workspaceRoot}/**/go.sum",
+      "{workspaceRoot}/go.work",
+      "{workspaceRoot}/go.work.sum",
+      "{workspaceRoot}/cmd/**/*",
+      "{workspaceRoot}/pkg/**/*",
+      "{workspaceRoot}/services/**/*",
+      "{workspaceRoot}/tools/**/*",
+      "{workspaceRoot}/infra/clickhouse-serverless/**/*",
+      "{workspaceRoot}/sdks/go/**/*",
+      {
+        "runtime": "go version"
+      },
+      {
+        "env": "GOFLAGS"
+      },
+      {
+        "env": "GOOS"
+      },
+      {
+        "env": "GOARCH"
+      },
+      {
+        "env": "CGO_ENABLED"
+      },
+      {
+        "env": "GOEXPERIMENT"
+      },
+      {
+        "externalDependencies": []
+      }
     ]
   },
-  "plugins": ["./dev/nx/lint-types-plugin.mjs"],
+  "plugins": ["./dev/nx/lint-types-plugin.mjs", "./dev/nx/go-plugin.mjs"],
   "targetDefaults": {
     "typecheck": {
       "cache": true,
-      "inputs": ["default", "^production"],
+      "inputs": [
+        "default",
+        "^production",
+        {
+          "externalDependencies": ["typescript"]
+        }
+      ],
       "outputs": ["{projectRoot}/dist"]
     },
     "build": [
       {
         "cache": true,
         "dependsOn": ["^build"],
-        "inputs": ["production", "^production"],
+        "inputs": ["production", "^production", "jsBuild"],
         "outputs": ["{projectRoot}/dist"]
       },
       {
@@ -56,9 +103,68 @@
           "{workspaceRoot}/modules/scenario/contract/src/evaluator-attachments.ts",
           "{workspaceRoot}/modules/scenario/contract/src/suite-fields.ts",
           "{workspaceRoot}/modules/trace/contract/src/trace-format.schemas.ts",
-          "{workspaceRoot}/packages/redaction/src/**/*"
+          "{workspaceRoot}/packages/redaction/src/**/*",
+          "jsBuild"
         ],
         "outputs": ["{projectRoot}/dist", "{projectRoot}/src/internal/generated"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/scenario-child"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": [
+          "production",
+          "^production",
+          "jsBuild",
+          {
+            "env": "EMIT_META"
+          }
+        ],
+        "outputs": ["{projectRoot}/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/haven-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/tools/thuishaven/adapters/dashboard/web/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/idpsim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/idpsim/web/dist"]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/mailsim-web"]
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": ["production", "^production", "jsBuild"],
+        "outputs": ["{workspaceRoot}/services/mailsim/web/dist"]
+      },
+      {
+        "filter": {
+          "plugin": "./dev/nx/go-plugin.mjs"
+        },
+        "cache": true,
+        "dependsOn": ["^build"],
+        "inputs": [
+          "go",
+          "!{workspaceRoot}/**/*_test.go",
+          {
+            "dependentTasksOutputFiles": "**/*"
+          }
+        ],
+        "outputs": ["{workspaceRoot}/.bin/{projectName}/{projectName}"]
       }
     ],
     "prisma:generate": {
@@ -68,24 +174,45 @@
         "{projectRoot}/prisma.config.ts",
         "{projectRoot}/scripts/generate-table-catalogue.mjs",
         "{projectRoot}/package.json",
-        "sharedGlobals"
+        "sharedGlobals",
+        {
+          "externalDependencies": []
+        }
       ],
       "outputs": ["{projectRoot}/src/generated", "{projectRoot}/src/table-catalogue.ts"]
     },
     "test": {
       "cache": true,
-      "inputs": ["default", "^production"],
+      "inputs": [
+        "default",
+        "^production",
+        {
+          "externalDependencies": ["vitest"]
+        }
+      ],
       "outputs": []
     },
     "test:unit": {
       "cache": true,
-      "inputs": ["default", "^production"],
+      "inputs": [
+        "default",
+        "^production",
+        {
+          "externalDependencies": ["vitest"]
+        }
+      ],
       "outputs": []
     },
     "lint": [
       {
         "cache": true,
-        "inputs": ["default", "lintGlobals"],
+        "inputs": [
+          "default",
+          "lintGlobals",
+          {
+            "externalDependencies": []
+          }
+        ],
         "outputs": []
       },
       {
@@ -97,11 +224,32 @@
     ],
     "lint:types": {
       "cache": true,
-      "inputs": ["default", "^production", "lintGlobals"],
+      "inputs": [
+        "default",
+        "^production",
+        "lintGlobals",
+        {
+          "externalDependencies": ["oxlint", "oxlint-tsgolint"]
+        }
+      ],
       "outputs": []
+    },
+    "lint:go": {
+      "cache": true,
+      "inputs": ["go", "{workspaceRoot}/.golangci.yml", "{workspaceRoot}/Makefile"],
+      "outputs": []
+    },
+    "test:go": {
+      "cache": false
     }
   },
   "parallel": 4,
   "maxCacheSize": "10GB",
-  "analytics": false
+  "analytics": false,
+  "pluginsConfig": {
+    "@nx/js": {
+      "analyzeSourceFiles": false,
+      "projectsAffectedByDependencyUpdates": "auto"
+    }
+  }
 }

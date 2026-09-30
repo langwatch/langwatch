@@ -1311,6 +1311,7 @@ jobs:
           --filter "@langwatch/platform-api..."
           --filter "@langwatch/worker..."
           --filter "@langwatch/ui..."
+          --filter "@langwatch/workspace"
 
       # build:types reads the generated Prisma client and the SDK's
       # declarations, so the generated files and the four dist-resolving
@@ -1327,8 +1328,12 @@ jobs:
       # apps/api and apps/worker declare no build — they run from source through
       # node. What is built here is the browser bundle the API process serves,
       # plus every workspace dependency that has a build of its own.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: build
+
       - name: Build
-        run: pnpm run build:types && pnpm --filter "@langwatch/ui..." run build
+        run: pnpm run build:types && pnpm exec nx run @langwatch/ui:build --outputStyle=static
 
       # A successful `vite build` only proves the bundle compiles, not that it
       # boots. Serve the built output and load it in a headless browser to
