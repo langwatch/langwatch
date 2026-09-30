@@ -459,7 +459,10 @@ async function refuseProjectKeyHandout(
   // grant them.
   const ownsPersonalProject =
     project.isPersonal && project.ownerUserId === session.user.id;
-  if (!ownsPersonalProject && (await isDeveloperSeat(session.user.id, project.id))) {
+  if (
+    !ownsPersonalProject &&
+    (await isDeveloperSeat(session.user.id, project.id))
+  ) {
     return c.json(
       {
         error: "developer_seat_personal_only",

@@ -321,6 +321,14 @@ function useMemberAccessEditor({
   };
 }
 
+/** The set with `id` flipped in or out, as a new set so React sees a change. */
+function toggled(prev: Set<string>, id: string): Set<string> {
+  const next = new Set(prev);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
 /**
  * The assignments held directly by this member, and the row that adds one.
  *
@@ -393,12 +401,7 @@ function DirectAssignments({
                 !mirrorsTheSeat(b)
               }
               onToggleRemoval={() =>
-                setPendingBindingRemovals((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(b.id)) next.delete(b.id);
-                  else next.add(b.id);
-                  return next;
-                })
+                setPendingBindingRemovals((prev) => toggled(prev, b.id))
               }
             />
           ))}

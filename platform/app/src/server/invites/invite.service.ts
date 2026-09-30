@@ -270,6 +270,36 @@ export function resolveInviteTeamMemberships({
   );
 }
 
+type InviteSeat = "FullMember" | "LiteMember" | "Developer";
+
+/**
+ * The seat one invite lands on: an EXTERNAL invite that carries a custom
+ * team role with more than view permissions is a Full seat, since that is
+ * what the licence counts it as once accepted.
+ */
+function inviteSeat(
+  invite: {
+    role: OrganizationUserRole;
+    teams?: Array<{ customRoleId?: string }>;
+  },
+  customRoleMap: Map<string, string[]>,
+): InviteSeat {
+  if (
+    invite.role === OrganizationUserRole.ADMIN ||
+    invite.role === OrganizationUserRole.MEMBER
+  ) {
+    return "FullMember";
+  }
+  // Counted so the caller can see it; never compared to a limit (ADR-143).
+  if (invite.role === OrganizationUserRole.DEVELOPER) return "Developer";
+  const hasNonViewRole = invite.teams?.some((t) => {
+    if (!t.customRoleId) return false;
+    const permissions = customRoleMap.get(t.customRoleId);
+    return permissions && !isViewOnlyCustomRole(permissions);
+  });
+  return hasNonViewRole ? "FullMember" : "LiteMember";
+}
+
 export function classifyInvitesByMemberType(
   invites: Array<{
     role: OrganizationUserRole;
@@ -277,34 +307,14 @@ export function classifyInvitesByMemberType(
   }>,
   customRoleMap: Map<string, string[]>,
 ): { fullMembers: number; liteMembers: number; developers: number } {
-  let fullMembers = 0;
-  let liteMembers = 0;
-  let developers = 0;
-
+  const counts = { fullMembers: 0, liteMembers: 0, developers: 0 };
   for (const invite of invites) {
-    if (
-      invite.role === OrganizationUserRole.ADMIN ||
-      invite.role === OrganizationUserRole.MEMBER
-    ) {
-      fullMembers++;
-    } else if (invite.role === OrganizationUserRole.DEVELOPER) {
-      // Counted so the caller can see it; never compared to a limit (ADR-143).
-      developers++;
-    } else if (invite.role === OrganizationUserRole.EXTERNAL) {
-      const hasNonViewRole = invite.teams?.some((t) => {
-        if (!t.customRoleId) return false;
-        const permissions = customRoleMap.get(t.customRoleId);
-        return permissions && !isViewOnlyCustomRole(permissions);
-      });
-      if (hasNonViewRole) {
-        fullMembers++;
-      } else {
-        liteMembers++;
-      }
-    }
+    const seat = inviteSeat(invite, customRoleMap);
+    if (seat === "FullMember") counts.fullMembers++;
+    else if (seat === "Developer") counts.developers++;
+    else counts.liteMembers++;
   }
-
-  return { fullMembers, liteMembers, developers };
+  return counts;
 }
 
 /**

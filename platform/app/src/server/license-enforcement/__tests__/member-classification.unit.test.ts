@@ -136,14 +136,18 @@ describe("classifyMemberType", () => {
 
     /** @scenario Developers are counted and never capped */
     it("returns Developer for DEVELOPER role, whatever permissions are passed", () => {
-      expect(classifyMemberType(OrganizationUserRole.DEVELOPER, undefined)).toBe(
-        "Developer",
-      );
+      expect(
+        classifyMemberType(OrganizationUserRole.DEVELOPER, undefined),
+      ).toBe("Developer");
       expect(
         classifyMemberType(OrganizationUserRole.DEVELOPER, ["project:manage"]),
       ).toBe("Developer");
-      expect(isFullMember(OrganizationUserRole.DEVELOPER, undefined)).toBe(false);
-      expect(isLiteMember(OrganizationUserRole.DEVELOPER, undefined)).toBe(false);
+      expect(isFullMember(OrganizationUserRole.DEVELOPER, undefined)).toBe(
+        false,
+      );
+      expect(isLiteMember(OrganizationUserRole.DEVELOPER, undefined)).toBe(
+        false,
+      );
     });
   });
 

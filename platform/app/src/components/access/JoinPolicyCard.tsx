@@ -165,6 +165,72 @@ const JOINER_SEAT_OPTIONS: Array<{
   },
 ];
 
+/**
+ * WHICH SEAT THEY LAND ON. Shown whenever anybody can get in without an
+ * invitation: with the door shut there is nobody to seat. The setting also
+ * answers for SSO-admitted arrivals, which is why it sits on this card and
+ * not on the identity provider page.
+ */
+function JoinerSeatOptions({
+  seat,
+  saving,
+  onSelect,
+}: {
+  seat: JoinerRole;
+  saving: boolean;
+  onSelect: (seat: JoinerRole) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={2}>
+      <Text fontSize="13px" fontWeight="500">
+        Seat for people who join
+      </Text>
+      <RadioGroup.Root
+        value={seat}
+        colorPalette="orange"
+        onValueChange={(event) =>
+          onSelect((event.value ?? "MEMBER") as JoinerRole)
+        }
+      >
+        <VStack align="stretch" gap={2}>
+          {JOINER_SEAT_OPTIONS.map((option) => (
+            <RadioGroup.Item
+              key={option.value}
+              value={option.value}
+              disabled={saving}
+              paddingX={2.5}
+              paddingY={2}
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              background="bg.panel"
+              _checked={{
+                borderColor: "colorPalette.solid",
+                background: "colorPalette.subtle",
+              }}
+            >
+              <RadioGroup.ItemHiddenInput
+                data-testid={`joiner-seat-${option.value}`}
+              />
+              <RadioGroup.ItemIndicator />
+              <RadioGroup.ItemText>
+                <VStack align="start" gap={0}>
+                  <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
+                    {option.label}
+                  </Text>
+                  <Text color="fg.muted" fontSize="11.5px" lineHeight="1.5">
+                    {option.help}
+                  </Text>
+                </VStack>
+              </RadioGroup.ItemText>
+            </RadioGroup.Item>
+          ))}
+        </VStack>
+      </RadioGroup.Root>
+    </VStack>
+  );
+}
+
 export function JoinPolicyCard({
   domainJoin,
   joinDomains,
@@ -272,58 +338,8 @@ export function JoinPolicyCard({
         </VStack>
       )}
 
-      {/* WHICH SEAT THEY LAND ON. Shown whenever anybody can get in without
-          an invitation: with the door shut there is nobody to seat. The
-          setting also answers for SSO-admitted arrivals, which is why it
-          sits here and not on the identity provider page. */}
       {selected !== "off" && (
-        <VStack align="stretch" gap={2}>
-          <Text fontSize="13px" fontWeight="500">
-            Seat for people who join
-          </Text>
-          <RadioGroup.Root
-            value={seat}
-            colorPalette="orange"
-            onValueChange={(event) =>
-              setSeat((event.value ?? "MEMBER") as JoinerRole)
-            }
-          >
-            <VStack align="stretch" gap={2}>
-              {JOINER_SEAT_OPTIONS.map((option) => (
-                <RadioGroup.Item
-                  key={option.value}
-                  value={option.value}
-                  disabled={saving}
-                  paddingX={2.5}
-                  paddingY={2}
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="md"
-                  background="bg.panel"
-                  _checked={{
-                    borderColor: "colorPalette.solid",
-                    background: "colorPalette.subtle",
-                  }}
-                >
-                  <RadioGroup.ItemHiddenInput
-                    data-testid={`joiner-seat-${option.value}`}
-                  />
-                  <RadioGroup.ItemIndicator />
-                  <RadioGroup.ItemText>
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
-                        {option.label}
-                      </Text>
-                      <Text color="fg.muted" fontSize="11.5px" lineHeight="1.5">
-                        {option.help}
-                      </Text>
-                    </VStack>
-                  </RadioGroup.ItemText>
-                </RadioGroup.Item>
-              ))}
-            </VStack>
-          </RadioGroup.Root>
-        </VStack>
+        <JoinerSeatOptions seat={seat} saving={saving} onSelect={setSeat} />
       )}
 
       {/* THE OTHER DOOR, NAMED. This card answers for people who arrive

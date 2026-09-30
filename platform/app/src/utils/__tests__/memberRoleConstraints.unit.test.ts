@@ -16,9 +16,9 @@ describe("memberRoleConstraints", () => {
     describe("when the seat is Developer", () => {
       /** Invariant (ADR-143): an ORGANIZATION-scoped ADMIN binding opens every project. */
       it("never maps to Admin", () => {
-        expect(ORGANIZATION_TO_TEAM_ROLE_MAP[OrganizationUserRole.DEVELOPER]).not.toBe(
-          TeamUserRole.ADMIN,
-        );
+        expect(
+          ORGANIZATION_TO_TEAM_ROLE_MAP[OrganizationUserRole.DEVELOPER],
+        ).not.toBe(TeamUserRole.ADMIN);
       });
     });
   });

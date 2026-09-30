@@ -3,10 +3,10 @@ import {
   DOMAIN_AUTO_JOIN_POLICY_ID,
   type DomainJoinSetting,
   isPublicEmailDomain,
-  type JoinerRole,
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
+  type JoinerRole,
   type JoinLookupDecision,
   JoinNotAvailableError,
   type JoinOffer,
@@ -650,19 +650,10 @@ export class JoinRequestsService {
     }
 
     if (domainJoin === "auto") {
-      if (!(await this.deps.autoJoinLicensed())) {
-        throw new JoinAutoNotLicensedError(
-          `organization ${organizationId} cannot enable automatic joining without a genuine license`,
-        );
-      }
-      if (normalized.length === 0) {
-        throw new JoinAutoDomainUnprovenError(
-          "automatic joining needs a company domain to be named",
-        );
-      }
-      for (const domain of normalized) {
-        await this.assertDomainProven({ organizationId, domain });
-      }
+      await this.assertAutomaticJoinAllowed({
+        organizationId,
+        domains: normalized,
+      });
     }
 
     // Turning automatic joining off clears the domains it named: a setting
@@ -685,12 +676,34 @@ export class JoinRequestsService {
     };
   }
 
-  /** How this organization has set joining, for the settings card. */
-  async readJoining({
+  /**
+   * What automatic joining needs before it may be switched on: a genuine
+   * licence, at least one domain, and every named domain proven.
+   */
+  private async assertAutomaticJoinAllowed({
     organizationId,
+    domains,
   }: {
     organizationId: string;
-  }): Promise<{
+    domains: readonly string[];
+  }): Promise<void> {
+    if (!(await this.deps.autoJoinLicensed())) {
+      throw new JoinAutoNotLicensedError(
+        `organization ${organizationId} cannot enable automatic joining without a genuine license`,
+      );
+    }
+    if (domains.length === 0) {
+      throw new JoinAutoDomainUnprovenError(
+        "automatic joining needs a company domain to be named",
+      );
+    }
+    for (const domain of domains) {
+      await this.assertDomainProven({ organizationId, domain });
+    }
+  }
+
+  /** How this organization has set joining, for the settings card. */
+  async readJoining({ organizationId }: { organizationId: string }): Promise<{
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
     joinerRole: JoinerRole;

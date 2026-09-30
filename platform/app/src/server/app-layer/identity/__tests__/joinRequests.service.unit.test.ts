@@ -1,7 +1,7 @@
 import type {
   DomainJoinSetting,
-  JoinerRole,
   JoinCandidateOrganization,
+  JoinerRole,
   JoinRequestAggregateState,
 } from "@langwatch/identity";
 import {

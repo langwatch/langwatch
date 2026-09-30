@@ -36,9 +36,9 @@ import { resolveApiKeyPermission } from "~/server/app-layer/authz/credential-per
 import { resolveProjectPermission } from "~/server/app-layer/authz/permission-adapters";
 import { liveGrants } from "~/server/app-layer/authz/repositories/live-rows";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "../../../db";
 import { seedRoleBinding } from "../../../../test-utils/authz-seeds";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
+import { prisma } from "../../../db";
 import {
   createSeatChangeFixture,
   type SeatChangeFixture,
@@ -265,20 +265,22 @@ describe("given a Full member on three shared teams, a shared project, and the o
     it("the shared-project key stops working and the personal one keeps working, with no revocation", async () => {
       const apiKeys = ApiKeyService.create(prisma);
       const mint = (projectId: string, teamId: string) =>
-        apiKeys.create({
-          name: `dev-seat-key-${projectId}`,
-          userId: fixture.soloUserId,
-          createdByUserId: fixture.soloUserId,
-          organizationId: fixture.organizationId,
-          permissionMode: "all",
-          bindings: [
-            {
-              role: TeamUserRole.ADMIN,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: teamId,
-            },
-          ],
-        }).then((minted) => ({ id: minted.apiKey.id, projectId, teamId }));
+        apiKeys
+          .create({
+            name: `dev-seat-key-${projectId}`,
+            userId: fixture.soloUserId,
+            createdByUserId: fixture.soloUserId,
+            organizationId: fixture.organizationId,
+            permissionMode: "all",
+            bindings: [
+              {
+                role: TeamUserRole.ADMIN,
+                scopeType: RoleBindingScopeType.TEAM,
+                scopeId: teamId,
+              },
+            ],
+          })
+          .then((minted) => ({ id: minted.apiKey.id, projectId, teamId }));
 
       const sharedKey = await mint(
         fixture.sharedProjectId,

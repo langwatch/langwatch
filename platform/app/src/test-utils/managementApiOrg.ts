@@ -110,26 +110,6 @@ export async function seedManagementOrg({
   };
 }
 
-/**
- * The binding role each organization role carries at ORGANIZATION scope.
- * `OrganizationUserRole` and `TeamUserRole` are separate enums that happen to
- * share two names today, so the pairing is written out: a new organization
- * role then fails to compile here rather than writing a value the
- * `RoleBinding.role` column rejects at runtime. `EXTERNAL` and `DEVELOPER`
- * are absent because neither seat holds an organization-scoped binding at
- * all (ADR-143 for the Developer seat).
- */
-const ORGANIZATION_BINDING_ROLE = {
-  [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
-  [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
-} satisfies Record<
-  Exclude<
-    OrganizationUserRole,
-    typeof OrganizationUserRole.EXTERNAL | typeof OrganizationUserRole.DEVELOPER
-  >,
-  TeamUserRole
->;
-
 /** The seats that carry an organization-scoped binding at all. */
 function organizationBindingRoleFor(
   role: OrganizationUserRole,

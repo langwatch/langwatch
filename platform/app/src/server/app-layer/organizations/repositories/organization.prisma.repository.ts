@@ -394,6 +394,23 @@ type ScopeBindingPlan = {
 };
 
 /**
+ * Revocations grouped by the reason they carry, so a seat-decided deletion is
+ * recorded as one and a duplicate collapse stays unlabelled.
+ */
+function revokesByReason(
+  plans: ScopeBindingPlan[],
+): Map<string | undefined, string[]> {
+  const grouped = new Map<string | undefined, string[]>();
+  for (const plan of plans) {
+    if (plan.revokeIds.length === 0) continue;
+    const ids = grouped.get(plan.revokeReason) ?? [];
+    ids.push(...plan.revokeIds);
+    grouped.set(plan.revokeReason, ids);
+  }
+  return grouped;
+}
+
+/**
  * Emit a batch of plans, revocations first: a crash mid-batch leaves the
  * member with less access than the correction asked for, never more, and the
  * retry converges. Revoking the collapsed siblings before the role change
@@ -410,16 +427,7 @@ async function emitScopeBindingPlans({
   plans: ScopeBindingPlan[];
   actor: LedgerActor;
 }): Promise<void> {
-  // Revocations grouped by the reason they carry, so a seat-decided deletion
-  // is recorded as one and a duplicate collapse stays unlabelled.
-  const revokesByReason = new Map<string | undefined, string[]>();
-  for (const plan of plans) {
-    if (plan.revokeIds.length === 0) continue;
-    const ids = revokesByReason.get(plan.revokeReason) ?? [];
-    ids.push(...plan.revokeIds);
-    revokesByReason.set(plan.revokeReason, ids);
-  }
-  for (const [reason, bindingIds] of revokesByReason) {
+  for (const [reason, bindingIds] of revokesByReason(plans)) {
     await writer.revokeBindings({
       organizationId,
       bindingIds,
@@ -1250,10 +1258,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // Keep the ORGANIZATION-scoped grant in sync. A Lite Member has none
       // (access comes from their teams) and neither does a Developer
       // (ADR-143: personal team only), so both seats revoke it instead.
-      if (
-        role !== OrganizationUserRole.EXTERNAL &&
-        holdsSharedAccess(role)
-      ) {
+      if (role !== OrganizationUserRole.EXTERNAL && holdsSharedAccess(role)) {
         plans.push(
           await planUserScopeBinding({
             tx,

@@ -355,104 +355,113 @@ export function AddMembersForm({
           </Text>
         )}
 
-        {orgRole !== OrganizationUserRole.DEVELOPER && teamFields.length > 0 && (
-          <VStack align="start" gap={2} width="100%">
-            <HStack justify="space-between" width="100%">
-              <Text fontSize="sm" fontWeight="medium" color="fg">
-                Team Assignments
-              </Text>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={handleAddTeam}
-                disabled={getAvailableTeamOptions().length === 0}
+        {orgRole !== OrganizationUserRole.DEVELOPER &&
+          teamFields.length > 0 && (
+            <VStack align="start" gap={2} width="100%">
+              <HStack justify="space-between" width="100%">
+                <Text fontSize="sm" fontWeight="medium" color="fg">
+                  Team Assignments
+                </Text>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleAddTeam}
+                  disabled={getAvailableTeamOptions().length === 0}
+                >
+                  <Plus size={14} /> Add team
+                </Button>
+              </HStack>
+              <Box
+                paddingX={4}
+                paddingY={3}
+                backgroundColor="bg.muted"
+                borderRadius="xl"
+                width="100%"
               >
-                <Plus size={14} /> Add team
-              </Button>
-            </HStack>
-            <Box
-              paddingX={4}
-              paddingY={3}
-              backgroundColor="bg.muted"
-              borderRadius="xl"
-              width="100%"
-            >
-              <Table.Root variant={"ghost" as any} width="100%">
-                <Table.Header>
-                  <Table.Row backgroundColor="transparent">
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                      Team
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                      Role
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader
-                      paddingLeft={0}
-                      paddingRight={0}
-                      paddingTop={0}
-                      width="50px"
-                    />
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {teamFields.map((teamField, teamIndex) => (
-                    <Table.Row key={teamField.id} backgroundColor="transparent">
-                      <Table.Cell paddingLeft={0}>
-                        <TeamSelect
-                          teamIndex={teamIndex}
-                          control={control}
-                          getAvailableTeamOptions={getAvailableTeamOptions}
-                        />
-                      </Table.Cell>
-                      <Table.Cell paddingLeft={0}>
-                        <TeamRoleSelect
-                          teamIndex={teamIndex}
-                          control={control}
-                          organizationId={organizationId}
-                          orgRole={orgRole}
-                          setValue={setValue}
-                          isInviterAdmin={isInviterAdmin}
-                        />
-                      </Table.Cell>
-                      <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
-                        <Button
-                          type="button"
-                          size="sm"
-                          colorPalette="red"
-                          variant="ghost"
-                          aria-label="Remove team assignment"
-                          onClick={() => removeTeam(teamIndex)}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      </Table.Cell>
+                <Table.Root variant={"ghost" as any} width="100%">
+                  <Table.Header>
+                    <Table.Row backgroundColor="transparent">
+                      <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
+                        Team
+                      </Table.ColumnHeader>
+                      <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
+                        Role
+                      </Table.ColumnHeader>
+                      <Table.ColumnHeader
+                        paddingLeft={0}
+                        paddingRight={0}
+                        paddingTop={0}
+                        width="50px"
+                      />
                     </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </Box>
-          </VStack>
-        )}
+                  </Table.Header>
+                  <Table.Body>
+                    {teamFields.map((teamField, teamIndex) => (
+                      <Table.Row
+                        key={teamField.id}
+                        backgroundColor="transparent"
+                      >
+                        <Table.Cell paddingLeft={0}>
+                          <TeamSelect
+                            teamIndex={teamIndex}
+                            control={control}
+                            getAvailableTeamOptions={getAvailableTeamOptions}
+                          />
+                        </Table.Cell>
+                        <Table.Cell paddingLeft={0}>
+                          <TeamRoleSelect
+                            teamIndex={teamIndex}
+                            control={control}
+                            organizationId={organizationId}
+                            orgRole={orgRole}
+                            setValue={setValue}
+                            isInviterAdmin={isInviterAdmin}
+                          />
+                        </Table.Cell>
+                        <Table.Cell
+                          paddingLeft={0}
+                          paddingRight={0}
+                          paddingY={2}
+                        >
+                          <Button
+                            type="button"
+                            size="sm"
+                            colorPalette="red"
+                            variant="ghost"
+                            aria-label="Remove team assignment"
+                            onClick={() => removeTeam(teamIndex)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              </Box>
+            </VStack>
+          )}
 
-        {orgRole !== OrganizationUserRole.DEVELOPER && teamFields.length === 0 && (
-          <VStack align="start" gap={2} width="100%">
-            {orgRole === OrganizationUserRole.EXTERNAL && (
-              <LiteMemberNeedsTeamWarning />
-            )}
-            <HStack gap={2}>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleAddTeam}
-                disabled={getAvailableTeamOptions().length === 0}
-              >
-                <Plus size={14} /> Add team
-              </Button>
-            </HStack>
-          </VStack>
-        )}
+        {orgRole !== OrganizationUserRole.DEVELOPER &&
+          teamFields.length === 0 && (
+            <VStack align="start" gap={2} width="100%">
+              {orgRole === OrganizationUserRole.EXTERNAL && (
+                <LiteMemberNeedsTeamWarning />
+              )}
+              <HStack gap={2}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAddTeam}
+                  disabled={getAvailableTeamOptions().length === 0}
+                >
+                  <Plus size={14} /> Add team
+                </Button>
+              </HStack>
+            </VStack>
+          )}
 
         <HStack justify="end" width="100%" marginTop={4}>
           <Button

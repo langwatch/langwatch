@@ -27,14 +27,10 @@ export class DeveloperSeatRestrictedError extends HandledError {
   declare readonly code: "developer_seat_restricted";
 
   constructor(resource: string) {
-    super(
-      "developer_seat_restricted",
-      "This is outside your Developer seat",
-      {
-        meta: { resource },
-        httpStatus: 401,
-      },
-    );
+    super("developer_seat_restricted", "This is outside your Developer seat", {
+      meta: { resource },
+      httpStatus: 401,
+    });
     this.name = "DeveloperSeatRestrictedError";
   }
 }

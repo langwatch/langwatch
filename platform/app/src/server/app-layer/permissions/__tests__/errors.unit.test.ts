@@ -1,6 +1,9 @@
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
-import { DeveloperSeatRestrictedError, LiteMemberRestrictedError } from "../errors";
+import {
+  DeveloperSeatRestrictedError,
+  LiteMemberRestrictedError,
+} from "../errors";
 
 describe("DeveloperSeatRestrictedError", () => {
   /** @scenario A Developer never sees a shared project */
