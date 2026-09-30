@@ -27,6 +27,7 @@ describe("userFromRecord", () => {
       langyCodeAccessPreference: null,
       passkeyNudgeDismissedAt: null,
       joinOfferDismissedDomains: [],
+      notificationPreferences: {},
     });
 
     expect(Object.keys(user).toSorted()).toEqual(
