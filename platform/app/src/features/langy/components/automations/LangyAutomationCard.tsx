@@ -7,18 +7,18 @@
  */
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import {
-  type LangyAutomationRecord,
+  useLangyAutomationNow,
+  useLangySlackConnections,
+} from "../../hooks/useLangyAutomationData";
+import {
   automationCondition,
   automationDestinations,
   automationKind,
+  type LangyAutomationRecord,
   mergeAutomation,
   nextFiringLine,
   readAutomations,
 } from "../../logic/langyAutomationSummary";
-import {
-  useLangyAutomationNow,
-  useLangySlackConnections,
-} from "../../hooks/useLangyAutomationData";
 import {
   buildResourceHref,
   type CapabilityCardInput,

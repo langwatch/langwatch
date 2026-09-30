@@ -46,23 +46,20 @@ describe("liveTriggerNotifier.sendSlack", () => {
       { status: 403, data: "invalid_token" },
       { status: 404, data: "no_service" },
       { status: 404, data: "" },
-    ])(
-      "says the webhook no longer works for $status $data",
-      async (refusal) => {
-        sendMock.mockRejectedValue(slackRefusal(refusal));
-        const error = await testSlack();
-        expect(error.customerMessage).toMatch(/no longer accepts this webhook/);
-        expect(error.customerMessage).toMatch(/Create a new incoming webhook/);
+    ])("says the webhook no longer works for $status $data", async (refusal) => {
+      sendMock.mockRejectedValue(slackRefusal(refusal));
+      const error = await testSlack();
+      expect(error.customerMessage).toMatch(/no longer accepts this webhook/);
+      expect(error.customerMessage).toMatch(/Create a new incoming webhook/);
 
-        const handled = new NotificationDeliveryError(error.message, {
-          customerMessage: error.customerMessage,
-        });
-        expect(handled.code).toBe("notification_delivery_error");
-        expect(handled.meta).toMatchObject({
-          message: error.customerMessage,
-        });
-      },
-    );
+      const handled = new NotificationDeliveryError(error.message, {
+        customerMessage: error.customerMessage,
+      });
+      expect(handled.code).toBe("notification_delivery_error");
+      expect(handled.meta).toMatchObject({
+        message: error.customerMessage,
+      });
+    });
   });
 
   describe("when the webhook's channel was archived", () => {

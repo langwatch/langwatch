@@ -17,8 +17,8 @@ import {
 } from "../../hooks/useLangyAutomationData";
 import { slackConnectionChoiceMessage } from "../../logic/langySlackConnectionPrompt";
 import { LangyCapabilityCard } from "../capabilities/LangyCapabilityCard";
-import { LangySpaAnchor } from "../LangySpaAnchor";
 import { useLangySend } from "../LangySendContext";
+import { LangySpaAnchor } from "../LangySpaAnchor";
 
 /** The Automations page with the Slack connection form open. */
 export function addSlackConnectionHref(projectSlug: string): string {

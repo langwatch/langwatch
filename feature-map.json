@@ -1034,7 +1034,7 @@
           "sdk": {
             "python": "langwatch.triggers",
             "typescript": "langwatch.triggers",
-            "go": null
+            "go": "client.Triggers"
           },
           "cli": [
             "trigger list",

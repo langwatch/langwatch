@@ -5,12 +5,13 @@
  * viewer's hydration returns (the rule inside `actionParams`, `triggerKind`).
  * Spec: specs/langy/langy-automations.feature.
  */
+
+import { CADENCE_LABELS } from "@langwatch/automations/cadences";
 import annotationQueueShared from "@langwatch/automations/providers/annotationQueue";
 import datasetShared from "@langwatch/automations/providers/dataset";
 import emailShared from "@langwatch/automations/providers/email";
 import slackShared from "@langwatch/automations/providers/slack";
 import webhookShared from "@langwatch/automations/providers/webhook";
-import { CADENCE_LABELS } from "@langwatch/automations/cadences";
 import { z } from "zod";
 import { isAutomationPauseReason } from "~/features/automations/logic/pauseReasons";
 import { describeCron } from "~/features/automations/logic/reportSchedule";

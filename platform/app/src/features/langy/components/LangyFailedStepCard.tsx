@@ -4,11 +4,12 @@
  * lets them make it, instead of the failure card and never beside it, and
  * neither folds away once the turn answers. Everything else is a failure.
  */
-import type { LangyToolErrorPresentation } from "../logic/langyToolFailure";
+
 import {
   isSlackConnectionRefusal,
   refusedSlackChannel,
 } from "../logic/langySlackConnectionPrompt";
+import type { LangyToolErrorPresentation } from "../logic/langyToolFailure";
 import { LangySlackConnectionCard } from "./automations/LangySlackConnectionCard";
 import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyToolErrorCard } from "./LangyToolErrorCard";
