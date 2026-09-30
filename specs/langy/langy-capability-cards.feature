@@ -43,6 +43,13 @@ Feature: Langy renders domain-capability cards for tool calls
     And the model's own figure sits beside it, captioned by the model's name
     And the card never shows the aggregation name or a count of result buckets
 
+  @unit
+  Scenario: A metrics card names its aggregation in words
+    When Langy reads a metric aggregated as a total, an average, a minimum, a maximum, a median or a percentile
+    Then the card keeps the metric as its heading
+    And the caption under the figure names the aggregation in words, such as "total" or "95th percentile"
+    And an aggregation it does not know is shown with its separators turned into spaces
+
   @integration
   Scenario: An evaluation run renders its result
     When Langy runs an experiment or suite and it completes
