@@ -14,9 +14,9 @@ COPY sdks/go/go.* sdks/go/
 COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 COPY cmd/devscripts ./cmd/devscripts
 COPY tools/devscripts ./tools/devscripts
+# devscripts imports these two stdlib-only packages.
 COPY tools/cliprof ./tools/cliprof
-COPY tools/internal/collate ./tools/internal/collate
-COPY tools/internal/jsonc ./tools/internal/jsonc
+COPY tools/internal ./tools/internal
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -o /out/devscripts ./cmd/devscripts
