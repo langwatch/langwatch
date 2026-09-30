@@ -3,6 +3,7 @@ package rpc_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -118,4 +119,9 @@ func TestAnAuthorizedRequestReachesTheRuntimeWithLangevalsWire(t *testing.T) {
 	assert.NotEmpty(t, req.Trace.Traceparent)
 	require.Len(t, req.Entries, 1)
 	assert.Equal(t, "a", *req.Entries[0].Output)
+}
+
+// ClusterTopics is not scripted; the clustering routes have their own tests.
+func (a *recordingAPI) ClusterTopics(context.Context, contract.TopicClusteringRequest) (contract.TopicClusteringResult, error) {
+	return contract.TopicClusteringResult{}, errors.New("recordingAPI: ClusterTopics is not scripted")
 }
