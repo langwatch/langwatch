@@ -799,6 +799,16 @@ test_lwql_replicas() {
   assert_eq "scaled-up pod $new_pod authenticates the restricted identity" \
     "$(kc exec "$new_pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
 
+  # Back to three before the next upgrade. Its pre-upgrade migrate hook dials the
+  # ClickHouse Service, and the fourth pod is outside the rendered cluster, so it
+  # never received the Replicated database: a statement routed there fails with
+  # "Database langwatch does not exist".
+  kc scale statefulset "${RELEASE}-clickhouse" --replicas=3
+  if ! kc wait --for=delete "pod/$new_pod" --timeout=180s; then
+    fail "scaled-up pod $new_pod did not go away after scaling back to 3"
+    return
+  fi
+
   # ── AC9: `sql` mode is REFUSED on a multi-host cluster (issue #8258) ─────────
   # The counterpart to the single-node case in test_lwql. This release is a
   # 3-host ReplicatedMergeTree cluster: system.clusters carries an is_local=1
@@ -844,9 +854,7 @@ $refuse_out"
   fi
 
   # (c) No SQL-store copy of the restricted user on any replica: the guard aborts
-  # before any access-model DDL, so only the rendered users_xml copy exists. The
-  # helm upgrade above reconciled the StatefulSet back to three replicas, so
-  # re-enumerate the current pods.
+  # before any access-model DDL, so only the rendered users_xml copy exists.
   pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
   for p in $pods; do
     assert_eq "[$p] no SQL-store copy of langwatch_lwql (guard blocked sql-mode DDL)" \
