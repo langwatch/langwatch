@@ -149,9 +149,10 @@ func (s *Server) serveConsoleAPI(w http.ResponseWriter, r *http.Request, path st
 		w.WriteHeader(http.StatusNoContent)
 	case strings.HasPrefix(path, "/calls/") && r.Method == http.MethodGet:
 		id := strings.TrimPrefix(path, "/calls/")
-		for _, c := range s.calls.newest() {
-			if c.ID == id {
-				writeJSON(w, c)
+		calls := s.calls.newest()
+		for i := range calls {
+			if calls[i].ID == id {
+				writeJSON(w, calls[i])
 				return
 			}
 		}

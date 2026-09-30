@@ -4,7 +4,7 @@ package main
 
 import "testing"
 
-const wantCombined = "aigateway,nlpgo,idpsim,mailsim,storagesim,voicesim,llmsim"
+const wantCombined = "aigateway,nlpgo,idpsim,mailsim,storagesim,voicesim,llmsim,analyticssim"
 
 // @scenario "A dev build hosts the simulators in the combined process"
 func TestDevBuildHostsTheSimulators(t *testing.T) {

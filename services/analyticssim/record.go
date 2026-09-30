@@ -63,7 +63,8 @@ type store struct {
 func (s *store) add(records []Record, at time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, r := range records {
+	for i := range records {
+		r := records[i]
 		s.next++
 		r.ID = fmt.Sprintf("rec_%06d", s.next)
 		r.ReceivedAt = at

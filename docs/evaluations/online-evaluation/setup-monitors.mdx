@@ -29,7 +29,9 @@ Pick **LLM as Judge**, then **LLM-as-a-Judge Boolean Evaluator**.
 <Step title="Configure the evaluator">
 Name the evaluator, pick the judge model and write the criteria in **Prompt**, for example: the reply passes only when it answers the customer's question and stays on the topic of the customer's order. A built-in evaluator such as PII Detection shows its own options here instead, for example the entity types to flag.
 
-Under **Variables**, map the evaluator's fields to the trace. `input` maps to the trace input and `output` to the trace output by default. Click **Create Evaluator**.
+Under **Variables**, map the evaluator's fields to the trace. For an LLM-as-judge evaluator, `input` maps to **Full Trace (AI-Readable)** (`formatted_trace`) by default: every span of the trace, tool calls with their arguments and results included, so the judge can check what the agent did as well as what it replied. `output` maps to the trace output.
+
+Other evaluators map `input` to the trace input and `output` to the trace output. Click **Create Evaluator**.
 
 </Step>
 
@@ -59,9 +61,13 @@ Click **Create Online Evaluation**. The monitor is active as soon as it is creat
 
 A trace is one request and response. A thread is the whole conversation, grouped by the `thread_id` you send in the trace metadata. Some checks only make sense on the conversation: whether the user's problem was resolved, whether the assistant stayed consistent across turns, whether the tone drifted.
 
-Pick **Thread Level** in the drawer. The evaluator's variables now map to the **Current Thread** source, whose `traces` field holds every trace in the thread with its input and output.
+Pick **Thread Level** in the drawer. The evaluator's variables now map to the **Current Thread** source. An LLM-as-judge evaluator's `input` maps to **Full Thread (AI-Readable)** by default; other evaluators map it to the `traces` field, which holds every trace in the thread with its input and output.
 
-The **Full Thread (AI-Readable)** field (`formatted_traces`) holds the thread as one text: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), cut to 64,000 tokens. It is the same rendering as the [`llm_readable_thread`](/api-reference/query/extraction-functions#which-thread-function-to-use) query function.
+The **Full Thread (AI-Readable)** field (`formatted_traces`) holds the thread as one text: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals). It is the same rendering as the [`llm_readable_thread`](/api-reference/query/extraction-functions#which-thread-function-to-use) query function.
+
+The thread is rendered under half of the evaluator's max tokens setting: 64,000 tokens at the default of 128,000, less when the judge model's context window is smaller. A long thread shortens every turn before it drops one.
+
+An LLM-as-judge evaluator always runs on long content. When the text is still longer than the evaluator's max tokens setting or the model's context window, the judge reads its opening and its ending with a marker naming how many tokens were left out of the middle, and the result details say so.
 
 <Frame>
   <img

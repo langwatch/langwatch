@@ -18208,7 +18208,7 @@
           "name": "llm_readable_trace",
           "kind": "extraction",
           "signature": "llm_readable_trace(trace_id, max_tokens)",
-          "description": "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the model calls, then the slowest.",
+          "description": "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the tool calls, then the model calls, then the slowest.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "trace",
@@ -18310,7 +18310,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed') AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_criteria",
@@ -18323,7 +18323,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_criteria(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_criteria(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_passed",
@@ -18336,7 +18336,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_passed(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_passed(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_score",
@@ -18349,7 +18349,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_score(conversation_bounded(ConversationId, 8000, ''), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_score(llm_readable_thread(ConversationId, 8000), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_category",
@@ -18362,7 +18362,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_category(conversation_bounded(ConversationId, 8000, ''), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_category(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_category_probs",
@@ -18375,7 +18375,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_category_probs(conversation_bounded(ConversationId, 8000, ''), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_category_probs(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         }
       ]
     },

@@ -923,7 +923,7 @@ const registry = {
   instant_eval_query_missing_columns: {
     tips: [
       "Read `meta.missing`; a run needs TraceId so every judgement can be tied back to its trace",
-      "Project at least one eval function, such as `eval(conversation_bounded(ConversationId, 8000, ''), '…') AS annoyed`",
+      "Project at least one eval function, such as `eval(llm_readable_thread(ConversationId, 8000), '…') AS annoyed`",
       "ThreadId, SpanId and OccurredAt are optional and are carried onto the judgements when the statement projects them",
     ],
   },

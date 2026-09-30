@@ -99,7 +99,7 @@ func TestSamePromptSameAnswer(t *testing.T) {
 	}
 }
 
-// @scenario "A seed header pins or randomises the answer"
+// @scenario "A seed header pins or varies the answer"
 func TestSeedHeader(t *testing.T) {
 	srv := newTestServer(t)
 	pinned := map[string]string{HeaderSeed: "42"}

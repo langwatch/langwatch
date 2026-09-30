@@ -46,15 +46,22 @@ export async function resolveThreadMappingsIntoData(params: {
   mappings: MappingState;
   getThreadTraces: GetThreadTraces;
   spanDigest: EvaluationSpanDigest;
+  /** The judge's render budget for `formatted_traces`. */
+  maxTokens: number;
 }): Promise<void> {
-  const { data, trace, mappings, getThreadTraces, spanDigest } = params;
+  const { data, trace, mappings, getThreadTraces, spanDigest, maxTokens } = params;
   const threadId = trace.metadata?.thread_id;
 
   // Eagerly fetch thread traces once (empty if no thread_id)
   const threadTraces = threadId ? await getThreadTraces(threadId) : [];
 
   for (const [targetField, mappingConfig] of Object.entries(mappings.mapping)) {
-    const outcome = await resolveThreadField({ mappingConfig, threadId, threadTraces, spanDigest });
+    const outcome = await resolveThreadField({
+      mappingConfig,
+      threadId,
+      threadTraces,
+      render: (traces) => spanDigest.formatThread({ threadKey: threadId ?? "", traces, maxTokens }),
+    });
     if (outcome.resolved) data[targetField] = outcome.value;
   }
 }
@@ -65,12 +72,12 @@ async function resolveThreadField({
   mappingConfig,
   threadId,
   threadTraces,
-  spanDigest,
+  render,
 }: {
   mappingConfig: MappingState["mapping"][string];
   threadId: string | null | undefined;
   threadTraces: Awaited<ReturnType<GetThreadTraces>>;
-  spanDigest: EvaluationSpanDigest;
+  render: (traces: Awaited<ReturnType<GetThreadTraces>>) => Promise<string>;
 }): Promise<ThreadFieldOutcome> {
   if (!("type" in mappingConfig && mappingConfig.type === "thread")) return { resolved: false };
   if (!("source" in mappingConfig) || !mappingConfig.source) return { resolved: false };
@@ -86,7 +93,7 @@ async function resolveThreadField({
 
     return {
       resolved: true,
-      value: await spanDigest.formatThread({ threadKey: threadId, traces: threadTraces }),
+      value: await render(threadTraces),
     };
   }
 

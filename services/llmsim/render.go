@@ -190,6 +190,7 @@ func writeEmbeddings(w http.ResponseWriter, body map[string]json.RawMessage) {
 
 func embedding(key string, dims int) []float32 {
 	sum := sha256.Sum256([]byte(key))
+	//nolint:gosec // G404: a deterministic embedding per key, not a secret
 	r := mrand.New(mrand.NewPCG(binary.LittleEndian.Uint64(sum[:8]), binary.LittleEndian.Uint64(sum[8:16])))
 	vec := make([]float32, dims)
 	norm := 0.0
