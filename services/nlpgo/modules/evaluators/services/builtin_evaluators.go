@@ -2,20 +2,27 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/rules"
 )
 
-// BuiltinEvaluators pairs each definition with how it runs.
+// BuiltinEvaluators pairs each ported evaluator's definition with how it
+// runs. Keyed on the scorers, so a defined but unported evaluator stays
+// evaluator_not_found.
 func BuiltinEvaluators() map[string]Evaluator {
-	definitions := rules.Definitions()
-	return map[string]Evaluator{
-		"langevals/exact_match": {
-			Definition: definitions["langevals/exact_match"],
-			Prepare:    WithSettings(rules.ParseExactMatchSettings, scoreExactMatch),
-		},
+	prepares := map[string]func(json.RawMessage) (Score, error){
+		"langevals/exact_match": WithSettings(rules.ParseExactMatchSettings, scoreExactMatch),
 	}
+	evaluators := make(map[string]Evaluator, len(prepares))
+	definitions := rules.Definitions()
+	for i := range definitions {
+		if prepare, ok := prepares[definitions[i].Slug]; ok {
+			evaluators[definitions[i].Slug] = Evaluator{Definition: definitions[i], Prepare: prepare}
+		}
+	}
+	return evaluators
 }
 
 // scoreExactMatch scores with rules.ExactMatch; the required fields were
