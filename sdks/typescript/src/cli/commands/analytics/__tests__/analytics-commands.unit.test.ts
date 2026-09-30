@@ -86,7 +86,7 @@ describe("queryAnalyticsCommand()", () => {
     it("excludes no origin", async () => {
       mockTimeseries.mockResolvedValue({ currentPeriod: [], previousPeriod: [] });
 
-      await queryAnalyticsCommand({ includeLangy: true });
+      await queryAnalyticsCommand({ shouldIncludeLangy: true });
 
       const body = mockTimeseries.mock.calls[0]![0] as Record<string, unknown>;
       expect(body.excludeOrigins).toBeUndefined();

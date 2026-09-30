@@ -94,7 +94,7 @@ export const queryAnalyticsCommand = async (options: {
   endDate?: string;
   groupBy?: string;
   timeScale?: string;
-  includeLangy?: boolean;
+  shouldIncludeLangy?: boolean;
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -154,7 +154,7 @@ export const queryAnalyticsCommand = async (options: {
       timeScale: options.timeScale === "full" ? "full" : options.timeScale ? Number(options.timeScale) : undefined,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       // Langy's own turns stay out unless asked for, as in the Trace Explorer.
-      ...(options.includeLangy ? {} : { excludeOrigins: [LANGY_ORIGIN] }),
+      ...(options.shouldIncludeLangy ? {} : { excludeOrigins: [LANGY_ORIGIN] }),
     });
 
     spinner.succeed("Analytics query complete");

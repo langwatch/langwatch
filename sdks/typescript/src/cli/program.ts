@@ -2962,7 +2962,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { metric?: string; aggregation?: string; startDate?: string; endDate?: string; groupBy?: string; timeScale?: string; includeLangy?: boolean }) => {
       const { queryAnalyticsCommand: impl } = await import("./commands/analytics/query.js");
-      return impl(options);
+      const { includeLangy, ...rest } = options;
+      return impl({ ...rest, shouldIncludeLangy: includeLangy });
     },
   );
 
