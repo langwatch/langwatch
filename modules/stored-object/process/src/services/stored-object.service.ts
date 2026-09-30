@@ -152,6 +152,12 @@ export class StoredObjectService {
     return { status: probe.status, mediaType: probe.mediaType };
   }
 
+  /** Whether the project holds a Postgres row for the object, in any status. */
+  async isRecorded(input: { projectId: string; id: string }): Promise<boolean> {
+    const value = await this.options.records.findById({ tenantId: input.projectId, id: input.id });
+    return value !== null;
+  }
+
   /** Postgres first; the legacy index answers only for an object it never held. */
   private async probe(input: { projectId: string; id: string }): Promise<StoredObjectProbe> {
     const value = await this.options.records.findById({ tenantId: input.projectId, id: input.id });

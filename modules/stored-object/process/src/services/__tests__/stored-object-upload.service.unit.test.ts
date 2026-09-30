@@ -101,6 +101,35 @@ describe("StoredObjectService uploads", () => {
     });
   });
 
+  describe("given a confirmed dataset attachment", () => {
+    it("is delivered to the permission its purpose is read behind", async () => {
+      const { service } = fixture();
+      const confirmed = await uploadAndConfirm(service, RECEIPT);
+
+      const delivered = await service.resolveDelivery({
+        projectId: PROJECT_ID,
+        id: confirmed.id,
+        audience: "datasets:view",
+      });
+
+      expect(delivered.metadata.id).toBe(confirmed.id);
+    });
+  });
+
+  describe("given a pending upload", () => {
+    it("is recorded for its own project and no other", async () => {
+      const { service } = fixture();
+      const created = await createAttachmentUpload(service);
+
+      await expect(
+        service.isRecorded({ projectId: PROJECT_ID, id: created.objectId }),
+      ).resolves.toBe(true);
+      await expect(
+        service.isRecorded({ projectId: "project_other", id: created.objectId }),
+      ).resolves.toBe(false);
+    });
+  });
+
   describe("when a dataset attachment is declared over its size limit", () => {
     /** @scenario "A file over the purpose's size limit is refused before any transfer" */
     it("refuses it as too large and names the attachment limit", async () => {

@@ -178,6 +178,7 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
     this.#files = StoredObjectFileReadService.create({
       countRead: (input) => this.countRead(input),
       assertProjectPermission: (input) => this.assertProjectPermission(input),
+      isRecorded: (input) => this.#storage.isRecorded(input),
       resolveOwner: (input) => this.resolveOwner(input),
       readById: (input) => this.readById(input),
     });

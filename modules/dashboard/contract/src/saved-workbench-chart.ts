@@ -1,3 +1,8 @@
+import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
+} from "@langwatch/analytics-contract/chart-grid";
 import { z } from "zod";
 
 export const WORKBENCH_CHART_DEFINITION_VERSION = 1;
@@ -60,20 +65,19 @@ export const savedWorkbenchChartIdSchema = z
   .regex(/^[A-Za-z0-9_-]{1,64}$/, "id must be 1-64 letters, digits, '_' or '-'");
 export const savedWorkbenchChartNameSchema = z.string().trim().min(1).max(255);
 
-const MAX_GRID_COORDINATE = 2_000_000_000;
-
 export const savedWorkbenchChartPlacementSchema = z
   .object({
     dashboardId: z.string().min(1),
-    gridColumn: z.number().int().min(0).max(1).optional(),
-    gridRow: z.number().int().min(0).max(MAX_GRID_COORDINATE).optional(),
-    colSpan: z.number().int().min(1).max(2).optional(),
-    rowSpan: z.number().int().min(1).max(2).optional(),
+    ...chartGridPlacementSchema.partial().shape,
   })
-  .refine(({ gridColumn = 0, colSpan = 1 }) => gridColumn + colSpan <= 2, {
-    message: "gridColumn + colSpan must not exceed the 2-column grid",
-    path: ["colSpan"],
-  });
+  .refine(
+    ({ gridColumn = 0, colSpan = CHART_GRID_DEFAULT_COL_SPAN }) =>
+      fitsChartGridWidth({ gridColumn, colSpan }),
+    {
+      message: "gridColumn + colSpan must not exceed the grid's columns",
+      path: ["colSpan"],
+    },
+  );
 export type SavedWorkbenchChartPlacement = z.infer<typeof savedWorkbenchChartPlacementSchema>;
 
 export type SavedWorkbenchChartDefinition = z.infer<typeof savedWorkbenchChartDefinitionSchema>;

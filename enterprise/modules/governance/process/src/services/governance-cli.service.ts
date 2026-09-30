@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  IngestionSourceNotFoundError,
   governanceCliBudgetStatusAnswers,
   governanceCliBootstrapAnswers,
   governanceCliBudgetOverviewAnswers,
@@ -259,14 +260,17 @@ export class GovernanceCliService {
       permission: "activityMonitor:view",
     });
     if ("refusal" in gate) return gate.refusal;
-    return ok(governanceCliIngestionSourceEventsAnswers[200], {
-      events: await this.#activity.eventsForSource({
+    try {
+      const events = await this.#activity.eventsForSource({
         organizationId: gate.caller.organization_id,
         sourceId: input.sourceId,
         limit: input.limit,
         beforeIso: input.beforeIso,
-      }),
-    });
+      });
+      return ok(governanceCliIngestionSourceEventsAnswers[200], { events });
+    } catch (error) {
+      return refuseAbsentSource(error);
+    }
   }
 
   async ingestionSourceHealth(
@@ -278,13 +282,15 @@ export class GovernanceCliService {
       permission: "activityMonitor:view",
     });
     if ("refusal" in gate) return gate.refusal;
-    return ok(
-      governanceCliIngestionSourceHealthAnswers[200],
-      await this.#activity.healthForSource({
+    try {
+      const health = await this.#activity.healthForSource({
         organizationId: gate.caller.organization_id,
         sourceId: input.sourceId,
-      }),
-    );
+      });
+      return ok(governanceCliIngestionSourceHealthAnswers[200], health);
+    } catch (error) {
+      return refuseAbsentSource(error);
+    }
   }
 
   async governanceStatus(
@@ -388,6 +394,13 @@ function created<Body>(
   body: unknown,
 ): { status: 201; body: Body } {
   return { status: 201, body: schema.parse(body) };
+}
+/** Main's CLI refusal body for an unknown source; anything else propagates. */
+function refuseAbsentSource(error: unknown) {
+  if (error instanceof IngestionSourceNotFoundError) {
+    return refuse("not_found", "IngestionSource not found", 404);
+  }
+  throw error;
 }
 function refuse<Status extends GovernanceCliRefusalAnswer["status"]>(
   error: string,

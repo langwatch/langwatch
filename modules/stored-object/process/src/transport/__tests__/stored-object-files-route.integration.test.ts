@@ -199,6 +199,24 @@ describe("given the /api/files family", () => {
     });
   });
 
+  describe("when the id-only URL names an upload only the key's own project records", () => {
+    it("reads it from the key's project without the cross-tenant lookup", async () => {
+      const read = vi.fn(async () => availableRead());
+      const owner = vi.fn(async () => {
+        throw new StoredObjectNotFoundError();
+      });
+      const isRecorded = vi.fn(async () => true);
+      const api = mount({ read, owner, isRecorded });
+
+      const response = await api.fetch(`/api/files/${OBJECT_ID}`, keyFor(OWNER_PROJECT));
+
+      expect(response.status).toBe(200);
+      expect(isRecorded).toHaveBeenCalledWith({ projectId: OWNER_PROJECT, id: OBJECT_ID });
+      expect(owner).not.toHaveBeenCalled();
+      expect(read).toHaveBeenCalledWith({ projectId: OWNER_PROJECT, id: OBJECT_ID });
+    });
+  });
+
   describe("when the caller has exhausted the per-caller rate limit", () => {
     /** @scenario "GET /api/files/:id throttles by caller identity before any cross-tenant lookup" */
     it("answers 429 keyed on the caller, before the cross-tenant owner lookup runs", async () => {
@@ -298,12 +316,14 @@ function keyFor(projectId: string): Record<string, string> {
 function mount(options: {
   read?: () => Promise<StoredObjectFileStreamRead>;
   owner?: () => Promise<{ projectId: string }>;
+  isRecorded?: StoredObjectFileGate["isRecorded"];
   assertProjectPermission?: StoredObjectFileGate["assertProjectPermission"];
   rateLimit?: StoredObjectFileGate["countRead"];
 }) {
   const files = StoredObjectFileReadService.create({
     countRead: options.rateLimit ?? (async () => ({ allowed: true, resetAt: 0 })),
     assertProjectPermission: options.assertProjectPermission ?? (async () => undefined),
+    isRecorded: options.isRecorded ?? (async () => false),
     resolveOwner: options.owner ?? (async () => ({ projectId: OWNER_PROJECT })),
     readById: options.read ?? (async () => availableRead()),
   });

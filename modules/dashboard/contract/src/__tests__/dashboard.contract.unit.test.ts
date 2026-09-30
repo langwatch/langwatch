@@ -187,11 +187,11 @@ describe("dashboard contract", () => {
     });
   });
 
-  it("keeps saved-chart placement inside the two-column persisted grid", () => {
+  it("keeps saved-chart placement inside main's chart grid width", () => {
     expect(
       savedWorkbenchChartPlacementSchema.validate({
         dashboardId: "dashboard_1",
-        gridColumn: 1,
+        gridColumn: 7,
         colSpan: 2,
       }),
     ).toBe(false);

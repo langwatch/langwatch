@@ -36,6 +36,7 @@ function readServiceOverLegacyIndex(): StoredObjectFileReadService {
   return StoredObjectFileReadService.create({
     countRead: async () => ({ allowed: true, resetAt: 0 }),
     assertProjectPermission: async () => undefined,
+    isRecorded: async () => false,
     resolveOwner: async () => ({ projectId: PROJECT }),
     readById: (input) => files.getById(input),
   });

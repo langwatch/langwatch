@@ -197,7 +197,7 @@ export const eSBatchEvaluationSchema = z.object({
       /** For Evaluations V3: identifies which target produced this result */
       target_id: z.string().optional().nullable(),
       entry: z.record(z.string(), z.unknown()),
-      predicted: z.record(z.string(), z.unknown()).optional(),
+      predicted: z.record(z.string(), z.unknown()).optional().nullable(),
       cost: z.number().optional().nullable(),
       duration: z.number().optional().nullable(),
       error: z.string().optional().nullable(),
@@ -213,7 +213,7 @@ export const eSBatchEvaluationSchema = z.object({
       status: z.union([z.literal("processed"), z.literal("skipped"), z.literal("error")]),
       index: z.number(),
       duration: z.number().optional().nullable(),
-      inputs: z.record(z.string(), z.unknown()).optional(),
+      inputs: z.record(z.string(), z.unknown()).optional().nullable(),
       score: z.number().optional().nullable(),
       label: z.string().optional().nullable(),
       passed: z.boolean().optional().nullable(),

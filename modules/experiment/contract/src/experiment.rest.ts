@@ -59,7 +59,7 @@ export const experimentInitBodySchema = z
     experiment_name: z.string().optional(),
     workflowId: z.string().optional(),
   })
-  .refine((data) => Boolean(data.experiment_id ?? data.experiment_slug));
+  .refine((data) => Boolean(data.experiment_id || data.experiment_slug));
 
 /** What an SDK names an experiment by on the create-or-take door. */
 export type ExperimentRunLookupInput = Readonly<{

@@ -509,7 +509,12 @@ export function multipartMiddleware({
   filesKey: string;
 }): MiddlewareHandler {
   return async (context, next) => {
-    const form = await context.req.parseBody({ all: false });
+    const form = await context.req.parseBody({ all: false }).catch((error: unknown) => {
+      throw new MalformedRequestError({
+        target: "form",
+        detail: error instanceof Error ? error.message : "Failed to parse body as FormData.",
+      });
+    });
     const files: Record<string, File> = {};
     const violations: FieldViolation[] = [];
 

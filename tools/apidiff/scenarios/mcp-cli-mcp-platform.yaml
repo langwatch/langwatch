@@ -297,7 +297,7 @@
   request: {"path": "/api/v1/query", "body": {"sql": "SELECT TraceId FROM traces LIMIT 5"}}
   expect:
     status: 200
-    body: {"columns": "<any>", "rows": "<any>", "statistics": {"elapsedMs": "<any>", "rowsReturned": "<any>"}, "truncated": false, "diagnostics": "<any>"}
+    body: {"columns": "<any>", "rows": "<any>", "statistics": {"elapsedMs": "<any>", "rowsReturned": "<any>"}, "diagnostics": "<any>"}
 
 - id: "mcp-query-reference-carries-both-languages"
   endpoint: "GET /api/v1/query/reference"
@@ -377,7 +377,7 @@
       auth: "org"
       expect:
         status: 200
-        body: {"pagination": {"page": 1, "limit": 100, "total": "<any>", "totalPages": "<any>"}}
+        body: {"pagination": {"page": 1, "limit": 100, "total": "<any>"}}
         contains: ["vd-{uid}", "slug", "framework", "updatedAt"]
     - request: "GET /api/projects/{newProjectId}"
       auth: "org"

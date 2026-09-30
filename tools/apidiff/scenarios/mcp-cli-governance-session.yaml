@@ -139,59 +139,62 @@
   request: {"path": "/api/auth/cli/virtual-key", "headers": {"X-LangWatch-Surface": "cli"}, "body": {"device_label": 7}}
   expect: {"status": 400, "body": {"error": "invalid_request"}}
 
-# ── governance: ingestion templates (the client's /api/v1 paths) ─────────────
+# ── governance: ingestion templates ──────────────────────────────────────────
 
-# The client reads `ingestion_templates`; both stacks answer `data` (main's own route and client
-# already disagreed), so this pins the client's read and is expected red until one side moves.
+# Main's project-keyed REST refuses a device token (401 Invalid auth token), so these send the
+# user-bound org key. The client's device-token calls to it fail on main too; it also reads
+# `ingestion_templates` where the route answers `data`.
 - id: "cli-governance-templates-admin-list-carries-ingestion-templates"
-  endpoint: "GET /api/v1/governance/ingestion-templates/admin"
-  auth: "cli"
-  request: {"path": "/api/v1/governance/ingestion-templates/admin"}
-  expect: {"status": 200, "body": {"ingestion_templates": "<any>"}}
+  endpoint: "GET /api/governance/ingestion-templates/admin"
+  auth: "org"
+  request: {"path": "/api/governance/ingestion-templates/admin", "headers": {"X-Project-Id": "{projectId}"}}
+  expect: {"status": 200, "body": {"data": "<any>"}}
 
 - id: "cli-governance-templates-create-get-update-rules-archive"
-  endpoint: "POST /api/v1/governance/ingestion-templates"
-  auth: "cli"
+  endpoint: "POST /api/governance/ingestion-templates"
+  auth: "org"
   request:
-    path: "/api/v1/governance/ingestion-templates"
-    headers: {"X-LangWatch-Surface": "cli"}
+    path: "/api/governance/ingestion-templates"
+    headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
     body: {"source_type": "otel_generic", "display_name": "vd-{uid}", "description": "apidiff", "credential_schema": "otlp_token", "ottl_rules": "# none"}
   capture: {"templateId": "ingestion_template.id"}
   expect:
     status: 201
     body: {"ingestion_template": {"id": "<any>", "source_type": "otel_generic", "display_name": "vd-{uid}", "platform_published": false, "enabled": true, "ottl_rules": "# none"}}
   verify:
-    - request: "GET /api/v1/governance/ingestion-templates/{templateId}"
-      auth: "cli"
+    - request: "GET /api/governance/ingestion-templates/{templateId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
       expect: {"status": 200, "body": {"ingestion_template": {"id": "{templateId}", "display_name": "vd-{uid}"}}}
-    - request: "PATCH /api/v1/governance/ingestion-templates/{templateId}/ottl-rules"
-      auth: "cli"
-      headers: {"X-LangWatch-Surface": "cli"}
+    - request: "PATCH /api/governance/ingestion-templates/{templateId}/ottl-rules"
+      auth: "org"
+      headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
       body: {"ottl_rules": "# rules-{uid}"}
       expect: {"status": 200, "body": {"ingestion_template": {"id": "{templateId}", "ottl_rules": "# rules-{uid}"}}}
-    - request: "DELETE /api/v1/governance/ingestion-templates/{templateId}"
-      auth: "cli"
-      headers: {"X-LangWatch-Surface": "cli"}
+    - request: "DELETE /api/governance/ingestion-templates/{templateId}"
+      auth: "org"
+      headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
       expect: {"status": 200, "body": {"archived": true}}
-    - request: "GET /api/v1/governance/ingestion-templates/{templateId}"
-      auth: "cli"
+    - request: "GET /api/governance/ingestion-templates/{templateId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
       expect: {"status": 404}
   teardown:
-    - request: "DELETE /api/v1/governance/ingestion-templates/{templateId}"
-      auth: "cli"
-      headers: {"X-LangWatch-Surface": "cli"}
+    - request: "DELETE /api/governance/ingestion-templates/{templateId}"
+      auth: "org"
+      headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
 
 - id: "cli-governance-templates-get-unknown-is-404"
-  endpoint: "GET /api/v1/governance/ingestion-templates/{id}"
-  auth: "cli"
-  request: {"path": "/api/v1/governance/ingestion-templates/tpl-nope-{uid}"}
+  endpoint: "GET /api/governance/ingestion-templates/{id}"
+  auth: "org"
+  request: {"path": "/api/governance/ingestion-templates/tpl-nope-{uid}", "headers": {"X-Project-Id": "{projectId}"}}
   expect: {"status": 404}
 
 - id: "cli-governance-templates-create-without-a-display-name-is-refused"
-  endpoint: "POST /api/v1/governance/ingestion-templates"
-  auth: "cli"
+  endpoint: "POST /api/governance/ingestion-templates"
+  auth: "org"
   request:
-    path: "/api/v1/governance/ingestion-templates"
-    headers: {"X-LangWatch-Surface": "cli"}
+    path: "/api/governance/ingestion-templates"
+    headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
     body: {"source_type": "otel_generic"}
   expect: {"status": [400, 422]}

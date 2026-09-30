@@ -12,14 +12,20 @@ export type UploadRefusal =
   | "empty_file"
   | "unsupported_format";
 
-/** A posted or imported file the dataset cannot take; too large or too long is a 400. */
+const BAD_REQUEST_REFUSALS: ReadonlySet<UploadRefusal> = new Set([
+  "file_too_large",
+  "row_limit_exceeded",
+  "column_mismatch",
+]);
+
+/** A posted or imported file the dataset cannot take; too big, too long or mismatched is a 400. */
 export class UploadValidationError extends HandledError {
   declare readonly code: "validation_error";
   readonly kind: UploadRefusal;
 
   constructor(message: string, kind: UploadRefusal) {
     super("validation_error", message, {
-      httpStatus: kind === "file_too_large" || kind === "row_limit_exceeded" ? 400 : 422,
+      httpStatus: BAD_REQUEST_REFUSALS.has(kind) ? 400 : 422,
       fault: "customer",
       meta: { fieldErrors: { file: [message] } },
     });

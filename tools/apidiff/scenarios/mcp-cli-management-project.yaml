@@ -4,9 +4,8 @@
 # delete), `/api/v1/projects/{projectId}/analytics/{charts,dashboard-widgets}` and
 # `/api/v1/test-suites` (the client has no "suites" or duplicate route). Bodies are what the
 # commands build. Anything a scenario creates is removed in a teardown step. Written unrun.
-# The widget scenarios address the fixture widget project (the only project with the
-# release_custom_chart_playground flag on; in any other the widget routes refuse and the chart
-# routes work) with its fixed key, as the other scenarios cannot reach it.
+# The widget scenarios use the run's own project, as uncovered-routes.yaml's widget scenarios do:
+# the fixture widget project is not provisioned on the haven path, so its key answers 401.
 
 # ── model defaults ───────────────────────────────────────────────────────────
 
@@ -224,21 +223,19 @@
   request: {"path": "/api/v1/projects/{projectId}/analytics/charts/chart-nope-{uid}"}
   expect: {"status": 404}
 
-# ── dashboard widgets (fixture widget project) ───────────────────────────────
+# ── dashboard widgets ───────────────────────────────
 
 - id: "cli-dashboard-widgets-create-get-list-update-pin-delete"
   endpoint: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets"
-  auth: "none"
+  auth: "project"
   setup:
     - request: "POST /api/dashboards"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      auth: "project"
       body: {"name": "vd-dash-{uid}"}
       capture: {"dashboardId": "id"}
       expect: {"status": 201}
   request:
-    path: "/api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets"
-    headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    path: "/api/v1/projects/{projectId}/analytics/dashboard-widgets"
     body: {"name": "vd-{uid}", "code": "export default function Widget() { return null; }", "queries": [{"name": "q", "sql": "SELECT 1 AS one"}]}
   capture: {"widgetId": "id"}
   expect:
@@ -256,86 +253,71 @@
       colSpan: "<any>"
       rowSpan: "<any>"
   verify:
-    - request: "GET /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+      auth: "project"
       expect: {"status": 200, "body": {"id": "{widgetId}", "name": "vd-{uid}"}}
-    - request: "GET /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets"
+      auth: "project"
       expect: {"status": 200, "path": "data", "contains": ["{widgetId}", "vd-{uid}"]}
-    - request: "PATCH /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "PATCH /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+      auth: "project"
       body: {"name": "vd2-{uid}", "code": "export default function Widget() { return 1; }", "queries": [{"name": "q", "sql": "SELECT 2 AS two"}]}
       expect: {"status": 200, "body": {"id": "{widgetId}", "name": "vd2-{uid}", "definition": {"code": "export default function Widget() { return 1; }"}}}
-    - request: "POST /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}/dashboard"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard"
+      auth: "project"
       body: {"dashboardId": "{dashboardId}"}
       expect: {"status": 200, "body": {"id": "{widgetId}", "dashboardId": "{dashboardId}"}}
-    - request: "DELETE /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+      auth: "project"
       expect: {"status": 204}
-    - request: "GET /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+      auth: "project"
       expect: {"status": 404}
   teardown:
-    - request: "DELETE /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+      auth: "project"
     - request: "DELETE /api/dashboards/{dashboardId}"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+      auth: "project"
 
 - id: "cli-dashboard-widgets-update-with-code-alone-is-refused"
   endpoint: "PATCH /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
-  auth: "none"
+  auth: "project"
   setup:
-    - request: "POST /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets"
+      auth: "project"
       body: {"name": "vd-{uid}", "code": "export default function Widget() { return null; }", "queries": [{"name": "q", "sql": "SELECT 1 AS one"}]}
       capture: {"widgetId": "id"}
       expect: {"status": 201}
   request:
-    path: "/api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
-    headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    path: "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
     body: {"code": "export default function Widget() { return 1; }"}
   expect: {"status": [400, 422]}
   teardown:
-    - request: "DELETE /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+      auth: "project"
 
 - id: "cli-dashboard-widgets-pin-on-an-unknown-dashboard-is-404"
   endpoint: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard"
-  auth: "none"
+  auth: "project"
   setup:
-    - request: "POST /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "POST /api/v1/projects/{projectId}/analytics/dashboard-widgets"
+      auth: "project"
       body: {"name": "vd-{uid}", "code": "export default function Widget() { return null; }", "queries": [{"name": "q", "sql": "SELECT 1 AS one"}]}
       capture: {"widgetId": "id"}
       expect: {"status": 201}
   request:
-    path: "/api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}/dashboard"
-    headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    path: "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard"
     body: {"dashboardId": "dash-nope-{uid}"}
   expect: {"status": 404}
   teardown:
-    - request: "DELETE /api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/{widgetId}"
-      auth: "none"
-      headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    - request: "DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
+      auth: "project"
 
 - id: "cli-dashboard-widgets-get-unknown-is-404"
   endpoint: "GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}"
-  auth: "none"
+  auth: "project"
   request:
-    path: "/api/v1/projects/apidiff-project-widgets/analytics/dashboard-widgets/widget-nope-{uid}"
-    headers: {"Authorization": "Bearer sk-lw-apidiff-project-widgets-key", "X-Auth-Token": "sk-lw-apidiff-project-widgets-key"}
+    path: "/api/v1/projects/{projectId}/analytics/dashboard-widgets/widget-nope-{uid}"
   expect: {"status": 404}
 
 # ── test suites ──────────────────────────────────────────────────────────────

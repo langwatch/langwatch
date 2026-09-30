@@ -47,6 +47,8 @@ export interface StoredObjectFileGate {
     projectId: string;
     permission: StoredObjectFileViewPermission;
   }): Promise<void>;
+  /** Whether the project holds a Postgres row for the object, in any status. */
+  isRecorded(input: { projectId: string; id: string }): Promise<boolean>;
   /** Which project owns an object, for a URL that does not say. Throws when none does. */
   resolveOwner(input: { id: string }): Promise<{ projectId: string }>;
   /** One object's row and, when the bytes are there, a stream of them. Throws when absent. */
@@ -122,9 +124,15 @@ export class StoredObjectFileReadService {
     }
   }
 
-  /** The scoped URL names its owner; the id-only URL falls back to the cross-tenant lookup. */
+  /**
+   * The scoped URL names its owner. The id-only URL asks the key's own project's rows first
+   * (uploads live only in Postgres), then the legacy cross-tenant index.
+   */
   private async ownerOf(input: StoredObjectFileReadInput): Promise<string> {
     if (input.claimedProjectId) return input.claimedProjectId;
+
+    const own = input.caller.apiKeyProjectId;
+    if (own && (await this.gate.isRecorded({ projectId: own, id: input.id }))) return own;
 
     try {
       return (await this.gate.resolveOwner({ id: input.id })).projectId;

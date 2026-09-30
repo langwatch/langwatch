@@ -62,7 +62,7 @@
     - request: "POST /api/v1/prompts"
       body:
         handle: "vd-{uid}"
-        messages: [{"role": "user", "content": "hello"}]
+        messages: [{"role": "system", "content": "hello"}]
         model: "openai/gpt-4o-mini"
       capture: {"versionId": "versionId"}
       expect: {"status": [200, 201]}
@@ -113,7 +113,8 @@
     - request: "PUT /api/v1/evaluators/{evaluatorId}"
       body: {"name": "ev2-{uid}"}
       expect: {"status": 200, "body": {"id": "{evaluatorId}", "name": "ev2-{uid}"}}
-    - request: "DELETE /api/v1/evaluators/{evaluatorSlug}"
+    # main resolves a slug on GET only; PUT and DELETE look the id up alone.
+    - request: "DELETE /api/v1/evaluators/{evaluatorId}"
       expect: {"status": 200}
     - request: "GET /api/v1/evaluators/{evaluatorId}"
       expect: {"status": 404}

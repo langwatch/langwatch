@@ -5,6 +5,10 @@ import type {
   LangWatchQLRunContext,
 } from "@langwatch/analytics-contract";
 import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+} from "@langwatch/analytics-contract/chart-grid";
+import {
   projectIdSchema,
   SAVED_WORKBENCH_CHART_KSUID_RESOURCE,
   savedWorkbenchChartDefinitionSchema,
@@ -177,8 +181,8 @@ export class SavedWorkbenchChartService {
         dashboardId: placement.dashboardId,
         gridColumn: placement.gridColumn ?? 0,
         gridRow,
-        colSpan: placement.colSpan ?? 1,
-        rowSpan: placement.rowSpan ?? 1,
+        colSpan: placement.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+        rowSpan: placement.rowSpan ?? CHART_GRID_DEFAULT_ROW_SPAN,
       }),
     );
   }

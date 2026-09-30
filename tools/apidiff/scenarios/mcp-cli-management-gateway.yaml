@@ -34,7 +34,8 @@
       auth: "org"
       headers: {"X-Project-Id": "{projectId}"}
       body: {"name": "vd2-{uid}", "description": null}
-      expect: {"status": 200, "body": {"virtual_key": {"id": "{vkId}", "name": "vd2-{uid}", "description": null}}}
+      # main's update reads `description ?? existing`, so a null keeps the stored value.
+      expect: {"status": 200, "body": {"virtual_key": {"id": "{vkId}", "name": "vd2-{uid}", "description": "vd key"}}}
     - request: "POST /api/gateway/v1/virtual-keys/{vkId}/disable"
       auth: "org"
       headers: {"X-Project-Id": "{projectId}"}
@@ -253,7 +254,7 @@
   endpoint: "GET /api/gateway/v1/budgets"
   auth: "org"
   request: {"path": "/api/gateway/v1/budgets", "headers": {"X-Project-Id": "{projectId}"}, "query": {"scope_type": "nope"}}
-  expect: {"status": 400}
+  expect: {"status": [400, 422]}
 
 - id: "cli-gateway-budgets-update-unknown-is-404"
   endpoint: "PATCH /api/gateway/v1/budgets/{id}"

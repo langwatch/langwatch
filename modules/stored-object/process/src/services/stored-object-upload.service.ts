@@ -364,7 +364,7 @@ function pendingUploadRecord({
     mediaTypeVerified: false,
     storage: address,
     generation: 0,
-    audiences: ["project:view"],
+    audiences: [purposePolicyOf(input.purpose).readPermission],
     expiresAt,
     availableAt: null,
     deletedAt: null,
