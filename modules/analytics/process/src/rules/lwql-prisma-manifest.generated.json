@@ -8493,6 +8493,20 @@
           }
         },
         {
+          "name": "latestEvaluation",
+          "columnName": "latestEvaluation",
+          "type": "TriggerLatestEvaluation",
+          "kind": "relation",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "",
+          "relation": {
+            "fields": [],
+            "references": [],
+            "to": "TriggerLatestEvaluation"
+          }
+        },
+        {
           "name": "customGraphId",
           "columnName": "customGraphId",
           "type": "String",
@@ -8514,6 +8528,158 @@
             "references": ["id"],
             "to": "CustomGraph"
           }
+        }
+      ]
+    },
+    {
+      "name": "SlackIntegration",
+      "tableName": "SlackIntegration",
+      "documentation": "One named Slack connection (ADR-093 §5a); an organization holds as many as\nit likes, each scoped to the organization or to one project. The secret is\nAES-256-GCM ciphertext and never returned to a client. `secretFingerprint`\nis an HMAC of the plaintext, so one secret is one connection per scope\nwithout decrypting anything. No foreign key: `scopeId` is\npolymorphic (ADR-021), as on RetentionPolicy and CustomLLMModelCost.",
+      "primaryKey": ["id"],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "SlackIntegrationKind",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "scopeType",
+          "columnName": "scopeType",
+          "type": "SlackIntegrationScopeType",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "scopeId",
+          "columnName": "scopeId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "botTokenEncrypted",
+          "columnName": "botTokenEncrypted",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "webhookUrlEncrypted",
+          "columnName": "webhookUrlEncrypted",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "secretFingerprint",
+          "columnName": "secretFingerprint",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "secretHint",
+          "columnName": "secretHint",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "slackTeamId",
+          "columnName": "slackTeamId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "slackTeamName",
+          "columnName": "slackTeamName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdById",
+          "columnName": "createdById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedById",
+          "columnName": "updatedById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         }
       ]
     },
@@ -11296,6 +11462,118 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "TriggerLatestEvaluation",
+      "tableName": "TriggerLatestEvaluation",
+      "documentation": "",
+      "primaryKey": ["triggerId"],
+      "fields": [
+        {
+          "name": "triggerId",
+          "columnName": "triggerId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "trigger",
+          "columnName": "trigger",
+          "type": "Trigger",
+          "kind": "relation",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "",
+          "relation": {
+            "fields": ["triggerId"],
+            "references": ["id"],
+            "to": "Trigger"
+          }
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "evaluatedAt",
+          "columnName": "evaluatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "verdict",
+          "columnName": "verdict",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "observedValue",
+          "columnName": "observedValue",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "threshold",
+          "columnName": "threshold",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "operator",
+          "columnName": "operator",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "timePeriodMinutes",
+          "columnName": "timePeriodMinutes",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "skipCode",
+          "columnName": "skipCode",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
           "documentation": ""
         },
         {
@@ -22694,6 +22972,14 @@
     {
       "name": "AlertType",
       "values": ["CRITICAL", "WARNING", "INFO"]
+    },
+    {
+      "name": "SlackIntegrationScopeType",
+      "values": ["ORGANIZATION", "PROJECT"]
+    },
+    {
+      "name": "SlackIntegrationKind",
+      "values": ["BOT", "INCOMING_WEBHOOK"]
     },
     {
       "name": "WebhookDeliveryOutcome",
