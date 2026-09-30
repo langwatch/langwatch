@@ -1,23 +1,7 @@
 /**
- * Generate the setup-skill bodies the "copy a prompt" menu hands to a
- * coding agent.
- *
- * The menu copies the skill itself, so the text pasted into the agent
- * is the whole instruction set and needs no network or `npx` to read.
- *
- * The bodies come from the same compiled skills the Langy image ships
- * (`skills/_compiled/native/<id>/SKILL.md`), so the prompt a customer
- * copies and the skill Langy runs can never say different things.
- *
- * The output lands under this package's `src/services/` on purpose. The
- * six bodies are ~100 kB of markdown, which belongs behind an API call
- * rather than in every bundle that renders an empty state.
- *
- * A TypeScript module rather than JSON: the package is consumed from
- * source, and a JSON import would need `resolveJsonModule` plus a
- * runtime import attribute on Node.
- *
- * Run:  pnpm --filter @langwatch/langy-process generate:setup-skill-bodies
+ * Generates the setup-skill bodies the "copy a prompt" menu hands to a coding agent, from the
+ * compiled skills the Langy image ships, as a TypeScript module under `src/rules/`.
+ * Run: pnpm --filter @langwatch/langy-process generate:setup-skill-bodies
  */
 import fs from "node:fs";
 import path from "node:path";
