@@ -14,6 +14,8 @@ COPY sdks/go/go.* sdks/go/
 COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 COPY cmd/devscripts ./cmd/devscripts
 COPY tools/devscripts ./tools/devscripts
+COPY tools/cliprof ./tools/cliprof
+COPY tools/internal ./tools/internal
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -o /out/devscripts ./cmd/devscripts
@@ -70,6 +72,7 @@ COPY vendor ./vendor
 # has nothing to check the lockfile against. This one carries no source into
 # the image — only the manifest the workspace needs to stay coherent.
 COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
+COPY dev/tests/e2e-stack/package.json ./dev/tests/e2e-stack/
 # The SDK, in full, because the app declares `langwatch: workspace:*` and so
 # imports THIS copy rather than a published release. Manifest-only was enough
 # while the app resolved the registry tarball; now the app's bundle cannot be
@@ -153,7 +156,7 @@ COPY specs/api-reference/openapi-document.json ./specs/api-reference/openapi-doc
 # langy skills) and the four dist-resolving packages (SDK, mcp-server, ksuid, mail)
 # before `build:types`, which reads their declarations.
 RUN pnpm start:prepare:files && pnpm ensure:built \
- && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build:types \
+ && pnpm exec tsc -b --builders 16 tsconfig.build.json \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
