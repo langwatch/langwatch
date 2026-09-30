@@ -2,8 +2,9 @@
  * An organization's own switch for Instant Evals.
  *
  * A run sends the judged text to the judge's provider, and that is a data flow
- * an organization agrees to rather than one a release turns on for it. So a self-serve organization switches Instant Evals on itself, from the
- * popover the search bar opens when a judged query is refused; an enterprise
+ * an organization agrees to rather than one a release turns on for it. So a
+ * self-serve organization switches Instant Evals on itself, from the popover
+ * the search bar opens when a judged query is refused; an enterprise
  * organization asks us instead, and an operator switches it on through the
  * release flag once the paperwork is where the customer wants it. Nothing ever
  * opts an organization in on its behalf.
