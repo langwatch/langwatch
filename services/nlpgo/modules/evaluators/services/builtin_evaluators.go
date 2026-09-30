@@ -19,6 +19,7 @@ func BuiltinEvaluators() map[string]Evaluator {
 	maps.Copy(prepares, langevalsRulesPrepares())
 	maps.Copy(prepares, ragasTextPrepares())
 	maps.Copy(prepares, vendorPrepares())
+	maps.Copy(prepares, linguaPrepares())
 	evaluators := make(map[string]Evaluator, len(prepares))
 	definitions := rules.Definitions()
 	for i := range definitions {

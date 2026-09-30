@@ -2,7 +2,7 @@
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
 .PHONY: dogfood-langy-local dogfood-langy-hooks
-.PHONY: herrgen herrgen-check test-scripts-run lint-rules-run
+.PHONY: herrgen herrgen-check test-scripts-run lint-rules-run lingua-models
 .PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-slot go-lint-changed
 .PHONY: _dev-up-deprecation-warning
 
@@ -233,6 +233,11 @@ herrgen:
 
 herrgen-check:
 	@go run ./cmd/herrgen -check
+
+# The language models nlpgo embeds under -tags lingua_models (Fork C, plan D16).
+# About 10 s and 1.5 GB of RAM; skipped when models.bin already exists.
+lingua-models:
+	@test -s services/third_party/lingua-go/models.bin || (cd services && go generate ./third_party/lingua-go)
 # ── Deterministic house rules ──────────────────────────────────────────────
 #
 # Every JavaScript/TypeScript house rule is a langwatch oxlint rule (`pnpm
