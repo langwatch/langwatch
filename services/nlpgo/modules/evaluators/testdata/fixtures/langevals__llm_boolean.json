@@ -1224,7 +1224,7 @@
               "role": "user"
             }
           ],
-          "model": "anthropic/claude-sonnet-4-5",
+          "model": "claude-sonnet-4-5",
           "temperature": 0.0,
           "tool_choice": {
             "function": {
@@ -1282,7 +1282,7 @@
           ],
           "created": 0,
           "id": "chatcmpl-recorded",
-          "model": "anthropic/claude-sonnet-4-5",
+          "model": "claude-sonnet-4-5",
           "object": "chat.completion",
           "usage": {
             "completion_tokens": 10,
@@ -1297,7 +1297,6 @@
       "output": "Paris is the capital of France."
     },
     "env": {
-      "X_LITELLM_custom_llm_provider": "openai",
       "X_LITELLM_temperature": "0",
       "X_LITELLM_top_p": "0.9"
     },
@@ -1311,7 +1310,7 @@
       "status": "processed"
     },
     "settings": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "openai/claude-sonnet-4-5"
     }
   },
   {
