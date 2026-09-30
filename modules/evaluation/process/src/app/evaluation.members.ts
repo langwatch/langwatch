@@ -96,9 +96,12 @@ export interface EvaluationCustomEvaluators {
   findAll(input: Readonly<{ projectId: string }>): Promise<CustomEvaluator[]>;
 }
 
-/** Scores one stored trace with one evaluator, resolving the caller's protections. */
+/** Scores one stored trace with one evaluator, read through the caller's protections. */
 export interface EvaluationRescore {
-  runForTrace(input: RunTraceEvaluationInput): Promise<EvaluationRunOutcome>;
+  runForTrace(
+    input: RunTraceEvaluationInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<EvaluationRunOutcome>;
 }
 
 /**

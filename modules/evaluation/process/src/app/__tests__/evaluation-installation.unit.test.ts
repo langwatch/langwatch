@@ -8,7 +8,7 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
  * The feature boots as a whole: the installer, its repositories and the one app
  * behind the `EvaluationApi` token, in every role a process installs it in.
  */
-import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluationApi, TraceNotEvaluatableError } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
@@ -19,19 +19,19 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import { memoryStores } from "@langwatch/process-stores";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { evaluationServer } from "../../evaluation.server.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
-function process(role: "api" | "worker") {
+function process(role: "api" | "worker", trace: TraceApi = createApiFixture<TraceApi>()) {
   return createApp({ role })
     .withModules([installableEvaluation])
     .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
     .withStores(memoryStores())
     .provide({
       workflow: createApiFixture<WorkflowApi>({ findEvaluatorWorkflows: async () => [] }),
-      trace: createApiFixture<TraceApi>(),
+      trace,
       "model-provider": createApiFixture<ModelProviderApi>({
         getExecutionProviders: async () => ({}),
       }),
@@ -115,5 +115,44 @@ describe("given a process that installs the evaluation feature", () => {
         }
       },
     );
+  });
+
+  describe("when a signed-in user re-runs an evaluator on a stored trace", () => {
+    /** @scenario "An installed evaluation module re-scores a stored trace through the caller's protections" */
+    it("reads the trace through that user's protections", async () => {
+      const viewer = { canSeeCosts: false, canSeeCapturedInput: false, canSeeCapturedOutput: true };
+      const resolveViewerProtections = vi.fn(async () => viewer);
+      const readTracesWithSpans = vi.fn(async () => []);
+      const runtime = await process(
+        "api",
+        createApiFixture<TraceApi>({ resolveViewerProtections, readTracesWithSpans }),
+      ).boot();
+
+      try {
+        await expect(
+          runtime.service(EvaluationApi).runTraceEvaluation(
+            {
+              projectId: "project-1",
+              evaluatorType: "langevals/exact_match",
+              traceId: "trace-1",
+              settings: {},
+              mappings: null,
+            },
+            { id: "user-1" },
+          ),
+        ).rejects.toBeInstanceOf(TraceNotEvaluatableError);
+        expect(resolveViewerProtections).toHaveBeenCalledWith({
+          projectId: "project-1",
+          userId: "user-1",
+        });
+        expect(readTracesWithSpans).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceIds: ["trace-1"],
+          protections: viewer,
+        });
+      } finally {
+        await runtime.stop();
+      }
+    });
   });
 });

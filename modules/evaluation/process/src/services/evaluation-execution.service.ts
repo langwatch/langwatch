@@ -2,8 +2,10 @@ import { mappingsReadEvaluationsSource, mappingStateSchema } from "@langwatch/da
 import type { MappingState } from "@langwatch/dataset-contract";
 import {
   type EvaluationExecutionResult,
+  type EvaluationRunOutcome,
   type ExecuteEvaluationCommand,
   EvaluatorNotFoundError,
+  type RunTraceEvaluationInput,
   TraceNotEvaluatableError,
 } from "@langwatch/evaluation-contract";
 import {
@@ -77,6 +79,29 @@ export type DataForEvaluation =
   | { type: "default"; data: Record<string, unknown> }
   | { type: "custom"; data: Record<string, unknown> };
 
+type TraceEvaluationParams = {
+  projectId: string;
+  traceId: string;
+  evaluatorType: string;
+  settings: Record<string, unknown> | string | number | boolean | null;
+  mappings: MappingState | null;
+  level?: "trace" | "thread";
+  workflowId?: string | null;
+  idempotencyKey?: string;
+  /** The reader's redactions; a monitor or queued run reads with full access. */
+  protections?: EvaluationTraceProtections;
+};
+
+/** One trace scored, or the reason it was not, before either caller shapes it. */
+type ScoredTrace =
+  | { kind: "skipped"; details: string }
+  | {
+      kind: "scored";
+      result: SingleEvaluationResult;
+      evaluationThreadId: string | undefined;
+      inputs: Record<string, unknown>;
+    };
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -100,16 +125,36 @@ export class EvaluationExecutionService implements EvaluationExecution {
     });
   }
 
-  async executeForTrace(params: {
-    projectId: string;
-    traceId: string;
-    evaluatorType: string;
-    settings: Record<string, unknown> | string | number | boolean | null;
-    mappings: MappingState | null;
-    level?: "trace" | "thread";
-    workflowId?: string | null;
-    idempotencyKey?: string;
-  }): Promise<EvaluationExecutionResult> {
+  async executeForTrace(params: TraceEvaluationParams): Promise<EvaluationExecutionResult> {
+    const scored = await this.scoreTrace(params);
+    if (scored.kind === "skipped") return { status: "skipped", details: scored.details };
+
+    return executionResultOf(scored);
+  }
+
+  /** A re-score a person asked for: the evaluator's own answer, read through their protections. */
+  async rescoreTrace({
+    input,
+    protections,
+  }: {
+    input: RunTraceEvaluationInput;
+    protections: EvaluationTraceProtections;
+  }): Promise<EvaluationRunOutcome> {
+    const scored = await this.scoreTrace({
+      ...input,
+      mappings: input.mappings === null ? null : mappingStateSchema.parse(input.mappings),
+      protections,
+    });
+    if (scored.kind === "skipped") return { status: "skipped", details: scored.details };
+
+    return {
+      ...scored.result,
+      evaluation_thread_id: scored.evaluationThreadId,
+      inputs: scored.inputs,
+    };
+  }
+
+  private async scoreTrace(params: TraceEvaluationParams): Promise<ScoredTrace> {
     const {
       projectId,
       traceId,
@@ -119,15 +164,13 @@ export class EvaluationExecutionService implements EvaluationExecution {
       level,
       workflowId,
       idempotencyKey,
+      protections = INTERNAL_PROTECTIONS,
     } = params;
 
-    const trace = await this.loadTraceForEvaluation({ projectId, traceId, mappings });
+    const trace = await this.loadTraceForEvaluation({ projectId, traceId, mappings, protections });
 
     if (trace.error && !trace.input && !trace.output) {
-      return {
-        status: "skipped",
-        details: "Cannot evaluate trace with errors",
-      };
+      return { kind: "skipped", details: "Cannot evaluate trace with errors" };
     }
 
     // 3. Determine evaluation level
@@ -142,10 +185,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
     // so a thread monitor running over non-thread traces stays cheap instead of erroring on
     // every trace.
     if (isThreadLevel && !trace.metadata?.thread_id) {
-      return {
-        status: "skipped",
-        details: "Trace has no thread_id for thread-based evaluation",
-      };
+      return { kind: "skipped", details: "Trace has no thread_id for thread-based evaluation" };
     }
 
     // 4. Build evaluation data
@@ -155,6 +195,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
       mappings,
       isThreadLevel,
       projectId,
+      protections,
     });
 
     // 5. Execute evaluation
@@ -175,11 +216,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
       idempotencyKey,
     });
 
-    return executionResultOf({
-      result,
-      evaluationThreadId,
-      inputs: data.data as Record<string, unknown>,
-    });
+    return { kind: "scored", result, evaluationThreadId, inputs: data.data };
   }
 
   /**
@@ -191,15 +228,17 @@ export class EvaluationExecutionService implements EvaluationExecution {
     projectId,
     traceId,
     mappings,
+    protections,
   }: {
     projectId: string;
     traceId: string;
     mappings: MappingState | null;
+    protections: EvaluationTraceProtections;
   }): Promise<Trace> {
     const traces = await this.deps.traces.readTracesWithSpans({
       projectId,
       traceIds: [traceId],
-      protections: INTERNAL_PROTECTIONS,
+      protections,
     });
     const trace = traces[0];
     if (!trace) {
@@ -210,7 +249,7 @@ export class EvaluationExecutionService implements EvaluationExecution {
       const evaluationsByTrace = await this.deps.traces.readEvaluations({
         projectId,
         traceIds: [traceId],
-        protections: INTERNAL_PROTECTIONS,
+        protections,
       });
       trace.evaluations = (evaluationsByTrace[traceId] ?? []) as Trace["evaluations"];
     }

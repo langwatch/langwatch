@@ -76,13 +76,22 @@ export class EvaluationDataService {
     mappings: MappingState | null;
     isThreadLevel: boolean;
     projectId: string;
+    /** The reader's redactions over the thread's other traces; full access when none is named. */
+    protections?: EvaluationTraceProtections;
   }): Promise<DataForEvaluation> {
-    const { evaluatorType, trace, mappings, isThreadLevel, projectId } = params;
+    const {
+      evaluatorType,
+      trace,
+      mappings,
+      isThreadLevel,
+      projectId,
+      protections = INTERNAL_PROTECTIONS,
+    } = params;
 
     let data: Record<string, unknown>;
 
     if (isThreadLevel) {
-      data = await this.buildThreadData(projectId, trace, mappings);
+      data = await this.buildThreadData({ projectId, trace, mappings, protections });
     } else {
       const mappedData = mapTraceFields(trace, mappings ?? DEFAULT_MAPPINGS);
       if (!mappedData) {
@@ -111,7 +120,7 @@ export class EvaluationDataService {
             this.deps.traces.readThreadsTraces({
               projectId,
               threadIds: [threadId],
-              protections: INTERNAL_PROTECTIONS,
+              protections,
             }),
         });
       }
@@ -150,11 +159,17 @@ export class EvaluationDataService {
     return { type: "default", data: filtered };
   }
 
-  private async buildThreadData(
-    projectId: string,
-    trace: Trace,
-    mappings: MappingState | null,
-  ): Promise<Record<string, unknown>> {
+  private async buildThreadData({
+    projectId,
+    trace,
+    mappings,
+    protections,
+  }: {
+    projectId: string;
+    trace: Trace;
+    mappings: MappingState | null;
+    protections: EvaluationTraceProtections;
+  }): Promise<Record<string, unknown>> {
     if (!mappings) {
       throw new EvaluatorConfigError("Mapping state is required for thread-based evaluation");
     }
@@ -167,7 +182,7 @@ export class EvaluationDataService {
     const threadTraces = await this.deps.traces.readThreadsTraces({
       projectId,
       threadIds: [threadId],
-      protections: INTERNAL_PROTECTIONS,
+      protections,
     });
 
     const result: Record<string, unknown> = {};

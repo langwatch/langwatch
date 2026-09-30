@@ -439,6 +439,16 @@ export class EvaluationApp implements EvaluationApiContract {
         inputResolution: inputs,
         environment,
         report: commands,
+        rescore: {
+          runForTrace: async (input, by) =>
+            execution.rescoreTrace({
+              input,
+              protections: await dependencies.traces.resolveViewerProtections({
+                projectId: input.projectId,
+                userId: by.id,
+              }),
+            }),
+        },
         runner: { runEvaluation: (input) => execution.executeForData(input) },
       },
       dependencies,
@@ -626,7 +636,7 @@ export class EvaluationApp implements EvaluationApiContract {
     input: RunTraceEvaluationInput,
     by: Readonly<{ id: string }>,
   ): Promise<EvaluationRunOutcome> {
-    const result = await this.#rescore.runForTrace(input);
+    const result = await this.#rescore.runForTrace(input, by);
 
     this.#analytics.evaluationRan({ userId: by.id, projectId: input.projectId });
     await this.#reportRescore({ input, result });

@@ -1,9 +1,13 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, type RestCredentialBinding } from "@langwatch/api/rest";
 import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { createTenantId, type EventingCommandSender, type ProcessStore } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope, type TokenIdentity } from "@langwatch/kernel";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -15,14 +19,19 @@ import { gatewayRealtimeSessionEventing } from "../../eventing/gateway-realtime-
 import { SPEND_SETTLEMENT_PROCESS_NAME } from "../../eventing/gateway-spend-settlement.process.ts";
 import { gatewaySpendEventing } from "../../eventing/gateway-spend.pipeline.ts";
 import { gatewayServer } from "../../gateway.server.ts";
+import type { GatewayGuardrailCheckRow } from "../../repositories/gateway-guardrail.repository.ts";
 import type { OpenAdmission } from "../../repositories/gateway-open-admissions.repository.ts";
+import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
 } from "../../rules/gateway-internal-identity.rules.ts";
+import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import type { GatewaySpendApp } from "../../services/gateway-spend-reconciliation.service.ts";
+import { signedGatewayRequest } from "../../transport/__tests__/support/gateway-internal-rest.harness.ts";
 import { gatewayInternalRest } from "../../transport/gateway-internal.rest.ts";
 import { GatewayApp } from "../gateway.app.ts";
+import { virtualKeyRow } from "./gateway-virtual-key.fixture.ts";
 
 /**
  * `withTransports` type-checks a family's declared Api, never its App, so a
@@ -46,6 +55,16 @@ function relationalWithoutStore(): PrismaClient {
       );
     },
   }) as PrismaClient;
+}
+
+/** Postgres answering only the guardrail read a data-plane check makes; the rest refuses. */
+function relationalWithGuardrails(rows: GatewayGuardrailCheckRow[]): PrismaClient {
+  return new Proxy(relationalWithoutStore(), {
+    get(target, property) {
+      if (property === "gatewayGuardrail") return { findMany: async () => rows };
+      return Reflect.get(target, property);
+    },
+  });
 }
 
 function analyticalWithoutStore(): ClickHouseQueryClient {
@@ -156,7 +175,15 @@ const INTERNAL_SECRET = "0123456789abcdef0123456789abcdef";
 async function installGateway({
   clickhouse = analyticalWithoutStore(),
   redis = redisDouble(),
-}: { clickhouse?: ClickHouseQueryClient; redis?: ReturnType<typeof redisDouble> } = {}) {
+  prisma = relationalWithoutStore(),
+  peers = new Map(),
+}: {
+  clickhouse?: ClickHouseQueryClient;
+  redis?: ReturnType<typeof redisDouble>;
+  prisma?: PrismaClient;
+  /** The peers a test reaches, by the Api token the gateway declared; every other peer refuses. */
+  peers?: ReadonlyMap<TokenIdentity, unknown>;
+} = {}) {
   const resources = new ResourceScope();
   const secrets = new ScopedSecrets(async (handle, build) =>
     build(handle.id === "LW_GATEWAY_INTERNAL_SECRET" ? INTERNAL_SECRET : undefined),
@@ -167,14 +194,14 @@ async function installGateway({
       resources,
       config: { spendSettlementGraceMs: undefined },
       members: {
-        prisma: relationalWithoutStore(),
+        prisma,
         clickhouse,
         encryption: createApiFixture<Encryption>(),
         redis,
       },
       role: "api",
       secrets,
-      resolve: () => peer("gateway dependency"),
+      resolve: (token) => (peers.has(token) ? peers.get(token) : peer("gateway dependency")),
     });
 
     return { state, resources };
@@ -182,6 +209,36 @@ async function installGateway({
     await resources.close();
     throw error;
   }
+}
+
+type InstalledGateway = Awaited<ReturnType<typeof installGateway>>["state"];
+
+/** The internal family on a closed REST host, bound to the credential the install published. */
+function servedInternalDoor(state: InstalledGateway, app: GatewayApp) {
+  const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
+  const runtime = RestHost.create({
+    identities: {
+      project: closed,
+      organization: closed,
+      apiKey: closed,
+      scimToken: closed,
+      "instance-admin": closed,
+      browser: closed,
+    },
+    bearers: () => closed,
+    audit: { record: async () => undefined },
+  });
+  runtime.mount(gatewayInternalRest.router(), () => app, { facts: state.facts });
+
+  return runtime.app;
+}
+
+function installedApp(state: InstalledGateway): GatewayApp {
+  const app = state.provided;
+  if (!(app instanceof GatewayApp))
+    throw new Error("Gateway installation did not provide GatewayApp");
+
+  return app;
 }
 
 function signedHealthRequest(): Request {
@@ -227,24 +284,7 @@ describe("gateway app installation", () => {
         expect(spendFamilyIsWhole).toBe(true);
         expect(credential.resolveIdentity()).toBe(app.internalDoor());
 
-        const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
-        const runtime = RestHost.create({
-          identities: {
-            project: closed,
-            organization: closed,
-            apiKey: closed,
-            scimToken: closed,
-            "instance-admin": closed,
-            browser: closed,
-          },
-          bearers: () => closed,
-          audit: { record: async () => undefined },
-        });
-        runtime.mount(gatewayInternalRest.router(), () => app, {
-          facts: state.facts,
-        });
-
-        const health = await runtime.app.request(signedHealthRequest());
+        const health = await servedInternalDoor(state, app).request(signedHealthRequest());
         expect(health.status).toBe(200);
 
         // Each of these reads `#dependencies`, which is what threw "The
@@ -437,6 +477,132 @@ describe("gateway app installation", () => {
         expect(
           maintenance.processManagers.get("gatewayRealtimeSessionReconcile")?.config.schedule,
         ).toEqual({ everyMs: 60_000 });
+      } finally {
+        await resources.close();
+      }
+    });
+  });
+
+  // Each callback's collaborator is built in GatewayApp's own composition; an install that
+  // drops one compiles nowhere else, so these drive the signed door of the installed module.
+  describe("given the data plane calls back into the installed control plane", () => {
+    /** @scenario "The installed gateway answers a config fetch from its config materialiser" */
+    it("answers a config fetch from its config materialiser", async () => {
+      const findKey = vi
+        .spyOn(PrismaGatewayInternalStoreRepository.prototype, "findVirtualKeyForConfig")
+        .mockResolvedValue(virtualKeyRow());
+      const versionToken = vi
+        .spyOn(GatewayConfigMaterialiserService.prototype, "versionToken")
+        .mockResolvedValue('"cfg-1"');
+      const { state, resources } = await installGateway();
+
+      try {
+        const response = await servedInternalDoor(state, installedApp(state)).request(
+          signedGatewayRequest({
+            method: "GET",
+            path: "/api/internal/gateway/config/vk_1",
+            headers: { "If-None-Match": '"cfg-1"' },
+            secret: INTERNAL_SECRET,
+          }),
+        );
+
+        expect(response.status).toBe(304);
+        expect(versionToken).toHaveBeenCalledWith(expect.objectContaining({ id: "vk_1" }));
+      } finally {
+        findKey.mockRestore();
+        versionToken.mockRestore();
+        await resources.close();
+      }
+    });
+
+    /** @scenario "The installed gateway runs a guardrail's evaluator through the evaluation module" */
+    it("runs a guardrail's evaluator through the evaluation module", async () => {
+      const runEvaluator = vi.fn(async (): Promise<SingleEvaluationResult> => ({
+        status: "processed",
+        passed: false,
+        details: "PII detected",
+      }));
+      const { state, resources } = await installGateway({
+        prisma: relationalWithGuardrails([
+          { id: "gr_1", name: "PII", evaluatorId: "eval_1", failureMode: "FAIL_CLOSED" },
+        ]),
+        peers: new Map<TokenIdentity, unknown>([
+          [EvaluationApi, createApiFixture<EvaluationApi>({ runEvaluator })],
+          [
+            MonitorApi,
+            createApiFixture<MonitorApi>({
+              listEnabledGuardrailMonitors: async () => [
+                {
+                  id: "mon_1",
+                  evaluatorId: "eval_1",
+                  checkType: "langevals/basic",
+                  parameters: {},
+                },
+              ],
+            }),
+          ],
+        ]),
+      });
+
+      try {
+        const response = await servedInternalDoor(state, installedApp(state)).request(
+          signedGatewayRequest({
+            method: "POST",
+            path: "/api/internal/gateway/guardrail/check",
+            body: {
+              vk_id: "vk_1",
+              project_id: "project-1",
+              direction: "request",
+              guardrail_ids: ["gr_1"],
+              content: { messages: [{ role: "user", content: "mail me at a@b.test" }] },
+            },
+            secret: INTERNAL_SECRET,
+          }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          decision: "block",
+          reason: "PII detected",
+          policies_triggered: ["gr_1"],
+        });
+        expect(runEvaluator).toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: "project-1", evaluatorType: "langevals/basic" }),
+        );
+      } finally {
+        await resources.close();
+      }
+    });
+
+    /** @scenario "The installed gateway refreshes a Codex session through the model provider module" */
+    it("refreshes a Codex session through the model provider module", async () => {
+      const refreshCodexForGateway = vi.fn(async () => ({
+        status: "refreshed" as const,
+        accessToken: "access-1",
+        accountId: "account-1",
+      }));
+      const { state, resources } = await installGateway({
+        peers: new Map<TokenIdentity, unknown>([
+          [ModelProviderApi, createApiFixture<ModelProviderApi>({ refreshCodexForGateway })],
+        ]),
+      });
+
+      try {
+        const response = await servedInternalDoor(state, installedApp(state)).request(
+          signedGatewayRequest({
+            method: "POST",
+            path: "/api/internal/gateway/codex/refresh",
+            body: { provider_row_id: "mp_codex" },
+            secret: INTERNAL_SECRET,
+          }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+          access_token: "access-1",
+          account_id: "account-1",
+        });
+        expect(refreshCodexForGateway).toHaveBeenCalledWith({ providerRowId: "mp_codex" });
       } finally {
         await resources.close();
       }

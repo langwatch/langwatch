@@ -42,6 +42,13 @@ Feature: Evaluation service boundary
     Then the evaluator runtime answers with the evaluator's result
     And the call is never refused for want of a composed runtime
 
+  @unit
+  Scenario: An installed evaluation module re-scores a stored trace through the caller's protections
+    Given a process that installs the evaluation feature
+    When a signed-in user re-runs an evaluator on one stored trace
+    Then the trace is read through that user's own read-time protections
+    And the call is never refused for want of a composed trace evaluation runtime
+
   Scenario: API and workers share the same service
     Given the process has composed one Evaluation service
     When an API handler or worker reads a run
