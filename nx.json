@@ -25,7 +25,6 @@
   "targetDefaults": {
     "typecheck": {
       "cache": true,
-      "dependsOn": ["^typecheck"],
       "inputs": ["default", "^production"],
       "outputs": ["{projectRoot}/dist"]
     },

@@ -52,10 +52,10 @@ package's own files and the non-test files of every package it depends on
 helpers stay, because `./testing` exports reach them). This is the
 property that matters here — because tests import dependency source directly,
 a cache keyed only on the package's own files would replay a stale pass after
-a dependency changed underneath it. `typecheck` additionally declares
-`dependsOn: ["^typecheck"]` and `outputs: ["{projectRoot}/dist"]`, so the
-declaration files a dependent's `tsc -b` reads are built, and cached, before it
-runs.
+a dependency changed underneath it. `typecheck` declares `outputs: ["{projectRoot}/dist"]` and no `dependsOn`
+(amended 2026-09-30): each package's `tsc -b` builds the references it reads
+itself, and the workspace graph has cycles that `^typecheck` turned into a
+refused task graph. Parallel tasks may rebuild a shared reference at once.
 
 `test:integration` is left uncached deliberately. Those suites read Postgres,
 ClickHouse and Redis, and their result is a function of datastore state that no
