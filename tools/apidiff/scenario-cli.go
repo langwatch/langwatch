@@ -1,6 +1,7 @@
 package apidiff
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -20,7 +21,7 @@ const defaultScenarioGlob = "tools/apidiff/scenarios/[a-z]*.yaml"
 // scenarioFlags are the flags of the scenario phase, in `run` and `scenarios`.
 type scenarioFlags struct {
 	glob        string
-	ids         stringSlice
+	ids         scenarioIDs
 	concurrency int
 	shards      int
 	repeat      int
@@ -28,6 +29,7 @@ type scenarioFlags struct {
 	mailB       string
 	seedDir     string
 	final       bool
+	trpc        string
 	dryRun      bool
 	skip        bool
 	maxErrors   int
@@ -35,7 +37,7 @@ type scenarioFlags struct {
 
 func registerScenarioFlags(flags *flag.FlagSet, scenarios *scenarioFlags) {
 	flags.StringVar(&scenarios.glob, "scenarios", "", "glob of scenario files (default "+defaultScenarioGlob+")")
-	flags.Var(&scenarios.ids, "scenario-id", "only run scenarios whose id matches this pattern, path.Match syntax (repeatable)")
+	flags.Var(&scenarios.ids, "scenario-id", "only run scenarios whose id matches this pattern, path.Match syntax, or is listed in @FILE one per line (repeatable)")
 	flags.IntVar(&scenarios.concurrency, "scenario-concurrency", defaultScenarioConcurrency, "scenarios in flight per side")
 	flags.IntVar(&scenarios.shards, "scenario-shards", defaultScenarioShards, "isolated projects and organizations seeded per side for project and org shards")
 	flags.IntVar(&scenarios.repeat, "repeat", 1, "debug: run every selected scenario this many times, to measure throughput")
@@ -43,13 +45,14 @@ func registerScenarioFlags(flags *flag.FlagSet, scenarios *scenarioFlags) {
 	flags.StringVar(&scenarios.seedDir, "seed-dir", ".apidiff", "single-sided mode: where the shared-stack seed record and its lock live")
 	flags.BoolVar(&scenarios.final, "final", false, "also run the scenarios the done ledger has signed off")
 	flags.IntVar(&scenarios.maxErrors, "max-consecutive-errors", defaultMaxConsecutiveErrors, "stop the scenario phase after this many ERROR scenarios in a row, in order of completion (0 never stops it)")
+	flags.StringVar(&scenarios.trpc, "trpc-transformer", trpcNone, "single-sided stacks: superjson or none, the tRPC body form the stack speaks (a two-sided run knows: branch none, main superjson)")
 	flags.StringVar(&scenarios.mailB, "mail-b", "", "base's mail sink base URL (mailsim), for mail steps")
 }
 
 // options builds the phase's options from the probe flags both modes share.
 func (scenarios *scenarioFlags) options(probe *probeFlags, runDir string, progress io.Writer) scenarioOptions {
 	return scenarioOptions{
-		A: probe.a, B: probe.b, MailA: scenarios.mailA, MailB: scenarios.mailB, Keys: probe.keys,
+		A: probe.a, B: probe.b, MailA: scenarios.mailA, MailB: scenarios.mailB, TRPC: scenarios.trpc, Keys: probe.keys,
 		Timeout: probe.timeout, Concurrency: scenarios.concurrency, Shards: scenarios.shards,
 		Repeat: scenarios.repeat, Glob: scenarios.glob, IDs: scenarios.ids, RunDir: runDir, Progress: progress,
 		SeedDir: scenarios.seedDir, Final: scenarios.final, DryRun: scenarios.dryRun, DoneRoot: ".", MaxErrors: scenarios.maxErrors,
@@ -69,6 +72,7 @@ func runScenariosSubcommand(ctx context.Context, args []string, out streams) int
 	if err := flags.Parse(args); err != nil {
 		return exitError
 	}
+	fromSuite(probe, scenarios)
 	if probe.a == "" && !scenarios.dryRun {
 		fmt.Fprintln(out.stderr, "scenarios requires -a (and -b for a comparison; with -a alone the scenarios run against the one stack)")
 		return exitError
@@ -89,7 +93,20 @@ func runScenariosSubcommand(ctx context.Context, args []string, out streams) int
 			fmt.Fprintln(out.stderr, "scenarios: took from the haven stack:", strings.Join(filled, ", "))
 		}
 	}
+	scenarios.mailA = cmp.Or(scenarios.mailA, serviceMailURL(ctx, probe.a))
+	scenarios.mailB = cmp.Or(scenarios.mailB, serviceMailURL(ctx, probe.b))
 	return runScenarioPhase(ctx, scenarios.options(probe, runDir, out.stderr), out.stdout, out.stderr)
+}
+
+// fromSuite fills the sides diffsuite handed this run that no flag named
+// (tools/diffsuite/README.md): -a from its branch stack, -b from its main one.
+func fromSuite(probe *probeFlags, scenarios *scenarioFlags) {
+	if branch, ok := diffkit.SuiteStack(diffkit.SuiteBranch); ok && probe.a == "" {
+		probe.a, scenarios.mailA = branch.APIOrigin, cmp.Or(scenarios.mailA, branch.MailURL)
+	}
+	if main, ok := diffkit.SuiteStack(diffkit.SuiteMain); ok && probe.b == "" {
+		probe.b, scenarios.mailB = main.APIOrigin, cmp.Or(scenarios.mailB, main.MailURL)
+	}
 }
 
 // runScenarioAfterMainPass is the phase `run` appends, when scenario files
@@ -138,7 +155,7 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 	runner.probeAdminKey()
 	items, deferred := runner.deferAdminScenarios(items)
 	if len(items) == 0 {
-		writeDeferred(report, deferred)
+		reportDeferred(report, progress, options.RunDir, deferred)
 		return exitEqual
 	}
 	fmt.Fprintf(progress, "scenarios: %d selected, %d in flight per side, %d shards per kind\n", len(items), runner.options.Concurrency, options.Shards)
@@ -158,7 +175,7 @@ func runScenarioPhase(ctx context.Context, options scenarioOptions, report, prog
 	phaseDone(progress, "scenarios", started)
 	timing := scenarioTiming{Wall: time.Since(started), Requests: runner.requests.Load(), Waits: time.Duration(runner.waitNanos.Load()), Workers: runner.options.Concurrency}
 	writeScenarioReport(report, results, timing)
-	writeDeferred(report, deferred)
+	reportDeferred(report, progress, options.RunDir, deferred)
 	if target, err := writeScenariosJSONL(options.RunDir, results); err != nil {
 		fmt.Fprintln(progress, "scenarios.jsonl:", err)
 	} else if target != "" {

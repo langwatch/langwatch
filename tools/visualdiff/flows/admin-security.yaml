@@ -163,7 +163,7 @@ flows:
           text: Profile
       - action: expect
         with:
-          testId: profile-name
+          testId: profile-name-input
       - action: expect
         with:
           testId: profile-email
@@ -297,3 +297,119 @@ flows:
       - action: expect
         with:
           text: LLM Metrics
+
+  # Ops and health, coverage round 2. Every step uses text both trees draw (titles and column
+  # headers). Instance-admin screens (main /ops/backoffice/users, organizations, projects,
+  # sso-connections, identity-lookup, directory-sync; branch /ops/users ... /ops/directory-sync)
+  # are hidden on SaaS and belong to the self-hosted pass.
+  - id: ops-dashboard-and-event-sourcing
+    title: The ops dashboard and each event-sourcing workspace page draw their title, and the retired queue and scheduler addresses follow
+    steps:
+      - action: go
+        with:
+          path: /ops
+      - action: expect
+        with:
+          text: Ops Dashboard
+      - action: go
+        with:
+          path: /ops/event-sourcing
+      - action: expect
+        with:
+          text: Event Sourcing
+      - action: go
+        with:
+          path: /ops/event-sourcing/dead-letters
+      - action: expect
+        with:
+          text: Dead Letters
+      - action: go
+        with:
+          path: /ops/event-sourcing/processes
+      - action: expect
+        with:
+          text: Processes
+      - action: go
+        with:
+          path: /ops/event-sourcing/projections
+      - action: expect
+        with:
+          text: Projections
+      - action: go
+        with:
+          path: /ops/event-sourcing/subscribers
+      - action: expect
+        with:
+          text: Event Subscribers
+      - action: go
+        with:
+          path: /ops/scheduler
+      - action: expect
+        with:
+          url: /ops/event-sourcing/schedules
+      - action: expect
+        with:
+          text: Schedules
+      - action: go
+        with:
+          path: /ops/queues
+      - action: expect
+        with:
+          url: /ops
+      - action: expect
+        with:
+          text: Ops Dashboard
+
+  - id: ops-flags-migrations-foundry
+    title: Feature flags, migrations and the foundry each draw their title
+    steps:
+      - action: go
+        with:
+          path: /ops/feature-flags
+      - action: expect
+        with:
+          text: Feature Flags
+      - action: go
+        with:
+          path: /ops/migrations
+      - action: expect
+        with:
+          text: Migrations
+      - action: go
+        with:
+          path: /ops/foundry
+      - action: expect
+        with:
+          text: The Foundry
+
+  - id: ops-cloud-bug-reports-and-installs
+    title: The bug reports list and the self-hosted installs list draw their title and columns
+    steps:
+      - action: go
+        with:
+          path: /ops/backoffice/bug-reports
+      - action: expect
+        with:
+          text: Bug Reports
+      - action: expect
+        with:
+          text: Received
+      - action: go
+        with:
+          path: /ops/backoffice/self-hosted-instances
+      - action: expect
+        with:
+          text: Self-hosted installs
+
+  - id: settings-email-suppressions
+    title: Email suppressions lists who unsubscribed, or says there are none
+    steps:
+      - action: go
+        with:
+          path: /settings/email-suppressions
+      - action: expect
+        with:
+          text: Email Suppressions
+      - action: expect
+        with:
+          text: /No suppressions yet|All notifications/

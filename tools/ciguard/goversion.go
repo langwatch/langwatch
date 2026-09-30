@@ -215,7 +215,7 @@ func childModulePaths(repoRoot string) ([]string, error) {
 			return fs.SkipDir
 		case err != nil:
 			return err
-		case entry.IsDir() && isSkippedDir(entry.Name()):
+		case entry.IsDir() && path != repoRoot && isSkippedDir(path, entry.Name()):
 			return fs.SkipDir
 		case entry.IsDir() || entry.Name() != "go.mod":
 			return nil
@@ -310,8 +310,15 @@ func goDockerfileImages(repoRoot, want string) ([]string, error) {
 	return problems, nil
 }
 
-func isSkippedDir(name string) bool {
-	return name == "node_modules" || name == ".git" || name == "dist"
+// isSkippedDir also skips scratch trees and linked worktrees (a .git file).
+func isSkippedDir(path, name string) bool {
+	switch name {
+	case "node_modules", ".git", "dist", ".apidiff", ".visualdiff", ".fuzz", ".worktrees", ".claude", ".bin":
+		return true
+	}
+	info, err := os.Lstat(filepath.Join(path, ".git"))
+
+	return err == nil && !info.IsDir()
 }
 
 func isDockerfile(name string) bool {
@@ -330,7 +337,7 @@ func dockerfilePaths(repoRoot string) ([]string, error) {
 			return fs.SkipDir
 		case err != nil:
 			return err
-		case entry.IsDir() && isSkippedDir(entry.Name()):
+		case entry.IsDir() && path != repoRoot && isSkippedDir(path, entry.Name()):
 			return fs.SkipDir
 		case entry.IsDir() || !isDockerfile(entry.Name()):
 			return nil

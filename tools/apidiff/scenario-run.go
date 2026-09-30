@@ -1,6 +1,7 @@
 package apidiff
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -34,7 +35,8 @@ type scenarioOptions struct {
 	DryRun       bool   // load and validate only
 	DoneRoot     string // repository root the done ledger sits under
 	Progress     io.Writer
-	MaxErrors    int // consecutive ERROR scenarios that stop the run; 0 never stops it
+	TRPC         string // single-sided stacks: trpcSuperjson or trpcNone (default)
+	MaxErrors    int    // consecutive ERROR scenarios that stop the run; 0 never stops it
 }
 
 const (
@@ -56,6 +58,7 @@ type scenarioSide struct {
 	foreign  *shardContext
 	creds    sideCredentials
 	slots    chan struct{}
+	trpc     string // trpcSuperjson or trpcNone: how this side reads and writes tRPC bodies
 }
 
 func (side *scenarioSide) acquire(ctx context.Context) {
@@ -156,7 +159,7 @@ func newScenarioClient(options scenarioOptions) *http.Client {
 		MaxIdleConnsPerHost: perHost,
 		IdleConnTimeout:     90 * time.Second,
 	}
-	return &http.Client{Timeout: options.Timeout, Transport: transport}
+	return &http.Client{Timeout: options.Timeout, Transport: transport, CheckRedirect: firstResponse}
 }
 
 func newScenarioRunner(ctx context.Context, options scenarioOptions) *scenarioRunner {
@@ -172,12 +175,14 @@ func newScenarioRunner(ctx context.Context, options scenarioOptions) *scenarioRu
 	runner := &scenarioRunner{ctx: ctx, engine: engine, options: options, live: map[string]int{}, streak: diffkit.NewStreak(options.MaxErrors), cancel: cancel, tag: strconv.FormatInt(time.Now().Unix()%1_000_000_000, 36)}
 	if options.B == "" {
 		runner.sides = []*scenarioSide{newScenarioSide("stack", options.A, options.MailA, options)}
+		runner.sides[0].trpc = cmp.Or(options.TRPC, trpcNone)
 		return runner
 	}
 	runner.sides = []*scenarioSide{
 		newScenarioSide("branch", options.A, options.MailA, options),
 		newScenarioSide("main", options.B, options.MailB, options),
 	}
+	runner.sides[0].trpc, runner.sides[1].trpc = trpcNone, trpcSuperjson
 	return runner
 }
 
@@ -216,7 +221,7 @@ func (runner *scenarioRunner) runAll(items []scenario) []scenarioResult {
 	counters := map[string]int{}
 	for index := range items {
 		results[index] = scenarioResult{ID: items[index].ID, Endpoint: items[index].Endpoint, File: items[index].file, Shard: items[index].Shard, item: &items[index], order: index}
-		if items[index].Shard == shardSerial {
+		if items[index].Shard == shardSerial || items[index].Serial {
 			serial = append(serial, index)
 			continue
 		}

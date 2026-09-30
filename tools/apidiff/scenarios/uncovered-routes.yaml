@@ -1291,3 +1291,136 @@
     body: { resourceMetrics: [] }
   expect:
     status: 200
+
+# ---- saved-chart placement and widget dashboard assignment (flag release_custom_chart_playground) ----
+
+- id: chart-placement-put-places-chart-on-dashboard
+  endpoint: PUT /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+  auth: project
+  setup:
+    - request: POST /api/dashboards
+      body: { name: "vd-dash-{uid}" }
+      capture: { dashboardId: id }
+    - request: POST /api/v1/projects/{projectId}/analytics/charts
+      body:
+        name: "vd-{uid}"
+        definition: { version: 1, sql: "SELECT TraceId FROM traces LIMIT 5", parameters: {} }
+      capture: { chartId: id }
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+    body: { dashboardId: "{dashboardId}" }
+  expect:
+    status: 200
+    contains: "{dashboardId}"
+  verify:
+    - request: GET /api/v1/projects/{projectId}/analytics/charts/{chartId}
+      expect: { status: 200, contains: "{dashboardId}" }
+
+- id: chart-placement-put-unknown-dashboard-is-404
+  endpoint: PUT /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+  auth: project
+  setup:
+    - request: POST /api/v1/projects/{projectId}/analytics/charts
+      body:
+        name: "vd-{uid}"
+        definition: { version: 1, sql: "SELECT TraceId FROM traces LIMIT 5", parameters: {} }
+      capture: { chartId: id }
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+    body: { dashboardId: "vd-none-{uid}" }
+  expect:
+    status: 404
+
+- id: chart-placement-put-refuses-no-key
+  endpoint: PUT /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+  auth: none
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts/vd-{uid}/placement
+    body: { dashboardId: "vd-{uid}" }
+  expect:
+    status: 401
+
+- id: chart-placement-delete-unplaces-chart
+  endpoint: DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+  auth: project
+  setup:
+    - request: POST /api/dashboards
+      body: { name: "vd-dash-{uid}" }
+      capture: { dashboardId: id }
+    - request: POST /api/v1/projects/{projectId}/analytics/charts
+      body:
+        name: "vd-{uid}"
+        definition: { version: 1, sql: "SELECT TraceId FROM traces LIMIT 5", parameters: {} }
+      capture: { chartId: id }
+    - request: PUT /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+      body: { dashboardId: "{dashboardId}" }
+      expect: { status: 200 }
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+  expect:
+    status: 204
+  verify:
+    - request: GET /api/v1/projects/{projectId}/analytics/charts/{chartId}
+      expect: { status: 200, notContains: "{dashboardId}" }
+
+- id: chart-placement-delete-is-idempotent
+  endpoint: DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+  auth: project
+  setup:
+    - request: POST /api/v1/projects/{projectId}/analytics/charts
+      body:
+        name: "vd-{uid}"
+        definition: { version: 1, sql: "SELECT TraceId FROM traces LIMIT 5", parameters: {} }
+      capture: { chartId: id }
+  request:
+    path: /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement
+  expect:
+    status: 204
+
+- id: dashboard-widget-assign-dashboard-reads-back
+  endpoint: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard
+  auth: project
+  setup:
+    - request: POST /api/dashboards
+      body: { name: "vd-dash-{uid}" }
+      capture: { dashboardId: id }
+    - request: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+      body:
+        name: "vd-{uid}"
+        code: "export default function Widget() { return null; }"
+        queries: [{ name: q, sql: "SELECT 1 AS one" }]
+      capture: { widgetId: id }
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard
+    body: { dashboardId: "{dashboardId}" }
+  expect:
+    status: 200
+    contains: "{dashboardId}"
+  verify:
+    - request: GET /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}
+      expect: { status: 200, contains: "{dashboardId}" }
+
+- id: dashboard-widget-assign-dashboard-unknown-dashboard-is-404
+  endpoint: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard
+  auth: project
+  setup:
+    - request: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets
+      body:
+        name: "vd-{uid}"
+        code: "export default function Widget() { return null; }"
+        queries: [{ name: q, sql: "SELECT 1 AS one" }]
+      capture: { widgetId: id }
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard
+    body: { dashboardId: "vd-none-{uid}" }
+  expect:
+    status: 404
+
+- id: dashboard-widget-assign-dashboard-refuses-no-key
+  endpoint: POST /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard
+  auth: none
+  request:
+    path: /api/v1/projects/{projectId}/analytics/dashboard-widgets/vd-{uid}/dashboard
+    body: { dashboardId: "vd-{uid}" }
+  expect:
+    status: 401

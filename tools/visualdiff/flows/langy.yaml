@@ -1,11 +1,12 @@
-# Langy, the assistant panel: open it, send a message, see the reply, come back to it in the
-# recent chats and start a new chat.
-# Needs release_langy_enabled on for the project (the orb does not draw without it) and, for the
-# reply, a model provider the langy worker can reach. A stack with neither fails the first step
-# or the reply expect: that is the finding, not a script fault. Names carry {uid}.
+# Langy, the assistant panel: open it, send a message, see the reply or the error, come back to it
+# in the recent chats, start a new chat and minimise it. Steps use what main has too (aria labels,
+# the data-langy-composer anchor, langy-transcript-notice); the one branch-only step is marked.
+# Needs release_langy_enabled on for the project (the orb does not draw without it) and, for a
+# reply, a model provider the langy worker can reach; without one the outcome step shows the
+# stack, not a script fault. Names carry {uid}.
 flows:
   - id: langy-send-message-and-reply
-    title: Open Langy, send a message and see it answered
+    title: Open Langy, send a message and see it answered, or a clear notice
     steps:
       - action: go
         with:
@@ -14,20 +15,23 @@ flows:
         with:
           label: Open Langy assistant
           optional: "true"
+      - action: expect
+        with:
+          label: Langy assistant
       - action: fill
         with:
-          testId: langy-composer-input
+          selector: '[data-langy-composer] textarea'
           value: Say hello to vd{uid} in one short sentence
       - action: click
         with:
-          testId: langy-composer-send
+          label: Send
       - action: expect
         with:
-          testId: langy-user-message
-          hasText: vd{uid}
+          text: vd{uid}
+      # branch-only: main has no langy-assistant-message id; langy-transcript-notice is shared.
       - action: expect
         with:
-          testId: langy-assistant-message
+          count: '[data-testid="langy-assistant-message"], [data-testid="langy-transcript-notice"]'
           timeout: "90000"
 
   - id: langy-history-and-new-chat
@@ -42,21 +46,20 @@ flows:
           optional: "true"
       - action: fill
         with:
-          testId: langy-composer-input
+          selector: '[data-langy-composer] textarea'
           value: Remember the word vd{uid}
       - action: click
         with:
-          testId: langy-composer-send
+          label: Send
       - action: expect
         with:
-          testId: langy-user-message
-          hasText: vd{uid}
+          text: vd{uid}
       - action: click
         with:
           label: New chat
       - action: expect
         with:
-          testId: langy-user-message
+          text: vd{uid}
           equals: "0"
       - action: go
         with:
@@ -70,15 +73,46 @@ flows:
           label: Recent chats
       - action: expect
         with:
-          testId: langy-recent-chat
-          hasText: vd{uid}
+          label: /vd{uid}/
           timeout: "30000"
       - action: click
         with:
-          testId: langy-recent-chat
-          hasText: vd{uid}
+          label: /vd{uid}/
       - action: expect
         with:
-          testId: langy-user-message
-          hasText: vd{uid}
+          text: vd{uid}
           timeout: "30000"
+
+  - id: langy-minimise-and-reopen
+    title: Minimise Langy, then reopen it on the same conversation
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          label: Open Langy assistant
+          optional: "true"
+      - action: fill
+        with:
+          selector: '[data-langy-composer] textarea'
+          value: Keep this open vd{uid}
+      - action: click
+        with:
+          label: Send
+      - action: expect
+        with:
+          text: vd{uid}
+      - action: click
+        with:
+          label: Minimise Langy
+      - action: expect
+        with:
+          label: Langy assistant
+          equals: "0"
+      - action: click
+        with:
+          label: Open Langy assistant
+      - action: expect
+        with:
+          text: vd{uid}

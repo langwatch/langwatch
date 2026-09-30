@@ -43,6 +43,7 @@ type apiRun struct {
 	client    *http.Client
 	appURL    string
 	apiURL    string
+	stackSlug string // the haven stack whose log is scanned; empty under -url
 	org       diffkit.ToolOrg
 	requests  int64
 	exercised sync.Map
@@ -88,11 +89,11 @@ func runAPI(ctx context.Context, streams Streams, options Options) error {
 		return diffkit.SetupFailed(err)
 	}
 	jobs := run.plan(operations)
-	logsBefore := logSignatures(ctx, run.slug())
+	logsBefore := logSignatures(ctx, run.stackSlug)
 	fuzzStart := time.Now()
 	run.fuzz(ctx, jobs)
 	fuzzTook := time.Since(fuzzStart)
-	run.recordLogHits(logsBefore, logSignatures(ctx, run.slug()))
+	run.recordLogHits(logsBefore, logSignatures(ctx, run.stackSlug))
 
 	shrinkStart := time.Now()
 	groups := run.shrinkGroups(run.shrinkContext(ctx))
@@ -121,15 +122,6 @@ func (run *apiRun) shrinkContext(ctx context.Context) context.Context {
 	return cancelled
 }
 
-// slug is the haven stack to scan logs from; empty when a -url overrode the
-// shared stack, since then the log scan cannot know which stack to read.
-func (run *apiRun) slug() string {
-	if run.options.URL != "" {
-		return ""
-	}
-	return diffkit.CheckSlug
-}
-
 // recordLogHits turns each new error/fatal log signature into a finding.
 func (run *apiRun) recordLogHits(before, after map[string]int) {
 	for _, hit := range newLogSignatures(before, after) {
@@ -148,10 +140,11 @@ func (run *apiRun) resolveStack(ctx context.Context) error {
 		run.apiURL = run.appURL
 		return nil
 	}
-	stack, err := diffkit.ReadSharedStack(ctx, diffkit.CheckSlug)
+	stack, err := diffkit.BranchStack(ctx)
 	if err != nil {
 		return err
 	}
+	run.stackSlug = stack.Slug
 	run.appURL = strings.TrimSuffix(stack.AppURL, "/")
 	run.apiURL = run.appURL
 	return nil
@@ -230,7 +223,7 @@ func (run *apiRun) runJob(ctx context.Context, item job) {
 	run.exercised.Store(item.op.Method+" "+item.op.Path, true)
 	hits := Evaluate(Observation{
 		Mutation: item.mutation, Status: status, Elapsed: elapsed, Body: body,
-		JSONExpected: true, SeparateOrg: run.org.Separate, LatencyCap: LatencyCap, ForeignIDs: request.foreign,
+		JSONExpected: true, SeparateOrg: run.org.Separate, OwnIDs: run.ownIDs(), LatencyCap: LatencyCap, ForeignIDs: request.foreign,
 	})
 	for _, hit := range hits {
 		run.record(item, request, status, hit)
@@ -366,4 +359,14 @@ func marshalBody(value any) []byte {
 	}
 	encoded, _ := json.Marshal(value)
 	return encoded
+}
+
+// ownIDs are the fuzzer's own organisation and project ids, the ones a body
+// resolved inside its own tenant names.
+func (run *apiRun) ownIDs() []string {
+	ids := []string{run.org.OrgID}
+	for _, project := range run.org.Projects {
+		ids = append(ids, project.ID)
+	}
+	return ids
 }

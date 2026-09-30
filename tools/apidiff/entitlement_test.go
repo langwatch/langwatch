@@ -3,10 +3,10 @@ package apidiff
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -98,7 +98,7 @@ func TestEntitledPassSkipsWithoutAnActivator(t *testing.T) {
 			},
 		}
 
-		t.Run("when the entitled pass runs with no ActivateEntitlement (probe mode, or the haven path)", func(t *testing.T) {
+		t.Run("when the entitled pass runs with no ActivateEntitlement (probe mode, or a deferred boot)", func(t *testing.T) {
 			findings := engine.entitledPass()
 
 			t.Run("then it reports nothing rather than crashing, and says why on the progress stream", func(t *testing.T) {
@@ -258,115 +258,104 @@ func TestActivateEntitlementSQL(t *testing.T) {
 	}
 }
 
-func TestReadLocalDevEnterpriseLicenseKey(t *testing.T) {
-	t.Run("given a checkout whose seed file declares the constant", func(t *testing.T) {
-		dir := t.TempDir()
-		seedDir := filepath.Join(dir, filepath.Dir(localDevLicenseSeedPath))
-		if err := os.MkdirAll(seedDir, 0o750); err != nil {
-			t.Fatal(err)
-		}
-		content := "export const LOCAL_DEV_ENTERPRISE_LICENSE_KEY =\n  \"eyJhbGciOiJ0ZXN0In0=\";\n"
-		if err := os.WriteFile(filepath.Join(dir, localDevLicenseSeedPath), []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
-
-		key, err := readLocalDevEnterpriseLicenseKey(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if key != "eyJhbGciOiJ0ZXN0In0=" {
-			t.Fatalf("key = %q", key)
-		}
-	})
-
-	t.Run("given a checkout with no such file", func(t *testing.T) {
-		if _, err := readLocalDevEnterpriseLicenseKey(t.TempDir()); err == nil {
-			t.Fatal("a missing seed file must error, not silently entitle nothing")
-		}
-	})
-
-	t.Run("given a checkout whose file no longer declares the constant in the expected shape", func(t *testing.T) {
-		dir := t.TempDir()
-		seedDir := filepath.Join(dir, filepath.Dir(localDevLicenseSeedPath))
-		if err := os.MkdirAll(seedDir, 0o750); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, localDevLicenseSeedPath), []byte("export const SOMETHING_ELSE = 1;"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := readLocalDevEnterpriseLicenseKey(dir); err == nil {
-			t.Fatal("a reshaped export must fail loudly rather than entitle nothing")
-		}
-	})
+// entitlementBooted is the pair of instances the activator reads and writes.
+func entitlementBooted() *Booted {
+	return &Booted{A: Instance{Name: "branch", Dir: "/wt/branch"}, B: Instance{Name: "main", Dir: "/wt/main"}}
 }
 
-// Reads the REAL repository file: if LOCAL_DEV_ENTERPRISE_LICENSE_KEY's
-// declaration ever moves or reshapes, this fails loudly instead of the
-// entitled pass silently activating nothing on every future run.
-func TestReadLocalDevEnterpriseLicenseKeyAgainstTheRealRepository(t *testing.T) {
-	repoRoot := filepath.Join("..", "..")
-	key, err := readLocalDevEnterpriseLicenseKey(repoRoot)
-	if err != nil {
-		t.Fatalf("the real %s must still declare LOCAL_DEV_ENTERPRISE_LICENSE_KEY in the expected shape: %v", localDevLicenseSeedPath, err)
-	}
-	if len(key) < 100 {
-		t.Fatalf("extracted key looks truncated (%d chars)", len(key))
-	}
-}
+// @scenario "The entitled pass copies the licence the branch seed signed onto both databases"
+func TestBuildEntitlementActivatorCopiesTheBranchLicenceToBothInstances(t *testing.T) {
+	recorder := &recordingRunner{output: "eyJhbGciOiJ0ZXN0In0=\n"}
+	state := externalBootState(recorder, BootConfig{BranchDir: t.TempDir()})
+	state.override = "/tmp/compose.apidiff.yml" // routes pgQueryDB through the recorded runner, no real docker/psql
 
-func TestBuildEntitlementActivatorAppliesTheKeyToBothInstances(t *testing.T) {
-	dir := t.TempDir()
-	seedDir := filepath.Join(dir, filepath.Dir(localDevLicenseSeedPath))
-	if err := os.MkdirAll(seedDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	content := "export const LOCAL_DEV_ENTERPRISE_LICENSE_KEY =\n  \"eyJhbGciOiJ0ZXN0In0=\";\n"
-	if err := os.WriteFile(filepath.Join(dir, localDevLicenseSeedPath), []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	recorder := &recordingRunner{}
-	state := externalBootState(recorder, BootConfig{BranchDir: dir})
-	state.runID = "testrun"
-	state.override = "/tmp/compose.apidiff.yml" // routes pgAdminDB through the recorded runner, no real docker/psql
-
-	activate := state.buildEntitlementActivator()
+	activate := state.buildEntitlementActivator(context.Background(), entitlementBooted())
 	if activate == nil {
-		t.Fatal("a readable seed file must produce an activator")
+		t.Fatal("a licence stored by the branch seed must produce an activator")
 	}
+	if !updatedBoth(recorder.commands, "apidiff_testrun_branch", "apidiff_testrun_main") {
+		t.Fatalf("boot must entitle both sides at once; got: %+v", recorder.commands)
+	}
+	recorder.commands = nil
 	if err := activate(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-
-	var sawBranch, sawMain bool
-	for _, spec := range recorder.commands {
-		joined := strings.Join(spec.args, " ")
-		if !strings.Contains(joined, `eyJhbGciOiJ0ZXN0In0=`) || !strings.Contains(joined, `UPDATE "Organization"`) {
-			continue
-		}
-		if strings.Contains(joined, "apidiff_testrun_branch") {
-			sawBranch = true
-		}
-		if strings.Contains(joined, "apidiff_testrun_main") {
-			sawMain = true
-		}
-	}
-	if !sawBranch || !sawMain {
+	if !updatedBoth(recorder.commands, "apidiff_testrun_branch", "apidiff_testrun_main") {
 		t.Fatalf("expected an UPDATE against both instances' databases, got: %+v", recorder.commands)
 	}
 }
 
-func TestBuildEntitlementActivatorDisabledWhenSeedFileIsMissing(t *testing.T) {
+// @scenario "The entitled pass is deferred on both sides when no licence keys are configured"
+func TestBuildEntitlementActivatorDeferredWhenTheBranchStoredNoLicence(t *testing.T) {
 	var stderr bytes.Buffer
-	state := externalBootState(&recordingRunner{}, BootConfig{BranchDir: t.TempDir()})
+	recorder := &recordingRunner{}
+	state := externalBootState(recorder, BootConfig{BranchDir: t.TempDir()})
+	state.override = "/tmp/compose.apidiff.yml"
 	state.stderr = &stderr
 
-	if activate := state.buildEntitlementActivator(); activate != nil {
-		t.Fatal("a missing seed file must disable the activator, not panic or crash the run")
+	if activate := state.buildEntitlementActivator(context.Background(), entitlementBooted()); activate != nil {
+		t.Fatal("no stored licence must defer the pass, not activate an empty one")
 	}
-	if !strings.Contains(stderr.String(), "entitled pass: disabled") {
-		t.Fatalf("stderr missing the disabled note: %q", stderr.String())
+	if strings.Count(stderr.String(), "\n") != 1 || !strings.Contains(stderr.String(), "entitled pass: deferred:") || !strings.Contains(stderr.String(), "LANGWATCH_LICENSE_PRIVATE_KEY") {
+		t.Fatalf("stderr must be one deferral line naming the keys: %q", stderr.String())
 	}
+	var clearedMain bool
+	for _, spec := range recorder.commands {
+		joined := strings.Join(spec.args, " ")
+		if strings.Contains(joined, "UPDATE") && strings.Contains(joined, "apidiff_testrun_branch") {
+			t.Fatalf("a deferred pass must not touch the branch, got: %+v", recorder.commands)
+		}
+		clearedMain = clearedMain || (strings.Contains(joined, `SET "license" = NULL`) && strings.Contains(joined, "apidiff_testrun_main"))
+	}
+	if !clearedMain {
+		t.Fatalf("main's own seeded licence must be cleared so it is not entitled alone, got: %+v", recorder.commands)
+	}
+}
+
+// @scenario "The entitled pass reaches haven stacks through haven db url"
+func TestBuildEntitlementActivatorOnTheHavenPathUsesEachStacksDatabase(t *testing.T) {
+	var commands []commandSpec
+	state := externalBootState(&recordingRunner{}, BootConfig{BranchDir: t.TempDir(), UseHaven: true})
+	state.run = func(_ context.Context, spec commandSpec, log io.Writer) error {
+		commands = append(commands, spec)
+		answer := "eyJhbGciOiJ0ZXN0In0=\n"
+		if spec.name == havenCommand {
+			answer = "postgres://prisma:pw@127.0.0.1:5432/" + spec.dir[len("/wt/"):] + "\n"
+		}
+		_, err := io.WriteString(log, answer)
+		return err
+	}
+
+	if activate := state.buildEntitlementActivator(context.Background(), entitlementBooted()); activate == nil {
+		t.Fatal("a licence stored by the branch stack must produce an activator on the haven path too")
+	}
+	if !updatedBoth(commands, "127.0.0.1:5432/branch", "127.0.0.1:5432/main") {
+		t.Fatalf("expected psql UPDATEs against both stacks' haven db url, got: %+v", commands)
+	}
+	for _, spec := range commands {
+		if spec.name != havenCommand {
+			continue
+		}
+		slug := HavenSlug("testrun", spec.dir[len("/wt/"):])
+		if !slices.Contains(spec.env, "LANGWATCH_SLUG="+slug) {
+			t.Fatalf("haven db url in %s must name its own stack %s", spec.dir, slug)
+		}
+	}
+}
+
+// updatedBoth reports whether the recorded commands UPDATE the test licence
+// onto both databases, told apart by the given argument fragments.
+func updatedBoth(commands []commandSpec, branch, main string) bool {
+	var sawBranch, sawMain bool
+	for _, spec := range commands {
+		joined := strings.Join(spec.args, " ")
+		if !strings.Contains(joined, `eyJhbGciOiJ0ZXN0In0=`) || !strings.Contains(joined, `UPDATE "Organization"`) {
+			continue
+		}
+		sawBranch = sawBranch || strings.Contains(joined, branch)
+		sawMain = sawMain || strings.Contains(joined, main)
+	}
+	return sawBranch && sawMain
 }
 
 // --- test helpers ---

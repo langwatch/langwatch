@@ -11,7 +11,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: "prompt-new-button"
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -19,13 +19,16 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: "prompt-handle-input"
-          value: "vd-prompt-{uid}"
+          field: prompt-name
+          value: vd-prompt-{uid}
       - action: click
         with:
-          testId: "prompt-handle-submit"
+          text: /^Save$/
       - action: expect
         with:
           api: "/api/prompts"
@@ -35,7 +38,7 @@ flows:
           path: "/{slug}/prompts"
       - action: expect
         with:
-          testId: "prompt-row-vd-prompt-{uid}"
+          text: /^vd-prompt-{uid}$/
 
   - id: prompt-edit-new-version
     title: Edit a saved prompt and commit it as a second version
@@ -45,7 +48,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: "prompt-new-button"
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -53,13 +56,16 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: "prompt-handle-input"
-          value: "vd-prompt-{uid}"
+          field: prompt-name
+          value: vd-prompt-{uid}
       - action: click
         with:
-          testId: "prompt-handle-submit"
+          text: /^Save$/
       - action: expect
         with:
           api: "/api/prompts"
@@ -71,18 +77,22 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Save Version
       - action: fill
         with:
-          testId: "prompt-save-version-message"
-          value: "second version {uid}"
+          field: Enter a description for this version
+          value: second version {uid}
       - action: click
         with:
-          testId: "prompt-save-version-submit"
+          text: /^Update to v/
       - action: expect
         with:
           api: "/api/prompts/vd-prompt-{uid}/versions"
           min: "2"
 
+  # branch-only: main draws no per-version changes toggle (version-changes-toggle-2) in the history popover.
   - id: prompt-version-history-and-diff
     title: Open the version history and read a version's changes
     steps:
@@ -91,7 +101,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: "prompt-new-button"
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -99,13 +109,16 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: "prompt-handle-input"
-          value: "vd-prompt-{uid}"
+          field: prompt-name
+          value: vd-prompt-{uid}
       - action: click
         with:
-          testId: "prompt-handle-submit"
+          text: /^Save$/
       - action: expect
         with:
           api: "/api/prompts"
@@ -117,13 +130,16 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Save Version
       - action: fill
         with:
-          testId: "prompt-save-version-message"
-          value: "edit v2 {uid}"
+          field: Enter a description for this version
+          value: edit v2 {uid}
       - action: click
         with:
-          testId: "prompt-save-version-submit"
+          text: /^Update to v/
       - action: expect
         with:
           api: "/api/prompts/vd-prompt-{uid}/versions"
@@ -152,7 +168,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: "prompt-new-button"
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -160,39 +176,45 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: "prompt-handle-input"
-          value: "vd-prompt-{uid}"
+          field: prompt-name
+          value: vd-prompt-{uid}
       - action: click
         with:
-          testId: "prompt-handle-submit"
+          text: /^Save$/
       - action: expect
         with:
           api: "/api/prompts"
           contains: "vd-prompt-{uid}"
       - action: click
         with:
-          testId: "prompt-deploy-button"
+          text: /^\s*Deploy\s*$/
       - action: click
         with:
-          testId: "prompt-deploy-add-tag"
+          text: /\+ Add tag/
       - action: fill
         with:
-          testId: "prompt-deploy-tag-name-input"
+          field: "Tag name (e.g. canary)"
           value: "canary-{uid}"
       - action: click
         with:
-          testId: "prompt-deploy-tag-add-confirm"
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Add\s*$/
       - action: click
         with:
-          testId: "prompt-deploy-tag-trigger-canary-{uid}"
+          selector: 'xpath=//*[normalize-space()="canary-{uid}"]/ancestor::*[.//*[@role="combobox"]][1]//*[@role="combobox"]'
       - action: click
         with:
-          testId: "prompt-deploy-tag-canary-{uid}-version-1"
+          selector: '[role="option"]'
+          hasText: /^\s*v1\b/
       - action: click
         with:
-          testId: "prompt-deploy-save"
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Save\s*$/
       - action: expect
         with:
           api: "/api/prompts/tags"
@@ -210,7 +232,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: "prompt-new-button"
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -218,34 +240,32 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: "prompt-handle-input"
-          value: "vd-prompt-{uid}"
+          field: prompt-name
+          value: vd-prompt-{uid}
       - action: click
         with:
-          testId: "prompt-handle-submit"
+          text: /^Save$/
       - action: expect
         with:
           api: "/api/prompts"
           contains: "vd-prompt-{uid}"
       - action: click
         with:
-          testId: "prompt-tab-variables"
+          text: /^Variables$/
       - action: fill
         with:
           testId: "variable-value-input-input"
           value: "echo-{uid}"
-      - action: click
+      - action: type
         with:
-          testId: "prompt-tab-conversation"
-      - action: fill
-        with:
-          testId: "prompt-chat-input"
-          value: "Go"
-      - action: click
-        with:
-          testId: "prompt-chat-send"
+          placeholder: "Type your message here"
+          text: "Go"
+          submit: "true"
       - action: expect
         with:
           text: "echo-{uid}"
@@ -259,7 +279,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: "prompt-new-button"
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -267,37 +287,46 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: "prompt-handle-input"
-          value: "vd-prompt-{uid}"
+          field: prompt-name
+          value: vd-prompt-{uid}
       - action: click
         with:
-          testId: "prompt-handle-submit"
+          text: /^Save$/
       - action: expect
         with:
           api: "/api/prompts"
           contains: "vd-prompt-{uid}"
       - action: click
         with:
-          testId: "prompt-model-selector-trigger"
+          selector: 'xpath=//div[svg[contains(@class,"lucide-chevron-down")]][preceding-sibling::*]'
+      - action: click
+        with:
+          selector: '[role="dialog"] [role="combobox"]'
       - action: fill
         with:
-          testId: "prompt-model-search-input"
+          field: "Search models"
           value: "mini"
       - action: click
         with:
-          testIdPrefix: "prompt-model-option-"
+          selector: '[role="option"]'
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Save Version
       - action: fill
         with:
-          testId: "prompt-save-version-message"
-          value: "model change {uid}"
+          field: Enter a description for this version
+          value: model change {uid}
       - action: click
         with:
-          testId: "prompt-save-version-submit"
+          text: /^Update to v/
       - action: expect
         with:
           api: "/api/prompts/vd-prompt-{uid}/versions"
@@ -311,7 +340,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: "prompt-new-button"
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -319,13 +348,16 @@ flows:
       - action: click
         with:
           testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: "prompt-handle-input"
-          value: "vd-prompt-{uid}"
+          field: prompt-name
+          value: vd-prompt-{uid}
       - action: click
         with:
-          testId: "prompt-handle-submit"
+          text: /^Save$/
       - action: expect
         with:
           api: "/api/prompts"
@@ -335,17 +367,17 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: "prompt-actions-menu-vd-prompt-{uid}"
+          selector: xpath=//p[normalize-space()="vd-prompt-{uid}"]/following-sibling::*[1]//button
       - action: click
         with:
-          testId: "prompt-actions-delete"
+          text: Delete prompt
       - action: fill
         with:
-          testId: "prompt-delete-confirm-input"
-          value: "delete"
+          field: Type 'delete' to confirm
+          value: delete
       - action: click
         with:
-          testId: "prompt-delete-confirm-button"
+          text: /^\s*Delete\s*$/
       - action: expect
         with:
           api: "/api/prompts/vd-prompt-{uid}"
@@ -359,43 +391,45 @@ flows:
           path: "/{slug}/automations/automations"
       - action: click
         with:
-          testId: "automation-add-automations"
+          text: "New automation"
       - action: fill
         with:
-          testId: "automation-name-input"
+          field: "Flag failing traces"
           value: "vd-automation-{uid}"
       - action: click
         with:
-          testId: "automation-subject-code"
+          text: /^\s*Code\s*$/
       - action: click
         with:
-          testId: "automation-subject-example-status:error"
+          text: "status:error"
       - action: fill
         with:
-          testId: "automation-settle-window-input"
+          field: "Settle window"
           value: "30"
       - action: click
         with:
-          testId: "automation-cadence-trigger"
+          selector: '[role="combobox"]'
+          hasText: /^\s*Immediate/
       - action: click
         with:
-          testId: "automation-cadence-hourly_digest"
+          selector: '[role="option"]'
+          hasText: Every hour
       - action: click
         with:
-          testId: "automation-delivery-send-email"
+          text: /^\s*Email/
       - action: fill
         with:
-          testId: "automation-email-input"
+          field: "alerts@partner.com"
           value: "vd-{uid}@example.com"
       - action: click
         with:
-          testId: "automation-email-add"
+          text: "Add email"
       - action: click
         with:
-          testId: "automation-setup-done"
+          text: /^\s*Done\s*$/
       - action: click
         with:
-          testId: "automation-save-automation"
+          text: /^\s*Create automation\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -405,7 +439,7 @@ flows:
           path: "/{slug}/automations/automations"
       - action: expect
         with:
-          testId: "automation-row-actions-vd-automation-{uid}"
+          label: "Actions for vd-automation-{uid}"
 
   - id: automation-create-alert
     title: Create a graph alert with a series and a severity
@@ -415,41 +449,43 @@ flows:
           path: "/{slug}/automations/alerts"
       - action: click
         with:
-          testId: "automation-add-alerts"
+          text: "New alert"
       - action: fill
         with:
-          testId: "automation-name-input"
+          field: "High latency alert"
           value: "vd-alert-{uid}"
       - action: select
         with:
-          testId: "automation-alert-graph-select"
+          field: "Custom graph"
           option: "Visual Diff Graph"
       - action: select
         with:
-          testId: "automation-alert-series-select"
+          field: "Series"
           option: "Traces"
       - action: click
         with:
-          testId: "automation-severity-trigger"
+          selector: '[role="combobox"]'
+          hasText: Pick a severity
       - action: click
         with:
-          testId: "automation-severity-warning"
+          selector: '[role="option"]'
+          hasText: /^\s*Warning\s*$/
       - action: click
         with:
-          testId: "automation-delivery-send-email"
+          text: /^\s*Email/
       - action: fill
         with:
-          testId: "automation-email-input"
+          field: "alerts@partner.com"
           value: "vd-{uid}@example.com"
       - action: click
         with:
-          testId: "automation-email-add"
+          text: "Add email"
       - action: click
         with:
-          testId: "automation-setup-done"
+          text: /^\s*Done\s*$/
       - action: click
         with:
-          testId: "automation-save-alert"
+          text: /^\s*Create alert\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -459,7 +495,7 @@ flows:
           path: "/{slug}/automations/alerts"
       - action: expect
         with:
-          testId: "automation-row-actions-vd-alert-{uid}"
+          label: "Actions for vd-alert-{uid}"
 
   - id: automation-schedule-report
     title: Schedule a recurring graph report
@@ -469,43 +505,43 @@ flows:
           path: "/{slug}/automations/schedules"
       - action: click
         with:
-          testId: "automation-add-schedules"
+          text: "New schedule"
       - action: fill
         with:
-          testId: "automation-name-input"
+          field: "Weekly quality digest"
           value: "vd-schedule-{uid}"
       - action: select
         with:
-          testId: "automation-schedule-source-select"
+          field: "What to send"
           option: "A custom graph (chart)"
       - action: select
         with:
-          testId: "automation-schedule-graph-select"
+          field: "Custom graph"
           option: "Visual Diff Graph"
       - action: select
         with:
-          testId: "automation-schedule-frequency-select"
+          field: "Frequency"
           option: "Weekly"
       - action: fill
         with:
-          testId: "automation-schedule-time-input"
+          selector: 'input[type="time"]'
           value: "09:30"
       - action: click
         with:
-          testId: "automation-delivery-send-email"
+          text: /^\s*Email/
       - action: fill
         with:
-          testId: "automation-email-input"
+          field: "alerts@partner.com"
           value: "vd-{uid}@example.com"
       - action: click
         with:
-          testId: "automation-email-add"
+          text: "Add email"
       - action: click
         with:
-          testId: "automation-setup-done"
+          text: /^\s*Done\s*$/
       - action: click
         with:
-          testId: "automation-save-schedule"
+          text: /^\s*Create schedule\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -515,7 +551,7 @@ flows:
           path: "/{slug}/automations/schedules"
       - action: expect
         with:
-          testId: "automation-row-actions-vd-schedule-{uid}"
+          label: "Actions for vd-schedule-{uid}"
 
   - id: automation-enable-disable
     title: Switch an automation off and see it stay off after a reload
@@ -525,33 +561,33 @@ flows:
           path: "/{slug}/automations/automations"
       - action: click
         with:
-          testId: "automation-add-automations"
+          text: "New automation"
       - action: fill
         with:
-          testId: "automation-name-input"
+          field: "Flag failing traces"
           value: "vd-toggle-{uid}"
       - action: click
         with:
-          testId: "automation-subject-code"
+          text: /^\s*Code\s*$/
       - action: click
         with:
-          testId: "automation-subject-example-status:error"
+          text: "status:error"
       - action: click
         with:
-          testId: "automation-delivery-send-email"
+          text: /^\s*Email/
       - action: fill
         with:
-          testId: "automation-email-input"
+          field: "alerts@partner.com"
           value: "vd-{uid}@example.com"
       - action: click
         with:
-          testId: "automation-email-add"
+          text: "Add email"
       - action: click
         with:
-          testId: "automation-setup-done"
+          text: /^\s*Done\s*$/
       - action: click
         with:
-          testId: "automation-save-automation"
+          text: /^\s*Create automation\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -561,14 +597,14 @@ flows:
           path: "/{slug}/automations/automations"
       - action: expect
         with:
-          count: '[data-testid="automation-toggle-vd-toggle-{uid}"][data-state="checked"]'
+          count: 'input[aria-label="Toggle vd-toggle-{uid}"]:checked'
           equals: "1"
       - action: click
         with:
-          testId: "automation-toggle-vd-toggle-{uid}"
+          selector: 'label:has(input[aria-label="Toggle vd-toggle-{uid}"])'
       - action: expect
         with:
-          count: '[data-testid="automation-toggle-vd-toggle-{uid}"][data-state="unchecked"]'
+          count: 'input[aria-label="Toggle vd-toggle-{uid}"]:not(:checked)'
           equals: "1"
       - action: wait
         with:
@@ -578,7 +614,7 @@ flows:
           path: "/{slug}/automations/automations"
       - action: expect
         with:
-          count: '[data-testid="automation-toggle-vd-toggle-{uid}"][data-state="unchecked"]'
+          count: 'input[aria-label="Toggle vd-toggle-{uid}"]:not(:checked)'
           equals: "1"
 
   - id: automation-edit
@@ -589,33 +625,33 @@ flows:
           path: "/{slug}/automations/automations"
       - action: click
         with:
-          testId: "automation-add-automations"
+          text: "New automation"
       - action: fill
         with:
-          testId: "automation-name-input"
+          field: "Flag failing traces"
           value: "vd-edit-{uid}"
       - action: click
         with:
-          testId: "automation-subject-code"
+          text: /^\s*Code\s*$/
       - action: click
         with:
-          testId: "automation-subject-example-status:error"
+          text: "status:error"
       - action: click
         with:
-          testId: "automation-delivery-send-email"
+          text: /^\s*Email/
       - action: fill
         with:
-          testId: "automation-email-input"
+          field: "alerts@partner.com"
           value: "vd-{uid}@example.com"
       - action: click
         with:
-          testId: "automation-email-add"
+          text: "Add email"
       - action: click
         with:
-          testId: "automation-setup-done"
+          text: /^\s*Done\s*$/
       - action: click
         with:
-          testId: "automation-save-automation"
+          text: /^\s*Create automation\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -625,17 +661,18 @@ flows:
           path: "/{slug}/automations/automations"
       - action: click
         with:
-          testId: "automation-row-actions-vd-edit-{uid}"
+          label: "Actions for vd-edit-{uid}"
       - action: click
         with:
-          testId: "automation-action-edit"
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
       - action: fill
         with:
-          testId: "automation-name-input"
+          field: "Flag failing traces"
           value: "vd-edited-{uid}"
       - action: click
         with:
-          testId: "automation-save-automation"
+          text: /^\s*Save changes\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -645,7 +682,7 @@ flows:
           path: "/{slug}/automations/automations"
       - action: expect
         with:
-          testId: "automation-row-actions-vd-edited-{uid}"
+          label: "Actions for vd-edited-{uid}"
 
   - id: automation-delete
     title: Delete an automation and see it leave the list
@@ -655,33 +692,33 @@ flows:
           path: "/{slug}/automations/automations"
       - action: click
         with:
-          testId: "automation-add-automations"
+          text: "New automation"
       - action: fill
         with:
-          testId: "automation-name-input"
+          field: "Flag failing traces"
           value: "vd-delete-{uid}"
       - action: click
         with:
-          testId: "automation-subject-code"
+          text: /^\s*Code\s*$/
       - action: click
         with:
-          testId: "automation-subject-example-status:error"
+          text: "status:error"
       - action: click
         with:
-          testId: "automation-delivery-send-email"
+          text: /^\s*Email/
       - action: fill
         with:
-          testId: "automation-email-input"
+          field: "alerts@partner.com"
           value: "vd-{uid}@example.com"
       - action: click
         with:
-          testId: "automation-email-add"
+          text: "Add email"
       - action: click
         with:
-          testId: "automation-setup-done"
+          text: /^\s*Done\s*$/
       - action: click
         with:
-          testId: "automation-save-automation"
+          text: /^\s*Create automation\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -691,13 +728,14 @@ flows:
           path: "/{slug}/automations/automations"
       - action: expect
         with:
-          testId: "automation-row-actions-vd-delete-{uid}"
+          label: "Actions for vd-delete-{uid}"
       - action: click
         with:
-          testId: "automation-row-actions-vd-delete-{uid}"
+          label: "Actions for vd-delete-{uid}"
       - action: click
         with:
-          testId: "automation-action-delete"
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
       - action: wait
         with:
           millis: "1500"
@@ -706,10 +744,10 @@ flows:
           path: "/{slug}/automations/automations"
       - action: expect
         with:
-          testId: "automation-add-automations"
+          text: "New automation"
       - action: expect
         with:
-          testId: "automation-row-actions-vd-delete-{uid}"
+          label: "Actions for vd-delete-{uid}"
           equals: "0"
 
   - id: dashboard-create
@@ -720,14 +758,15 @@ flows:
           path: "/{slug}/analytics/reports"
       - action: click
         with:
-          testId: "analytics-dashboard-add"
+          text: "Add Dashboard"
       - action: fill
         with:
-          testId: "analytics-dashboard-name-input"
+          field: "Dashboard name"
           value: "vd-dash-{uid}"
       - action: click
         with:
-          testId: "analytics-dashboard-create-confirm"
+          selector: button
+          hasText: /^\s*Create Dashboard\s*$/
       - action: expect
         with:
           api: "/api/dashboards"
@@ -737,7 +776,7 @@ flows:
           path: "/{slug}/analytics/reports"
       - action: expect
         with:
-          testId: "analytics-dashboard-menu-vd-dash-{uid}"
+          text: "vd-dash-{uid}"
 
   - id: dashboard-widget-add-edit-delete
     title: Add a chart to a dashboard, rename it, then delete it
@@ -747,20 +786,21 @@ flows:
           path: "/{slug}/analytics/reports"
       - action: click
         with:
-          testId: "analytics-dashboard-add"
+          text: "Add Dashboard"
       - action: fill
         with:
-          testId: "analytics-dashboard-name-input"
+          field: "Dashboard name"
           value: "vd-widgets-{uid}"
       - action: click
         with:
-          testId: "analytics-dashboard-create-confirm"
+          selector: button
+          hasText: /^\s*Create Dashboard\s*$/
       - action: expect
         with:
-          testId: "analytics-dashboard-menu-vd-widgets-{uid}"
+          text: "vd-widgets-{uid}"
       - action: click
         with:
-          testId: "analytics-add-chart"
+          text: "Add chart"
       - action: click
         with:
           label: "Rename New widget"
@@ -770,19 +810,20 @@ flows:
           value: "vd-widget-{uid}"
       - action: click
         with:
-          testId: "analytics-widget-tab-queries"
+          text: /^\s*Queries/
       - action: click
         with:
-          testId: "analytics-widget-save"
+          text: /^\s*Save\s*$/
       - action: expect
         with:
           text: "vd-widget-{uid}"
       - action: click
         with:
-          testId: "analytics-chart-menu"
+          selector: 'button:has(svg.lucide-ellipsis-vertical[width="24"])'
       - action: click
         with:
-          testId: "analytics-chart-edit"
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit( Graph)?\s*$/
       - action: click
         with:
           label: "Rename vd-widget-{uid}"
@@ -792,19 +833,20 @@ flows:
           value: "vd-widget-edited-{uid}"
       - action: click
         with:
-          testId: "analytics-widget-tab-queries"
+          text: /^\s*Queries/
       - action: click
         with:
-          testId: "analytics-widget-save"
+          text: /^\s*Save\s*$/
       - action: expect
         with:
           text: "vd-widget-edited-{uid}"
       - action: click
         with:
-          testId: "analytics-chart-menu"
+          selector: 'button:has(svg.lucide-ellipsis-vertical[width="24"])'
       - action: click
         with:
-          testId: "analytics-chart-delete"
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete Graph\s*$/
       - action: expect
         with:
           text: "vd-widget-edited-{uid}"
@@ -818,30 +860,32 @@ flows:
           path: "/{slug}/analytics/reports"
       - action: click
         with:
-          testId: "analytics-dashboard-add"
+          text: "Add Dashboard"
       - action: fill
         with:
-          testId: "analytics-dashboard-name-input"
+          field: "Dashboard name"
           value: "vd-rename-{uid}"
       - action: click
         with:
-          testId: "analytics-dashboard-create-confirm"
+          selector: button
+          hasText: /^\s*Create Dashboard\s*$/
       - action: expect
         with:
-          testId: "analytics-dashboard-menu-vd-rename-{uid}"
+          text: "vd-rename-{uid}"
       - action: click
         with:
-          testId: "analytics-dashboard-menu-vd-rename-{uid}"
+          selector: 'xpath=//a[normalize-space()="vd-rename-{uid}"]/following-sibling::button[contains(@class,"menu-btn")]'
       - action: click
         with:
-          testId: "analytics-dashboard-rename"
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Rename\s*$/
       - action: fill
         with:
-          testId: "analytics-dashboard-rename-input"
+          selector: "input:focus"
           value: "vd-renamed-{uid}"
       - action: type
         with:
-          testId: "analytics-dashboard-rename-input"
+          selector: "input:focus"
           text: ""
           submit: "true"
       - action: expect
@@ -850,17 +894,18 @@ flows:
           contains: "vd-renamed-{uid}"
       - action: expect
         with:
-          testId: "analytics-dashboard-menu-vd-renamed-{uid}"
+          text: "vd-renamed-{uid}"
       - action: click
         with:
-          testId: "analytics-dashboard-menu-vd-renamed-{uid}"
+          selector: 'xpath=//a[normalize-space()="vd-renamed-{uid}"]/following-sibling::button[contains(@class,"menu-btn")]'
       - action: click
         with:
-          testId: "analytics-dashboard-delete"
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
       - action: click
         with:
           text: "/^Delete$/"
       - action: expect
         with:
-          testId: "analytics-dashboard-menu-vd-renamed-{uid}"
+          text: "vd-renamed-{uid}"
           equals: "0"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { orderFlows, runPool, width } from "../schedule.ts";
+import { laneLimit, orderFlows, runPool, Throttle, width } from "../schedule.ts";
 
 const flow = (id: string, actions: string[]) => ({
   id,
@@ -48,6 +48,50 @@ describe("Feature: visualdiff catches regressions and reports its own coverage",
         await expect(run).rejects.toThrow("shell does not render");
         expect(started.length).toBeLessThan(6);
       });
+    });
+  });
+
+  describe("given a machine whose load or crashed renderers leave room for fewer pages", () => {
+    /** @scenario A side works on fewer pages while the machine is loaded or a renderer crashed */
+    it("keeps every page under the CPUs' load, scales down above it and drops one per crash", () => {
+      expect(laneLimit({ max: 4, cpus: 10, load: 8, crashes: 0 })).toBe(4);
+      expect(laneLimit({ max: 4, cpus: 10, load: 20, crashes: 0 })).toBe(2);
+      expect(laneLimit({ max: 4, cpus: 10, load: 130, crashes: 0 })).toBe(1);
+      expect(laneLimit({ max: 4, cpus: 10, load: 2, crashes: 1 })).toBe(3);
+      expect(laneLimit({ max: 4, cpus: 10, load: 2, crashes: 9 })).toBe(1);
+      expect(laneLimit({ max: 4, cpus: 0, load: 50, crashes: 0 })).toBe(4);
+    });
+
+    /** @scenario A side works on fewer pages while the machine is loaded or a renderer crashed */
+    it("backs a side off by one page for each crash it hears", () => {
+      const throttle = new Throttle("candidate", 4, () => ({ cpus: 10, load: 1 }));
+      expect(throttle.limit()).toBe(4);
+      throttle.crashed();
+      throttle.crashed();
+      expect(throttle.limit()).toBe(2);
+    });
+
+    /** @scenario A side works on fewer pages while the machine is loaded or a renderer crashed */
+    it("parks the lanes over the limit and still takes every item once", async () => {
+      let running = 0;
+      let peak = 0;
+      const done: number[] = [];
+      await runPool({
+        items: Array.from({ length: 8 }, (_, index) => index),
+        width: 4,
+        limit: () => 2,
+        pauseMillis: 1,
+        work: async ({ item }) => {
+          running += 1;
+          peak = Math.max(peak, running);
+          await new Promise((resolve) => setTimeout(resolve, 3));
+          done.push(item);
+          running -= 1;
+        },
+      });
+
+      expect(peak).toBe(2);
+      expect(done.toSorted((a, b) => a - b)).toEqual(Array.from({ length: 8 }, (_, i) => i));
     });
   });
 

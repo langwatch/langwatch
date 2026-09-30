@@ -67,6 +67,8 @@ export interface Plan {
   credential: Credential;
   /** failFast aborts once the candidate's first routes show its shell does not render. */
   failFast?: boolean;
+  /** fast launches the lean Chromium: quicker, but its pixels are not the full browser's. */
+  fast?: boolean;
   /** frozenTime is the Date.now() every page sees, so relative times render alike on both sides. */
   frozenTime?: number;
   /** fixtures fill a route's {name} placeholders with seeded ids. */

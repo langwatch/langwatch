@@ -1,6 +1,6 @@
 # Prompts beyond create, version, deploy and delete in prompts-automations.yaml: duplicate
 # and rename the handle, each read back from the API and the list after a reload. Prompt
-# variable mappings live in the experiment workbench and are not scripted yet.
+# variable values are the Variables tab, then restore, run and compare (shared selectors).
 # Unrun: written under load.
 flows:
   - id: prompt-duplicate
@@ -11,7 +11,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: prompt-new-button
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -19,13 +19,16 @@ flows:
       - action: click
         with:
           testId: save-prompt-button
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: prompt-handle-input
+          field: prompt-name
           value: vd-pdup-{uid}
       - action: click
         with:
-          testId: prompt-handle-submit
+          text: /^Save$/
       - action: expect
         with:
           api: /api/prompts
@@ -35,17 +38,16 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: prompt-actions-menu-vd-pdup-{uid}
+          selector: xpath=//p[normalize-space()="vd-pdup-{uid}"]/following-sibling::*[1]//button
       - action: click
         with:
-          testId: prompt-actions-duplicate
+          text: Duplicate prompt
       - action: go
         with:
           path: "/{slug}/prompts"
       - action: expect
         with:
-          testIdPrefix: prompt-row-
-          hasText: vd-pdup-{uid}
+          count: xpath=//p[contains(normalize-space(),"vd-pdup-{uid}")]
           min: "2"
           timeout: "20000"
 
@@ -57,7 +59,7 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: prompt-new-button
+          text: New Prompt
       - action: fill
         with:
           field: "Enter your prompt..."
@@ -65,13 +67,16 @@ flows:
       - action: click
         with:
           testId: save-prompt-button
+      - action: expect
+        with:
+          text: Prompt Identifier
       - action: fill
         with:
-          testId: prompt-handle-input
+          field: prompt-name
           value: vd-pren-{uid}
       - action: click
         with:
-          testId: prompt-handle-submit
+          text: /^Save$/
       - action: expect
         with:
           api: /api/prompts
@@ -81,17 +86,17 @@ flows:
           path: "/{slug}/prompts"
       - action: click
         with:
-          testId: prompt-actions-menu-vd-pren-{uid}
+          selector: xpath=//p[normalize-space()="vd-pren-{uid}"]/following-sibling::*[1]//button
       - action: click
         with:
-          testId: prompt-actions-rename-handle
+          text: Rename handle
       - action: fill
         with:
-          testId: prompt-handle-input
+          field: prompt-name
           value: vd-pren-{uid}-renamed
       - action: click
         with:
-          testId: prompt-handle-submit
+          text: /^Save$/
       - action: expect
         with:
           api: /api/prompts/vd-pren-{uid}-renamed
@@ -101,8 +106,272 @@ flows:
           path: "/{slug}/prompts"
       - action: expect
         with:
-          testId: prompt-row-vd-pren-{uid}-renamed
+          text: /^vd-pren-{uid}-renamed$/
       - action: expect
         with:
-          testId: prompt-row-vd-pren-{uid}
+          text: /^vd-pren-{uid}$/
           equals: "0"
+  - id: prompt-restore-version
+    title: Restore version one from the history and save it as version three
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "restore-one {uid}"
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prst-{uid}
+      - action: click
+        with:
+          text: "/^Save$/"
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-prst-{uid}
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "restore-two {uid}"
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: "Enter a description for this version"
+          value: "second {uid}"
+      - action: click
+        with:
+          text: "/^Update to v/"
+      - action: expect
+        with:
+          api: /api/prompts/vd-prst-{uid}/versions
+          min: "2"
+      - action: click
+        with:
+          testId: version-history-button
+      - action: click
+        with:
+          testId: restore-version-button-1
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: "Enter a description for this version"
+          value: "restored {uid}"
+      - action: click
+        with:
+          text: "/^Update to v/"
+      - action: expect
+        with:
+          api: /api/prompts/vd-prst-{uid}
+          field: version
+          equals: "3"
+      - action: expect
+        with:
+          api: /api/prompts/vd-prst-{uid}
+          contains: restore-one {uid}
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: expect
+        with:
+          api: /api/prompts/vd-prst-{uid}/versions
+          min: "3"
+
+  - id: prompt-variable-add-and-value
+    title: Add a variable, give it a value and find it on the saved prompt after a reload
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Echo the topic."
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-pvar-{uid}
+      - action: click
+        with:
+          text: "/^Save$/"
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-pvar-{uid}
+      - action: click
+        with:
+          text: "/^Variables$/"
+      - action: click
+        with:
+          testId: add-variable-button
+      - action: click
+        with:
+          text: "/^Text$/"
+      - action: fill
+        with:
+          testId: variable-name-input-input_1
+          value: topic
+      - action: click
+        with:
+          text: "/^Variables$/"
+      - action: fill
+        with:
+          testId: variable-value-input-topic
+          value: "value-{uid}"
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Echo the topic: {{topic}}"
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: "Enter a description for this version"
+          value: "add topic variable {uid}"
+      - action: click
+        with:
+          text: "/^Update to v/"
+      - action: expect
+        with:
+          api: /api/prompts/vd-pvar-{uid}
+          field: inputs
+          contains: topic
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: vd-pvar-{uid}
+          optional: "true"
+      - action: click
+        with:
+          text: "/^Variables$/"
+      - action: expect
+        with:
+          testId: variable-value-input-topic
+
+  - id: prompt-playground-run-outcome
+    title: Send a playground message and see the reply, or the model provider error when the stack has no model
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Repeat the input back exactly and nothing else: {{input}}"
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prun-{uid}
+      - action: click
+        with:
+          text: "/^Save$/"
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-prun-{uid}
+      - action: type
+        with:
+          placeholder: "Type your message here"
+          text: "hello-{uid}"
+          submit: "true"
+      - action: expect
+        with:
+          text: hello-{uid}
+      - action: expect
+        with:
+          count: '.copilotKitAssistantMessage, [role="alert"]'
+          timeout: "60000"
+
+  - id: prompt-compare-split
+    title: Split two prompts side by side with Compare and keep the split after a reload
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Compare source {uid}"
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-pcmp-{uid}
+      - action: click
+        with:
+          text: "/^Save$/"
+      - action: expect
+        with:
+          api: /api/prompts
+          contains: vd-pcmp-{uid}
+      - action: click
+        with:
+          text: New Prompt
+      - action: click
+        with:
+          text: Compare
+      - action: expect
+        with:
+          count: 'textarea[placeholder^="Type your message here"]'
+          min: "2"
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: expect
+        with:
+          count: 'textarea[placeholder^="Type your message here"]'
+          min: "2"
+          timeout: "20000"

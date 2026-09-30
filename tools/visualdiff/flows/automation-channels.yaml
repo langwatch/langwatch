@@ -11,30 +11,30 @@ flows:
           path: /{slug}/automations/automations
       - action: click
         with:
-          testId: automation-add-automations
+          text: New automation
       - action: fill
         with:
-          testId: automation-name-input
-          value: vd-hook-{uid}
+          field: Flag failing traces
+          value: 'vd-hook-{uid}'
       - action: click
         with:
-          testId: automation-subject-code
+          text: /^\s*Code\s*$/
       - action: click
         with:
-          testId: automation-subject-example-status:error
+          text: 'status:error'
       - action: click
         with:
-          testId: automation-delivery-send-webhook
+          text: /^\s*Webhook/
       - action: fill
         with:
-          testId: automation-webhook-url-input
-          value: https://example.com/hooks/vd-{uid}
+          field: 'https://example.com/hooks/langwatch'
+          value: 'https://example.com/hooks/vd-{uid}'
       - action: click
         with:
-          testId: automation-setup-done
+          text: /^\s*Done\s*$/
       - action: click
         with:
-          testId: automation-save-automation
+          text: /^\s*Create automation\s*$/
       - action: expect
         with:
           api: /api/triggers
@@ -48,7 +48,7 @@ flows:
           path: /{slug}/automations/automations
       - action: expect
         with:
-          testId: automation-row-actions-vd-hook-{uid}
+          label: 'Actions for vd-hook-{uid}'
 
   - id: automation-condition-preview-and-save
     title: Build a condition from the query chips, see the trace preview and keep it after saving
@@ -58,37 +58,37 @@ flows:
           path: /{slug}/automations/automations
       - action: click
         with:
-          testId: automation-add-automations
+          text: New automation
       - action: fill
         with:
-          testId: automation-name-input
-          value: vd-cond-{uid}
+          field: Flag failing traces
+          value: 'vd-cond-{uid}'
       - action: click
         with:
-          testId: automation-subject-code
+          text: /^\s*Code\s*$/
       - action: click
         with:
-          testId: automation-subject-example-model:gpt*
+          text: 'model:gpt*'
       - action: expect
         with:
           text: /matched/
           timeout: "20000"
       - action: click
         with:
-          testId: automation-delivery-send-email
+          text: /^\s*Email/
       - action: fill
         with:
-          testId: automation-email-input
-          value: vd-{uid}@example.com
+          field: 'alerts@partner.com'
+          value: 'vd-{uid}@example.com'
       - action: click
         with:
-          testId: automation-email-add
+          text: Add email
       - action: click
         with:
-          testId: automation-setup-done
+          text: /^\s*Done\s*$/
       - action: click
         with:
-          testId: automation-save-automation
+          text: /^\s*Create automation\s*$/
       - action: expect
         with:
           api: /api/triggers
@@ -102,4 +102,4 @@ flows:
           path: /{slug}/automations/automations
       - action: expect
         with:
-          testId: automation-row-actions-vd-cond-{uid}
+          label: 'Actions for vd-cond-{uid}'

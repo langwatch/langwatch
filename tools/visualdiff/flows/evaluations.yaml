@@ -19,13 +19,13 @@ flows:
           path: /{slug}/online-evaluations
       - action: click
         with:
-          testId: monitor-new-open
+          text: New Online Evaluation
       - action: click
         with:
-          testId: online-evaluation-level-trace
+          text: Trace Level
       - action: click
         with:
-          testId: evaluator-selection-box-open
+          text: Select Evaluator
       - action: click
         with:
           testId: new-evaluator-button
@@ -44,11 +44,11 @@ flows:
           testId: save-evaluator-button
       - action: fill
         with:
-          testId: online-evaluation-name-input
+          field: Enter evaluation name
           value: vd-mon-{uid}
       - action: click
         with:
-          testId: online-evaluation-save
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
       - action: expect
         with:
           api: /api/monitors
@@ -70,13 +70,13 @@ flows:
           path: /{slug}/online-evaluations
       - action: click
         with:
-          testId: monitor-new-open
+          text: New Online Evaluation
       - action: click
         with:
-          testId: online-evaluation-level-trace
+          text: Trace Level
       - action: click
         with:
-          testId: evaluator-selection-box-open
+          text: Select Evaluator
       - action: click
         with:
           testId: new-evaluator-button
@@ -95,11 +95,11 @@ flows:
           testId: save-evaluator-button
       - action: fill
         with:
-          testId: online-evaluation-name-input
+          field: Enter evaluation name
           value: vd-mon-{uid}
       - action: click
         with:
-          testId: online-evaluation-save
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
       - action: expect
         with:
           text: Active
@@ -110,7 +110,8 @@ flows:
           label: Actions for vd-mon-{uid}
       - action: click
         with:
-          testId: monitor-action-toggle
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Enable|Disable)\s*$/
       - action: expect
         with:
           text: Paused
@@ -129,14 +130,15 @@ flows:
           label: Actions for vd-mon-{uid}
       - action: click
         with:
-          testId: monitor-action-edit
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
       - action: fill
         with:
-          testId: online-evaluation-name-input
+          field: Enter evaluation name
           value: vd-mon-{uid}-renamed
       - action: click
         with:
-          testId: online-evaluation-save
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
       - action: expect
         with:
           text: vd-mon-{uid}-renamed
@@ -147,7 +149,8 @@ flows:
           label: Actions for vd-mon-{uid}-renamed
       - action: click
         with:
-          testId: monitor-action-delete
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
       - action: click
         with:
           text: /^Delete$/
@@ -171,19 +174,19 @@ flows:
           path: /{slug}/experiments
       - action: click
         with:
-          testId: experiment-new-open
+          text: New Experiment
       - action: click
         with:
-          testId: experiment-new-create
+          text: Create Experiment
       - action: expect
         with:
           text: Datasets
       - action: click
         with:
-          testId: experiment-name-edit
+          selector: .edit-icon
       - action: fill
         with:
-          testId: experiment-name-input
+          selector: input:focus
           value: vd-exp-{uid}
       - action: click
         with:
@@ -210,7 +213,7 @@ flows:
           path: /{slug}/evaluators
       - action: click
         with:
-          testId: evaluator-new-open
+          text: New Evaluator
       - action: click
         with:
           testId: evaluator-category-code
@@ -247,7 +250,7 @@ flows:
           path: /{slug}/evaluators
       - action: click
         with:
-          testId: evaluator-new-open
+          text: New Evaluator
       - action: click
         with:
           testId: evaluator-category-llm_judge
@@ -283,21 +286,21 @@ flows:
           testId: upload-or-create-dataset
       - action: click
         with:
-          testId: dataset-menu-create
+          text: Create empty dataset
       - action: fill
         with:
-          testId: dataset-name-input
+          selector: input[name="name"]
           value: vd-ds-{uid}
       - action: click
         with:
-          testId: dataset-column-add
+          text: Add Column
       - action: fill
         with:
-          testId: dataset-column-name-7
+          selector: input[name="columnTypes.7.name"]
           value: vd_extra
       - action: click
         with:
-          testId: dataset-form-submit
+          text: Create Dataset
       - action: expect
         with:
           api: /api/dataset
@@ -307,8 +310,8 @@ flows:
           path: /{slug}/datasets
       - action: click
         with:
-          testIdPrefix: dataset-row-
-          hasText: vd-ds-{uid}
+          selector: tr
+          text: vd-ds-{uid}
       - action: expect
         with:
           testId: dataset-title
@@ -324,8 +327,8 @@ flows:
           path: /{slug}/datasets
       - action: click
         with:
-          testIdPrefix: dataset-row-
-          hasText: vd-ds-{uid}
+          selector: tr
+          text: vd-ds-{uid}
       - action: expect
         with:
           testId: dataset-row-count
@@ -342,24 +345,23 @@ flows:
           testId: upload-or-create-dataset
       - action: click
         with:
-          testId: dataset-menu-upload
+          text: Upload datasets
       - action: upload
         with:
-          testId: dataset-bulk-upload-file
           fixture: sample.csv
       - action: expect
         with:
           testId: bulk-summary
       - action: click
         with:
-          testId: dataset-bulk-name-edit
+          selector: button[title="Rename dataset"]
       - action: fill
         with:
-          testId: dataset-bulk-name-input
+          label: Dataset name
           value: vd-csv-{uid}
       - action: click
         with:
-          testId: dataset-bulk-upload-submit
+          text: /^\s*Upload all\s*$/
       - action: expect
         with:
           api: /api/dataset
@@ -369,8 +371,8 @@ flows:
           path: /{slug}/datasets
       - action: expect
         with:
-          testIdPrefix: dataset-row-
-          hasText: vd-csv-{uid}
+          count: tr:has-text("vd-csv-{uid}")
+          min: "1"
 
   - id: eval-dataset-use-in-experiment
     title: Create a dataset, then select it in a new experiment's workbench
@@ -383,14 +385,14 @@ flows:
           testId: upload-or-create-dataset
       - action: click
         with:
-          testId: dataset-menu-create
+          text: Create empty dataset
       - action: fill
         with:
-          testId: dataset-name-input
+          selector: input[name="name"]
           value: vd-ds-{uid}
       - action: click
         with:
-          testId: dataset-form-submit
+          text: Create Dataset
       - action: expect
         with:
           api: /api/dataset
@@ -400,16 +402,16 @@ flows:
           path: /{slug}/experiments
       - action: click
         with:
-          testId: experiment-new-open
+          text: New Experiment
       - action: click
         with:
-          testId: experiment-new-create
+          text: Create Experiment
       - action: click
         with:
-          testId: experiment-dataset-add
+          selector: button:text-is("Add")
       - action: click
         with:
-          testId: experiment-dataset-add-select
+          text: Select existing dataset
       - action: fill
         with:
           testId: dataset-picker-search
@@ -430,24 +432,24 @@ flows:
           path: /{slug}/workflows
       - action: click
         with:
-          testId: workflow-new-open
+          text: New Workflow
       - action: click
         with:
           testId: new-workflow-card-blank
       - action: fill
         with:
-          testId: workflow-create-name
+          label: Name and Icon
           value: vd-wf-{uid}
       - action: click
         with:
-          testId: workflow-create-submit
+          text: /^create workflow$/i
       - action: expect
         with:
-          testId: workflow-node-entry
+          count: .react-flow__node[data-id="entry"]
           timeout: "30000"
       - action: expect
         with:
-          testId: workflow-node-end
+          count: .react-flow__node[data-id="end"]
       - action: expect
         with:
           api: /api/workflows
@@ -467,30 +469,129 @@ flows:
           path: /{slug}/workflows
       - action: click
         with:
-          testId: workflow-new-open
+          text: New Workflow
       - action: click
         with:
           testId: new-workflow-card-blank
       - action: fill
         with:
-          testId: workflow-create-name
+          label: Name and Icon
           value: vd-wfp-{uid}
       - action: click
         with:
-          testId: workflow-create-submit
+          text: /^create workflow$/i
       - action: expect
         with:
-          testId: workflow-node-entry
+          count: .react-flow__node[data-id="entry"]
           timeout: "30000"
       - action: click
         with:
-          testId: workflow-publish-open
+          text: /^\s*Publish\s*$/
       - action: click
         with:
-          testId: workflow-publish-item
+          text: /^\s*Publish workflow\s*$/i
       - action: click
         with:
-          testId: workflow-publish-submit
+          text: /^\s*Publish( Version \d+)?\s*$/
       - action: expect
         with:
           text: New version published
+
+  # Same journey as eval-online-toggle-edit-delete, for main: the monitor is posted through the
+  # API and every click uses handles both trees draw (Actions for <name>, menu words, the
+  # drawer's name placeholder and its Save Changes button).
+  - id: eval-online-disable-edit-delete-shared
+    title: Disable an online evaluation, rename it, delete it, each read back from the API
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-mon-{uid}
+          checkType: langevals/exact_match
+          evaluatorId: "{evaluatorId}"
+          parameters: {}
+        as:
+          monitorId: id
+          monitorName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: Active
+          role: row
+          name: "{monitorName}"
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Disable\s*$/
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: enabled
+          equals: "false"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: Paused
+          role: row
+          name: "{monitorName}"
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          field: Enter evaluation name
+          value: "{monitorName}-renamed"
+      - action: click
+        with:
+          text: Save Changes
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: name
+          equals: "{monitorName}-renamed"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          count: 'tr:has-text("{monitorName}-renamed")'
+          min: "1"
+      - action: click
+        with:
+          label: Actions for {monitorName}-renamed
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          status: "404"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          count: 'tr:has-text("{monitorName}-renamed")'
+          equals: "0"

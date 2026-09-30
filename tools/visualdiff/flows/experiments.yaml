@@ -1,0 +1,243 @@
+# Experiments: the list, a workbench, a run's results and two runs compared. Selectors are ones main and the
+# branch share (run-item-<id>, compare-button, run-checkbox-<id>, exit-compare-button, toggle-charts-button,
+# dataset-tab-<id>, row text). Runs are posted as an SDK would (experiment/init then batch/log_results),
+# so no flow calls a model; a run started from the workbench needs a model key and is not scripted here.
+# Results land through the event pipeline, so the first read of them waits up to 30 seconds. Unrun.
+flows:
+  - id: experiment-workbench-open-and-list
+    title: Open a new experiment's workbench and find it in the list
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-expwb-{uid}
+        as:
+          expSlug: slug
+          expName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          min: "1"
+      - action: expect
+        with:
+          text: "{expName}"
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: expect
+        with:
+          text: "{expName}"
+          role: row
+          name: "{expName}"
+      - action: expect
+        with:
+          api: /api/experiments/{expSlug}
+          contains: "{expName}"
+
+  - id: experiment-results-open
+    title: Open a batch run's results from the experiment list and read its rows
+    setup:
+      - post: /api/experiment/init
+        body:
+          experiment_slug: vd-expres-{uid}
+          experiment_name: vd-expres-{uid}
+          experiment_type: BATCH_EVALUATION_V2
+        as:
+          expSlug: slug
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-run-a
+          progress: 2
+          total: 2
+          dataset:
+            - index: 0
+              entry:
+                question: vd question alpha
+              predicted:
+                answer: vd answer alpha
+              cost: 0.001
+              duration: 120
+            - index: 1
+              entry:
+                question: vd question beta
+              predicted:
+                answer: vd answer beta
+              cost: 0.002
+              duration: 140
+          evaluations:
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 0
+              score: 1
+              passed: true
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 1
+              score: 0
+              passed: false
+          timestamps:
+            created_at: 1790726400000
+            finished_at: 1790726405000
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: expect
+        with:
+          text: "{expSlug}"
+          role: row
+          name: "{expSlug}"
+      - action: click
+        with:
+          text: "{expSlug}"
+      - action: expect
+        with:
+          url: /experiments/{expSlug}
+      - action: expect
+        with:
+          testId: run-item-vd-run-a
+          timeout: "30000"
+      - action: expect
+        with:
+          text: vd question alpha
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd question beta
+      - action: go
+        with:
+          path: /{slug}/experiments/{expSlug}
+      - action: expect
+        with:
+          text: vd question beta
+          timeout: "20000"
+
+  - id: experiment-runs-compare
+    title: Post two runs of one experiment, compare them and leave comparison
+    setup:
+      - post: /api/experiment/init
+        body:
+          experiment_slug: vd-expcmp-{uid}
+          experiment_name: vd-expcmp-{uid}
+          experiment_type: BATCH_EVALUATION_V2
+        as:
+          expSlug: slug
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-run-a
+          progress: 2
+          total: 2
+          dataset:
+            - index: 0
+              entry:
+                question: vd question alpha
+              predicted:
+                answer: vd answer alpha
+              cost: 0.001
+              duration: 120
+            - index: 1
+              entry:
+                question: vd question beta
+              predicted:
+                answer: vd answer beta
+              cost: 0.002
+              duration: 140
+          evaluations:
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 0
+              score: 1
+              passed: true
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 1
+              score: 0
+              passed: false
+          timestamps:
+            created_at: 1790726400000
+            finished_at: 1790726405000
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-run-b
+          progress: 2
+          total: 2
+          dataset:
+            - index: 0
+              entry:
+                question: vd question alpha
+              predicted:
+                answer: vd answer alpha two
+              cost: 0.001
+              duration: 90
+            - index: 1
+              entry:
+                question: vd question beta
+              predicted:
+                answer: vd answer beta two
+              cost: 0.002
+              duration: 100
+          evaluations:
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 0
+              score: 1
+              passed: true
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 1
+              score: 1
+              passed: true
+          timestamps:
+            created_at: 1790726460000
+            finished_at: 1790726465000
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/{expSlug}
+      - action: expect
+        with:
+          testId: run-item-vd-run-a
+          timeout: "30000"
+      - action: expect
+        with:
+          testId: run-item-vd-run-b
+          timeout: "30000"
+      - action: click
+        with:
+          testId: compare-button
+      - action: expect
+        with:
+          testId: exit-compare-button
+      - action: click
+        with:
+          testId: run-checkbox-vd-run-a
+      - action: expect
+        with:
+          testIdPrefix: run-checkbox-
+          min: "2"
+      - action: expect
+        with:
+          testId: toggle-charts-button
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd question alpha
+          timeout: "20000"
+      - action: click
+        with:
+          testId: exit-compare-button
+      - action: expect
+        with:
+          testId: compare-button

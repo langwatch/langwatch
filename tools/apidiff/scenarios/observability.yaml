@@ -1641,6 +1641,34 @@
   request: {"path": "/api/trace/vdt{uid}"}
   expect: {"status": 404}
 
+- id: thread-legacy-get-happy
+  endpoint: GET /api/thread/{id}
+  setup:
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
+  request: {"path": "/api/thread/vd-thread-{uid}"}
+  expect: {"status": 200, "contains": "vd answer {uid}"}
+
+- id: thread-legacy-get-unknown-is-empty
+  endpoint: GET /api/thread/{id}
+  request: {"path": "/api/thread/vdmissing{uid}"}
+  expect: {"status": 200, "body": {"traces": []}}
+
+- id: thread-legacy-get-refuses-no-key
+  endpoint: GET /api/thread/{id}
+  auth: none
+  request: {"path": "/api/thread/vd-thread-{uid}"}
+  expect: {"status": 401}
+
+- id: thread-legacy-get-other-project-is-empty
+  endpoint: GET /api/thread/{id}
+  auth: project-b
+  setup:
+    - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200}}
+  request: {"path": "/api/thread/vd-thread-{uid}"}
+  expect: {"status": 200, "body": {"traces": []}}
+
 - id: traces-transcript-happy
   endpoint: GET /api/traces/{traceId}/transcript
   setup:
@@ -2321,3 +2349,27 @@
   endpoint: POST /api/dashboards
   request: {"path": "/api/dashboards", "body": {"name": "😀\u0000\ufffd\u202e中文"}}
   expect: {"status": [422, 500]}
+
+# ---- cov-ui-tracing: the CSV header row, and the legacy track_event alias ----
+- id: export-traces-csv-starts-with-header-row
+  endpoint: POST /api/export/traces/download
+  auth: session
+  setup:
+    - {"request": "POST /api/collector", "auth": "project", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "GET /api/traces/vdt{uid}", "auth": "project", "eventually": "60s", "expect": {"status": 200}}
+  request: {"path": "/api/export/traces/download", "body": {"projectId": "{projectId}", "mode": "summary", "format": "csv", "startDate": 1700000000000, "endDate": 4102444800000}}
+  expect: {"status": 200, "contains": "trace_id,timestamp,input,output,labels"}
+- id: track-event-legacy-path-records-event
+  endpoint: POST /api/track_event
+  setup:
+    - {"request": "POST /api/collector", "auth": "project", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
+    - {"request": "GET /api/traces/vdt{uid}", "auth": "project", "eventually": "60s", "expect": {"status": 200}}
+  request: {"path": "/api/track_event", "body": {"trace_id": "vdt{uid}", "event_type": "add_to_cart-{uid}", "metrics": {"amount": 3}}}
+  expect: {"status": 200, "body": {"message": "Event tracked"}}
+  verify:
+    - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200, "contains": "add_to_cart-{uid}"}}
+- id: track-event-legacy-path-refuses-no-key
+  endpoint: POST /api/track_event
+  auth: none
+  request: {"path": "/api/track_event", "body": {"trace_id": "vdt{uid}", "event_type": "add_to_cart-{uid}"}}
+  expect: {"status": 401}

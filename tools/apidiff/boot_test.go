@@ -100,6 +100,7 @@ func TestInstanceEnv(t *testing.T) {
 		chDatabase:   "http://default:langwatch@127.0.0.1:58123/apidiff_branch",
 		redisURL:     "redis://127.0.0.1:56379",
 		redisDBIndex: "14",
+		publicKey:    "test-public-key",
 	})
 	joined := strings.Join(env, "\n")
 
@@ -119,6 +120,7 @@ func TestInstanceEnv(t *testing.T) {
 		"CREDENTIALS_SECRET=" + throwawayCredentialsSecret,
 		"NEXTAUTH_SECRET=" + throwawayNextAuthSecret,
 		"BASE_HOST=http://localhost:6560",
+		"LANGWATCH_LICENSE_PUBLIC_KEY=test-public-key",
 	} {
 		found := false
 		for _, entry := range env {

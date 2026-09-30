@@ -1,0 +1,626 @@
+# Organisation, teams, access and SCIM flows (lane cov-flows-org-access). Each flow creates its
+# own data under {uid} and reads the save back after a reload or through the organisation API
+# ({orgKey}). Members come from a real invite: `mail` fetches the link, `acceptInvite` signs the
+# invitee up in a cookieless page and joins. The roles, SCIM and governance flows are enterprise
+# edition; the free pass shows their upsell on both sides. Steps use text, aria-label, placeholder
+# and row handles both trees draw; the branch-only steps carry a `# branch-only:` comment.
+flows:
+  - id: org-settings-rename-reads-back
+    title: Rename the organisation, save and read the new name back from the API
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings
+      - action: expect
+        with:
+          text: Organization Settings
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: VD Org {uid}
+      - action: click
+        with:
+          text: /^\s*(Update|Save)\s*$/
+      - action: expect
+        with:
+          api: /api/organization
+          auth: "{orgKey}"
+          field: name
+          equals: VD Org {uid}
+      - action: go
+        with:
+          path: /settings
+      - action: expect
+        with:
+          api: /api/organization
+          auth: "{orgKey}"
+          field: name
+          equals: VD Org {uid}
+
+  # branch-only: the role select, its option and Save (members-role-*, members-detail-save); main changes a role in the person drawer with different controls.
+  - id: members-change-role-and-remove
+    title: Invite a member who joins, make them a Lite Member, then remove them
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-mem-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-mem-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-mem-{uid}@mail.langwatch.localhost
+          name: vd-member-{uid}
+      - action: expect
+        with:
+          api: /api/organization/members
+          auth: "{orgKey}"
+          contains: vd-mem-{uid}@mail.langwatch.localhost
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-member-{uid}
+      - action: click
+        with:
+          label: Actions for vd-member-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Edit|Open)\s*$/
+      - action: click
+        with:
+          testId: members-role-select
+      - action: click
+        with:
+          testId: members-role-option-EXTERNAL
+      - action: click
+        with:
+          testId: members-detail-save
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: Lite Member
+      - action: click
+        with:
+          label: Actions for vd-member-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-member-{uid}
+          equals: "0"
+
+  - id: team-rename-reads-back
+    title: Create a team, rename it from its settings page and see the new name after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: New team
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: 'vd-team-{uid}'
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: expect
+        with:
+          text: vd-team-{uid}
+      - action: click
+        with:
+          selector: 'xpath=//*[normalize-space(text())="vd-team-{uid}"]/following-sibling::a[contains(@href,"/settings/teams/")]'
+      - action: expect
+        with:
+          url: /settings/teams/
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: vd-team-renamed-{uid}
+      - action: expect
+        with:
+          api: /api/teams
+          auth: "{orgKey}"
+          contains: vd-team-renamed-{uid}
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: expect
+        with:
+          text: vd-team-renamed-{uid}
+      - action: expect
+        with:
+          text: vd-team-{uid}
+          equals: "0"
+
+  - id: team-add-member-reads-back
+    title: Add a member who joined by invite to a team and see them on the team after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-tm-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-tm-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-tm-{uid}@mail.langwatch.localhost
+          name: vd-member-{uid}
+      - action: expect
+        with:
+          api: /api/organization/members
+          auth: "{orgKey}"
+          contains: vd-tm-{uid}@mail.langwatch.localhost
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: New team
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: 'vd-team-{uid}'
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: expect
+        with:
+          text: vd-team-{uid}
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: vd-team-{uid}
+      - action: click
+        with:
+          text: /Add to team/
+      - action: select
+        with:
+          field: Person
+          option: vd-member-{uid}
+      - action: click
+        with:
+          text: /^\s*Add member\s*$/
+      - action: expect
+        with:
+          text: vd-member-{uid}
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: vd-team-{uid}
+      - action: expect
+        with:
+          text: vd-member-{uid}
+
+  - id: team-archive
+    title: Archive a team from its danger zone and see it gone from the list
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: New team
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: 'vd-team-{uid}'
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: expect
+        with:
+          text: vd-team-{uid}
+      - action: click
+        with:
+          selector: 'xpath=//*[normalize-space(text())="vd-team-{uid}"]/following-sibling::a[contains(@href,"/settings/teams/")]'
+      - action: expect
+        with:
+          url: /settings/teams/
+      - action: click
+        with:
+          text: /^\s*Archive team\s*$/
+      - action: click
+        with:
+          text: /^\s*Archive\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: expect
+        with:
+          text: vd-team-{uid}
+          equals: "0"
+
+  - id: project-create-in-team-rename-archive
+    title: Create a project in a team, rename it, then archive it from the team page
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: New team
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: 'vd-team-{uid}'
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: expect
+        with:
+          text: vd-team-{uid}
+      - action: click
+        with:
+          text: Add project
+      - action: fill
+        with:
+          field: AI Project
+          value: 'vd-proj-{uid}'
+      - action: select
+        with:
+          field: Team
+          option: vd-team-{uid}
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: vd-team-{uid}
+      - action: expect
+        with:
+          text: vd-proj-{uid}
+      - action: click
+        with:
+          selector: 'xpath=//p[contains(normalize-space(), "vd-proj-{uid}")]/following-sibling::button[normalize-space()="Edit"]'
+      - action: fill
+        with:
+          field: AI Project
+          value: vd-proj-renamed-{uid}
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: vd-team-{uid}
+      - action: expect
+        with:
+          text: vd-proj-renamed-{uid}
+      - action: click
+        with:
+          selector: 'xpath=//*[normalize-space(text())="vd-team-{uid}"]/following-sibling::a[contains(@href,"/settings/teams/")]'
+      - action: expect
+        with:
+          url: /settings/teams/
+      - action: click
+        with:
+          selector: 'tr:has(a:text-is("vd-proj-renamed-{uid}")) button'
+      - action: click
+        with:
+          text: /^\s*Archive\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: vd-team-{uid}
+      - action: expect
+        with:
+          text: vd-proj-renamed-{uid}
+          equals: "0"
+
+  # branch-only: the permission step (authz-permission-*); main's role dialog composes permissions with different controls.
+  - id: role-create-with-permission-and-delete
+    title: Create a custom role with a permission, see it in the API, delete it and see it gone
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/roles
+      - action: click
+        with:
+          text: New role
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: 'vd-role-{uid}'
+      - action: click
+        with:
+          testIdPrefix: authz-permission-
+      - action: click
+        with:
+          text: /^\s*Create role\s*$/i
+      - action: go
+        with:
+          path: /settings/roles
+      - action: expect
+        with:
+          text: vd-role-{uid}
+      - action: expect
+        with:
+          api: /api/roles
+          auth: "{orgKey}"
+          contains: vd-role-{uid}
+      - action: click
+        with:
+          selector: 'button[aria-label="Delete this role"], button[aria-label="Delete vd-role-{uid}"]'
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: go
+        with:
+          path: /settings/roles
+      - action: expect
+        with:
+          text: vd-role-{uid}
+          equals: "0"
+
+  # branch-only: the permission step (authz-permission-*); main's role dialog composes permissions with different controls.
+  - id: role-assign-custom-role-to-member
+    title: Give a member a custom role on a team and see the assignment listed on the Roles page
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/roles
+      - action: click
+        with:
+          text: New role
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: 'vd-role-{uid}'
+      - action: click
+        with:
+          testIdPrefix: authz-permission-
+      - action: click
+        with:
+          text: /^\s*Create role\s*$/i
+      - action: expect
+        with:
+          api: /api/roles
+          auth: "{orgKey}"
+          contains: vd-role-{uid}
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-rl-{uid}@mail.langwatch.localhost'
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-rl-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-rl-{uid}@mail.langwatch.localhost
+          name: vd-member-{uid}
+      - action: expect
+        with:
+          api: /api/organization/members
+          auth: "{orgKey}"
+          contains: vd-rl-{uid}@mail.langwatch.localhost
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: New team
+      - action: fill
+        with:
+          selector: 'input[name="name"]'
+          value: 'vd-team-{uid}'
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: expect
+        with:
+          text: vd-team-{uid}
+      - action: go
+        with:
+          path: /settings/directory?tab=teams
+      - action: click
+        with:
+          text: vd-team-{uid}
+      - action: click
+        with:
+          text: /Add to team/
+      - action: select
+        with:
+          field: Person
+          option: vd-member-{uid}
+      - action: select
+        with:
+          field: Role on this team
+          option: vd-role-{uid}
+      - action: click
+        with:
+          text: /^\s*Add member\s*$/
+      - action: go
+        with:
+          path: /settings/roles?tab=assignments
+      - action: expect
+        with:
+          text: vd-member-{uid}
+      - action: expect
+        with:
+          text: vd-role-{uid}
+
+  - id: api-key-restricted-permissions-detail-and-revoke
+    title: Mint a restricted key with chosen permissions, see them on its detail, then revoke it
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: click
+        with:
+          text: Create new secret key
+      - action: fill
+        with:
+          field: e.g., CI Pipeline
+          value: vd-rkey-{uid}
+      - action: click
+        with:
+          text: Restricted
+      - action: click
+        with:
+          selector: 'xpath=//p[normalize-space()="Traces"]/following-sibling::div[1]'
+      - action: click
+        with:
+          selector: '[role=menuitem]'
+          hasText: /^Read$/
+      - action: click
+        with:
+          selector: 'xpath=//p[normalize-space()="Annotations"]/following-sibling::div[1]'
+      - action: click
+        with:
+          selector: '[role=menuitem]'
+          hasText: /^Write$/
+      - action: click
+        with:
+          text: Create secret key
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: expect
+        with:
+          text: vd-rkey-{uid}
+      - action: expect
+        with:
+          text: Restricted
+      - action: expect
+        with:
+          api: /api/api-keys
+          auth: "{orgKey}"
+          contains: vd-rkey-{uid}
+      - action: click
+        with:
+          label: Edit API key vd-rkey-{uid}
+      - action: expect
+        with:
+          text: /^Read$/
+      - action: expect
+        with:
+          text: /^Write$/
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: click
+        with:
+          label: Revoke API key vd-rkey-{uid}
+      - action: click
+        with:
+          text: /^\s*Revoke\s*$/
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: expect
+        with:
+          text: vd-rkey-{uid}
+          equals: "0"
+
+  - id: scim-provisioning-page-and-token-dialog
+    title: The directory and provisioning pages load and the token dialog says a connection comes first
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: Directory
+      - action: go
+        with:
+          path: /settings/authentication/connectors
+      - action: expect
+        with:
+          text: Provisioning tokens
+      - action: expect
+        with:
+          text: Provisioning address
+      - action: expect
+        with:
+          api: /api/scim-tokens
+          auth: "{orgKey}"
+          status: "200"
+      - action: click
+        with:
+          text: Issue token
+      - action: expect
+        with:
+          text: Waiting for single sign-on

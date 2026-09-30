@@ -1,6 +1,7 @@
 package diffsuite
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -13,6 +14,10 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
+	"github.com/langwatch/langwatch/tools/havenrun"
+	"github.com/langwatch/langwatch/tools/visualdiff"
 )
 
 const (
@@ -22,10 +27,22 @@ const (
 	sleepy      = `sleep 30`
 )
 
+// TestMain stands a fake haven in: every stack it reads is one live server.
+func TestMain(m *testing.M) {
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	haven.read = func(_ context.Context, slug string) (diffkit.SharedStack, error) {
+		return diffkit.SharedStack{Slug: slug, AppURL: server.URL, APIOrigin: server.URL}, nil
+	}
+	stdout = io.Discard
+	code := m.Run()
+	server.Close()
+	os.Exit(code)
+}
+
 func suiteRun(t *testing.T, flags []string, tools ...string) (int, string, map[string]any) {
 	t.Helper()
 	out := t.TempDir()
-	args := append(append([]string{"-out", out}, flags...), "--")
+	args := append(append([]string{"-out", out, "-tools", ""}, flags...), "--")
 	code := Run(append(args, tools...), io.Discard)
 	events, _ := os.ReadFile(filepath.Join(out, "events.log"))
 	var summary map[string]any
@@ -99,7 +116,7 @@ func TestHealthGate(t *testing.T) {
 	down := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(500) }))
 	defer down.Close()
 	out := t.TempDir()
-	if code := Run([]string{"-out", out, "-health", down.URL, "--", "a=touch " + filepath.Join(out, "ran")}, io.Discard); code != 2 {
+	if code := Run([]string{"-out", out, "-tools", "", "-health", down.URL, "--", "a=touch " + filepath.Join(out, "ran")}, io.Discard); code != 2 {
 		t.Fatalf("unhealthy start: got %d", code)
 	}
 	if _, err := os.Stat(filepath.Join(out, "ran")); err == nil {
@@ -161,5 +178,154 @@ func TestClassify(t *testing.T) {
 		if got := classify(reason); got != want {
 			t.Errorf("classify(%q) = %s, want %s", reason, got, want)
 		}
+	}
+}
+
+func TestToolsReadTheSuiteStacksFromTheEnvironment(t *testing.T) {
+	seen := filepath.Join(t.TempDir(), "seen")
+	code, _, _ := suiteRun(t, []string{"-stack", "branchy", "-main-stack", "mainly"},
+		"a=echo $DIFFSUITE_BRANCH_STACK $DIFFSUITE_MAIN_STACK $DIFFSUITE_OUT > "+seen)
+	body, _ := os.ReadFile(seen)
+	if fields := strings.Fields(string(body)); code != 0 || len(fields) != 3 || fields[0] != "branchy" || fields[1] != "mainly" {
+		t.Fatalf("code %d, the tool saw %q", code, body)
+	}
+}
+
+// fakeStarts records what the suite starts and stops, and restores haven after the test.
+func fakeStarts(t *testing.T) *[]string {
+	t.Helper()
+	saved, calls := haven, &[]string{}
+	t.Cleanup(func() { haven = saved })
+	haven.up = func(_ context.Context, _, slug string, deltas []string, env havenrun.EnvOptions, _ io.Writer) error {
+		*calls = append(*calls, strings.TrimSpace("up "+slug+" "+strings.Join(append(deltas, env.Extra...), " ")))
+		return nil
+	}
+	haven.destroy = func(_, slug string, _ io.Writer) { *calls = append(*calls, "destroy "+slug) }
+	haven.upMain = func(_ context.Context, request visualdiff.MainStackRequest) (string, func(), error) {
+		*calls = append(*calls, "up "+request.Slug)
+		return "", func() { *calls = append(*calls, "stop "+request.Slug) }, nil
+	}
+	return calls
+}
+
+func TestStacksItStartedAreStoppedAndPassedOnesLeftAlone(t *testing.T) {
+	calls := fakeStarts(t)
+	suiteRun(t, []string{"-up", "-main"}, "a=exit 1")
+	got := strings.Join(*calls, "\n")
+	if len(*calls) != 4 || !strings.HasPrefix((*calls)[2], "stop diffsuite-") || !strings.HasPrefix((*calls)[3], "destroy diffsuite-") {
+		t.Fatalf("want up branch, up main, stop main, destroy branch:\n%s", got)
+	}
+	*calls = nil
+	suiteRun(t, []string{"-stack", "given", "-main-stack", "given-main"}, "a=true")
+	if len(*calls) != 0 {
+		t.Fatalf("passed-in stacks were touched: %v", *calls)
+	}
+}
+
+func TestCancelStopsTheToolsThenTheStacks(t *testing.T) {
+	calls := fakeStarts(t)
+	started := filepath.Join(t.TempDir(), "started")
+	go func() {
+		for range 200 {
+			if _, err := os.Stat(started); err == nil {
+				syscall.Kill(os.Getpid(), syscall.SIGINT)
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}()
+	code, events, _ := suiteRun(t, []string{"-up"}, "a=touch "+started+"; sleep 30")
+	if code != 3 || !strings.Contains(events, "stopping all: cancelled") || len(*calls) != 2 || !strings.HasPrefix((*calls)[1], "destroy ") {
+		t.Fatalf("code %d calls %v\n%s", code, *calls, events)
+	}
+}
+
+func TestSuiteToolsDefaultsReplaceAndExtend(t *testing.T) {
+	tools, err := suiteTools(defaultNames(), []string{"visual+=-only a", "api=echo hi", "extra=true"})
+	if err != nil || len(tools) != 5 {
+		t.Fatalf("%v %d", err, len(tools))
+	}
+	if !strings.HasSuffix(tools[1].command, "check -routes -all -only a") || tools[1].binary != "visualdiff" {
+		t.Errorf("extend: %+v", tools[1])
+	}
+	if tools[0].command != "echo hi" || tools[0].binary != "" {
+		t.Errorf("replace: %+v", tools[0])
+	}
+	for _, bad := range [][]string{{"nope+=x"}, {"noequals"}} {
+		if _, err := suiteTools(nil, bad); err == nil {
+			t.Errorf("%v: want an error", bad)
+		}
+	}
+	if _, err := suiteTools([]string{"nope"}, nil); err == nil {
+		t.Error("unknown default: want an error")
+	}
+}
+
+// @scenario "A diffsuite stack can run langevals"
+func TestLangevalsAddsItsDeltaToTheBranchStackItStarts(t *testing.T) {
+	calls := fakeStarts(t)
+	suiteRun(t, []string{"-up", "-langevals"}, "a=exit 0")
+	if len(*calls) == 0 || !strings.HasPrefix((*calls)[0], "up diffsuite-") || !strings.HasSuffix((*calls)[0], "-branch +langevals") {
+		t.Fatalf("want the branch stack brought up with +langevals, got %q", *calls)
+	}
+}
+
+// @scenario "diffsuite runs the self-hosted pass on a stack of its own"
+func TestSelfHostedStartsItsOwnStackWithSaaSOff(t *testing.T) {
+	calls := fakeStarts(t)
+	suiteRun(t, []string{"-up", "-deployment", "self-hosted"}, "a=exit 0")
+	if len(*calls) == 0 || !strings.HasPrefix((*calls)[0], "up diffsuite-") || !strings.HasSuffix((*calls)[0], "-selfhosted IS_SAAS=false") {
+		t.Fatalf("want a selfhosted stack brought up with IS_SAAS=false, got %q", *calls)
+	}
+	*calls = nil
+	suiteRun(t, []string{"-up"}, "a=exit 0")
+	if len(*calls) == 0 || strings.Contains((*calls)[0], "IS_SAAS") {
+		t.Fatalf("a SaaS stack must keep the .env's IS_SAAS, got %q", *calls)
+	}
+}
+
+func TestSelfHostedAdoptsTheSelfHostedSlugByDefault(t *testing.T) {
+	seen := filepath.Join(t.TempDir(), "seen")
+	code, _, _ := suiteRun(t, []string{"-deployment", "self-hosted"}, "a=echo $DIFFSUITE_BRANCH_STACK > "+seen)
+	if body, _ := os.ReadFile(seen); code != 0 || strings.TrimSpace(string(body)) != selfHostedSlug {
+		t.Fatalf("code %d, the tool saw %q", code, body)
+	}
+}
+
+func TestDeploymentFlagRefusals(t *testing.T) {
+	fakeStarts(t)
+	for _, flags := range [][]string{{"-deployment", "onprem"}, {"-deployment", "self-hosted", "-main"}, {"-deferred", "x"}} {
+		if code, _, _ := suiteRun(t, flags, "a=exit 0"); code != 2 {
+			t.Errorf("%v: code %d, want 2", flags, code)
+		}
+	}
+}
+
+func TestSelfHostedRefusesAStackThatAnswersAsSaaS(t *testing.T) {
+	saved := haven.read
+	t.Cleanup(func() { haven.read = saved })
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/organizations" {
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	haven.read = func(_ context.Context, slug string) (diffkit.SharedStack, error) {
+		return diffkit.SharedStack{Slug: slug, AppURL: server.URL, APIOrigin: server.URL}, nil
+	}
+	if code, _, _ := suiteRun(t, []string{"-deployment", "self-hosted"}, "a=exit 0"); code != 2 {
+		t.Fatalf("self-hosted: code %d, want 2", code)
+	}
+	if code, _, _ := suiteRun(t, nil, "a=exit 0"); code != 0 {
+		t.Fatalf("a SaaS run takes the same stack: code %d, want 0", code)
+	}
+}
+
+func TestDeferredNarrowsTheAPIToolToTheListedScenarios(t *testing.T) {
+	seen := filepath.Join(t.TempDir(), "seen")
+	list := filepath.Join(t.TempDir(), "deferred.txt")
+	code, _, _ := suiteRun(t, []string{"-deployment", "self-hosted", "-deferred", list}, "api=echo > "+seen)
+	if body, _ := os.ReadFile(seen); code != 0 || strings.TrimSpace(string(body)) != "-scenario-id @"+list {
+		t.Fatalf("code %d, the api tool saw %q", code, body)
 	}
 }

@@ -135,8 +135,10 @@ func Env(inherit []string, slug string, options EnvOptions) []string {
 // UpArgs brings one instance's stack up and returns rather than attaching
 // the log viewer. --agent is plain, token-free output; --detach backgrounds
 // the stack instead of attaching the log viewer, which is what makes this a
-// call rather than a session.
-func UpArgs() []string { return []string{"up", "--agent", "--detach"} }
+// call rather than a session. deltas are haven's sticky +svc/-svc choices.
+func UpArgs(deltas ...string) []string {
+	return append([]string{"up", "--agent", "--detach"}, deltas...)
+}
 
 // StatusArgs asks for the machine-readable one-shot report.
 func StatusArgs() []string { return []string{"status", "--agent", "--json"} }

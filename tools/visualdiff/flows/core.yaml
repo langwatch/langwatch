@@ -54,7 +54,7 @@ flows:
           traceId: trace_visualdiff_0
       - action: click
         with:
-          testId: trace-mode-tab-trace
+          text: /^\s*Trace\s*$/
       - action: expect
         with:
           testId: waterfall-row
@@ -152,7 +152,7 @@ flows:
       - action: createExperiment
       - action: click
         with:
-          testId: experiment-new-create
+          text: Create Experiment
       - action: expect
         with:
           text: Datasets

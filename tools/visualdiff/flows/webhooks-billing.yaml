@@ -34,7 +34,7 @@ flows:
           as: secretOne
       - action: click
         with:
-          testId: webhook-secret-close
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
           text: 'example.com/vd-{uid}'
@@ -80,16 +80,17 @@ flows:
           testId: webhook-secret-value
       - action: click
         with:
-          testId: webhook-secret-close
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
           text: 'example.com/vd-{uid}'
       - action: click
         with:
-          selector: 'tr:has-text("vd-{uid}") [data-testid="webhook-row-actions"]'
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
       - action: click
         with:
-          testId: webhook-menu-edit
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
       - action: fill
         with:
           testId: webhook-url-input
@@ -134,16 +135,17 @@ flows:
           testId: webhook-secret-value
       - action: click
         with:
-          testId: webhook-secret-close
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
           text: 'example.com/vd-{uid}'
       - action: click
         with:
-          selector: 'tr:has-text("vd-{uid}") [data-testid="webhook-row-actions"]'
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
       - action: click
         with:
-          testId: webhook-menu-disable
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Disable\s*$/
       - action: expect
         with:
           count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
@@ -155,10 +157,11 @@ flows:
           count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
       - action: click
         with:
-          selector: 'tr:has-text("vd-{uid}") [data-testid="webhook-row-actions"]'
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
       - action: click
         with:
-          testId: webhook-menu-enable
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Enable\s*$/
       - action: expect
         with:
           count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
@@ -205,16 +208,17 @@ flows:
           as: secretOne
       - action: click
         with:
-          testId: webhook-secret-close
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
           text: 'example.com/vd-{uid}'
       - action: click
         with:
-          selector: 'tr:has-text("vd-{uid}") [data-testid="webhook-row-actions"]'
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
       - action: click
         with:
-          testId: webhook-menu-roll-secret
+          selector: '[role="menuitem"]'
+          hasText: Roll secret
       - action: click
         with:
           text: Roll secret
@@ -230,7 +234,7 @@ flows:
           as: secretTwo
       - action: click
         with:
-          testId: webhook-secret-close
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
           testId: webhook-secret-dialog
@@ -266,16 +270,17 @@ flows:
           testId: webhook-secret-value
       - action: click
         with:
-          testId: webhook-secret-close
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
           text: 'example.com/vd-{uid}'
       - action: click
         with:
-          selector: 'tr:has-text("vd-{uid}") [data-testid="webhook-row-actions"]'
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
       - action: click
         with:
-          testId: webhook-menu-delete
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
       - action: click
         with:
           text: Delete endpoint
@@ -321,16 +326,17 @@ flows:
           testId: webhook-secret-value
       - action: click
         with:
-          testId: webhook-secret-close
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
       - action: expect
         with:
           text: 'example.com/vd-{uid}'
       - action: click
         with:
-          selector: 'tr:has-text("vd-{uid}") [data-testid="webhook-row-actions"]'
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
       - action: click
         with:
-          testId: webhook-menu-deliveries
+          selector: '[role="menuitem"]'
+          hasText: Deliveries
       - action: expect
         with:
           testId: webhook-health-strip

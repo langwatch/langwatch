@@ -6,7 +6,7 @@
 # a POST through its own origin) and a budget crossing its limit (needs spend on the ledger).
 flows:
   - id: gateway-virtual-key-create-reveal-revoke
-    title: Create a virtual key, reveal its secret once, revoke it and see its menu gone
+    title: Create a virtual key, reveal its secret once, revoke it and see the API read it back revoked
     isolated: true
     steps:
       - action: go
@@ -14,27 +14,27 @@ flows:
           path: /gateway/virtual-keys
       - action: click
         with:
-          testId: gateway-virtual-key-new
+          text: New virtual key
       - action: fill
         with:
-          testId: gateway-virtual-key-name
+          field: e.g. codex-prod
           value: vk-{uid}
       - action: click
         with:
-          testId: gateway-virtual-key-create-submit
+          text: /^\s*Create\s*$/
       - action: click
         with:
-          testId: gateway-virtual-key-secret-reveal
+          label: Reveal secret
       - action: capture
         with:
-          testId: gateway-virtual-key-secret
+          selector: '[role="alertdialog"] code'
           as: vkSecret
       - action: click
         with:
-          testId: gateway-virtual-key-secret-confirm
+          selector: "#vk-secret-confirm"
       - action: click
         with:
-          testId: gateway-virtual-key-secret-close
+          text: /^\s*Close\s*$/
       - action: expect
         with:
           text: "{vkSecret}"
@@ -48,20 +48,18 @@ flows:
           path: /gateway/virtual-keys
       - action: click
         with:
-          label: Actions for vk-{uid}
+          selector: 'tr:has-text("vk-{uid}") button[aria-label^="Actions"]'
       - action: click
         with:
-          testId: gateway-virtual-key-row-revoke
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Revoke\s*$/
       - action: click
         with:
           text: Revoke key
-      - action: go
-        with:
-          path: /gateway/virtual-keys
       - action: expect
         with:
-          label: Actions for vk-{uid}
-          equals: "0"
+          api: /api/gateway/v1/virtual-keys
+          contains: '"status":"revoked"'
 
   - id: gateway-virtual-key-revoke-reads-back
     title: Revoke a virtual key from its row and read the revoked status back from the API
@@ -84,10 +82,11 @@ flows:
           path: /gateway/virtual-keys
       - action: click
         with:
-          label: Actions for {vkName}
+          selector: 'tr:has-text("{vkName}") button[aria-label^="Actions"]'
       - action: click
         with:
-          testId: gateway-virtual-key-row-revoke
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Revoke\s*$/
       - action: click
         with:
           text: Revoke key
@@ -119,19 +118,20 @@ flows:
           path: /gateway/virtual-keys
       - action: click
         with:
-          label: Actions for {vkName}
+          selector: 'tr:has-text("{vkName}") button[aria-label^="Actions"]'
       - action: click
         with:
-          testId: gateway-virtual-key-row-rotate
+          selector: '[role="menuitem"]'
+          hasText: Rotate secret
       - action: click
         with:
           text: Rotate secret
       - action: click
         with:
-          testId: gateway-virtual-key-secret-reveal
+          label: Reveal secret
       - action: capture
         with:
-          testId: gateway-virtual-key-secret
+          selector: '[role="alertdialog"] code'
           match: "^(.{13})"
           as: newPrefix
       - action: expect
@@ -146,10 +146,10 @@ flows:
           equals: active
       - action: click
         with:
-          testId: gateway-virtual-key-secret-confirm
+          selector: "#vk-secret-confirm"
       - action: click
         with:
-          testId: gateway-virtual-key-secret-close
+          text: /^\s*Close\s*$/
       - action: expect
         with:
           text: "{oldSecret}"
@@ -164,18 +164,18 @@ flows:
           path: /gateway/budgets
       - action: click
         with:
-          testId: gateway-budget-new
+          text: New budget
       - action: fill
         with:
-          testId: gateway-budget-name
-          value: budget-{uid}
+          field: e.g. Engineering monthly $1k cap
+          value: 'budget-{uid}'
       - action: fill
         with:
-          testId: gateway-budget-limit
-          value: "25"
+          field: '1000.00'
+          value: '25'
       - action: click
         with:
-          testId: gateway-budget-create-submit
+          text: /^\s*Create budget\s*$/
       - action: expect
         with:
           api: /api/gateway/v1/budgets
@@ -188,9 +188,8 @@ flows:
           text: budget-{uid}
       - action: expect
         with:
-          testId: gateway-budget-row
-          hasText: budget-{uid}
-          min: "1"
+          count: 'tr:has-text("budget-{uid}")'
+          min: '1'
 
   - id: gateway-budget-org-warn-create
     title: Create an organisation budget that only warns on breach and see both in its row
@@ -201,37 +200,36 @@ flows:
           path: /gateway/budgets
       - action: click
         with:
-          testId: gateway-budget-new
+          text: New budget
       - action: fill
         with:
-          testId: gateway-budget-name
-          value: budget-org-{uid}
+          field: e.g. Engineering monthly $1k cap
+          value: 'budget-org-{uid}'
       - action: click
         with:
           testId: budget-kind-organization
       - action: select
         with:
-          testId: gateway-budget-window
+          selector: 'xpath=//label[contains(normalize-space(.),"Window")]/following::select[1]'
           option: Per day
       - action: fill
         with:
-          testId: gateway-budget-limit
-          value: "40"
+          field: '1000.00'
+          value: '40'
       - action: select
         with:
-          testId: gateway-budget-on-breach
+          selector: 'xpath=//label[contains(normalize-space(.),"On breach")]/following::select[1]'
           option: /^Warn/
       - action: click
         with:
-          testId: gateway-budget-create-submit
+          text: /^\s*Create budget\s*$/
       - action: go
         with:
           path: /gateway/budgets
       - action: expect
         with:
-          testId: gateway-budget-row
-          hasText: /budget-org-{uid}.*organization.*day.*warn/is
-          min: "1"
+          count: 'tr:has-text("budget-org-{uid}"):has-text("organization"):has-text("day"):has-text("warn")'
+          min: '1'
 
   - id: gateway-budget-team-create
     title: Create a budget on a team and see the team as its scope after a reload
@@ -242,11 +240,11 @@ flows:
           path: /gateway/budgets
       - action: click
         with:
-          testId: gateway-budget-new
+          text: New budget
       - action: fill
         with:
-          testId: gateway-budget-name
-          value: budget-team-{uid}
+          field: e.g. Engineering monthly $1k cap
+          value: 'budget-team-{uid}'
       - action: click
         with:
           testId: budget-kind-team
@@ -256,19 +254,18 @@ flows:
           option: /^(?!Pick a|Loading).+/
       - action: fill
         with:
-          testId: gateway-budget-limit
-          value: "60"
+          field: '1000.00'
+          value: '60'
       - action: click
         with:
-          testId: gateway-budget-create-submit
+          text: /^\s*Create budget\s*$/
       - action: go
         with:
           path: /gateway/budgets
       - action: expect
         with:
-          testId: gateway-budget-row
-          hasText: /budget-team-{uid}.*team/is
-          min: "1"
+          count: 'tr:has-text("budget-team-{uid}"):has-text("team")'
+          min: '1'
 
   - id: gateway-budget-project-create
     title: Create a budget on a project and see the project as its scope after a reload
@@ -279,11 +276,11 @@ flows:
           path: /gateway/budgets
       - action: click
         with:
-          testId: gateway-budget-new
+          text: New budget
       - action: fill
         with:
-          testId: gateway-budget-name
-          value: budget-project-{uid}
+          field: e.g. Engineering monthly $1k cap
+          value: 'budget-project-{uid}'
       - action: click
         with:
           testId: budget-kind-project
@@ -293,19 +290,18 @@ flows:
           option: /^(?!Pick a|Loading).+/
       - action: fill
         with:
-          testId: gateway-budget-limit
-          value: "70"
+          field: '1000.00'
+          value: '70'
       - action: click
         with:
-          testId: gateway-budget-create-submit
+          text: /^\s*Create budget\s*$/
       - action: go
         with:
           path: /gateway/budgets
       - action: expect
         with:
-          testId: gateway-budget-row
-          hasText: /budget-project-{uid}.*project/is
-          min: "1"
+          count: 'tr:has-text("budget-project-{uid}"):has-text("project")'
+          min: '1'
 
   - id: gateway-budget-virtual-key-create
     title: Create a budget on a virtual key and see the key as its scope after a reload
@@ -322,11 +318,11 @@ flows:
           path: /gateway/budgets
       - action: click
         with:
-          testId: gateway-budget-new
+          text: New budget
       - action: fill
         with:
-          testId: gateway-budget-name
-          value: budget-key-{uid}
+          field: e.g. Engineering monthly $1k cap
+          value: 'budget-key-{uid}'
       - action: click
         with:
           testId: budget-kind-virtual_key
@@ -336,19 +332,18 @@ flows:
           option: "{vkName}"
       - action: fill
         with:
-          testId: gateway-budget-limit
-          value: "15"
+          field: '1000.00'
+          value: '15'
       - action: click
         with:
-          testId: gateway-budget-create-submit
+          text: /^\s*Create budget\s*$/
       - action: go
         with:
           path: /gateway/budgets
       - action: expect
         with:
-          testId: gateway-budget-row
-          hasText: /budget-key-{uid}.*{vkName}/is
-          min: "1"
+          count: 'tr:has-text("budget-key-{uid}"):has-text("{vkName}")'
+          min: '1'
 
   - id: gateway-budget-edit-limit-and-breach
     title: Raise a budget's limit and switch it to warn, and read both back from the API
@@ -370,22 +365,22 @@ flows:
           path: /gateway/budgets
       - action: click
         with:
-          testId: gateway-budget-row-actions
-          hasText: "{budgetName}"
+          selector: 'tr:has-text("{budgetName}") button[aria-label="Actions"]'
       - action: click
         with:
-          testId: gateway-budget-row-edit
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
       - action: fill
         with:
-          testId: gateway-budget-edit-limit
-          value: "55"
+          selector: 'xpath=//label[contains(normalize-space(.),"Limit (USD)")]/following::input[1]'
+          value: '55'
       - action: select
         with:
-          testId: gateway-budget-edit-on-breach
+          selector: 'xpath=//label[contains(normalize-space(.),"On breach")]/following::select[1]'
           option: /^Warn/
       - action: click
         with:
-          testId: gateway-budget-edit-submit
+          text: /^\s*Save changes\s*$/
       - action: expect
         with:
           api: /api/gateway/v1/budgets/{budgetId}
@@ -417,16 +412,15 @@ flows:
           path: /gateway/budgets
       - action: expect
         with:
-          testId: gateway-budget-row
-          hasText: "{budgetName}"
-          min: "1"
+          count: 'tr:has-text("{budgetName}")'
+          min: '1'
       - action: click
         with:
-          testId: gateway-budget-row-actions
-          hasText: "{budgetName}"
+          selector: 'tr:has-text("{budgetName}") button[aria-label="Actions"]'
       - action: click
         with:
-          testId: gateway-budget-row-archive
+          selector: '[role="menuitem"]'
+          hasText: Archive
       - action: click
         with:
           text: Archive
@@ -436,9 +430,8 @@ flows:
           path: /gateway/budgets
       - action: expect
         with:
-          testId: gateway-budget-row
-          hasText: "{budgetName}"
-          equals: "0"
+          count: 'tr:has-text("{budgetName}")'
+          equals: '0'
 
   - id: gateway-budget-detail-page
     title: A budget opens on its own page, showing its name and the scope it applies to
@@ -500,14 +493,14 @@ flows:
           path: /gateway/routing-policies
       - action: click
         with:
-          testId: gateway-routing-policy-new
+          text: New policy
       - action: fill
         with:
-          testId: gateway-routing-policy-name
-          value: policy-{uid}
+          field: Developer default
+          value: 'policy-{uid}'
       - action: click
         with:
-          testId: gateway-routing-policy-submit
+          text: Create policy
       - action: go
         with:
           path: /gateway/routing-policies
@@ -524,14 +517,14 @@ flows:
           path: /gateway/routing-policies
       - action: click
         with:
-          testId: gateway-routing-policy-new
+          text: New policy
       - action: fill
         with:
-          testId: gateway-routing-policy-name
-          value: policy-edit-{uid}
+          field: Developer default
+          value: 'policy-edit-{uid}'
       - action: click
         with:
-          testId: gateway-routing-policy-submit
+          text: Create policy
       - action: go
         with:
           path: /gateway/routing-policies
@@ -540,14 +533,15 @@ flows:
           label: Actions for policy-edit-{uid}
       - action: click
         with:
-          testId: gateway-routing-policy-row-edit
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
       - action: fill
         with:
-          testId: gateway-routing-policy-name
-          value: policy-renamed-{uid}
+          field: Developer default
+          value: 'policy-renamed-{uid}'
       - action: click
         with:
-          testId: gateway-routing-policy-submit
+          text: Save changes
       - action: go
         with:
           path: /gateway/routing-policies
@@ -563,7 +557,8 @@ flows:
           label: Actions for policy-renamed-{uid}
       - action: click
         with:
-          testId: gateway-routing-policy-row-delete
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
       - action: click
         with:
           text: Delete
@@ -585,14 +580,14 @@ flows:
           path: /gateway/routing-policies
       - action: click
         with:
-          testId: gateway-routing-policy-new
+          text: New policy
       - action: fill
         with:
-          testId: gateway-routing-policy-name
-          value: policy-default-{uid}
+          field: Developer default
+          value: 'policy-default-{uid}'
       - action: click
         with:
-          testId: gateway-routing-policy-submit
+          text: Create policy
       - action: go
         with:
           path: /gateway/routing-policies
@@ -601,7 +596,8 @@ flows:
           label: Actions for policy-default-{uid}
       - action: click
         with:
-          testId: gateway-routing-policy-row-default
+          selector: '[role="menuitem"]'
+          hasText: Make default
       - action: go
         with:
           path: /gateway/routing-policies
@@ -610,8 +606,8 @@ flows:
           label: Actions for policy-default-{uid}
       - action: expect
         with:
-          testId: gateway-routing-policy-row-default
-          equals: "0"
+          text: Make default
+          equals: '0'
 
   # The evaluation itself runs in the gateway data plane; this proves the guardrail is
   # stored and attaches to a key. The evaluator is a monitor set to run as a guardrail.
@@ -645,36 +641,34 @@ flows:
           path: /gateway/guardrails
       - action: click
         with:
-          testId: gateway-guardrail-new
+          text: New guardrail
       - action: fill
         with:
-          testId: gateway-guardrail-name
-          value: guardrail-{uid}
+          field: e.g. block PII on requests
+          value: 'guardrail-{uid}'
       - action: select
         with:
-          testId: gateway-guardrail-evaluator
-          option: "{monitorName}"
+          field: Evaluator
+          option: '{monitorName}'
       - action: click
         with:
-          testId: gateway-guardrail-submit
+          text: /^\s*Create\s*$/
       - action: go
         with:
           path: /gateway/guardrails
       - action: expect
         with:
-          testId: gateway-guardrail-row
-          hasText: guardrail-{uid}
-          min: "1"
+          count: 'tr:has-text("guardrail-{uid}")'
+          min: '1'
       - action: go
         with:
           path: /gateway/virtual-keys/{vkId}
       - action: click
         with:
-          testId: gateway-guardrail-attach
-          hasText: guardrail-{uid}
+          text: 'guardrail-{uid}'
       - action: click
         with:
-          testId: gateway-guardrail-attach-save
+          text: /^\s*Save guardrails\s*$/
       - action: expect
         with:
           text: Guardrails updated
@@ -704,21 +698,21 @@ flows:
           path: /gateway/guardrails
       - action: click
         with:
-          testId: gateway-guardrail-new
+          text: New guardrail
       - action: fill
         with:
-          testId: gateway-guardrail-name
-          value: guardrail-archive-{uid}
+          field: e.g. block PII on requests
+          value: 'guardrail-archive-{uid}'
       - action: select
         with:
-          testId: gateway-guardrail-evaluator
-          option: "{monitorName}"
+          field: Evaluator
+          option: '{monitorName}'
       - action: click
         with:
-          testId: gateway-guardrail-submit
+          text: /^\s*Create\s*$/
       - action: click
         with:
-          label: Archive guardrail-archive-{uid}
+          selector: 'tr:has-text("guardrail-archive-{uid}") button:has([class*="lucide-archive"])'
       - action: click
         with:
           text: Archive
@@ -728,9 +722,8 @@ flows:
           path: /gateway/guardrails
       - action: expect
         with:
-          testId: gateway-guardrail-row
-          hasText: guardrail-archive-{uid}
-          equals: "0"
+          count: 'tr:has-text("guardrail-archive-{uid}")'
+          equals: '0'
 
   - id: gateway-usage-screen-renders
     title: The usage screen opens with its key filter and either its charts or its empty state

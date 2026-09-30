@@ -45,6 +45,17 @@ func TestGoVersionAcceptsAnAgreeingRepo(t *testing.T) {
 	assert.Empty(t, problems)
 }
 
+func TestGoVersionIgnoresScratchTreesAndLinkedWorktrees(t *testing.T) {
+	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
+		".apidiff/x/go.mod": "module y\n\ngo 1.20.0\n",
+		"linked/go.mod":     "module z\n\ngo 1.20.0\n",
+		"linked/.git":       "gitdir: elsewhere\n",
+	}))
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
 // @scenario "The workspace and the root module must agree"
 func TestGoVersionReportsAWorkspaceOnADifferentVersion(t *testing.T) {
 	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{

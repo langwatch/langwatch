@@ -1,7 +1,14 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import type { Browser, BrowserContext, Page, Request, Response } from "playwright";
+import type {
+  Browser,
+  BrowserContext,
+  BrowserContextOptions,
+  Page,
+  Request,
+  Response,
+} from "playwright";
 import { chromium } from "playwright";
 
 import { isModuleConsoleError, isModuleRequest } from "./module-load.ts";
@@ -15,7 +22,7 @@ import {
 } from "./protocol.ts";
 import { StepRecorder, type Drained } from "./recorder.ts";
 import { InFlightTracker, isPageReady, readyMarker, shouldIgnoreRequest } from "./settle.ts";
-import { serveBuiltUi } from "./static-ui.ts";
+import { prepareBuiltUi, type ServeBuiltUi } from "./static-ui.ts";
 
 /** Animations and carets are the largest source of pixel noise between two identical screens. */
 const FREEZE_CSS =
@@ -33,12 +40,15 @@ const MAX_ARIA_SNAPSHOT = 64_000;
 const RELATIVE_TIME =
   /\b(?:\d+|an?|a few) (?:seconds?|minutes?|hours?|days?|weeks?|months?|years?) ago\b|\bjust now\b/i;
 
+/** StorageState is a signed-in session: a saved file, or one read off a live context. */
+export type StorageState = BrowserContextOptions["storageState"];
+
 export const contextOptions = ({
   viewport,
   storageState,
 }: {
   viewport: Viewport;
-  storageState?: string;
+  storageState?: StorageState;
 }) => ({
   viewport: { width: viewport.width, height: viewport.height },
   reducedMotion: "reduce" as const,
@@ -121,6 +131,8 @@ export class Side {
   private readonly tracker: InFlightTracker<Request>;
   /** late are the requests a settle ran out on, and when each started, logged once they end. */
   private readonly late = new Map<Request, number>();
+  /** died is set once the page's renderer crashed, usually out of memory: the machine's fault. */
+  private died = false;
 
   constructor(
     readonly name: string,
@@ -157,6 +169,13 @@ export class Side {
     page.on("pageerror", (error) => {
       this.recorder.consoleError(`pageerror: ${String(error.message)}`);
     });
+    page.on("crash", () => {
+      this.died = true;
+    });
+  }
+
+  get crashed(): boolean {
+    return this.died;
   }
 
   /** openAnonymous is a fresh page of this stack with no cookies: a share link, a revoked key. */
@@ -225,7 +244,10 @@ export class Side {
     return url.replace(this.baseUrl, "").slice(0, 160);
   }
 
-  async waitUntilQuiet(): Promise<SettleOutcome> {
+  /** waitUntilQuiet waits `loadingScale` times the usual budget for a page still loading. */
+  async waitUntilQuiet({
+    loadingScale = 1,
+  }: { loadingScale?: number } = {}): Promise<SettleOutcome> {
     this.tracker.begin(Date.now());
     let expired = false;
     for (;;) {
@@ -257,7 +279,7 @@ export class Side {
             selector: this.extras.readySelector,
           }),
         },
-        { timeout: LOADING_WAIT_MILLIS, polling: LOADING_POLL_MILLIS },
+        { timeout: LOADING_WAIT_MILLIS * loadingScale, polling: LOADING_POLL_MILLIS },
       )
       .then(
         () => false,
@@ -346,23 +368,36 @@ export class Side {
  */
 const FULFILLED_SHELL = "--disable-features=LocalNetworkAccessChecks";
 
-/** builtAssets serves a side's prebuilt UI, or says why the side stays on its dev server. */
+/** FAST_ARGS strip Chromium to a lean renderer: quicker, but its pixels are not the full
+ * browser's. */
+const FAST_ARGS = [
+  "--disable-gpu",
+  "--disable-canvas-aa",
+  "--disable-2d-canvas-clip-aa",
+  "--disable-gl-drawing-for-tests",
+  "--js-flags=--max-old-space-size=256",
+];
+
+/** builtAssets reads a side's prebuilt UI once, answering what serves it to each context,
+ * or undefined, saying why, when the side stays on its dev server. */
 const builtAssets = async ({
   context,
   side,
 }: {
   context: BrowserContext;
   side: PlanSide;
-}): Promise<void> => {
+}): Promise<ServeBuiltUi | undefined> => {
   const dir = side.staticDir ?? "";
   try {
-    await serveBuiltUi({ context, baseUrl: side.baseUrl, dir });
+    const serve = await prepareBuiltUi({ context, baseUrl: side.baseUrl, dir });
     note({ text: `${side.name}: serving the prebuilt UI from ${dir}`, err: process.stderr });
+    return serve;
   } catch (thrown) {
     note({
       text: `${side.name}: the prebuilt UI could not be served, capturing from the dev server: ${String(thrown)}`,
       err: process.stderr,
     });
+    return undefined;
   }
 };
 
@@ -372,12 +407,14 @@ const builtAssets = async ({
  * at once without reading each other's requests.
  */
 export class SideBrowser {
+  private session: Promise<StorageState> | undefined;
+
   constructor(
     readonly definition: PlanSide,
     private readonly browser: Browser,
     private readonly context: BrowserContext,
     private readonly settle: SettleConfig,
-    private readonly freshContext: () => Promise<BrowserContext>,
+    private readonly freshContext: (state?: StorageState) => Promise<BrowserContext>,
   ) {}
 
   get name(): string {
@@ -387,6 +424,21 @@ export class SideBrowser {
   async openPage(): Promise<Side> {
     const page = await this.context.newPage();
     return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
+      openAnonymous: async () => this.openAnonymousPage(),
+      readySelector: this.definition.readySelector,
+    });
+  }
+
+  /**
+   * openLane is one job's page, in a context of its own carrying the signed-in session as it
+   * stood at the first call; disposing the Side closes the context and frees its renderer.
+   */
+  async openLane(): Promise<Side> {
+    this.session ??= this.context.storageState();
+    const context = await this.freshContext(await this.session);
+    const page = await context.newPage();
+    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
+      owns: context,
       openAnonymous: async () => this.openAnonymousPage(),
       readySelector: this.definition.readySelector,
     });
@@ -428,17 +480,21 @@ export const openSideBrowser = async ({
   settle,
   storageState,
   frozenTime,
+  fast = false,
 }: {
   side: PlanSide;
   viewport: Viewport;
   settle: SettleConfig;
-  storageState?: string;
+  storageState?: StorageState;
   frozenTime?: number;
+  fast?: boolean;
 }): Promise<SideBrowser> => {
   const args = ["--disable-dev-shm-usage"];
   if (side.staticDir !== undefined) args.push(FULFILLED_SHELL);
+  if (fast) args.push(...FAST_ARGS);
   const browser = await chromium.launch({ args });
-  const fresh = async (state?: string): Promise<BrowserContext> => {
+  let serving: Promise<ServeBuiltUi | undefined> | undefined;
+  const fresh = async (state?: StorageState): Promise<BrowserContext> => {
     const context = await browser.newContext(contextOptions({ viewport, storageState: state }));
     if (frozenTime !== undefined) await context.clock.setFixedTime(frozenTime);
     await context.addInitScript(() => {
@@ -449,10 +505,15 @@ export const openSideBrowser = async ({
       }
     });
     context.setDefaultTimeout(10_000);
-    if (side.staticDir !== undefined) await builtAssets({ context, side });
+    if (side.staticDir !== undefined) {
+      serving ??= builtAssets({ context, side });
+      await (
+        await serving
+      )?.(context);
+    }
     return context;
   };
-  return new SideBrowser(side, browser, await fresh(storageState), settle, async () => fresh());
+  return new SideBrowser(side, browser, await fresh(storageState), settle, fresh);
 };
 
 /** captureMessage assembles one protocol capture from a side's current state. */

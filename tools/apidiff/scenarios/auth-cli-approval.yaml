@@ -1,0 +1,49 @@
+# GET /api/auth/cli/device-approval: the stream `langwatch login` waits on so it need not sit
+# on its poll interval. The device_code is the credential; settled or unknown codes answer at
+# once with one frame, so every case here returns without holding the stream open. Main serves
+# the route; a branch that does not is a merge defect (handoff ui-coverage-auth-cli).
+- id: "auth-cli-device-approval-rejects-missing-code"
+  endpoint: "GET /api/auth/cli/device-approval"
+  auth: "none"
+  request: {"path": "/api/auth/cli/device-approval"}
+  expect: {"status": 400, "body": {"error": "invalid_request"}}
+
+- id: "auth-cli-device-approval-unknown-code-is-expired"
+  endpoint: "GET /api/auth/cli/device-approval"
+  auth: "none"
+  request:
+    path: "/api/auth/cli/device-approval"
+    query: {"device_code": "nope-{uid}"}
+  expect: {"status": 200, "contains": "expired"}
+
+- id: "auth-cli-device-approval-denied-code-settles"
+  endpoint: "GET /api/auth/cli/device-approval"
+  auth: "none"
+  setup:
+    - request: "POST /api/auth/cli/device-code"
+      body: {}
+      auth: "none"
+      capture: {"deviceCode": "device_code", "userCode": "user_code"}
+    - request: "POST /api/auth/cli/deny"
+      body: {"user_code": "{userCode}"}
+      auth: "session"
+  request:
+    path: "/api/auth/cli/device-approval"
+    query: {"device_code": "{deviceCode}"}
+  expect: {"status": 200, "contains": "denied"}
+
+- id: "auth-cli-device-approval-approved-code-settles"
+  endpoint: "GET /api/auth/cli/device-approval"
+  auth: "none"
+  setup:
+    - request: "POST /api/auth/cli/device-code"
+      body: {}
+      auth: "none"
+      capture: {"deviceCode": "device_code", "userCode": "user_code"}
+    - request: "POST /api/auth/cli/approve"
+      body: {"user_code": "{userCode}", "organization_id": "{orgId}"}
+      auth: "session"
+  request:
+    path: "/api/auth/cli/device-approval"
+    query: {"device_code": "{deviceCode}"}
+  expect: {"status": 200, "contains": "approved"}

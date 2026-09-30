@@ -62,7 +62,7 @@ func runUI(ctx context.Context, streams Streams, options Options) error {
 	}
 	appURL := options.URL
 	if appURL == "" {
-		stack, err := diffkit.ReadSharedStack(ctx, diffkit.CheckSlug)
+		stack, err := diffkit.BranchStack(ctx)
 		if err != nil {
 			return diffkit.SetupFailed(err)
 		}

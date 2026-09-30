@@ -4,6 +4,8 @@ package diffsuite
 
 import (
 	"bufio"
+	"cmp"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -37,8 +40,13 @@ type stop struct {
 
 type tool struct {
 	name, command string
+	binary        string // the .bin/<binary> a default command runs, built before the suite starts
 	cmd           *exec.Cmd
 	stopLine      string
+	progress      string // the latest line matching the tool's progress pattern
+	lastLine      string
+	tally         string // the latest tally line, the headline of the summary table
+	results       toolResults
 	exit          int
 	done          bool
 	began         time.Time
@@ -50,6 +58,10 @@ type tool struct {
 
 type suite struct {
 	out, policy string
+	root        string
+	env         []string
+	began       time.Time
+	stacks      *stacks
 	stderr      io.Writer
 	events      *os.File
 	eventsMu    sync.Mutex
@@ -64,21 +76,59 @@ func Run(args []string, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	out := flags.String("out", "", "directory for logs, events.log and summary.json")
 	policy := flags.String("policy", "half", "half | same-cause | any | none")
-	health := flags.String("health", "", "URL that must answer 2xx before and while the tools run")
+	health := flags.String("health", "", "URL that must answer 2xx before and while the tools run (default: the branch stack's /api/health)")
+	chosen := flags.String("tools", strings.Join(defaultNames(), ","), "which of the default tools run; name=command after -- adds or replaces one")
+	var stackChoice stackFlags
+	flags.StringVar(&stackChoice.stack, "stack", "", "a running haven stack to test (default "+diffkit.CheckSlug+")")
+	flags.BoolVar(&stackChoice.up, "up", false, "start the branch stack from this checkout, and destroy it at the end")
+	flags.StringVar(&stackChoice.mainStack, "main-stack", "", "a running haven stack of main to compare with")
+	flags.BoolVar(&stackChoice.main, "main", false, "start pinned main as a stack of its own, and destroy it at the end")
+	flags.BoolVar(&stackChoice.langevals, "langevals", false, "run langevals in the branch stack -up starts (haven up +langevals)")
+	flags.StringVar(&stackChoice.deployment, "deployment", saas, "saas | self-hosted: self-hosted adopts "+selfHostedSlug+" (or -up starts one with IS_SAAS=false) and runs only api by default")
+	deferred := flags.String("deferred", "", "a SaaS run's apidiff deferred.txt: api runs only the scenarios it lists")
 	if flags.Parse(args) != nil {
 		return 2
 	}
-	suite := &suite{out: *out, policy: *policy, stderr: stderr}
-	if err := suite.setup(flags.Args()); err != nil {
+	names, specs := splitNames(*chosen), flags.Args()
+	if stackChoice.deployment == selfHosted && !flagSet(flags, "tools") {
+		names = []string{"api"}
+	}
+	if *deferred != "" {
+		path, err := filepath.Abs(*deferred)
+		if err != nil {
+			fmt.Fprintln(stderr, "diffsuite:", err)
+			return 2
+		}
+		specs = append(specs, "api+=-scenario-id '@"+path+"'")
+	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	suite := &suite{out: *out, policy: *policy, stderr: stderr, root: repoRoot()}
+	if err := suite.setup(names, specs); err != nil {
 		fmt.Fprintln(stderr, "diffsuite:", err)
 		return 2
 	}
 	defer suite.events.Close()
-	if *health != "" && !healthy(*health) {
+	stacks := &stacks{}
+	defer stacks.stop()
+	if err := stacks.resolve(ctx, stackChoice, suite.root, suite.out, stderr); err != nil {
+		fmt.Fprintln(stderr, "diffsuite:", err)
+		return 2
+	}
+	suite.env = append(append(os.Environ(), "DIFFSUITE_OUT="+suite.out), stacks.env()...)
+	suite.stacks = stacks
+	fmt.Fprintf(stderr, "diffsuite: branch %s at %s; main %s\n", stacks.branch.Slug, stacks.branch.AppURL, cmp.Or(stacks.main.AppURL, "none (baselines)"))
+	*health = cmp.Or(*health, stacks.branch.AppURL+"/api/health")
+	if !healthy(*health) {
 		fmt.Fprintln(stderr, "diffsuite: refusing to start: not healthy:", *health)
 		return 2
 	}
+	if err := suite.build(ctx); err != nil {
+		fmt.Fprintln(stderr, "diffsuite:", err)
+		return 2
+	}
 	began := time.Now()
+	suite.began = began
 	for _, tool := range suite.tools {
 		if err := suite.start(tool); err != nil {
 			suite.signal(syscall.SIGKILL)
@@ -92,28 +142,49 @@ func Run(args []string, stderr io.Writer) int {
 		go func() { defer running.Done(); suite.wait(tool) }()
 	}
 	finished := make(chan struct{})
-	if *health != "" {
-		go suite.watch(*health, finished)
-	}
+	go suite.watch(*health, finished)
+	go suite.heartbeat(finished)
+	go func() {
+		<-ctx.Done()
+		suite.mu.Lock()
+		defer suite.mu.Unlock()
+		suite.stopAll("cancelled")
+	}()
 	running.Wait()
 	close(finished)
 	suite.line("all runs ended: %s", filepath.Join(suite.out, "events.log"))
-	return suite.summarize(time.Since(began))
+	code := suite.summarize(time.Since(began))
+	suite.eventsMu.Lock()
+	fmt.Fprint(stdout, summaryTable(suite.tools))
+	fmt.Fprint(stdout, summaryReport(suite.tools))
+	suite.eventsMu.Unlock()
+	return code
 }
 
-func (suite *suite) setup(specs []string) error {
-	if suite.out == "" || len(specs) == 0 {
-		return fmt.Errorf("usage: diffsuite -out <dir> [-policy half|same-cause|any|none] [-health <url>] -- <name>='<command>' ...")
+// flagSet is true when the command line named the flag, rather than leaving its default.
+func flagSet(flags *flag.FlagSet, name string) bool {
+	named := false
+	flags.Visit(func(each *flag.Flag) { named = named || each.Name == name })
+	return named
+}
+
+func (suite *suite) setup(names, specs []string) error {
+	if suite.out == "" {
+		return fmt.Errorf("usage: diffsuite -out <dir> [-stack <slug> | -up] [-main-stack <slug> | -main] [-deployment saas|self-hosted] [-deferred <file>] [-tools a,b] [-policy half|same-cause|any|none] [-health <url>] [-- <name>='<command>' | <name>+='<flags>' ...]")
 	}
 	if !strings.Contains(" half same-cause any none ", " "+suite.policy+" ") {
 		return fmt.Errorf("unknown policy %q", suite.policy)
 	}
-	for _, spec := range specs {
-		name, command, ok := strings.Cut(spec, "=")
-		if !ok || name == "" || command == "" {
-			return fmt.Errorf("%q is not name=command", spec)
-		}
-		suite.tools = append(suite.tools, &tool{name: name, command: command})
+	tools, err := suiteTools(names, specs)
+	if err != nil {
+		return err
+	}
+	if len(tools) == 0 {
+		return fmt.Errorf("no tools to run")
+	}
+	suite.tools = tools
+	if suite.out, err = filepath.Abs(suite.out); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(suite.out, 0o755); err != nil {
 		return err
@@ -127,6 +198,7 @@ func (suite *suite) line(format string, args ...any) {
 	suite.eventsMu.Lock()
 	defer suite.eventsMu.Unlock()
 	fmt.Fprintf(suite.events, format+"\n", args...)
+	fmt.Fprintf(stdout, format+"\n", args...)
 }
 
 func (suite *suite) start(tool *tool) error {
@@ -136,7 +208,8 @@ func (suite *suite) start(tool *tool) error {
 	}
 	pipeIn, pipeOut := io.Pipe()
 	tool.output, tool.scanned = pipeOut, make(chan struct{})
-	tool.cmd = exec.Command("bash", "-c", tool.command)
+	tool.cmd = exec.Command("bash", "-c", tool.command) // #nosec G204 -- the operator's own suite.
+	tool.cmd.Dir, tool.cmd.Env = suite.root, suite.env
 	tool.cmd.Stdout, tool.cmd.Stderr = pipeOut, pipeOut
 	tool.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	tool.cmd.WaitDelay = 2 * time.Second
@@ -156,14 +229,23 @@ func (suite *suite) start(tool *tool) error {
 			if eventLine.MatchString(text) {
 				suite.line("[%s] %s", tool.name, text)
 			}
-			if _, ok := stopReason(text); ok {
+			suite.mu.Lock()
+			tool.noteLine(text)
+			streamed := tool.result(text)
+			suite.mu.Unlock()
+			if streamed != "" && !eventLine.MatchString(text) {
+				suite.say(tool.name, streamed)
+			}
+			if reason, ok := stopReason(text); ok {
 				suite.mu.Lock()
 				tool.stopLine = text
 				suite.mu.Unlock()
+				suite.say(tool.name, "STOPPED ("+classify(reason)+"): "+reason)
 			}
 		}
 		io.Copy(io.Discard, pipeIn)
 	}()
+	go suite.followFindings(tool)
 	return nil
 }
 
@@ -287,6 +369,8 @@ func (suite *suite) summarize(took time.Duration) int {
 	body, _ := json.MarshalIndent(map[string]any{
 		"verdict": verdict, "stopReason": suite.stopped, "exit": code,
 		"durationMs": took.Milliseconds(), "tools": tools,
+		"startedAt": suite.began.Format(time.RFC3339), "commit": headCommit(suite.root),
+		"branchStack": suite.stacks.branch.Slug, "mainStack": suite.stacks.main.Slug,
 	}, "", "  ")
 	os.WriteFile(filepath.Join(suite.out, "summary.json"), body, 0o644)
 	return code

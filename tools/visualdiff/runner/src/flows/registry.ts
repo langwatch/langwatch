@@ -1,7 +1,8 @@
 import * as actions from "./actions.ts";
 import type { Action } from "./context.ts";
 import { expectOutcome } from "./expect.ts";
-import { capture, drag, upload } from "./interactions.ts";
+import { capture, download, drag, hover, upload } from "./interactions.ts";
+import { acceptInvite } from "./invite.ts";
 import { mail } from "./mail.ts";
 import { click, dismissTour, fill, go, select, type, wait } from "./primitives.ts";
 
@@ -17,8 +18,11 @@ export const REGISTRY: Record<string, Action> = {
   expect: expectOutcome,
   upload,
   drag,
+  download,
+  hover,
   capture,
   mail,
+  acceptInvite,
   signIn: actions.signIn,
   createAutomation: actions.createAutomation,
   createEvaluation: actions.createEvaluation,

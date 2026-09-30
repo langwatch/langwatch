@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/diffkit"
 )
 
 const usage = `visualdiff — render every route and every flow on two refs and diff them
@@ -20,6 +22,7 @@ const usage = `visualdiff — render every route and every flow on two refs and 
                  [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
                  [-no-fail-fast] [-resume RUNID] [-no-publish] [-include-done]
                  [-rebase-main] [-force] [-max-load N] [-pages N] [-max-consecutive-errors N]
+                 [-batch-size N]
 
   visualdiff flow ID | route PATH [-edition E] [-candidate REF] [-force] [-dev-ui] [-dry-run] [-root DIR]
   visualdiff down [-root DIR]
@@ -29,6 +32,8 @@ const usage = `visualdiff — render every route and every flow on two refs and 
   visualdiff coverage [-base REF] [-candidate REF] [-config FILE] [-root DIR]
   visualdiff gc [-kept] [-no-haven] [-root DIR]
   visualdiff publish -run-dir DIR [-pr N] [-link URL] [-base REF] [-candidate REF] [-root DIR]
+  visualdiff batches [-dir OUT] [-wait] [-after N] [-timeout DUR]
+  visualdiff batch-review BATCH-DIR
 
 Each ref boots as a haven stack under its own run-scoped slug wherever haven
 is installed, so a run never reaches the datastores your own stack uses.
@@ -126,6 +131,10 @@ func Run(ctx context.Context, args []string, streams Streams) int {
 		return publishCommand(ctx, args[1:], streams)
 	case "check":
 		return checkCommand(ctx, args[1:], streams)
+	case "batch-review":
+		return batchReviewCommand(args[1:], streams)
+	case "batches":
+		return batchesCommand(ctx, args[1:], streams)
 	case "done":
 		return doneCommand(args[1:], streams)
 	case "flow", "route":
@@ -152,6 +161,10 @@ type runFlags struct {
 }
 
 func runCommand(ctx context.Context, args []string, streams Streams) int {
+	if _, suite := diffkit.SuiteStack(diffkit.SuiteBranch); suite {
+		fmt.Fprintln(streams.Err, "visualdiff run: not under diffsuite, which owns the stacks: run boots its own; `visualdiff check -routes` compares diffsuite's")
+		return ExitOperational
+	}
 	parsed, err := parseRunFlags(args, streams.Err)
 	if err == nil && !parsed.includeDone {
 		parsed.done, err = LoadDoneLedger(parsed.options.Root)
@@ -226,6 +239,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	noBaseline := flags.Bool("no-baseline", false, "render the base every time and cache nothing")
 	refreshBaseline := flags.Bool("refresh-baseline", false, "render the base and replace its cached baseline")
 	noFailFast := flags.Bool("no-fail-fast", false, "keep capturing even when the candidate's shell does not render")
+	fast := flags.Bool("fast", false, "render on a lean Chromium for a quick look; never caches a baseline or publishes to the pull request")
 	resume := flags.String("resume", "", "continue a -keep run by id: reuse its worktrees and running stacks")
 	noPublish, devUI, includeDone := flags.Bool("no-publish", false, "do not show the run's screens on the branch's pull request"),
 		flags.Bool("dev-ui", false, "capture both sides from their Vite dev servers instead of a production build of each UI"),
@@ -235,6 +249,7 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 	maxLoad := flags.Float64("max-load", DefaultMaxLoad, "refuse to start above this 1-minute load average")
 	pages := flags.Int("pages", 0, "pages each side captures on at once (default half the CPUs, fewer under load)")
 	maxErrors := flags.Int("max-consecutive-errors", DefaultMaxConsecutiveErrors, "stop after this many captures in a row that are harness or stack errors on one side (0 never stops)")
+	batchSize := flags.Int("batch-size", DefaultBatchSize, "seal a review batch every this many routes or flows (0 never does)")
 	if err := flags.Parse(args); err != nil {
 		return nil, errFlagsReported
 	}
@@ -261,11 +276,11 @@ func parseRunFlags(args []string, stderr io.Writer) (*runFlags, error) {
 		Identity: SeedIdentity{
 			ProjectKey: *projectKey, Slug: *slug, Email: *email, Password: *password,
 		},
-		Editions: editions, Baseline: !*noBaseline, RefreshBaseline: *refreshBaseline,
-		FailFast: !*noFailFast, NoPublish: *noPublish, DevUI: *devUI,
+		Editions: editions, Baseline: !*noBaseline && !*fast, RefreshBaseline: *refreshBaseline,
+		FailFast: !*noFailFast, Fast: *fast, NoPublish: *noPublish || *fast, DevUI: *devUI,
 		PinMain: !isFlagSet(flags, "base"), RebaseMain: *rebaseMain, Force: *force, MaxLoad: *maxLoad, Pages: *pages,
-		MaxConsecutiveErrors: *maxErrors,
-		SkipWorks:            !*includeDone && *routeList == "" && *flowList == "",
+		MaxConsecutiveErrors: *maxErrors, BatchSize: *batchSize,
+		SkipWorks: !*includeDone && *routeList == "" && *flowList == "",
 	}
 	resumeRun(&options, *resume)
 	return &runFlags{options: options, config: config, includeDone: *includeDone}, nil

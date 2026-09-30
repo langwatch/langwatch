@@ -14,7 +14,7 @@ import (
 )
 
 // SetupStep is one API call a flow's `setup:` makes before the flow runs, so a
-// prerequisite is posted instead of clicked through: Post is the path, Body its JSON
+// prerequisite is posted instead of clicked through: Post is the path (its {name} filled too), Body its JSON
 // with {name} filled from the fixtures and earlier captures, As names the strings
 // kept from the answer (value name to dot path). A flow reads them as {name}.
 type SetupStep struct {
@@ -79,7 +79,11 @@ func runSetup(ctx context.Context, request setupRequest, key string, flow Flow) 
 		if err != nil {
 			return captured, fmt.Errorf("step %d: %w", index, err)
 		}
-		answer, err := postReading(ctx, request.client, postSpec{url: request.apiURL + step.Post, key: key, body: body})
+		path := step.Post
+		for name, value := range values {
+			path = strings.ReplaceAll(path, "{"+name+"}", value)
+		}
+		answer, err := postReading(ctx, request.client, postSpec{url: request.apiURL + path, key: key, body: body})
 		if err != nil {
 			return captured, fmt.Errorf("step %d: %w", index, err)
 		}

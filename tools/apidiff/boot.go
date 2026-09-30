@@ -124,8 +124,8 @@ type Booted struct {
 	Teardown func()
 	// ActivateEntitlement, when non-nil, lets the entitled pass elevate the
 	// seeded organization to an Enterprise plan on both instances' own
-	// databases mid-run. nil on the haven path (see EntitlementActivator)
-	// and whenever the license it activates could not be read.
+	// databases mid-run. nil in probe mode, when the branch seed stored no
+	// licence (deferred), and when it could not be read or written.
 	ActivateEntitlement EntitlementActivator
 }
 
@@ -273,6 +273,7 @@ var managedEnvKeys = []string{
 	"LW_GATEWAY_INTERNAL_SECRET", "LW_GATEWAY_JWT_SECRET", "LW_VIRTUAL_KEY_PEPPER",
 	"FEATURE_FLAG_FORCE_ENABLE", "LANGWATCH_LOCAL_STORAGE_PATH",
 	"API_RATE_LIMIT_REQUESTS", "API_RATE_LIMIT_SECONDS",
+	"LANGWATCH_LICENSE_PUBLIC_KEY",
 }
 
 // Both instances run with the API's request limiter raised out of reach: the
@@ -293,6 +294,7 @@ type instanceEnvSpec struct {
 	redisURL      string
 	redisDBIndex  string
 	storagePath   string   // LANGWATCH_LOCAL_STORAGE_PATH: where each side stores dataset files
+	publicKey     string   // LANGWATCH_LICENSE_PUBLIC_KEY both sides verify licences with (see licensePublicKey)
 	collaborators []string // collaboratorEnv: LangWatchQL, the judge, the Langy agent stub
 }
 
@@ -336,6 +338,9 @@ func instanceEnv(inherit []string, spec instanceEnvSpec) []string {
 	)
 	if spec.storagePath != "" {
 		env = append(env, "LANGWATCH_LOCAL_STORAGE_PATH="+spec.storagePath)
+	}
+	if spec.publicKey != "" {
+		env = append(env, licensePublicKeyEnv+"="+spec.publicKey)
 	}
 	env = append(env, spec.collaborators...)
 	env = append(env, spec.extraEnv...)
@@ -607,7 +612,11 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 	booted.Teardown = state.teardown
 
 	if state.cfg.UseHaven {
-		return booted, state.bootHaven(ctx, booted)
+		if err := state.bootHaven(ctx, booted); err != nil {
+			return booted, err
+		}
+		booted.ActivateEntitlement = state.buildEntitlementActivator(ctx, booted)
+		return booted, nil
 	}
 	if err := state.prepareInstances(booted); err != nil {
 		return booted, err
@@ -615,7 +624,7 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 	if err := state.bootInstances(ctx, booted); err != nil {
 		return booted, err
 	}
-	booted.ActivateEntitlement = state.buildEntitlementActivator()
+	booted.ActivateEntitlement = state.buildEntitlementActivator(ctx, booted)
 	state.timing("both instances healthy")
 	return booted, nil
 }
@@ -639,29 +648,6 @@ func (state *bootState) branchTree() string {
 		return state.branchDir
 	}
 	return state.cfg.BranchDir
-}
-
-// buildEntitlementActivator reads the license the entitled pass activates
-// from this run's own branch checkout and, if that succeeds, returns a
-// closure that upserts it onto both instances' seeded organization. Reading
-// fails loudly to stderr and returns nil (skip, not crash) when the seed
-// source has moved or reshaped — a run should still finish and report
-// everything else it found rather than dying over one optional pass.
-func (state *bootState) buildEntitlementActivator() EntitlementActivator {
-	licenseKey, err := readLocalDevEnterpriseLicenseKey(state.cfg.BranchDir)
-	if err != nil {
-		state.logf("entitled pass: disabled (%v)", err)
-		return nil
-	}
-	sql := activateEntitlementSQL(licenseKey)
-	return func(ctx context.Context) error {
-		for _, name := range []string{"branch", "main"} {
-			if err := state.pgAdminDB(ctx, DatabaseName(state.runID, name), sql); err != nil {
-				return fmt.Errorf("activate entitlement %s: %w", name, err)
-			}
-		}
-		return nil
-	}
 }
 
 // bootHaven is the haven-path half of boot(): the branch instance runs from
@@ -1419,6 +1405,7 @@ func (state *bootState) envFor(instance Instance) ([]string, error) {
 		redisURL:      state.infra.redisServer,
 		redisDBIndex:  strconv.Itoa(redisIndex),
 		storagePath:   storagePath,
+		publicKey:     licensePublicKey(state.cfg.BranchDir),
 	}), nil
 }
 

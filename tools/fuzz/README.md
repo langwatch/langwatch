@@ -1,7 +1,8 @@
 # fuzz
 
 A generic, non-AI, highly parallel fuzzer for the LangWatch API and UI. It runs
-against the one shared stack (`visualdiff-check`), seeds its own `fuzzer`
+against the one shared stack (`visualdiff-check`), or under diffsuite its branch
+stack (`DIFFSUITE_BRANCH_*`, `tools/diffsuite/README.md`), seeds its own `fuzzer`
 organisation through the public API (diffkit's org-per-tool helper), and never
 restarts the stack or lowers a global limit.
 
@@ -36,6 +37,22 @@ exits 3 after `fuzz <mode>: stopping: N consecutive errors, most common cause:
 In `api` the requests in flight are cancelled and dropped, and findings are not
 shrunk against the stack that stopped answering. In `ui` the lanes finish their
 current action and take no new visit.
+
+## Load and crashes (`ui`)
+
+The UI half shares the visualdiff runner's throttle and context handling
+(`tools/visualdiff/runner/src/schedule.ts`, `capture.ts`):
+
+- each load of a route opens a fresh browser context that copies the signed-in
+  session, and closes it before the next load; in-app moves keep the context
+  until the next load, so `-reload-every` still sets the mix;
+- the workers are throttled by the machine's load (lanes above `workers x CPUs / load`
+  wait) and each renderer crash takes one worker off, logged as `fuzz pages: N of M`;
+- a visit whose page crashed is taken once more in a fresh context, its findings
+  held back. A second crash is not a finding either: it counts as the harness error
+  `page crashed` toward `-max-consecutive-errors`;
+- the "still loading" wait (30s) is scaled by `workers / limit`, so a throttled
+  run does not report a slow machine as a stuck page.
 
 ## The oracles (no AI)
 

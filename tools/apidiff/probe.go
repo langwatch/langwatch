@@ -142,7 +142,7 @@ type ProbeResult struct {
 func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation) ProbeResult {
 	client := options.Client
 	if client == nil {
-		client = &http.Client{Timeout: options.Timeout}
+		client = &http.Client{Timeout: options.Timeout, CheckRedirect: firstResponse}
 	}
 	engine := &probeEngine{
 		ctx: ctx, options: options, client: client,
@@ -716,6 +716,7 @@ type probeRequest struct {
 	query   url.Values
 	headers map[string]string
 	body    any
+	raw     *string // scenario steps: sent as it is, not as JSON
 }
 
 // execute performs one request against one instance and captures the outcome.
@@ -786,7 +787,7 @@ func (engine *probeEngine) executeOnce(probe probeRequest, encoded []byte) SideR
 	for name, value := range probe.headers {
 		request.Header.Set(name, value)
 	}
-	if encoded != nil {
+	if encoded != nil && request.Header.Get("Content-Type") == "" {
 		request.Header.Set("Content-Type", "application/json")
 	}
 	request.Header.Set("Accept", "application/json")
@@ -1056,3 +1057,7 @@ func excluded(path string, prefixes []string) bool {
 func pathWithinPrefix(path, prefix string) bool {
 	return prefix == "" || path == prefix || strings.HasPrefix(path, prefix+"/")
 }
+
+// firstResponse makes an http.Client return a redirect as the route's own
+// answer instead of following it.
+func firstResponse(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }

@@ -5,6 +5,7 @@
 # project id no fixture carries, so persistence is read back through the Open menu after a reload.
 # Every name carries {uid}.
 flows:
+  # branch-only: main has no /analytics/query LangWatchQL workbench page (only dashboard widgets render LWQL).
   - id: lwql-run-result-table
     title: Run a statement and read its rows in the result table
     steps:
@@ -27,6 +28,7 @@ flows:
         with:
           testId: lwql-result-summary
 
+  # branch-only: main has no /analytics/query LangWatchQL workbench page (only dashboard widgets render LWQL).
   - id: lwql-bad-statement-refused
     title: A statement naming a view that does not exist is refused in place and shows no rows
     steps:
@@ -49,6 +51,7 @@ flows:
           testId: lwql-result-row
           equals: "0"
 
+  # branch-only: main has no /analytics/query LangWatchQL workbench page (only dashboard widgets render LWQL).
   - id: lwql-saved-chart-lifecycle
     title: Save a statement as a chart, reopen it after a reload, rename it, then delete it
     steps:

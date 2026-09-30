@@ -4,9 +4,16 @@ import { openSideBrowser, type Side, type SideBrowser } from "./capture.ts";
 import { DiffPool } from "./diff-pool.ts";
 import { Pairing, readReplay } from "./pairing.ts";
 import { awaitSide } from "./pending-side.ts";
-import { emit, note, type Plan, type PlanSide } from "./protocol.ts";
-import { orderFlows, runPool, width } from "./schedule.ts";
-import { captureFlow, captureRoutes, type Collect } from "./screens.ts";
+import { emit, note, type Plan, type PlanFlow, type PlanSide } from "./protocol.ts";
+import { orderFlows, runPoolWithRecapture, Throttle, width } from "./schedule.ts";
+import {
+  captureRoutes,
+  holdsBack,
+  takeFlow,
+  type Collect,
+  type Lanes,
+  type Take,
+} from "./screens.ts";
 import { signInSide } from "./sign-in.ts";
 
 const out = process.stdout;
@@ -48,8 +55,8 @@ const readPlan = (argv: string[]): Plan => {
   return { ...plan, routes: plan.routes ?? [], flows: plan.flows ?? [] };
 };
 
-/** openPages launches a side, signs its first page in, and opens the rest in the same session. */
-const openPages = async ({
+/** signInFirst opens a side's first page and signs it in; every lane copies its session. */
+const signInFirst = async ({
   plan,
   browser,
   collect,
@@ -57,24 +64,19 @@ const openPages = async ({
   plan: Plan;
   browser: SideBrowser;
   collect: Collect;
-}): Promise<Side[]> => {
+}): Promise<Side> => {
   const first = await browser.openPage();
-  const count = Math.max(width(plan.concurrency?.routes), width(plan.concurrency?.flows));
-  const signInStartedAt = Date.now();
-  const signedIn = signInSide({ plan, side: first, collect }).then(() => {
-    const millis = Date.now() - signInStartedAt;
-    emit({ message: { type: "phase", side: first.name, name: "sign-in", millis }, out });
-  });
-  const [, rest] = await Promise.all([
-    signedIn,
-    Promise.all(Array.from({ length: count - 1 }, () => browser.openPage())),
-  ]);
-  return [first, ...rest];
+  const startedAt = Date.now();
+  await signInSide({ plan, side: first, collect });
+  const millis = Date.now() - startedAt;
+  emit({ message: { type: "phase", side: first.name, name: "sign-in", millis }, out });
+  return first;
 };
 
 /**
- * captureSide renders the routes across its pages, read-only flows taking pages as the
- * routes drain; then every other flow, on every page; then the `serial` flows, alone.
+ * captureSide renders the routes across its lanes, read-only flows taking lanes as the
+ * routes drain; then every other flow, on every lane; then the `serial` flows, alone. Each
+ * job gets a context of its own, closed after it, so no page lives long enough to bloat.
  */
 const captureSide = async ({
   plan,
@@ -85,26 +87,33 @@ const captureSide = async ({
   browser: SideBrowser;
   collect: Collect;
 }): Promise<void> => {
-  const pages = await openPages({ plan, browser, collect });
-  const [first] = pages;
-  if (first === undefined) return;
-  const flows = orderFlows(plan.flows);
+  const first = await signInFirst({ plan, browser, collect });
   const side = first.name;
-  const timings = await captureRoutes({ plan, pages, collect, alongside: flows.readers });
+  const max = Math.max(width(plan.concurrency?.routes), width(plan.concurrency?.flows));
+  const lanes: Lanes = {
+    open: async () => browser.openLane(),
+    width: max,
+    throttle: new Throttle(side, max),
+  };
+  const flows = orderFlows(plan.flows);
+  const timings = await captureRoutes({ plan, first, lanes, collect, alongside: flows.readers });
+  await first.dispose();
   emit({ message: { type: "phase", side, name: "capture", millis: timings.captureMillis }, out });
   emit({
     message: { type: "phase", side, name: "recapture", millis: timings.recaptureMillis },
     out,
   });
   const flowsStartedAt = Date.now();
-  await runPool({
+  await runPoolWithRecapture<PlanFlow, Take>({
     items: flows.writers,
-    width: pages.length,
-    work: async ({ item, lane }) =>
-      captureFlow({ plan, flow: item, side: pages[lane] ?? first, collect }),
+    width: lanes.width,
+    limit: () => lanes.throttle.limit(),
+    take: async ({ item }) => takeFlow({ plan, flow: item, lanes, collect }),
+    spoiled: (take) => holdsBack({ take, lanes, side }),
+    keep: (take) => take.keep(),
   });
   for (const flow of flows.last) {
-    await captureFlow({ plan, flow, side: first, collect });
+    (await takeFlow({ plan, flow, lanes, collect })).keep();
   }
   emit({
     message: { type: "phase", side, name: "flows", millis: Date.now() - flowsStartedAt },
@@ -149,6 +158,7 @@ const main = async (): Promise<void> => {
           viewport: plan.viewport,
           settle: plan.settle,
           frozenTime: plan.frozenTime,
+          fast: plan.fast,
         });
         browsers.push(browser);
         try {
@@ -169,13 +179,15 @@ const main = async (): Promise<void> => {
   emit({ message: { type: "done" }, out });
 };
 
-main().then(
-  () => exit(0),
-  (thrown: unknown) => {
+main()
+  .then(() => exit(0))
+  .catch((thrown: unknown) => {
     emit({
-      message: { type: "error", message: String(thrown instanceof Error ? thrown.message : thrown) },
+      message: {
+        type: "error",
+        message: String(thrown instanceof Error ? thrown.message : thrown),
+      },
       out,
     });
     exit(1);
-  },
-);
+  });

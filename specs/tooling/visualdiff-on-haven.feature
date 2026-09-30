@@ -246,9 +246,9 @@ Feature: visualdiff boots its stacks through haven
 
   Rule: Every screen is compared in both editions
 
-    # Both refs seed the same signed local-dev enterprise licence onto the
-    # organization, and a null licence is the open-source plan on both, so
-    # one pair of stacks serves both editions by flipping that column.
+    # Each ref seeds its own licence (the branch signs one only with the root
+    # .env's licence keys), and a null licence is the open-source plan on both,
+    # so one pair of stacks serves both editions by flipping that column.
 
     @unit
     Scenario: Every screen is captured once per edition

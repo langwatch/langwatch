@@ -8,6 +8,7 @@
     "./capture": "./src/capture.ts",
     "./protocol": "./src/protocol.ts",
     "./sign-in": "./src/sign-in.ts",
+    "./schedule": "./src/schedule.ts",
     "./module-load": "./src/module-load.ts",
     "./settle": "./src/settle.ts",
     "./flows/actions": "./src/flows/actions.ts",

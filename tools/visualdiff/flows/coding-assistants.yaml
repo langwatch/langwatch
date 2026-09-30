@@ -14,14 +14,12 @@ flows:
           path: /{slug}/sessions
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: Visual diff alpha session
-          min: "1"
+          count: 'tbody tr:has-text("Visual diff alpha session")'
+          min: '1'
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: Visual diff beta session
-          min: "1"
+          count: 'tbody tr:has-text("Visual diff beta session")'
+          min: '1'
       - action: expect
         with:
           text: vd-org/vd-repo
@@ -35,19 +33,16 @@ flows:
           path: /{slug}/sessions
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: /Visual diff alpha session.*feat\/vd-alpha/s
-          min: "1"
+          count: 'tbody tr:has-text("/Visual diff alpha session.*feat\/vd-alpha/s")'
+          min: '1'
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: /Visual diff beta session.*feat\/vd-beta/s
-          min: "1"
+          count: 'tbody tr:has-text("/Visual diff beta session.*feat\/vd-beta/s")'
+          min: '1'
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: /Visual diff beta session.*vd-repo · main/s
-          equals: "0"
+          count: 'tbody tr:has-text("/Visual diff beta session.*vd-repo · main/s")'
+          equals: '0'
 
   - id: coding-session-list-search-narrows
     title: Searching the session list narrows it to the matching session, and clearing restores it
@@ -57,32 +52,28 @@ flows:
           path: /{slug}/sessions
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: Visual diff beta session
-          min: "1"
+          count: 'tbody tr:has-text("Visual diff beta session")'
+          min: '1'
       - action: type
         with:
           placeholder: Search sessions
           text: alpha
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: Visual diff alpha session
-          min: "1"
+          count: 'tbody tr:has-text("Visual diff alpha session")'
+          min: '1'
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: Visual diff beta session
-          equals: "0"
+          count: 'tbody tr:has-text("Visual diff beta session")'
+          equals: '0'
       - action: fill
         with:
-          field: Search sessions
+          selector: 'input[placeholder="Search sessions"]'
           value: ""
       - action: expect
         with:
-          testId: coding-agent-session-row
-          hasText: Visual diff beta session
-          min: "1"
+          count: 'tbody tr:has-text("Visual diff beta session")'
+          min: '1'
 
   - id: coding-session-opens-terminal-replay
     title: Opening a session from its row menu finds its stored trace and replays it
@@ -95,7 +86,8 @@ flows:
           label: Actions for Visual diff alpha session
       - action: click
         with:
-          testId: coding-agent-session-replay
+          selector: '[role="menuitem"]'
+          hasText: Open terminal replay
       - action: wait
         with:
           millis: "2500"
@@ -185,7 +177,7 @@ flows:
           path: /settings/integrations
       - action: expect
         with:
-          testId: github-connection-card
+          count: '#github'
       - action: expect
         with:
           text: /Connect GitHub|not available on this instance|Installed/
@@ -208,3 +200,82 @@ flows:
           api: /api/github-langy/setup
           auth: none
           status: "400"
+
+  - id: github-install-error-comes-back-as-toast
+    title: GitHub's redirect back with a refusal shows the failure once and does not repeat on reload
+    steps:
+      - action: go
+        with:
+          path: /settings/integrations?githubError=vd-github-refused-{uid}
+      - action: expect
+        with:
+          text: GitHub installation failed
+      - action: expect
+        with:
+          text: vd-github-refused-{uid}
+      - action: go
+        with:
+          path: /settings/integrations
+      - action: expect
+        with:
+          text: Lets LangWatch open pull requests on the repositories you choose
+      - action: expect
+        with:
+          text: GitHub installation failed
+          equals: "0"
+
+  - id: github-integrations-not-connected-state
+    title: With no installation the card offers Connect or says it is unavailable, and shows no installed account
+    steps:
+      - action: go
+        with:
+          path: /settings/integrations
+      - action: expect
+        with:
+          text: /Connect GitHub|The GitHub integration is not available on this instance/
+      - action: expect
+        with:
+          text: Add another account
+          equals: "0"
+      - action: expect
+        with:
+          text: /^\s*Installed\s*$/
+          equals: "0"
+
+  - id: coding-session-usage-tab-in-trace-drawer
+    title: A coding-agent trace opens with a Usage tab that reads the session summary
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/5c0d1a6e0000000000000000000000a1
+      - action: expect
+        with:
+          text: claude_code.llm_request
+      - action: click
+        with:
+          text: /^\s*Usage\s*$/
+      - action: expect
+        with:
+          text: /Where the tokens went|What it did|Where the time went|No usage summary for this session/
+
+  - id: coding-session-replay-drawer-tabs
+    title: Opening a replay from a session row shows the Terminal and Usage tabs, and Usage reads
+    steps:
+      - action: go
+        with:
+          path: /{slug}/sessions
+      - action: click
+        with:
+          label: Actions for Visual diff alpha session
+      - action: click
+        with:
+          text: /^\s*Open terminal replay\s*$/
+      - action: expect
+        with:
+          text: /^\s*Terminal\s*$/
+      - action: click
+        with:
+          text: /^\s*Usage\s*$/
+      - action: expect
+        with:
+          text: /Where the tokens went|What it did|Where the time went|No usage summary for this session/

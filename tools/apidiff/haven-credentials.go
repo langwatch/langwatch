@@ -154,3 +154,17 @@ func servesTarget(stack havenrun.StackStatus, target *url.URL) bool {
 	}
 	return false
 }
+
+// serviceMailURL is the mail sink of the haven stack serving baseURL; empty
+// when there is no haven, no such stack or no sink.
+func serviceMailURL(ctx context.Context, baseURL string) string {
+	if baseURL == "" {
+		return ""
+	}
+	stack, found, err := havenStackServing(ctx, baseURL)
+	if err != nil || !found {
+		return ""
+	}
+	address, _ := stack.ServiceURL(havenMailService)
+	return address
+}

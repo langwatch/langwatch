@@ -83,3 +83,33 @@ export class FindingSink {
     this.writes.add(tracked);
   }
 }
+
+/** VisitSink is what a visit writes findings and screenshots through. */
+export type VisitSink = Pick<FindingSink, "wantsScreenshot" | "nextShot" | "save" | "write">;
+
+/** HeldFindings keeps one visit's findings back until the lane knows the page did not crash. */
+export class HeldFindings implements VisitSink {
+  private readonly held: Finding[] = [];
+
+  constructor(private readonly sink: FindingSink) {}
+
+  wantsScreenshot(signature: string): boolean {
+    return this.sink.wantsScreenshot(signature);
+  }
+
+  nextShot(navigation: Navigation): { file: string; relative: string } {
+    return this.sink.nextShot(navigation);
+  }
+
+  save(shot: { file: string; bytes: Buffer }): void {
+    this.sink.save(shot);
+  }
+
+  write(finding: Finding): void {
+    this.held.push(finding);
+  }
+
+  release(): void {
+    for (const finding of this.held) this.sink.write(finding);
+  }
+}

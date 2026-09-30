@@ -299,25 +299,28 @@ Detection reads the `error.code` field out of the body — never a hardcoded
 path list — so a gate on a surface added later (SCIM, the webhook endpoints
 that already check `assertEndpointsEntitled`) is caught the same way.
 
-Activation is a live, mid-run database write, not a boot-time flag: `run`
-mode `UPDATE`s the `Organization.license` column both layouts read fresh on
-every request (branch:
-`PrismaOrganizationLicenseRepository.tryReadLicense`; main:
-`LicenseHandler`'s `readStoredLicense`), for `local-dev-organization`, on
-BOTH instances' databases, with the same pre-signed ENTERPRISE license the
-local-dev seed itself writes
-(`LOCAL_DEV_ENTERPRISE_LICENSE_KEY`, read at runtime from
-`enterprise/modules/licensing/process/src/seeding.ts` in the branch checkout —
-never copied into Go source, so a rotation is caught by a failing read
-instead of silently entitling nothing). No restart, and nothing is skipped on
+Activation writes the `Organization.license` column both layouts read fresh on
+every request (branch: `PrismaOrganizationLicenseRepository.tryReadLicense`;
+main: `LicenseHandler`'s `readStoredLicense`) for `local-dev-organization`, on
+BOTH instances' databases, with one licence: the one the branch seed stored.
+Both licence keys live in the root `.env`: `LANGWATCH_LICENSE_PUBLIC_KEY`,
+which both sides verify with, and `LANGWATCH_LICENSE_PRIVATE_KEY`, which the
+branch seed signs an ENTERPRISE licence with
+(`dev/docs/runbooks/license-generator.md`). On the haven path the root `.env`
+is copied into both worktrees; on `-no-haven` the public key is passed to both
+sides from the shell or the root `.env`. Main's own seed writes a licence
+signed for another key, so as soon as both sides are healthy `run` copies the
+branch's licence onto main (both start entitled), and the pass re-applies it
+to both. The haven path reaches each stack's database through `haven db url`
+and `psql`, as visualdiff's editions do. No restart, and nothing is skipped on
 the unentitled pass to make room for it: the original gate refusal stays its
 own finding, under the ordinary case.
 
-`probe` mode has no database and never activates anything; `run`'s haven path
-provisions no fixtures at all (same reason the SCIM and permission-probe
-fixtures are skipped there — a haven stack's database belongs to haven), so
-the entitled pass is skipped too, noted on stderr rather than silently doing
-nothing.
+With no keys configured the branch seed stores no licence, so `run` clears
+main's too (never an entitled main against an unentitled branch) and prints
+one line, `entitled pass: deferred: no licence keys ...`; the pass then skips.
+`probe` mode has no database and never activates anything, noted on stderr
+rather than silently doing nothing.
 
 **The activation attempt can genuinely do nothing, and the pass reports that
 honestly rather than papering over it.** Elevating the database row only
@@ -649,10 +652,14 @@ once per side; on a 404 it logs one line, drops the key, seeds through the
 no-key path and defers every scenario that needs it (`shard: org`, auth
 `admin`, `org-c`, `org-c-org`). They are listed by id on a `deferred:
 self-hosted pass` line, are not in the tally and are not failures. A 401 or 403
-keeps the key. The list of what a later non-SaaS pass must cover is kept in
-the run notes, not here.
+keeps the key. The same ids go to `deferred.txt` in the run directory, one per
+line, and `-scenario-id @<file>` reads them back (a file naming no id is
+refused, since no pattern would select every scenario). `diffsuite
+-deployment self-hosted -deferred <file>` runs them on a self-hosted stack
+(`tools/diffsuite/README.md`).
 `scenarios.jsonl` lands in the run directory (`-run-dir` in the standalone
-mode).
+mode). Under diffsuite, `-a`/`-mail-a` default to its branch stack and
+`-b`/`-mail-b` to its main stack when it has one (`tools/diffsuite/README.md`).
 
 - **One stack (PASS or FAIL):** `apidiff scenarios -a URL` with no `-b` runs
   every scenario against that one stack; the verdicts are PASS, FAIL and
@@ -694,6 +701,19 @@ mode).
   only what scenarios in the same project do; eight shards means about a
   scenario in eight shares a project, so keep the request's own name unique
   with `{uid}`. Prefer it to `serial`. A `countDelta` on a shared list races.
+- **`serial: true`:** a scenario-level flag, orthogonal to `shard`: the
+  scenario keeps its shard kind (a `project` shard still gets isolated keys) but
+  runs in the serial pass, alone after the pool drains and under the instance
+  lock, its steps back to back. Use it for a rate-limit window
+  (`lim-files-read-121st-is-429`) or a scope another scenario claims
+  (`model-defaults-update-config`).
+- **tRPC bodies:** a step to `/api/trpc/<procedure>` writes its input once, plain
+  (`body: { projectId: ... }`); the harness wraps it per side as `{json: input}`
+  for a superjson side and leaves it plain otherwise, and lifts
+  `result.data.json` to `result.data` in a superjson answer, so a capture reads
+  `result.data.workflow.id` on both. In a two-sided run branch is `none` and main
+  is `superjson`; a single-sided stack sets `-trpc-transformer superjson|none`
+  (default `none`).
 - **Placeholders:** `{uid}` (fixed width, so one never prefixes another),
   `{UID}` (upper case, for names like `^[A-Z][A-Z0-9_]*$`), `{uidHex16}`,
   `{uidHex32}`, `{nowMs}` and `{nowMs-3600000}` / `{nowMs+60000}` (read when
@@ -703,6 +723,18 @@ mode).
 - **Expect:** `body: { key: "<any>" }` is present and not null;
   `body: { key: "<absent>" }` is not in the body at all. Methods: GET, HEAD,
   POST, PUT, PATCH, DELETE (no multipart bodies yet).
+- **Absolute-URL and raw-body steps:** a request whose path is a placeholder
+  that expands to an `http(s)://` URL (`request: "PUT {uploadUrl}"`, with
+  `uploadUrl` captured by an earlier step) is sent to that URL as it is: not
+  the side's base URL, and none of the side's auth headers (a presigned URL
+  is its own credential; only the step's own `headers` go). A path that
+  expands to neither `/path` nor an absolute URL is ERROR. `bodyRaw: "text"`
+  sends the (placeholder-expanded) string as the body with no JSON encoding,
+  with `contentType` as its `Content-Type` (`bodyRaw: ""` sends an empty
+  body); it replaces `body`, and both keys work on a scalar step or in the
+  mapping form. The stored-object round trip (create, PUT, confirm, read) is
+  in `scenarios/stored-objects.yaml`. A capture reads a response body field,
+  so a presigned URL's required `headers` object cannot be forwarded yet.
 - **Auth kinds:** project, project-b, project-c, org, admin, scim, none,
   restricted (a read-only key minted per shard), session, cli, and `org-c` /
   `org-c-org`: the project key and the organization key of a second

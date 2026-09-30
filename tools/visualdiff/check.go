@@ -9,6 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -20,15 +21,17 @@ import (
 // LoopCandidateURL is the fix loop's candidate stack, which `check -url` can name.
 const LoopCandidateURL = "https://app.visualdiff-loop-candidate.langwatch.localhost"
 
-// DefaultCheckPages is how many flows check runs at once; flows are independent by {uid}.
-const DefaultCheckPages = 16
-
 // checkFlags is one parsed `visualdiff check` command line.
 type checkFlags struct {
 	root, url, only, skip string
 	pages, maxErrors      int
+	batchSize             int
 	all, mark, down       bool
-	devUI, shared         bool
+	devUI, shared, fast   bool
+	// stack is the haven stack checked (-url aside); baseURL a live main to compare
+	// with instead of the baseline; adoptOnly refuses to boot (diffsuite owns the stacks).
+	stack, baseURL    string
+	routes, adoptOnly bool
 }
 
 // checkCommand is `visualdiff check`: every flow not yet done (less -skip) against ONE
@@ -71,21 +74,44 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 	side.Fixtures = mergeFixtures(side.Fixtures, setups)
 	times.seed += time.Since(setupStarted)
 	times.seedParts = append(times.seedParts, SeedTiming{Part: "setups", Took: time.Since(setupStarted)})
+	if parsed.pages <= 0 {
+		parsed.pages = CheckPages(runtime.NumCPU(), readFreeMemory(ctx))
+	}
 	plan := checkPlan(parsed, side, config)
-	baseline, held := checkBaseline(parsed.root, config.Flows)
+	// A fast check's lean pixels would differ from main's baseline everywhere, so it compares none.
+	baseline, held := "", map[string]bool(nil)
+	if parsed.baseURL != "" {
+		base, err := liveBase(ctx, parsed.baseURL, config.Flows, streams.Err)
+		if err != nil {
+			fmt.Fprintln(streams.Err, "visualdiff:", diffkit.SetupFailed(err))
+			return ExitOperational
+		}
+		plan.Sides, held = append([]RunnerSide{base}, plan.Sides...), map[string]bool{}
+		for _, id := range flowIDs(config) {
+			held[id] = true
+		}
+		fmt.Fprintf(streams.Err, "check: screenshots compared with main at %s\n", parsed.baseURL)
+	} else if !parsed.fast {
+		baseline, held = checkBaseline(parsed.root, config.Flows)
+	}
 	if baseline != "" {
 		plan.Sides = append([]RunnerSide{{Name: "base", Replay: filepath.Join(baseline, BaselineCaptures)}}, plan.Sides...)
 		fmt.Fprintf(streams.Err, "check: screenshots compared with %s (%d of %d flows)\n", baseline, len(held), len(config.Flows))
 	}
-	fmt.Fprintf(streams.Err, "check: %d flows against %s, %d at a time\n", len(plan.Flows), side.BaseURL, parsed.pages)
+	fmt.Fprintf(streams.Err, "check: %d flows against %s, %d at a time\n", len(plan.Flows), side.BaseURL, plan.Concurrency.Flows)
 	results := newFlowResults()
 	started := time.Now()
 	progress := &checkProgress{results: results, total: len(plan.Flows), started: started, out: streams.Err}
-	stream, runErr := RunRunner(ctx, plan, CaptureOptions{Root: parsed.root, Stderr: streams.Err, MaxConsecutiveErrors: parsed.maxErrors, OnCapture: func(capture Capture) {
+	resetBatches(plan.OutDir)
+	batches := newBatcher(batcherInputs{OutDir: plan.OutDir, Size: parsed.batchSize, Plan: plan, Out: streams.Out})
+	stream, runErr := RunRunner(ctx, plan, batches.wrap(CaptureOptions{Root: parsed.root, Stderr: streams.Err, MaxConsecutiveErrors: parsed.maxErrors, OnCapture: func(capture Capture) {
 		if line := results.add(capture); line != "" {
 			fmt.Fprintln(streams.Err, line)
 		}
-	}, OnPhase: progress.phase})
+	}, OnPhase: progress.phase}))
+	if err := batches.close(); err != nil {
+		fmt.Fprintln(streams.Err, "visualdiff: batches:", err)
+	}
 	fmt.Fprintf(streams.Err, "check: phase flows %s, compare and close %s\n", progress.flowsTook().Round(time.Second), progress.windDown().Round(time.Second))
 	if failure := runnerFailure(stream, runErr); failure != "" {
 		fmt.Fprintln(streams.Err, "visualdiff:", diffkit.SetupFailed(errors.New(failure)))
@@ -93,6 +119,9 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 		return ExitOperational
 	}
 	outcome := results.outcome(checkOutcomeInputs{flows: config.Flows, done: done, diffs: stream.Diffs, held: held, took: time.Since(started)})
+	if len(plan.Routes) > 0 {
+		outcome = withRoutes(outcome, plan, stream)
+	}
 	outcome.text += timingBlock(times, stream.Phases, time.Since(began))
 	fmt.Fprint(streams.Out, outcome.text)
 	if err := os.WriteFile(filepath.Join(plan.OutDir, "check-report.md"), []byte("# visualdiff check\n\n```\n"+outcome.text+"```\n"), 0o600); err != nil {
@@ -138,16 +167,22 @@ func parseCheckFlags(args []string, stderr io.Writer) (checkFlags, error) {
 	flags.StringVar(&parsed.url, "url", "", "a running app to check instead of check's own stack (booted from the working tree)")
 	flags.StringVar(&parsed.only, "only", "", "comma-separated flow ids to run (default: all not done)")
 	flags.StringVar(&parsed.skip, "skip", "", "comma-separated flow ids to leave out")
-	flags.IntVar(&parsed.pages, "pages", DefaultCheckPages, "flows run at once")
+	flags.IntVar(&parsed.pages, "pages", 0, "flows run at once (default up to 4: half the CPUs, one per GB free)")
 	flags.IntVar(&parsed.maxErrors, "max-consecutive-errors", DefaultMaxConsecutiveErrors, "stop after this many captures in a row that are harness or stack errors (0 never stops)")
 	flags.BoolVar(&parsed.all, "all", false, "run the flows the done ledger holds too (the final pass)")
 	flags.BoolVar(&parsed.mark, "mark", false, "mark every flow that passes as done, so later checks skip it")
 	flags.BoolVar(&parsed.down, "down", false, "destroy check's own stack and forget its seed")
 	flags.BoolVar(&parsed.devUI, "dev-ui", false, "serve pages from the stack's Vite dev server instead of a production build")
+	flags.BoolVar(&parsed.fast, "fast", false, "render on a lean Chromium: quicker, but not the pixels a pull request shows")
 	flags.BoolVar(&parsed.shared, "shared", false, "lanes share the stack: boot, seed and ui build under a lock, never restart it")
+	flags.StringVar(&parsed.stack, "stack", CheckSlug, "the haven stack to check; diffsuite's branch stack under diffsuite")
+	flags.StringVar(&parsed.baseURL, "base-url", "", "a running main to compare with instead of the pinned baseline; diffsuite's main stack under diffsuite")
+	flags.IntVar(&parsed.batchSize, "batch-size", DefaultBatchSize, "seal a review batch every this many routes or flows (0 never does)")
+	flags.BoolVar(&parsed.routes, "routes", false, "capture every route too, and write report/ beside check-report.md")
 	if err := flags.Parse(args); err != nil {
 		return parsed, err
 	}
+	fromSuite(&parsed, flags)
 	root, err := filepath.Abs(parsed.root)
 	if err != nil {
 		fmt.Fprintln(stderr, "visualdiff:", err)
@@ -172,7 +207,14 @@ func checkConfig(parsed checkFlags) (*Config, []string, error) {
 			ids = append(ids, id)
 		}
 	}
+	routes := config.Routes
 	selected, err := config.Select([]string{}, ids)
+	if err == nil {
+		selected.Routes = nil
+		if parsed.routes {
+			selected.Routes = routes
+		}
+	}
 	if err != nil || parsed.all {
 		return selected, nil, err
 	}
@@ -191,10 +233,70 @@ func checkConfig(parsed checkFlags) (*Config, []string, error) {
 // checkSide is the app under check: check's own stack, or -url as given, unseeded.
 func checkSide(ctx context.Context, parsed checkFlags, times *checkTimes, stderr io.Writer) (RunnerSide, error) {
 	if parsed.url == "" {
-		return checkStack(ctx, checkStackRequest{root: parsed.root, devUI: parsed.devUI, shared: parsed.shared, stderr: stderr}, times)
+		return checkStack(ctx, checkStackRequest{root: parsed.root, slug: parsed.stack, devUI: parsed.devUI, shared: parsed.shared, adoptOnly: parsed.adoptOnly, stderr: stderr}, times)
 	}
 	app := Stack{HavenURL: parsed.url}
 	return RunnerSide{Name: "candidate", BaseURL: app.URL(), MailURL: app.MailURL(), Fixtures: map[string]string{}}, nil
+}
+
+// fromSuite points check at the stacks diffsuite handed it, when no flag named one:
+// the branch stack, adopted and never booted or restarted, and main's, live.
+func fromSuite(parsed *checkFlags, flags *flag.FlagSet) {
+	branch, ok := diffkit.SuiteStack(diffkit.SuiteBranch)
+	if !ok || parsed.url != "" {
+		return
+	}
+	if !isFlagSet(flags, "stack") {
+		parsed.stack = branch.Slug
+	}
+	parsed.adoptOnly, parsed.shared = true, true
+	if main, ok := diffkit.SuiteStack(diffkit.SuiteMain); ok && parsed.baseURL == "" {
+		parsed.baseURL = main.AppURL
+	}
+}
+
+// liveBase seeds a running main as run seeds its base, and answers it as the runner's base side.
+func liveBase(ctx context.Context, url string, flows []Flow, stderr io.Writer) (RunnerSide, error) {
+	stack := Stack{HavenURL: url}
+	seeded, err := Seed(ctx, SeedRequest{APIURL: stack.APIURL(), Identity: SeedIdentity{}.withSeededDefaults(), TraceCount: 6})
+	if err != nil {
+		return RunnerSide{}, fmt.Errorf("seed main: %w", err)
+	}
+	setups, warnings := runFlowSetups(ctx, setupRequest{apiURL: stack.APIURL(), key: DefaultProjectKey, fixtures: seeded.Fixtures, flows: flows})
+	for _, warning := range append(seeded.Warnings, warnings...) {
+		fmt.Fprintln(stderr, "check: main:", warning)
+	}
+	return RunnerSide{Name: "base", BaseURL: stack.URL(), MailURL: stack.MailURL(), Fixtures: mergeFixtures(seeded.Fixtures, setups)}, nil
+}
+
+// withRoutes adds a line per route that fails or differs from main, writes the full
+// report under report/enterprise/ (what `visualdiff publish` reads), and counts those routes as failures.
+func withRoutes(outcome checkOutcome, plan RunnerPlan, stream RunnerStream) checkOutcome {
+	rows := BuildRows(stream.Captures, stream.Diffs)
+	var out strings.Builder
+	total, failed, unmatched := 0, 0, 0
+	for index := range rows {
+		row := rows[index]
+		if row.Kind != "route" {
+			continue
+		}
+		total++
+		switch {
+		case row.Base == nil && (row.Candidate == nil || row.Candidate.Error == ""):
+			unmatched++
+		case row.Finding():
+			failed++
+			fmt.Fprintf(&out, "ROUTE    %s · %s · %s\n", row.Key, row.Class, row.Why)
+		}
+	}
+	fmt.Fprintf(&out, "%d/%d routes without a finding (%d with nothing of main's to compare)\n", total-failed, total, unmatched)
+	report := filepath.Join(plan.OutDir, "report", string(EditionEnterprise))
+	if err := WriteReport(report, rows, ReportMeta{CandidateURL: plan.Sides[len(plan.Sides)-1].BaseURL, StartedAt: time.Now().UTC().Format(time.RFC3339)}); err != nil {
+		fmt.Fprintf(&out, "report: %v\n", err)
+	}
+	outcome.text += out.String()
+	outcome.failed += failed
+	return outcome
 }
 
 // checkPlan is a runner plan whose one live side is the app under check.
@@ -206,7 +308,7 @@ func checkPlan(parsed checkFlags, side RunnerSide, config *Config) RunnerPlan {
 		Sides:       []RunnerSide{side},
 		OutDir:      CheckDir(parsed.root),
 		Slug:        identity.Slug,
-		Routes:      []string{},
+		Routes:      append([]string{}, config.Routes...),
 		Flows:       config.Flows,
 		Credential:  identity,
 		FrozenTime:  time.Now().UnixMilli(),
@@ -214,6 +316,7 @@ func checkPlan(parsed checkFlags, side RunnerSide, config *Config) RunnerPlan {
 		Concurrency: Concurrency{Routes: parsed.pages, Flows: parsed.pages},
 		Edition:     EditionEnterprise,
 		Check:       true,
+		Fast:        parsed.fast,
 	}
 }
 
@@ -223,38 +326,55 @@ func clockLines(out io.Writer) io.Writer {
 }
 
 // checkProgress prints a line as each flow ends: done, the tally, elapsed and what is left.
+// flowsFrom is when the route pass ended; the time left is paced from there, not the start.
 type checkProgress struct {
-	mutex    sync.Mutex
-	results  *flowResults
-	total    int
-	done     int
-	tally    map[string]int
-	started  time.Time
-	lastFlow time.Time
-	out      io.Writer
+	mutex       sync.Mutex
+	results     *flowResults
+	total       int
+	done        int
+	doneAtFlows int
+	tally       map[string]int
+	started     time.Time
+	flowsFrom   time.Time
+	lastFlow    time.Time
+	out         io.Writer
 }
 
 func (progress *checkProgress) phase(phase RunnerPhase) {
-	id, isFlow := strings.CutPrefix(phase.Name, "flow ")
-	if !isFlow || phase.Side != "candidate" {
+	if phase.Side != "candidate" {
 		return
 	}
 	progress.mutex.Lock()
 	defer progress.mutex.Unlock()
+	if phase.Name == "recapture" {
+		progress.flowsFrom, progress.doneAtFlows = time.Now(), progress.done
+		return
+	}
+	id, isFlow := strings.CutPrefix(phase.Name, "flow ")
+	if !isFlow {
+		return
+	}
 	if progress.tally == nil {
 		progress.tally = map[string]int{}
 	}
 	progress.done++
 	progress.tally[progress.results.verdict(id)]++
 	progress.lastFlow = time.Now()
-	elapsed := time.Since(progress.started)
-	left := time.Duration(0)
-	if progress.done > 0 {
-		left = elapsed / time.Duration(progress.done) * time.Duration(progress.total-progress.done)
-	}
 	fmt.Fprintf(progress.out, "%d/%d flows · %d pass %d fail %d unproven · %s elapsed · ~%s left\n",
 		progress.done, progress.total, progress.tally["pass"], progress.tally["fail"], progress.tally["unproven"],
-		elapsed.Round(time.Second), left.Round(time.Second))
+		time.Since(progress.started).Round(time.Second), progress.left(time.Now()).Round(time.Second))
+}
+
+// left is the flows still to run at the pace of those done since flowsFrom (the start without one).
+func (progress *checkProgress) left(now time.Time) time.Duration {
+	from, done := progress.flowsFrom, progress.done-progress.doneAtFlows
+	if from.IsZero() {
+		from, done = progress.started, progress.done
+	}
+	if done <= 0 {
+		return 0
+	}
+	return now.Sub(from) / time.Duration(done) * time.Duration(progress.total-progress.done)
 }
 
 // flowsTook is from the first page to the last flow's end.

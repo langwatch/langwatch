@@ -212,6 +212,7 @@ func (exec *scenarioExec) capture(label string, captures map[string]string, resu
 		return nil
 	}
 	decoded, _ := decodeJSONBody(result.Body)
+	decoded = unwrapTRPCData(exec.side.trpc, decoded)
 	for _, name := range sortedStringKeys(captures) {
 		value, ok := lookupPath(decoded, captures[name])
 		if !ok {
@@ -283,7 +284,11 @@ func (exec *scenarioExec) send(label string, request scenarioRequest, fallbackAu
 		return SideResult{}, harnessFailure(label, "%v", err)
 	}
 	exec.runner.requests.Add(1)
-	result := exec.runner.engine.executeOnce(built, encodeBody(built.body))
+	encoded := encodeBody(built.body)
+	if built.raw != nil {
+		encoded = []byte(*built.raw)
+	}
+	result := exec.runner.engine.executeOnce(built, encoded)
 	exec.record(label, built, result)
 	switch {
 	case result.Error != "":
@@ -299,26 +304,50 @@ func (exec *scenarioExec) build(request scenarioRequest, fallbackAuth string) (p
 	if kind == "" {
 		kind = fallbackAuth
 	}
-	headers, err := exec.side.authHeaders(exec.shard, kind)
+	path, err := expandText(request.Path, exec.vars)
 	if err != nil {
 		return probeRequest{}, err
 	}
-	built := probeRequest{baseURL: exec.side.baseURL, method: request.Method, headers: headers}
-	if built.path, err = expandText(request.Path, exec.vars); err != nil {
-		return built, err
-	}
-	for name, value := range request.Headers {
-		if headers[name], err = expandText(value, exec.vars); err != nil {
+	built := probeRequest{baseURL: exec.side.baseURL, method: request.Method, path: path, headers: map[string]string{}}
+	switch {
+	case isAbsoluteURL(path):
+		built.baseURL = ""
+	case strings.HasPrefix(path, "/"):
+		if built.headers, err = exec.side.authHeaders(exec.shard, kind); err != nil {
 			return built, err
 		}
+	default:
+		return built, fmt.Errorf("request path %q is neither /path nor an absolute http(s) URL", excerpt(path))
+	}
+	for name, value := range request.Headers {
+		if built.headers[name], err = expandText(value, exec.vars); err != nil {
+			return built, err
+		}
+	}
+	if request.ContentType != "" {
+		built.headers["Content-Type"] = request.ContentType
 	}
 	if built.query, err = exec.expandQuery(request.Query); err != nil {
 		return built, err
 	}
+	if request.BodyRaw != nil {
+		raw, rawErr := expandText(*request.BodyRaw, exec.vars)
+		built.raw = &raw
+		return built, rawErr
+	}
 	if request.Body != nil {
 		built.body, err = expandValue(request.Body, exec.vars)
+		if isTRPCPath(path) {
+			built.body = wrapTRPCBody(exec.side.trpc, built.body)
+		}
 	}
 	return built, err
+}
+
+// isAbsoluteURL is a request path taken from a capture (a presigned upload
+// URL): it goes to that host as it is, with none of the side's credentials.
+func isAbsoluteURL(path string) bool {
+	return strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://")
 }
 
 func (exec *scenarioExec) expandQuery(query map[string]any) (url.Values, error) {

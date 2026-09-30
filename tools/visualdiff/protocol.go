@@ -145,6 +145,8 @@ type RunnerPlan struct {
 	// FailFast stops the runner once the candidate's first routes show its
 	// shell does not render (runner/src/shell.ts).
 	FailFast bool `json:"failFast,omitempty"`
+	// Fast launches the lean Chromium: quicker, but its pixels are not the full browser's.
+	Fast bool `json:"fast,omitempty"`
 	// FrozenTime is the Date.now() both sides' pages see, so relative times
 	// and "today" render alike; Fixtures fill a route's {name} placeholders.
 	FrozenTime int64             `json:"frozenTime,omitempty"`

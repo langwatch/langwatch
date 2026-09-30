@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -86,4 +88,56 @@ func writeDeferred(out io.Writer, deferred []string) {
 		return
 	}
 	fmt.Fprintf(out, "scenarios: %d deferred: self-hosted pass (instance-admin key unusable under SaaS): %s\n", len(deferred), strings.Join(deferred, ", "))
+}
+
+// deferredFile is where a run keeps its deferred ids, one per line, for the
+// self-hosted pass to read back as `-scenario-id @<file>`.
+const deferredFile = "deferred.txt"
+
+// writeDeferredList writes the deferred ids into the run directory and answers
+// the path, "" when there is nothing to write or nowhere to write it.
+func writeDeferredList(dir string, deferred []string) (string, error) {
+	if dir == "" || len(deferred) == 0 {
+		return "", nil
+	}
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", err
+	}
+	target := filepath.Join(dir, deferredFile)
+	return target, os.WriteFile(target, []byte(strings.Join(deferred, "\n")+"\n"), 0o600)
+}
+
+// reportDeferred prints the deferred line and keeps the list beside the run.
+func reportDeferred(report, progress io.Writer, dir string, deferred []string) {
+	writeDeferred(report, deferred)
+	if target, err := writeDeferredList(dir, deferred); err != nil {
+		fmt.Fprintln(progress, "scenarios: deferred list:", err)
+	} else if target != "" {
+		fmt.Fprintln(progress, "scenarios: deferred list:", target)
+	}
+}
+
+// scenarioIDs is -scenario-id: a path.Match pattern, or @FILE for the ids a
+// file lists one per line (a run's deferred.txt). A file listing none is an
+// error, since no pattern at all would select every scenario.
+type scenarioIDs []string
+
+func (ids *scenarioIDs) String() string { return strings.Join(*ids, ",") }
+
+func (ids *scenarioIDs) Set(value string) error {
+	path, isFile := strings.CutPrefix(value, "@")
+	if !isFile {
+		*ids = append(*ids, value)
+		return nil
+	}
+	body, err := os.ReadFile(path) // #nosec G304 -- a path the operator named
+	if err != nil {
+		return err
+	}
+	listed := strings.Fields(string(body))
+	if len(listed) == 0 {
+		return fmt.Errorf("%s lists no scenario id", path)
+	}
+	*ids = append(*ids, listed...)
+	return nil
 }

@@ -1,6 +1,36 @@
-# Annotations beyond the trace drawer flows in observability.yaml: score metrics in
-# settings and editing a queue. Unrun: written under load.
+# Annotations beyond the trace drawer flows in observability.yaml: an annotation posted over REST shows in
+# the annotations list, score metrics in settings, and editing a queue. Every step uses selectors main and
+# the branch share (form labels, button words, aria labels, a table row's text). Unrun.
 flows:
+  - id: annotation-list-shows-annotation
+    title: An annotation posted on a trace shows in the annotations list with its comment and thumb
+    setup:
+      - post: /api/annotations/trace/trace_visualdiff_1
+        body:
+          comment: vd rest note {uid}
+          isThumbsUp: true
+        as:
+          noteText: data.comment
+          noteId: data.id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/annotations/all
+      - action: expect
+        with:
+          text: "{noteText}"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/annotations/{noteId}
+          contains: '"isThumbsUp":true'
+      - action: go
+        with:
+          path: /{slug}/annotations/all
+      - action: expect
+        with:
+          text: "{noteText}"
+
   - id: annotation-score-create
     title: Add a score metric in settings and find it after a reload
     steps:
@@ -9,31 +39,31 @@ flows:
           path: /settings/annotation-scores
       - action: click
         with:
-          testId: annotation-score-add
+          text: Add new score metric
       - action: fill
         with:
-          testId: annotation-score-name
+          label: /^Name/
           value: vd-score-{uid}
       - action: fill
         with:
-          testId: annotation-score-description
+          label: /^Description/
           value: Score made by the visual diff flow {uid}
       - action: fill
         with:
-          label: Option 1
+          selector: input[placeholder="value"]
           value: good
       - action: click
         with:
-          testId: annotation-score-submit
+          text: Add Score Metric
       - action: expect
         with:
-          testId: annotation-score-row-vd-score-{uid}
+          text: vd-score-{uid}
       - action: go
         with:
           path: /settings/annotation-scores
       - action: expect
         with:
-          testId: annotation-score-row-vd-score-{uid}
+          text: vd-score-{uid}
 
   - id: annotation-score-edit-and-delete
     title: Rename a score metric, then delete it, each read back after a reload
@@ -43,69 +73,69 @@ flows:
           path: /settings/annotation-scores
       - action: click
         with:
-          testId: annotation-score-add
+          text: Add new score metric
       - action: fill
         with:
-          testId: annotation-score-name
+          label: /^Name/
           value: vd-scoreed-{uid}
       - action: fill
         with:
-          testId: annotation-score-description
+          label: /^Description/
           value: Score made by the visual diff flow {uid}
       - action: fill
         with:
-          label: Option 1
+          selector: input[placeholder="value"]
           value: good
       - action: click
         with:
-          testId: annotation-score-submit
+          text: Add Score Metric
       - action: expect
         with:
-          testId: annotation-score-row-vd-scoreed-{uid}
+          text: vd-scoreed-{uid}
       - action: go
         with:
           path: /settings/annotation-scores
       - action: expect
         with:
-          testId: annotation-score-row-vd-scoreed-{uid}
+          text: vd-scoreed-{uid}
       - action: click
         with:
-          label: Actions for score vd-scoreed-{uid}
+          selector: tr:has-text("vd-scoreed-{uid}") button
       - action: click
         with:
-          testId: annotation-score-action-edit
+          text: /^\s*Edit\s*$/
       - action: fill
         with:
-          testId: annotation-score-name
+          label: /^Name/
           value: vd-scoreed-{uid}-renamed
       - action: click
         with:
-          testId: annotation-score-submit
+          text: Update Score Metric
       - action: go
         with:
           path: /settings/annotation-scores
       - action: expect
         with:
-          testId: annotation-score-row-vd-scoreed-{uid}-renamed
+          text: vd-scoreed-{uid}-renamed
       - action: click
         with:
-          label: Actions for score vd-scoreed-{uid}-renamed
+          selector: tr:has-text("vd-scoreed-{uid}-renamed") button
       - action: click
         with:
-          testId: annotation-score-action-delete
+          text: /^\s*Delete\s*$/
       - action: click
         with:
           text: /^\s*Delete\s*$/
       - action: expect
         with:
-          testId: annotation-score-row-vd-scoreed-{uid}-renamed
+          text: vd-scoreed-{uid}-renamed
           equals: "0"
       - action: go
         with:
           path: /settings/annotation-scores
       - action: expect
         with:
-          testId: annotation-score-row-vd-scoreed-{uid}-renamed
+          text: vd-scoreed-{uid}-renamed
           equals: "0"
 
   - id: annotation-queue-edit-rename
@@ -116,40 +146,39 @@ flows:
           path: /{slug}/annotations
       - action: click
         with:
-          testId: annotation-queue-create
+          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
       - action: fill
         with:
-          testId: annotation-queue-editor-name
+          label: /^Name Annotation Queue/
           value: vd-qedit-{uid}
       - action: fill
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
           value: Created by the visual diff flow {uid}
       - action: click
         with:
-          testId: annotation-queue-editor-participants
+          text: Add Participants
       - action: click
         with:
-          testId: annotation-queue-editor-participant-option
+          selector: button[aria-pressed]
       - action: click
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
       - action: click
         with:
-          testId: annotation-queue-editor-score-types
+          text: Add Score Type
       - action: click
         with:
-          testId: annotation-queue-editor-score-option
+          selector: button[aria-pressed]
       - action: click
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
       - action: click
         with:
-          testId: annotation-queue-editor-save
+          text: /^\s*Save\s*$/
       - action: expect
         with:
-          testId: annotation-queue-entry
-          hasText: vd-qedit-{uid}
+          label: Actions for queue vd-qedit-{uid}
       - action: click
         with:
           label: Actions for queue vd-qedit-{uid}
@@ -158,15 +187,14 @@ flows:
           text: Edit queue
       - action: fill
         with:
-          testId: annotation-queue-editor-name
+          label: /^Name Annotation Queue/
           value: vd-qedit-{uid}-renamed
       - action: click
         with:
-          testId: annotation-queue-editor-save
+          text: /^\s*Save\s*$/
       - action: go
         with:
           path: /{slug}/annotations
       - action: expect
         with:
-          testId: annotation-queue-entry
-          hasText: vd-qedit-{uid}-renamed
+          label: Actions for queue vd-qedit-{uid}-renamed

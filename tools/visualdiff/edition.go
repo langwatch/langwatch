@@ -10,10 +10,10 @@ import (
 )
 
 // Edition is which license the seeded organization runs under while a pass
-// captures. Both refs seed the same signed local-dev enterprise license onto
-// Organization.license, and a null license resolves to the open-source plan on
-// both, so one stack serves both editions by flipping that column between
-// passes - no second boot.
+// captures. Each ref seeds its own license onto Organization.license (the branch
+// signs one only with the root .env's license keys), and a null license is the
+// open-source plan on both, so one stack serves both editions by flipping that
+// column between passes - no second boot.
 type Edition string
 
 // The two editions: the seeded signed license, and none at all.

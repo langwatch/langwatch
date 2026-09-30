@@ -60,6 +60,7 @@ type scenario struct {
 	Endpoint string            `yaml:"endpoint"`
 	Auth     string            `yaml:"auth"`
 	Shard    string            `yaml:"shard"`
+	Serial   bool              `yaml:"serial"` // run alone after the pool drains, in its own shard kind
 	Setup    []scenarioStep    `yaml:"setup"`
 	Request  scenarioRequest   `yaml:"request"`
 	Capture  map[string]string `yaml:"capture"`
@@ -78,6 +79,9 @@ type scenarioRequest struct {
 	Query   map[string]any
 	Headers map[string]string
 	Auth    string
+	// BodyRaw is sent as it is (no JSON encoding) with ContentType.
+	BodyRaw     *string
+	ContentType string
 }
 
 type scenarioRequestFields struct {
@@ -87,19 +91,22 @@ type scenarioRequestFields struct {
 	Query   map[string]any    `yaml:"query"`
 	Headers map[string]string `yaml:"headers"`
 	Auth    string            `yaml:"auth"`
+
+	BodyRaw     *string `yaml:"bodyRaw"`
+	ContentType string  `yaml:"contentType"`
 }
 
 // UnmarshalYAML accepts "METHOD /path" or the mapping form.
 func (request *scenarioRequest) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
 		method, path, ok := strings.Cut(strings.TrimSpace(node.Value), " ")
-		if !ok || !isScenarioMethod(method) || !strings.HasPrefix(strings.TrimSpace(path), "/") {
+		if !ok || !isScenarioMethod(method) || !isScenarioPath(strings.TrimSpace(path)) {
 			return fmt.Errorf("line %d: request %q is not \"METHOD /path\"", node.Line, node.Value)
 		}
 		request.Method, request.Path = method, strings.TrimSpace(path)
 		return nil
 	}
-	if err := rejectUnknownKeys(node, "request", "method", "path", "body", "query", "headers", "auth"); err != nil {
+	if err := rejectUnknownKeys(node, "request", "method", "path", "body", "query", "headers", "auth", "bodyRaw", "contentType"); err != nil {
 		return err
 	}
 	var fields scenarioRequestFields
@@ -108,6 +115,12 @@ func (request *scenarioRequest) UnmarshalYAML(node *yaml.Node) error {
 	}
 	*request = scenarioRequest(fields)
 	return nil
+}
+
+// isScenarioPath accepts a path on the side's own host, or a placeholder that
+// expands to an absolute URL ("PUT {uploadUrl}"; checked when it is built).
+func isScenarioPath(path string) bool {
+	return strings.HasPrefix(path, "/") || strings.HasPrefix(path, "{")
 }
 
 func isScenarioMethod(method string) bool {
@@ -139,16 +152,18 @@ func rejectUnknownKeys(node *yaml.Node, kind string, allowed ...string) error {
 // scenarioStep is one prior (setup) or after (verify) action: a request, a
 // countDelta or a mail check, optionally polled with eventually.
 type scenarioStep struct {
-	Request    *scenarioRequest  `yaml:"request"`
-	Body       any               `yaml:"body"`
-	Query      map[string]any    `yaml:"query"`
-	Headers    map[string]string `yaml:"headers"`
-	Auth       string            `yaml:"auth"`
-	Capture    map[string]string `yaml:"capture"`
-	Expect     *scenarioExpect   `yaml:"expect"`
-	Eventually time.Duration     `yaml:"eventually"`
-	CountDelta *scenarioCount    `yaml:"countDelta"`
-	Mail       *scenarioMail     `yaml:"mail"`
+	Request     *scenarioRequest  `yaml:"request"`
+	Body        any               `yaml:"body"`
+	BodyRaw     *string           `yaml:"bodyRaw"`
+	ContentType string            `yaml:"contentType"`
+	Query       map[string]any    `yaml:"query"`
+	Headers     map[string]string `yaml:"headers"`
+	Auth        string            `yaml:"auth"`
+	Capture     map[string]string `yaml:"capture"`
+	Expect      *scenarioExpect   `yaml:"expect"`
+	Eventually  time.Duration     `yaml:"eventually"`
+	CountDelta  *scenarioCount    `yaml:"countDelta"`
+	Mail        *scenarioMail     `yaml:"mail"`
 }
 
 // scenarioCount asserts a list's length changed by By between before the
@@ -322,8 +337,11 @@ func validateMainRequest(item *scenario) []string {
 	if !isScenarioMethod(item.Request.Method) {
 		problems = append(problems, fmt.Sprintf("request.method %q is not a method", item.Request.Method))
 	}
-	if !strings.HasPrefix(item.Request.Path, "/") {
-		problems = append(problems, "request.path is required and starts with /")
+	if !isScenarioPath(item.Request.Path) {
+		problems = append(problems, "request.path is required and starts with / (or a {placeholder} that expands to an absolute URL)")
+	}
+	if item.Request.BodyRaw != nil && item.Request.Body != nil {
+		problems = append(problems, "request takes body or bodyRaw, not both")
 	}
 	if len(item.Expect.Status) == 0 {
 		problems = append(problems, "expect.status is required")
@@ -370,6 +388,12 @@ func validateRequestStep(where string, step *scenarioStep, verify bool) []string
 	if request.Body == nil {
 		request.Body = step.Body
 	}
+	if request.BodyRaw == nil {
+		request.BodyRaw = step.BodyRaw
+	}
+	if request.ContentType == "" {
+		request.ContentType = step.ContentType
+	}
 	if request.Query == nil {
 		request.Query = step.Query
 	}
@@ -380,6 +404,9 @@ func validateRequestStep(where string, step *scenarioStep, verify bool) []string
 		request.Auth = step.Auth
 	}
 	problems := validateCaptures(where+" capture", step.Capture)
+	if request.BodyRaw != nil && request.Body != nil {
+		problems = append(problems, where+": a request takes body or bodyRaw, not both")
+	}
 	if request.Method == "" || request.Path == "" {
 		problems = append(problems, where+": request needs a method and a path")
 	}

@@ -15,7 +15,7 @@ import { pickAction, trailStep, type Action, type TrailStep } from "./picker.ts"
 import type { FuzzPlan, Navigation, Oracle } from "./protocol.ts";
 import { oracleOf, routeLabel, signatureOf, trailLine } from "./report.ts";
 import { hashSeed, mulberry32, type Rng } from "./rng.ts";
-import type { FindingSink } from "./sink.ts";
+import type { VisitSink } from "./sink.ts";
 
 /** Collector buffers what one page reports between two looks, so a finding names its action. */
 export class Collector {
@@ -108,7 +108,9 @@ export interface Visit {
   side: Side;
   collector: Collector;
   plan: FuzzPlan;
-  sink: FindingSink;
+  sink: VisitSink;
+  /** loadingScale multiplies the wait for a page still loading: 1 unthrottled, more under load. */
+  loadingScale: () => number;
   route: string;
   path: string;
   visit: number;
@@ -160,13 +162,20 @@ class RouteWalk {
     return this.visit.side.page;
   }
 
-  /** run opens the route, then acts until the plan's actions or the deadline are spent. */
+  /**
+   * run opens the route, then acts until the plan's actions or the deadline are spent, or the
+   * page stops being usable: each action on a page still loading waits out the full settle.
+   */
   async run(): Promise<VisitResult> {
     const { plan, path } = this.visit;
     this.visit.collector.take();
     this.trail.push({ n: 0, action: "open", target: path, url: this.origin + path });
     await this.open();
-    for (let n = 1; n <= plan.actionsPerRoute && this.visit.now() < this.visit.deadline; n++) {
+    for (
+      let n = 1;
+      n <= plan.actionsPerRoute && this.error === "" && this.visit.now() < this.visit.deadline;
+      n++
+    ) {
       if (!(await this.step(n))) break;
     }
     return {
@@ -267,7 +276,9 @@ class RouteWalk {
   }
 
   private async settle(): Promise<void> {
-    const outcome = await this.visit.side.waitUntilQuiet();
+    const outcome = await this.visit.side.waitUntilQuiet({
+      loadingScale: this.visit.loadingScale(),
+    });
     const url = this.page.url();
     if (outcome.expired && outcome.inFlight.length > 0) {
       const what = `request pending ${outcome.inFlight[0]?.slice(0, 120)}`;
@@ -306,7 +317,7 @@ class RouteWalk {
   private async checkSession(): Promise<void> {
     if (!this.signedOut) return;
     await this.visit.side.goto(this.visit.path).catch(() => undefined);
-    await this.visit.side.waitUntilQuiet();
+    await this.visit.side.waitUntilQuiet({ loadingScale: this.visit.loadingScale() });
     if (this.signedOut) {
       const last = JSON.stringify(this.trail.at(-1));
       throw new SessionLost(`signed out at ${this.page.url()} after ${last}`);

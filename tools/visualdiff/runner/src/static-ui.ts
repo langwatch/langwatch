@@ -67,12 +67,15 @@ const readBuilt = (dir: string): ((pathname: string) => Promise<Buffer | undefin
   };
 };
 
+/** ServeBuiltUi installs the prebuilt UI on one context. */
+export type ServeBuiltUi = (context: BrowserContext) => Promise<void>;
+
 /**
- * serveBuiltUi answers every document the side opens with the prebuilt shell, and every
- * file the build holds from memory on the page's own origin, so no page waits on the dev
- * server's module graph. /api and whatever the build does not hold still reach the stack.
+ * prepareBuiltUi reads the dev shell's public config once, through `context`, and answers what
+ * serves any context the prebuilt shell for every document and every file the build holds from
+ * memory on the page's own origin. /api and whatever the build does not hold still reach the stack.
  */
-export const serveBuiltUi = async ({
+export const prepareBuiltUi = async ({
   context,
   baseUrl,
   dir,
@@ -80,7 +83,7 @@ export const serveBuiltUi = async ({
   context: BrowserContext;
   baseUrl: string;
   dir: string;
-}): Promise<void> => {
+}): Promise<ServeBuiltUi> => {
   const origin = new URL(baseUrl).origin;
   const probe = await context.newPage();
   const response = await probe.goto(`${baseUrl}/`, { waitUntil: "commit", timeout: 30_000 });
@@ -88,19 +91,21 @@ export const serveBuiltUi = async ({
   await probe.close();
   const shell = builtShell({ built: await readFile(join(dir, "index.html"), "utf8"), devShell });
   const read = readBuilt(dir);
-  await context.route(
-    (url) => url.origin === origin && !url.pathname.startsWith("/api/"),
-    async (route) => {
-      const request = route.request();
-      if (request.method() !== "GET") return route.continue();
-      if (request.resourceType() === "document") {
-        return route.fulfill({ status: 200, contentType: "text/html", body: shell });
-      }
-      const pathname = new URL(request.url()).pathname;
-      const body = await read(pathname);
-      if (body === undefined) return route.continue();
-      const contentType = CONTENT_TYPES[extname(pathname)] ?? "application/octet-stream";
-      return route.fulfill({ status: 200, contentType, body });
-    },
-  );
+  return async (target) => {
+    await target.route(
+      (url) => url.origin === origin && !url.pathname.startsWith("/api/"),
+      async (route) => {
+        const request = route.request();
+        if (request.method() !== "GET") return route.continue();
+        if (request.resourceType() === "document") {
+          return route.fulfill({ status: 200, contentType: "text/html", body: shell });
+        }
+        const pathname = new URL(request.url()).pathname;
+        const body = await read(pathname);
+        if (body === undefined) return route.continue();
+        const contentType = CONTENT_TYPES[extname(pathname)] ?? "application/octet-stream";
+        return route.fulfill({ status: 200, contentType, body });
+      },
+    );
+  };
 };

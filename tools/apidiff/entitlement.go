@@ -1,13 +1,15 @@
 package apidiff
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // The entitled pass. Six management-API operations (GET/POST /api/groups,
@@ -43,11 +45,10 @@ const entitledOrgID = seededOrganizationID
 
 // EntitlementActivator elevates entitledOrgID to an Enterprise plan on every
 // instance a run is probing, mid-run, with no restart. Only `apidiff run`
-// can supply one — it alone owns the databases. The plain `probe` subcommand
-// (external instances, no database) and the haven path (a stack's database
-// belongs to haven, exactly like the SCIM and permission-probe fixtures)
-// leave it nil, which the entitled pass reads as "nothing to activate" and
-// skips outright, noted rather than silently doing nothing.
+// can supply one, on either path (buildEntitlementActivator). The plain
+// `probe` subcommand (external instances, no database) and a deferred or
+// disabled boot leave it nil, which the entitled pass reads as "nothing to
+// activate" and skips outright, noted rather than silently doing nothing.
 type EntitlementActivator func(ctx context.Context) error
 
 // gateCode reads the handled-error code out of a JSON error envelope
@@ -125,7 +126,7 @@ func (engine *probeEngine) entitledPass() []Finding {
 	}
 	ops := engine.sortedGatedOps()
 	if engine.options.ActivateEntitlement == nil {
-		engine.progress("entitled pass: skipped (%d operation(s) hit the Enterprise gate, but this run owns no database to activate a license on)\n", len(ops))
+		engine.progress("entitled pass: skipped (%d operation(s) hit the Enterprise gate, but this run has no licence to activate: probe mode, or deferred or disabled at boot)\n", len(ops))
 		return nil
 	}
 	engine.progress("entitled pass: activating %s's license for %d gated operation(s)\n", entitledOrgID, len(ops))
@@ -160,7 +161,7 @@ func (engine *probeEngine) entitledProbe(operation Operation) []Finding {
 	return outcome.Findings
 }
 
-// --- Activation: reading and applying the local-dev Enterprise license ---
+// --- Activation: one licence, copied from the branch onto both databases ---
 //
 // Both layouts read the entitled organization's license off the same
 // column, per request, with no cache in front of it:
@@ -170,41 +171,102 @@ func (engine *probeEngine) entitledProbe(operation Operation) []Finding {
 //   - main: platform/app/ee/licensing/licenseHandler.ts's readStoredLicense
 //     reads the identical column, the identical way.
 //
-// So an UPDATE lands for the very next request on either side — no restart,
-// no boot-time env var. Verified NOT to flip apps/api's own answer today:
-// see this package's README ("Entitled pass") and the lane handoff for why.
+// So an UPDATE lands for the very next request on either side, with no
+// restart. Both licence keys live in the root .env (LANGWATCH_LICENSE_PUBLIC_KEY
+// and LANGWATCH_LICENSE_PRIVATE_KEY): both sides verify with the public key and
+// the branch seed signs an ENTERPRISE licence with the private one. That stored
+// licence is the one both databases get, since main's own seed writes one
+// signed for another key. No licence stored means no keys: main's is cleared
+// too, so an entitled main is never compared against an unentitled branch.
 
-// localDevLicenseSeedPath is where the checkout's own seed keeps the
-// pre-signed ENTERPRISE license it activates for entitledOrgID
-// (the apps/tasks storage-seed task). Main's own
-// mirror (platform/app/scripts/localDevLicense.ts) carries the identical
-// string — verified byte-for-byte when this pass was written — so reading it
-// once from the branch checkout is enough to activate BOTH sides' databases.
-const localDevLicenseSeedPath = "apps/tasks/src/storage-seed/seed-license.ts"
+// licensePublicKeyEnv is the key both sides verify licences with.
+const licensePublicKeyEnv = "LANGWATCH_LICENSE_PUBLIC_KEY"
 
-// localDevLicenseKeyPattern extracts LOCAL_DEV_ENTERPRISE_LICENSE_KEY's
-// quoted value. Copying the constant's VALUE into Go would silently go
-// stale the day somebody rotates it; reading the source file keeps this
-// pass bound to whatever the seed itself activates. A rename or reshape of
-// the export fails this pattern rather than quietly entitling nothing — see
-// entitlement_test.go's assertion against the real file.
-var localDevLicenseKeyPattern = regexp.MustCompile(`LOCAL_DEV_ENTERPRISE_LICENSE_KEY\s*=\s*\n?\s*"([^"]+)"`)
+// licensePublicKey is the invoking shell's value, else the root .env's, else
+// "". The haven path needs neither: haven inherits the shell, and
+// havenrun.CopyEnvFiles copies the root .env into both worktrees.
+func licensePublicKey(branchDir string) string {
+	if value := os.Getenv(licensePublicKeyEnv); value != "" {
+		return value
+	}
+	values := map[string]string{}
+	domain.ReadEnvFile(filepath.Join(branchDir, ".env"), values)
+	return values[licensePublicKeyEnv]
+}
 
-// readLocalDevEnterpriseLicenseKey reads the license the entitled pass
-// activates, from the branch checkout's own seeding source.
-func readLocalDevEnterpriseLicenseKey(branchDir string) (string, error) {
-	path := filepath.Join(branchDir, localDevLicenseSeedPath)
-	// #nosec G304 -- path is branchDir (this run's own checkout, resolved by
-	// Boot) joined onto a fixed package constant, never user input.
-	data, err := os.ReadFile(path)
+// buildEntitlementActivator reads the licence the branch seed stored and
+// writes it onto both sides at once, returning that write for the entitled
+// pass to re-apply. No licence clears main's and defers the pass in one line;
+// a failed read or write disables it without failing the run.
+func (state *bootState) buildEntitlementActivator(ctx context.Context, booted *Booted) EntitlementActivator {
+	licenseKey, err := state.sideSQL(ctx, booted.A, readSeededLicenseSQL())
 	if err != nil {
-		return "", fmt.Errorf("read local-dev enterprise license: %w", err)
+		state.logf("entitled pass: disabled (read the branch seed's licence: %v)", err)
+		return nil
 	}
-	match := localDevLicenseKeyPattern.FindSubmatch(data)
-	if match == nil {
-		return "", fmt.Errorf("read local-dev enterprise license: %s no longer declares LOCAL_DEV_ENTERPRISE_LICENSE_KEY in the expected shape", path)
+	if licenseKey == "" {
+		if _, err := state.sideSQL(ctx, booted.B, clearEntitlementSQL()); err != nil {
+			state.logf("entitled pass: disabled (clear main's licence: %v); main may be entitled while the branch is not", err)
+			return nil
+		}
+		state.logf("entitled pass: deferred: no licence keys (%s and LANGWATCH_LICENSE_PRIVATE_KEY in the root .env), so neither side is entitled", licensePublicKeyEnv)
+		return nil
 	}
-	return string(match[1]), nil
+	sql := activateEntitlementSQL(licenseKey)
+	activate := func(ctx context.Context) error {
+		for _, instance := range []Instance{booted.A, booted.B} {
+			if _, err := state.sideSQL(ctx, instance, sql); err != nil {
+				return fmt.Errorf("activate entitlement %s: %w", instance.Name, err)
+			}
+		}
+		return nil
+	}
+	if err := activate(ctx); err != nil {
+		state.logf("entitled pass: disabled (%v)", err)
+		return nil
+	}
+	return activate
+}
+
+// sideSQL runs one statement on a side's database: the run's own server on
+// -no-haven, the stack's `haven db url` on the haven path (as visualdiff's
+// edition.go does). The URL carries a password and is never logged.
+func (state *bootState) sideSQL(ctx context.Context, instance Instance, sql string) (string, error) {
+	if !state.cfg.UseHaven {
+		return state.pgQueryDB(ctx, DatabaseName(state.runID, instance.Name), sql)
+	}
+	plan := state.havenPlanFor(instance)
+	var address bytes.Buffer
+	spec := commandSpec{name: havenCommand, args: []string{"db", "url"}, dir: plan.dir, env: havenEnv(state.environ(), plan.slug)}
+	if err := state.run(ctx, spec, &address); err != nil {
+		return "", fmt.Errorf("haven db url %s: %w", instance.Name, err)
+	}
+	url := ""
+	for _, field := range strings.Fields(address.String()) {
+		if strings.HasPrefix(field, "postgres://") || strings.HasPrefix(field, "postgresql://") {
+			url = field
+			break
+		}
+	}
+	if url == "" {
+		return "", fmt.Errorf("haven db url %s answered no postgres address", instance.Name)
+	}
+	var output bytes.Buffer
+	if err := state.run(ctx, commandSpec{name: "psql", args: []string{url, "-v", "ON_ERROR_STOP=1", "-tAc", sql}}, &output); err != nil {
+		return "", fmt.Errorf("psql %s: %w", instance.Name, err)
+	}
+	return strings.TrimSpace(output.String()), nil
+}
+
+// readSeededLicenseSQL reads the licence the branch seed stored, "" when it
+// stored none (no keys configured, or a private key that does not pair).
+func readSeededLicenseSQL() string {
+	return `SELECT coalesce("license", '') FROM "Organization" WHERE "id" = '` + entitledOrgID + `'`
+}
+
+// clearEntitlementSQL removes the seeded organization's licence.
+func clearEntitlementSQL() string {
+	return `UPDATE "Organization" SET "license" = NULL WHERE "id" = '` + entitledOrgID + `'`
 }
 
 // activateEntitlementSQL upserts the license directly onto the seeded

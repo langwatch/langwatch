@@ -3,6 +3,7 @@ package diffkit
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/langwatch/langwatch/tools/havenrun"
@@ -13,10 +14,13 @@ import (
 const CheckSlug = "visualdiff-check"
 
 // SharedStack is the shared stack's addresses, read from `haven status`.
+// APIOrigin serves /api without the proxy: the backend lane's loopback port,
+// or AppURL on a monolith (apidiff's -a and -b).
 type SharedStack struct {
-	Slug    string
-	AppURL  string
-	MailURL string
+	Slug      string
+	AppURL    string
+	MailURL   string
+	APIOrigin string
 }
 
 // APIURL is the REST base the tools call: the app URL with the /api mount.
@@ -45,5 +49,40 @@ func ReadSharedStack(ctx context.Context, slug string) (SharedStack, error) {
 		return SharedStack{}, fmt.Errorf("stack %s reports no app URL", slug)
 	}
 	mail, _ := stack.ServiceURL("mail")
-	return SharedStack{Slug: slug, AppURL: app, MailURL: mail}, nil
+	origin := app
+	if !stack.IsMonolith() && stack.APIPort != 0 {
+		origin = fmt.Sprintf("http://127.0.0.1:%d", stack.APIPort)
+	}
+	return SharedStack{Slug: slug, AppURL: app, MailURL: mail, APIOrigin: origin}, nil
+}
+
+// The sides diffsuite hands every tool it starts, in DIFFSUITE_<side>_STACK,
+// _URL, _API_URL and _MAIL_URL (tools/diffsuite/README.md). MAIN is set only
+// when the suite has a main stack.
+const (
+	SuiteBranch = "BRANCH"
+	SuiteMain   = "MAIN"
+)
+
+// SuiteEnv is the environment that hands stack to a tool as side.
+func SuiteEnv(side string, stack SharedStack) []string {
+	prefix := "DIFFSUITE_" + side + "_"
+	return []string{prefix + "STACK=" + stack.Slug, prefix + "URL=" + stack.AppURL,
+		prefix + "API_URL=" + stack.APIOrigin, prefix + "MAIL_URL=" + stack.MailURL}
+}
+
+// SuiteStack is the stack diffsuite handed this process as side, if it did.
+func SuiteStack(side string) (SharedStack, bool) {
+	prefix := "DIFFSUITE_" + side + "_"
+	stack := SharedStack{Slug: os.Getenv(prefix + "STACK"), AppURL: os.Getenv(prefix + "URL"),
+		APIOrigin: os.Getenv(prefix + "API_URL"), MailURL: os.Getenv(prefix + "MAIL_URL")}
+	return stack, stack.AppURL != ""
+}
+
+// BranchStack is the branch stack diffsuite handed this process, else the shared check stack.
+func BranchStack(ctx context.Context) (SharedStack, error) {
+	if stack, ok := SuiteStack(SuiteBranch); ok {
+		return stack, nil
+	}
+	return ReadSharedStack(ctx, CheckSlug)
 }

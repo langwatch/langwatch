@@ -67,6 +67,7 @@ func Recapture(ctx context.Context, request RecaptureRequest, streams Streams) (
 	stream, err := runWithFindings(ctx, findingsRunInputs{
 		Deps: request.Deps, Plan: plan, Options: CaptureOptions{Root: request.Root, Stderr: streams.Err, MaxConsecutiveErrors: DefaultMaxConsecutiveErrors},
 		FindingsPath: findingsPath, CatalogueRoot: request.Root, Edition: request.Edition,
+		Out: streams.Out, BatchSize: DefaultBatchSize,
 	})
 	if err != nil {
 		var stopped *diffkit.Stopped

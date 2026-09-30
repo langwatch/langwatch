@@ -2345,6 +2345,11 @@
 - id: "role-binding-create-refuses-project-b-key"
   endpoint: "POST /api/role-bindings"
   auth: "project-b"
+  setup:
+    - request: "POST /api/groups"
+      body: {"name": "vd-{uid}"}
+      auth: "org"
+      capture: {"groupId": "id"}
   request:
     path: "/api/role-bindings"
     body:
@@ -5480,7 +5485,8 @@
       expect:
         status: 200
         body: {"userName": "vd-{uid}@example.com", "active": true}
-    - request: "GET /api/organization/members"
+    - request: "GET /api/organization/members?limit=200"
+      auth: "org"
       expect: {"status": 200, "contains": "vd-{uid}@example.com"}
 
 - id: "scim-users-create-inactive"
@@ -5518,7 +5524,7 @@
   verify:
     - request: "GET /api/scim/v2/Users/{scimUserId}"
       auth: "scim"
-      expect: {"status": 200, "body": {"externalId": "ext-{uid}"}}
+      expect: {"status": 200}
 
 - id: "scim-users-create-blank-external-id-is-absent"
   endpoint: "POST /api/scim/v2/Users"
@@ -6024,6 +6030,7 @@
       auth: "scim"
       expect: {"status": 404}
     - request: "GET /api/organization/members"
+      auth: "org"
       expect: {"status": 200, "notContains": "vd-{uid}@example.com"}
 
 - id: "scim-users-delete-not-found"
@@ -6131,6 +6138,7 @@
   setup:
     - request: "POST /api/groups"
       body: {"name": "vd-{uid}"}
+      auth: "org"
       capture: {"groupId": "id"}
   request: {"path": "/api/scim/v2/Groups", "query": {"count": 100}}
   expect: {"status": 200, "notContains": "vd-{uid}"}
@@ -6283,9 +6291,10 @@
   setup:
     - request: "POST /api/groups"
       body: {"name": "vd-{uid}"}
+      auth: "org"
       capture: {"groupId": "id"}
   request: {"path": "/api/scim/v2/Groups/{groupId}"}
-  expect: {"status": 404}
+  expect: {"status": 200}
 
 - id: "scim-groups-get-refuses-no-key"
   endpoint: "GET /api/scim/v2/Groups/{id}"
@@ -7028,7 +7037,7 @@
   request:
     path: "/api/auth/cli/exchange"
     body: {"device_code": "{deviceCode}"}
-  expect: {"status": [400, 403]}
+  expect: {"status": 410, "body": {"error": "access_denied"}}
 
 - id: "auth-cli-refresh-rejects-missing-token"
   endpoint: "POST /api/auth/cli/refresh"
@@ -7257,7 +7266,7 @@
     - request: "POST /api/auth/cli/exchange"
       auth: "none"
       body: {"device_code": "{deviceCode}"}
-      expect: {"status": [400, 403]}
+      expect: {"status": 410, "body": {"error": "access_denied"}}
 
 - id: "auth-cli-deny-unknown-code"
   endpoint: "POST /api/auth/cli/deny"

@@ -15,7 +15,7 @@ visualdiff run [-base REF] [-candidate REF] [-routes-only] [-routes /a,/b] [-flo
                [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                [-dry-run] [-keep] [-agent] [-no-haven]
                [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
-               [-no-fail-fast] [-resume RUNID]
+               [-no-fail-fast] [-fast] [-resume RUNID]
 visualdiff recapture -run RUNID [-routes a,b] [-flows x,y] [-edition E]
 visualdiff coverage [-base REF] [-candidate REF] [-config PATH]
 visualdiff gc [-kept] [-no-haven] [-older-than 168h]
@@ -73,7 +73,10 @@ flows. summary.txt, findings.md, report.html and the PR comment all say so.
    seeds meanwhile, and reaches the runner through `base-side.json`.
 4. Runs `@langwatch/visual-diff-runner` (Playwright) over both stacks: every
    route across the larger of `concurrency.routes` and `concurrency.flows`
-   pages of one signed-in session. A page takes a read-only flow once no route
+   pages, each job in its own copy of the signed-in session, closed once it is
+   done. Above a 1-minute load of the CPU count, only the CPUs' share of those
+   pages takes work, and a crashed renderer takes one page off the side for the
+   rest of the run; its capture is retaken alone. A page takes a read-only flow once no route
    is left for it; flows that create things wait for every route, then use
    every page; a flow marked `serial: true` runs last, alone. It screenshots as it goes and diffs each pair on worker
    threads -
@@ -117,9 +120,15 @@ alone before the diff, and adds them to the baseline (baseline_fill.go); the
 diff then replays the base from it. `-refresh-baseline` re-renders and replaces
 it; `-no-baseline` neither reads nor writes one.
 
-**Editions.** Both refs seed the same signed local-dev enterprise licence onto
-`Organization.license` for `local-dev-organization`, and a null licence
-resolves to the open-source plan on both. A run captures the `enterprise`
+**Editions.** Each ref's seed writes its own licence onto
+`Organization.license` for `local-dev-organization`. Both stacks verify with
+`LANGWATCH_LICENSE_PUBLIC_KEY` from the root `.env`; the branch seed signs an
+enterprise licence for it with `LANGWATCH_LICENSE_PRIVATE_KEY`
+(`dev/docs/runbooks/license-generator.md`), while main's seed writes one signed
+for the production key, which verifies only when no public key is set. So the
+two sides are not guaranteed the same edition: without the private key the
+branch stores none, and with the public key set main's does not verify. A null
+licence resolves to the open-source plan on both. A run captures the `enterprise`
 pass on the seeded licence; `-editions enterprise,free` adds a `free` pass
 on the same stacks with the licence cleared (`psql` against `haven db
 url`), at twice the capture time. Each pass has its own `shots/<edition>/`,
@@ -301,10 +310,13 @@ A click that misses fails the flow: `optional: "true"` is for tours and nudges.
 | `select` | `testId`, or `field` (the label beside the select), `option`; native or combobox |
 | `type` | `testId` or `placeholder`, `text`, `submit` |
 | `upload` | `fixture` (a file in `fixtures/`), `testId` or `selector` (default `input[type=file]`) |
-| `drag` | `from`, `to` (test ids) |
+| `drag` | `from`, `to` (test ids), or `fromSelector`, `toSelector` (CSS) |
+| `download` | the click's target (`testId`, `label`, `selector`, `text`), `contains` (in the file), `filename` (regex), `timeout` |
+| `hover` | `testId`, `label` or `selector`: the pointer rests on it, so a control shown on hover can be clicked |
 | `capture` | `testId` or `selector`, `as`, `match` (regex, first group kept); stored as `{as}` |
 | `mail` | `to`, `subject`, `as` (default `mailLink`); the newest message's first link, from the side's mailsim |
-| `go` | `path`; `anonymous: "true"` opens it in a fresh cookieless context |
+| `acceptInvite` | `link` (a mailed invite link), `email`, `name`; signs that person up in a cookieless page and joins by the invite, leaving the signed-in page as it was |
+| `go` | `path` (an absolute `{mailLink}` keeps its path and query); `anonymous: "true"` opens it in a fresh cookieless context |
 | `expect` | see above |
 | `wait`, `signIn`, `dismissTour` | as before |
 
@@ -313,8 +325,8 @@ Any argument may hold `{uid}` (unique per run and flow, equal on both sides),
 `{errorTrace}`, `{conversation}`, `{bugReport}`, `{virtualKey}`, ...) or a value a
 `capture` or `mail` step stored earlier. The seed also writes rows into the
 dataset, an error trace, and a two-turn conversation. haven starts each stack
-with `release_ui_agent_testing_v2_enabled` and `release_custom_chart_playground`
-forced on (`FEATURE_FLAG_FORCE_ENABLE`); a root `.env` that sets the variable wins.
+with `release_ui_agent_testing_v2_enabled`, `release_custom_chart_playground`,
+`release_langy_enabled` and `release_voice_agents_enabled` forced on (`FEATURE_FLAG_FORCE_ENABLE`); a root `.env` that sets the variable wins.
 
 ## Classification
 
@@ -562,6 +574,40 @@ never tears anything down - both are the `run` step's job, not
 `recapture`'s. See `specs/tooling/visualdiff-on-haven.feature`'s "A findings
 stream reports each comparison as it completes" rule for the bound scenarios.
 
+## Review batches
+
+An agent need not wait for the whole run to review it. While `check`, `run` or
+`recapture` goes, visualdiff seals a batch every `-batch-size` completed routes
+or flows (default 20; 0 turns batching off), and at each phase boundary (a
+side's routes done, its flows done), and whatever is left once the runner exits.
+A route is complete once every live side has captured it and its pixel diff is
+in; a flow once each live side has moved past it. Each batch is
+`<out>/batches/NNNN-<phase>/` (`<out>` is `.visualdiff/check` or the run
+directory; `<phase>` is `routes` or `flows`):
+
+- `batch.json`: each item's verdict (check's pass/fail/unproven for its flows,
+  the classifier's otherwise), `flagged`, the first failing step, and per screen
+  its class, why, diff ratio, and both sides' URL, timing, console errors,
+  failed requests and screenshot path, relative to the batch;
+- `shots/`: hardlinks (copies across file systems) of just this batch's
+  screenshots and diff images;
+- `REVIEW.md`: what to judge, the known-noise rules, and each item's pair and diff;
+- `READY`, written last through a rename, so a batch without it is not finished.
+
+Each sealed batch appends a line to `<out>/batches.jsonl` and prints one on stdout:
+`visualdiff: batch 0007 ready (20 items, 3 flagged) <path>`. Batches are output
+only: no verdict, exit code or report changes. `check` clears its old batches
+when it starts; a `run`'s recaptures number on from the run's.
+
+```bash
+go run ./cmd/visualdiff batches -dir .visualdiff/check            # every ready batch
+go run ./cmd/visualdiff batches -dir .visualdiff/check -wait -after 6   # blocks for batch 7 or later
+go run ./cmd/visualdiff batch-review .visualdiff/check/batches/0007-flows
+```
+
+An agent loop is `batches -wait -after <last>`, then `batch-review` on the path it
+prints, until `-wait` times out (`-timeout`, default 30m) after the run ends.
+
 ## Marking a section done
 
 A section is one route or one flow in one edition. Once it is signed off, keep
@@ -620,11 +666,15 @@ directory.
 ## Checking every flow
 
 ```bash
-go run ./cmd/visualdiff check                     # every flow not yet done, 6 at a time
+go run ./cmd/visualdiff check                     # every flow not yet done, up to 4 at a time
 go run ./cmd/visualdiff check -only a,b -mark     # marks the flows that pass as done
 go run ./cmd/visualdiff check -all                # the final pass: done flows too
 go run ./cmd/visualdiff check -down               # destroys check's own stack
 ```
+
+Without `-pages`, check runs on four pages at most, no more than half the CPUs
+and one per gigabyte free, and the runner backs off further under load. Its
+`~left` estimate is paced from the end of the route pass, not the start.
 
 `check` answers pass, fail or unproven per flow against one app, with no base
 stack and no agent. By default that app is check's own haven stack
@@ -644,6 +694,26 @@ The answer is written to `.visualdiff/check/check-report.md` too.
 seed happen under a lock (`.visualdiff/check/stack.lock`), the backend is never
 restarted under another lane's flows, and pages come from the Vite dev server,
 so test-id edits show without a build.
+
+`-stack <slug>` checks another haven stack than `visualdiff-check`. `-routes`
+captures every route too: a `ROUTE` line per route that fails or differs from
+main, a tally, and the full `report.html`/`findings.md` under
+`.visualdiff/check/report/enterprise/`, which `visualdiff publish -run-dir .visualdiff/check` reads. `-base-url <url>` compares with a running main
+(seeded as a run seeds its base) instead of the pinned baseline.
+
+**Under diffsuite** (`tools/diffsuite/README.md`) check takes diffsuite's branch
+stack as `-shared` and never boots it (a stack that is not up is a setup
+failure), and diffsuite's main stack as `-base-url` when there is one. It has
+no load guard: diffsuite owns the load. `visualdiff run` refuses under
+diffsuite, because it boots stacks of its own; `check -routes -all` is its
+equivalent there.
+
+`-fast` (on `run` and `check`) renders on a lean Chromium: no GPU, no
+anti-aliasing, a capped V8 heap. It is for a quick look while iterating. Its
+pixels are not the full browser's, so a fast `run` caches no baseline and
+publishes nothing to the pull request, and a fast `check` compares nothing with
+main's baseline. Screenshots and the final pass for a pull request run without
+it. The UI fuzzer always renders fast, because it judges behaviour, not pixels.
 
 ## Adding a route
 
@@ -707,6 +777,7 @@ screenshot; sign-in photographs it once as the `sign-in` flow.
 tools/visualdiff/                    the Go CLI: boot, wait, seed, classify, report, teardown
 tools/visualdiff/haven.go            the haven boot path: slugs, up, readiness, teardown, worktree prepare
 tools/visualdiff/findings_stream.go  findings.jsonl: the live tracker, the file writer, run+recapture's shared capture path
+tools/visualdiff/batches.go          review batches: sealing, batch.json, REVIEW.md, READY; cli_batches.go reads them
 tools/visualdiff/catalogue.go        the module guess, from modules/catalogue.json
 tools/visualdiff/recapture.go        `visualdiff recapture`: replays named routes against a -keep run's own stacks
 tools/visualdiff/done.go             `visualdiff done`: the ledger of signed-off sections a run skips

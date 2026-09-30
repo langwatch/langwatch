@@ -52,7 +52,7 @@ func Main(ctx context.Context, args []string, streams Streams, root string) int 
 	flags.IntVar(&options.ReloadEvery, "reload-every", DefaultReloadEvery, "ui: full page load every Nth visit, in-app navigation between (1 = always load)")
 	flags.IntVar(&options.ActionsPerRoute, "actions", DefaultActionsPerRoute, "ui: random actions per visited route")
 	flags.IntVar(&options.MaxConsecutiveErrors, "max-consecutive-errors", -1, "stop after this many harness errors in a row: api transport errors (default 200), ui visits that errored or stayed loading (default 10); 0 never stops")
-	flags.StringVar(&options.URL, "url", "", "app origin; default resolves the shared stack")
+	flags.StringVar(&options.URL, "url", "", "app origin; default is diffsuite's branch stack, else the shared stack")
 	if err := flags.Parse(args[1:]); err != nil {
 		return 2
 	}

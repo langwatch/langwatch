@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/diffkit"
@@ -28,7 +29,7 @@ func openRunLog(options Options, streams *Streams) (func(), error) {
 	if err != nil {
 		return func() {}, fmt.Errorf("run log: %w", err)
 	}
-	streams.Err = io.MultiWriter(streams.Err, diffkit.NewStampedWriter(file, time.Now))
+	streams.Err = &lockedWriter{out: io.MultiWriter(streams.Err, diffkit.NewStampedWriter(file, time.Now))}
 	unmark, err := MarkRun(options.RunDir, options.Keep)
 	if err != nil {
 		_ = file.Close()
@@ -133,4 +134,17 @@ func appendUncovered(path string, uncovered []CoverageEntry, now time.Time) erro
 		}
 	}
 	return nil
+}
+
+// lockedWriter serialises writes: base and candidate stacks report progress
+// from their own goroutines into one stream.
+type lockedWriter struct {
+	mu  sync.Mutex
+	out io.Writer
+}
+
+func (writer *lockedWriter) Write(chunk []byte) (int, error) {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	return writer.out.Write(chunk)
 }

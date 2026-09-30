@@ -1,0 +1,80 @@
+# Langy routes the other files leave out (local control, waits, ui actions): a request with no key
+# is refused with 401 before any flag or conversation is read, on main and the branch alike.
+
+- id: langy-local-workspace-refuses-no-key
+  endpoint: GET /api/langy/local/workspace
+  auth: none
+  request:
+    path: /api/langy/local/workspace
+    query: { conversationId: "vd-missing-{uid}" }
+  expect:
+    status: 401
+
+- id: langy-local-request-create-refuses-no-key
+  endpoint: POST /api/langy/local/requests
+  auth: none
+  request:
+    path: "/api/langy/local/requests"
+    body: {}
+  expect:
+    status: 401
+
+- id: langy-local-call-start-refuses-no-key
+  endpoint: POST /api/langy/local/calls
+  auth: none
+  request:
+    path: "/api/langy/local/calls"
+    body: {}
+  expect:
+    status: 401
+
+- id: langy-local-call-read-refuses-no-key
+  endpoint: GET /api/langy/local/calls/{callId}
+  auth: none
+  request:
+    path: "/api/langy/local/calls/vd-missing-{uid}"
+  expect:
+    status: 401
+
+- id: langy-local-call-cancel-refuses-no-key
+  endpoint: POST /api/langy/local/calls/{callId}/cancel
+  auth: none
+  request:
+    path: "/api/langy/local/calls/vd-missing-{uid}/cancel"
+    body: {}
+  expect:
+    status: 401
+
+- id: langy-wait-start-refuses-no-key
+  endpoint: POST /api/langy/waits
+  auth: none
+  request:
+    path: "/api/langy/waits"
+    body: {}
+  expect:
+    status: 401
+
+- id: langy-wait-read-refuses-no-key
+  endpoint: GET /api/langy/waits/{waitId}
+  auth: none
+  request:
+    path: "/api/langy/waits/vd-missing-{uid}"
+  expect:
+    status: 401
+
+- id: langy-ui-action-dispatch-refuses-no-key
+  endpoint: POST /api/langy/ui/actions
+  auth: none
+  request:
+    path: "/api/langy/ui/actions"
+    body: {}
+  expect:
+    status: 401
+
+- id: langy-ui-actions-list-refuses-no-key
+  endpoint: GET /api/langy/ui/actions
+  auth: none
+  request:
+    path: "/api/langy/ui/actions"
+  expect:
+    status: 401

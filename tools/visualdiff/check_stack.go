@@ -27,10 +27,10 @@ func CheckDir(root string) string { return filepath.Join(root, ".visualdiff", "c
 
 // checkStackRequest is how check brings its own stack up.
 type checkStackRequest struct {
-	root   string
-	devUI  bool
-	shared bool
-	stderr io.Writer
+	root, slug    string
+	devUI, shared bool
+	adoptOnly     bool
+	stderr        io.Writer
 }
 
 // checkTimes are where check's time went before its flows ran, for the timing block.
@@ -58,7 +58,7 @@ func checkStack(ctx context.Context, request checkStackRequest, times *checkTime
 	if err != nil {
 		return RunnerSide{}, err
 	}
-	stack := Stack{Name: "check", Dir: request.root, HavenSlug: CheckSlug, Layout: layout}
+	stack := Stack{Name: "check", Dir: request.root, HavenSlug: request.slug, Layout: layout}
 	if request.shared {
 		unlock, err := lockCheckStack(dir, request.stderr)
 		if err != nil {
@@ -68,7 +68,7 @@ func checkStack(ctx context.Context, request checkStackRequest, times *checkTime
 	}
 	started := time.Now()
 	code := workingTreeKey(ctx, request.root)
-	booted, err := run.upCheckStack(ctx, &stack)
+	booted, err := run.upCheckStack(ctx, &stack, request.adoptOnly)
 	if err == nil && !booted && !request.shared {
 		err = run.restartChangedBackend(ctx, &stack, code)
 	}
@@ -97,7 +97,7 @@ func checkStack(ctx context.Context, request checkStackRequest, times *checkTime
 
 // upCheckStack reuses the stack when its lanes listen, waits for one still booting,
 // and otherwise runs `haven up` from the working tree. It reports a fresh boot.
-func (run *session) upCheckStack(ctx context.Context, stack *Stack) (bool, error) {
+func (run *session) upCheckStack(ctx context.Context, stack *Stack, adoptOnly bool) (bool, error) {
 	status, err := run.havenStatus(ctx, *stack)
 	if err != nil {
 		return false, fmt.Errorf("check: haven status: %w", err)
@@ -108,6 +108,9 @@ func (run *session) upCheckStack(ctx context.Context, stack *Stack) (bool, error
 		return false, nil
 	}
 	booted := !stackLive(status, stack.HavenSlug)
+	if booted && adoptOnly {
+		return false, fmt.Errorf("check: haven stack %s is not up, and diffsuite owns the stacks", stack.HavenSlug)
+	}
 	if booted {
 		if err := run.havenUp(ctx, *stack); err != nil {
 			return false, err

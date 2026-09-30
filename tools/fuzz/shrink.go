@@ -92,7 +92,7 @@ func (run *apiRun) reproduces(ctx context.Context, finding rawFinding) bool {
 	status, elapsed, responseBody, _ := run.do(ctx, finding.request)
 	hits := Evaluate(Observation{
 		Mutation: finding.item.mutation, Status: status, Elapsed: elapsed, Body: responseBody,
-		JSONExpected: true, SeparateOrg: run.org.Separate, LatencyCap: LatencyCap, ForeignIDs: finding.request.foreign,
+		JSONExpected: true, SeparateOrg: run.org.Separate, OwnIDs: run.ownIDs(), LatencyCap: LatencyCap, ForeignIDs: finding.request.foreign,
 	})
 	for _, hit := range hits {
 		if hit.Oracle == finding.hit.Oracle && status == finding.status {

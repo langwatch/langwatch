@@ -7,6 +7,14 @@ import { isTargeted, targetOf } from "./target.ts";
 const CLICKABLE =
   "button, a, [role=button], [role=menuitem], [role=tab], [role=option], [role=radio]";
 
+/** withinSide keeps a mailed link's path, query and fragment: the side prefixes its own
+ * base URL. */
+const withinSide = (target: string): string => {
+  if (!/^https?:\/\//i.test(target)) return target;
+  const url = new URL(target);
+  return url.pathname + url.search + url.hash;
+};
+
 export const goTo = async ({
   context,
   path,
@@ -15,7 +23,7 @@ export const goTo = async ({
   path: string;
 }): Promise<void> => {
   const { side, slug } = context;
-  await side.goto(fillPath({ path, slug }));
+  await side.goto(withinSide(fillPath({ path, slug })));
   await side.page.waitForLoadState("domcontentloaded", { timeout: 15_000 }).catch(() => undefined);
 };
 
@@ -138,14 +146,18 @@ const selectBox = async (context: ActionContext): Promise<Locator> => {
     .first();
 };
 
-/** select picks an option in a native select, or opens a combobox and picks the option in its list. */
+/** select picks an option in a native select, or opens a combobox and picks the option in
+ * its list. */
 export const select: Action = async (context) => {
   const option = argument({ context, name: "option" });
   const box = await selectBox(context);
-  const native = await box.evaluate((node) => node.tagName === "SELECT", undefined, { timeout: 6000 });
+  const native = await box.evaluate((node) => node.tagName === "SELECT", undefined, {
+    timeout: 6000,
+  });
   if (native) {
     const labels = (await box.locator("option").allTextContents()).map((label) => label.trim());
-    const label = labels.find((text) => text === option) ?? labels.find((text) => asRegExp(option).test(text));
+    const label =
+      labels.find((text) => text === option) ?? labels.find((text) => asRegExp(option).test(text));
     if (label === undefined) throw new Error(`no option "${option}" among: ${labels.join(" | ")}`);
     await box.selectOption({ label }, { timeout: 6000 });
     return;
@@ -154,7 +166,8 @@ export const select: Action = async (context) => {
   await context.side.page.getByRole("option", { name: option }).first().click({ timeout: 6000 });
 };
 
-/** type puts text into a box (placeholder, test id, label or selector) and optionally submits it. */
+/** type puts text into a box (placeholder, test id, label or selector) and optionally
+ * submits it. */
 export const type: Action = async (context) => {
   const { side } = context;
   const box = isTargeted(context.args)

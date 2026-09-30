@@ -16,11 +16,11 @@ flows:
           path: /onboarding/local-dev-team/project
       - action: fill
         with:
-          testId: onboarding-project-name
-          value: vd-onb-{uid}
+          field: Project Name
+          value: 'vd-onb-{uid}'
       - action: click
         with:
-          testId: onboarding-project-submit
+          selector: 'button[type="submit"]'
       - action: expect
         with:
           url: /vd-onb-{uid}/
@@ -41,11 +41,11 @@ flows:
           path: /{isolatedSlug}/setup
       - action: expect
         with:
-          testId: setup-first-trace-waiting
+          text: Waiting for first trace
       - action: expect
         with:
-          testId: setup-first-trace-received
-          equals: "0"
+          text: /Integration configured/
+          equals: '0'
       - action: expect
         with:
           label: API key
@@ -58,12 +58,12 @@ flows:
           path: /{slug}/setup
       - action: expect
         with:
-          testId: setup-first-trace-received
-          timeout: "20000"
+          text: /Integration configured/
+          timeout: '20000'
       - action: expect
         with:
-          testId: setup-first-trace-waiting
-          equals: "0"
+          text: Waiting for first trace
+          equals: '0'
 
   - id: onboarding-welcome-sends-a-member-home
     title: A member who already belongs to an organisation is sent past the welcome screen
@@ -89,14 +89,14 @@ flows:
           path: /settings/members
       - action: click
         with:
-          testId: members-invite-open
+          text: Invite people
       - action: fill
         with:
-          testId: members-invite-emails
-          value: vd-onb-{uid}@mail.langwatch.localhost
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-onb-{uid}@mail.langwatch.localhost'
       - action: click
         with:
-          testId: members-invite-submit
+          text: /^\s*(Send|Create) invites\s*$/
       - action: mail
         with:
           to: vd-onb-{uid}@mail.langwatch.localhost

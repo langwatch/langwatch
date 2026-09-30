@@ -61,3 +61,31 @@ func TestCrossTenantOracleIgnoresEmptyListsAndOwnReads(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "An object resolved inside the caller's own tenant is not a cross-tenant hit"
+// @scenario "An answer naming another tenant's project or organisation is a cross-tenant hit"
+// @scenario "An answer carrying no tenant field keeps the id-echo rule"
+// A prompt read by a handle that happens to spell the other tenant's id resolves
+// inside the caller's own project; its body names only the caller's tenant.
+func TestCrossTenantOracleIgnoresAnObjectOfTheCallersOwnTenant(t *testing.T) {
+	observation := func(body string) Observation {
+		return Observation{
+			Mutation: Mutation{Name: "foreign-id", Foreign: true}, Status: 200, Body: []byte(body), SeparateOrg: true,
+			ForeignIDs: []string{"prompt_seeded"}, OwnIDs: []string{"organization_own", "project_own"},
+		}
+	}
+	for body, want := range map[string]bool{
+		`{"id":"prompt_seeded","projectId":"project_own","organizationId":"organization_own"}`:   false,
+		`{"id":"prompt_seeded","projectId":"project_other"}`:                                     true,
+		`{"id":"prompt_seeded","projectId":"project_own","organizationId":"organization_other"}`: true,
+		`{"id":"prompt_seeded","name":"no tenant fields"}`:                                       true,
+	} {
+		flagged := false
+		for _, hit := range Evaluate(observation(body)) {
+			flagged = flagged || hit.Oracle == "cross-tenant"
+		}
+		if flagged != want {
+			t.Errorf("%s: cross-tenant=%v, want %v", body, flagged, want)
+		}
+	}
+}

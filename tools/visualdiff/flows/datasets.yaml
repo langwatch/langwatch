@@ -1,16 +1,15 @@
-# Datasets, beyond create and CSV upload in evaluations.yaml: open the seeded one, search
-# its rows, send it to an experiment, rename it, add rows from a CSV and delete it. Each
-# outcome is read back from the API or the list after a reload. Unrun: written under load.
+# Datasets: list, create, open, search, edit a row, add rows by hand and by CSV, rename, delete.
+# Every selector is one main and the branch share: a test id both trees carry (upload-or-create-dataset,
+# dataset-row-count, add-row, cell-<row>-<column>, save-status-saved, ...), a field label, or a menu item's
+# words. A dataset a flow works on is posted by `setup:` (its name and ids captured), so flows share a stack.
+# Each outcome is read back from the API or the page after a reload. Unrun: first run proves them.
 flows:
   - id: dataset-open-seeded-and-search-rows
     title: Open the seeded dataset, see its rows and narrow them with the row search
     steps:
       - action: go
         with:
-          path: /{slug}/datasets
-      - action: click
-        with:
-          testId: dataset-row-{dataset}
+          path: /{slug}/datasets/{dataset}
       - action: expect
         with:
           testId: dataset-editor-grid
@@ -33,10 +32,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/datasets
-      - action: click
-        with:
-          testId: dataset-row-{dataset}
+          path: /{slug}/datasets/{dataset}
       - action: click
         with:
           testId: run-experiment-from-dataset
@@ -48,8 +44,8 @@ flows:
           testIdPrefix: dataset-tab-
           min: "1"
 
-  - id: dataset-rename-through-edit
-    title: Rename a dataset from its row menu and find the new name after a reload
+  - id: dataset-create-from-list
+    title: Create an empty dataset from the list and find it after a reload
     steps:
       - action: go
         with:
@@ -59,34 +55,53 @@ flows:
           testId: upload-or-create-dataset
       - action: click
         with:
-          testId: dataset-menu-create
+          text: Create empty dataset
       - action: fill
         with:
-          testId: dataset-name-input
-          value: vd-dsren-{uid}
+          label: /^Name/
+          value: vd-dscreate-{uid}
       - action: click
         with:
-          testId: dataset-form-submit
+          text: Create Dataset
       - action: expect
         with:
           api: /api/dataset
-          contains: vd-dsren-{uid}
+          contains: vd-dscreate-{uid}
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: expect
+        with:
+          text: vd-dscreate-{uid}
+
+  - id: dataset-rename-through-edit
+    title: Rename a dataset from its row menu and find the new name after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-dsren-{uid}
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          dsName: name
+    steps:
       - action: go
         with:
           path: /{slug}/datasets
       - action: click
         with:
-          label: Actions for vd-dsren-{uid}
+          selector: tr:has-text("{dsName}") button
       - action: click
         with:
           text: Edit dataset
       - action: fill
         with:
-          testId: dataset-name-input
+          label: /^Name/
           value: vd-dsren-{uid}-renamed
       - action: click
         with:
-          testId: dataset-form-submit
+          text: /^\s*Save\s*$/
       - action: expect
         with:
           api: /api/dataset
@@ -96,39 +111,141 @@ flows:
           path: /{slug}/datasets
       - action: expect
         with:
-          testIdPrefix: dataset-row-
-          hasText: vd-dsren-{uid}-renamed
+          text: vd-dsren-{uid}-renamed
 
-  - id: dataset-add-rows-from-csv
-    title: Add rows to an existing dataset from a CSV and see the row count after a reload
+  - id: dataset-row-edit
+    title: Edit a cell of an existing row and read the value back after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-dsedit-{uid}
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          dsId: id
+          dsSlug: slug
+      - post: /api/dataset/{dsSlug}/records
+        body:
+          entries:
+            - input: vd original cell
     steps:
       - action: go
         with:
-          path: /{slug}/datasets
-      - action: click
-        with:
-          testId: upload-or-create-dataset
-      - action: click
-        with:
-          testId: dataset-menu-create
-      - action: fill
-        with:
-          testId: dataset-name-input
-          value: vd-dsrows-{uid}
-      - action: click
-        with:
-          testId: dataset-form-submit
+          path: /{slug}/datasets/{dsId}
       - action: expect
         with:
-          api: /api/dataset
-          contains: vd-dsrows-{uid}
-      - action: go
+          testId: dataset-row-count
+          hasText: /^1 /
+      - action: expect
         with:
-          path: /{slug}/datasets
+          text: vd original cell
+      - action: type
+        with:
+          testIdPrefix: cell-0-
+          text: ""
+          submit: "true"
+      - action: fill
+        with:
+          selector: textarea
+          value: vd edited cell {uid}
       - action: click
         with:
-          testIdPrefix: dataset-row-
-          hasText: vd-dsrows-{uid}
+          testId: dataset-title
+      - action: expect
+        with:
+          testId: save-status-saved
+      - action: expect
+        with:
+          api: /api/dataset/{dsSlug}
+          contains: vd edited cell {uid}
+          timeout: "20000"
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
+      - action: expect
+        with:
+          text: vd edited cell {uid}
+
+  - id: dataset-row-add-manual
+    title: Add a row by hand, fill its cell and see two records after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-dsadd-{uid}
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          dsId: id
+          dsSlug: slug
+      - post: /api/dataset/{dsSlug}/records
+        body:
+          entries:
+            - input: vd first row
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 /
+      - action: click
+        with:
+          testId: add-row
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^2 /
+      - action: type
+        with:
+          testIdPrefix: cell-1-
+          text: ""
+          submit: "true"
+      - action: fill
+        with:
+          selector: textarea
+          value: vd second row {uid}
+      - action: click
+        with:
+          testId: dataset-title
+      - action: expect
+        with:
+          testId: save-status-saved
+      - action: expect
+        with:
+          api: /api/dataset/{dsSlug}
+          contains: vd second row {uid}
+          timeout: "20000"
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^2 /
+      - action: expect
+        with:
+          text: vd second row {uid}
+
+  - id: dataset-add-rows-from-csv
+    title: Add rows to an existing dataset from a CSV and see the row count after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-dsrows-{uid}
+          columnTypes:
+            - name: input
+              type: string
+            - name: expected_output
+              type: string
+        as:
+          dsId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
       - action: click
         with:
           testId: add-rows-from-csv
@@ -137,7 +254,7 @@ flows:
           fixture: sample.csv
       - action: click
         with:
-          testId: dataset-add-rows-submit
+          text: /^\s*Upload\s*$/
       - action: expect
         with:
           testId: dataset-row-count
@@ -145,11 +262,7 @@ flows:
           timeout: "20000"
       - action: go
         with:
-          path: /{slug}/datasets
-      - action: click
-        with:
-          testIdPrefix: dataset-row-
-          hasText: vd-dsrows-{uid}
+          path: /{slug}/datasets/{dsId}
       - action: expect
         with:
           testId: dataset-row-count
@@ -157,50 +270,38 @@ flows:
 
   - id: dataset-delete
     title: Delete a dataset behind its typed confirmation and see it gone after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-dsdel-{uid}
+          columnTypes:
+            - name: input
+              type: string
+        as:
+          dsName: name
     steps:
       - action: go
         with:
           path: /{slug}/datasets
-      - action: click
-        with:
-          testId: upload-or-create-dataset
-      - action: click
-        with:
-          testId: dataset-menu-create
-      - action: fill
-        with:
-          testId: dataset-name-input
-          value: vd-dsdel-{uid}
-      - action: click
-        with:
-          testId: dataset-form-submit
       - action: expect
         with:
-          api: /api/dataset
-          contains: vd-dsdel-{uid}
-      - action: go
-        with:
-          path: /{slug}/datasets
-      - action: expect
-        with:
-          testIdPrefix: dataset-row-
-          hasText: vd-dsdel-{uid}
+          text: "{dsName}"
       - action: click
         with:
-          label: Actions for vd-dsdel-{uid}
+          selector: tr:has-text("{dsName}") button
       - action: click
         with:
           text: Delete dataset
       - action: fill
         with:
-          testId: delete-dataset-confirmation
+          field: /Type .?delete.? to confirm/
           value: delete
       - action: click
         with:
-          testId: delete-dataset-confirm
+          text: /^\s*Delete\s*$/
       - action: expect
         with:
-          count: '[data-testid^="dataset-row-"]:has-text("vd-dsdel-{uid}")'
+          text: "{dsName}"
           equals: "0"
       - action: go
         with:
@@ -210,5 +311,5 @@ flows:
           testId: upload-or-create-dataset
       - action: expect
         with:
-          count: '[data-testid^="dataset-row-"]:has-text("vd-dsdel-{uid}")'
+          text: "{dsName}"
           equals: "0"

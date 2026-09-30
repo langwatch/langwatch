@@ -3,9 +3,10 @@ Feature: The transport-declares lint rule
   framework parses, refuses and serialises, and a handler takes
   `{ input, app, actor, scope, signal }`, calls exactly one API operation, and
   returns a plain value or throws. The rule reads a module's process source
-  three ways: every source for the process-only roots it may not build, the
-  `transport/` folder for its handlers, and route families for the HTTP and
-  tRPC machinery underneath the chain. Scenarios about route families live in
+  four ways: every source for the process-only roots it may not build, the
+  `transport/` folder for its handlers, transport and `*.server.ts` files for a
+  request re-checked by hand, and route families for the HTTP and tRPC
+  machinery underneath the chain. Scenarios about route families live in
   api-transport-through-framework.feature.
 
   @unit
@@ -49,3 +50,15 @@ Feature: The transport-declares lint rule
     Given a transport that registers raw Hono routes, reads a credential off the context bag or dispatches by string path
     When the transport-declares rule runs over it
     Then each is reported with the typed alternative
+
+  @unit
+  Scenario: A handler that refuses a missing input field is sent to the route's schema
+    Given handlers that throw when a field of their own input is missing, undefined or empty
+    When the transport-declares rule runs over them
+    Then it reports handlerChecksInput on each such check, and handlerControlFlow only on a branch that is not one
+
+  @unit
+  Scenario: A transport or middleware binding that re-checks the request's media type or body is refused
+    Given a server file whose middleware bindings compare the content-type or read the body, and a transport that compares the content-type
+    When the transport-declares rule runs over them
+    Then it reports mediaTypeCheck on each comparison and requestBodyRead on each body read, and nothing for a content-type only passed on

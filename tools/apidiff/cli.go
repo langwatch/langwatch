@@ -256,8 +256,8 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	probe.activateEntitlement = booted.ActivateEntitlement
 	if boot.UseHaven {
 		// The SCIM token and the permission-probe projects are inserted with
-		// SQL, and the haven path runs none: a stack's database belongs to
-		// haven. Both sides are missing the same fixtures, so those operations
+		// SQL, and the haven path runs none of it (only the entitled pass's
+		// licence copy). Both sides are missing the same fixtures, so those operations
 		// still compare like against like - unauthorized against unauthorized.
 		fmt.Fprintln(out.stderr, "haven path: SCIM and permission-probe fixtures are not provisioned; those operations compare unauthorized on both sides")
 	}
@@ -386,7 +386,7 @@ func probePipeline(ctx context.Context, probe *probeFlags, out streams) int {
 		return exitError
 	}
 
-	client := &http.Client{Timeout: probe.timeout}
+	client := &http.Client{Timeout: probe.timeout, CheckRedirect: firstResponse}
 	fmt.Fprintf(out.stderr, "fetching %s from both instances\n", SpecPath)
 	specs, err := fetchBothSpecs(ctx, probe, specFetch{
 		client:   client,

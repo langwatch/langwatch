@@ -6,9 +6,9 @@
 # plain {trace}, to enable trace sharing for the project, and to leave at
 # least one active annotation score and one organisation member so a queue can
 # be created. The queue flows pick the first option of each picker.
-# Not scripted: a download assertion for export (the runner has no expect for a
-# download, so the export flow proves the dialog closes) and the user-events
-# and sample-agents journeys (no UI).
+# Steps use handles both trees share (aria labels, button words, placeholders,
+# anchor-comment-button, tab and lens words); analytics-query-run is the one branch-only flow.
+# Not scripted: the user-events and sample-agents journeys (no UI).
 flows:
   - id: trace-share-link
     title: Share a trace, open the link with no session, revoke it and see it denied
@@ -18,16 +18,13 @@ flows:
           path: /{slug}/traces/{trace}
       - action: click
         with:
-          testId: trace-drawer-share
+          label: Share trace
       - action: click
         with:
-          testId: share-link-create
-      - action: expect
-        with:
-          testId: share-link-row
+          selector: 'button:text-is("Create link")'
       - action: capture
         with:
-          testId: share-link-url
+          selector: 'p:has-text("/share/")'
           as: shareToken
           match: /share/([A-Za-z0-9_-]+)
       - action: go
@@ -36,22 +33,18 @@ flows:
           anonymous: "true"
       - action: expect
         with:
-          testId: share-page-trace
-          anonymous: "true"
-      - action: expect
-        with:
           text: handle_request
           anonymous: "true"
       - action: click
         with:
-          selector: '[data-testid="share-link-row"]:has-text("{shareToken}") [data-testid="share-link-revoke"]'
+          selector: 'xpath=//p[contains(., "{shareToken}")]/ancestor::div[.//button[@aria-label="Revoke link"]][1]//button[@aria-label="Revoke link"]'
       - action: go
         with:
           path: /share/{shareToken}
           anonymous: "true"
       - action: expect
         with:
-          testId: share-page-unavailable
+          text: Create a free account
           anonymous: "true"
 
   - id: trace-open-spans
@@ -62,7 +55,7 @@ flows:
           path: /{slug}/traces/{trace}
       - action: click
         with:
-          testId: trace-mode-tab-trace
+          text: /^Trace(?![a-z])/
       - action: expect
         with:
           testId: waterfall-row
@@ -76,28 +69,28 @@ flows:
           text: gpt-5-mini
       - action: click
         with:
-          testId: trace-mode-tab-summary
+          text: /^Summary/
       - action: expect
         with:
           api: /api/traces/{trace}
           contains: handle_request
 
   - id: trace-annotate-comment
-    title: Comment on a message in the trace drawer and read the annotation back
+    title: Comment on the trace input from the drawer and read the annotation back
     steps:
       - action: go
         with:
           path: /{slug}/traces/{trace}
       - action: click
         with:
-          label: Comment on this message
+          testId: anchor-comment-button
       - action: fill
         with:
-          testId: annotation-comment-input
+          selector: 'textarea[placeholder="Optional"]'
           value: vd-note-{uid}
       - action: click
         with:
-          testId: annotation-form-save
+          selector: 'button:text-is("Save")'
       - action: expect
         with:
           api: /api/annotations/trace/{trace}
@@ -108,8 +101,81 @@ flows:
           path: /{slug}/annotations
       - action: expect
         with:
-          testId: annotation-row
+          text: vd-note-{uid}
+
+  - id: trace-annotation-add-edit-delete
+    title: Annotate a message in Conversation mode, edit it, delete it and see the annotations list follow
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/{conversationTrace}
+      - action: click
+        with:
+          text: /^Conversation$/
+      - action: hover
+        with:
+          selector: '.group:has([aria-label="Annotate this message"])'
+      - action: click
+        with:
+          label: Annotate this message
+      - action: fill
+        with:
+          selector: 'textarea[placeholder="Optional"]'
+          value: vd-note-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          api: /api/annotations/trace/{conversationTrace}
+          field: data
+          contains: vd-note-{uid}
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          text: vd-note-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces/{conversationTrace}
+      - action: click
+        with:
+          text: /^Conversation$/
+      - action: click
+        with:
+          label: Edit annotation
           hasText: vd-note-{uid}
+      - action: fill
+        with:
+          selector: 'textarea[placeholder="Optional"]'
+          value: vd-note-{uid}-edited
+      - action: click
+        with:
+          selector: 'button:text-is("Update")'
+      - action: expect
+        with:
+          api: /api/annotations/trace/{conversationTrace}
+          field: data
+          contains: vd-note-{uid}-edited
+      - action: click
+        with:
+          label: Edit annotation
+          hasText: vd-note-{uid}-edited
+      - action: click
+        with:
+          label: Delete annotation
+      - action: expect
+        with:
+          text: vd-note-{uid}-edited
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          text: vd-note-{uid}
+          equals: "0"
 
   - id: annotation-queue-add-trace
     title: Create an annotation queue, add a trace to it from the drawer and open the queue
@@ -119,70 +185,73 @@ flows:
           path: /{slug}/annotations
       - action: click
         with:
-          testId: annotation-queue-create
+          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
       - action: fill
         with:
-          testId: annotation-queue-editor-name
+          label: /^Name Annotation Queue/
           value: vd-queue-{uid}
       - action: fill
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
           value: Created by the visual diff flow {uid}
       - action: click
         with:
-          testId: annotation-queue-editor-participants
+          text: Add Participants
       - action: click
         with:
-          testId: annotation-queue-editor-participant-option
+          selector: button[aria-pressed]
       - action: click
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
       - action: click
         with:
-          testId: annotation-queue-editor-score-types
+          text: Add Score Type
       - action: click
         with:
-          testId: annotation-queue-editor-score-option
+          selector: button[aria-pressed]
       - action: click
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
       - action: click
         with:
-          testId: annotation-queue-editor-save
+          text: /^\s*Save\s*$/
       - action: expect
         with:
-          testId: annotation-queue-entry
-          hasText: vd-queue-{uid}
+          label: Actions for queue vd-queue-{uid}
       - action: go
         with:
-          path: /{slug}/traces/{trace}
+          path: /{slug}/traces
+      - action: expect
+        with:
+          label: Select trace {trace}
+          timeout: 20000
       - action: click
         with:
-          testId: trace-overflow-menu
+          label: Select trace {trace}
       - action: click
         with:
-          testId: trace-overflow-add-to-annotation-queue
+          text: Add to annotation queue
       - action: click
         with:
-          testId: annotation-queue-participants-trigger
+          text: Add Participants
       - action: click
         with:
-          testId: annotation-queue-participant-option
-          hasText: vd-queue-{uid}
+          text: vd-queue-{uid}
       - action: click
         with:
-          testId: annotation-queue-participants-send
+          text: /^Send to:/
+      - action: click
+        with:
+          text: /^\s*Send\s*$/
       - action: go
         with:
           path: /{slug}/annotations
       - action: click
         with:
-          testId: annotation-queue-entry
-          hasText: vd-queue-{uid}
+          text: vd-queue-{uid}
       - action: expect
         with:
-          testId: annotation-queue-position
-          hasText: /^1 of 1$/
+          text: /^1 of 1$/
 
   - id: annotation-queue-walk
     title: Queue two traces and step through them with Next until Done
@@ -192,107 +261,113 @@ flows:
           path: /{slug}/annotations
       - action: click
         with:
-          testId: annotation-queue-create
+          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
       - action: fill
         with:
-          testId: annotation-queue-editor-name
+          label: /^Name Annotation Queue/
           value: vd-walk-{uid}
       - action: fill
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
           value: Walked by the visual diff flow {uid}
       - action: click
         with:
-          testId: annotation-queue-editor-participants
+          text: Add Participants
       - action: click
         with:
-          testId: annotation-queue-editor-participant-option
+          selector: button[aria-pressed]
       - action: click
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
       - action: click
         with:
-          testId: annotation-queue-editor-score-types
+          text: Add Score Type
       - action: click
         with:
-          testId: annotation-queue-editor-score-option
+          selector: button[aria-pressed]
       - action: click
         with:
-          testId: annotation-queue-editor-description
+          label: /^Description/
       - action: click
         with:
-          testId: annotation-queue-editor-save
+          text: /^\s*Save\s*$/
       - action: expect
         with:
-          testId: annotation-queue-entry
-          hasText: vd-walk-{uid}
+          label: Actions for queue vd-walk-{uid}
       - action: go
         with:
-          path: /{slug}/traces/{trace}
+          path: /{slug}/traces
+      - action: expect
+        with:
+          label: Select trace {trace}
+          timeout: 20000
       - action: click
         with:
-          testId: trace-overflow-menu
+          label: Select trace {trace}
       - action: click
         with:
-          testId: trace-overflow-add-to-annotation-queue
+          text: Add to annotation queue
       - action: click
         with:
-          testId: annotation-queue-participants-trigger
+          text: Add Participants
       - action: click
         with:
-          testId: annotation-queue-participant-option
-          hasText: vd-walk-{uid}
+          text: vd-walk-{uid}
       - action: click
         with:
-          testId: annotation-queue-participants-send
+          text: /^Send to:/
+      - action: click
+        with:
+          text: /^\s*Send\s*$/
       - action: go
         with:
-          path: /{slug}/traces/trace_visualdiff_1
+          path: /{slug}/traces
+      - action: expect
+        with:
+          label: Select trace trace_visualdiff_1
+          timeout: 20000
       - action: click
         with:
-          testId: trace-overflow-menu
+          label: Select trace trace_visualdiff_1
       - action: click
         with:
-          testId: trace-overflow-add-to-annotation-queue
+          text: Add to annotation queue
       - action: click
         with:
-          testId: annotation-queue-participants-trigger
+          text: Add Participants
       - action: click
         with:
-          testId: annotation-queue-participant-option
-          hasText: vd-walk-{uid}
+          text: vd-walk-{uid}
       - action: click
         with:
-          testId: annotation-queue-participants-send
+          text: /^Send to:/
+      - action: click
+        with:
+          text: /^\s*Send\s*$/
       - action: go
         with:
           path: /{slug}/annotations
       - action: click
         with:
-          testId: annotation-queue-entry
-          hasText: vd-walk-{uid}
+          text: vd-walk-{uid}
       - action: expect
         with:
-          testId: annotation-queue-position
-          hasText: /^1 of 2$/
+          text: /^1 of 2$/
       - action: click
         with:
-          testId: annotation-queue-next
+          text: /^\s*Next\s*$/
       - action: expect
         with:
-          testId: annotation-queue-position
-          hasText: /^2 of 2$/
+          text: /^2 of 2$/
       - action: expect
         with:
-          testId: annotation-queue-next
-          hasText: Done
+          text: /^Done$/
       - action: click
         with:
-          testId: annotation-queue-previous
+          text: /^\s*Previous\s*$/
       - action: expect
         with:
-          testId: annotation-queue-position
-          hasText: /^1 of 2$/
+          text: /^1 of 2$/
 
   - id: trace-errors-lens
     title: The Errors lens lists the failed trace and only failed traces
@@ -302,23 +377,25 @@ flows:
           path: /{slug}/traces
       - action: click
         with:
-          testId: trace-lens-tab-errors
+          selector: '[role="tab"]'
+          text: /^Errors/
       - action: expect
         with:
-          count: tbody[data-testid="trace-row"][data-trace-id="{errorTrace}"]
+          count: tbody[data-trace-id="{errorTrace}"]
       - action: expect
         with:
-          count: tbody[data-testid="trace-row"]:not([data-row-variant="error"])
-          equals: "0"
+          count: tbody:not([data-row-variant="error"])
+          equals: '"0"'
       - action: expect
         with:
-          count: tbody[data-testid="trace-row"][data-trace-id="{errorTrace}"]
+          count: tbody[data-trace-id="{errorTrace}"]
       - action: click
         with:
-          testId: trace-lens-tab-all-traces
+          selector: '[role="tab"]'
+          text: /^All Traces/
       - action: expect
         with:
-          count: tbody[data-testid="trace-row"][data-trace-id="{trace}"]
+          count: tbody[data-trace-id="{trace}"]
 
   - id: trace-search-query
     title: Type a search query into the explorer and see the list narrow to matching traces
@@ -328,19 +405,19 @@ flows:
           path: /{slug}/traces
       - action: expect
         with:
-          count: tbody[data-testid="trace-row"][data-trace-id="{trace}"]
+          count: tbody[data-trace-id="{trace}"]
       - action: type
         with:
-          testId: trace-search-input
-          text: "status:error"
-          submit: "true"
+          label: Search filters or type what you are looking for
+          text: status:error
+          submit: true
       - action: expect
         with:
-          count: tbody[data-testid="trace-row"][data-trace-id="{errorTrace}"]
+          count: tbody[data-trace-id="{errorTrace}"]
       - action: expect
         with:
-          count: tbody[data-testid="trace-row"]:not([data-row-variant="error"])
-          equals: "0"
+          count: tbody:not([data-row-variant="error"])
+          equals: '"0"'
 
   - id: trace-save-lens
     title: Save the current view as a lens and find its tab after a reload
@@ -350,25 +427,23 @@ flows:
           path: /{slug}/traces
       - action: click
         with:
-          testId: trace-lens-create
+          label: Create new lens
       - action: fill
         with:
-          testId: trace-lens-name-input
+          field: Lens name
           value: vd-lens-{uid}
       - action: click
         with:
-          testId: trace-lens-name-submit
+          text: /^\s*Create\s*$/
       - action: expect
         with:
-          testIdPrefix: trace-lens-tab-
-          hasText: vd-lens-{uid}
+          text: vd-lens-{uid}
       - action: go
         with:
           path: /{slug}/traces
       - action: expect
         with:
-          testIdPrefix: trace-lens-tab-
-          hasText: vd-lens-{uid}
+          text: vd-lens-{uid}
 
   - id: trace-export
     title: Open the export dialog from the toolbar and start an export
@@ -378,20 +453,38 @@ flows:
           path: /{slug}/traces
       - action: expect
         with:
-          count: tbody[data-testid="trace-row"][data-trace-id="{trace}"]
+          count: tbody[data-trace-id="{trace}"]
       - action: click
         with:
-          testId: trace-toolbar-export
+          label: Export traces
       - action: expect
         with:
           text: Export Traces
       - action: click
         with:
-          testId: trace-export-submit
+          selector: button:text-is("Export")
       - action: expect
         with:
-          testId: trace-export-submit
-          equals: "0"
+          text: Export Traces
+          equals: 0
+
+  - id: trace-export-download-csv
+    title: Export the current view as CSV, the download starts and its first line is the header row
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          label: Export traces
+      - action: expect
+        with:
+          text: Export Traces
+      - action: download
+        with:
+          selector: 'button:text-is("Export")'
+          contains: trace_id,timestamp,input,output,labels
+          filename: '/\.csv$/'
 
   - id: trace-conversation-thread
     title: Open a conversation trace in Conversation mode and see its turns
@@ -401,11 +494,13 @@ flows:
           path: /{slug}/traces/{conversationTrace}
       - action: click
         with:
-          testId: trace-mode-tab-conversation
+          text: /^Conversation/
       - action: expect
         with:
-          testId: trace-conversation-turn
-          min: "2"
+          text: /^Turn 1$/i
+      - action: expect
+        with:
+          text: /^Turn 2$/i
 
   - id: analytics-custom-chart
     title: Build a custom chart, save it and read it back from the graphs API
@@ -415,16 +510,17 @@ flows:
           path: /{slug}/analytics/custom
       - action: fill
         with:
-          testId: analytics-graph-title
+          selector: input[name="title"]
           value: vd-chart-{uid}
       - action: click
         with:
-          testId: analytics-graph-save
+          text: /^\s*Save\s*$/
       - action: expect
         with:
           api: /api/graphs
           contains: vd-chart-{uid}
 
+  # branch-only: main has no analytics query workbench page (lwql-editor, lwql-run); only the REST route.
   - id: analytics-query-run
     title: Write a query in the analytics workbench, run it and read the result table
     steps:

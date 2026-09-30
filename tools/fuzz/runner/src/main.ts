@@ -8,14 +8,15 @@ import {
   type SideBrowser,
 } from "@langwatch/visual-diff-runner/capture";
 import { note, type Plan as CapturePlan } from "@langwatch/visual-diff-runner/protocol";
+import { Throttle } from "@langwatch/visual-diff-runner/schedule";
 import { signInSide } from "@langwatch/visual-diff-runner/sign-in";
 
-import { Collector, SessionLost, walkRoute } from "./monkey.ts";
+import { Collector, SessionLost, walkRoute, type VisitResult } from "./monkey.ts";
 import { planSchema, type Coverage, type FuzzPlan, type Navigation } from "./protocol.ts";
 import { hashSeed, mulberry32, shuffled } from "./rng.ts";
 import { expandRoute, registeredRoutes, type Expanded } from "./routes.ts";
-import { ReloadSchedule } from "./schedule.ts";
-import { FindingSink } from "./sink.ts";
+import { loadingScale, ReloadSchedule, takeOnceMore } from "./schedule.ts";
+import { FindingSink, HeldFindings } from "./sink.ts";
 import { ErrorStreak } from "./streak.ts";
 
 const out = process.stdout;
@@ -27,6 +28,8 @@ const LANDING_MILLIS = 180_000;
 /** STOPPED_EXIT is the exit code of a run that stopped early on purpose (the Go side reads it). */
 const STOPPED_EXIT = 3;
 const REASON_CHARS = 200;
+/** PAUSE_MILLIS is how often a lane over the throttle asks again whether it may work. */
+const PAUSE_MILLIS = 1000;
 
 const firstLine = (thrown: unknown): string =>
   String(thrown instanceof Error ? thrown.message : thrown)
@@ -104,27 +107,26 @@ const signInWithRetry = async ({
   }
 };
 
-/** openPages opens every page while the first signs in: they share the one session. */
-const openPages = async ({
+/** closePopups closes the tabs an action opens in a context. */
+const closePopups = (side: Side): void => {
+  side.page.context().on("page", (popup) => {
+    void popup.opener().then((opener) => (opener === null ? undefined : popup.close()));
+  });
+};
+
+/** signIn signs the first page in; every visit's context then copies its session. */
+const signIn = async ({
   plan,
   outDir,
   browser,
-  count,
 }: {
   plan: FuzzPlan;
   outDir: string;
   browser: SideBrowser;
-  count: number;
-}): Promise<Side[]> => {
+}): Promise<Side> => {
   const first = await browser.openPage();
-  const [, rest] = await Promise.all([
-    signInWithRetry({ plan, outDir, side: first }),
-    Promise.all(Array.from({ length: count - 1 }, async () => browser.openPage())),
-  ]);
-  first.page.context().on("page", (popup) => {
-    void popup.opener().then((opener) => (opener === null ? undefined : popup.close()));
-  });
-  return [first, ...rest];
+  await signInWithRetry({ plan, outDir, side: first });
+  return first;
 };
 
 /** projectSlug is the address `/` lands on once signed in: the user's first project. */
@@ -151,6 +153,32 @@ const visitsLine = ({ run, deadline }: { run: Run; deadline: number }): string =
   return `visits ${run.visits} ${kinds} routes ${run.routesVisited}/${run.order.length} left ${clock}`;
 };
 
+/** LanePage is a lane's page, in a context of its own, and what listens to it. */
+interface LanePage {
+  side: Side;
+  collector: Collector;
+}
+
+/** Walked is a visit's result, or what it threw. */
+interface Walked {
+  result?: VisitResult;
+  thrown?: unknown;
+}
+
+/** Attempt is one try at a visit: what it found, held back, and whether the page crashed. */
+interface Attempt {
+  walked: Walked;
+  held: HeldFindings;
+  crashed: boolean;
+  navigation: Navigation;
+}
+
+const openLanePage = async (browser: SideBrowser): Promise<LanePage> => {
+  const side = await browser.openLane();
+  closePopups(side);
+  return { side, collector: new Collector(side.page) };
+};
+
 /** Run is the state the lanes share: the queue of visits and what they have done so far. */
 class Run {
   readonly perRoute: Coverage["perRoute"] = {};
@@ -163,6 +191,7 @@ class Run {
   navigationFallbacks = 0;
   sessionLost: SessionLost | undefined;
   readonly streak: ErrorStreak;
+  readonly throttle: Throttle;
   private next = 0;
 
   readonly plan: FuzzPlan;
@@ -184,6 +213,7 @@ class Run {
     this.avoid = input.avoid;
     this.deadline = input.deadline;
     this.streak = new ErrorStreak(input.plan.maxConsecutiveErrors);
+    this.throttle = new Throttle("fuzz", input.plan.workers);
   }
 
   get routesVisited(): number {
@@ -195,15 +225,18 @@ class Run {
     return this.order.length * passes;
   }
 
-  /** take hands out the next visit, or nothing once the queue, deadline or session is gone. */
-  take(): { entry: Expanded; visit: number } | undefined {
-    if (
+  private get exhausted(): boolean {
+    return (
       this.next >= this.total ||
       Date.now() >= this.deadline ||
-      this.sessionLost ||
+      this.sessionLost !== undefined ||
       this.streak.stopped !== undefined
-    )
-      return undefined;
+    );
+  }
+
+  /** take hands out the next visit, or nothing once the queue, deadline or session is gone. */
+  take(): { entry: Expanded; visit: number } | undefined {
+    if (this.exhausted) return undefined;
     const index = this.next++;
     return {
       entry: this.order[index % this.order.length] as Expanded,
@@ -211,37 +244,63 @@ class Run {
     };
   }
 
-  async lane(side: Side): Promise<void> {
-    const collector = new Collector(side.page);
+  /** lane works visits on pages of its own: a lane over the throttle's limit waits. */
+  async lane({ browser, index }: { browser: SideBrowser; index: number }): Promise<void> {
     const schedule = new ReloadSchedule(this.plan.reloadEvery);
-    for (let job = this.take(); job !== undefined; job = this.take()) {
+    let page: LanePage | undefined;
+    while (!this.exhausted) {
+      if (index > 0 && index >= this.throttle.limit()) {
+        await new Promise((resolve) => setTimeout(resolve, PAUSE_MILLIS));
+        continue;
+      }
+      const job = this.take();
+      if (job === undefined) break;
       const navigation = schedule.next();
-      const outcome = await this.visit({ side, collector, navigation, ...job });
-      schedule.done(outcome);
+      const attempt = async (n: number): Promise<Attempt> => {
+        const how = n === 0 ? navigation : "reload";
+        if (how === "reload" || page === undefined) {
+          await page?.side.dispose();
+          page = await openLanePage(browser);
+        }
+        const held = new HeldFindings(this.sink);
+        const walked = await this.walk({ ...page, sink: held, navigation: how, ...job });
+        return { walked, held, crashed: page.side.crashed, navigation: how };
+      };
+      const taken = await takeOnceMore({
+        take: attempt,
+        crashed: (result) => result.crashed,
+        onCrash: () => this.throttle.crashed(),
+      });
+      if (taken.crashed) {
+        await page?.side.dispose();
+        page = undefined;
+      }
+      schedule.done(this.account({ ...job, taken }));
       this.visits += 1;
     }
+    await page?.side.dispose();
   }
 
-  private async visit({
+  private async walk({
     side,
     collector,
+    sink,
     entry,
     visit,
     navigation,
-  }: {
-    side: Side;
-    collector: Collector;
+  }: LanePage & {
+    sink: HeldFindings;
     entry: Expanded;
     visit: number;
     navigation: Navigation;
-  }): Promise<{ navigation: Navigation; broken: boolean }> {
-    const stats = (this.perRoute[entry.route] ??= { visits: 0, actions: 0, findings: 0 });
+  }): Promise<Walked> {
     try {
       const result = await walkRoute({
         side,
         collector,
         plan: this.plan,
-        sink: this.sink,
+        sink,
+        loadingScale: () => loadingScale({ max: this.plan.workers, limit: this.throttle.limit() }),
         route: entry.route,
         path: entry.path as string,
         visit,
@@ -251,25 +310,47 @@ class Run {
         now: () => (this.streak.stopped === undefined ? Date.now() : Number.POSITIVE_INFINITY),
         deadline: this.deadline,
       });
-      this.streak.record(result.error);
-      stats.visits += 1;
-      stats.actions += result.actions;
-      stats.findings += result.findings;
-      this.actions += result.actions;
-      this.moduleFailures += result.moduleFailures;
-      for (const seen of result.paths) this.paths.add(seen);
-      if (result.navigation === "reload") this.reloads += 1;
-      else this.inAppVisits += 1;
-      if (result.fellBack) this.navigationFallbacks += 1;
-      return result;
+      return { result };
     } catch (thrown) {
       if (thrown instanceof SessionLost) this.sessionLost = thrown;
-      else {
-        stamp(`fuzz: visit ${entry.route} #${visit} failed: ${String(thrown).slice(0, 200)}`);
-        this.streak.record(firstLine(thrown));
-      }
+      return { thrown };
     }
-    return { navigation, broken: true };
+  }
+
+  /** account counts a visit and releases its findings; a visit that crashed twice counts none. */
+  private account({ entry, visit, taken }: { entry: Expanded; visit: number; taken: Attempt }): {
+    navigation: Navigation;
+    broken: boolean;
+  } {
+    const { walked, navigation } = taken;
+    const stats = (this.perRoute[entry.route] ??= { visits: 0, actions: 0, findings: 0 });
+    if (taken.crashed) {
+      stamp(`fuzz: visit ${entry.route} #${visit} crashed the page twice, not a finding`);
+      this.streak.record("page crashed");
+      return { navigation, broken: true };
+    }
+    taken.held.release();
+    if (walked.result === undefined) {
+      if (!(walked.thrown instanceof SessionLost)) {
+        stamp(
+          `fuzz: visit ${entry.route} #${visit} failed: ${String(walked.thrown).slice(0, 200)}`,
+        );
+        this.streak.record(firstLine(walked.thrown));
+      }
+      return { navigation, broken: true };
+    }
+    const { result } = walked;
+    this.streak.record(result.error);
+    stats.visits += 1;
+    stats.actions += result.actions;
+    stats.findings += result.findings;
+    this.actions += result.actions;
+    this.moduleFailures += result.moduleFailures;
+    for (const seen of result.paths) this.paths.add(seen);
+    if (result.navigation === "reload") this.reloads += 1;
+    else this.inAppVisits += 1;
+    if (result.fellBack) this.navigationFallbacks += 1;
+    return result;
   }
 }
 
@@ -310,8 +391,7 @@ const walk = async ({
   const outDir = join(runDir, "ui");
   const sink = new FindingSink(runDir);
   const signInStartedAt = Date.now();
-  const pages = await setup(async () => openPages({ plan, outDir, browser, count: plan.workers }));
-  const first = pages[0] as Side;
+  const first = await setup(async () => signIn({ plan, outDir, browser }));
   const slug = plan.slug ?? (await setup(async () => projectSlug(first)));
   const signInMillis = Date.now() - signInStartedAt;
   const expanded = (plan.routes ?? registeredRoutes())
@@ -322,7 +402,7 @@ const walk = async ({
     items: expanded.filter((entry) => entry.path !== undefined),
   });
   stamp(
-    `fuzz: signed in (${signInMillis}ms), ${pages.length} pages, ${order.length}/${expanded.length} routes`,
+    `fuzz: signed in (${signInMillis}ms), ${plan.workers} pages, ${order.length}/${expanded.length} routes`,
   );
 
   const walkStartedAt = Date.now();
@@ -347,7 +427,9 @@ const walk = async ({
           void sink.flush().then(() => process.exit(2));
         }, plan.durationMs + WATCHDOG_MILLIS)
       : undefined;
-  await Promise.all(pages.map(async (side) => run.lane(side)));
+  await Promise.all(
+    Array.from({ length: plan.workers }, async (_, index) => run.lane({ browser, index })),
+  );
   clearInterval(progress);
   clearTimeout(watchdog);
 
@@ -371,6 +453,8 @@ const main = async (): Promise<number> => {
       side: { name: "fuzz", baseUrl: plan.url },
       viewport: plan.viewport,
       settle: plan.settle,
+      // The fuzzer judges behaviour, never pixels.
+      fast: true,
     }),
   );
   try {

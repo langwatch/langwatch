@@ -9,5 +9,8 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "publish" {
+		os.Exit(diffsuite.Publish(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	os.Exit(diffsuite.Run(os.Args[1:], os.Stderr))
 }

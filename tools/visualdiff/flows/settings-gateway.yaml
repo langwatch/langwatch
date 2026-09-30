@@ -1,5 +1,5 @@
-# Settings, auth, gateway flows (lane vf-settings-gateway). Steps click and fill by
-# data-testid; text is only asserted. Names carry {uid}. Journeys not scripted here are
+# Settings, auth, gateway flows (lane vf-settings-gateway). Steps use handles both trees draw
+# (button words, placeholders, aria labels, row scoping); text is also asserted. Names carry {uid}. Journeys not scripted here are
 # listed in .claude/handoffs/vf-settings-gateway.md.
 flows:
   - id: passkey-offer-after-password-signin
@@ -44,10 +44,10 @@ flows:
           path: /{slug}
       - action: click
         with:
-          testId: app-header-user-menu-trigger
+          label: /^Open user menu/
       - action: click
         with:
-          testId: app-header-user-menu-logout
+          text: Logout
       - action: go
         with:
           path: /{slug}/traces
@@ -64,24 +64,25 @@ flows:
           path: /settings/api-keys
       - action: click
         with:
-          testId: api-key-create
+          text: Create new secret key
       - action: fill
         with:
-          testId: api-key-name
-          value: vd-key-{uid}
+          field: 'e.g., CI Pipeline, Local Dev'
+          value: 'vd-key-{uid}'
       - action: click
         with:
-          testId: api-key-create-submit
+          text: /^\s*Create secret key\s*$/
       - action: click
         with:
-          testId: token-created-tab-bearer
+          text: /^\s*Bearer\s*$/
       - action: click
         with:
-          testId: token-created-bearer-visibility-toggle
+          label: Show sensitive values
       - action: capture
         with:
-          testId: token-created-bearer
-          match: "Bearer\\s+(\\S+)"
+          selector: pre
+          hasText: 'Authorization: Bearer'
+          match: Bearer\s+(\S+)
           as: apiKeyToken
       - action: expect
         with:
@@ -96,7 +97,7 @@ flows:
           label: Revoke API key vd-key-{uid}
       - action: click
         with:
-          testId: api-key-revoke-confirm
+          text: /^\s*Revoke\s*$/
       - action: expect
         with:
           api: /api/triggers
@@ -112,14 +113,14 @@ flows:
           path: /settings/members
       - action: click
         with:
-          testId: members-invite-open
+          text: Invite people
       - action: fill
         with:
-          testId: members-invite-emails
-          value: vd-{uid}@mail.langwatch.localhost
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-{uid}@mail.langwatch.localhost'
       - action: click
         with:
-          testId: members-invite-submit
+          text: /^\s*(Send|Create) invites\s*$/
       - action: go
         with:
           path: /settings/members
@@ -138,24 +139,24 @@ flows:
           path: /settings/members
       - action: click
         with:
-          testId: members-invite-open
+          text: Invite people
       - action: fill
         with:
-          testId: members-invite-emails
-          value: vd-revoke-{uid}@mail.langwatch.localhost
+          field: 'alice@example.com, bob@example.com'
+          value: 'vd-revoke-{uid}@mail.langwatch.localhost'
       - action: click
         with:
-          testId: members-invite-submit
+          text: /^\s*(Send|Create) invites\s*$/
       - action: go
         with:
           path: /settings/members
       - action: click
         with:
-          testId: invites-row-actions
-          hasText: vd-revoke-{uid}@mail.langwatch.localhost
+          selector: '[data-testid="invite-row"]:has-text("vd-revoke-{uid}@mail.langwatch.localhost") button[aria-label="Invite actions"]'
       - action: click
         with:
-          testId: invites-row-revoke
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Revoke\s*$/
       - action: go
         with:
           path: /settings/members
@@ -173,24 +174,25 @@ flows:
           path: /settings/model-providers
       - action: click
         with:
-          testId: model-provider-add
+          text: Add Model Provider
       - action: click
         with:
-          testId: model-provider-add-option-anthropic
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Anthropic\s*$/
       - action: fill
         with:
-          testId: model-provider-credential-ANTHROPIC_API_KEY
-          value: sk-ant-vd-{uid}
+          selector: 'input[type="password"]'
+          value: 'sk-ant-vd-{uid}'
       - action: click
         with:
-          testId: model-provider-save
+          text: /^\s*Save\s*$/
       - action: go
         with:
           path: /settings/model-providers
       - action: expect
         with:
-          testId: model-provider-row-anthropic
-          min: "1"
+          count: 'tr:has-text("Anthropic")'
+          min: '1'
 
   - id: model-provider-delete
     title: Delete a model provider from its row menu and see it gone after a reload
@@ -201,36 +203,38 @@ flows:
           path: /settings/model-providers
       - action: click
         with:
-          testId: model-provider-add
+          text: Add Model Provider
       - action: click
         with:
-          testId: model-provider-add-option-anthropic
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Anthropic\s*$/
       - action: fill
         with:
-          testId: model-provider-credential-ANTHROPIC_API_KEY
-          value: sk-ant-vd-{uid}
+          selector: 'input[type="password"]'
+          value: 'sk-ant-vd-{uid}'
       - action: click
         with:
-          testId: model-provider-save
+          text: /^\s*Save\s*$/
       - action: go
         with:
           path: /settings/model-providers
       - action: click
         with:
-          testId: model-provider-row-menu-anthropic
+          selector: 'tr:has-text("Anthropic") button'
       - action: click
         with:
-          testId: model-provider-row-delete
+          selector: '[role="menuitem"]'
+          hasText: Delete Provider
       - action: click
         with:
-          testId: model-provider-delete-confirm
+          text: /^\s*Delete\s*$/
       - action: go
         with:
           path: /settings/model-providers
       - action: expect
         with:
-          testId: model-provider-row-anthropic
-          equals: "0"
+          count: 'tr:has-text("Anthropic")'
+          equals: '0'
 
   - id: project-create
     title: Create a project from the switcher and see it in the switcher after a reload
@@ -241,17 +245,17 @@ flows:
           path: /{isolatedSlug}
       - action: click
         with:
-          testId: navigation-project-switcher
+          label: Switch project
       - action: click
         with:
-          testId: navigation-project-new
+          text: New Project
       - action: fill
         with:
-          testId: project-form-name
-          value: vd-project-{uid}
+          field: AI Project
+          value: 'vd-project-{uid}'
       - action: click
         with:
-          testId: project-form-submit
+          text: /^\s*Create\s*$/
       - action: go
         with:
           path: /settings/teams
@@ -268,14 +272,14 @@ flows:
           path: /settings/teams
       - action: click
         with:
-          testId: teams-team-new
+          text: New team
       - action: fill
         with:
-          testId: team-form-name
-          value: vd-team-{uid}
+          selector: 'input[name="name"]'
+          value: 'vd-team-{uid}'
       - action: click
         with:
-          testId: team-form-submit
+          text: /^\s*Create\s*$/
       - action: go
         with:
           path: /settings/teams
@@ -292,14 +296,14 @@ flows:
           path: /settings/groups
       - action: click
         with:
-          testId: groups-add-manual
+          text: /Add (a |manual )?group/
       - action: fill
         with:
-          testId: groups-create-name
-          value: vd-group-{uid}
+          field: Group name
+          value: 'vd-group-{uid}'
       - action: click
         with:
-          testId: groups-create-submit
+          text: /^\s*Create group\s*$/
       - action: go
         with:
           path: /settings/groups
@@ -307,6 +311,7 @@ flows:
         with:
           text: vd-group-{uid}
 
+  # branch-only: the permission step (authz-permission-*): main's role dialog composes permissions with different controls.
   - id: custom-role-create
     title: Create a custom role and see it listed after a reload
     isolated: true
@@ -316,17 +321,17 @@ flows:
           path: /settings/roles
       - action: click
         with:
-          testId: authz-role-create
+          text: New role
       - action: fill
         with:
-          testId: authz-role-name
-          value: vd-role-{uid}
+          selector: 'input[name="name"]'
+          value: 'vd-role-{uid}'
       - action: click
         with:
           testIdPrefix: authz-permission-
       - action: click
         with:
-          testId: authz-role-submit
+          text: /^\s*Create role\s*$/i
       - action: go
         with:
           path: /settings/roles
@@ -343,45 +348,216 @@ flows:
           path: /settings/secrets
       - action: click
         with:
-          testId: secret-add
+          text: Add Secret
       - action: fill
         with:
-          testId: secret-name
-          value: vdsecret{uid}
+          field: 'e.g., OPENAI_API_KEY'
+          value: 'vdsecret{uid}'
       - action: fill
         with:
-          testId: secret-value
-          value: sv-{uid}
+          field: Enter secret value
+          value: 'sv-{uid}'
       - action: click
         with:
-          testId: secret-save
+          text: /^\s*Save\s*$/
       - action: go
         with:
           path: /settings/secrets
       - action: expect
         with:
-          testId: secret-row
-          hasText: /vdsecret{uid}/i
-          min: "1"
+          count: 'tr:has-text("vdsecret{uid}")'
+          min: '1'
       - action: expect
         with:
           text: sv-{uid}
           equals: "0"
       - action: click
         with:
-          testId: secret-row-actions
-          hasText: /vdsecret{uid}/i
+          selector: 'tr:has-text("vdsecret{uid}") button'
       - action: click
         with:
-          testId: secret-row-delete
+          selector: '[role="menuitem"]'
+          hasText: Delete Secret
       - action: click
         with:
-          testId: secret-delete-confirm
+          text: /^\s*Delete\s*$/
       - action: go
         with:
           path: /settings/secrets
       - action: expect
         with:
-          testId: secret-row
-          hasText: /vdsecret{uid}/i
+          count: 'tr:has-text("vdsecret{uid}")'
+          equals: '0'
+
+  # Coverage round 2. The steps below use only handles both trees draw: button words, form
+  # placeholders, the test ids main already carries (add-config-button, empty-state-add-config,
+  # role-row-*, config-save, config-row-*) and row scoping with tr:has-text.
+  - id: model-provider-add-and-delete-shared
+    title: Add a model provider from the header menu, see its row after a reload, then delete it from the row menu
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Groq\s*$/
+      - action: fill
+        with:
+          selector: input[type="password"]
+          value: gsk-vd-{uid}
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("Groq")'
+          min: "1"
+      - action: click
+        with:
+          selector: 'tr:has-text("Groq") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Delete Provider
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("Groq")'
+          equals: "0"
+
+  - id: model-defaults-set-and-read-back
+    title: With a provider added, set the default model for a project and see it in the defaults table after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Gemini\s*$/
+      - action: fill
+        with:
+          selector: input[type="password"]
+          value: gem-vd-{uid}
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          testId: empty-state-add-config
+      - action: expect
+        with:
+          testId: default-model-override-drawer
+      - action: select
+        with:
+          selector: '[data-testid="role-row-default"] [role="combobox"]'
+          option: gemini
+      - action: click
+        with:
+          testId: config-save
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          testId: default-models-section
+      - action: expect
+        with:
+          testIdPrefix: config-row-
+          hasText: /gemini/i
+          min: "1"
+
+  - id: secret-create-rotate-delete-shared
+    title: Add a secret, update its value, never see either value, then delete it
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: click
+        with:
+          text: Add Secret
+      - action: fill
+        with:
+          field: e.g., OPENAI_API_KEY
+          value: vdrot{uid}
+      - action: fill
+        with:
+          field: Enter secret value
+          value: first-{uid}
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: expect
+        with:
+          count: 'tr:has-text("vdrot{uid}")'
+          min: "1"
+      - action: expect
+        with:
+          text: first-{uid}
+          equals: "0"
+      - action: click
+        with:
+          selector: 'tr:has-text("vdrot{uid}") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Update Value
+      - action: fill
+        with:
+          field: Enter new secret value
+          value: second-{uid}
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: expect
+        with:
+          count: 'tr:has-text("vdrot{uid}")'
+          min: "1"
+      - action: expect
+        with:
+          text: second-{uid}
+          equals: "0"
+      - action: click
+        with:
+          selector: 'tr:has-text("vdrot{uid}") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Delete Secret
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: expect
+        with:
+          count: 'tr:has-text("vdrot{uid}")'
           equals: "0"

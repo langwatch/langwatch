@@ -3,10 +3,10 @@ import { join } from "node:path";
 import { captureMessage, type Side } from "./capture.ts";
 import { DeadlineAlarm } from "./deadline-alarm.ts";
 import { fillPath, sideFixtures } from "./flows/context.ts";
-import { fillArgs, flowValues, ISOLATED_KEY, ISOLATED_SLUG, uidFor } from "./flows/values.ts";
 import { describeExpect } from "./flows/expect.ts";
 import { declinePasskeyOffer } from "./flows/primitives.ts";
 import { resolveAction } from "./flows/registry.ts";
+import { fillArgs, flowValues, ISOLATED_KEY, ISOLATED_SLUG, uidFor } from "./flows/values.ts";
 import { needsRecapture } from "./module-load.ts";
 import { safeName } from "./pairing.ts";
 import {
@@ -14,10 +14,12 @@ import {
   note,
   type CaptureMessage,
   type Credential,
+  type PhaseMessage,
   type Plan,
   type PlanFlow,
+  type PlanStep,
 } from "./protocol.ts";
-import { runPoolWithRecapture } from "./schedule.ts";
+import { runPoolWithRecapture, type Throttle } from "./schedule.ts";
 import { SHELL_PROBE, shellBroken, type ShellProbe } from "./shell.ts";
 
 export type Collect = (message: CaptureMessage) => void;
@@ -139,52 +141,148 @@ export interface RouteTimings {
   recaptureMillis: number;
 }
 
+/** Lanes give each pooled job a page in a context of its own, as many at once as the
+ * throttle allows. */
+export interface Lanes {
+  open: () => Promise<Side>;
+  width: number;
+  throttle: Throttle;
+}
+
+/** Take is one job's capture, held until it is kept; `spoiled` says why it must be taken again. */
+export interface Take {
+  key: string;
+  crashed: boolean;
+  spoiled: string;
+  keep: () => void;
+}
+
+const CRASHED = "the page's renderer crashed";
+
+/** takeRoute captures one route on a lane of its own and closes it. */
+const takeRoute = async ({
+  plan,
+  route,
+  lanes,
+  alarm,
+  collect,
+}: {
+  plan: Plan;
+  route: string;
+  lanes: Lanes;
+  alarm: DeadlineAlarm;
+  collect: Collect;
+}): Promise<Take> => {
+  const side = await lanes.open();
+  try {
+    const message = await captureRoute({ plan, route, side, alarm });
+    let spoiled = "";
+    if (side.crashed) spoiled = CRASHED;
+    else if (message.blank) spoiled = "blank";
+    else if (needsRecapture(message)) spoiled = message.moduleFailures?.[0] ?? "";
+    return { key: route, crashed: side.crashed, spoiled, keep: () => collect(message) };
+  } finally {
+    await side.dispose();
+  }
+};
+
+/** takeFlow runs one flow on a lane of its own and closes it, holding its captures until kept. */
+export const takeFlow = async ({
+  plan,
+  flow,
+  lanes,
+  collect,
+}: {
+  plan: Plan;
+  flow: PlanFlow;
+  lanes: Lanes;
+  collect: Collect;
+}): Promise<Take> => {
+  const side = await lanes.open();
+  const held: CaptureMessage[] = [];
+  try {
+    const { crashed, millis } = await captureFlow({
+      plan,
+      flow,
+      side,
+      collect: (message) => {
+        held.push(message);
+      },
+    });
+    const keep = (): void => {
+      for (const message of held) collect(message);
+      if (plan.check !== true) return;
+      const phase: PhaseMessage = {
+        type: "phase",
+        side: side.name,
+        name: `flow ${flow.id}`,
+        millis,
+      };
+      emit({ message: phase, out: process.stdout });
+    };
+    return { key: flow.id, crashed, spoiled: crashed ? CRASHED : "", keep };
+  } finally {
+    await side.dispose();
+  }
+};
+
+/** holdsBack is a pool's `spoiled`: it logs why a take is retaken and backs off on a crash. */
+export const holdsBack = ({
+  take,
+  lanes,
+  side,
+}: {
+  take: Take;
+  lanes: Lanes;
+  side: string;
+}): boolean => {
+  if (take.spoiled === "") return false;
+  if (take.crashed) lanes.throttle.crashed();
+  note({ text: `${side} holds back ${take.key}: ${take.spoiled}`, err: process.stderr });
+  return true;
+};
+
 /**
- * captureRoutes takes the first SHELL_PROBE routes one at a time (the fail-fast probe), then
- * spreads the rest over the side's pages, each taking an `alongside` flow once no route is
- * left. A capture the concurrency may have spoiled is taken again alone, after the pool.
+ * captureRoutes takes the first SHELL_PROBE routes one at a time on the signed-in page (the
+ * fail-fast probe), then spreads the rest over lanes, each taking an `alongside` flow once no
+ * route is left. A capture the concurrency may have spoiled is taken again alone, after the pool.
  */
 export const captureRoutes = async ({
   plan,
-  pages,
+  first,
+  lanes,
   collect,
   alongside = [],
 }: {
   plan: Plan;
-  pages: Side[];
+  first: Side;
+  lanes: Lanes;
   collect: Collect;
   alongside?: PlanFlow[];
 }): Promise<RouteTimings> => {
   const startedAt = Date.now();
   let recaptureMillis = 0;
-  const [first] = pages;
-  if (first === undefined) return { captureMillis: 0, recaptureMillis };
   const alarm = new DeadlineAlarm(first.name);
-  const capture = (route: string, side: Side): Promise<CaptureMessage> =>
-    captureRoute({ plan, route, side, alarm });
-  await probeShell({ plan, capture: (route) => capture(route, first), collect, side: first });
+  await probeShell({
+    plan,
+    capture: (route) => captureRoute({ plan, route, side: first, alarm }),
+    collect,
+    side: first,
+  });
   const jobs: RouteJob[] = [
     ...plan.routes.slice(SHELL_PROBE).map((route) => ({ route })),
     ...alongside.map((flow) => ({ flow })),
   ];
-  const heldBack = await runPoolWithRecapture<RouteJob, CaptureMessage | undefined>({
+  const heldBack = await runPoolWithRecapture<RouteJob, Take>({
     items: jobs,
-    width: pages.length,
-    take: async ({ item, lane }) => {
-      const side = pages[lane] ?? first;
-      if ("route" in item) return capture(item.route, side);
-      await captureFlow({ plan, flow: item.flow, side, collect });
-      return undefined;
-    },
-    spoiled: (message) => {
-      if (message === undefined || !needsRecapture(message)) return false;
-      const why = message.blank ? "blank" : (message.moduleFailures?.[0] ?? "");
-      note({ text: `${first.name} holds back ${message.key}: ${why}`, err: process.stderr });
-      return true;
-    },
-    keep: (message) => {
-      if (message !== undefined) collect(message);
-    },
+    width: lanes.width,
+    limit: () => lanes.throttle.limit(),
+    take: async ({ item }) =>
+      "route" in item
+        ? takeRoute({ plan, route: item.route, lanes, alarm, collect })
+        : takeFlow({ plan, flow: item.flow, lanes, collect }),
+    spoiled: (take) => holdsBack({ take, lanes, side: first.name }),
+    keep: (take) => take.keep(),
     onRecaptured: (millis) => {
       recaptureMillis = millis;
     },
@@ -220,14 +318,109 @@ export const flowProject = ({
   const slug = fixtures[ISOLATED_SLUG];
   const projectKey = fixtures[ISOLATED_KEY];
   if (slug === undefined || projectKey === undefined) {
-    return { slug: plan.slug, credential: plan.credential, missing: "this side seeded no isolated project" };
+    return {
+      slug: plan.slug,
+      credential: plan.credential,
+      missing: "this side seeded no isolated project",
+    };
   }
   return { slug, credential: { ...plan.credential, slug, projectKey }, missing: "" };
 };
 
+/** FlowWalk is what every step of one flow's walk shares. */
+interface FlowWalk {
+  plan: Plan;
+  flow: PlanFlow;
+  side: Side;
+  collect: Collect;
+  project: FlowProject;
+  values: Record<string, string>;
+  mailUrl: string | undefined;
+  everyStep: boolean;
+}
+
+/** runStep runs one flow step, photographing it as the mode asks; it answers the step's error. */
+const runStep = async ({
+  walk,
+  stepIndex,
+  step,
+  anonymous: opened,
+}: {
+  walk: FlowWalk;
+  stepIndex: number;
+  step: PlanStep;
+  anonymous: Side | undefined;
+}): Promise<{ error: string; anonymous: Side | undefined }> => {
+  const { plan, flow, side, collect, project, values, mailUrl, everyStep } = walk;
+  let anonymous = opened;
+  let snapshots = 0;
+  let active = side;
+  const startedAt = Date.now();
+  const shoot = async ({ label, error }: { label: string; error: string }): Promise<void> => {
+    const index = stepIndex * SNAPSHOT_STRIDE + snapshots;
+    snapshots += 1;
+    const file = join(
+      plan.outDir,
+      side.name,
+      "flows",
+      flow.id,
+      `${String(index).padStart(4, "0")}.png`,
+    );
+    await active.waitUntilQuiet();
+    await photograph({ side: active, file }).catch(() => undefined);
+    collect(
+      captureMessage({
+        kind: "flow",
+        key: flow.id,
+        index,
+        label: `${step.action}${label === "" ? "" : `: ${label}`}`,
+        side: active,
+        screenshot: file,
+        error,
+        durationMs: Date.now() - startedAt,
+        notFound: false,
+        blank: await active.blank(),
+        ariaSnapshot: await active.ariaSnapshot(),
+        expect: step.action === "expect" ? describeExpect(step.with ?? {}) : undefined,
+      }),
+    );
+  };
+
+  let error = "";
+  try {
+    if (project.missing !== "") throw new Error(project.missing);
+    if (step.with?.anonymous === "true") {
+      anonymous ??= await side.openAnonymous();
+      active = anonymous;
+    }
+    await resolveAction(step.action)({
+      side: active,
+      slug: project.slug,
+      credential: project.credential,
+      args: fillArgs({ args: step.with ?? {}, values }),
+      values,
+      mailUrl,
+      snapshot: async (label: string) => (everyStep ? shoot({ label, error: "" }) : undefined),
+    });
+  } catch (thrown) {
+    error = step.optional === true ? "" : stepError(thrown);
+  }
+  if (error !== "") {
+    note({
+      text: `${side.name} ${flow.id} ${stepIndex} ${step.action} ${error}`,
+      err: process.stderr,
+    });
+  }
+  // Check mode still settles after every step: the next step's 6s starts on a loaded screen.
+  if (everyStep || error !== "" || step.action === "expect") await shoot({ label: "after", error });
+  else await active.waitUntilQuiet();
+  return { error, anonymous };
+};
+
 /**
  * captureFlow runs one flow's steps on one page, each step's first action opening its own
- * screen, and stops at the first step that fails. Check mode photographs only expects and the failure.
+ * screen, and stops at the first step that fails. Check mode photographs only expects and
+ * the failure. It answers how long the walk took and whether a renderer crashed under it.
  */
 export const captureFlow = async ({
   plan,
@@ -239,7 +432,7 @@ export const captureFlow = async ({
   flow: PlanFlow;
   side: Side;
   collect: Collect;
-}): Promise<void> => {
+}): Promise<{ crashed: boolean; millis: number }> => {
   side.drain();
   const flowStartedAt = Date.now();
   const everyStep = plan.check !== true;
@@ -253,80 +446,22 @@ export const captureFlow = async ({
     uid: uidFor(flow.id),
   };
   const mailUrl = plan.sides.find((candidate) => candidate.name === side.name)?.mailUrl;
+  const walk: FlowWalk = { plan, flow, side, collect, project, values, mailUrl, everyStep };
   let anonymous: Side | undefined;
   for (const [stepIndex, step] of flow.steps.entries()) {
-    let snapshots = 0;
-    let active = side;
-    const startedAt = Date.now();
-    const shoot = async ({ label, error }: { label: string; error: string }): Promise<void> => {
-      const index = stepIndex * SNAPSHOT_STRIDE + snapshots;
-      snapshots += 1;
-      const file = join(
-        plan.outDir,
-        side.name,
-        "flows",
-        flow.id,
-        `${String(index).padStart(4, "0")}.png`,
-      );
-      await active.waitUntilQuiet();
-      await photograph({ side: active, file }).catch(() => undefined);
-      collect(
-        captureMessage({
-          kind: "flow",
-          key: flow.id,
-          index,
-          label: `${step.action}${label === "" ? "" : `: ${label}`}`,
-          side: active,
-          screenshot: file,
-          error,
-          durationMs: Date.now() - startedAt,
-          notFound: false,
-          blank: await active.blank(),
-          ariaSnapshot: await active.ariaSnapshot(),
-          expect: step.action === "expect" ? describeExpect(step.with ?? {}) : undefined,
-        }),
-      );
-    };
-
-    let error = "";
-    try {
-      if (project.missing !== "") throw new Error(project.missing);
-      if (step.with?.anonymous === "true") {
-        anonymous ??= await side.openAnonymous();
-        active = anonymous;
-      }
-      await resolveAction(step.action)({
-        side: active,
-        slug: project.slug,
-        credential: project.credential,
-        args: fillArgs({ args: step.with ?? {}, values }),
-        values,
-        mailUrl,
-        snapshot: async (label: string) => (everyStep ? shoot({ label, error: "" }) : undefined),
-      });
-    } catch (thrown) {
-      error = step.optional === true ? "" : stepError(thrown);
-    }
-    if (error !== "") {
-      failed += 1;
-      note({
-        text: `${side.name} ${flow.id} ${stepIndex} ${step.action} ${error}`,
-        err: process.stderr,
-      });
-    }
-    // Check mode still settles after every step: the next step's 6s starts on a loaded screen.
-    if (everyStep || error !== "" || step.action === "expect") await shoot({ label: "after", error });
-    else await active.waitUntilQuiet();
-    if (error !== "") break;
+    const ran = await runStep({ walk, stepIndex, step, anonymous });
+    anonymous = ran.anonymous;
+    if (ran.error === "") continue;
+    failed += 1;
+    break;
   }
   await anonymous?.dispose();
-  if (!everyStep) {
-    const millis = Date.now() - flowStartedAt;
-    emit({ message: { type: "phase", side: side.name, name: `flow ${flow.id}`, millis }, out: process.stdout });
-  }
-  const outcome = failed === 0 ? "ok" : `${failed} failed`;
+  const crashed = side.crashed || anonymous?.crashed === true;
+  let outcome = failed === 0 ? "ok" : `${failed} failed`;
+  if (crashed) outcome = CRASHED;
   note({
     text: `${side.name} ${flow.id}: ${flow.steps.length} steps, ${outcome}`,
     err: process.stderr,
   });
+  return { crashed, millis: Date.now() - flowStartedAt };
 };

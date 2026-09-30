@@ -48,9 +48,9 @@ flows:
           path: /{slug}/traces
       - action: type
         with:
-          testId: trace-search-input
-          text: eval:"the reply mentions vd{uid}"
-          submit: "true"
+          label: Search filters or type what you are looking for
+          text: 'eval:"the reply mentions vd{uid}"'
+          submit: 'true'
       - action: expect
         with:
           api: /api/v1/instant-evals

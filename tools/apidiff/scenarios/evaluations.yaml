@@ -348,8 +348,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id", wfName: "result.data.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}" }
   expect: { status: 200, body: { id: "{wfId}", name: "{wfName}", platformUrl: "<any>", isEvaluator: "<any>", createdAt: "<any>" } }
@@ -360,8 +360,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id", wfName: "result.data.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "renamed-{uid}" } }
   expect: { status: 200, body: { id: "{wfId}", name: "renamed-{uid}" } }
@@ -382,8 +382,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name", wfDescription: "result.data.json.workflow.description" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id", wfName: "result.data.workflow.name", wfDescription: "result.data.workflow.description" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { description: "described-{uid}", icon: "🧪" } }
   expect: { status: 200, body: { id: "{wfId}", description: "described-{uid}", icon: "🧪", name: "{wfName}" } }
@@ -401,8 +401,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id", wfName: "result.data.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "" } }
   expect: { status: [400, 422] }
@@ -416,8 +416,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id", wfName: "result.data.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "refused-{uid}" } }
   expect: { status: 401 }
@@ -432,8 +432,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id", wfName: "result.data.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "refused-{uid}" } }
   expect: { status: [401, 403] }
@@ -448,8 +448,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id", wfName: "result.data.json.workflow.name" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id", wfName: "result.data.workflow.name" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}", body: { name: "hijacked-{uid}" } }
   expect: { status: 404 }
@@ -464,8 +464,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}" }
   expect: { status: 401 }
@@ -480,8 +480,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}" }
   expect: { status: [401, 403] }
@@ -496,8 +496,8 @@
   setup:
     - request: POST /api/trpc/workflow.create
       auth: session
-      body: { json: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } } }
-      capture: { wfId: "result.data.json.workflow.id" }
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id" }
       expect: { status: 200 }
   request: { path: "/api/workflows/{wfId}" }
   expect: { status: 404 }

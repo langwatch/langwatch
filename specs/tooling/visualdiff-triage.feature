@@ -290,8 +290,30 @@ Feature: visualdiff catches regressions and reports its own coverage
     Scenario: A side captures its routes on several pages at once
       Given four pages per side: -pages, half the CPUs by default, or visualdiff.yaml's concurrency when the machine cannot be read
       When a side captures its routes
-      Then four pages of one signed-in session each take the next route as they free up
+      Then four pages each take the next route as they free up, each in its own copy of the signed-in session
+      And each page closes once its capture is done, so no renderer lives long enough to bloat
       And a candidate whose shell does not render stops every page taking another route
+
+    @unit
+    Scenario: A side works on fewer pages while the machine is loaded or a renderer crashed
+      Given a side allowed four pages on a machine with ten CPUs
+      When the 1-minute load average rises above ten
+      Then only the CPUs' share of the four pages takes new work, and never fewer than one
+      And each page whose renderer crashes takes one page off the side for the rest of the run
+      And the capture that crashed is held back and taken again alone once the others are done
+
+    @unit
+    Scenario: check runs on as many pages as the machine has room for
+      Given `visualdiff check` with no -pages
+      When it plans its flows
+      Then it runs them on four pages at most, no more than half the CPUs and one per gigabyte of free memory
+      And never on fewer than one
+
+    @unit
+    Scenario: check's time left counts only the flows' own pace
+      Given a check whose route pass took sixteen minutes
+      When nineteen of 210 flows are done seventy seconds into the flows
+      Then the time left is paced from the end of the route pass: about twelve minutes, not hours
 
     @unit
     Scenario: Flows run side by side, and the one editing the project runs last
@@ -491,3 +513,22 @@ Feature: visualdiff catches regressions and reports its own coverage
       When `visualdiff done` marks it without -force
       Then it is refused naming the class, and no entry is written
       And with -force and a note it is marked done and recorded as forced
+
+  Rule: Review batches seal while the run is still going
+
+    @unit
+    Scenario: A batch seals every N completed items, and at each phase boundary
+      Given a check or run with -batch-size N
+      When N routes or flows complete, or a side finishes its routes or its flows, or the runner exits
+      Then a batch directory <out>/batches/NNNN-<phase>/ holds batch.json, REVIEW.md and only that batch's screenshots and diffs
+      And batch.json names each item's verdict, first failing step, diff scores, console errors and both sides' URLs and timings
+      And a route waiting on its pixel diff is not sealed until the diff arrives
+      And READY is written last through a rename, a line is appended to batches.jsonl and one is printed on stdout
+      And every verdict, exit code and report is the same as without batches
+
+    @unit
+    Scenario: A reviewer waits for the next ready batch and never reads a half-written one
+      Given batches after the last one reviewed, one without READY
+      When `visualdiff batches -wait -after N` runs
+      Then it blocks until a batch numbered after N holds READY and prints that batch's path
+      And `visualdiff batch-review <dir>` prints its REVIEW.md, and refuses a batch without READY

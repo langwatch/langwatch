@@ -52,6 +52,9 @@ type Options struct {
 	RefreshBaseline bool
 	// FailFast aborts the capture once the candidate's shell does not render.
 	FailFast bool
+	// Fast renders on a lean Chromium (no GPU, no anti-aliasing), so its
+	// pixels are never cached as a baseline or published (runner/src/capture.ts).
+	Fast bool
 	// Resume continues a -keep run in RunDir: its prepared worktrees and
 	// running stacks are reused, and its fixtures are not seeded twice.
 	Resume bool
@@ -77,6 +80,8 @@ type Options struct {
 	// MaxConsecutiveErrors stops the run after this many harness errors in a
 	// row on one side (streaks.go); 0 never stops it.
 	MaxConsecutiveErrors int
+	// BatchSize seals a review batch every this many routes or flows (batches.go); 0 never does.
+	BatchSize int
 }
 
 // Streams are where a run writes: the summary on Out, everything a person
@@ -780,6 +785,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 		Routes:      config.Routes,
 		Credential:  options.Identity,
 		FailFast:    options.FailFast,
+		Fast:        options.Fast,
 		FrozenTime:  deps.Now().UnixMilli(),
 		Fixtures:    config.Fixtures,
 		Concurrency: run.concurrency(config),
@@ -800,6 +806,7 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 	stream, err := runWithFindings(ctx, findingsRunInputs{
 		Deps: deps, Plan: runnerPlan, Options: CaptureOptions{Root: options.Root, Stderr: run.streams.Err, MaxConsecutiveErrors: options.MaxConsecutiveErrors},
 		FindingsPath: findingsPath, CatalogueRoot: options.Root, Edition: edition,
+		Out: run.streams.Out, BatchSize: options.BatchSize,
 	})
 	run.phases.recordRunnerPhases(string(edition), stream.Phases)
 	run.phases.since(string(edition)+" runner", started)

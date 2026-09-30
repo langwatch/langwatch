@@ -26,6 +26,10 @@ const serve = async (): Promise<Server> => {
   const server = createServer((request, response) => {
     if (request.url === "/api/broken") {
       response.writeHead(500).end("no");
+    } else if (request.url === "/loading") {
+      response
+        .writeHead(200, { "content-type": "text/html" })
+        .end('<body><div aria-busy="true">Loading</div><button>Wait</button></body>');
     } else if (request.url === "/") {
       response.writeHead(200, { "content-type": "text/html" }).end(PAGE);
     } else {
@@ -47,7 +51,8 @@ describe.skipIf(!installed)("the monkey against a fixture page", () => {
     server = await serve();
     baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     browser = await openSideBrowser({
-      side: { name: "fixture", baseUrl },
+      // Every fixture page's own marker stands in for the app's signed-in header.
+      side: { name: "fixture", baseUrl, readySelector: "h1, p" },
       viewport: { width: 800, height: 600 },
       settle: { quietMillis: 50, deadlineMillis: 2000 },
     });
@@ -57,7 +62,7 @@ describe.skipIf(!installed)("the monkey against a fixture page", () => {
     server?.close();
   });
 
-  const run = async (seed: number): Promise<Finding[]> => {
+  const walk = async ({ seed, path }: { seed: number; path: string }) => {
     const plan = planSchema.parse({
       url: baseUrl,
       seed,
@@ -73,14 +78,20 @@ describe.skipIf(!installed)("the monkey against a fixture page", () => {
       collector: new Collector(side.page),
       plan,
       sink,
-      route: "/",
-      path: "/",
+      loadingScale: () => 1,
+      route: path,
+      path,
       visit: 0,
       navigation: "reload",
       avoid: [],
       now: Date.now,
       deadline: Number.POSITIVE_INFINITY,
     });
+    return { side, sink, dir, result };
+  };
+
+  const run = async (seed: number): Promise<Finding[]> => {
+    const { side, sink, dir, result } = await walk({ seed, path: "/" });
     const signedOut = await side.page.evaluate(
       () => (window as { signedOut?: boolean }).signedOut === true,
     );
@@ -105,6 +116,13 @@ describe.skipIf(!installed)("the monkey against a fixture page", () => {
     );
     expect(findings.filter((finding) => finding.evidence.screenshot !== undefined)).not.toEqual([]);
   }, 120_000);
+
+  it("ends the visit when the page is still loading after it opens", async () => {
+    const { side, result } = await walk({ seed: 1, path: "/loading" });
+    await side.dispose();
+    expect(result.error).toBe("still loading");
+    expect(result.actions).toBe(0);
+  }, 90_000);
 
   it("replays the same trail for the same seed", async () => {
     const trails = async (seed: number) =>

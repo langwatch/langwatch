@@ -69,8 +69,9 @@ func havenEnv(inherit []string, slug string) []string {
 }
 
 // FeatureFlagsOn turns on the flags the flow suite's screens sit behind: agent
-// testing v2 and the chart playground. It is the product's own local override.
-const FeatureFlagsOn = "FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled,release_custom_chart_playground,release_langy_enabled"
+// testing v2, the chart playground, Langy and voice agents. It is the product's
+// own local override.
+const FeatureFlagsOn = "FEATURE_FLAG_FORCE_ENABLE=release_ui_agent_testing_v2_enabled,release_custom_chart_playground,release_langy_enabled,release_voice_agents_enabled"
 
 // bringUpHaven checks out each ref and brings it up as a haven stack the
 // moment it is prepared: `up --detach` returns as soon as the stack is

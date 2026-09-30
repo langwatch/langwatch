@@ -357,3 +357,18 @@ func TestAWholeNowMsPlaceholderExpandsToANumber(t *testing.T) {
 		t.Fatalf("label = %#v, want a string", fields["label"])
 	}
 }
+
+func TestSerialScenarioRunsAloneAndKeepsItsShard(t *testing.T) {
+	yaml := `
+- id: serial-flag-keeps-shard
+  endpoint: POST /api/dataset
+  shard: project
+  serial: true
+  request: { path: /api/dataset, body: { name: "vd-{uid}" } }
+  expect: { status: 201 }
+`
+	code, report, results := runFake(t, newFake(), newFake(), yaml, 1)
+	if code != exitEqual || len(results) != 1 || results[0].Verdict != verdictPass || results[0].Shard != shardProject {
+		t.Fatalf("code %d, results %+v:\n%s", code, results, report)
+	}
+}

@@ -3,8 +3,12 @@ package apidiff
 import (
 	"bytes"
 	"context"
+	"flag"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -67,6 +71,53 @@ func TestAdminRoutesAbsentUnderSaaSDeferTheScenariosThatNeedThem(t *testing.T) {
 	}
 	if strings.Count(report, "answer 404") != 1 {
 		t.Errorf("the fallback must be logged once:\n%s", report)
+	}
+}
+
+// @scenario "The self-hosted pass runs exactly the scenarios the SaaS run deferred"
+func TestTheDeferredListRoundTripsThroughScenarioID(t *testing.T) {
+	runDir, glob := t.TempDir(), writeScenarioYAML(t, adminMixYAML)
+	var report bytes.Buffer
+	options := scenarioOptions{
+		Progress: &report, A: adminStack(t, http.StatusNotFound), Timeout: 2 * time.Second, Concurrency: 1, Shards: 1,
+		RunDir: runDir, Glob: glob, Keys: Keys{ProjectKey: "key", OrgKey: "org", AdminKey: "admin"},
+	}
+	runScenarioPhase(context.Background(), options, &report, &report)
+	listed := filepath.Join(runDir, deferredFile)
+	if !strings.Contains(report.String(), "deferred list: "+listed) {
+		t.Fatalf("the run must name its deferred list:\n%s", report.String())
+	}
+	flags := flag.NewFlagSet("scenarios", flag.ContinueOnError)
+	scenarios := &scenarioFlags{}
+	registerScenarioFlags(flags, scenarios)
+	if err := flags.Parse([]string{"-scenario-id", "@" + listed, "-scenario-id", "reads-*"}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := loadScenarios(glob)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var selected []string
+	for _, item := range selectScenarios(loaded, scenarios.ids) {
+		selected = append(selected, item.ID)
+	}
+	if got := strings.Join(selected, ","); got != "reads-dataset,needs-admin-key,needs-own-org" {
+		t.Fatalf("selected %s", got)
+	}
+}
+
+func TestAnEmptyOrMissingDeferredListIsRefused(t *testing.T) {
+	empty := filepath.Join(t.TempDir(), deferredFile)
+	if err := os.WriteFile(empty, []byte("\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{"@" + empty, "@" + empty + ".missing"} {
+		flags := flag.NewFlagSet("scenarios", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		registerScenarioFlags(flags, &scenarioFlags{})
+		if err := flags.Parse([]string{"-scenario-id", value}); err == nil {
+			t.Errorf("%s: want an error, since no id would select every scenario", value)
+		}
 	}
 }
 

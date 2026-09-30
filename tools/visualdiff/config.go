@@ -117,7 +117,7 @@ type Config struct {
 var RunnerActions = []string{
 	// primitives
 	"go", "click", "fill", "select", "dismissTour", "type", "wait", "expect",
-	"upload", "drag", "capture", "mail",
+	"upload", "drag", "download", "hover", "capture", "mail", "acceptInvite",
 	// named flow actions
 	"signIn", "createAutomation", "createEvaluation", "sendTrace", "openTrace",
 	"annotate", "editProjectSettings", "createPrompt", "createExperiment",

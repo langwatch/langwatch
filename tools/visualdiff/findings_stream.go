@@ -3,6 +3,7 @@ package visualdiff
 import (
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
 	"time"
 
@@ -77,6 +78,9 @@ type findingsRunInputs struct {
 	// Edition tags every line this pass writes, so one findings.jsonl carries
 	// every edition's pass side by side.
 	Edition Edition
+	// Out gets a line per sealed review batch, and BatchSize is how many items fill one.
+	Out       io.Writer
+	BatchSize int
 }
 
 // runWithFindings drives inputs.Deps.Capture, writing one Finding to
@@ -100,7 +104,11 @@ func runWithFindings(ctx context.Context, inputs findingsRunInputs) (RunnerStrea
 	options := inputs.Options
 	options.OnCapture = tracker.onCapture
 	options.OnDiff = tracker.onDiff
-	stream, captureErr := inputs.Deps.Capture(ctx, inputs.Plan, options)
+	batches := newBatcher(batcherInputs{OutDir: tracker.runRoot, Size: inputs.BatchSize, Plan: inputs.Plan, Out: inputs.Out, Now: inputs.Deps.Now})
+	stream, captureErr := inputs.Deps.Capture(ctx, inputs.Plan, batches.wrap(options))
+	if err := batches.close(); err != nil && options.Stderr != nil {
+		fmt.Fprintln(options.Stderr, "visualdiff: batches:", err)
+	}
 	if err := tracker.finalize(); err != nil && captureErr == nil {
 		captureErr = fmt.Errorf("write findings: %w", err)
 	}

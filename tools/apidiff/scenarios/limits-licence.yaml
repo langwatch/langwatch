@@ -18,6 +18,7 @@
   endpoint: GET /api/files/{projectId}/{storedObjectId}
   auth: project
   shard: project
+  serial: true
   setup:
     - &fileRead
       request: "GET /api/files/{projectId}/vd-{uid}"
