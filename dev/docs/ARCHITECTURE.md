@@ -346,6 +346,13 @@ document, is the authority on filenames):
   `domain/`, in a module or a framework package (Alex, 2026-10-19,
   [ADR-181](adr/181-framework-packages-are-layered-like-a-process-half.md); §3.4).
 
+**Go services use the same grammar** for new feature code under `services/*` (not `tools/`):
+`services/<svc>/modules/<name>/` with `contract/` (API, types, config, `herr` codes),
+`services/`, `repositories/`, `channels/` (interface files at the top, one subpackage per tier:
+`http/`, `memory/`, ...), `rules/` and `transport/`, each a Go package; tests are colocated
+`_test.go` files; Go modules are not `modules/catalogue.json` entries. The first is nlpgo's
+`evaluators` module, which replaces langevals ([plan](plans/langevals-go-replacement.md); Alex, 2026-09-30).
+
 **A value is parsed once, where it enters untyped** (a transport, a channel's inbound message, a
 fold's stored payload) and travels as its `z.infer` type after that: a service does not re-parse what
 its transport or a peer's typed call handed it, and a Prisma repository does not parse columns Prisma

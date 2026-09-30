@@ -500,6 +500,11 @@ const LEGACY_INERT: string[] = [
   // line is still here when the change is called done, the change is not done.
   "specs/identity/one-decision-per-write.feature",
   "specs/identity/org-admin-identity-surface.feature",
+  // Planned, not yet built: the Go evaluator runtime that replaces langevals
+  // (dev/docs/plans/langevals-go-replacement.md). Each leaves with its first binding.
+  "specs/evaluators/go-evaluator-runtime.feature",
+  "specs/evaluators/ragas-go-parity.feature",
+  "specs/data-privacy/pii-analyser-choice.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-command-bar-activation.feature",
