@@ -189,8 +189,8 @@ app:
   # Shutdown budget — same shape and the same rule as workers.* below. The app
   # runs its own process now (apps/api; the workers are apps/worker in their own
   # Deployment) and is sized the same way, because the clock has the same shape:
-  # the value below becomes API_HTTP_DRAIN_GRACE_MS, and the process deadline
-  # sits above it. The API drains in well under this; the grace period is a
+  # the process deadline (PROCESS_SHUTDOWN_DEADLINE_MS) is this value plus 20s.
+  # The API drains in well under this; the grace period is a
   # ceiling, not a wait.
   ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
   shutdownDrainSeconds: 25
@@ -285,11 +285,11 @@ app:
 
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
-  ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
+  ## @param app.features.skipEnvValidation [default: false] Deprecated and inert: no process reads SKIP_ENV_VALIDATION any more.
   ## @param app.features.disableStrictPiiRedaction [default: false] Skip the strict PII redaction pass (Presidio analysis service). Native secrets and essential PII redaction still run.
   ## @param app.features.topicClustering [default: true] Enable automatic topic clustering.
   features:
-    # Skip environment variable validation (useful for development)
+    # Deprecated and inert. Kept so existing values files still render.
     skipEnvValidation: false
     # Skip the strict PII redaction pass (Presidio analysis service) to shed
     # analysis-service load. Native secrets and essential PII redaction still
@@ -1005,8 +1005,8 @@ workers:
   replicaCount: 1
 
   # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
-  # for in-flight jobs to finish their ClickHouse writes; it must match the
-  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
+  # for in-flight jobs to finish their ClickHouse writes. The chart hands the
+  # process PROCESS_SHUTDOWN_DEADLINE_MS, this value plus 20s, from it.
   #
   # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
   # the drain plus 5s for App.close, 15s for process teardown and 10s of
