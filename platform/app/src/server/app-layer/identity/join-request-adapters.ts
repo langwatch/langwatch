@@ -548,8 +548,14 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
         disabledAt: null,
         user: { deactivatedAt: null },
       },
-      select: { userId: true },
+      select: { role: true },
     });
+    if (!membership) throw new AuthzGrantNotConfirmedError();
+    // A Developer never receives an organisation-wide grant (ADR-143), so
+    // the membership row alone is the admission. Waiting for a grant here
+    // would hold every notification for a Developer joiner until the outbox
+    // gave up on it.
+    if (membership.role === OrganizationUserRole.DEVELOPER) return true;
     const grant = await liveGrants(this.prisma).findFirst({
       where: {
         organizationId: payload.organizationId,
@@ -561,7 +567,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       },
       select: { id: true },
     });
-    if (!membership || !grant) throw new AuthzGrantNotConfirmedError();
+    if (!grant) throw new AuthzGrantNotConfirmedError();
     return true;
   }
 

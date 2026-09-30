@@ -44,6 +44,7 @@ import {
   toAuthzAuditRow,
 } from "~/server/event-sourcing/pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { InMemoryProcessStore } from "~/server/event-sourcing/process-manager/stores/inMemoryProcessStore";
+import { sendEmail } from "~/server/mailer/emailSender";
 import {
   EmailJoinRequestNotifier,
   PrismaJoinMembership,
@@ -55,9 +56,15 @@ const ORGANIZATION_ID = "org_acme";
 function fakePrisma({
   joinerRole = "MEMBER",
   membershipInserted = 1,
+  requesterRole = "MEMBER",
+  requesterGranted = true,
 }: {
   membershipInserted?: number;
   joinerRole?: "MEMBER" | "DEVELOPER";
+  /** The seat the person the notification is about holds. */
+  requesterRole?: "MEMBER" | "DEVELOPER";
+  /** Whether their organization-wide grant has landed. */
+  requesterGranted?: boolean;
 } = {}) {
   const processManagerOutbox = {
     createMany: vi.fn(
@@ -74,11 +81,19 @@ function fakePrisma({
     createMany: vi.fn(async () => ({ count: membershipInserted })),
     findUnique: vi.fn(async () => null),
     findUniqueOrThrow: vi.fn(async () => ({ membershipStamp: "stamp_1" })),
+    findFirst: vi.fn(async () => ({ role: requesterRole })),
   };
+  const auditLog = { create: vi.fn(async () => ({})) };
   return {
     $transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
-      callback({ organizationUser, processManagerOutbox }),
+      callback({ organizationUser, processManagerOutbox, auditLog }),
     ),
+    auditLog,
+    grant: {
+      findFirst: vi.fn(async () =>
+        requesterGranted ? { id: "grant_requester" } : null,
+      ),
+    },
     organization: {
       findUnique: vi.fn(async () => ({ name: "Acme", joinerRole })),
     },
@@ -319,6 +334,68 @@ describe("given an organization whose joiner seat is Developer (ADR-143)", () =>
       );
       expect(prisma.processManagerOutbox.createMany).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the admins are told a Developer joined", () => {
+    /** @scenario The joiner seat setting lands email joiners as Developers */
+    it("sends the email without waiting for a grant that will never come", async () => {
+      const prisma = fakePrisma({
+        requesterRole: "DEVELOPER",
+        requesterGranted: false,
+      });
+      const notifier = new EmailJoinRequestNotifier(
+        prisma as never,
+        new InMemoryProcessStore(),
+      );
+
+      await notifier.sendNotification({
+        kind: "joinedAutomatically",
+        joinRequestId: "jreq_dev",
+        organizationId: ORGANIZATION_ID,
+        requesterUserId: "user_sam",
+        recipientUserId: "user_ana",
+        isAdmin: false,
+        content: {
+          to: "sam@acme.com",
+          subject: "Sam joined",
+          html: "html",
+          from: "LangWatch <test@example.com>",
+          idempotencyKey: "joined:developer",
+        },
+      });
+
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it("still holds a Full member's email until their grant lands", async () => {
+      const prisma = fakePrisma({
+        requesterRole: "MEMBER",
+        requesterGranted: false,
+      });
+      const notifier = new EmailJoinRequestNotifier(
+        prisma as never,
+        new InMemoryProcessStore(),
+      );
+
+      await expect(
+        notifier.sendNotification({
+          kind: "joinedAutomatically",
+          joinRequestId: "jreq_full",
+          organizationId: ORGANIZATION_ID,
+          requesterUserId: "user_sam",
+          recipientUserId: "user_ana",
+          isAdmin: false,
+          content: {
+            to: "sam@acme.com",
+            subject: "Sam joined",
+            html: "html",
+            from: "LangWatch <test@example.com>",
+            idempotencyKey: "joined:full",
+          },
+        }),
+      ).rejects.toMatchObject({ code: "authz_grant_not_confirmed" });
+      expect(sendEmail).not.toHaveBeenCalled();
     });
   });
 
