@@ -264,7 +264,9 @@ type reply struct {
 func (s *Server) answer(h http.Header, req request) reply {
 	r := s.rng(h, req)
 	var rep reply
-	if strings.EqualFold(h.Get(HeaderMode), "langy") || strings.Contains(req.model, "langy-echo") {
+	if text, ok := cannedFor(req.model); ok {
+		rep = reply{Mode: "canned", Text: text, Finish: "stop"}
+	} else if strings.EqualFold(h.Get(HeaderMode), "langy") || strings.Contains(req.model, "langy-echo") {
 		rep = langy(req, r)
 	} else {
 		rep = s.markovReply(req, r)

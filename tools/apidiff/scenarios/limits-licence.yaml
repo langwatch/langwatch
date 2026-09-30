@@ -16,14 +16,22 @@
 
 - id: lim-files-read-121st-is-429
   endpoint: GET /api/files/{projectId}/{storedObjectId}
-  auth: project
+  auth: none
   shard: project
   serial: true
   setup:
+    # A project of its own, so the 120-per-minute window is this scenario's alone.
+    - request: "POST /api/projects"
+      auth: org
+      body: { name: "vd-limit-{uid}", language: python, framework: openai, teamId: "{teamId}" }
+      capture: { freshProjectId: id, freshProjectKey: serviceApiKey }
+      expect: { status: [200, 201] }
     # Own-project misses: main counts foreign claims too, but the branch's door refuses a
     # foreign projectId before any counter (runtime.ts countCall runs after the door).
     - &fileRead
-      request: "GET /api/files/{projectId}/vd-{uid}"
+      request: "GET /api/files/{freshProjectId}/vd-{uid}"
+      auth: none
+      headers: { X-Auth-Token: "{freshProjectKey}" }
       expect: { status: 404 }
     - *fileRead
     - *fileRead
@@ -145,17 +153,23 @@
     - *fileRead
     - *fileRead
   request:
-    path: "/api/files/{projectId}/vd-{uid}"
+    path: "/api/files/{freshProjectId}/vd-{uid}"
+    headers: { X-Auth-Token: "{freshProjectKey}" }
   expect:
     status: 429
     contains: rate_limited
   verify:
-    - request: "GET /api/files/{projectId}/vd-{uid}"
+    - request: "GET /api/files/{freshProjectId}/vd-{uid}"
       auth: project-b
       expect: { status: [403, 404], notContains: rate_limited }
-    - request: "GET /api/files/{projectId}/vd-{uid}"
+    - request: "GET /api/files/{freshProjectId}/vd-{uid}"
+      auth: none
+      headers: { X-Auth-Token: "{freshProjectKey}" }
       eventually: 75s
       expect: { status: [404, 429], notContains: rate_limited }
+  teardown:
+    - request: "DELETE /api/projects/{freshProjectId}"
+      auth: org
 
 - id: lim-files-read-under-the-limit-is-not-limited
   endpoint: GET /api/files/{projectId}/{storedObjectId}

@@ -138,8 +138,9 @@ RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
 # agent editing across a feature package writes hundreds of files in a few
 # seconds; without a window that is hundreds of restarts, each one reconnecting
 # to Postgres, ClickHouse and Redis. One knob, so the Node lane's debouncer and
-# the Go lane's rebuild delay can never drift apart.
-export LANGWATCH_DEV_WATCH_DEBOUNCE_MS="${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750}"
+# the Go lane's rebuild delay can never drift apart. 2 s: an agent writes a
+# file per tool call, seconds apart, so a shorter window never coalesces (ADR-168).
+export LANGWATCH_DEV_WATCH_DEBOUNCE_MS="${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-2000}"
 
 # --- the Go lane -----------------------------------------------------------
 #

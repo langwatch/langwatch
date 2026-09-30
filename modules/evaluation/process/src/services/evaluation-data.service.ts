@@ -4,7 +4,8 @@
  */
 
 import {
-  DEFAULT_MAPPINGS,
+  defaultEvaluatorMappings,
+  hasMappingEntries,
   migrateLegacyMappings,
   mapTraceToDatasetEntry,
   type MappingState,
@@ -17,6 +18,7 @@ import { EvaluatorNotFoundError, TraceNotEvaluatableError } from "@langwatch/eva
 import {
   AVAILABLE_EVALUATORS,
   isCodeEvaluatorCheckType,
+  isLlmJudgeEvaluator,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
@@ -51,10 +53,12 @@ export class EvaluationDataService {
     mapping,
     mappedData,
     trace,
+    maxTokens,
   }: {
     mapping: MappingState["mapping"];
     mappedData: Record<string, unknown>;
     trace: Trace;
+    maxTokens: number;
   }): Promise<void> {
     for (const [field, config] of Object.entries(mapping)) {
       if (
@@ -65,7 +69,7 @@ export class EvaluationDataService {
       }
 
       if (config.source === "formatted_trace") {
-        mappedData[field] = await this.deps.spanDigest.format(trace.spans ?? []);
+        mappedData[field] = await this.deps.spanDigest.format({ trace, maxTokens });
       }
     }
   }
@@ -78,34 +82,45 @@ export class EvaluationDataService {
     projectId: string;
     /** The reader's redactions over the thread's other traces; full access when none is named. */
     protections?: EvaluationTraceProtections;
+    /** Tokens the AI-readable trace and thread sources are rendered under. */
+    renderBudgetTokens: number;
   }): Promise<DataForEvaluation> {
     const {
       evaluatorType,
       trace,
-      mappings,
       isThreadLevel,
       projectId,
       protections = INTERNAL_PROTECTIONS,
+      renderBudgetTokens,
     } = params;
+    const mappings = effectiveMappings({
+      evaluatorType,
+      mappings: params.mappings,
+      level: isThreadLevel ? "thread" : "trace",
+    });
 
     let data: Record<string, unknown>;
 
     if (isThreadLevel) {
-      data = await this.buildThreadData({ projectId, trace, mappings, protections });
+      data = await this.buildThreadData({
+        projectId,
+        trace,
+        mappings,
+        protections,
+        maxTokens: renderBudgetTokens,
+      });
     } else {
-      const mappedData = mapTraceFields(trace, mappings ?? DEFAULT_MAPPINGS);
+      const mappedData = mapTraceFields(trace, mappings);
       if (!mappedData) {
         throw new TraceNotEvaluatableError(trace.trace_id);
       }
 
-      // Fill in server-only trace sources
-      if (mappings?.mapping) {
-        await this.fillServerOnlyTraceSources({
-          mapping: mappings.mapping,
-          mappedData: mappedData as Record<string, unknown>,
-          trace,
-        });
-      }
+      await this.fillServerOnlyTraceSources({
+        mapping: mappings.mapping,
+        mappedData: mappedData as Record<string, unknown>,
+        trace,
+        maxTokens: renderBudgetTokens,
+      });
 
       data = mappedData as Record<string, unknown>;
 
@@ -116,6 +131,7 @@ export class EvaluationDataService {
           trace,
           mappings,
           spanDigest: this.deps.spanDigest,
+          maxTokens: renderBudgetTokens,
           getThreadTraces: (threadId) =>
             this.deps.traces.readThreadsTraces({
               projectId,
@@ -164,16 +180,14 @@ export class EvaluationDataService {
     trace,
     mappings,
     protections,
+    maxTokens,
   }: {
     projectId: string;
     trace: Trace;
-    mappings: MappingState | null;
+    mappings: MappingState;
     protections: EvaluationTraceProtections;
+    maxTokens: number;
   }): Promise<Record<string, unknown>> {
-    if (!mappings) {
-      throw new EvaluatorConfigError("Mapping state is required for thread-based evaluation");
-    }
-
     const threadId = trace.metadata?.thread_id;
     if (!threadId) {
       throw new EvaluatorConfigError("Trace does not have a thread_id for thread-based evaluation");
@@ -191,8 +205,8 @@ export class EvaluationDataService {
       if (!("source" in mappingConfig)) continue;
 
       const outcome = isThreadSourced(mappingConfig)
-        ? await this.resolveThreadSource({ mappingConfig, threadId, threadTraces })
-        : await this.resolveTraceSource({ targetField, mappingConfig, trace });
+        ? await this.resolveThreadSource({ mappingConfig, threadId, threadTraces, maxTokens })
+        : await this.resolveTraceSource({ targetField, mappingConfig, trace, maxTokens });
       if (outcome.resolved) result[targetField] = outcome.value;
     }
 
@@ -203,10 +217,12 @@ export class EvaluationDataService {
     mappingConfig,
     threadId,
     threadTraces,
+    maxTokens,
   }: {
     mappingConfig: SourcedMapping;
     threadId: string;
     threadTraces: Trace[];
+    maxTokens: number;
   }): Promise<FieldOutcome> {
     const source = mappingConfig.source;
     if (!source) return { resolved: false };
@@ -219,6 +235,7 @@ export class EvaluationDataService {
         value: await this.deps.spanDigest.formatThread({
           threadKey: threadId,
           traces: threadTraces,
+          maxTokens,
         }),
       };
     }
@@ -239,15 +256,17 @@ export class EvaluationDataService {
     targetField,
     mappingConfig,
     trace,
+    maxTokens,
   }: {
     targetField: string;
     mappingConfig: SourcedMapping;
     trace: Trace;
+    maxTokens: number;
   }): Promise<FieldOutcome> {
     if ((SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)) {
       if (mappingConfig.source !== "formatted_trace") return { resolved: false };
 
-      return { resolved: true, value: await this.deps.spanDigest.format(trace.spans ?? []) };
+      return { resolved: true, value: await this.deps.spanDigest.format({ trace, maxTokens }) };
     }
 
     const traceMappingConfig: { source: string; key?: string; subkey?: string } = {
@@ -262,6 +281,26 @@ export class EvaluationDataService {
     })[0];
     return { resolved: true, value: mapped?.[targetField] };
   }
+}
+
+/**
+ * The mappings an evaluation runs with. A built-in evaluator with no saved
+ * mapping (null, or the `{}` a create with no mappings stores) gets its
+ * defaults, so an LLM judge reads the whole trace instead of empty fields.
+ * @see specs/evaluators/judges-read-tool-evidence.feature
+ */
+function effectiveMappings({
+  evaluatorType,
+  mappings,
+  level,
+}: {
+  evaluatorType: string;
+  mappings: MappingState | null;
+  level: "trace" | "thread";
+}): MappingState {
+  if (hasMappingEntries(mappings)) return mappings;
+  if (mappings !== null && !(evaluatorType in AVAILABLE_EVALUATORS)) return mappings;
+  return defaultEvaluatorMappings({ level, readsWholeTrace: isLlmJudgeEvaluator(evaluatorType) });
 }
 
 type SourcedMapping = Extract<MappingState["mapping"][string], { source: unknown }>;

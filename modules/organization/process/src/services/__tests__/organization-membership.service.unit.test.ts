@@ -33,7 +33,7 @@ describe("OrganizationMembershipService", () => {
     createMembership: vi.fn(),
     findPersonalTeamsInScopes: vi.fn(),
     findSharedTeamIds: vi.fn(),
-    findTeamRoleBindings: vi.fn(),
+    findTeamGrants: vi.fn(),
     findCustomRolePermissions: vi.fn(),
     findUserOrgRoleByTeamId: vi.fn(),
     getOrganizationIntent: vi.fn(),
@@ -108,7 +108,7 @@ describe("OrganizationMembershipService", () => {
     // test states otherwise.
     vi.mocked(mockRepo.findPersonalTeamsInScopes).mockResolvedValue([]);
     vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue([]);
-    vi.mocked(mockRepo.findTeamRoleBindings).mockResolvedValue([]);
+    vi.mocked(mockRepo.findTeamGrants).mockResolvedValue([]);
     vi.mocked(mockRepo.findCustomRolePermissions).mockResolvedValue([]);
     service = OrganizationMembershipService.create({
       repository: mockRepo,
@@ -125,6 +125,7 @@ describe("OrganizationMembershipService", () => {
 
   describe("createAndAssign()", () => {
     /** @scenario "A test arrival is not sent to the screen that creates an organization" */
+    /** @scenario A test arrival cannot create an organization */
     it("refuses somebody mid-way through proving a connection", async () => {
       mockStandingFor.mockResolvedValueOnce({
         testing: true,
@@ -344,6 +345,7 @@ describe("OrganizationMembershipService", () => {
     };
 
     describe("when the acting user removes themselves", () => {
+      /** @scenario "A member cannot remove themselves" */
       it("refuses with cannot_remove_self before touching the repository", async () => {
         await expect(
           service.deleteMember({
@@ -410,6 +412,7 @@ describe("OrganizationMembershipService", () => {
 
   describe("when changing a member's disabled state", () => {
     describe("when the acting user disables themselves", () => {
+      /** @scenario "A member cannot disable themselves" */
       it("refuses with cannot_disable_self", async () => {
         await expect(
           service.setMemberDisabled({
@@ -609,6 +612,7 @@ describe("OrganizationMembershipService", () => {
 
     describe("when re-enabling a member the plan has no seat for", () => {
       /** @scenario Re-enabling a member is refused when it would exceed the seats */
+      /** @scenario "Re-enabling a member checks the seat limit" */
       it("refuses with member_seat_limit_reached", async () => {
         vi.mocked(mockRepo.getMembership).mockResolvedValue({
           userId: "user-456",
@@ -686,6 +690,7 @@ describe("OrganizationMembershipService", () => {
     });
 
     describe("when the member exists", () => {
+      /** @scenario "Fetching a member includes their team bindings" */
       it("returns the membership with its team bindings", async () => {
         vi.mocked(mockRepo.getMembership).mockResolvedValue({
           userId: "user-456",

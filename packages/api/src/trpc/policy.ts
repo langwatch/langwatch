@@ -41,6 +41,7 @@ import type {
   Simplify,
 } from "@trpc/server/unstable-core-do-not-import";
 
+import { DatabaseBusyError, isDatabaseBusy } from "../errors.ts";
 import {
   auditScopeIds,
   callerTraceContext,
@@ -823,10 +824,9 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
     // user-induced race as a server fault.
     425: "PRECONDITION_FAILED",
     429: "TOO_MANY_REQUESTS",
-    // 502/503/504 have no key in tRPC v10's code table (added in v11), so an
-    // upstream failure has to fall through to INTERNAL_SERVER_ERROR here. The
-    // domain status survives on the wire as `data.error.httpStatus`, and
-    // `handleTrpcCallLogging` records the handled status rather than this one.
+    // Mirrors TRPC_CODE_BY_STATUS in runtime.ts; other 5xx fall through to
+    // INTERNAL_SERVER_ERROR, the domain status surviving as `data.error.httpStatus`.
+    503: "SERVICE_UNAVAILABLE",
   };
 
   // Every 4xx a handled error raises needs a line here. The fallback is
@@ -836,17 +836,19 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
 }
 
 /**
- * The TRPCError a known cause becomes: a HandledError keeps its code, a bare
- * ZodError is promoted as the REST door does, and a process-translated cause
- * takes its translation. None for anything else.
+ * The TRPCError a known cause becomes: a HandledError keeps its code, a bare ZodError
+ * and a busy database are promoted as the REST door does, and a process-translated
+ * cause takes its translation. None for anything else.
  */
 function promotedTrpcErrors({
-  cause,
+  cause: raised,
   translate,
 }: {
   cause: unknown;
   translate: (cause: unknown) => { code: TRPCError["code"]; message: string } | null | undefined;
 }): TRPCError[] {
+  const cause = isDatabaseBusy(raised) ? new DatabaseBusyError() : raised;
+
   if (HandledError.isHandled(cause)) {
     return [
       new TRPCError({

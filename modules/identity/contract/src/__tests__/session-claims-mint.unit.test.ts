@@ -45,6 +45,13 @@ describe("when a sign-in mints a session", () => {
     ).toEqual(["oidc", "pwd", "mfa"]);
   });
 
+  /** @scenario Current verified Auth0 factors are recorded on the new session */
+  it("records the verified factors it supports and omits the one it does not", () => {
+    expect(
+      deriveSessionAmr({ path: "/callback/auth0", providerAssertedAmr: ["pwd", "otp", "unknown"] }),
+    ).toEqual(["oidc", "pwd", "otp"]);
+  });
+
   it("infers no factor from a provider that asserted none", () => {
     expect(deriveSessionAmr({ path: "/callback/auth0" })).toEqual(["oidc"]);
   });

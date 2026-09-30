@@ -2,7 +2,6 @@ import {
   ClickHouseQueryClient,
   type InsertRequest,
   type QueryDriver,
-  type QueryRequest,
   type QueryResult,
 } from "@langwatch/clickhouse-client";
 import { createTenantId, type Event, type ProjectionStoreContext } from "@langwatch/eventing";
@@ -56,13 +55,13 @@ function compose(options: {
   const redis = options.redis ?? { get: vi.fn(async () => null), setex: vi.fn(async () => "OK") };
   const inserts: InsertRequest[] = [];
   const driver: QueryDriver = {
-    async execute<Row>(_: QueryRequest): Promise<QueryResult<Row>> {
+    async execute<Row>(): Promise<QueryResult<Row>> {
       return { rows: [] };
     },
     async insert(request: InsertRequest): Promise<void> {
       inserts.push(request);
     },
-    async command(_: QueryRequest): Promise<void> {},
+    async command(): Promise<void> {},
   };
 
   const organizations = BillingTenantOrganizationService.create({

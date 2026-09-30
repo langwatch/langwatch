@@ -4,6 +4,7 @@ import {
   defineGroupQueue,
   GroupQueueConsumer,
   GroupQueueProducer,
+  NonRetryableGroupQueueError,
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
@@ -13,6 +14,25 @@ import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./
 export interface EventingGroupQueueFactoryOptions {
   dependencies: GroupQueueDependencies<Record<string, unknown>>;
   consumersEnabled?: boolean;
+}
+
+/** A schema refusal is deterministic: retrying the same value would only fail 25 times. */
+export async function refuseInvalidValueOnce<T>({
+  queueName,
+  run,
+}: {
+  queueName: string;
+  run: () => Promise<T>;
+}): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (!(error instanceof Error && "issues" in error && Array.isArray(error.issues))) throw error;
+    throw new NonRetryableGroupQueueError(
+      `Queue ${queueName} refused a value that fails its schema: ${error.message}`,
+      { cause: error },
+    );
+  }
 }
 
 /**
@@ -52,6 +72,8 @@ export function createEventingGroupQueueFactory({
       onExhausted: eventingDefinition.onExhausted,
     });
 
+    const refuse = <T>(run: () => Promise<T>) =>
+      refuseInvalidValueOnce({ queueName: eventingDefinition.name, run });
     const producer = new GroupQueueProducer(queueDefinition, dependencies);
     let consumer: RunningGroupQueueConsumer<Record<string, unknown>> | undefined;
     // Claiming starts on `start()`, never at construction: a job claimed before
@@ -60,11 +82,12 @@ export function createEventingGroupQueueFactory({
       const configuredConsumer = new GroupQueueConsumer(queueDefinition, dependencies);
       return eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
-            each: (payload, context) => eventingDefinition.process(payload, context),
-            batch: (payloads, context) => eventingDefinition.processBatch!(payloads, context),
+            each: (payload, context) => refuse(() => eventingDefinition.process(payload, context)),
+            batch: (payloads, context) =>
+              refuse(() => eventingDefinition.processBatch!(payloads, context)),
           })
         : configuredConsumer.handle((payload, context) =>
-            eventingDefinition.process(payload, context),
+            refuse(() => eventingDefinition.process(payload, context)),
           );
     };
 

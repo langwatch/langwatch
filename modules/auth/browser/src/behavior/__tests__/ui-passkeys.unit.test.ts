@@ -50,6 +50,7 @@ describe("given a ceremony result", () => {
      * at it and closed it.
      */
     /** @scenario A dismissed device prompt is not reported as a failure */
+    /** @scenario Cancelling the device prompt is not a dead end */
     it("reads as a cancellation rather than a failure", () => {
       expect(readPasskeyOutcome({ error: { status: 0 } })).toEqual({
         ok: false,

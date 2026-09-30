@@ -22,9 +22,10 @@ export {
   AuthzCommandDispatcherService,
   type AuthzGrantsCommandSenders,
 } from "./services/authz-grants-command-dispatcher.service.ts";
-export { AuthzBindingIdService } from "./services/authz-binding-id.service.ts";
+export { AuthzGrantIdService } from "./services/authz-grant-id.service.ts";
 export type { PostgresAuthzDatabase } from "./app/authz-composition.build.ts";
 export type { AuthzRepositories } from "./repositories/authz.repositories.ts";
 export { authzServer, type AuthzInfrastructure } from "./authz.server.ts";
 export { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";
+export { authzGrantRest, grantRestFacts } from "./transport/authz-grant.rest.ts";
 export { authzTrpc, authzTrpcTransport } from "./transport/authz.trpc.ts";

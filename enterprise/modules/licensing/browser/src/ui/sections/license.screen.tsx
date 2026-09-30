@@ -1,10 +1,13 @@
 // Organization license page for self-hosted operators; licenses are issued in
 // the backoffice. No chrome — the settings frame is applied by the host.
 
-import { Text, VStack } from "@chakra-ui/react";
+import { Link, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
+import { ArrowUpRight } from "lucide-react";
 
 import { useLicensingHost } from "../../model/licensing-host.ts";
+import { LicenseLoadingSkeleton } from "../elements/license-loading-skeleton.tsx";
 import { LicenseStatusPanel } from "./license-status-panel.tsx";
 
 export default function LicenseScreen() {
@@ -15,17 +18,23 @@ export default function LicenseScreen() {
     <>
       <PageLayout.Header>
         <PageLayout.Heading>License</PageLayout.Heading>
+        <PageLayout.HeaderButton asChild>
+          <Link href={CONTACT_SALES_URL} target="_blank" rel="noreferrer">
+            Contact sales
+            <ArrowUpRight size={14} />
+          </Link>
+        </PageLayout.HeaderButton>
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
         <Text color="fg.muted">
-          Manage your LangWatch license. Running LangWatch, commercial use included, never needs
-          one. A license covers the seats you bought and unlocks the enterprise capabilities: single
-          sign-on, SCIM provisioning and audit logs.
+          What your license covers: the seats you bought and the enterprise capabilities it unlocks,
+          such as single sign-on, SCIM provisioning and audit logs. Running LangWatch, commercial
+          use included, never needs one.
         </Text>
         {organizationId ? (
           <LicenseStatusPanel organizationId={organizationId} />
         ) : (
-          <Text>Loading...</Text>
+          <LicenseLoadingSkeleton />
         )}
       </VStack>
     </>

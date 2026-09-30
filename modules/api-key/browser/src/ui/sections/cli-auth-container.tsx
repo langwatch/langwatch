@@ -1,49 +1,15 @@
 /**
- * Full-page frame for CLI authorize screen. Narrowed copy because /cli/auth is
- * standalone (no shell), so settings chrome is wrong here.
+ * Full-page frame for the CLI authorize screen: the branded card every standalone page
+ * stands on, wide enough for the permission list, with a way to sign out.
  */
 
-import {
-  Box,
-  Center,
-  Container,
-  HStack,
-  IconButton,
-  Skeleton,
-  SkeletonText,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, IconButton, Skeleton, SkeletonText, VStack } from "@chakra-ui/react";
+import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LogOut } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 
 import { useApiKeyHost } from "../../model/api-key-host.ts";
-import { FullLogo } from "../elements/full-logo.tsx";
-
-const MotionBox = motion.create(Box);
-const MotionText = motion.create(Text);
-
-/** The soft orange wash behind the card. */
-function CliAuthMeshBackground(): React.ReactElement {
-  return (
-    <Box
-      position="absolute"
-      inset={0}
-      pointerEvents="none"
-      overflow="hidden"
-      zIndex={0}
-      style={{
-        contain: "layout paint",
-        background: [
-          "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(237,137,38,0.06) 0%, transparent 70%)",
-          "radial-gradient(ellipse 60% 40% at 70% 100%, rgba(237,137,38,0.02) 0%, transparent 60%)",
-        ].join(", "),
-      }}
-    />
-  );
-}
 
 /** What the card shows while the session answer is still arriving. */
 function CliAuthSkeleton(): React.ReactElement {
@@ -79,19 +45,7 @@ export function CliAuthContainer({
 }>): React.ReactElement {
   const host = useApiKeyHost();
   return (
-    // "stable both-edges" keeps the reserved scrollbar gutter symmetric so
-    // the card column stays visually centered even with always-visible
-    // scrollbars (one-edge "stable" shifted everything left).
-    <Box
-      w="full"
-      minH="100dvh"
-      bg="bg.page"
-      position="relative"
-      style={{ scrollbarGutter: "stable both-edges" }}
-      overflowY="auto"
-    >
-      <CliAuthMeshBackground />
-
+    <BrandedCardPage>
       <Box position="fixed" top={3} right={3} zIndex={99}>
         <Tooltip content="Sign out">
           <IconButton
@@ -107,68 +61,9 @@ export function CliAuthContainer({
           </IconButton>
         </Tooltip>
       </Box>
-
-      <Container
-        width="full"
-        mx="auto"
-        pt="14vh"
-        pb={16}
-        maxW={{ base: "100%", md: "540px" }}
-        px={{ base: 4, md: 0 }}
-      >
-        <MotionBox
-          bg="bg.panel"
-          borderRadius="16px"
-          border="1px solid"
-          borderColor="border.subtle"
-          boxShadow="sm"
-          px={{ base: 5, md: 7 }}
-          py={{ base: 6, md: 8 }}
-          initial={{ opacity: 0, y: 16, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-        >
-          <VStack gap={6} align="stretch" w="full">
-            <Center pt={1}>
-              <FullLogo width={130} />
-            </Center>
-            <VStack gap={1.5} align="center" textAlign="center" w="full">
-              <AnimatePresence mode="wait">
-                <MotionText
-                  key={title}
-                  textStyle="xl"
-                  fontWeight="600"
-                  color="fg"
-                  letterSpacing="-0.01em"
-                  lineHeight="1.3"
-                  initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                >
-                  {title}
-                </MotionText>
-              </AnimatePresence>
-              <AnimatePresence mode="wait">
-                {subTitle && (
-                  <MotionText
-                    key={subTitle}
-                    textStyle="sm"
-                    color="fg.muted"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15, ease: "easeOut" }}
-                  >
-                    {subTitle}
-                  </MotionText>
-                )}
-              </AnimatePresence>
-            </VStack>
-            {loading ? <CliAuthSkeleton /> : children}
-          </VStack>
-        </MotionBox>
-      </Container>
-    </Box>
+      <BrandedCard title={title} intro={subTitle} size="wide">
+        {loading ? <CliAuthSkeleton /> : children}
+      </BrandedCard>
+    </BrandedCardPage>
   );
 }

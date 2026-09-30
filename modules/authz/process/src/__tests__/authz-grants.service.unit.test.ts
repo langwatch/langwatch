@@ -7,9 +7,9 @@ import {
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
-import { StubAuthzBindingRepository } from "../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
 import {
   type AuthzGrantRepository,
@@ -17,6 +17,7 @@ import {
   type BindingPrincipalWhere,
   DuplicateBindingError,
 } from "../repositories/authz-grant.repository.ts";
+import { permissiveGrantGuards } from "../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
@@ -101,11 +102,12 @@ const WRITE_ACTOR = { type: "user", id: "admin-1" } as const;
 function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger()) {
   const epoch = new StubAuthzEpoch();
   const service = AuthzGrantsService.create({
+    permissions: permissiveGrantGuards,
     repository,
     ledger,
     epoch,
     newBindingId: () => "rb_test_ksuid",
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
   });
   const bumpEpoch = epoch.bump;
   return { service, bumpEpoch, ledger };
@@ -680,7 +682,7 @@ describe("AuthzGrantsService.offboard", () => {
             },
           ]),
         }),
-        bindings: new StubAuthzBindingRepository(),
+        bindings: new StubAuthzManagedGrantRepository(),
       });
 
       const decision = await authz.check({

@@ -3,7 +3,8 @@
  *
  * @see specs/rbac/role-bindings-rest-api.feature
  */
-import { RoleBindingScopeType, TeamUserRole } from "@langwatch/prisma-client/generated";
+import { GrantScopeTier } from "@langwatch/authz-contract";
+import { TeamUserRole } from "@langwatch/prisma-client/generated";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -18,7 +19,7 @@ describe("the binding a create answers with while the projection lags", () => {
         id: "rb_1",
         principal: { userId: "user_1" },
         role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.TEAM,
+        scopeType: GrantScopeTier.TEAM,
         scopeId: "team_1",
         now: () => AT,
       });
@@ -29,7 +30,7 @@ describe("the binding a create answers with while the projection lags", () => {
         role: TeamUserRole.MEMBER,
         customRoleId: null,
         customRoleName: null,
-        scopeType: RoleBindingScopeType.TEAM,
+        scopeType: GrantScopeTier.TEAM,
         scopeId: "team_1",
         scopeName: null,
         createdAt: toDate(AT),
@@ -44,7 +45,7 @@ describe("the binding a create answers with while the projection lags", () => {
         id: "rb_1",
         principal: { userId: "user_1" },
         role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.TEAM,
+        scopeType: GrantScopeTier.TEAM,
         scopeId: "team_1",
         expiresAt,
         now: () => AT,
@@ -60,7 +61,7 @@ describe("the binding a create answers with while the projection lags", () => {
         id: "rb_2",
         principal: { groupId: "group_1" },
         role: TeamUserRole.VIEWER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeType: GrantScopeTier.ORGANIZATION,
         scopeId: "org_1",
         now: () => AT,
       });
@@ -79,7 +80,7 @@ describe("the binding a create answers with while the projection lags", () => {
         id: "rb_3",
         principal: { apiKeyId: "apikey_1" },
         role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.PROJECT,
+        scopeType: GrantScopeTier.PROJECT,
         scopeId: "project_1",
         now: () => AT,
       });
@@ -99,7 +100,7 @@ describe("the binding a create answers with while the projection lags", () => {
         principal: { userId: "user_1" },
         role: TeamUserRole.CUSTOM,
         customRoleId: "role_1",
-        scopeType: RoleBindingScopeType.PROJECT,
+        scopeType: GrantScopeTier.PROJECT,
         scopeId: "project_1",
         now: () => AT,
       });

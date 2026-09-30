@@ -18,7 +18,7 @@ import {
   AuthzGrantRepository,
   type BindingPrincipalWhere,
   type DirectoryCausedGrantChange,
-  type RoleBindingWrite,
+  type GrantWrite,
 } from "../authz-grant.repository.ts";
 import type { AuthzDatabase, AuthzReadRepository } from "../authz-read.repository.ts";
 import {
@@ -184,13 +184,13 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     return this.reads.findPersonalTeams(...args);
   }
 
-  /** @throws DuplicateBindingError on an identical binding at this scope. */
+  /** An identical binding at this scope is written too: bindings are never unique. */
   async createBinding({
     row,
     actor,
     source,
   }: {
-    row: RoleBindingWrite;
+    row: GrantWrite;
     actor: LedgerActor;
     source?: GrantEventSource;
   }): Promise<void> {
@@ -203,15 +203,12 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
         // Omitted rather than defaulted here: the writer owns the default,
         // and stating it twice is how the two drift apart.
         ...(source ? { source } : {}),
-        onDuplicate: "reject",
+        onDuplicate: "attach",
       }),
     );
   }
 
-  /**
-   * @throws DuplicateBindingError when a sibling already holds the target role.
-   * @throws BindingMissingError when the row is gone.
-   */
+  /** @throws BindingMissingError when the row is gone. */
   async updateBindingRole({
     bindingId,
     organizationId,
@@ -221,7 +218,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
   }: {
     bindingId: string;
     organizationId: string;
-    role: RoleBindingWrite["role"];
+    role: GrantWrite["role"];
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {
@@ -260,10 +257,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     );
   }
 
-  /**
-   * @throws BindingMissingError when the delete matched nothing.
-   * @throws DuplicateBindingError when the narrower binding already exists.
-   */
+  /** @throws BindingMissingError when the delete matched nothing. */
   async replaceBinding({
     deleteWhere,
     create,
@@ -271,11 +265,11 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
   }: {
     deleteWhere: {
       organizationId: string;
-      scopeType: RoleBindingWrite["scopeType"];
+      scopeType: GrantWrite["scopeType"];
       scopeId: string;
       principal: BindingPrincipalWhere;
     };
-    create: RoleBindingWrite;
+    create: GrantWrite;
     actor: LedgerActor;
   }): Promise<void> {
     // Refuse before emitting writes when the original grant is absent. A
@@ -311,7 +305,7 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
         organizationId,
         bindings: [binding],
         actor,
-        onDuplicate: "reject",
+        onDuplicate: "attach",
       }),
     );
   }

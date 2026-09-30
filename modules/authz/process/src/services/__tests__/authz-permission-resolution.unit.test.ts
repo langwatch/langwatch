@@ -2,8 +2,8 @@
 import type { AuthzPermission, CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
 import type {
   AuthzReadRepository,
@@ -54,7 +54,7 @@ function authzFor({
     isOnEngine: async () => true,
     repository: makeReader(overrides),
     listing: new StubAuthzListingRepository(),
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
     ...(demoProjectId ? { demoProjectId: () => demoProjectId } : {}),
   });
 }

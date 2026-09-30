@@ -4,9 +4,13 @@
  * surfaces evaluator, langy and trace mount today.
  */
 
+import { modelProviderTrpc } from "@langwatch/model-provider-contract";
 import { defineWebModule } from "@langwatch/ui-kernel";
 
+import { modelProviderApi } from "./behavior/model-provider-api.ts";
+
 export const modelProviderWeb = defineWebModule("model-provider")
+  .withApi(modelProviderApi, { contracts: [modelProviderTrpc] })
   .withHosts({
     requires: ["ModelProviderHostApi"],
     mounts: {

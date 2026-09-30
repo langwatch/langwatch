@@ -1,3 +1,4 @@
+import { uiBatchResponse } from "@langwatch/browser-host/testing";
 import { createUiFeatureApiClient } from "@langwatch/browser-host/transport";
 
 import type { UiFeatureApiTransport } from "../ui-session-queries";
@@ -34,8 +35,10 @@ export function answeringTransport(answer: ProcedureAnswer): UiFeatureApiTranspo
         result: { data: await answer(path, inputs[index] ?? {}) },
       })),
     );
-    const body = url.searchParams.get("batch") === "1" ? results : results[0];
-    return new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+    if (url.searchParams.get("batch") === "1") return uiBatchResponse({ results });
+    return new Response(JSON.stringify(results[0]), {
+      headers: { "content-type": "application/json" },
+    });
   };
   return createUiFeatureApiClient({ url: TEST_ENDPOINT, fetch });
 }

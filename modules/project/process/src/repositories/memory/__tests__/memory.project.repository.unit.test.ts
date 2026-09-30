@@ -162,6 +162,8 @@ describe("MemoryProjectRepository", () => {
   });
 
   describe("when a coding-agent fold stamps activity", () => {
+    /** @scenario An active project is stamped when its activity is stale */
+    /** @scenario A freshly stamped project is not written again */
     it("writes the first stamp and throttles a second one inside the window", async () => {
       const { repository } = seeded();
       await repository.create(creation);

@@ -2,9 +2,9 @@
  * Changing what a member may do: enabling and disabling a seat, and the cascading role update
  * across the organization and its teams.
  */
+import { GrantScopeTier } from "@langwatch/authz-contract";
 import {
   TeamRoleUpdateRejectedError,
-  RoleBindingScopeType,
   type OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
@@ -141,7 +141,7 @@ export class OrganizationMemberRoleService {
     userId: string;
   }): Promise<void> {
     const { organizationId, teamId, userId } = params;
-    const currentTeamBindings = await this.repo.findTeamRoleBindings({
+    const currentTeamBindings = await this.repo.findTeamGrants({
       organizationId,
       userId,
       teamIds: [teamId],
@@ -187,7 +187,7 @@ export class OrganizationMemberRoleService {
     // the organization", which is both wrong and no help.
     const [personalTeam] = await this.repo.findPersonalTeamsInScopes({
       scopes: (teamRoleUpdates ?? []).map((update) => ({
-        scopeType: RoleBindingScopeType.TEAM,
+        scopeType: GrantScopeTier.TEAM,
         scopeId: update.teamId,
       })),
     });
@@ -202,7 +202,7 @@ export class OrganizationMemberRoleService {
     // the whole role change would go down with the refusal.
     const organizationTeamIds = await this.repo.findSharedTeamIds({ organizationId });
 
-    const currentTeamBindings = await this.repo.findTeamRoleBindings({
+    const currentTeamBindings = await this.repo.findTeamGrants({
       organizationId,
       userId,
       teamIds: organizationTeamIds,

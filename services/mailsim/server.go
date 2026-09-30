@@ -35,9 +35,17 @@ func NewServer(cfg Config) (*Server, error) {
 
 // newServer is NewServer with the inbox bundle named, so tests serve a fixed one.
 func newServer(cfg Config, bundle fs.FS) (*Server, error) {
-	store, err := NewStore(cfg.DataDir)
+	if cfg.MaxMessages < 1 {
+		cfg.MaxMessages = defaultMaxMessages
+	}
+	store, err := NewBoundedStore(cfg.DataDir, cfg.MaxMessages)
 	if err != nil {
 		return nil, err
+	}
+	if cfg.Seed {
+		if err := seedInbox(store); err != nil {
+			return nil, err
+		}
 	}
 	s := &Server{cfg: cfg, store: store, console: newConsole(bundle)}
 	s.mux = s.buildMux()

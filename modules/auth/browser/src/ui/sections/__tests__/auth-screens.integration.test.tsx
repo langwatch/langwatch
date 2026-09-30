@@ -1,9 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The identifier-first screens are the screens (ADR-117 §7): reset follows the
- * identifier, is refused where the installation holds no passwords, and no
- * journey reaches a provider's hosted pages.
+ * The identifier-first screens are the screens (ADR-117 §7): reset follows the identifier, is
+ * refused where the installation holds no passwords, and no journey reaches hosted pages.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { RoutingDecision } from "@langwatch/identity-contract";

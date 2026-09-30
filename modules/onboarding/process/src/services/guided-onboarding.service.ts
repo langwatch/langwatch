@@ -55,12 +55,22 @@ function assertGuidedPaths(paths: readonly string[]): GuidedPath[] {
 }
 
 export class GuidedOnboardingService {
-  private constructor(
-    private readonly organizations: OrganizationApi,
-    private readonly events: PostHogEventsChannel,
-    private readonly announce: GuidedOnboardingAnnouncer,
-    private readonly now: () => string,
-  ) {}
+  private readonly organizations: OrganizationApi;
+  private readonly events: PostHogEventsChannel;
+  private readonly announce: GuidedOnboardingAnnouncer;
+  private readonly now: () => string;
+
+  private constructor(options: {
+    organizations: OrganizationApi;
+    events: PostHogEventsChannel;
+    announce: GuidedOnboardingAnnouncer;
+    now: () => string;
+  }) {
+    this.organizations = options.organizations;
+    this.events = options.events;
+    this.announce = options.announce;
+    this.now = options.now;
+  }
 
   static create(options: {
     organizations: OrganizationApi;
@@ -68,12 +78,10 @@ export class GuidedOnboardingService {
     announce: GuidedOnboardingAnnouncer;
     now?: () => string;
   }): GuidedOnboardingService {
-    return new GuidedOnboardingService(
-      options.organizations,
-      options.events,
-      options.announce,
-      options.now ?? (() => nowInstant().toString()),
-    );
+    return new GuidedOnboardingService({
+      ...options,
+      now: options.now ?? (() => nowInstant().toString()),
+    });
   }
 
   async getState(actor: { organizationId: string }): Promise<GuidedOnboardingState> {

@@ -19,11 +19,11 @@ import { api } from "../../behavior/organization-api.ts";
 import { useShowErrorToast } from "../../behavior/organization-feedback.ts";
 import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 import {
-  BindingInputRow,
-  type PendingBinding,
+  GrantInputRow,
+  type PendingGrant,
   roleBadgeColor,
   scopeTypeLabel,
-} from "./group-binding-input-row.tsx";
+} from "./group-grant-input-row.tsx";
 
 export function CreateGroupDialog({
   organizationId,
@@ -37,7 +37,7 @@ export function CreateGroupDialog({
   const showErrorToast = useShowErrorToast();
   const queryClient = api.useUtils();
   const [name, setName] = useState("");
-  const [pendingBindings, setPendingBindings] = useState<PendingBinding[]>([]);
+  const [pendingGrants, setPendingGrants] = useState<PendingGrant[]>([]);
   const [pendingMemberIds, setPendingMemberIds] = useState<string[]>([]);
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
@@ -51,7 +51,7 @@ export function CreateGroupDialog({
 
   function reset() {
     setName("");
-    setPendingBindings([]);
+    setPendingGrants([]);
     setPendingMemberIds([]);
     setAddMemberId("");
     setMemberSearch("");
@@ -63,7 +63,7 @@ export function CreateGroupDialog({
       await createGroup.mutateAsync({
         organizationId,
         name: name.trim(),
-        bindings: pendingBindings.map((b) => ({
+        grants: pendingGrants.map((b) => ({
           role: b.role,
           customRoleId: b.customRoleId,
           scopeType: b.scopeType,
@@ -118,14 +118,14 @@ export function CreateGroupDialog({
               onChange={(e) => setName(e.target.value)}
             />
 
-            {/* Bindings */}
+            {/* Grants */}
             <Box>
               <Text fontSize="sm" fontWeight="semibold" mb={3}>
                 Access
               </Text>
-              {pendingBindings.length > 0 && (
+              {pendingGrants.length > 0 && (
                 <VStack gap={2} align="stretch" mb={2}>
-                  {pendingBindings.map((b, i) => (
+                  {pendingGrants.map((b, i) => (
                     <HStack key={i} px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm">
                       <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
                         {b.customRoleName ?? b.role}
@@ -139,8 +139,8 @@ export function CreateGroupDialog({
                         size="xs"
                         variant="ghost"
                         color="fg.muted"
-                        aria-label={`Remove ${b.customRoleName ?? b.role} binding on ${b.scopeName ?? b.scopeId}`}
-                        onClick={() => setPendingBindings((prev) => prev.filter((_, j) => j !== i))}
+                        aria-label={`Remove ${b.customRoleName ?? b.role} access on ${b.scopeName ?? b.scopeId}`}
+                        onClick={() => setPendingGrants((prev) => prev.filter((_, j) => j !== i))}
                       >
                         <X size={14} />
                       </Button>
@@ -148,9 +148,9 @@ export function CreateGroupDialog({
                   ))}
                 </VStack>
               )}
-              <BindingInputRow
+              <GrantInputRow
                 organizationId={organizationId}
-                onAdd={(b) => setPendingBindings((prev) => [...prev, b])}
+                onAdd={(b) => setPendingGrants((prev) => [...prev, b])}
               />
             </Box>
 

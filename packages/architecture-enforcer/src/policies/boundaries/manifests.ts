@@ -265,6 +265,27 @@ function enterpriseRuntimeViolation(
   };
 }
 
+/** Raw clients and process runtimes (§2): a contract never declares one, imported or not (§3). */
+const SERVER_RUNTIME_PACKAGE =
+  /^@langwatch\/(?:eventing|group-queue|prisma-client|clickhouse-client|redis-client|process(?:-server|-stores)?)$/;
+
+/** Contract-declares-a-server-runtime violation, read by name: raw clients are not snapshots. */
+function contractRuntimeViolation(
+  pkg: ClassifiedPackage,
+  dependency: string,
+): ArchitectureViolation | undefined {
+  if (pkg.kind !== "contract" || !SERVER_RUNTIME_PACKAGE.test(dependency)) return undefined;
+
+  return {
+    policy: "package-role",
+    file: pkg.manifestPath,
+    specifier: dependency,
+    message: `A contract package cannot declare the server runtime ${dependency}.`,
+    allowed:
+      "Remove the dependency, or move the code that needs it into this module's process package.",
+  };
+}
+
 type DependencyCheck = (
   pkg: ClassifiedPackage,
   target: ClassifiedPackage,
@@ -451,10 +472,13 @@ function dependencyViolations(
   dependency: string,
   byName: Map<string, ClassifiedPackage>,
 ): ArchitectureViolation[] {
-  const runtimeViolation =
-    enterpriseRuntimeViolation(pkg, dependency) ?? libraryRuntimeViolation(pkg, dependency);
+  const runtimeViolations = [
+    enterpriseRuntimeViolation(pkg, dependency),
+    libraryRuntimeViolation(pkg, dependency),
+    contractRuntimeViolation(pkg, dependency),
+  ].flatMap((violation) => (violation ? [violation] : []));
   const target = byName.get(dependency);
-  if (!target) return runtimeViolation ? [runtimeViolation] : [];
+  if (!target) return runtimeViolations;
 
   const targetViolations = DEPENDENCY_TARGET_CHECKS.flatMap((check) => {
     const violation = check(pkg, target, dependency);
@@ -462,7 +486,7 @@ function dependencyViolations(
     return violation ? [violation] : [];
   });
 
-  return runtimeViolation ? [runtimeViolation, ...targetViolations] : targetViolations;
+  return [...runtimeViolations, ...targetViolations];
 }
 
 /** Every violation for one package: its exports, its Zod runtime, and each declared dependency. */

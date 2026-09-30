@@ -3,7 +3,7 @@ import type { Instant } from "@langwatch/time";
 
 export type StoredApiKey = ApiKey & { hashedSecret: string };
 /** A key as its own row holds it: its grants are authz's, joined by the service. */
-export type ApiKeyRow = Omit<StoredApiKey, "roleBindings">;
+export type ApiKeyRow = Omit<StoredApiKey, "grants">;
 export type ApiKeyCreateRecord = {
   name: string;
   description: string | null;
@@ -24,14 +24,14 @@ export type ApiKeyCreateRecord = {
   ingestSourceType: string | null;
   ingestionTemplateId: string | null;
   startsDisabled: boolean;
-  roleBindings: ApiKeyScope[];
+  grants: ApiKeyScope[];
 };
 export type ApiKeyUpdateRecord = {
   id: string;
   name?: string;
   description?: string | null;
   permissionMode?: string;
-  roleBindings?: ApiKeyScope[];
+  grants?: ApiKeyScope[];
   revokedAt?: Instant | null;
   lastUsedAt?: Instant;
   hashedSecret?: string;

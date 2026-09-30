@@ -174,7 +174,7 @@ export class PersonalWorkspaceService {
     const parsed = personalWorkspaceFeaturesInputSchema.parse(input);
     const project = await this.deps.repository.getPersonalWorkspaceFeatureProject(parsed.projectId);
     if (!project.isPersonal || project.ownerUserId !== parsed.callerUserId) {
-      throw new PersonalProjectOwnerMismatchError();
+      throw new PersonalProjectOwnerMismatchError(parsed.projectId);
     }
 
     return project;

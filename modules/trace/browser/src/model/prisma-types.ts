@@ -18,14 +18,6 @@ export const OrganizationUserRole = {
 } as const;
 export type OrganizationUserRole = (typeof OrganizationUserRole)[keyof typeof OrganizationUserRole];
 
-export const RoleBindingScopeType = {
-  ORGANIZATION: "ORGANIZATION",
-  TEAM: "TEAM",
-  PROJECT: "PROJECT",
-  PLATFORM: "PLATFORM",
-} as const;
-export type RoleBindingScopeType = (typeof RoleBindingScopeType)[keyof typeof RoleBindingScopeType];
-
 export const AnnotationScoreDataType = {
   OPTION: "OPTION",
   CHECKBOX: "CHECKBOX",

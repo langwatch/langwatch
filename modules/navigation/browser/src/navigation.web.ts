@@ -4,12 +4,14 @@
  * address falls to, and the `@project` forward the old parallel route minted.
  */
 
+import { featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 import { navigationApi } from "./behavior/navigation-api.ts";
 
 export const navigationWeb = defineWebModule("navigation")
-  .withApi(navigationApi)
+  // navigationApi reads featureFlag.*, so the flags' session tier travels with it.
+  .withApi(navigationApi, { contracts: [featureFlagTrpc] })
   .withScreens({
     "pages/index": {
       load: () => import("./ui/sections/navigation/landing.screen.tsx"),

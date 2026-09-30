@@ -57,7 +57,7 @@ export const apiKeySchema = z
     ingestionTemplateId: z.string().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
-    roleBindings: z.array(apiKeyBindingSchema),
+    grants: z.array(apiKeyBindingSchema),
   })
   .strict();
 export type ApiKey = z.infer<typeof apiKeySchema>;

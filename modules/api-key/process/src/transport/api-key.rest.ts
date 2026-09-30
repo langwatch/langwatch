@@ -74,13 +74,13 @@ const detailOf = (apiKey: ApiKeyDetail): ApiKeyRestDetail => ({
   expiresAt: apiKey.expiresAt,
   lastUsedAt: apiKey.lastUsedAt,
   revokedAt: apiKey.revokedAt,
-  roleBindings: apiKey.roleBindings.map((rb) => ({
+  roleBindings: apiKey.grants.map((rb) => ({
     id: rb.id,
     role: rb.role,
     scopeType: rb.scopeType,
     scopeId: rb.scopeId,
   })),
-  bindings: apiKey.roleBindings.map((rb) => ({
+  bindings: apiKey.grants.map((rb) => ({
     role: rb.role,
     scopeType: rb.scopeType,
     scopeId: rb.scopeId,
@@ -241,7 +241,7 @@ export const apiKeyRest: Readonly<{
         expiresAt: key.expiresAt,
         lastUsedAt: key.lastUsedAt,
         revokedAt: key.revokedAt,
-        roleBindings: key.roleBindings.map((rb) => ({
+        roleBindings: key.grants.map((rb) => ({
           id: rb.id,
           role: rb.role,
           scopeType: rb.scopeType,

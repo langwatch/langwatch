@@ -9,7 +9,7 @@ export type OrganizationGroupRole = z.infer<typeof organizationGroupRoleSchema>;
 export const organizationGroupScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
 export type OrganizationGroupScopeType = z.infer<typeof organizationGroupScopeTypeSchema>;
 
-export const organizationGroupBindingSchema = z
+export const organizationGroupGrantSchema = z
   .object({
     id: z.string().min(1),
     role: organizationGroupRoleSchema,
@@ -19,7 +19,7 @@ export const organizationGroupBindingSchema = z
     scopeId: z.string().min(1),
   })
   .strict();
-export type OrganizationGroupBinding = z.infer<typeof organizationGroupBindingSchema>;
+export type OrganizationGroupGrant = z.infer<typeof organizationGroupGrantSchema>;
 
 export const organizationGroupMemberSchema = z
   .object({
@@ -47,13 +47,13 @@ export type OrganizationGroup = z.infer<typeof organizationGroupSchema>;
 
 export const organizationGroupDetailsSchema = organizationGroupSchema.safeExtend({
   members: z.array(organizationGroupMemberSchema),
-  bindings: z.array(organizationGroupBindingSchema),
+  grants: z.array(organizationGroupGrantSchema),
 });
 export type OrganizationGroupDetails = z.infer<typeof organizationGroupDetailsSchema>;
 
 export const organizationGroupSummarySchema = organizationGroupSchema.safeExtend({
   memberCount: z.number().int().nonnegative(),
-  bindings: z.array(organizationGroupBindingSchema),
+  grants: z.array(organizationGroupGrantSchema),
 });
 export type OrganizationGroupSummary = z.infer<typeof organizationGroupSummarySchema>;
 
@@ -71,7 +71,7 @@ export const organizationGroupPageSchema = z
   .strict();
 export type OrganizationGroupPage = z.infer<typeof organizationGroupPageSchema>;
 
-export const organizationGroupBindingInputSchema = z
+export const organizationGroupGrantInputSchema = z
   .object({
     role: organizationGroupRoleSchema,
     customRoleId: z.string().min(1).optional(),
@@ -79,7 +79,7 @@ export const organizationGroupBindingInputSchema = z
     scopeId: z.string().min(1),
   })
   .strict();
-export type OrganizationGroupBindingInput = z.infer<typeof organizationGroupBindingInputSchema>;
+export type OrganizationGroupGrantInput = z.infer<typeof organizationGroupGrantInputSchema>;
 
 export const getOrganizationGroupInputSchema = z
   .object({
@@ -112,7 +112,7 @@ export const createOrganizationGroupInputSchema = z
   .object({
     organizationId: organizationIdSchema,
     name: z.string().trim().min(1).max(100),
-    bindings: z.array(organizationGroupBindingInputSchema).optional(),
+    grants: z.array(organizationGroupGrantInputSchema).optional(),
     memberIds: z.array(z.string().min(1)).optional(),
     actor: organizationLedgerActorSchema,
   })
@@ -137,24 +137,22 @@ export type ChangeOrganizationGroupMemberInput = z.infer<
   typeof changeOrganizationGroupMemberInputSchema
 >;
 
-export const addOrganizationGroupBindingInputSchema = getOrganizationGroupInputSchema.safeExtend({
-  binding: organizationGroupBindingInputSchema,
+export const addOrganizationGroupGrantInputSchema = getOrganizationGroupInputSchema.safeExtend({
+  grant: organizationGroupGrantInputSchema,
   actor: organizationLedgerActorSchema,
 });
-export type AddOrganizationGroupBindingInput = z.infer<
-  typeof addOrganizationGroupBindingInputSchema
->;
+export type AddOrganizationGroupGrantInput = z.infer<typeof addOrganizationGroupGrantInputSchema>;
 
-export const removeOrganizationGroupBindingInputSchema = z
+export const removeOrganizationGroupGrantInputSchema = z
   .object({
     organizationId: organizationIdSchema,
     groupId: z.string().min(1).optional(),
-    bindingId: z.string().min(1),
+    grantId: z.string().min(1),
     actor: organizationLedgerActorSchema,
   })
   .strict();
-export type RemoveOrganizationGroupBindingInput = z.infer<
-  typeof removeOrganizationGroupBindingInputSchema
+export type RemoveOrganizationGroupGrantInput = z.infer<
+  typeof removeOrganizationGroupGrantInputSchema
 >;
 
 export const applyOrganizationGroupEditsInputSchema = getOrganizationGroupInputSchema.safeExtend({
@@ -163,8 +161,8 @@ export const applyOrganizationGroupEditsInputSchema = getOrganizationGroupInputS
     .strict()
     .nullable()
     .optional(),
-  bindingIdsToDelete: z.array(z.string().min(1)),
-  bindingsToCreate: z.array(organizationGroupBindingInputSchema),
+  grantIdsToRevoke: z.array(z.string().min(1)),
+  grantsToCreate: z.array(organizationGroupGrantInputSchema),
   memberUserIdsToAdd: z.array(z.string().min(1)),
   memberUserIdsToRemove: z.array(z.string().min(1)),
   actor: organizationLedgerActorSchema,

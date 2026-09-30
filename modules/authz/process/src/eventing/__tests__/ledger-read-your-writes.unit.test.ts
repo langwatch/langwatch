@@ -354,7 +354,6 @@ describe("given a binding role change", () => {
           },
         }),
       )
-      .mockResolvedValueOnce(null)
       .mockResolvedValue({ roleKey: "viewer" });
 
     await expect(

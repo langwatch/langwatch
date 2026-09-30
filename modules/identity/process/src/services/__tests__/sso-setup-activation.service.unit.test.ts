@@ -174,6 +174,21 @@ describe("taking a connection live", () => {
     expect(activateConnection).not.toHaveBeenCalled();
   });
 
+  /** @scenario Any of the three answers unblocks it, because the gate is deciding */
+  it.each(["refuse", "request", "admit"] as const)(
+    "goes live once the answer is %s",
+    async (arrivalPolicy) => {
+      const { service, activateConnection } = serviceOver({
+        row: connection({ arrivalPolicy }),
+        signIns: [{ userId: "user_ana", providerAccountId: "okta|ana", atMs: 1_699_000_000_000 }],
+      });
+
+      await activate(service);
+
+      expect(activateConnection).toHaveBeenCalledOnce();
+    },
+  );
+
   it("keeps the account a completed activation already recorded", async () => {
     const { service, activateConnection } = serviceOver({
       row: connection({ state: "ACTIVE", testLoginAccountId: "okta|ana" }),

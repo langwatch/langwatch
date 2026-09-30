@@ -138,29 +138,39 @@ describe("tenant soft-cap (LANGWATCH_DISPATCH_TENANT_CAP)", () => {
     expect(Math.abs(score - expectedExpiry)).toBeLessThanOrEqual(2000);
   });
 
-  /** @scenario RETRY_RESTAGE bumps the in-flight slot expiry to the retry window */
-  it("RETRY_RESTAGE_LUA bumps the tenant slot's expiry score to the retry window", async () => {
-    scripts = new GroupStagingScripts(redis, QUEUE_NAME, { tenantConcurrencyCap: 10 });
-    const groupId = await stageOne({ tenantId: "proj_acme", groupSuffix: "g1", stagedJobId: "j1" });
+  /** @scenario A group waiting out its retry backoff frees its tenant slot and keeps its order */
+  it("frees the retrying group's tenant slot, unparks a waiting group and keeps the retrying group locked", async () => {
+    scripts = new GroupStagingScripts(redis, QUEUE_NAME, { tenantConcurrencyCap: 1 });
+    const retrying = await stageOne({
+      tenantId: "proj_acme",
+      groupSuffix: "g1",
+      stagedJobId: "j1",
+    });
+    await stageOne({ tenantId: "proj_acme", groupSuffix: "g2", stagedJobId: "j2" });
     const dispatched = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+    expect(dispatched?.groupId).toBe(retrying);
+    expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).toBeNull();
+    expect(await redis.zcard(parkedKey("proj_acme"))).toBe(1);
+    await scripts.stage(
+      makeJob({ groupId: retrying, stagedJobId: "j1-later", dispatchAfterMs: 1500 }),
+    );
 
     await scripts.retryRestage({
-      groupId,
+      groupId: retrying,
       stagedJobId: dispatched!.stagedJobId,
-      newStagedJobId: "j1-retry",
-      dispatchAfterMs: 9999,
+      newStagedJobId: dispatched!.stagedJobId,
+      dispatchAfterMs: Date.now() + 30_000,
       jobDataJson: JSON.stringify({ hello: "world" }),
       backoffMs: 30_000,
       attempt: 1,
       attemptTtlSec: 1800,
     });
 
-    // retryRestage sets the slot expiry to Date.now() + retryTtlSec*1000,
-    // retryTtlSec = ceil(backoffMs/1000)+2 = 32s.
-    const score = Number(await redis.zscore(tenantActiveZKey("proj_acme"), groupId));
-    const expectedExpiry = Date.now() + 32 * 1000;
-    expect(score).toBeGreaterThan(0);
-    expect(Math.abs(score - expectedExpiry)).toBeLessThanOrEqual(2000);
+    expect(await redis.zscore(tenantActiveZKey("proj_acme"), retrying)).toBeNull();
+    expect(await redis.zcard(parkedKey("proj_acme"))).toBe(0);
+    const next = await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 60 });
+    expect(next?.groupId).toBe("proj_acme/g2");
+    expect(await redis.get(`${keyPrefix()}group:${retrying}:active`)).toBe(dispatched!.stagedJobId);
   });
 
   /** @scenario DISPATCH_BATCH_LUA refuses to dispatch when tenant is at cap */

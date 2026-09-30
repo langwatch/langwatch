@@ -19,8 +19,8 @@ import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
-import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
 import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const logger = createLogger("langwatch:api-key:lifecycle");
@@ -48,14 +48,14 @@ export class ApiKeyLifecycleService {
     return new ApiKeyLifecycleService(options.repository, options, grants);
   }
 
-  private readonly bindings: ApiKeyBindingsService;
+  private readonly bindings: ApiKeyGrantsService;
 
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
     private readonly grants: ApiKeyGrantPolicyService,
   ) {
-    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+    this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
   }
 
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
@@ -108,7 +108,7 @@ export class ApiKeyLifecycleService {
       ingestSourceType: parsed.ingestSourceType ?? null,
       ingestionTemplateId: parsed.ingestionTemplateId ?? null,
       startsDisabled: true,
-      roleBindings: effectiveBindings,
+      grants: effectiveBindings,
     });
     await this.grants.writeBindings({
       apiKeyId: row.id,
@@ -195,7 +195,7 @@ export class ApiKeyLifecycleService {
           name: input.name,
           description: input.description,
           permissionMode: input.permissionMode,
-          roleBindings: effectiveBindings,
+          grants: effectiveBindings,
         }),
       ),
     );
@@ -226,9 +226,7 @@ export class ApiKeyLifecycleService {
     });
     const customRoleIds = [
       ...new Set(
-        existing.roleBindings.flatMap((binding) =>
-          binding.customRoleId ? [binding.customRoleId] : [],
-        ),
+        existing.grants.flatMap((binding) => (binding.customRoleId ? [binding.customRoleId] : [])),
       ),
     ];
     for (const roleId of customRoleIds) {
@@ -243,7 +241,7 @@ export class ApiKeyLifecycleService {
     const cause = input.cause ?? "user";
     const revoked = publicApiKey({
       ...(await this.repository.revoke({ id: input.id, cause })),
-      roleBindings: existing.roleBindings,
+      grants: existing.grants,
     });
 
     if (input.cascadeToChildren ?? true) {

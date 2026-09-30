@@ -1,6 +1,5 @@
-import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Button, Input, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link } from "@langwatch/browser-host/link";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,6 +10,7 @@ import { forgetCarriedEmail, readCarriedEmail } from "../../model/carried-email.
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
 import { CheckYourEmail } from "../../ui/elements/check-your-email.tsx";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../../ui/elements/front-door-field.tsx";
+import { SecondaryActionLink } from "../../ui/elements/secondary-action-link.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
 const forgotPasswordSchema = z.object({ email: z.string().email() });
@@ -111,12 +111,12 @@ function ForgotPasswordForm() {
   }
 
   return (
-    <AuthCard title="Forgot your password?">
+    <AuthCard
+      title="Forgot your password?"
+      intro="Enter the email for your account and we will send you a link to reset your password."
+    >
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <VStack width="full" align="stretch" gap="14px">
-          <Text color="fg.muted" fontSize="13.5px" lineHeight="1.65">
-            Enter the email for your account and we will send you a link to reset your password.
-          </Text>
           <FrontDoorField label="Email" error={form.formState.errors.email}>
             {(id) => (
               <Input
@@ -148,9 +148,7 @@ function ForgotPasswordForm() {
           >
             Send reset link
           </Button>
-          <HStack width="full" justify="center">
-            <BackToSignInLink />
-          </HStack>
+          <BackToSignInLink />
         </VStack>
       </form>
     </AuthCard>
@@ -158,11 +156,5 @@ function ForgotPasswordForm() {
 }
 
 function BackToSignInLink() {
-  return (
-    <Box asChild>
-      <Link href="/auth/signin" style={{ textDecoration: "underline" }}>
-        Back to sign in
-      </Link>
-    </Box>
-  );
+  return <SecondaryActionLink href="/auth/signin" label="Back to sign in" />;
 }

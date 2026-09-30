@@ -145,3 +145,18 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Given a service that writes a row whose unique key another writer took first
       When the REST boundary renders the error
       Then it is the 409 conflict
+
+  Rule: Running out of database connections is a retryable wait, not a fault
+
+    @integration
+    Scenario: A database with no connection to give is a retryable 503, never a 500
+      Given a service whose store could not get a Postgres connection or start a transaction in time
+      When the REST boundary renders the error
+      Then it is the 503, marked retryable
+      And the answer carries Retry-After
+
+    @integration
+    Scenario: A family's own error handler cannot turn a busy database back into a 500
+      Given a family whose own error handler answers anything unhandled as a 500
+      When its service's store could not get a Postgres connection in time
+      Then the family's handler is handed the handled 503, and the answer is a 503 with Retry-After

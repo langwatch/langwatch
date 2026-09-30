@@ -165,6 +165,8 @@ export abstract class SimulationService {
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
   /** The usage report's figure: scenario runs started since `since` (epoch ms). */
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
+  /** Lifetime runs across one organization's projects, in one read: they share one route. */
+  abstract countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number>;
   abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;

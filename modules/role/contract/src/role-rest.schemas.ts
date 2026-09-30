@@ -46,10 +46,21 @@ export const roleRestSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   permissions: z.array(z.string()),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  /** `admin`, `member` and `viewer`: always listed, never changed or deleted. */
+  builtIn: z.boolean(),
+  /** Null on a built-in role, which has no definition moment. */
+  createdAt: z.date().nullable(),
+  updatedAt: z.date().nullable(),
 });
 export type RoleRest = z.infer<typeof roleRestSchema>;
+
+/** `?builtIn=true` lists only the built-in roles, `false` only the custom ones; omitted, both. */
+export const roleRestListQuerySchema = z.object({
+  builtIn: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
+});
 
 export const roleRestListSchema = z.object({ roles: z.array(roleRestSchema) });
 

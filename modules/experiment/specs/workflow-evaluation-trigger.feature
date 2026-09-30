@@ -47,8 +47,8 @@ Feature: A workflow evaluation is requested by the api and run by the worker
     Then the poller reads it running with the requested total, as main registered it
 
   @unit
-  Scenario: A requested evaluation the worker does not register in time is refused as unavailable
-    Given a worker that does not fold the request within the bounded wait
+  Scenario: A requested evaluation answers as soon as its request command is written
+    Given a worker that has not folded the request yet
     When an evaluation is triggered
-    Then the request is sent once
-    And it is refused as service_unavailable, naming the worker that did not register the run
+    Then the request is sent once and the run id answered at once, without waiting for the worker
+    And the run's start is recorded with its requested total, so a poll reads it running, not missing

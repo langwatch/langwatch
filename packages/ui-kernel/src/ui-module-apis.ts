@@ -32,6 +32,7 @@ export function installedModuleApis(
         `Module ${JSON.stringify(module.name)} declared an api with no Provider to mount.`,
       );
     }
-    return [{ name: module.name, Provider: api.Provider }];
+    const contracts = module.installation.apiContracts;
+    return [{ name: module.name, Provider: api.Provider, ...(contracts ? { contracts } : {}) }];
   });
 }

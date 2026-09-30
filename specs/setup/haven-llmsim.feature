@@ -16,7 +16,7 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then both answers carry the same text and plausible token usage
     And a different prompt gets a different answer
 
-  Scenario: A seed header pins or randomises the answer
+  Scenario: A seed header pins or varies the answer
     When two different prompts carry the same X-Llmsim-Seed value
     Then they get the same answer
     And calls carrying X-Llmsim-Seed "random" get different answers

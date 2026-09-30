@@ -497,7 +497,7 @@ describe("column-pruning", () => {
   describe("when guarding fieldMappings column coverage", () => {
     it("ensures all trace_summaries field mappings reference columns in the identity set or known metric/groupBy columns", () => {
       const traceSummaryMappings = Object.entries(fieldMappings).filter(
-        ([_, mapping]) => mapping.table === "trace_summaries",
+        ([, mapping]) => mapping.table === "trace_summaries",
       );
 
       // Every column referenced by a trace_summaries field mapping must be
@@ -543,7 +543,7 @@ describe("column-pruning", () => {
 
     it("ensures all stored_spans field mappings reference known span columns", () => {
       const spanMappings = Object.entries(fieldMappings).filter(
-        ([_, mapping]) => mapping.table === "stored_spans",
+        ([, mapping]) => mapping.table === "stored_spans",
       );
 
       const knownSpanColumns = new Set([
@@ -573,7 +573,7 @@ describe("column-pruning", () => {
 
     it("ensures all evaluation_runs field mappings reference known evaluation columns", () => {
       const evalMappings = Object.entries(fieldMappings).filter(
-        ([_, mapping]) => mapping.table === "evaluation_runs",
+        ([, mapping]) => mapping.table === "evaluation_runs",
       );
 
       const knownEvalColumns = new Set([

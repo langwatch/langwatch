@@ -1,0 +1,197 @@
+# CV1 coverage sweep, workflows: journeys the studio flows in workflows.yaml do not walk
+# (detach a dataset, open from the list card, two workflows kept apart). Labels and test ids
+# are the ones workflows.yaml already relies on.
+flows:
+  - id: cv1-workflow-detach-dataset-and-save
+    title: Attach the seeded dataset, detach it again, save a version and find no dataset on the entry node after reopening
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-cv1wfdet-{uid}"
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: click
+        with:
+          selector: .react-flow__node[data-id="entry"]
+      - action: click
+        with:
+          testId: attach-dataset-button
+      - action: click
+        with:
+          testId: dataset-card-Visual Diff QA
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          hasText: Visual Diff QA
+      - action: click
+        with:
+          testId: detach-dataset-button
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          equals: "0"
+      - action: click
+        with:
+          selector: button:has(path[d^="M3.51 14A9"])
+      - action: click
+        with:
+          text: Save new version
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: "vd-cv1wfdet-{uid}"
+      - action: click
+        with:
+          selector: .react-flow__node[data-id="entry"]
+      - action: expect
+        with:
+          testId: attach-dataset-button
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          equals: "0"
+
+  - id: cv1-workflow-list-card-opens-studio
+    title: Create a workflow, return to the list and open it from its card into the studio canvas
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-cv1wfcard-{uid}"
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          text: "vd-cv1wfcard-{uid}"
+      - action: click
+        with:
+          text: "vd-cv1wfcard-{uid}"
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          equals: "1"
+
+  - id: cv1-workflow-delete-one-keeps-the-other
+    title: Create two workflows, delete the first behind its confirmation and find only the second after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-cv1wfa-{uid}"
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-cv1wfb-{uid}"
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          text: "vd-cv1wfa-{uid}"
+      - action: expect
+        with:
+          text: "vd-cv1wfb-{uid}"
+      - action: click
+        with:
+          selector: a:has-text("vd-cv1wfa-{uid}") button.js-inner-menu
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: fill
+        with:
+          testId: cascade-archive-confirm-input
+          value: delete
+      - action: click
+        with:
+          testId: cascade-archive-confirm-button
+      - action: expect
+        with:
+          text: "vd-cv1wfa-{uid}"
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          text: "vd-cv1wfb-{uid}"
+      - action: expect
+        with:
+          text: "vd-cv1wfa-{uid}"
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/workflows
+          contains: "vd-cv1wfb-{uid}"

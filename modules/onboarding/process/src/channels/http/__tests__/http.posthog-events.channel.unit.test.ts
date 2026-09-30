@@ -38,4 +38,15 @@ describe("HttpPostHogEventsChannel", () => {
 
     expect(reads.count).toBe(1);
   });
+
+  /** @scenario "a failing analytics call never fails the write" */
+  it("returns normally when the targets cannot be read", () => {
+    const channel = HttpPostHogEventsChannel.create({
+      targets: () => {
+        throw new Error("ops unavailable");
+      },
+    });
+
+    expect(() => channel.track(EVENT)).not.toThrow();
+  });
 });

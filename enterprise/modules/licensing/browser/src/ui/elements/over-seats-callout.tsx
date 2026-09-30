@@ -1,6 +1,5 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Alert, Button, HStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
-import { UserMinus } from "lucide-react";
 
 interface OverSeatsCalloutProps {
   currentMembers: number;
@@ -15,45 +14,31 @@ export function OverSeatsCallout({ currentMembers, maxMembers }: OverSeatsCallou
   if (overBy <= 0) return null;
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="orange.300"
-      backgroundColor="orange.50"
-      borderRadius="lg"
-      padding={5}
-      width="full"
-      marginBottom={4}
-      data-testid="over-seats-callout"
-      _dark={{ backgroundColor: "orange.950", borderColor: "orange.700" }}
-    >
-      <HStack align="start" gap={4}>
-        <Box color="orange.600" paddingTop={1}>
-          <UserMinus size={20} />
-        </Box>
-        <VStack align="start" gap={2} flex={1}>
-          <Text fontWeight="medium">
-            {overBy === 1
-              ? "One member is over the seats your license covers"
-              : `${overBy} members are over the seats your license covers`}
-          </Text>
-          <Text color="fg.muted" fontSize="sm">
-            Your license covers {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and{" "}
-            {currentMembers} members are active. Everyone keeps working, but you cannot add anyone
-            new until you are back within {maxMembers}. Disable the members who no longer need
-            access, or talk to us about more seats.
-          </Text>
-          <HStack gap={3} paddingTop={1}>
-            <Button asChild size="sm" colorPalette="orange">
-              <Link unstyled href="/settings/members">
-                Choose who to disable
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <a href="mailto:enterprise@langwatch.ai">Get more seats</a>
-            </Button>
-          </HStack>
-        </VStack>
-      </HStack>
-    </Box>
+    <Alert.Root status="warning" data-testid="over-seats-callout">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>
+          {overBy === 1
+            ? "One member is over the seats your license covers"
+            : `${overBy} members are over the seats your license covers`}
+        </Alert.Title>
+        <Alert.Description>
+          Your license covers {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and{" "}
+          {currentMembers} members are active. Everyone keeps working, but you cannot add anyone new
+          until you are back within {maxMembers}. Disable the members who no longer need access, or
+          talk to us about more seats.
+        </Alert.Description>
+        <HStack gap={3} paddingTop={2}>
+          <Button asChild size="sm" variant="outline" colorPalette="orange">
+            <Link unstyled href="/settings/members">
+              Choose who to disable
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <a href="mailto:enterprise@langwatch.ai">Get more seats</a>
+          </Button>
+        </HStack>
+      </Alert.Content>
+    </Alert.Root>
   );
 }

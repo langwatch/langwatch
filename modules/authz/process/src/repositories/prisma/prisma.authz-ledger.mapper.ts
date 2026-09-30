@@ -9,7 +9,7 @@ import type {
   AuthzRoleBindingFilter,
   LedgerBindingAttach,
 } from "../../eventing/authz-grant.store.ts";
-import type { BindingPrincipalWhere, RoleBindingWrite } from "../authz-grant.repository.ts";
+import type { BindingPrincipalWhere, GrantWrite } from "../authz-grant.repository.ts";
 import { PRINCIPAL_TO_DB } from "./prisma.authz-grant.mapper.ts";
 
 const storedIdSchema = z.object({ id: z.string() });
@@ -105,7 +105,7 @@ export function roleKeyFor({
   role,
   customRoleId,
 }: {
-  role: RoleBindingWrite["role"];
+  role: GrantWrite["role"];
   customRoleId: string | null;
 }): string {
   return customRoleId === null

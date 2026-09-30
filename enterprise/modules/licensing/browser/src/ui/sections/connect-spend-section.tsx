@@ -1,11 +1,14 @@
 import { Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { SettingsSection } from "@langwatch/design-system/settings-section";
+import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import type { ConnectContractView } from "@langwatch/enterprise-licensing-contract";
+import { CircleDollarSign, Gauge, PiggyBank, Wallet } from "lucide-react";
 import { useState } from "react";
 
 import { connectApi } from "../../behavior/connect-api.ts";
 import { formatPeriodStart, formatUsd } from "../../model/hosted-services.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
-import { Figure, SettingsBlock } from "../elements/settings-block.tsx";
 import type { ConnectEnabledStatus } from "./connect-status.ts";
 
 /** Said in place of a figure while LangWatch cannot report spend. */
@@ -27,10 +30,11 @@ export function ConnectSpendSection({
   const contract = usage.contract;
 
   return (
-    <SettingsBlock
+    <SettingsSection
+      icon={<CircleDollarSign size={18} />}
       title="Spend"
-      description="What this install has spent on hosted services, and the cap it stops at."
-      testId="connect-spend"
+      hint="What this install has spent on hosted services, and the cap it stops at."
+      data-testid="connect-spend"
     >
       {contract ? (
         <VStack width="full" align="stretch" gap={5}>
@@ -40,11 +44,13 @@ export function ConnectSpendSection({
           ) : null}
         </VStack>
       ) : (
-        <Text fontSize="sm" color="fg.muted">
-          No spend limit has been agreed for hosted services yet. Contact LangWatch to agree one.
-        </Text>
+        <NoDataInfoBlock
+          icon={<Wallet />}
+          title="No spend limit yet"
+          description="No spend limit has been agreed for hosted services yet. Contact LangWatch to agree one."
+        />
       )}
-    </SettingsBlock>
+    </SettingsSection>
   );
 }
 
@@ -58,17 +64,21 @@ function SpendFigures({
   const periodStart = formatPeriodStart({ value: contract.periodStartedAt, fallback: "" });
   return (
     <VStack width="full" align="stretch" gap={2}>
-      <HStack width="full" gap={10} align="start" flexWrap="wrap">
-        <Figure
-          label="Spent"
-          value={spendAvailable ? formatUsd(contract.spentUsd) : SPEND_UNAVAILABLE}
-        />
-        <Figure label="Cap" value={formatUsd(contract.capUsd)} />
-        <Figure
-          label="Remaining"
-          value={spendAvailable ? formatUsd(contract.remainingUsd) : SPEND_UNAVAILABLE}
-        />
-      </HStack>
+      <StatTileGrid columns={3}>
+        <StatTile label="Spent" icon={<Wallet size={14} />}>
+          <StatTileFigure muted={!spendAvailable}>
+            {spendAvailable ? formatUsd(contract.spentUsd) : SPEND_UNAVAILABLE}
+          </StatTileFigure>
+        </StatTile>
+        <StatTile label="Cap" icon={<Gauge size={14} />}>
+          <StatTileFigure>{formatUsd(contract.capUsd)}</StatTileFigure>
+        </StatTile>
+        <StatTile label="Remaining" icon={<PiggyBank size={14} />}>
+          <StatTileFigure muted={!spendAvailable}>
+            {spendAvailable ? formatUsd(contract.remainingUsd) : SPEND_UNAVAILABLE}
+          </StatTileFigure>
+        </StatTile>
+      </StatTileGrid>
       {periodStart ? (
         <Text fontSize="sm" color="fg.muted">
           For the period that started on {periodStart}.
@@ -112,6 +122,9 @@ function CapField({
           onChange={(event) => setDraft(event.target.value)}
         />
         <Button
+          size="sm"
+          variant="outline"
+          colorPalette="orange"
           loading={setCap.isPending}
           disabled={!isValid}
           data-testid="connect-cap-save"

@@ -28,7 +28,9 @@ function useCasesInvalidate(projectId: string): () => void {
 
 export type SuiteMutations = {
   isArchiving: boolean;
-  createSuite: (name: string) => void;
+  isCreating: boolean;
+  /** `onCreated` runs once the new suite is in the rail and open. */
+  createSuite: (input: { name: string; onCreated: () => void }) => void;
   renameSuite: (input: { suiteId: string; name: string }) => void;
   archiveSuite: (suiteId: string) => void;
 };
@@ -43,10 +45,17 @@ export function useSuiteMutations({
   selectedSuiteId: string | null;
   selectSuite: (selection: AgentTestingSelection) => void;
 }): SuiteMutations {
+  const utils = api.useUtils();
   const invalidate = useCasesInvalidate(projectId);
 
   const create = api.suites.testSuites.create.useMutation({
     onSuccess: (testSuite) => {
+      // The rail learns the suite from the answer, not the refetch: until the
+      // list names its slug the tab falls back to the first suite, and a New
+      // scenario chosen then would be filed there.
+      utils.suites.testSuites.getAll.setData({ projectId }, (rows) =>
+        rows ? [...rows.filter((row) => row.id !== testSuite.id), testSuite] : rows,
+      );
       invalidate();
       selectSuite({ kind: "suite", slug: testSuite.slug });
     },
@@ -79,7 +88,9 @@ export function useSuiteMutations({
 
   return {
     isArchiving: archive.isPending,
-    createSuite: (name) => create.mutate({ projectId, name }),
+    isCreating: create.isPending,
+    createSuite: ({ name, onCreated }) =>
+      create.mutate({ projectId, name }, { onSuccess: () => onCreated() }),
     renameSuite: ({ suiteId, name }) => rename.mutate({ projectId, testSuiteId: suiteId, name }),
     archiveSuite: (suiteId) => archive.mutate({ projectId, testSuiteId: suiteId }),
   };

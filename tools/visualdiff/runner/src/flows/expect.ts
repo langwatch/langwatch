@@ -9,7 +9,15 @@ export const EXPECT_TIMEOUT_MILLIS = 10_000;
 const POLL_MILLIS = 250;
 
 /** The keys an expect step may carry; tools/visualdiff/config.go refuses any other. */
-export const EXPECT_FORMS = ["text", "count", "url", "api", "testId", "testIdPrefix", "label"] as const;
+export const EXPECT_FORMS = [
+  "text",
+  "count",
+  "url",
+  "api",
+  "testId",
+  "testIdPrefix",
+  "label",
+] as const;
 
 const TARGET_FORMS = ["testId", "testIdPrefix", "label"] as const;
 
@@ -37,7 +45,8 @@ export const describeExpect = (args: Record<string, string>): string => {
   if (args.url !== undefined) return `url ${args.url}`;
   if (args.api !== undefined) {
     const field = args.field === undefined ? "" : ` ${args.field}`;
-    if (args.status !== undefined && !hasBodyCheck(args)) return `api ${args.api} status ${args.status}`;
+    if (args.status !== undefined && !hasBodyCheck(args))
+      return `api ${args.api} status ${args.status}`;
     if (args.contains !== undefined) return `api ${args.api}${field} contains "${args.contains}"`;
     if (args.equals !== undefined) return `api ${args.api}${field} == ${args.equals}`;
     return `api ${args.api}${field} length >= ${args.min ?? "1"}`;
@@ -64,7 +73,13 @@ const sizeOf = (value: unknown): number => {
 };
 
 /** judgeCount is "" when a count meets its bound, or why it does not. */
-export const judgeCount = ({ found, args }: { found: number; args: Record<string, string> }): string => {
+export const judgeCount = ({
+  found,
+  args,
+}: {
+  found: number;
+  args: Record<string, string>;
+}): string => {
   if (args.equals !== undefined) {
     return found === Number(args.equals) ? "" : `found ${found}, want ${args.equals}`;
   }
@@ -73,7 +88,13 @@ export const judgeCount = ({ found, args }: { found: number; args: Record<string
 };
 
 /** judgeBody is "" when an api expect's field holds, or why it does not. */
-export const judgeBody = ({ body, args }: { body: unknown; args: Record<string, string> }): string => {
+export const judgeBody = ({
+  body,
+  args,
+}: {
+  body: unknown;
+  args: Record<string, string>;
+}): string => {
   const value = readField({ body, path: args.field });
   if (args.contains !== undefined) {
     const text = JSON.stringify(value) ?? "";
@@ -92,7 +113,8 @@ const readOnce = async (context: ActionContext): Promise<string> => {
   const page = side.page;
   if (args.text !== undefined) {
     const scoped = page.locator(`role=${args.role ?? ""}`);
-    const within = args.name === undefined ? scoped : scoped.filter({ hasText: asRegExp(args.name) });
+    const within =
+      args.name === undefined ? scoped : scoped.filter({ hasText: asRegExp(args.name) });
     const root = args.role === undefined ? page : within;
     const visible = await root
       .getByText(asRegExp(args.text))
@@ -102,7 +124,9 @@ const readOnce = async (context: ActionContext): Promise<string> => {
     return judgeCount({ found: visible, args });
   }
   if (hasTarget(args)) {
-    const found = await targetOf({ root: page, args }).count().catch(() => 0);
+    const found = await targetOf({ root: page, args })
+      .count()
+      .catch(() => 0);
     return judgeCount({ found, args });
   }
   if (args.count !== undefined) {
@@ -115,9 +139,8 @@ const readOnce = async (context: ActionContext): Promise<string> => {
   }
   if (args.url !== undefined) {
     const path = new URL(page.url()).pathname;
-    return asRegExp(fillPath({ path: args.url, slug: context.slug })).test(path)
-      ? ""
-      : `on ${path}`;
+    const wanted = asRegExp(fillPath({ path: args.url, slug: context.slug }));
+    return wanted.test(path) ? "" : `on ${path}`;
   }
   if (args.api !== undefined) {
     const token = args.auth ?? context.credential.projectKey;

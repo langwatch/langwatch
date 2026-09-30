@@ -60,7 +60,7 @@ export function CheckupRows({
     <VStack width="full" align="stretch" gap={0}>
       <Text fontSize="sm" color="fg.muted" paddingBottom={2}>
         Checked at {ranAt}. Live queues, errors and throughput are on the{" "}
-        <Link href="/ops" color="blue.600">
+        <Link href="/ops" color="orange.fg">
           ops dashboard <ExternalLink size={12} />
         </Link>
         .

@@ -1,10 +1,10 @@
+import type { GrantScopeTier } from "@langwatch/authz-contract";
 import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
 import type {
   Organization,
   OrganizationInvite,
   OrganizationUser,
   OrganizationUserRole,
-  RoleBindingScopeType,
 } from "@langwatch/organization-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
@@ -147,7 +147,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
   findPersonalTeamsInScopes({
     scopes,
   }: {
-    scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[];
   }): Promise<{ name: string }[]> {
     return PrismaPersonalTeamScopeRepository.create().findPersonalTeamsInScopes({
       client: this.prisma,

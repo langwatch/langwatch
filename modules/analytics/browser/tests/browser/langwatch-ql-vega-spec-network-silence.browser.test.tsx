@@ -228,6 +228,7 @@ describe("the LangWatchQL chart surface with the browser's network recorded", ()
   describe("given the whole specification corpus", () => {
     describe("when each specification is validated and rendering is attempted", () => {
       /** @scenario "No renderer path performs network or file loading" */
+      /** @scenario "Rejected and adversarial specs cause no network request" */
       it("triggers no request from any specification, refused or admitted", async () => {
         // Warm the surface once before the recorders go on, so the first
         // paint's own styling work is not attributed to a fixture.

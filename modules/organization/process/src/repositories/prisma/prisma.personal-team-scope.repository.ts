@@ -1,12 +1,12 @@
-import { RoleBindingScopeType } from "@langwatch/organization-contract";
+import { GrantScopeTier } from "@langwatch/authz-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { PersonalTeamScopeReader } from "../../services/personal-team-scope.service.ts";
 
 export type PersonalTeamScopeClient = PrismaClient | Prisma.TransactionClient;
 
-export interface RoleBindingScope {
-  scopeType: RoleBindingScopeType;
+export interface PersonalTeamGrantScope {
+  scopeType: GrantScopeTier;
   scopeId: string;
 }
 
@@ -47,7 +47,7 @@ export class PrismaPersonalTeamScopeRepository {
     scopes,
   }: {
     client: PersonalTeamScopeClient;
-    scopes: RoleBindingScope[];
+    scopes: PersonalTeamGrantScope[];
   }): Promise<{ name: string }[]> {
     return this.findPersonalTeamMatching({ client, scopes, teamWhere: {} });
   }
@@ -62,7 +62,7 @@ export class PrismaPersonalTeamScopeRepository {
     ownerUserId,
   }: {
     client: PersonalTeamScopeClient;
-    scopes: RoleBindingScope[];
+    scopes: PersonalTeamGrantScope[];
     ownerUserId: string | null;
   }): Promise<{ name: string }[]> {
     return this.findPersonalTeamMatching({
@@ -78,17 +78,17 @@ export class PrismaPersonalTeamScopeRepository {
     teamWhere,
   }: {
     client: PersonalTeamScopeClient;
-    scopes: RoleBindingScope[];
+    scopes: PersonalTeamGrantScope[];
     teamWhere: Prisma.TeamWhereInput;
   }): Promise<{ name: string }[]> {
-    const idsOfType = (scopeType: RoleBindingScopeType) => [
+    const idsOfType = (scopeType: GrantScopeTier) => [
       ...new Set(
         scopes.filter((scope) => scope.scopeType === scopeType).map((scope) => scope.scopeId),
       ),
     ];
 
     const reached: { name: string }[] = [];
-    const teamIds = idsOfType(RoleBindingScopeType.TEAM);
+    const teamIds = idsOfType(GrantScopeTier.TEAM);
     if (teamIds.length > 0) {
       const personalTeams = await client.team.findMany({
         where: { id: { in: teamIds }, isPersonal: true, AND: [teamWhere] },
@@ -100,7 +100,7 @@ export class PrismaPersonalTeamScopeRepository {
     // A project-scoped binding on the personal project reaches the same private
     // space the team-scoped one does, so naming the project rather than the team
     // cannot be the way around this.
-    const projectIds = idsOfType(RoleBindingScopeType.PROJECT);
+    const projectIds = idsOfType(GrantScopeTier.PROJECT);
     if (projectIds.length > 0) {
       const personalProjects = await client.project.findMany({
         where: {

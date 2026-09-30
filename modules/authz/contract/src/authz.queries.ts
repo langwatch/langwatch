@@ -8,7 +8,7 @@ import {
   collectedGrantsSchema,
   declaredScopeIdSchema,
   organizationRoleSchema,
-  roleBindingScopeTypeSchema,
+  grantScopeTierSchema,
   teamUserRoleSchema,
 } from "./authz.ts";
 import { authzPermissionSchema } from "./registry.ts";
@@ -290,7 +290,7 @@ export const authzAccessBindingSchema = z
     apiKeyId: z.string().nullable(),
     role: teamUserRoleSchema,
     customRoleId: z.string().nullable(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     createdAt: z.date(),
     expiresAt: z.date().nullable().optional(),
@@ -318,7 +318,7 @@ export type AuthzTeamMemberBinding = z.infer<typeof authzTeamMemberBindingSchema
 export const authzBindingForSynthesisSchema = z
   .object({
     organizationId: z.string(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     role: teamUserRoleSchema,
     customRoleId: z.string().nullable(),
@@ -353,7 +353,7 @@ export type AuthzListUserAndGroupBindingsInput = z.infer<
 export const authzListScopeBindingsInputSchema = z
   .object({
     organizationId: z.string(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeIds: z.array(z.string()).readonly(),
   })
   .strict();

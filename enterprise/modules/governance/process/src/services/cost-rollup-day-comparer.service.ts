@@ -30,13 +30,25 @@ export const COST_ROLLUP_LAG_METRIC_NAME = "langwatch_governance_cost_rollup_lag
 export class CostRollupDayComparerService implements CostRollupDayComparer {
   readonly costSource = GOVERNANCE_COST_SOURCE.PULLED;
 
-  private constructor(
-    private readonly costRollup: GovernanceCostRollupRepository,
-    private readonly costCharges: GovernanceCostChargeRepository,
-    private readonly mismatches: CounterHandle,
-    private readonly lag: GaugeHandle,
-    private readonly logger: Logger,
-  ) {}
+  private readonly costRollup: GovernanceCostRollupRepository;
+  private readonly costCharges: GovernanceCostChargeRepository;
+  private readonly mismatches: CounterHandle;
+  private readonly lag: GaugeHandle;
+  private readonly logger: Logger;
+
+  private constructor(parts: {
+    costRollup: GovernanceCostRollupRepository;
+    costCharges: GovernanceCostChargeRepository;
+    mismatches: CounterHandle;
+    lag: GaugeHandle;
+    logger: Logger;
+  }) {
+    this.costRollup = parts.costRollup;
+    this.costCharges = parts.costCharges;
+    this.mismatches = parts.mismatches;
+    this.lag = parts.lag;
+    this.logger = parts.logger;
+  }
 
   static create({
     costRollup,
@@ -47,21 +59,21 @@ export class CostRollupDayComparerService implements CostRollupDayComparer {
     costCharges: GovernanceCostChargeRepository;
     logger?: Logger;
   }): CostRollupDayComparerService {
-    return new CostRollupDayComparerService(
+    return new CostRollupDayComparerService({
       costRollup,
       costCharges,
-      counter({
+      mismatches: counter({
         name: COST_ROLLUP_MISMATCH_METRIC_NAME,
         description:
           "Days on which the governance cost rollup disagreed with the charges it was derived from",
       }),
-      gauge({
+      lag: gauge({
         name: COST_ROLLUP_LAG_METRIC_NAME,
         description:
           "Seconds between the newest cost charge and the newest moment the rollup covers",
       }),
       logger,
-    );
+    });
   }
 
   async compareDay({

@@ -17,7 +17,7 @@ import type { ProjectIdentity } from "@langwatch/project-contract";
 import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
-import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
+import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 function publicApiKey(row: StoredApiKey): ApiKey {
@@ -59,13 +59,13 @@ export class ApiKeyTokenResolutionService {
     return new ApiKeyTokenResolutionService(options.repository, options);
   }
 
-  private readonly bindings: ApiKeyBindingsService;
+  private readonly bindings: ApiKeyGrantsService;
 
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
   ) {
-    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+    this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
   }
 
   async findVerifiedToken({
@@ -220,7 +220,7 @@ export class ApiKeyTokenResolutionService {
     if (!effectiveProjectId) {
       const projectIds = [
         ...new Set(
-          apiKey.roleBindings.flatMap((binding) =>
+          apiKey.grants.flatMap((binding) =>
             binding.scopeType === "PROJECT" && binding.scopeId ? [binding.scopeId] : [],
           ),
         ),
@@ -241,7 +241,7 @@ export class ApiKeyTokenResolutionService {
 
     // Only a caller-NAMED project needs this: a self-scoped resolution derived
     // the project from a binding already.
-    if (projectId && !bindingsReachProject(apiKey.roleBindings, project)) {
+    if (projectId && !bindingsReachProject(apiKey.grants, project)) {
       return null;
     }
 

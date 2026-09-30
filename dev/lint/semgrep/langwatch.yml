@@ -57,9 +57,15 @@ rules:
           - pattern: "console.$LEVEL(..., { ..., email: $E, ... }, ...)"
           - pattern: "console.$LEVEL(..., { ..., apiKey: $K, ... }, ...)"
           - pattern: "console.$LEVEL(..., { ..., token: $T, ... }, ...)"
-          # Spread of a user/session/account object.
-          - pattern: "logger.$LEVEL(..., { ...$USER, ... }, ...)"
-          - pattern: "console.$LEVEL(..., { ...$USER, ... }, ...)"
+          # Spread of a user/session/account object (`$USER` is constrained
+          # below: unconstrained it matched every spread, e.g. `...context`).
+          - patterns:
+              - pattern-either:
+                  - pattern: "logger.$LEVEL(..., { ...$USER, ... }, ...)"
+                  - pattern: "console.$LEVEL(..., { ...$USER, ... }, ...)"
+              - metavariable-regex:
+                  metavariable: $USER
+                  regex: '(?i)^\w*(user|session|account)\w*$'
           # Shorthand / named property with a user-shaped name.
           - pattern: "logger.$LEVEL(..., { ..., user: $U, ... }, ...)"
           - pattern: "logger.$LEVEL(..., { ..., session: $S, ... }, ...)"

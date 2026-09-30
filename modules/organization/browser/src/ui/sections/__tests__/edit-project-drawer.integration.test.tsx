@@ -28,7 +28,7 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
       organization: { getAll: invalidator("organization.getAll") },
       team: {
         getTeamsWithMembers: invalidator("team.getTeamsWithMembers"),
-        getTeamsWithRoleBindings: invalidator("team.getTeamsWithRoleBindings"),
+        getTeamsWithGrants: invalidator("team.getTeamsWithGrants"),
       },
     }),
     team: {

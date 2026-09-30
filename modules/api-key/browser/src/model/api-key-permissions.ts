@@ -264,9 +264,9 @@ export function scopeLabel({
 }
 
 export function bindingsToScopes(
-  roleBindings: { scopeType: string; scopeId: string }[],
+  grants: { scopeType: string; scopeId: string }[],
 ): { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[] {
-  return roleBindings.map((rb) => ({
+  return grants.map((rb) => ({
     scopeType: rb.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
     scopeId: rb.scopeId,
   }));
@@ -274,12 +274,12 @@ export function bindingsToScopes(
 
 export function bindingsToPermissionMode(apiKey: {
   permissionMode: string;
-  roleBindings: { role: string }[];
+  grants: { role: string }[];
 }): "all" | "restricted" {
   const mode = apiKey.permissionMode as PermissionMode;
   if (mode === "readonly" || mode === "restricted") return "restricted";
-  const [onlyBinding] = apiKey.roleBindings;
-  const hasSingleCustomBinding = apiKey.roleBindings.length === 1 && onlyBinding?.role === "CUSTOM";
+  const [onlyBinding] = apiKey.grants;
+  const hasSingleCustomBinding = apiKey.grants.length === 1 && onlyBinding?.role === "CUSTOM";
   if (hasSingleCustomBinding) {
     return "restricted";
   }
@@ -289,7 +289,7 @@ export function bindingsToPermissionMode(apiKey: {
 export function bindingsToSelections(
   apiKey: {
     permissionMode: string;
-    roleBindings: {
+    grants: {
       role: string;
       customRoleId: string | null;
       customRolePermissions: string[] | null;
@@ -308,7 +308,7 @@ export function bindingsToSelections(
 
   if (mode === "readonly") return readSelections(deps.permissionCategories);
 
-  const binding = apiKey.roleBindings[0];
+  const binding = apiKey.grants[0];
   if (!binding) return {};
 
   if (binding.role === "CUSTOM" && binding.customRoleId) {

@@ -76,6 +76,7 @@ export abstract class SimulationRepository {
   abstract findDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>>;
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
   abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
+  abstract countOrganizationRuns(input: { projectIds: readonly string[] }): Promise<number>;
   abstract listRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;
@@ -142,6 +143,9 @@ export class NullSimulationRepository extends SimulationRepository {
     return 0;
   }
   async countUsage(): Promise<number> {
+    return 0;
+  }
+  async countOrganizationRuns(): Promise<number> {
     return 0;
   }
   async listRunsForExport(): Promise<{

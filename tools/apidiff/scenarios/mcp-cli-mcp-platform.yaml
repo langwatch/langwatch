@@ -87,6 +87,8 @@
       expect: {"status": 200, "body": {"id": "{triggerId}", "deleted": true}}
     - request: "GET /api/v1/triggers/{triggerId}"
       expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/v1/triggers/{triggerId}"
 
 - id: "mcp-triggers-create-with-no-filters-is-refused"
   endpoint: "POST /api/v1/triggers"
@@ -383,11 +385,11 @@
       auth: "org"
       expect:
         status: 200
-        body: {"id": "{newProjectId}", "name": "vd-{uid}", "slug": "<any>", "teamId": "<any>", "piiRedactionLevel": "<any>", "createdAt": "<any>", "updatedAt": "<any>"}
+        body: {"id": "{newProjectId}", "name": "vd-{uid}", "slug": "<any>", "teamId": "<any>", "createdAt": "<any>", "updatedAt": "<any>"}
     - request: "PATCH /api/projects/{newProjectId}"
       auth: "org"
-      body: {"name": "vd2-{uid}", "piiRedactionLevel": "STRICT"}
-      expect: {"status": 200, "body": {"id": "{newProjectId}", "name": "vd2-{uid}", "piiRedactionLevel": "STRICT", "language": "python", "framework": "openai"}}
+      body: {"name": "vd2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{newProjectId}", "name": "vd2-{uid}", "language": "python", "framework": "openai"}}
     - request: "DELETE /api/projects/{newProjectId}"
       auth: "org"
       expect: {"status": 200, "body": {"id": "{newProjectId}", "name": "vd2-{uid}", "archivedAt": "<any>"}}

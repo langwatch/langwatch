@@ -2801,7 +2801,7 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   /** A rejected payload, kept in the log rather than in the customer's body. */
   reportError(error: unknown): void {
-    logger.error({ error }, "the tracked-event route rejected a payload");
+    logger.warn({ error }, "the tracked-event route rejected a payload");
   }
 
   /** What both tracked-event addresses do; a body that fails to parse or validate is a 400. */
@@ -2838,7 +2838,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       this.assertPredefinedEventPayload(rawBody);
       return body;
     } catch (error) {
-      logger.error({ error, body: rawBody, projectId }, "invalid event received");
+      logger.warn({ error, body: rawBody, projectId }, "invalid event received");
       this.reportError(error);
       throw new TrackedEventInvalidError(this.describeValidationError(error));
     }

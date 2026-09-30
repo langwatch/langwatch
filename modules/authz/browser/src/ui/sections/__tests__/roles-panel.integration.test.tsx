@@ -2,13 +2,11 @@
  * @vitest-environment jsdom
  *
  * What a role can do, and who holds one (main's RolesPanel suite).
- *
  * Spec: specs/identity/org-access-cluster.feature
  */
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 
 const { api, state } = vi.hoisted(() => {
   const state = {
@@ -21,7 +19,7 @@ const { api, state } = vi.hoisted(() => {
   const api = {
     useUtils: () => ({
       role: { getAll: { invalidate: () => void 0 } },
-      roleBinding: { listForOrg: { invalidate: () => void 0 } },
+      authz: { listManagedGrants: { invalidate: () => void 0 } },
     }),
     role: {
       getAll: {
@@ -36,8 +34,8 @@ const { api, state } = vi.hoisted(() => {
       update: { useMutation: mutation },
       delete: { useMutation: mutation },
     },
-    roleBinding: {
-      listForOrg: {
+    authz: {
+      listManagedGrants: {
         useQuery: () => ({
           data: state.assignmentsError ? undefined : state.assignments,
           isLoading: false,

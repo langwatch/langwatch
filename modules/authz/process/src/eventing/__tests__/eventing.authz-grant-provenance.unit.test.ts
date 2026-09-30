@@ -5,9 +5,10 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
 import { StubAuthzEpoch } from "../../repositories/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
+import { permissiveGrantGuards } from "../../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzGrantsService } from "../../services/authz-grants.service.ts";
 import { ORG_ID, harness, storedGrantRow } from "./support/eventing.authz-ledger-fork.harness.ts";
 
@@ -21,11 +22,12 @@ function service() {
   db.grant.count.mockResolvedValue(1);
   const repository = EventingAuthzGrantRepository.create({ database: db as never, writer });
   const grants = AuthzGrantsService.create({
+    permissions: permissiveGrantGuards,
     repository,
     ledger: writer,
     epoch: new StubAuthzEpoch(),
     newBindingId: () => BINDING_ID,
-    bindings: new StubAuthzBindingRepository(),
+    bindings: new StubAuthzManagedGrantRepository(),
   });
   return { grants, db, sent };
 }

@@ -290,6 +290,7 @@ describe("ReportUsageForMonthCommand", () => {
   });
 
   describe("given delta is zero", () => {
+    /** @scenario Reporting the same usage twice does not double it */
     it("returns empty events without reporting", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
@@ -695,6 +696,7 @@ describe("ReportUsageForMonthCommand", () => {
       return hosted?.[0].events[0];
     }
 
+    /** @scenario Usage past the prepaid commit never reaches the invoice */
     it("clamps hosted usage that ran past what the contract agreed", async () => {
       arrange({ measured: 120_000, ceiling: 100_000 });
       const handler = await createHandler();
@@ -704,6 +706,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(hostedUsageEvent()?.value).toBe(10);
     });
 
+    /** @scenario Hosted usage of a connected customer reaches its metered subscription */
     it("reports the measured total when it stayed inside the contract", async () => {
       arrange({ measured: 90_000, ceiling: 100_000 });
       const handler = await createHandler();
@@ -723,6 +726,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(hostedUsageEvent()?.timestamp).toBe(Math.floor(monthEndMs / 1000));
     });
 
+    /** @scenario Usage older than the meter accepts is not sent with a stale timestamp */
     it("falls back to the time of reporting for a month older than the meter accepts", async () => {
       arrange({ measured: 90_000, ceiling: null });
       const before = Math.floor(Date.now() / 1000);
@@ -731,6 +735,7 @@ describe("ReportUsageForMonthCommand", () => {
       await handler.handle(makeCommand("org-1", "2020-02"));
 
       expect(hostedUsageEvent()?.timestamp).toBeGreaterThanOrEqual(before);
+      expect(hostedUsageEvent()?.value).toBe(9);
     });
 
     it("never asks for a ceiling on the events meter, which no contract caps", async () => {

@@ -1,0 +1,67 @@
+# CV1 coverage sweep, instant evals: create runs with a rating and a choice question and read
+# the definition back through get and list. query-analytics.yaml holds the estimate and refusals.
+
+- id: cv1-instant-evals-score-question-reads-back
+  endpoint: POST /api/v1/instant-evals
+  request:
+    path: /api/v1/instant-evals
+    body:
+      name: "vd-{uid}"
+      target: traces
+      filter: "traceId:vd-cv1-none-{uid}"
+      start: "2020-01-01T00:00:00Z"
+      limit: 5
+      questions:
+        - { id: severity, kind: score, instructions: "How severe is the failure", range: { min: 1, max: 5 } }
+  capture: { runId: id }
+  expect:
+    status: [200, 201, 202]
+    body: { id: "<any>" }
+  verify:
+    - request: GET /api/v1/instant-evals/{runId}
+      eventually: 10s
+      expect: { status: 200, contains: ["severity", "score"], body: { id: "{runId}" } }
+    - request: GET /api/v1/instant-evals
+      eventually: 10s
+      expect: { status: 200, contains: "{runId}" }
+
+- id: cv1-instant-evals-category-question-reads-back
+  endpoint: POST /api/v1/instant-evals
+  request:
+    path: /api/v1/instant-evals
+    body:
+      name: "vd-{uid}"
+      target: traces
+      filter: "traceId:vd-cv1-none-{uid}"
+      start: "2020-01-01T00:00:00Z"
+      limit: 5
+      questions:
+        - id: cause
+          kind: category
+          instructions: "What kind of failure is this"
+          options:
+            - { name: model, description: "The model call failed" }
+            - { name: tool, description: "A tool call failed" }
+  capture: { runId: id }
+  expect:
+    status: [200, 201, 202]
+    body: { id: "<any>" }
+  verify:
+    - request: GET /api/v1/instant-evals/{runId}
+      eventually: 10s
+      expect: { status: 200, contains: ["cause", "category"], body: { id: "{runId}" } }
+
+- id: cv1-instant-evals-category-with-one-option-is-refused
+  endpoint: POST /api/v1/instant-evals
+  request:
+    path: /api/v1/instant-evals
+    body:
+      name: "vd-{uid}"
+      target: traces
+      questions:
+        - { id: cause, kind: category, instructions: "What kind", options: [{ name: only, description: "One" }] }
+  expect:
+    status: [400, 422]
+  verify:
+    - request: GET /api/v1/instant-evals
+      expect: { status: 200, notContains: "vd-{uid}" }

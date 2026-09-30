@@ -7,7 +7,7 @@ import {
   type TeamUserRole,
 } from "@langwatch/authz-contract";
 
-import type { RoleBinding } from "./role-binding-principals.ts";
+import type { ManagedGrant } from "./managed-grant.ts";
 
 /** One built-in role, as the page presents it. */
 export type BuiltinRoleCard = {
@@ -68,7 +68,7 @@ export function peopleHoldingBuiltinRole({
   bindings,
   teamRole,
 }: {
-  bindings: readonly RoleBinding[];
+  bindings: readonly ManagedGrant[];
   teamRole: BuiltinRoleCard["teamRole"];
 }): number {
   const people = new Set<string>();

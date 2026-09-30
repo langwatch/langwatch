@@ -546,16 +546,16 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.groupService.listGroupBindings(input);
   }
 
-  async addGroupBinding(
-    input: Parameters<OrganizationGroupService["addGroupBinding"]>[0],
-  ): ReturnType<OrganizationGroupService["addGroupBinding"]> {
-    return this.groupService.addGroupBinding(input);
+  async addGroupGrant(
+    input: Parameters<OrganizationGroupService["addGroupGrant"]>[0],
+  ): ReturnType<OrganizationGroupService["addGroupGrant"]> {
+    return this.groupService.addGroupGrant(input);
   }
 
-  async removeGroupBinding(
-    input: Parameters<OrganizationGroupService["removeGroupBinding"]>[0],
-  ): ReturnType<OrganizationGroupService["removeGroupBinding"]> {
-    return this.groupService.removeGroupBinding(input);
+  async removeGroupGrant(
+    input: Parameters<OrganizationGroupService["removeGroupGrant"]>[0],
+  ): ReturnType<OrganizationGroupService["removeGroupGrant"]> {
+    return this.groupService.removeGroupGrant(input);
   }
 
   async applyGroupEdits(

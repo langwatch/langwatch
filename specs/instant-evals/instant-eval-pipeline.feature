@@ -301,6 +301,58 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then exactly one spend record is reported for the run
     And it carries our cost, the customer price and the tokens
 
+  # ---------------------------------------------------------------------------
+  # What a page sends to the classifier, and what comes back into its rows
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Every question about one text is one classifier request
+    Given a page row whose questions are all about the same text
+    When the page's requests are built
+    Then there is one request carrying every question
+    And rows are never packed together into one request
+
+  @unit
+  Scenario: Questions about different texts are separate requests
+    Given a page row with one question about the conversation and one about the last answer
+    When the page's requests are built
+    Then there is one request per text
+
+  @unit
+  Scenario: A row whose extraction found no text is not sent
+    Given a page holding a row with an empty text and a row with a conversation
+    When the page's requests are built
+    Then only the row with a conversation has a request
+
+  @unit
+  Scenario: A page whose questions leave no room for text is refused before anything is sent
+    Given questions that alone fill the classifier's state
+    When the page's requests are built
+    Then the run fails with instant_eval_questions_too_long
+    And nothing is sent to the classifier
+
+  @unit
+  Scenario: A page that would send more text than its rows could carry is refused before anything is sent
+    Given a page whose texts together exceed the token budget its rows allow
+    When the page is checked against its ceiling
+    Then the run fails with instant_eval_query_budget_exceeded naming the estimated tokens and the budget
+    And nothing is sent to the classifier
+
+  @unit
+  Scenario: Each verdict lands in its own column and unanswered rows are named
+    Given a page where one row was answered, one was not reached and one had no text
+    When the rows are written
+    Then the answered row holds its verdict in the question's column
+    And the row that was not reached is named as unjudged
+    And the row with no text is null without being named as unjudged
+
+  @unit
+  Scenario: A question the classifier declined is null and does not make its row unjudged
+    Given a page row whose only question the classifier declined
+    When the rows are written
+    Then the cell is null
+    And no row is named as unjudged
+
   # Every pass re-validates the caller's statement with the full policy, then
   # runs it inside a wrapper Analytics composes from the pass's kind (probe,
   # count, keys, sample, page). A caller names a kind and never sends wrapper SQL.

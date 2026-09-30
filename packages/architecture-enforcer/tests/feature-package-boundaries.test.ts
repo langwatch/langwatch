@@ -348,6 +348,20 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("package-role");
   });
 
+  /** @scenario A contract manifest cannot declare a server runtime */
+  it("rejects a server runtime a contract declares even when nothing imports it", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { "@langwatch/eventing": "workspace:*" },
+    });
+
+    const messages = lintWorkspace({ root, declarations: false }).map((item) => item.message);
+    expect(messages).toContain(
+      "A contract package cannot declare the server runtime @langwatch/eventing.",
+    );
+  });
+
   it("accepts canonical dotted artifact roles with kebab-case subjects", () => {
     featurePackage({ feature: "agent", role: "contract" });
     featurePackage({ feature: "agent", role: "process" });
@@ -1088,5 +1102,27 @@ describe("Prisma client containment", () => {
       devDependencies: { "@langwatch/agent-contract": "workspace:*" },
     });
     expect(policies()).toContain("package-cycle");
+  });
+
+  /** @scenario A cycle through a framework package is a package cycle */
+  it("counts framework packages as cycle nodes", () => {
+    write("pnpm-workspace.yaml", 'packages:\n  - "packages/*"\n');
+    write(
+      "packages/raw-client/package.json",
+      JSON.stringify({
+        name: "@langwatch/raw-client",
+        dependencies: { "@langwatch/agent-contract": "workspace:*" },
+      }),
+    );
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { "@langwatch/raw-client": "workspace:*" },
+    });
+
+    const messages = lintWorkspace({ root, declarations: false }).map((item) => item.message);
+    expect(messages).toContain(
+      "Package dependency cycle: @langwatch/agent-contract -> @langwatch/raw-client -> @langwatch/agent-contract",
+    );
   });
 });

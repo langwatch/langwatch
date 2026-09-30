@@ -34,6 +34,10 @@ const tokenCacheKey = (token: string) => `${CACHE_PREFIX}${token}`;
 
 type CachedSession = { token: string; expiresAt: number };
 
+/** How long a person's stored name, address and status are trusted on a session read. */
+export const SESSION_PERSON_TTL_MS = 30_000;
+const MAX_CACHED_PEOPLE = 10_000;
+
 /** What the browser-session half of the module is built from. */
 export interface BrowserSessionDeps {
   sessions: AuthSessionRepository;
@@ -55,6 +59,8 @@ export class BrowserSessionService {
     return new BrowserSessionService(deps);
   }
 
+  readonly #people = new Map<string, { value: Promise<SessionPerson>; until: number }>();
+
   private constructor(private readonly deps: BrowserSessionDeps) {}
 
   countSignedInUsers(input: { at: number }): Promise<number> {
@@ -75,10 +81,7 @@ export class BrowserSessionService {
 
     if (await this.pastItsWindow({ stored })) return { kind: "anonymous" };
 
-    const user = await this.deps.users.findById({ id: verified.user.id });
-    const identityEmail = await this.deps.identityEmails?.resolveEmail({
-      userId: verified.user.id,
-    });
+    const { user, identityEmail } = await this.person({ userId: verified.user.id });
     const session = browserSessionSchema.parse({
       user: {
         id: verified.user.id,
@@ -99,6 +102,32 @@ export class BrowserSessionService {
   }
 
   /**
+   * The stored person behind a session, remembered briefly: a page load asks once per request,
+   * and none of it decides access. Revocation stays with the session row, read every time.
+   */
+  private person({ userId }: { userId: string }): Promise<SessionPerson> {
+    const nowMs = this.deps.now().epochMilliseconds;
+    const remembered = this.#people.get(userId);
+    if (remembered && remembered.until > nowMs) return remembered.value;
+
+    const value = Promise.all([
+      this.deps.users.findById({ id: userId }),
+      this.deps.identityEmails?.resolveEmail({ userId }),
+    ]).then(([user, identityEmail]) => ({ user, identityEmail }));
+    // A failed read is never remembered: the next request asks again.
+    value.catch(() => {
+      if (this.#people.get(userId)?.value === value) this.#people.delete(userId);
+    });
+    if (this.#people.size >= MAX_CACHED_PEOPLE) {
+      const oldest = this.#people.keys().next().value;
+      if (oldest !== void 0) this.#people.delete(oldest);
+    }
+    this.#people.set(userId, { value, until: nowMs + SESSION_PERSON_TTL_MS });
+
+    return value;
+  }
+
+  /**
    * The same session seen as whoever is being browsed AS, or unchanged when
    * nobody is. An expired impersonation and a retired target both give the
    * signed-in session back: the back office renders as who is actually there.
@@ -116,14 +145,13 @@ export class BrowserSessionService {
       Temporal.Instant.compare(fromDate(impersonation.data.expires), this.deps.now()) <= 0;
     if (impersonationExpired) return session;
 
-    const impersonatedUser = await this.deps.users.findById({ id: impersonation.data.id });
+    const { user: impersonatedUser, identityEmail } = await this.person({
+      userId: impersonation.data.id,
+    });
     if (!impersonatedUser || impersonatedUser.deactivatedAt !== null) {
       return session;
     }
 
-    const identityEmail = await this.deps.identityEmails?.resolveEmail({
-      userId: impersonation.data.id,
-    });
     return browserSessionSchema.parse({
       ...session,
       user: {
@@ -181,6 +209,7 @@ export class BrowserSessionService {
    * bound. specs/identity/org-session-lifetime.feature
    */
   async endSessionsPastWindow({ userIds }: { userIds: readonly string[] }): Promise<number> {
+    this.deps.sessionBound.forget();
     let ended = 0;
     for (const userId of userIds) {
       for (const stored of await this.deps.sessions.findStoredForUser({ userId })) {
@@ -358,6 +387,11 @@ export class BrowserSessionService {
     }
   }
 }
+
+type SessionPerson = {
+  user: Awaited<ReturnType<UserApi["findById"]>>;
+  identityEmail: Awaited<ReturnType<IdentityEmailService["resolveEmail"]>> | undefined;
+};
 
 function parseCachedSessions(value: string): CachedSession[] {
   if (!value) {

@@ -16,7 +16,7 @@ function serviceWhere(options: {
   customRolePermissions: unknown[];
   assertRoleChangeAllowed: OrganizationSeatLicense["assertRoleChangeAllowed"];
 }) {
-  const findTeamRoleBindings = vi.fn(async () =>
+  const findTeamGrants = vi.fn(async () =>
     options.customRolePermissions.length > 0
       ? [{ scopeId: TARGET.teamId, role: TeamUserRole.CUSTOM, customRoleId: "role-1" }]
       : [{ scopeId: TARGET.teamId, role: TeamUserRole.VIEWER, customRoleId: null }],
@@ -25,7 +25,7 @@ function serviceWhere(options: {
   const assertRoleChangeAllowed = vi.fn(options.assertRoleChangeAllowed);
   const service = OrganizationMembershipService.create({
     repository: createApiFixture<OrganizationMembershipRepository>({
-      findTeamRoleBindings,
+      findTeamGrants,
       findCustomRolePermissions,
     }),
     prompts: { seedTagsForOrganization: vi.fn(), reportCompensationFailure: vi.fn() },
@@ -36,21 +36,21 @@ function serviceWhere(options: {
     admissions: { attachBindings: vi.fn(), completeAdmission: vi.fn() },
   });
 
-  return { service, assertRoleChangeAllowed, findTeamRoleBindings };
+  return { service, assertRoleChangeAllowed, findTeamGrants };
 }
 
 describe("OrganizationMembershipService.assertTeamRoleChangeWithinSeatLimits", () => {
   describe("given the member holds a custom role granting more than viewing on the team", () => {
     /** @scenario "A Lite Member's team-role change is weighed against the seat their custom role held" */
     it("weighs the change from that role's permissions to a Lite Member seat", async () => {
-      const { service, assertRoleChangeAllowed, findTeamRoleBindings } = serviceWhere({
+      const { service, assertRoleChangeAllowed, findTeamGrants } = serviceWhere({
         customRolePermissions: [["traces:view", "traces:manage"]],
         assertRoleChangeAllowed: async () => undefined,
       });
 
       await service.assertTeamRoleChangeWithinSeatLimits(TARGET);
 
-      expect(findTeamRoleBindings).toHaveBeenCalledWith({
+      expect(findTeamGrants).toHaveBeenCalledWith({
         organizationId: "org-1",
         userId: "user-2",
         teamIds: ["team-1"],

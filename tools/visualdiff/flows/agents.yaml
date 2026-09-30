@@ -372,13 +372,14 @@ flows:
             method: POST
         as:
           agentId: id
+          agentName: name
     steps:
       - action: go
         with:
           path: /{slug}/agents
       - action: click
         with:
-          text: vd-httpdrawer-{uid}
+          text: '{agentName}'
       - action: expect
         with:
           testId: agent-name-input

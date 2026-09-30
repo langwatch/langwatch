@@ -123,6 +123,7 @@ describe("resolving a license token", () => {
   });
 
   /** @scenario "An unregistered license is refused" */
+  /** @scenario An unlinked license resolves to nothing */
   it("refuses a token the registry does not hold, and an unlinked one the same way", async () => {
     const { credentials } = harness([rowFor({ organizationId: null })]);
 
@@ -205,6 +206,34 @@ describe("resolving a license token", () => {
     await credentials.resolve({ token: TOKEN, instanceId: "install-1" });
 
     expect(managedKeys.licensed).toEqual([]);
+  });
+
+  /** @scenario A managed key that fails to attach is ended */
+  it("ends the key it created when recording it on the license fails", async () => {
+    const { credentials, repository, managedKeys } = harness([rowFor()]);
+    repository.attachVirtualKey = async () => {
+      throw new Error("the registry write failed");
+    };
+
+    await expect(credentials.resolve({ token: TOKEN, instanceId: "install-1" })).rejects.toThrow(
+      "the registry write failed",
+    );
+    expect(managedKeys.retired).toEqual(["vk-1"]);
+  });
+
+  /** @scenario A license that stops being active mid-call issues no credential */
+  it("refuses with the license's new state and ends the key it made", async () => {
+    const { credentials, repository, managedKeys } = harness([rowFor()]);
+    repository.attachVirtualKey = async () => {
+      await repository.update("license-1", { revokedAt: NOW });
+      return false;
+    };
+
+    await expect(credentials.resolve({ token: TOKEN, instanceId: "install-1" })).resolves.toEqual({
+      ok: false,
+      code: "connect_license_revoked",
+    });
+    expect(managedKeys.retired).toEqual(["vk-1"]);
   });
 
   /** @scenario "A license token replayed from another instance is refused" */
@@ -314,6 +343,7 @@ describe("a license sync", () => {
   });
 
   /** @scenario "The replaced license is retired once the new one is in use" */
+  /** @scenario A reissued license is held encrypted only until it is delivered */
   it("delivers a reissued license until the install presents it", async () => {
     const replacement = rowFor({
       id: "license-2",

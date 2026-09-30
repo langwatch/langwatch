@@ -8,6 +8,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -164,6 +165,14 @@ func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 		keep("flow fixtures", started, fixtures, warnings)
 		return nil
 	})
+	if identity := request.Identity; identity.Email != "" && identity.Password != "" {
+		group.Go(func() error {
+			started := time.Now()
+			warnings := seedCatalogue(groupCtx, catalogueRequest{client: client, apiURL: request.APIURL, key: key, identity: identity})
+			keep("catalogue", started, nil, warnings)
+			return nil
+		})
+	}
 	if err := group.Wait(); err != nil {
 		return result, err
 	}
@@ -258,6 +267,8 @@ type postSpec struct {
 	body   any
 	method string
 	bearer string
+	// headers are sent as given, after the credential.
+	headers map[string]string
 }
 
 func post(ctx context.Context, client *http.Client, spec postSpec) error {
@@ -265,12 +276,33 @@ func post(ctx context.Context, client *http.Client, spec postSpec) error {
 	return err
 }
 
-// postReading posts one fixture and returns the answer's body.
+// postReading posts one fixture and returns the answer's body. A request that never
+// reached the stack (a TLS handshake timeout or a refused connection under load) is
+// sent again, a bounded few times: nothing was written, so the retry cannot duplicate.
 func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byte, error) {
 	encoded, err := json.Marshal(spec.body)
 	if err != nil {
 		return nil, err
 	}
+	answer, err := sendOnce(ctx, client, spec, encoded)
+	for attempt := 1; err != nil && neverSent.MatchString(err.Error()) && attempt < sendAttempts; attempt++ {
+		select {
+		case <-ctx.Done():
+			return nil, err
+		case <-time.After(time.Duration(attempt) * time.Second):
+		}
+		answer, err = sendOnce(ctx, client, spec, encoded)
+	}
+	return answer, err
+}
+
+// sendAttempts bounds postReading's resends; neverSent is the transport failure that
+// guarantees the stack never read the request.
+const sendAttempts = 3
+
+var neverSent = regexp.MustCompile(`TLS handshake timeout|connection refused`)
+
+func sendOnce(ctx context.Context, client *http.Client, spec postSpec, encoded []byte) ([]byte, error) {
 	method, body := http.MethodPost, io.Reader(bytes.NewReader(encoded))
 	if spec.method != "" {
 		method, body = spec.method, nil
@@ -282,8 +314,11 @@ func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byt
 	outgoing.Header.Set("Content-Type", "application/json")
 	if spec.bearer != "" {
 		outgoing.Header.Set("Authorization", "Bearer "+spec.bearer)
-	} else {
+	} else if spec.key != "" {
 		outgoing.Header.Set("X-Auth-Token", spec.key)
+	}
+	for name, value := range spec.headers {
+		outgoing.Header.Set(name, value)
 	}
 	response, err := client.Do(outgoing)
 	if err != nil {
@@ -291,7 +326,7 @@ func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byt
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 300 {
-		detail, _ := io.ReadAll(io.LimitReader(response.Body, 400))
+		detail, _ := io.ReadAll(io.LimitReader(response.Body, 4000))
 		return nil, fmt.Errorf("%s answered %d: %s", spec.url, response.StatusCode, bytes.TrimSpace(detail))
 	}
 	return io.ReadAll(io.LimitReader(response.Body, 1<<20))

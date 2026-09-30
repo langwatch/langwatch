@@ -55,15 +55,18 @@ export type ProjectRestAccess = {
 
 /**
  * The family over one application boundary, stubbed operation by operation.
- * `granted` is what the credential holds at the organization;
- * `grantedOnProject` what it holds at a named project.
+ * `granted` is the credential's organization grant, `grantedOnProject` its
+ * grant at a named project. The PII level reads ESSENTIAL unless overridden.
  */
 export function mountProjectRest(
   options: ProjectRestAccess & { app?: Partial<ProjectManagementApi> } = {},
 ) {
   const { app, ...access } = options;
 
-  return mountProjectRestApplication(new TestProjectManagementApi(app ?? {}), access);
+  return mountProjectRestApplication(
+    new TestProjectManagementApi({ getPiiRedactionLevel: async () => "ESSENTIAL", ...app }),
+    access,
+  );
 }
 
 /**

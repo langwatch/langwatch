@@ -45,6 +45,8 @@ type SideResult struct {
 	Body        string `json:"body,omitempty"`
 	LatencyMS   int64  `json:"latencyMs"`
 	Error       string `json:"error,omitempty"`
+	// Headers are the response's headers, for a scenario's expect.headers; never recorded.
+	Headers http.Header `json:"-"`
 }
 
 // Transcript records one probe case: the request plus both sides' outcomes.
@@ -804,6 +806,7 @@ func (engine *probeEngine) executeOnce(probe probeRequest, encoded []byte) SideR
 		ContentType: response.Header.Get("Content-Type"),
 		Body:        string(captured),
 		LatencyMS:   time.Since(started).Milliseconds(),
+		Headers:     response.Header,
 	}
 	if readErr != nil {
 		result.Error = "read response: " + readErr.Error()

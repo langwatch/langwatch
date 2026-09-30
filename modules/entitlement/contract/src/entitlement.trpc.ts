@@ -15,7 +15,7 @@ import { planSchema } from "./plan.ts";
 import { usageStatsSchema } from "./usage.ts";
 
 export const planTrpc = defineTrpcContract("plan")
-  .query("getActivePlan")
+  .query("getActivePlan", { cache: { tier: "session" } })
   .withInput(entitlementOrganizationScopeSchema)
   .withOutput(planSchema)
   .build();

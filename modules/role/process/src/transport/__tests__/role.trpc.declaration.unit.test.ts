@@ -5,10 +5,9 @@ import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc"
  * privilege-escalation surface.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { roleBindingTrpc, roleTrpc } from "@langwatch/role-contract";
+import { roleTrpc } from "@langwatch/role-contract";
 import { describe, expect, it } from "vitest";
 
-import { roleBindingTrpcTransport } from "../role-binding.trpc.ts";
 import { roleTrpcTransport } from "../role.trpc.ts";
 
 type Declared = Record<string, readonly string[]>;
@@ -62,19 +61,6 @@ describe("given the role transport declared by the feature", () => {
 
       for (const [name, claimed] of Object.entries(claims)) {
         expect(claimed).toContain(name === "getById" ? "organization:view" : "organization:manage");
-      }
-    });
-
-    it("publishes the binding surface at manage, apart from the caller's own standing", () => {
-      const claims = claimsOf(roleBindingTrpcTransport);
-
-      expect(Object.keys(claims).toSorted()).toEqual(
-        Object.keys(roleBindingTrpc.members).toSorted(),
-      );
-      expect(claims.getMyAccessBreakdown).toEqual(["organization:view"]);
-      for (const [name, claimed] of Object.entries(claims)) {
-        if (name === "getMyAccessBreakdown") continue;
-        expect(claimed).toEqual(["organization:manage"]);
       }
     });
   });

@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
-import { PrismaAuthzBindingRepository } from "../repositories/prisma/prisma.authz-binding.repository.ts";
+import { PrismaAuthzManagedGrantRepository } from "../repositories/prisma/prisma.authz-managed-grant.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const DB_URL = process.env.DATABASE_URL ?? process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -27,7 +27,7 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
   const authz = AuthzService.create({
     repository: EventingAuthzReadRepository.create(database),
     listing: EventingAuthzListingRepository.create(database),
-    bindings: PrismaAuthzBindingRepository.create({
+    bindings: PrismaAuthzManagedGrantRepository.create({
       database: prisma,
     }),
     isOnEngine: async () => true,

@@ -29,7 +29,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import type { ApiKeyBindingId } from "./api-key-binding-id.service.ts";
+import type { ApiKeyGrantId } from "./api-key-grant-id.service.ts";
 import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import { ApiKeyCliService } from "./api-key-cli.service.ts";
 import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
@@ -45,7 +45,7 @@ export type ApiKeyDependencies = {
   grants: AuthzApi;
   organizations: OrganizationApi;
   projects: ProjectApi;
-  bindingIds: ApiKeyBindingId;
+  bindingIds: ApiKeyGrantId;
   legacyGrants: Pick<LegacyApiKeyGrantService, "mint">;
   tokens: ApiKeyTokenService;
 };

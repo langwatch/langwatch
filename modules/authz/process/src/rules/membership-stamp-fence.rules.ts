@@ -3,14 +3,14 @@
  * which attaches need a locked generation, which one each carries, and the
  * one shape allowed to state its own.
  */
-import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz-contract";
+import type { GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
 
 /** Exactly the fields the fence reads off a binding about to be attached. */
 export type FencedBindingAttach = {
   principal: { userId?: string | undefined };
   role: TeamUserRole;
   customRoleId: string | null;
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   membershipStamp?: string;
   membershipBootstrap?: boolean;

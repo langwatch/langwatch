@@ -23,6 +23,7 @@ import { z } from "zod";
 import {
   barOverQueryResult,
   inlineDataValues,
+  multiSeriesTimeLine,
   schemaInvalidEncodingType,
   unknownDataset,
   unknownField,
@@ -201,6 +202,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
     describe("when it renders", () => {
       /** @scenario "Chart controls expose no unsafe embed actions" */
       /** @scenario "No renderer path performs network or file loading" */
+      /** @scenario "No embed actions are exposed" */
       it("embeds with no actions, an interpreter, and the repository's own loader", async () => {
         withChakra(chart());
 
@@ -244,7 +246,44 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         });
       });
 
+      /** @scenario "A time-bucketed multi-series result renders responsively with tooltips" */
+      it("fits a time-bucketed multi-series line to its container, with tooltips and resizing", async () => {
+        const observers: (() => void)[] = [];
+        vi.stubGlobal(
+          "ResizeObserver",
+          class {
+            constructor(callback: () => void) {
+              observers.push(callback);
+            }
+            observe() {}
+            disconnect() {}
+          },
+        );
+
+        withChakra(
+          chart({
+            spec: multiSeriesTimeLine,
+            rows: [
+              { bucket: "2026-01-01T00:00:00Z", series: "gpt-5-mini", total: 3 },
+              { bucket: "2026-01-01T00:00:00Z", series: "claude", total: 5 },
+              { bucket: "2026-01-02T00:00:00Z", series: "gpt-5-mini", total: 4 },
+              { bucket: "2026-01-02T00:00:00Z", series: "claude", total: 2 },
+            ],
+          }),
+        );
+
+        await waitFor(() => expect(vega.state.calls).toHaveLength(1));
+        const { spec, options } = vega.state.calls[0]!;
+        expect(spec.width).toBe("container");
+        expect(options.tooltip).toEqual({ theme: "light" });
+
+        await waitFor(() => expect(observers.length).toBeGreaterThan(0));
+        observers[0]!();
+        expect(vega.state.resizes).toBe(1);
+      });
+
       /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
+      /** @scenario "The chart is accessible and does not trap focus" */
       it("carries an accessible name and description, and takes no focus", async () => {
         withChakra(chart({ ariaLabel: "Chart of the result of run 4" }));
 
@@ -260,6 +299,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
     describe("when only the rows change", () => {
       /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
+      /** @scenario "A data-only Reload updates the chart through the live view" */
       it("feeds the running view instead of building a new one", async () => {
         const first = { query_result: ROWS };
         const { rerender } = withChakra(
@@ -302,6 +342,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
     describe("when the specification, the colour mode, or the container changes", () => {
       /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
+      /** @scenario "Spec, size, and color-mode changes update the chart and unmount finalizes it" */
       it("rebuilds the view for a new specification and finalizes the old one", async () => {
         const { rerender } = withChakra(chart());
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
@@ -319,6 +360,8 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       });
 
       /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
+      /** @scenario "Spec, size, and color-mode changes update the chart and unmount finalizes it" */
+      /** @scenario "The chart follows LangWatch theming in light and dark modes" */
       it("rebuilds with a dark configuration when the colour mode flips", async () => {
         const { rerender } = withChakra(chart());
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
@@ -337,6 +380,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       });
 
       /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
+      /** @scenario "Spec, size, and color-mode changes update the chart and unmount finalizes it" */
       it("resizes the running view when its container changes size", async () => {
         const observers: (() => void)[] = [];
         vi.stubGlobal(
@@ -357,7 +401,24 @@ describe("the LangWatchQL Vega-Lite chart", () => {
         expect(vega.state.resizes).toBe(1);
       });
 
+      /** @scenario "Spec, size, and color-mode changes update the chart and unmount finalizes it" */
+      it("finalizes the running view when the specification changes to one policy refuses", async () => {
+        const { rerender } = withChakra(chart());
+        await waitFor(() => expect(vega.state.calls).toHaveLength(1));
+
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            {chart({ spec: inlineDataValues })}
+          </ChakraProvider>,
+        );
+
+        await screen.findByTestId("lwql-chart-failure");
+        expect(failureCode()).toBe("policy-rejection");
+        expect(vega.state.finalized).toBe(1);
+      });
+
       /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
+      /** @scenario "Spec, size, and color-mode changes update the chart and unmount finalizes it" */
       it("finalizes the view when the chart unmounts", async () => {
         const { unmount } = withChakra(chart());
         await waitFor(() => expect(vega.state.calls).toHaveLength(1));
@@ -371,6 +432,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
   describe("given values a chart cannot place on an axis", () => {
     /** @scenario "Chart failures are explicit and do not discard the table" */
+    /** @scenario "Values Vega cannot represent faithfully produce a warning, not a zero" */
     it("draws the chart and warns rather than turning them into zero", async () => {
       withChakra(
         chart({
@@ -402,6 +464,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
 
   describe("given a chart that cannot be drawn", () => {
     /** @scenario "Chart failures are explicit and do not discard the table" */
+    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
     it("renders a distinct, named state for each cause and never a blank chart", async () => {
       const cases: { name: string; element: ReactElement; code: string }[] = [
         {
@@ -462,6 +525,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
     });
 
     /** @scenario "Chart failures are explicit and do not discard the table" */
+    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
     it("names a failure from inside the chart runtime", async () => {
       vega.state.failWith = new Error("Unrecognized signal name: bogus");
       withChakra(chart());
@@ -474,6 +538,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
     });
 
     /** @scenario "Chart failures are explicit and do not discard the table" */
+    /** @scenario "Chart failures are distinct intentional states, never a blank chart" */
     it("names a failure raised while the specification is being built", async () => {
       // A build throw is synchronous, so it lands before `embed` has a
       // rejection handler. Unguarded it escapes the effect and the panel sits
@@ -523,6 +588,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
     });
 
     /** @scenario "Chart failures are explicit and do not discard the table" */
+    /** @scenario "A result past the row ceiling is refused clearly, naming the limit it crossed" */
     it("refuses a result past the row ceiling, naming the limit it crossed", async () => {
       const tooMany: LangWatchQLDataset = Array.from({ length: 10_001 }, (_, index) => ({
         model: `m${index}`,

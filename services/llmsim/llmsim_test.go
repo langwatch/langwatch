@@ -99,7 +99,7 @@ func TestSamePromptSameAnswer(t *testing.T) {
 	}
 }
 
-// @scenario "A seed header pins or randomises the answer"
+// @scenario "A seed header pins or varies the answer"
 func TestSeedHeader(t *testing.T) {
 	srv := newTestServer(t)
 	pinned := map[string]string{HeaderSeed: "42"}
@@ -445,5 +445,40 @@ func TestRingKeepsTheNewest(t *testing.T) {
 	got := r.newest()
 	if len(got) != 3 || got[0].Model != "e" || got[2].Model != "c" {
 		t.Fatalf("ring %+v", got)
+	}
+}
+
+func TestCannedModelAnswersTheSameTextForAnyPrompt(t *testing.T) {
+	srv := newTestServer(t)
+	a := chat(t, srv, `{"model":"canned-ok","messages":[{"role":"user","content":"one"}]}`, nil)
+	b := chat(t, srv, `{"model":"canned-ok","messages":[{"role":"user","content":"two"}]}`, nil)
+	if text(a) != "OK" || text(b) != "OK" {
+		t.Fatalf("canned answers = %q, %q", text(a), text(b))
+	}
+}
+
+func TestCapsAreConfigurable(t *testing.T) {
+	s := NewServer(Config{MaxCalls: 2, MaxBodyBytes: 10})
+	if cap(s.calls.items) != 2 {
+		t.Fatalf("call log capacity = %d", cap(s.calls.items))
+	}
+	if got := string(recordedBody([]byte(`{"a":"0123456789"}`), s.cfg.MaxBodyBytes)); !strings.Contains(got, `"truncated":true`) {
+		t.Fatalf("an oversized body should be kept as a marker, got %s", got)
+	}
+}
+
+// @scenario "The llmsim model provider is listed and seeded when haven enables it"
+func TestModelsListNamesTheSeededModels(t *testing.T) {
+	srv := newTestServer(t)
+	resp, err := http.Get(srv.URL + "/v1/models")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	for _, id := range []string{"markov-small", "markov-json", "langy-echo"} {
+		if !strings.Contains(string(body), `"`+id+`"`) {
+			t.Errorf("/v1/models lacks %s: %s", id, body)
+		}
 	}
 }

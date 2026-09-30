@@ -1,0 +1,148 @@
+# Model providers and defaults journeys the first file leaves out: a custom model added to a
+# provider, a cancelled delete, and the defaults drawer's roles. Handles are the ones the
+# model-provider screens draw. Providers not used by model-providers.yaml, so the shared isolated
+# project holds no clash. Unrun until a check.
+flows:
+  - id: cv2-model-provider-custom-model-reads-back
+    title: Add a custom model to a provider, save, and find it in the list API and the reopened drawer
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Groq\s*$/
+      - action: fill
+        with:
+          selector: 'input[type="password"]'
+          value: "gsk-vd-cv2-{uid}"
+      - action: click
+        with:
+          text: /^\s*Add model\s*$/
+      - action: expect
+        with:
+          text: Add Model
+      - action: fill
+        with:
+          label: Model ID
+          value: "vd-cv2-model-{uid}"
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Add model\s*$/
+      - action: expect
+        with:
+          text: "vd-cv2-model-{uid}"
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("Groq")'
+          min: "1"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/model-providers
+          field: groq.models
+          contains: "vd-cv2-model-{uid}"
+          timeout: "20000"
+      - action: click
+        with:
+          selector: 'tr:has-text("Groq") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Edit Provider
+      - action: expect
+        with:
+          text: "vd-cv2-model-{uid}"
+
+  - id: cv2-model-provider-delete-cancel-keeps-row
+    title: Open Delete Provider, cancel it and find the provider still listed after a reload
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Mistral\s*$/
+      - action: fill
+        with:
+          selector: 'input[type="password"]'
+          value: "msk-vd-cv2-{uid}"
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("Mistral")'
+          min: "1"
+          timeout: "20000"
+      - action: click
+        with:
+          selector: 'tr:has-text("Mistral") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Delete Provider
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Cancel\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("Mistral")'
+          min: "1"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/model-providers
+          field: mistral.enabled
+          equals: "true"
+
+  - id: cv2-model-defaults-drawer-shows-roles
+    title: Open the add-default drawer and find the default, fast and embeddings rows and its Save
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          selector: '[data-testid="add-config-button"], [data-testid="empty-state-add-config"]'
+      - action: expect
+        with:
+          testId: default-model-override-drawer
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: role-row-default
+      - action: expect
+        with:
+          testId: role-row-fast
+      - action: expect
+        with:
+          testId: role-row-embeddings
+      - action: expect
+        with:
+          testId: config-save

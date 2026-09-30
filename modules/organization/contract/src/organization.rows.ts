@@ -34,13 +34,6 @@ export const TeamUserRole = {
 } as const;
 export type TeamUserRole = (typeof TeamUserRole)[keyof typeof TeamUserRole];
 
-export const RoleBindingScopeType = {
-  ORGANIZATION: "ORGANIZATION",
-  TEAM: "TEAM",
-  PROJECT: "PROJECT",
-} as const;
-export type RoleBindingScopeType = (typeof RoleBindingScopeType)[keyof typeof RoleBindingScopeType];
-
 export const PricingModel = { TIERED: "TIERED", SEAT_EVENT: "SEAT_EVENT" } as const;
 export type PricingModel = (typeof PricingModel)[keyof typeof PricingModel];
 

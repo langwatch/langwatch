@@ -10,9 +10,9 @@ import { describe, expect, it } from "vitest";
 import type { AuthzRepositories } from "../authz.repositories.ts";
 import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
 import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
-import { MemoryAuthzBindingRepository } from "../memory/memory.authz-binding.repository.ts";
 import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
 import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
+import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
 
 const ORGANIZATION_ID = "org_contract";
 const USER_ID = "user_contract";
@@ -30,7 +30,7 @@ const backends: readonly Backend[] = [
 
       return {
         store: memory,
-        bindings: MemoryAuthzBindingRepository.create({ memory }),
+        bindings: MemoryAuthzManagedGrantRepository.create({ memory }),
         cutover: MemoryAuthzCutoverRepository.create({ memory }),
         admissions: MemoryAuthzAdmissionRepository.create({ memory }),
       };

@@ -21,22 +21,19 @@ export const groupTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof g
     .withPermission("organization:manage")
     .handle(({ app, input, actor }) => app.createLicensedGroup(input, { id: actor.id }))
 
-    .procedure("addBinding")
+    .procedure("addGrant")
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) => {
-      const { organizationId, groupId, ...binding } = input;
-      const created = await app.addGroupBinding(
-        { organizationId, groupId, binding },
-        { id: actor.id },
-      );
+      const { organizationId, groupId, ...grant } = input;
+      const created = await app.addGroupGrant({ organizationId, groupId, grant }, { id: actor.id });
 
       return { id: created.id };
     })
 
-    .procedure("removeBinding")
+    .procedure("removeGrant")
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) => {
-      await app.removeGroupBinding(input, { id: actor.id });
+      await app.removeGroupGrant(input, { id: actor.id });
 
       return { success: true as const };
     })

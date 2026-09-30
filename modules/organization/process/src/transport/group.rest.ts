@@ -12,7 +12,7 @@ import {
 } from "@langwatch/api/rest";
 import {
   OrganizationApi,
-  organizationGroupBindingInputSchema,
+  organizationGroupGrantInputSchema,
   organizationGroupRestAddMemberSchema,
   organizationGroupRestBindingListSchema,
   organizationGroupRestBindingParamsSchema,
@@ -29,7 +29,7 @@ import {
   organizationGroupRestRenamedSchema,
   organizationRestSuccessSchema,
   type OrganizationCaller,
-  type OrganizationGroupBinding,
+  type OrganizationGroupGrant,
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
 import { z } from "zod";
@@ -55,7 +55,7 @@ const callerOf = (actor: { type: string; id?: string } | null): OrganizationCall
     : { id: SYSTEM_ACTORS.managementApi };
 
 /** One binding, as every route that reports one answers it. */
-const bindingWire = (binding: OrganizationGroupBinding) => ({
+const bindingWire = (binding: OrganizationGroupGrant) => ({
   id: binding.id,
   role: binding.role,
   customRoleId: binding.customRoleId,
@@ -101,7 +101,7 @@ export const groupsRest: Readonly<{
         externalId: group.externalId,
         scimSource: group.scimSource,
         memberCount: group.memberCount,
-        bindings: group.bindings.map(bindingWire),
+        bindings: group.grants.map(bindingWire),
         createdAt: group.createdAt,
       })),
       pagination: result.pagination,
@@ -120,7 +120,7 @@ export const groupsRest: Readonly<{
       {
         organizationId: scope.id,
         name: input.name,
-        ...(input.bindings ? { bindings: input.bindings } : {}),
+        ...(input.bindings ? { grants: input.bindings } : {}),
         ...(input.memberIds ? { memberIds: input.memberIds } : {}),
       },
       callerOf(actor),
@@ -151,7 +151,7 @@ export const groupsRest: Readonly<{
       externalId: group.externalId,
       scimSource: group.scimSource,
       members: group.members.map(memberWire),
-      bindings: group.bindings.map(bindingWire),
+      bindings: group.grants.map(bindingWire),
     };
   })
 
@@ -248,15 +248,15 @@ export const groupsRest: Readonly<{
   .post("/:groupId/bindings", "postApiGroupsByIdBindings")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestParamsSchema)
-  .withInput(organizationGroupBindingInputSchema)
+  .withInput(organizationGroupGrantInputSchema)
   .withOutput(organizationGroupRestBindingSchema)
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Add a role binding to a group" })
   .withMiddleware(groupsRestEnterpriseGate)
   .handle(async ({ app, input, scope, actor }) => {
     const { groupId: id, ...binding } = input;
-    const created = await app.addGroupBinding(
-      { groupId: id, organizationId: scope.id, binding },
+    const created = await app.addGroupGrant(
+      { groupId: id, organizationId: scope.id, grant: binding },
       callerOf(actor),
     );
 
@@ -275,8 +275,8 @@ export const groupsRest: Readonly<{
   .withDocs({ tags: ["Groups"], description: "Remove a role binding from a group" })
   .withMiddleware(groupsRestEnterpriseGate)
   .handle(async ({ app, input, scope, actor }) => {
-    await app.removeGroupBinding(
-      { groupId: input.groupId, bindingId: input.bindingId, organizationId: scope.id },
+    await app.removeGroupGrant(
+      { groupId: input.groupId, grantId: input.bindingId, organizationId: scope.id },
       callerOf(actor),
     );
 

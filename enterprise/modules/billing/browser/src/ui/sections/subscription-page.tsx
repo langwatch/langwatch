@@ -2,8 +2,9 @@
  * Cloud-only Subscription Page; lets org admins manage plans and users.
  * @see specs/licensing/subscription-page.feature
  */
-import { Badge, Flex, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Alert, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import { StatusChip } from "@langwatch/design-system/settings-card";
 import { CONTACT_SALES_URL, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";
 import { useEffect, useState } from "react";
@@ -230,9 +231,14 @@ export function SubscriptionPage() {
 
   if (activePlan.isError || !plan) {
     return (
-      <Flex justifyContent="center" padding={8}>
-        <Text color="red.fg">Failed to load subscription information. Please try again later.</Text>
-      </Flex>
+      <Alert.Root status="error">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>
+            Failed to load subscription information. Please try again later.
+          </Alert.Title>
+        </Alert.Content>
+      </Alert.Root>
     );
   }
 
@@ -279,20 +285,14 @@ export function SubscriptionPage() {
       />
       <VStack gap={6} width="full" align="stretch" paddingTop={4}>
         <Text color="fg.muted">
-          For questions about billing,{" "}
-          <Link
-            href="mailto:sales@langwatch.ai"
-            fontWeight="semibold"
-            color="fg"
-            _hover={{ color: "fg" }}
-          >
-            contact us
+          Your plan, your seats and your invoices. Questions about billing?{" "}
+          <Link href="mailto:sales@langwatch.ai" color="orange.fg">
+            Contact us →
           </Link>
         </Text>
 
         {showSuccess && <SubscriptionSuccessNotice showUpgradeCredit={showUpgradeCredit} />}
 
-        {/* Current Plan Block */}
         <CurrentPlanBlock
           planName={currentPlanName}
           pricing={currentPlanPricing}
@@ -309,22 +309,21 @@ export function SubscriptionPage() {
           contactSalesUrl={isEnterprisePlan && !isLicenseOverride ? CONTACT_SALES_URL : undefined}
         />
 
-        {/* Invoices Block—always shown; empty when no Stripe customer */}
         <InvoicesBlock
           organizationId={organization.id}
           onViewAllInStripe={handleManageSubscription}
         />
 
-        {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
         {isUpgradePlanRequired && (
           <UpgradePlanBlock
             planName={
               <>
                 Growth Plan{" "}
                 {effectiveBillingPeriod === "annual" && (
-                  <Badge colorPalette="green" variant="subtle" fontSize="xs">
-                    Save {pricing.getAnnualDiscountPercent(effectiveCurrency)}%
-                  </Badge>
+                  <StatusChip
+                    label={`Save ${pricing.getAnnualDiscountPercent(effectiveCurrency)}%`}
+                    tone="good"
+                  />
                 )}
               </>
             }
@@ -337,7 +336,6 @@ export function SubscriptionPage() {
           />
         )}
 
-        {/* Update seats Block—shown when seats change on Growth plan */}
         {isUpgradeSeatsRequired && (
           <UpdateSeatsBlock
             totalFullMembers={billingSeats}

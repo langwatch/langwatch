@@ -174,7 +174,7 @@ function keyRow(overrides: Record<string, unknown> = {}) {
     ingestSourceType: null,
     ingestionTemplateId: null,
     createdByDeviceLabel: null,
-    roleBindings: [
+    grants: [
       {
         id: "rb-1",
         role: "ADMIN",
@@ -237,7 +237,7 @@ describe("given the organization has an ingestion key and a regular key", () => 
       state.members = [{ id: "user-1", name: "Dev", email: "dev@example.com" }];
       renderWithApiKeyHost(<ApiKeysScreen />);
       expect(
-        screen.getByRole("button", { name: "Revoke ingestion key claude wrapper" }),
+        screen.getByRole("button", { name: "Actions for ingestion key claude wrapper" }),
       ).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit API key claude wrapper" })).toBeNull();
     });
@@ -274,7 +274,7 @@ describe("given keys bound at different scopes", () => {
       keyRow({
         id: "key-other",
         name: "Growth key",
-        roleBindings: [
+        grants: [
           {
             id: "rb-2",
             role: "ADMIN",
@@ -367,7 +367,7 @@ describe("given keys bound at different scopes", () => {
       expect(screen.getByText("No API keys. Create one to get started.")).toBeInTheDocument();
       unmount();
 
-      state.keys = [keyRow({ roleBindings: [] })];
+      state.keys = [keyRow({ grants: [] })];
       renderWithApiKeyHost(
         <ApiKeysScreen />,
         new FakeApiKeyHost({ query: { [API_KEY_SCOPE_QUERY_KEY]: "TEAM:team-1" } }),
@@ -465,12 +465,14 @@ describe("given the legacy project key exists", () => {
 
 describe("given a reader who is not an organization admin", () => {
   /** @scenario A member manages only their own keys */
-  it("offers edit and revoke on their own key and on nobody else's", () => {
+  it("offers the actions menu on their own key and on nobody else's", () => {
     state.members = [];
     state.keys = [keyRow(), keyRow({ id: "key-3", name: "Someone else's", userId: "user-9" })];
     renderWithApiKeyHost(<ApiKeysScreen />);
-    expect(screen.getByRole("button", { name: "Edit API key CI Pipeline" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit API key Someone else's" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Actions for API key CI Pipeline" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actions for API key Someone else's" })).toBeNull();
   });
 });
 

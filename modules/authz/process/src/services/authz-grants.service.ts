@@ -41,19 +41,31 @@ import {
   type GrantRole,
   type GrantableAuthzScopeRef,
   scopeOrganizationId,
+  type AuthzChangeGrantRoleInput,
+  type AuthzCreateGrantInput,
+  type AuthzGetGrantInput,
+  type AuthzListGrantsInput,
+  type AuthzRevokeGrantByIdInput,
+  type Grant,
+  type GrantPage,
+  type GrantRevoked,
 } from "@langwatch/authz-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
-import type { AuthzBindingRepository } from "../repositories/authz-binding.repository.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type {
   AuthzGrantRepository,
   BindingPrincipalWhere,
-  RoleBindingWrite,
+  GrantWrite,
 } from "../repositories/authz-grant.repository.ts";
-import { AuthzBindingWriterService } from "./authz-binding-writer.service.ts";
+import type { AuthzManagedGrantRepository } from "../repositories/authz-managed-grant.repository.ts";
 import { AuthzGrantGuardsService } from "./authz-grant-guards.service.ts";
+import { AuthzGrantManagementService } from "./authz-grant-management.service.ts";
+import {
+  AuthzGrantWriterService,
+  type AuthzGrantWriterPermissions,
+} from "./authz-grant-writer.service.ts";
 import { AuthzOffboardingService } from "./authz-offboarding.service.ts";
 
 /**
@@ -67,7 +79,9 @@ export type AuthzGrantsServiceOptions = {
   ledger: AuthzCompatibilityLedger;
   epoch: AuthzEpochRepository;
   newBindingId: () => string;
-  bindings: AuthzBindingRepository;
+  bindings: AuthzManagedGrantRepository;
+  /** The permission side's reads the writer's guards need (escalation, limit, last admin). */
+  permissions: AuthzGrantWriterPermissions;
 };
 
 type AuthzAttachGrantRequest = Omit<AuthzAttachGrantInput, "actor" | "where"> & {
@@ -98,12 +112,19 @@ const RESOURCE_SCOPE_REJECTION =
 
 export class AuthzGrantsService extends AuthzGrantsServiceContract {
   static create(options: AuthzGrantsServiceOptions): AuthzGrantsService {
+    const bindingWriter = AuthzGrantWriterService.create({
+      bindings: options.bindings,
+      ledger: options.ledger,
+      newBindingId: options.newBindingId,
+      permissions: options.permissions,
+    });
+
     return new AuthzGrantsService({
       options,
-      bindingWriter: AuthzBindingWriterService.create({
-        bindings: options.bindings,
-        ledger: options.ledger,
-        newBindingId: options.newBindingId,
+      bindingWriter,
+      grantManagement: AuthzGrantManagementService.create({
+        writer: bindingWriter,
+        permissions: options.permissions,
       }),
       offboarding: AuthzOffboardingService.create(options.repository),
       guards: AuthzGrantGuardsService.create({ repository: options.repository }),
@@ -111,24 +132,28 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   }
 
   private readonly options: AuthzGrantsServiceOptions;
-  private readonly bindingWriter: AuthzBindingWriterService;
+  private readonly bindingWriter: AuthzGrantWriterService;
+  private readonly grantManagement: AuthzGrantManagementService;
   private readonly offboarding: AuthzOffboardingService;
   private readonly guards: AuthzGrantGuardsService;
 
   private constructor({
     options,
     bindingWriter,
+    grantManagement,
     offboarding,
     guards,
   }: {
     options: AuthzGrantsServiceOptions;
-    bindingWriter: AuthzBindingWriterService;
+    bindingWriter: AuthzGrantWriterService;
+    grantManagement: AuthzGrantManagementService;
     offboarding: AuthzOffboardingService;
     guards: AuthzGrantGuardsService;
   }) {
     super();
     this.options = options;
     this.bindingWriter = bindingWriter;
+    this.grantManagement = grantManagement;
     this.offboarding = offboarding;
     this.guards = guards;
   }
@@ -402,6 +427,26 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return this.bindingWriter.applyMemberBindings(args);
   }
 
+  listGrants(args: AuthzListGrantsInput): Promise<GrantPage> {
+    return this.grantManagement.list(args);
+  }
+
+  getGrant(args: AuthzGetGrantInput): Promise<Grant> {
+    return this.grantManagement.get(args);
+  }
+
+  createGrant(args: AuthzCreateGrantInput): Promise<Grant> {
+    return this.grantManagement.create(args);
+  }
+
+  changeGrantRole(args: AuthzChangeGrantRoleInput): Promise<Grant> {
+    return this.grantManagement.changeRole(args);
+  }
+
+  revokeGrant(args: AuthzRevokeGrantByIdInput): Promise<GrantRevoked> {
+    return this.grantManagement.revoke(args);
+  }
+
   private bindingRow({
     who,
     role,
@@ -414,7 +459,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     where: GrantableScope;
     organizationId: string;
     expiresAtMs: number | undefined;
-  }): RoleBindingWrite {
+  }): GrantWrite {
     return {
       bindingId: this.options.newBindingId(),
       organizationId,

@@ -21,6 +21,9 @@ const SHUTDOWN_DEADLINE_MS = 20_000;
 
 const write = (line: string): void => void process.stderr.write(line);
 
+/** The record that says both halves are serving; the dev script's ready pattern names it. */
+export const BACKEND_READY_MSG = "backend ready";
+
 /** The service name the launcher's own fatal records carry. */
 const BACKEND_SERVICE = "langwatch-backend";
 
@@ -70,6 +73,8 @@ export function bootBackendEntry(): Promise<void> {
   return startBackend({ startWorker, startApi })
     .then((started) => {
       halves = started;
+      // The watch supervisor ends a boot on this line (LANGWATCH_DEV_READY_PATTERN).
+      process.stdout.write(`${JSON.stringify({ level: "info", msg: BACKEND_READY_MSG })}\n`);
     })
     .catch((error) => {
       // Name the half that refused, then exit outright: a failed boot's own

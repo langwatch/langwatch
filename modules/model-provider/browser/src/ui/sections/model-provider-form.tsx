@@ -85,7 +85,7 @@ export type EditModelProviderFormProps = {
   onSaved?: (saved: GuidedSave) => void;
   /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
   guided?: boolean;
-  /** Why the connection did not happen: a refused credential, or a sign-in that failed or timed out. */
+  /** Why the connection did not happen: a refused credential, or a failed or timed out sign-in. */
   onFailed?: (failure: { provider: string; code: string }) => void;
 };
 

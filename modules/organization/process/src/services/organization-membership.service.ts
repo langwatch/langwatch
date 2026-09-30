@@ -1,8 +1,9 @@
 import {
-  newAuthzBindingId,
+  newAuthzGrantId,
   type AuthzApi,
   type AuthzBindingForSynthesis,
   type GrantsLedgerActor,
+  GrantScopeTier,
 } from "@langwatch/authz-contract";
 /**
  * The organization surface the canonical contract does not carry: membership,
@@ -21,7 +22,6 @@ import {
   type OrganizationUser,
   OrganizationUserRole,
   PricingModel,
-  RoleBindingScopeType,
   type TeamUserRole,
   type User,
   CannotRemoveLastAdminError,
@@ -89,7 +89,7 @@ type TeamMembershipLike = {
 export type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
 
 export class OrganizationMembershipService {
-  static enrichTeamWithRoleBindings<
+  static enrichTeamWithGrants<
     T extends {
       members: TeamMembershipLike[];
       id: string;
@@ -98,29 +98,29 @@ export class OrganizationMembershipService {
   >({
     team,
     userId,
-    userRoleBindings,
+    userGrants,
     organizationId,
   }: {
     team: T;
     userId: string;
-    userRoleBindings: AuthzBindingForSynthesis[];
+    userGrants: AuthzBindingForSynthesis[];
     organizationId: string;
   }): T {
     const teamProjectIds = new Set(team.projects.map((p) => p.id));
     // TEAM scope takes precedence over PROJECT scope so the synthesized role is
     // deterministic when a user has both kinds of binding for the same team.
-    const teamBinding = userRoleBindings.find(
+    const teamBinding = userGrants.find(
       (b) =>
         b.organizationId === organizationId &&
-        b.scopeType === RoleBindingScopeType.TEAM &&
+        b.scopeType === GrantScopeTier.TEAM &&
         b.scopeId === team.id,
     );
     const projectBinding = teamBinding
       ? undefined
-      : userRoleBindings.find(
+      : userGrants.find(
           (b) =>
             b.organizationId === organizationId &&
-            b.scopeType === RoleBindingScopeType.PROJECT &&
+            b.scopeType === GrantScopeTier.PROJECT &&
             teamProjectIds.has(b.scopeId),
         );
     const binding = teamBinding ?? projectBinding;
@@ -573,7 +573,7 @@ export class OrganizationMembershipService {
     userId: string;
     admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
   }): Promise<"created" | "already-present"> {
-    const grantId = newAuthzBindingId();
+    const grantId = newAuthzGrantId();
     const outcome = await this.repo.createMembership({
       organizationId,
       userId,

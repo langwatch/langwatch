@@ -48,7 +48,7 @@ import {
   type AgentSandboxKeyShareRedis,
 } from "../repositories/redis/redis.agent-sandbox-key-share.repository.ts";
 import { AgentSandboxKeyMintService } from "../services/agent-sandbox-key-mint.service.ts";
-import { ApiKeyBindingIdService } from "../services/api-key-binding-id.service.ts";
+import { ApiKeyGrantIdService } from "../services/api-key-grant-id.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
@@ -160,7 +160,7 @@ export class ApiKeyApp implements ApiKeyApi {
       grants: authorization,
       organizations: setup.dependencies.organizations,
       projects: setup.dependencies.projects,
-      bindingIds: ApiKeyBindingIdService.create(),
+      bindingIds: ApiKeyGrantIdService.create(),
       legacyGrants: LegacyApiKeyGrantService.create({
         authz: authorization,
         grants: authorization,
@@ -460,7 +460,7 @@ export class ApiKeyApp implements ApiKeyApi {
           organizationId: input.organizationId,
         });
 
-    const allBindings = apiKeys.flatMap((k) => k.roleBindings);
+    const allBindings = apiKeys.flatMap((k) => k.grants);
     // A key row renders the scope's NAME — "Acme" and "Checkout", not two
     // opaque ids — so the scope half of the enrichment is read alongside the
     // custom-role half. Both come from the one call.
@@ -512,7 +512,7 @@ export class ApiKeyApp implements ApiKeyApi {
       // key with no label of its own can still be shown against the machine
       // it came from. Null for keys minted outside a CLI session.
       parentApiKeyId: apiKey.parentApiKeyId ?? null,
-      roleBindings: apiKey.roleBindings.map((rb) => ({
+      grants: apiKey.grants.map((rb) => ({
         id: rb.id,
         role: rb.role,
         customRoleId: rb.customRoleId ?? null,

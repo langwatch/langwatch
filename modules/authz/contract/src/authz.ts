@@ -16,9 +16,9 @@ export type OrganizationRole = z.infer<typeof organizationRoleSchema>;
 export const OrganizationUserRole = organizationRoleSchema.enum;
 export type OrganizationUserRole = OrganizationRole;
 
-export const roleBindingScopeTypeSchema = storedBindingScopeTierSchema;
-export type RoleBindingScopeType = z.infer<typeof roleBindingScopeTypeSchema>;
-export const RoleBindingScopeType = roleBindingScopeTypeSchema.enum;
+export const grantScopeTierSchema = storedBindingScopeTierSchema;
+export type GrantScopeTier = z.infer<typeof grantScopeTierSchema>;
+export const GrantScopeTier = grantScopeTierSchema.enum;
 
 const projectScopeRefSchema = z
   .object({
@@ -125,7 +125,7 @@ export const bindingRoleKeySchema = z.custom<BindingRoleKey>(
 export const collectedBindingSchema = z
   .object({
     roleKey: bindingRoleKeySchema,
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string(),
     viaGroupId: z.string().nullable().optional(),
     /** Reported, never filtered, by the reader: whether an elapsed one still grants is

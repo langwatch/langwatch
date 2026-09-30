@@ -41,7 +41,6 @@ require_file "sdks/typescript/src/internal/generated/types/evaluators.generated.
 require_file "mcp/typescript/dist/index.js"
 require_file "packages/ksuid/dist/index.d.ts"
 require_file "packages/mail/dist/index.js"
-require_file "packages/mail/dist/gateway.js"
 
 # `generator client { output = "../src/generated" }` — the generated client is
 # first-party source owned by @langwatch/prisma-client, not node_modules state.

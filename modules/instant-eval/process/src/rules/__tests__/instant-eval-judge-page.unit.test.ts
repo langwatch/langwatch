@@ -37,6 +37,7 @@ function question(overrides: Partial<InstantEvalRunQuestion> = {}): InstantEvalR
 
 describe("given a page whose rows carry the text each question is about", () => {
   describe("when its requests are built", () => {
+    /** @scenario "Every question about one text is one classifier request" */
     it("asks every question about one text in a single request", () => {
       const units = instantEvalJudgementUnits({
         rows: [{ annoyed: "the same text", polite: "the same text" }],
@@ -48,6 +49,7 @@ describe("given a page whose rows carry the text each question is about", () => 
       expect(units[0]?.questions.map((one) => one.id)).toEqual(["annoyed", "polite"]);
     });
 
+    /** @scenario "Questions about different texts are separate requests" */
     it("sends a request per text when the questions are about different ones", () => {
       const units = instantEvalJudgementUnits({
         rows: [{ annoyed: "the conversation", polite: "the last answer" }],
@@ -58,6 +60,7 @@ describe("given a page whose rows carry the text each question is about", () => 
       expect(units.map((unit) => unit.text)).toEqual(["the conversation", "the last answer"]);
     });
 
+    /** @scenario "A row whose extraction found no text is not sent" */
     it("skips a row whose extraction found no text, which has nothing to judge", () => {
       const units = instantEvalJudgementUnits({
         rows: [{ annoyed: "" }, { annoyed: "a conversation" }],
@@ -68,6 +71,7 @@ describe("given a page whose rows carry the text each question is about", () => 
       expect(units.map((unit) => unit.rowIndex)).toEqual([1]);
     });
 
+    /** @scenario "A page whose questions leave no room for text is refused before anything is sent" */
     it("refuses once when the questions leave no room for any text", () => {
       expect(() =>
         instantEvalJudgementUnits({
@@ -86,6 +90,7 @@ describe("given a page whose rows carry the text each question is about", () => 
 
 describe("given a page that would send more text than its own rows could carry", () => {
   describe("when the page is checked against its ceiling", () => {
+    /** @scenario "A page that would send more text than its rows could carry is refused before anything is sent" */
     it("refuses before anything is sent", () => {
       // Two questions about two different texts, each the size of the judge's
       // whole state: one row's worth of budget, two rows' worth of sending.
@@ -109,6 +114,7 @@ describe("given a page that would send more text than its own rows could carry",
 
 describe("given a page some of whose questions were answered", () => {
   describe("when the rows are written", () => {
+    /** @scenario "Each verdict lands in its own column and unanswered rows are named" */
     it("puts each verdict in its own column and names the rows left unanswered", () => {
       const verdict: InstantEvalVerdict = { questionId: "annoyed", probability: 0.7 };
 
@@ -132,6 +138,7 @@ describe("given a page some of whose questions were answered", () => {
       expect(judged.unjudgedRows).toEqual([1]);
     });
 
+    /** @scenario "A question the classifier declined is null and does not make its row unjudged" */
     it("leaves a declined question null without calling its row unjudged", () => {
       const judged = instantEvalJudgedRows({
         rows: [{ TraceId: "t1", annoyed: "one" }],

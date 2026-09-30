@@ -16,13 +16,13 @@ import {
  * `apiKeyScopeSchema`: not `.strict()`, so a stray field is stripped, and
  * no `customRoleId` — a restricted key's role is minted by the service.
  */
-const roleBindingSchema = z.object({
+const grantWriteSchema = z.object({
   role: apiKeyRoleSchema,
   scopeType: apiKeyScopeTypeSchema,
   scopeId: z.string(),
 });
 /** One binding as the drawers write it. */
-export type ApiKeyTrpcRoleBinding = z.infer<typeof roleBindingSchema>;
+export type ApiKeyTrpcGrant = z.infer<typeof grantWriteSchema>;
 
 /** Every read and write on the namespace is narrowed to one organization. */
 export const apiKeyTrpcOrganizationScopeSchema = z.object({ organizationId: z.string() });
@@ -42,7 +42,7 @@ export const apiKeyTrpcCreateInputSchema = z
     keyType: z.enum(["personal", "service"]).default("personal"),
     assignedToUserId: z.string().optional(),
     permissions: z.array(apiKeyPermissionFormatSchema).optional(),
-    bindings: z.array(roleBindingSchema).max(20),
+    bindings: z.array(grantWriteSchema).max(20),
   })
   .superRefine(refineRestrictedPermissions);
 export type ApiKeyTrpcCreateInput = z.infer<typeof apiKeyTrpcCreateInputSchema>;
@@ -55,7 +55,7 @@ export const apiKeyTrpcUpdateInputSchema = z
     description: z.string().max(500).nullish(),
     permissionMode: z.enum(API_KEY_PERMISSION_MODES).optional(),
     permissions: z.array(apiKeyPermissionFormatSchema).optional(),
-    bindings: z.array(roleBindingSchema).min(1).max(20).optional(),
+    bindings: z.array(grantWriteSchema).min(1).max(20).optional(),
   })
   .superRefine(refineRestrictedPermissions);
 export type ApiKeyTrpcUpdateInput = z.infer<typeof apiKeyTrpcUpdateInputSchema>;

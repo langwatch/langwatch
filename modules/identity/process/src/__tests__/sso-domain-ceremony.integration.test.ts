@@ -5,6 +5,8 @@ import {
   emptySsoConnection,
   reduceSsoConnection,
   SSO_DNS_PROOF_TTL_MS,
+  SSO_DNS_RECORD_NAME,
+  SSO_VERIFICATION_FILE_PATH,
   type SsoConnectionFactInput,
   type SsoConnectionState,
   ssoDnsRecordName,
@@ -322,6 +324,45 @@ describe("asking for a record", () => {
   });
 });
 
+describe("what the record says about itself", () => {
+  /** @scenario "The record names itself completely, so nothing has to be guessed" */
+  it("gives the type, the whole name and the label without the domain, and a bare token", async () => {
+    await reachClaimed();
+
+    const issued = await ceremony.proveDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: DOMAIN,
+      actor: ANA,
+    });
+
+    expect(issued.proved).toBe(false);
+    if (issued.proved) return;
+    expect(issued.record.type).toBe("TXT");
+    expect(issued.record.label).toBe(SSO_DNS_RECORD_NAME);
+    expect(issued.record.label).not.toContain(DOMAIN);
+    expect(issued.record.name).toBe(`${issued.record.label}.${DOMAIN}`);
+    expect(issued.record.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  /** @scenario "The administrator is offered the file channel beside the record" */
+  it("offers the well-known path and the https address for the same value", async () => {
+    await reachClaimed();
+
+    const issued = await ceremony.proveDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: DOMAIN,
+      actor: ANA,
+    });
+
+    expect(issued.proved).toBe(false);
+    if (issued.proved) return;
+    expect(issued.record.file.path).toBe(SSO_VERIFICATION_FILE_PATH);
+    expect(issued.record.file.url).toBe(`https://${DOMAIN}${SSO_VERIFICATION_FILE_PATH}`);
+  });
+});
+
 describe("checking what the domain publishes", () => {
   async function issue(): Promise<string> {
     await reachClaimed();
@@ -499,6 +540,85 @@ describe("checking what the domain publishes", () => {
     const state = await stateOf();
     expect(state?.verifiedDomains).toEqual([DOMAIN]);
     expect(stated.filter((fact) => fact.type === DOMAIN_VERIFIED_EVENT_TYPE)).toHaveLength(1);
+  });
+});
+
+describe("a domain somebody else proved while this claim waited", () => {
+  /** @scenario "A domain another organization proved while this one waited is refused at the check" */
+  it("refuses the check by code, names nobody and proves nothing", async () => {
+    await reachClaimed();
+    const issued = await ceremony.proveDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: DOMAIN,
+      actor: ANA,
+    });
+    seedRivalOwner();
+    proofs.answer = { outcome: "published", values: [issued.proved ? "" : issued.record.value] };
+
+    const refusal = await ceremony
+      .checkDomainRecord({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: DOMAIN,
+        actor: ANA,
+      })
+      .catch((error: unknown) => error);
+
+    expect(refusal).toMatchObject({ code: "sso_connection_domain_taken" });
+    const spoken = `${String(Reflect.get(Object(refusal), "message"))} ${JSON.stringify(
+      Reflect.get(Object(refusal), "meta") ?? {},
+    )}`;
+    expect(spoken).not.toContain(OTHER_ORG);
+    expect(spoken).not.toContain(OTHER_CONNECTION);
+    expect((await stateOf())?.verifiedDomains).toEqual([]);
+  });
+});
+
+describe("adding a domain to a live connection", () => {
+  /** @scenario "Adding a domain never takes a live connection off the air" */
+  it("keeps the connection ACTIVE through claim, proof and verification of the second domain", async () => {
+    await reachRegistered();
+    await proveAndCheck(DOMAIN);
+    await connectionService.activateConnection({
+      tenantId: ORG,
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      commandId: "ssocmd_activate",
+      occurredAtMs: T0,
+      actor: { type: "user", id: ANA.userId },
+      source: "self-serve",
+      testLoginAccountId: "acc_test",
+    });
+    expect((await stateOf())?.state).toBe("ACTIVE");
+
+    await ceremony.claimDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: "acme.co.uk",
+      actor: ANA,
+    });
+    expect((await stateOf())?.state).toBe("ACTIVE");
+
+    const issued = await ceremony.proveDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: "acme.co.uk",
+      actor: ANA,
+    });
+    expect((await stateOf())?.state).toBe("ACTIVE");
+
+    proofs.answer = { outcome: "published", values: [issued.proved ? "" : issued.record.value] };
+    await ceremony.checkDomainRecord({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: "acme.co.uk",
+      actor: ANA,
+    });
+
+    const state = await stateOf();
+    expect(state?.state).toBe("ACTIVE");
+    expect(state?.verifiedDomains).toEqual([DOMAIN, "acme.co.uk"]);
   });
 });
 

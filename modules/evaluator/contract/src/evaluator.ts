@@ -134,9 +134,8 @@ export function getEvaluatorDefaultSettings(
 ): Record<string, unknown> {
   if (!definition || !("settings" in definition)) return {};
   return Object.fromEntries(
-    Object.entries(definition.settings).map(([key, setting]) => [
-      key,
-      evaluatorSettingDefault({ key, setting, resolved, fallback }),
-    ]),
+    Object.entries(definition.settings)
+      .map(([key, setting]) => [key, evaluatorSettingDefault({ key, setting, resolved, fallback })])
+      .filter(([, value]) => value !== undefined),
   );
 }

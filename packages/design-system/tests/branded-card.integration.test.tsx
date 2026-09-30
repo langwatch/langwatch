@@ -41,4 +41,17 @@ describe("BrandedCard", () => {
       expect(container.querySelector("svg")).not.toBeNull();
     });
   });
+
+  describe("given a page that brings its own ground", () => {
+    it("draws that ground under the card instead of the ambient one", () => {
+      renderWithDesignSystem(
+        <BrandedCardPage ground={<div data-testid="own-ground" />}>
+          <BrandedCard title="Forgot your password?" />
+        </BrandedCardPage>,
+      );
+
+      expect(screen.getByTestId("own-ground")).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Forgot your password?" })).toBeTruthy();
+    });
+  });
 });

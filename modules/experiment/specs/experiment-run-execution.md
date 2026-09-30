@@ -121,11 +121,15 @@ domainError, traceId`), `recentEvents` (last 50, each `{seq, eventId, frame}`), 
   - A comparison cell waits (throws, the queue retries) until every target cell's finish is folded,
     exact because a cell appends its results before its finish.
   - `experimentSlug` and `runUrl` come from the plan (optional fields the plan builder fills).
-- **Registration before the answer:** a polled start (`POST /:slug/run` without events) and a workflow
-  evaluation send their command, then wait (50 reads, 100 ms apart) until `readRunProgress` holds the
-  run under its experiment, so a poll straight after the answer finds it, as main's registration did.
-  A wait that runs out answers `service_unavailable` (503, capability "worker that registered the run
-  in time"); the command was sent, so a late worker still runs it.
+- **A polled start answers once its command is written (Alex, 2026-09-30):** `POST /:slug/run`
+  without events sends its command (or, refused before its start, its failed completion), records the
+  run's start at `eval_v3_run:<runId>:start` (`recordRunStart`: project, experiment, total, start
+  time; 24 h TTL) and answers 200 with the run id. It never waits for the worker. Until the progress
+  fold holds the run, `GET /runs/:runId` reads the start and answers main's just-registered body
+  (`running`, progress 0, the planned total, `startedAt`), and abort reads its project and experiment
+  from it; another project's run, or an archived experiment's, still answers `run_not_found`, and a
+  run neither holds answers `run_not_found`. Once folded, the fold wins. A workflow evaluation's
+  request does the same: its command sent, its start recorded with the requested total, answered.
 - **Runs refused before their start:** the refusal's `completed{failed}` carries the planned `total`,
   so the poller reads it failed with that total. The ClickHouse `experimentRunState` store writes no
   row for a run that folded only its completion (`rules/experiment-run-state.rules.ts`).
@@ -163,7 +167,7 @@ domainError, traceId`), `recentEvents` (last 50, each `{seq, eventId, frame}`), 
   It lands once per run: the write names the run as its actor's `runId`, and a redelivered intent
   whose run the experiment's version history already holds (`hasWorkbenchVersionOfRun`) writes
   nothing and bumps no version, even when a later run has written the board since.
-- **Workflow evaluations:** the api sends RequestWorkflowEvaluation and waits for its registration.
+- **Workflow evaluations:** the api sends RequestWorkflowEvaluation, records its start and answers.
   The progress fold stores the request as `running` with its slug and total (`seq` 0 until the start),
   as main registered it. The worker's subscriber prepares the run (workflow, version, dataset), plans
   it with its slug and link, and sends StartExperimentRun unless the fold shows the run already
@@ -223,9 +227,8 @@ foreign run, and GET runs' bodies. Differences:
     event ids); the board shows the same cell. A redelivered finish, start or completion streams
     nothing.
 13. A streamed saved run can be polled by its runId; main's stream kept no poller state.
-14. A polled start or workflow evaluation whose worker does not fold it within the bounded wait
-    (5 s) answers 503 `service_unavailable`, where main registered the run itself and answered; the
-    command was sent, so the run may still start.
+14. None since 2026-09-30: a polled start or workflow evaluation answers at once, as main did, and a
+    poll before the worker folds it reads the recorded start as main read its registration.
 
 ## 10. Decisions
 

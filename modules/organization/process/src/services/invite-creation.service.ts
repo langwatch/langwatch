@@ -1,3 +1,4 @@
+import { GrantScopeTier } from "@langwatch/authz-contract";
 import type { PlanProvider, PlanProviderUser } from "@langwatch/entitlement-contract";
 /**
  * Creating invitations: the duplicate and membership guards, the seat-licence check, the team
@@ -12,7 +13,6 @@ import {
   MemberSeatLimitReachedError,
   OrganizationUserRole,
   PersonalWorkspaceNotManagedHereError,
-  RoleBindingScopeType,
   TeamUserRole,
   type Organization,
   type OrganizationInvite,
@@ -384,7 +384,7 @@ export class InviteCreationService {
       scopes: validInvites.flatMap(
         (invite) =>
           invite.teamAssignments?.map((assignment) => ({
-            scopeType: RoleBindingScopeType.TEAM,
+            scopeType: GrantScopeTier.TEAM,
             scopeId: assignment.teamId,
           })) ?? [],
       ),

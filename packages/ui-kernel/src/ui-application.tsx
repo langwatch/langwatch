@@ -87,6 +87,7 @@ export function createUiApplication({
           isDevelopment: providers.isDevelopment,
           sessionQueryKey,
           ...(features.transport ? { transport: features.transport } : {}),
+          ...(features.sessionVersions ? { sessionVersions: features.sessionVersions } : {}),
           ...(features.session ? { session: features.session } : {}),
         }),
         pageErrorFallback: pages.errorFallback,

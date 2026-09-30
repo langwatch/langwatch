@@ -38,6 +38,7 @@ import {
 } from "../../../../behavior/automation-feedback.ts";
 import {
   useAppBaseUrl,
+  useCloseAddressedDrawer,
   useFeatureFlag,
   useOrganizationTeamProject,
 } from "../../../../behavior/automation-session.ts";
@@ -147,6 +148,12 @@ function cadenceTodo(draft: AutomationDraft): string {
     case "trace":
       return "";
   }
+}
+
+/** The editor as the registry opens it by address, where nothing else supplies `onClose`. */
+export function RegisteredAutomationDrawer({ onClose, ...props }: UiAutomationDrawerProps) {
+  const close = useCloseAddressedDrawer();
+  return <AutomationDrawer {...props} onClose={onClose ?? close} />;
 }
 
 /**

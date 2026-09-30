@@ -1,3 +1,4 @@
+import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 export const personalWorkspaceInputSchema = z
@@ -83,20 +84,21 @@ export function readPersonalFeatures(stored: unknown): PersonalFeatures {
   };
 }
 
-export class PersonalProjectNotFoundError extends Error {
-  readonly code = "personal_project_not_found" as const;
+export class PersonalProjectNotFoundError extends NotFoundError {
+  declare readonly code: "personal_project_not_found";
 
   constructor(projectId: string) {
-    super(`Personal project ${projectId} not found`);
+    super("personal_project_not_found", { resource: "Personal project", id: projectId });
     this.name = "PersonalProjectNotFoundError";
   }
 }
 
-export class PersonalProjectOwnerMismatchError extends Error {
-  readonly code = "personal_project_owner_mismatch" as const;
+/** Answers as not found, so a caller cannot probe other people's personal projects by id. */
+export class PersonalProjectOwnerMismatchError extends NotFoundError {
+  declare readonly code: "personal_project_owner_mismatch";
 
-  constructor() {
-    super("Personal project not found");
+  constructor(projectId: string) {
+    super("personal_project_owner_mismatch", { resource: "Personal project", id: projectId });
     this.name = "PersonalProjectOwnerMismatchError";
   }
 }

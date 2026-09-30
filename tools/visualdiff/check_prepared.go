@@ -56,10 +56,20 @@ func checkoutUnprepared(root string, prepares []checkoutPrepare) error {
 }
 
 // newestUnder is the newest modification time of a file, or of any file under a directory; zero when absent.
+// Tests never reach a build's output, so a new test file does not make it stale.
 func newestUnder(path string) time.Time {
 	var newest time.Time
 	_ = filepath.WalkDir(path, func(_ string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if entry.Name() == "__tests__" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.Contains(entry.Name(), ".test.") {
 			return nil
 		}
 		if info, err := entry.Info(); err == nil && info.ModTime().After(newest) {

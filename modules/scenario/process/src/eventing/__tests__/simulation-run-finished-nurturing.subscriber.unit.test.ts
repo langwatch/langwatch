@@ -43,8 +43,10 @@ function deps({
   runCount?: number;
 } = {}) {
   const recorded: NurturingSignal[] = [];
+  const counted: (readonly string[])[] = [];
   return {
     recorded,
+    counted,
     resolveOrgAdmin: async () => ({
       userId,
       organizationId,
@@ -53,14 +55,17 @@ function deps({
       organizationCreatedAt: null,
     }),
     listIdsByOrganization: async () => projectIds,
-    countUsage: async () => runCount,
+    countOrganizationRuns: async ({ projectIds: ids }: { projectIds: readonly string[] }) => {
+      counted.push(ids);
+      return runCount;
+    },
     build() {
       return createSimulationRunFinishedNurturingSubscriber({
         projects: {
           resolveOrgAdmin: this.resolveOrgAdmin,
           listIdsByOrganization: this.listIdsByOrganization,
         },
-        simulations: { countUsage: this.countUsage },
+        simulations: { countOrganizationRuns: this.countOrganizationRuns },
         nurturing: {
           recordSignal: async (signal: NurturingSignal) => {
             recorded.push(signal);
@@ -100,6 +105,38 @@ describe("the simulation-run-finished nurturing subscriber", () => {
     await subscriber.handler(finished(), context);
 
     expect(target.recorded).toEqual([]);
+  });
+
+  /** @scenario "The organization's run count is read once per sync, not once per project" */
+  it("asks for the organization's count in one read naming every project", async () => {
+    const target = deps({ projectIds: ["project-1", "project-2", "project-3"] });
+    const subscriber = target.build();
+
+    await subscriber.handler(finished(), context);
+
+    expect(target.counted).toEqual([["project-1", "project-2", "project-3"]]);
+  });
+
+  /** @scenario "Finished runs in one project tell nurturing at most once per five-minute window" */
+  it("tells a project's first run at once and squashes the rest of its five minutes", () => {
+    const subscriber = deps().build();
+    const first = finished();
+    const second = { ...finished(), id: "event-2", aggregateId: "run-2" };
+    const elsewhere = { ...finished(), tenantId: createTenantId("project-2") };
+    const { dedup } = subscriber;
+    if (dedup === undefined || dedup === "aggregate") throw new Error("no debounce declared");
+
+    expect(subscriber.delay).toBe(0);
+    expect(dedup).toMatchObject({
+      ttlMs: 300_000,
+      extend: false,
+      replace: true,
+      shouldSurviveDispatch: true,
+    });
+    expect(dedup.makeId(second)).toBe(dedup.makeId(first));
+    expect(dedup.makeId(elsewhere)).not.toBe(dedup.makeId(first));
+    expect(subscriber.groupKeyFn?.(second)).toBe(subscriber.groupKeyFn?.(first));
+    expect(subscriber.groupKeyFn?.(elsewhere)).not.toBe(subscriber.groupKeyFn?.(first));
   });
 
   it("tells nurturing nothing when the organization has no admin", async () => {

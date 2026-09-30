@@ -20,10 +20,9 @@ function stringAttributes(span: OtlpSpan): Record<string, unknown> {
 }
 
 /**
- * The helper thread each codex temporary structured request span in one export request was
- * issued for, keyed by request span id. The request span carries the mark (scope-gated per
- * entry), its queue child the thread id (matched by parent id across every entry, so a pair the
- * exporter splits over two scope entries still joins). A request with no child maps to nothing.
+ * The helper thread each codex request span was issued for, keyed by request span id. The span
+ * carries the mark (scope-gated per entry), its queue child the thread id (matched by parent id
+ * across every entry). A request with no child maps to nothing.
  */
 export function codexHelperThreadMarkersOf({
   scopes,

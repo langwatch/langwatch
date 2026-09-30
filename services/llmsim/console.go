@@ -44,12 +44,13 @@ func (s *Server) handleConsole(w http.ResponseWriter, r *http.Request) {
 	s.console.ServeHTTP(w, r)
 }
 
-// recentCalls bounds the console's memory of calls; the oldest drop off.
-const recentCalls = 500
-
-// recordedBodyBytes caps the request body kept per call, so 500 agent
-// transcripts cannot hold the process's memory hostage.
-const recordedBodyBytes = 256 << 10
+// Defaults for LLMSIM_MAX_CALLS and LLMSIM_MAX_BODY_BYTES: the console keeps
+// the newest calls, each with at most this much request body, so a few
+// hundred agent transcripts cannot hold the process's memory hostage.
+const (
+	defaultRecentCalls = 500
+	defaultBodyBytes   = 256 << 10
+)
 
 // Settings are the console's switches, applied to every call that does not
 // carry its own header.
@@ -85,11 +86,11 @@ type record struct {
 	Response     *reply          `json:"response,omitempty"`
 }
 
-func recordedBody(raw []byte) json.RawMessage {
-	if len(raw) <= recordedBodyBytes {
+func recordedBody(raw []byte, limit int) json.RawMessage {
+	if len(raw) <= limit {
 		return append(json.RawMessage{}, raw...)
 	}
-	b, _ := json.Marshal(map[string]any{"truncated": true, "bytes": len(raw), "head": string(raw[:4096])})
+	b, _ := json.Marshal(map[string]any{"truncated": true, "bytes": len(raw), "head": string(raw[:min(4096, len(raw))])})
 	return b
 }
 
@@ -135,7 +136,7 @@ func (s *Server) serveConsoleAPI(w http.ResponseWriter, r *http.Request, path st
 	w.Header().Set("Cache-Control", "no-store")
 	switch {
 	case path == "/info" && r.Method == http.MethodGet:
-		writeJSON(w, map[string]any{"sim": "llm", "stack": s.cfg.Stack, "models": Models, "capacity": recentCalls, "settings": s.settings()})
+		writeJSON(w, map[string]any{"sim": "llm", "stack": s.cfg.Stack, "models": Models, "capacity": s.cfg.MaxCalls, "settings": s.settings()})
 	case path == "/calls" && r.Method == http.MethodGet:
 		calls := s.calls.newest()
 		for i := range calls {
@@ -149,9 +150,10 @@ func (s *Server) serveConsoleAPI(w http.ResponseWriter, r *http.Request, path st
 		w.WriteHeader(http.StatusNoContent)
 	case strings.HasPrefix(path, "/calls/") && r.Method == http.MethodGet:
 		id := strings.TrimPrefix(path, "/calls/")
-		for _, c := range s.calls.newest() {
-			if c.ID == id {
-				writeJSON(w, c)
+		calls := s.calls.newest()
+		for i := range calls {
+			if calls[i].ID == id {
+				writeJSON(w, calls[i])
 				return
 			}
 		}

@@ -129,7 +129,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
       case "grant.revoke":
         return this.compatForRevoke(write.grantId);
       case "role.upsert":
-        return this.compatForRole(write.row);
+        return this.compatForRole(write.row, typeof result === "number" && result > 0);
       case "role.setPermissions":
         await this.prisma.customRole.updateMany({
           where: { id: write.roleId },
@@ -137,9 +137,12 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
         });
         return;
       case "role.delete":
-        await this.prisma.customRole.deleteMany({
-          where: { id: write.roleId },
-        });
+        // A compat binding still naming the role would be nulled by the
+        // foreign key and fail the custom-role check, so it goes first.
+        await this.prisma.$transaction([
+          this.prisma.roleBinding.deleteMany({ where: { customRoleId: write.roleId } }),
+          this.prisma.customRole.deleteMany({ where: { id: write.roleId } }),
+        ]);
         return;
     }
   }
@@ -273,8 +276,26 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
     }
   }
 
-  private async compatForRole(row: RoleRow): Promise<void> {
+  /** A write the guard skipped mirrors only a redelivery of the live head;
+   *  a head that is absent means another role holds the name. */
+  private async compatForRole(row: RoleRow, guardWon: boolean): Promise<void> {
     const { id, organizationId, name, description, permissions, kind } = row;
+    if (!guardWon) {
+      const head = await this.prisma.role.findUnique({
+        where: { id },
+        select: { occurredAt: true, deletedAt: true },
+      });
+      if (!head) {
+        logger.warn(
+          { roleId: id, organizationId },
+          "role name held by another role; not projected",
+        );
+        return;
+      }
+      if (head.deletedAt) return;
+      const isLiveHead = head.occurredAt.getTime() === toDate(row.occurredAt).getTime();
+      if (!isLiveHead) return;
+    }
     const compat = { name, description, permissions, kind };
     await this.prisma.customRole.upsert({
       where: { organizationId, id },
@@ -412,16 +433,23 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
   }
 
   /** The same rule for roles. `deletedAt` is left alone for the reason
-   *  `revokedAt` is on the grant side. */
+   *  `revokedAt` is on the grant side. A name another live role holds skips
+   *  the write rather than failing it, so the fold cannot retry forever. */
   private upsertRole(row: RoleRow): Prisma.PrismaPromise<number> {
     return this.prisma.$executeRaw`
       INSERT INTO "Role" (
         "id", "organizationId", "name", "description", "permissions",
         "kind", "occurredAt", "updatedAt"
-      ) VALUES (
+      ) SELECT
         ${row.id}, ${row.organizationId}, ${row.name}, ${row.description},
         ${JSON.stringify(row.permissions)}::jsonb, ${row.kind},
         ${toDate(row.occurredAt)}, NOW()
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "Role"
+        WHERE "organizationId" = ${row.organizationId}
+          AND "name" = ${row.name}
+          AND "id" <> ${row.id}
+          AND "deletedAt" IS NULL
       )
       ON CONFLICT ("id") DO UPDATE SET
         "organizationId" = EXCLUDED."organizationId",

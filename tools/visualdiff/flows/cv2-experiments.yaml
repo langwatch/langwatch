@@ -1,0 +1,212 @@
+# Experiments journeys the first file leaves out: the list's row menu (delete, replicate, view
+# results), creating one from New Experiment, and the results export. Runs are posted as an SDK
+# would, so no flow calls a model. Results land through the event pipeline, so the first read of
+# them waits up to 30 seconds. Unrun until a check.
+flows:
+  - id: cv2-experiment-list-delete-removes-row
+    title: Delete an experiment from its row menu behind the confirmation and see it gone after a reload
+    setup:
+      - post: /api/experiments
+        body:
+          name: "vd-cv2-expdel-{uid}"
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/experiments"
+      - action: expect
+        with:
+          text: "vd-cv2-expdel-{uid}"
+          timeout: "20000"
+      - action: click
+        with:
+          label: "Actions for vd-cv2-expdel-{uid}"
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Delete
+      - action: expect
+        with:
+          text: Delete experiment
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Delete\s*$/
+      - action: expect
+        with:
+          text: Experiment deleted
+          timeout: "20000"
+      - action: go
+        with:
+          path: "/{slug}/experiments"
+      - action: expect
+        with:
+          text: "vd-cv2-expdel-{uid}"
+          equals: "0"
+      - action: expect
+        with:
+          api: "/api/experiments/{expSlug}"
+          status: "404"
+
+  - id: cv2-experiment-list-replicate-dialog-opens
+    title: Open Replicate to another project from an experiment's menu and cancel out of it
+    setup:
+      - post: /api/experiments
+        body:
+          name: "vd-cv2-expcopy-{uid}"
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/experiments"
+      - action: expect
+        with:
+          text: "vd-cv2-expcopy-{uid}"
+          timeout: "20000"
+      - action: click
+        with:
+          label: "Actions for vd-cv2-expcopy-{uid}"
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Replicate to another project
+      - action: expect
+        with:
+          text: Replicate Experiment
+      - action: expect
+        with:
+          text: Replicate associated dataset
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Cancel\s*$/
+      - action: expect
+        with:
+          text: Replicate Experiment
+          equals: "0"
+
+  - id: cv2-experiment-new-experiment-opens-workbench
+    title: Create an experiment from New Experiment and land in its workbench with a dataset tab
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/experiments"
+      - action: click
+        with:
+          testId: experiment-new-open
+      - action: click
+        with:
+          testId: experiment-new-create
+      - action: expect
+        with:
+          url: /experiments/workbench/
+          timeout: "30000"
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          min: "1"
+          timeout: "20000"
+
+  - id: cv2-experiment-results-view-from-row-menu
+    title: Open View Results from an SDK experiment's row menu and read its rows
+    setup:
+      - post: /api/experiment/init
+        body:
+          experiment_slug: "vd-cv2-expview-{uid}"
+          experiment_name: "vd-cv2-expview-{uid}"
+          experiment_type: BATCH_EVALUATION_V2
+        as:
+          expSlug: slug
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-cv2-run-view
+          progress: 1
+          total: 1
+          dataset:
+            - index: 0
+              entry:
+                question: vd cv2 question view
+              predicted:
+                answer: vd cv2 answer view
+              cost: 0.001
+              duration: 100
+          evaluations:
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 0
+              score: 1
+              passed: true
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/experiments"
+      - action: expect
+        with:
+          text: "{expSlug}"
+          timeout: "30000"
+      - action: click
+        with:
+          label: "Actions for {expSlug}"
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: View Results
+      - action: expect
+        with:
+          url: "/experiments/{expSlug}"
+      - action: expect
+        with:
+          text: vd cv2 question view
+          timeout: "30000"
+      - action: expect
+        with:
+          text: vd cv2 answer view
+
+  - id: cv2-experiment-results-export-csv-downloads
+    title: Export an SDK experiment's results to CSV and find its rows in the file
+    setup:
+      - post: /api/experiment/init
+        body:
+          experiment_slug: "vd-cv2-expcsv-{uid}"
+          experiment_name: "vd-cv2-expcsv-{uid}"
+          experiment_type: BATCH_EVALUATION_V2
+        as:
+          expSlug: slug
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-cv2-run-csv
+          progress: 1
+          total: 1
+          dataset:
+            - index: 0
+              entry:
+                question: vd cv2 question csv
+              predicted:
+                answer: vd cv2 answer csv
+              cost: 0.001
+              duration: 100
+          evaluations:
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 0
+              score: 1
+              passed: true
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/experiments/{expSlug}"
+      - action: expect
+        with:
+          text: vd cv2 question csv
+          timeout: "30000"
+      - action: download
+        with:
+          text: Export to CSV
+          contains: vd cv2 answer csv
+          filename: /\.csv$/i

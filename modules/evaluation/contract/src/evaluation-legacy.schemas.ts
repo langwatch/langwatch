@@ -70,8 +70,6 @@ export const evaluationInputSchema = z.object({
     .describe("Overrides the name the result is recorded under"),
   data: z
     .looseObject({})
-    .optional()
-    .nullable()
     .describe(
       "What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them.",
     ),

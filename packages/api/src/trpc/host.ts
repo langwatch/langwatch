@@ -2,7 +2,11 @@
  * Where every tRPC namespace mounts: `/api/trpc`, plus the subscription lane at `/api/sse` over the
  * SAME router. tRPC is session-authenticated by definition, so the session reader is required.
  */
-import { LiteMemberRestrictedError } from "@langwatch/authz-contract";
+import {
+  LiteMemberRestrictedError,
+  type AuthzScopeLineageResult,
+  type PermissionDecision,
+} from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   FeatureTrpcHost,
@@ -37,6 +41,13 @@ import {
   type TrpcRouterDeclaration,
   type TrpcRuntimeMembers,
 } from "./runtime.ts";
+import {
+  contentEtag,
+  holdsEtag,
+  SESSION_VERSION_HEADER,
+  trpcRequestPaths,
+  type TrpcSessionVersions,
+} from "./session-version.ts";
 import type { TrpcThrottle, TrpcThrottlePolicy } from "./throttle.ts";
 
 /** The signed-in person, as the procedures that render one read it. */
@@ -140,6 +151,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       | undefined;
     /** What the process knows about a caller on every namespace at once. */
     facts?: readonly TrpcFactBinding<TrpcRequestContext>[] | undefined;
+    /** The caller's session version (ADR-164). Absent, answers carry no version and no tag. */
+    sessionVersions?: TrpcSessionVersions | undefined;
     logger?: Pick<Logger, "warn" | "error"> | undefined;
   }): TrpcHost {
     return new TrpcHost(options);
@@ -151,7 +164,11 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   readonly #namespaces: Record<string, TrpcNamespace> = {};
   /** Each mounted procedure's declared kind, by its dotted path. */
   readonly #procedureKinds = new Map<string, TrpcContractKind>();
+  /** The session and reference reads, which revalidate by a content ETag (ADR-164). */
+  readonly #revalidatedPaths = new Set<string>();
   readonly #options: Parameters<typeof TrpcHost.create>[0];
+  /** One request's decisions, by the request itself: never shared with the next one. */
+  readonly #decisions = new WeakMap<TrpcRequestLike, TrpcAuthorizationDecisions>();
   #composed: AnyTRPCRouter | undefined;
 
   private constructor(options: Parameters<typeof TrpcHost.create>[0]) {
@@ -223,6 +240,10 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     this.#namespaces[namespace] = mounted;
     for (const [name, member] of Object.entries(trpcDeclaration.contract.members)) {
       this.#procedureKinds.set(`${namespace}.${name}`, member.kind);
+      const tier = member.cache?.tier;
+      if (member.kind === "query" && (tier === "session" || tier === "reference")) {
+        this.#revalidatedPaths.add(`${namespace}.${name}`);
+      }
     }
 
     return mounted;
@@ -246,6 +267,74 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
    */
   procedureTypeAt(path: string): TrpcContractKind | undefined {
     return this.#procedureKinds.get(path);
+  }
+
+  /** The caller's session version header; none for an anonymous caller or an unreadable store. */
+  async sessionVersionHeaders(input: {
+    context: () => Promise<TrpcRequestContext>;
+  }): Promise<Readonly<Record<string, string>>> {
+    const versions = this.#options.sessionVersions;
+    if (!versions) return {};
+    const userId = await this.#userOf(input.context);
+    if (!userId) return {};
+    try {
+      const version = await versions.getSessionVersion({ userId });
+      return { [SESSION_VERSION_HEADER]: String(version) };
+    } catch (error) {
+      this.#logger.warn(
+        { error },
+        "The session version could not be read; this answer carries none",
+      );
+      return {};
+    }
+  }
+
+  /**
+   * Tags a 200 of one unbatched session or reference GET with a hash of its body, and
+   * answers 304 with no body when the browser already holds that body. A 304 hides
+   * nothing by construction: the body it stands for is byte-identical.
+   */
+  async revalidate(input: {
+    request: Request;
+    response: Response;
+    context: () => Promise<TrpcRequestContext>;
+  }): Promise<Response> {
+    const { request, response } = input;
+    if (response.status !== 200 || !this.#isRevalidatedRead(request)) return response;
+    // A streamed answer (application/jsonl) is never buffered to be hashed.
+    const mediaType = response.headers.get("content-type")?.split(";")[0]?.trim();
+    if (mediaType !== "application/json") return response;
+    const userId = await this.#userOf(input.context);
+    if (!userId) return response;
+
+    // ponytail: hashes the computed body, so it saves transfer, not compute; a cheap source
+    // version (the projection's last event, max updatedAt) could skip the heaviest reads first,
+    // such as modelProvider.listAllForProjectForFrontend.
+    const body = new Uint8Array(await response.arrayBuffer());
+    const etag = contentEtag({ userId, body });
+    const headers = new Headers(response.headers);
+    headers.set("ETag", etag);
+    headers.set("Cache-Control", "private, no-cache");
+    headers.set("Vary", "Cookie");
+    if (!holdsEtag({ ifNoneMatch: request.headers.get("if-none-match"), etag })) {
+      return new Response(body, { status: 200, headers });
+    }
+    headers.delete("content-type");
+    headers.delete("content-length");
+    return new Response(null, { status: 304, headers });
+  }
+
+  /** One path, unbatched: a batch's body answers several reads, so one tag would mean several. */
+  #isRevalidatedRead(request: Request): boolean {
+    if (request.method !== "GET") return false;
+    const paths = trpcRequestPaths({ request, endpoint: TrpcHost.path });
+    return paths.length === 1 && paths.every((path) => this.#revalidatedPaths.has(path));
+  }
+
+  /** A context that fails is the procedure's failure to answer, never the stamp's. */
+  async #userOf(context: () => Promise<TrpcRequestContext>): Promise<string | undefined> {
+    const resolved = await context().catch(() => void 0);
+    return resolved?.tryActor()?.id;
   }
 
   /** One request, resolved into the context every procedure reads. */
@@ -293,6 +382,20 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     ];
   }
 
+  /**
+   * The decisions a request is authorized through (policy.ts `forRequest`): a batch asking one
+   * question on one scope asks authz once. A caller with no request asks authz directly.
+   */
+  #decisionsFor(ctx: Pick<TrpcRequestContext, "req">): TrpcAuthorizationDecisions {
+    if (!ctx.req) return this.#options.authz;
+    const known = this.#decisions.get(ctx.req);
+    if (known) return known;
+    const decisions = decidingOnce(this.#options.authz);
+    this.#decisions.set(ctx.req, decisions);
+
+    return decisions;
+  }
+
   #members(options: Parameters<typeof TrpcHost.create>[0]): TrpcRuntimeMembers<TrpcRequestContext> {
     return {
       identity: {
@@ -311,7 +414,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
           };
         },
       },
-      authorization: { forRequest: () => options.authz },
+      authorization: { forRequest: (ctx) => this.#decisionsFor(ctx) },
       denials: DENIALS,
       ...(options.throttle ? { throttle: throttleOf(options.throttle) } : {}),
       audit: {
@@ -363,6 +466,37 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       ...(entry.error ? { error: entry.error } : {}),
     });
   }
+}
+
+/** The same decisions, each distinct question asked once and its answer shared. */
+function decidingOnce(authz: TrpcAuthorizationDecisions): TrpcAuthorizationDecisions {
+  const decisions = new Map<string, Promise<PermissionDecision>>();
+  const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
+
+  return {
+    getDecision: (input) =>
+      askOnce(decisions, `one:${JSON.stringify(input)}`, () => authz.getDecision(input)),
+    getProjectAnyDecision: (input) =>
+      askOnce(decisions, `any:${JSON.stringify(input)}`, () => authz.getProjectAnyDecision(input)),
+    // Lineage reads only the three scope ids, so they alone are the question.
+    checkScopeLineage: (input) =>
+      askOnce(lineages, JSON.stringify([input.organizationId, input.teamId, input.projectId]), () =>
+        authz.checkScopeLineage(input),
+      ),
+  };
+}
+
+function askOnce<T>(
+  asked: Map<string, Promise<T>>,
+  key: string,
+  ask: () => Promise<T>,
+): Promise<T> {
+  const known = asked.get(key);
+  if (known) return known;
+  const answer = ask();
+  asked.set(key, answer);
+
+  return answer;
 }
 
 /** The session a resolved caller stands for, in the shape procedures read. */

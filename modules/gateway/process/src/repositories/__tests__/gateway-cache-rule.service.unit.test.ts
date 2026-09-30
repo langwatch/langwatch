@@ -2,7 +2,6 @@ import {
   GatewayCacheRuleNotFoundError,
   type ArchiveGatewayCacheRuleInput,
   type CreateGatewayCacheRuleInput,
-  type GatewayCacheRuleCursor,
   type GatewayCacheRuleResource,
   type UpdateGatewayCacheRuleInput,
 } from "@langwatch/gateway-contract";
@@ -41,11 +40,7 @@ class MemoryCacheRuleRepository extends GatewayCacheRuleRepository {
     return Promise.resolve(this.rule ? [this.rule] : []);
   }
 
-  findPage(_: {
-    organizationId: string;
-    limit: number;
-    cursor: GatewayCacheRuleCursor | null;
-  }): Promise<GatewayCacheRuleResource[]> {
+  findPage(): Promise<GatewayCacheRuleResource[]> {
     return this.findAll();
   }
 

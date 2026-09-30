@@ -15,7 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import type { ApiKeyRole, ApiKeyTrpcRoleBinding } from "@langwatch/api-key-contract";
+import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Select } from "@langwatch/design-system/select";
 import type { Instant } from "@langwatch/time";
@@ -58,7 +58,7 @@ export type CreateApiKeyInput = {
   scopeType: string;
   scopeId: string;
   permissions?: string[];
-  bindings: ApiKeyTrpcRoleBinding[];
+  bindings: ApiKeyTrpcGrant[];
 };
 
 type CreateKeyForm = {

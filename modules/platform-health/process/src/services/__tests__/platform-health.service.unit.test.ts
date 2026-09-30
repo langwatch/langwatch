@@ -66,6 +66,7 @@ describe("given a probe that throws", () => {
 
 describe("given every subsystem answers", () => {
   describe("when the platform health is checked", () => {
+    /** @scenario "The aggregate runs every subsystem" */
     it("reports one entry per subsystem, with how long each took", async () => {
       const service = PlatformHealthService.create({
         probes: [healthy("collector"), healthy("evaluations")],

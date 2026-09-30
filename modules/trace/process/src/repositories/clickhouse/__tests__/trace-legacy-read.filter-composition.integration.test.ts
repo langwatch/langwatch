@@ -97,7 +97,7 @@ async function search({
   return results.groups
     .flat()
     .map((trace) => trace.trace_id)
-    .sort();
+    .toSorted();
 }
 
 describe.skipIf(!clickHouseConfigured)("a trace search filter (integration)", () => {
@@ -146,7 +146,7 @@ describe.skipIf(!clickHouseConfigured)("a trace search filter (integration)", ()
     /** @scenario A filter string narrows the search */
     it("returns only the traces that contain an error", async () => {
       expect(await search({ queryText: "status:error" })).toEqual(
-        [FAILED_REFUND_U1, FAILED_REFUND_U2, FAILED_HELLO_U1].sort(),
+        [FAILED_REFUND_U1, FAILED_REFUND_U2, FAILED_HELLO_U1].toSorted(),
       );
     });
 
@@ -157,7 +157,7 @@ describe.skipIf(!clickHouseConfigured)("a trace search filter (integration)", ()
         input: { filters: { "metadata.user_id": ["u_1"] } },
       });
 
-      expect(traceIds).toEqual([FAILED_REFUND_U1, FAILED_HELLO_U1].sort());
+      expect(traceIds).toEqual([FAILED_REFUND_U1, FAILED_HELLO_U1].toSorted());
     });
 
     /** @scenario A filter combines with free text and with an explicit trace id list */

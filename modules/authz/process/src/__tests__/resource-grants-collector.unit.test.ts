@@ -5,7 +5,7 @@ import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts
 import { AuthzCollectorService } from "../services/authz-collector.service.ts";
 import { liveShareLinkRow, ORG, PROJECT, TEAM, traceScope } from "./support/resource-fixtures.ts";
 
-const customRoleBinding = [
+const customRoleGrant = [
   {
     roleKey: "custom:cr-1",
     scopeType: "PROJECT" as const,
@@ -34,7 +34,7 @@ describe("collector at the resource tier", () => {
   describe("when collecting grants for an apiKey principal", () => {
     it("reads only the key's bindings — a key has no membership of its own", async () => {
       const reader = makeReader({
-        findApiKeyBindings: vi.fn().mockResolvedValue(customRoleBinding),
+        findApiKeyBindings: vi.fn().mockResolvedValue(customRoleGrant),
         findCustomRolePermissions: vi
           .fn()
           .mockResolvedValue([{ id: "cr-1", permissions: ["traces:view"] }]),
@@ -62,7 +62,7 @@ describe("collector at the resource tier", () => {
     const collectWith = async (permissions: unknown) => {
       const reader = makeReader({
         findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
-        findUserBindings: vi.fn().mockResolvedValue(customRoleBinding),
+        findUserBindings: vi.fn().mockResolvedValue(customRoleGrant),
         findCustomRolePermissions: vi.fn().mockResolvedValue([{ id: "cr-1", permissions }]),
       });
       const grants = await AuthzCollectorService.create({

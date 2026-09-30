@@ -1,3 +1,4 @@
+import type { CacheDeclaringContract } from "@langwatch/browser-host/cache-tiers";
 import type { DrawersDifferingFromMap } from "@langwatch/browser-host/drawer";
 import type { output, ZodType } from "zod";
 
@@ -111,6 +112,8 @@ export type WebModuleInstallation = Readonly<{
   hosts: WebHostDeclaration;
   capabilities: WebCapabilities;
   api?: unknown;
+  /** The contracts whose cache tiers the api's reads follow (ADR-164). */
+  apiContracts?: readonly CacheDeclaringContract[];
   slots: readonly string[];
   seatTypeCopy: boolean;
   failureInterceptors: readonly unknown[];
@@ -250,6 +253,7 @@ export class WebModule<
 
   withApi<Api>(
     api: Api,
+    options: { contracts?: readonly CacheDeclaringContract[] } = {},
   ): WebModule<
     Name,
     Merge<Requirements, RequirementFields<"transport">>,
@@ -260,6 +264,7 @@ export class WebModule<
     return this.#next({
       ...this.#installation,
       api,
+      ...(options.contracts ? { apiContracts: options.contracts } : {}),
       requirements: mergeNames(this.#installation.requirements, ["transport"]),
     });
   }

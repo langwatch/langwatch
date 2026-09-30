@@ -118,11 +118,21 @@ describe("the application's AuthZ tRPC adapter", () => {
 
   describe("given the mounted router", () => {
     /** @scenario "Application tRPC remains a separate adapter" */
-    it("exposes only the read the surface declares", () => {
+    it("exposes only the procedures the surface declares", () => {
       const { procedures } = harness();
+      const declared = [
+        "effectivePermissions",
+        "listGrants",
+        "createGrant",
+        "changeGrantRole",
+        "revokeGrant",
+        "listManagedGrants",
+        "listMemberGrants",
+        "applyMemberGrants",
+      ];
 
-      expect(Object.keys(authzTrpc.members)).toEqual(["effectivePermissions"]);
-      expect(Object.keys(procedures)).toEqual(["effectivePermissions"]);
+      expect(Object.keys(authzTrpc.members)).toEqual(declared);
+      expect(Object.keys(procedures)).toEqual(declared);
     });
 
     /**
@@ -133,7 +143,8 @@ describe("the application's AuthZ tRPC adapter", () => {
     it("declares the read service-authorized", () => {
       const { accesses } = harness();
 
-      expect(accesses).toEqual(["service-authorized"]);
+      // The grant procedures beside it sit at organization:manage.
+      expect(accesses).toEqual(["service-authorized", ...Array(7).fill("permission")]);
     });
   });
 });

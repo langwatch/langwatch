@@ -198,8 +198,6 @@ function BudgetsPage() {
           <Spacer />
           {canCreate && (
             <PageLayout.HeaderButton
-              variant="solid"
-              colorPalette="orange"
               data-testid="gateway-budget-new"
               onClick={() => setCreateOpen(true)}
             >
@@ -407,7 +405,7 @@ function BudgetTableRow({
         </VStack>
       </Table.Cell>
       <Table.Cell>
-        <Badge variant="subtle" colorPalette="gray">
+        <Badge variant="subtle" colorPalette="gray" textTransform="capitalize">
           {b.window.toLowerCase()}
         </Badge>
       </Table.Cell>

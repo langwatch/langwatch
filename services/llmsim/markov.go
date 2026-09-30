@@ -84,7 +84,7 @@ func (m *markov) text(r *mrand.Rand, want, maxTokens int) (out string, truncated
 // phrase is a few words without the trailing full stop, for JSON strings.
 func (m *markov) phrase(r *mrand.Rand, words int) string {
 	s, _ := m.text(r, 1, words)
-	return strings.TrimRightFunc(s, func(c rune) bool { return unicode.IsPunct(c) })
+	return strings.TrimRightFunc(s, unicode.IsPunct)
 }
 
 // tokens estimates a text's token count: a word each, or six characters a

@@ -32,7 +32,10 @@ import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
 import type { ExperimentWorkbenchObserver } from "../app/experiment-workbench.members.ts";
-import type { ExperimentRunProgressState } from "../repositories/experiment-run-fold.repository.ts";
+import type {
+  ExperimentRunProgressState,
+  ExperimentRunStartRecord,
+} from "../repositories/experiment-run-fold.repository.ts";
 import type { ExperimentRunRefusal } from "../rules/experiment-run-availability.rules.ts";
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
@@ -321,18 +324,24 @@ export class ExperimentWorkbenchRunService {
     const { runId } = input;
 
     const runState = await this.#progressOf(runId);
+    const run = runState ?? (await this.#startOf(runId));
 
     // All three not-found branches raise the SAME code: from outside they
     // are one answer - this run is not yours to read.
-    if (!runState || runState.projectId !== input.projectId) throw new RunNotFoundError(runId);
+    if (!run || run.projectId !== input.projectId) throw new RunNotFoundError(runId);
 
     // A run whose owning experiment was archived must not keep serving status from the cache.
-    if (runState.experimentId) {
+    if (run.experimentId) {
       const stillLive = await this.experiments.isActive({
         projectId: input.projectId,
-        id: runState.experimentId,
+        id: run.experimentId,
       });
       if (!stillLive) throw new RunNotFoundError(runId);
+    }
+
+    // Started, not yet folded by the worker: main's just-registered run (spec section 7).
+    if (!runState) {
+      return { runId, status: "running", progress: 0, total: run.total, startedAt: run.startedAt };
     }
 
     logger.debug({ runId, status: runState.status }, "Run status queried");
@@ -415,7 +424,7 @@ export class ExperimentWorkbenchRunService {
     by: Readonly<{ id: string }>,
   ): Promise<{ success: true; runId: string; message: "Abort requested" }> {
     const { projectId, runId } = input;
-    const runState = await this.#progressOf(runId);
+    const runState = (await this.#progressOf(runId)) ?? (await this.#startOf(runId));
     if (!runState || runState.projectId !== projectId) throw new RunNotFoundError(runId);
 
     logger.info({ projectId, runId }, "Requesting abort");
@@ -440,6 +449,13 @@ export class ExperimentWorkbenchRunService {
     const read = await runs.folds.readRunProgress({ runId });
 
     return read.kind === "folded" ? read.state : undefined;
+  }
+
+  /** A polled run's recorded start, read while the worker has not folded it yet. */
+  async #startOf(runId: string): Promise<ExperimentRunStartRecord | undefined> {
+    const [start] = await this.#pipeline().folds.findRunStart({ runId });
+
+    return start;
   }
 
   /** The link a polled run answers with, which a process with no public address cannot give. */

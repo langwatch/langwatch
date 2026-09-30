@@ -34,7 +34,7 @@ class RecordingDriver implements QueryDriver {
     this.inserts.push(request);
   }
 
-  async command(_: QueryRequest): Promise<void> {
+  async command(): Promise<void> {
     throw new Error("This billing registry test did not expect a ClickHouse command");
   }
 }

@@ -1,4 +1,4 @@
-import { generate, parse } from "../dist/index.js";
+import { generate, parse } from "../src/index.ts";
 
 console.log("=== Basic KSUID Usage ===");
 

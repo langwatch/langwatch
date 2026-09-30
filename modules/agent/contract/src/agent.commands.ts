@@ -5,7 +5,6 @@ import type * as connectedModule from "./config/connected.ts";
 import { HTTP_METHODS, httpAuthSchema, httpHeaderSchema } from "./config/http.ts";
 import {
   codeAgentConfigSchema,
-  connectedAgentConfigSchema,
   httpAgentConfigSchema,
   signatureAgentConfigSchema,
   voiceAgentConfigSchema,
@@ -58,7 +57,8 @@ const createAgentRequestVariants = [
   z.object({
     ...createAgentRequestBaseSchema.shape,
     type: z.literal("connected"),
-    config: connectedAgentConfigSchema,
+    // Create refuses connected agents (they register), so any config reaches that refusal.
+    config: z.record(z.string(), z.unknown()),
   }),
   z.object({
     ...createAgentRequestBaseSchema.shape,

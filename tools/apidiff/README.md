@@ -648,15 +648,20 @@ measure, including a 429), else 1 if anything is not PASS, else 0.
 
 Under SaaS the instance-admin routes answer 404 (`instanceAdminDoor`), so the
 admin key is unusable. The phase probes `GET /api/organizations` with the key
-once per side; on a 404 it logs one line, drops the key, seeds through the
-no-key path and defers every scenario that needs it (`shard: org`, auth
-`admin`, `org-c`, `org-c-org`). They are listed by id on a `deferred:
+once per side; on a 404 it logs one line and drops the key. It then signs the
+seeded admin in and makes every second organization (`shard: org`, `org-c`,
+`org-c-org`, `project-c`) through that session: tRPC
+`organization.createAndAssign`, then `apiKey.create` for an organization admin
+key. What SaaS cannot run is deferred: scenarios using auth `admin`, ones
+marked `selfHosted: true` (a route Cloud does not serve), and, when the
+sign-in fails, every scenario that needs a second organization. They are
+listed by id on a `deferred:
 self-hosted pass` line, are not in the tally and are not failures. A 401 or 403
 keeps the key. The same ids go to `deferred.txt` in the run directory, one per
 line, and `-scenario-id @<file>` reads them back (a file naming no id is
 refused, since no pattern would select every scenario). `diffsuite
 -deployment self-hosted -deferred <file>` runs them on a self-hosted stack
-(`tools/diffsuite/README.md`).
+(`tools/diffsuite/README.md`). `-dry-run` prints how many a SaaS run defers.
 `scenarios.jsonl` lands in the run directory (`-run-dir` in the standalone
 mode). Under diffsuite, `-a`/`-mail-a` default to its branch stack and
 `-b`/`-mail-b` to its main stack when it has one (`tools/diffsuite/README.md`).
@@ -721,7 +726,9 @@ mode). Under diffsuite, `-a`/`-mail-a` default to its branch stack and
   user), `{projectId}`, `{orgId}`, `{projectKey}`, `{orgKey}`, `{teamId}` and
   every capture.
 - **Expect:** `body: { key: "<any>" }` is present and not null;
-  `body: { key: "<absent>" }` is not in the body at all. Methods: GET, HEAD,
+  `body: { key: "<absent>" }` is not in the body at all;
+  `headers: { Deprecation: "true" }` wants each named response header to
+  contain the text (the name is case-insensitive). Methods: GET, HEAD,
   POST, PUT, PATCH, DELETE (no multipart bodies yet).
 - **Absolute-URL and raw-body steps:** a request whose path is a placeholder
   that expands to an `http(s)://` URL (`request: "PUT {uploadUrl}"`, with

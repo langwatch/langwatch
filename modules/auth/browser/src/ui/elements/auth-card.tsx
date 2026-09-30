@@ -4,7 +4,7 @@ import { BrandedCard } from "@langwatch/design-system/branded-card";
 import "./auth-front-door.css";
 import type { ReactNode } from "react";
 
-/** Glass card container for all auth screens; centered on desktop, full-bleed on mobile. */
+/** The branded card for every auth screen; its hooks let the door animate the card. */
 export function AuthCard({
   title,
   intro,
@@ -24,7 +24,6 @@ export function AuthCard({
       title={title}
       intro={intro}
       footer={finePrint}
-      className="lw-front-door-card"
       cardAttributes={{ "data-auth-card": true }}
       logoAttributes={{ "data-auth-card-logo": true }}
       bodyAttributes={{ "data-auth-card-body": true }}

@@ -33,7 +33,7 @@ function loginKey(overrides: Pick<StoredApiKey, "id" | "createdAt">): StoredApiK
     ingestSourceType: null,
     ingestionTemplateId: null,
     updatedAt: overrides.createdAt,
-    roleBindings: [],
+    grants: [],
     hashedSecret: "hashed",
     ...overrides,
   };

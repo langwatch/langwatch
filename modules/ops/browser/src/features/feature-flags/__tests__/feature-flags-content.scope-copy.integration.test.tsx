@@ -37,6 +37,23 @@ const FLAGS = [
     lastEditedBy: null,
     updatedAt: null,
   },
+  {
+    key: "ops_es_targeted_killswitch",
+    scope: "SYSTEM" as const,
+    defaultValue: false,
+    description: "Halts a targeted pipeline.",
+    family: null,
+    storedValue: false,
+    rules: [
+      { match: { organizationId: "organization_a" }, enabled: true },
+      { match: { organizationId: "organization_b" }, enabled: true },
+      { match: { projectId: "project_a" }, enabled: true },
+    ],
+    envOverride: null,
+    effective: false,
+    lastEditedBy: "operator_a",
+    updatedAt: "2026-09-28T11:52:42.000Z",
+  },
 ];
 
 const isSaas = vi.fn(() => true);
@@ -178,6 +195,15 @@ describe("the Ops feature flags page", () => {
 
       expect(screen.queryByText("All customers")).toBeNull();
       expect(screen.queryByText(/whole fleet/i)).toBeNull();
+    });
+  });
+
+  describe("when a rule has switched a flag on for some organizations and projects", () => {
+    it("says so under the toggle while the toggle itself reads off", () => {
+      renderPage();
+
+      expect(screen.getAllByText(/^Enabled for /)).toHaveLength(1);
+      expect(screen.getByText("Enabled for 2 organizations, 1 project")).toBeDefined();
     });
   });
 });

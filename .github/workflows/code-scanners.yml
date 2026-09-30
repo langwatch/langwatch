@@ -243,10 +243,16 @@ jobs:
       # remedy is the same version bump this commit demonstrates.
       # v1.8.0 or newer: v1.1.4 builds SSA with x/tools v0.29, which panics on
       # the Go 1.27 standard library.
+      # One run per workspace module: there is no root go.mod, and
+      # govulncheck refuses a directory that is not inside a module.
       - name: govulncheck
         run: |
-          go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 \
-            ./services/... ./pkg/... ./cmd/... ./tools/...
+          rc=0
+          for m in cmd pkg services tools; do
+            echo "==> govulncheck $m"
+            (cd "$m" && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...) || rc=1
+          done
+          exit "$rc"
 
   python-advisories:
     name: pip-audit (report-only)

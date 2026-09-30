@@ -291,7 +291,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Retention Policies</PageLayout.Heading>
+        <PageLayout.Heading>Data Retention</PageLayout.Heading>
         <Spacer />
         <ScopeFilter
           value={scopeFilter}
@@ -301,16 +301,15 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
           currentProjectId={projectId}
         />
         {canWrite && (
-          <PageLayout.HeaderButton
-            variant="solid"
-            colorPalette="blue"
-            onClick={() => setDrawerOpen(true)}
-          >
+          <PageLayout.HeaderButton onClick={() => setDrawerOpen(true)}>
             Add retention policy
           </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text color="fg.muted">
+          How long your traces, scenarios and experiments are kept before deletion.
+        </Text>
         {!canConfigureRetention && snapshot && (
           <Alert.Root status="info">
             <Alert.Indicator />

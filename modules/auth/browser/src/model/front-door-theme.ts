@@ -59,15 +59,7 @@ export const frontDoorThemeConfig = defineConfig({
           detail: mode(brand[500], orange300(0.75)),
           focusRing: mode(orange(0.22), orange300(0.22)),
           glow: mode(orange(0.28), orange300(0.22)),
-          /** Glass card background: transparent pane showing ground beneath. */
-          cardBg: mode(white(0.3), "rgba(10, 10, 12, 0.54)"),
-          /**
-           * On paper the border is a shadow's job done with a line: a soft
-           * dark hairline. The white(0.85) it used to be read as a bright
-           * ring around the card on a pale ground — an outline, not an edge.
-           */
-          cardBorder: mode("rgba(20, 20, 23, 0.09)", white(0.1)),
-          /** Fields are the same idea, one step down. */
+          /** Fields: a translucent pane over the card's glass. */
           fieldBg: mode(white(0.62), white(0.06)),
           fieldBorder: mode("rgba(20, 20, 23, 0.14)", white(0.14)),
         },

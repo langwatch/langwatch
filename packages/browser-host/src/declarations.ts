@@ -100,7 +100,7 @@ export type UiInlineCommandPaletteProps = { placeholder: string };
 /** Project's lent switcher needs nothing handed in: it reads the scope and the graph itself. */
 export type UiProjectSwitcherProps = Record<string, never>;
 
-/** Organization's lent card of people waiting to join needs nothing handed in: it reads the scope itself. */
+/** Organization's lent card of people waiting to join needs nothing handed in: it reads scope. */
 export type UiPendingJoinRequestsProps = Record<string, never>;
 
 /** What project's settings form hands organization's lent department row. */
@@ -285,7 +285,7 @@ export type UiEditModelProviderFormProps = {
   onSaved?: (saved: { chatModel?: string }) => void;
   /** Onboarding's presentation: Connect wording, model pills, no settings chrome. */
   guided?: boolean;
-  /** Why the connection did not happen: a refused credential, or a sign-in that failed or timed out. */
+  /** Why the connection did not happen: a refused credential, or a failed or timed-out sign-in. */
   onFailed?: (failure: { provider: string; code: string }) => void;
 };
 

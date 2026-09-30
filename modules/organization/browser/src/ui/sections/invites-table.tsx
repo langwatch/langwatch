@@ -80,7 +80,7 @@ export const InviteRow = ({
 
   return (
     <IdentityRow
-      // An invitation names an address and nothing else; a name from the local part would be a guess.
+      // An invitation names an address only; a name from the local part would be a guess.
       name={invite.email}
       address={null}
       data-testid="invite-row"

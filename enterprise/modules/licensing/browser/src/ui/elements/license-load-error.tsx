@@ -1,4 +1,4 @@
-import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import { Alert, Button } from "@chakra-ui/react";
 
 /**
  * Shown when the license status could not be fetched. Distinct from having no
@@ -7,17 +7,18 @@ import { Box, Button, Text, VStack } from "@chakra-ui/react";
  */
 export function LicenseLoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
-      <VStack align="start" gap={4}>
-        <Text fontWeight="medium">Unable to load license</Text>
-        <Text color="fg.muted">
+    <Alert.Root status="error">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Unable to load license</Alert.Title>
+        <Alert.Description>
           Your license status could not be retrieved. Please try again or contact support if the
           issue persists.
-        </Text>
-        <Button onClick={onRetry} size="sm">
-          Retry
-        </Button>
-      </VStack>
-    </Box>
+        </Alert.Description>
+      </Alert.Content>
+      <Button size="sm" variant="outline" colorPalette="orange" onClick={onRetry}>
+        Retry
+      </Button>
+    </Alert.Root>
   );
 }

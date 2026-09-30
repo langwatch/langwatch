@@ -28,7 +28,13 @@ export const automationWeb = defineWebModule("automation")
     automation: {
       load: async () => ({
         default: (await import("./features/authoring/ui/sections/automation-drawer.tsx"))
-          .AutomationDrawer,
+          .RegisteredAutomationDrawer,
+      }),
+    },
+    viewAutomation: {
+      load: async () => ({
+        default: (await import("./features/authoring/ui/sections/view-automation-drawer.tsx"))
+          .RegisteredViewAutomationDrawer,
       }),
     },
   })

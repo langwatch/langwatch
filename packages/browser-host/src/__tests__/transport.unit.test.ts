@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { isUiBatchRequest, uiBatchResponse } from "../testing";
 import { createUiFeatureApiClient } from "../transport";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
@@ -17,7 +18,9 @@ function transportOver(bodies: unknown[]): {
   const queue = [...bodies];
   const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     calls.push({ url: requestUrl(input), method: init?.method ?? "GET" });
-    return new Response(JSON.stringify(queue.shift()), {
+    const body = queue.shift();
+    if (isUiBatchRequest(init) && Array.isArray(body)) return uiBatchResponse({ results: body });
+    return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -100,13 +103,11 @@ describe("when a feature sends an answer on its way out of the document", () => 
     const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       urls.push(input instanceof Request ? input.url : input.toString());
       inits.push(init ?? {});
-      return new Response(
-        JSON.stringify(urls.length === 1 ? resultOf("kept") : [resultOf("other")]),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
+      if (isUiBatchRequest(init)) return uiBatchResponse({ results: [resultOf("other")] });
+      return new Response(JSON.stringify(resultOf("kept")), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
     }) as typeof globalThis.fetch;
     const client = createUiFeatureApiClient({ fetch });
     const outputs = await Promise.all([

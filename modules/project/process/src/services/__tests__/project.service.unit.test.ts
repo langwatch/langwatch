@@ -335,11 +335,11 @@ class StubOrganizationService extends OrganizationServiceContract {
     throw new Error("not used by this test");
   }
 
-  addGroupBinding(): Promise<never> {
+  addGroupGrant(): Promise<never> {
     throw new Error("not used by this test");
   }
 
-  removeGroupBinding(): Promise<never> {
+  removeGroupGrant(): Promise<never> {
     throw new Error("not used by this test");
   }
 

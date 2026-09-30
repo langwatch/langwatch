@@ -35,7 +35,7 @@ function makeRepository(name: string): ApiKeyRepository {
     ingestionTemplateId: null,
     createdAt: new Date("2026-01-01T00:00:00Z"),
     updatedAt: new Date("2026-01-01T00:00:00Z"),
-    roleBindings: [],
+    grants: [],
     hashedSecret: "hashed",
   };
   return Object.assign(MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }), {

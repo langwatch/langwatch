@@ -4,6 +4,7 @@ import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import type { DataPrivacySnapshot } from "./data-privacy.snapshot.ts";
 import type {
   DataPrivacyConfig,
+  DataPrivacyPiiRedactionLevel,
   DataPrivacyPolicy,
   DataPrivacyScope,
   ResolvedDataPrivacy,
@@ -22,8 +23,6 @@ export type DataPrivacyScopeTarget = {
   scope: DataPrivacyScope;
   personalOnly: boolean;
 };
-
-export type DataPrivacyPiiRedactionLevel = "STRICT" | "ESSENTIAL" | "DISABLED";
 
 export type DataPrivacyLogRecord = {
   body: string;
@@ -71,6 +70,14 @@ export interface DataPrivacyApi {
     organizationId: string;
     scope: DataPrivacyScope;
     personalOnly: boolean;
+  }): Promise<void>;
+
+  /** The level this project's PII is redacted at; a custom entity list reads as STRICT. */
+  getPiiRedactionLevel(input: { projectId: string }): Promise<DataPrivacyPiiRedactionLevel>;
+  /** Writes the level into the project's own rule, keeping every other field it sets. */
+  setPiiRedactionLevel(input: {
+    projectId: string;
+    level: DataPrivacyPiiRedactionLevel;
   }): Promise<void>;
 
   /**

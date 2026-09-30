@@ -78,7 +78,7 @@
     - request: "GET /api/v1/prompts/tags"
       expect: {"status": 200, "contains": "vdrenamed-{uid}", "notContains": "vdtag-{uid}"}
     - request: "DELETE /api/v1/prompts/tags/vdrenamed-{uid}"
-      expect: {"status": 200}
+      expect: {"status": 204}
 
 # The client reads `message` (or `error.message`) and `code` off a refusal to build its text.
 - id: "mcp-prompts-unknown-refusal-carries-message"
@@ -157,6 +157,8 @@
       expect: {"status": 200, "contains": ["mon-{uid}", "checkType"]}
     - request: "DELETE /api/v1/monitors/{monitorId}"
       expect: {"status": 200, "body": {"id": "{monitorId}", "deleted": true}}
+  teardown:
+    - request: "DELETE /api/v1/monitors/{monitorId}"
 
 # scenarios: platform_create_scenario, update, archive (reads `archived`)
 - id: "mcp-scenarios-create-update-archive"

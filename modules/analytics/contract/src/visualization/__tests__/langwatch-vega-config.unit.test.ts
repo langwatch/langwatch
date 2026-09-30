@@ -60,6 +60,7 @@ describe("the LangWatch Vega configuration", () => {
   describe("given resolved theme tokens", () => {
     describe("when a configuration is built for light and for dark", () => {
       /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
+      /** @scenario "The chart follows LangWatch theming in light and dark modes" */
       it("takes every font, colour and size from the tokens it was given", () => {
         for (const colorMode of COLOR_MODES) {
           const tokens = colorMode === "dark" ? DARK_TOKENS : LIGHT_TOKENS;
@@ -99,6 +100,7 @@ describe("the LangWatch Vega configuration", () => {
       });
 
       /** @scenario "Chart mode preserves data and offers an accessible table fallback" */
+      /** @scenario "The chart follows LangWatch theming in light and dark modes" */
       it("reads differently in each mode rather than sharing one palette", () => {
         const light = configFor("light");
         const dark = configFor("dark");

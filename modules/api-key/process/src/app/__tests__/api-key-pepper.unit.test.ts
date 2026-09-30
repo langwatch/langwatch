@@ -42,7 +42,7 @@ async function appOver({
     ingestSourceType: null,
     ingestionTemplateId: null,
     startsDisabled: false,
-    roleBindings: [],
+    grants: [],
   });
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
 

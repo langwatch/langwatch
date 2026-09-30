@@ -217,6 +217,7 @@ class ApiSurface {
       audit: trpcAudit(peers.find(AuditLogApi)),
       throttle: rateLimiter ? { limiter: rateLimiter, policies: {} } : void 0,
       facts: this.#trpcFacts(),
+      sessionVersions: this.authz,
     });
   }
 

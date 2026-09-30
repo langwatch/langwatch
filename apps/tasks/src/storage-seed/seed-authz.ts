@@ -7,13 +7,9 @@ import {
   bindingRoleKeyOf,
   STORED_PRINCIPAL_KIND,
   type GrantEventSource,
+  type GrantScopeTier,
 } from "@langwatch/authz-contract";
-import type {
-  Prisma,
-  PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient, TeamUserRole } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 const SEED_GRANT_SOURCE: GrantEventSource = "grants-service";
@@ -24,7 +20,7 @@ export type SeedGrantBinding = {
   principal: { type: "user" | "apiKey"; id: string };
   role: TeamUserRole;
   customRoleId?: string | null;
-  scope: { type: RoleBindingScopeType; id: string };
+  scope: { type: GrantScopeTier; id: string };
 };
 
 export type SeedRoleProjection = {

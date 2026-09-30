@@ -13,11 +13,18 @@ export const SUITE_NAME_REQUIRED = "A test suite needs a name.";
 
 export type SuiteNameDialogProps = {
   open: boolean;
+  /** True while the suite is being created, so a second submit cannot send it twice. */
+  isCreating?: boolean;
   onClose: () => void;
   onConfirm: (name: string) => void;
 };
 
-export function SuiteNameDialog({ open, onClose, onConfirm }: SuiteNameDialogProps) {
+export function SuiteNameDialog({
+  open,
+  isCreating = false,
+  onClose,
+  onConfirm,
+}: SuiteNameDialogProps) {
   const [name, setName] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -28,6 +35,7 @@ export function SuiteNameDialog({ open, onClose, onConfirm }: SuiteNameDialogPro
   }, [open]);
 
   const submit = () => {
+    if (isCreating) return;
     const trimmed = name.trim();
     if (!trimmed) {
       setProblem(SUITE_NAME_REQUIRED);
@@ -75,7 +83,13 @@ export function SuiteNameDialog({ open, onClose, onConfirm }: SuiteNameDialogPro
           <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button colorPalette="blue" size="sm" onClick={submit} data-testid="suite-name-confirm">
+          <Button
+            colorPalette="blue"
+            size="sm"
+            loading={isCreating}
+            onClick={submit}
+            data-testid="suite-name-confirm"
+          >
             Create
           </Button>
         </Dialog.Footer>

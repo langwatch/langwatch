@@ -34,12 +34,12 @@ import {
 import { useActivePlan } from "../../../behavior/use-active-plan.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { CreateGroupDialog } from "../../../ui/sections/create-group-dialog.tsx";
+import { GroupDetailDialog } from "../../../ui/sections/group-detail-dialog.tsx";
 import {
   roleBadgeColor,
   SourceBadge,
   scopeTypeLabel,
-} from "../../../ui/sections/group-binding-input-row.tsx";
-import { GroupDetailDialog } from "../../../ui/sections/group-detail-dialog.tsx";
+} from "../../../ui/sections/group-grant-input-row.tsx";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 
@@ -141,7 +141,7 @@ export default function GroupsScreen() {
                       </Table.Cell>
                       <Table.Cell>
                         <VStack gap={1} align="end">
-                          {g.bindings.map((b, i) => (
+                          {g.grants.map((b, i) => (
                             <HStack key={i} gap={1} fontSize="xs">
                               <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
                                 {b.customRoleName ?? b.role}
@@ -152,7 +152,7 @@ export default function GroupsScreen() {
                               </Badge>
                             </HStack>
                           ))}
-                          {g.bindings.length === 0 && (
+                          {g.grants.length === 0 && (
                             <Text fontSize="xs" color="fg.subtle" textAlign="right">
                               No access configured
                             </Text>

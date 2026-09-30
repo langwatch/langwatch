@@ -1,12 +1,12 @@
 // Who holds a custom role and where, folded out of the assignments (main's roleHolders.ts).
 
-import type { RoleBindingScopeType } from "@langwatch/authz-contract";
+import type { GrantScopeTier } from "@langwatch/authz-contract";
 
-import type { RoleBinding } from "./role-binding-principals.ts";
+import type { ManagedGrant } from "./managed-grant.ts";
 
 /** One place a role is in force. */
 export type GrantScope = {
-  scopeType: RoleBindingScopeType;
+  scopeType: GrantScopeTier;
   scopeId: string;
   scopeName: string | null;
 };
@@ -22,7 +22,7 @@ export type Holder = {
   directory: string | null;
 };
 
-const SCOPE_ORDER: Record<RoleBindingScopeType, number> = {
+const SCOPE_ORDER: Record<GrantScopeTier, number> = {
   ORGANIZATION: 0,
   TEAM: 1,
   PROJECT: 2,
@@ -30,7 +30,7 @@ const SCOPE_ORDER: Record<RoleBindingScopeType, number> = {
 
 const KIND_ORDER: Record<Holder["kind"], number> = { person: 0, group: 1, apiKey: 2 };
 
-function holderOf(binding: RoleBinding): Holder {
+function holderOf(binding: ManagedGrant): Holder {
   const shared = { userId: binding.userId, image: binding.userImage, directory: null };
   if (binding.userId) {
     return {
@@ -70,7 +70,7 @@ export function holdersOfCustomRole({
   assignments,
   customRoleId,
 }: {
-  assignments: readonly RoleBinding[];
+  assignments: readonly ManagedGrant[];
   customRoleId: string;
 }): Holder[] {
   const holders = new Map<string, Holder>();
@@ -79,7 +79,7 @@ export function holdersOfCustomRole({
     const holder = holderOf(binding);
     if (!holders.has(holder.key)) holders.set(holder.key, holder);
   }
-  return [...holders.values()].sort(
+  return [...holders.values()].toSorted(
     (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name),
   );
 }
@@ -89,7 +89,7 @@ export function peopleHoldingCustomRole({
   assignments,
   customRoleId,
 }: {
-  assignments: readonly RoleBinding[];
+  assignments: readonly ManagedGrant[];
   customRoleId: string;
 }): number {
   const people = new Set<string>();
@@ -106,7 +106,7 @@ export function scopesOfCustomRole({
   assignments,
   customRoleId,
 }: {
-  assignments: readonly RoleBinding[];
+  assignments: readonly ManagedGrant[];
   customRoleId: string;
 }): GrantScope[] {
   const scopes = new Map<string, GrantScope>();
@@ -118,7 +118,7 @@ export function scopesOfCustomRole({
       scopeName: binding.scopeName,
     });
   }
-  return [...scopes.values()].sort(
+  return [...scopes.values()].toSorted(
     (a, b) =>
       SCOPE_ORDER[a.scopeType] - SCOPE_ORDER[b.scopeType] ||
       (a.scopeName ?? "").localeCompare(b.scopeName ?? ""),

@@ -231,6 +231,7 @@ describe("mintVoiceSession", () => {
     });
 
     describe("when the project has no key", () => {
+      /** @scenario "A session mint without a provider key is refused with the key-missing code" */
       it("refuses with the missing-key message and never calls the transport", async () => {
         const runner = fakeRunner();
         const ports = fakePorts({
@@ -672,6 +673,7 @@ describe("finishVoiceSession", () => {
     });
 
     describe("when the provider record names a different agent than the token", () => {
+      /** @scenario "A finish whose conversation ran against another agent is refused" */
       it("refuses without writing the run", async () => {
         const runner = fakeRunner({
           getCallRecord: vi.fn(async (): Promise<CallRecord> => ({
@@ -1088,6 +1090,7 @@ describe("authorizeRecordingPlayback", () => {
     });
 
     describe("when there is no run and no saved row matches", () => {
+      /** @scenario "The recording proxy refuses a conversation that is neither a run nor a saved voice agent's call in the project" */
       it("refuses and never returns the credential", async () => {
         const ports = fakePorts({
           runner: fakeRunner({

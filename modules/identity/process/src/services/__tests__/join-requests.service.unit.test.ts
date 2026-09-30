@@ -91,12 +91,15 @@ function harness({
     withdrawJoin: vi.fn(async () => []),
     expireJoin: vi.fn(async () => []),
   };
-  const membership: JoinMembership = {
-    attachDefaultMembership: vi.fn(async () => undefined),
-    isMember: vi.fn(async ({ organizationId }) =>
+  const membership = {
+    attachDefaultMembership: vi.fn(async (_command: Record<string, unknown>) => undefined),
+    isMember: vi.fn(async ({ organizationId }: { organizationId: string }) =>
       memberOf ? memberOf.includes(organizationId) : isMember,
     ),
-  };
+    memberOrganizationIds: vi.fn(async ({ organizationIds }: { organizationIds: string[] }) =>
+      organizationIds.filter((id) => (memberOf ? memberOf.includes(id) : isMember)),
+    ),
+  } satisfies JoinMembership;
   const settings = {
     read: vi.fn(async () => setting),
     write: vi.fn(async () => undefined),
@@ -216,6 +219,24 @@ describe("given somebody who already belongs to one of the matches", () => {
       // beside the workspace somebody is already using reads as the product
       // not knowing who they are, and asking could only ever be refused.
       expect(decision).toEqual({ outcome: "none" });
+    });
+
+    /** @scenario Two organizations on one domain are both offered to ask */
+    it("asks about membership once for every candidate, not once per organization", async () => {
+      const many = Array.from({ length: 120 }, (_, index) => ({
+        ...acme,
+        organizationId: `org_${index}`,
+      }));
+      const { service, membership } = harness({ candidates: many, memberOf: ["org_7"] });
+
+      const decision = await service.lookup({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      expect(membership.memberOrganizationIds).toHaveBeenCalledTimes(1);
+      expect(membership.isMember).not.toHaveBeenCalled();
+      expect(decision.outcome === "ask" ? decision.organizations.length : 0).toBe(119);
     });
   });
 });

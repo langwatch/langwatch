@@ -88,7 +88,7 @@ export function EditProjectDrawer({
         },
         {
           onSuccess: () => {
-            void queryClient.team.getTeamsWithRoleBindings.invalidate();
+            void queryClient.team.getTeamsWithGrants.invalidate();
             void queryClient.team.getTeamsWithMembers.invalidate();
             void queryClient.organization.getAll.invalidate();
             toaster.create({

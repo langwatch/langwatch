@@ -38,3 +38,10 @@ Feature: A pipeline declares its tenants' retention
     Given a module whose projections write tenant rows, depending on data retention
     When its consuming pipeline is built
     Then the pipeline's retention resolver answers what data retention resolves for the tenant
+
+  @unit
+  Scenario: A job whose value fails its schema is refused once, not retried
+    Given a queue whose handler throws a schema error for the job's value
+    When the queue's worker handles the job
+    Then the failure is non-retryable so the job is not attempted again
+    And other failures still surface unchanged and retryable

@@ -137,6 +137,7 @@ describe("given an email deployment", () => {
     });
 
     /** @scenario "Every password field on the page masks what is typed into it" */
+    /** @scenario The dialog asks for current + new password in both modes */
     it("masks all three fields in the change dialog", async () => {
       renderSection();
 
@@ -148,6 +149,7 @@ describe("given an email deployment", () => {
     });
 
     describe("when the change succeeds", () => {
+      /** @scenario Successful change shows a toast and closes the dialog */
       it("sends both passwords, says so, and closes the dialog", async () => {
         const host = renderSection();
 
@@ -164,10 +166,61 @@ describe("given an email deployment", () => {
             expect.objectContaining({ title: "Password changed successfully" }),
           ),
         );
+        await waitFor(() => expect(screen.queryByLabelText(/Current Password/i)).toBeNull());
+      });
+    });
+
+    describe("when the server fails on submit", () => {
+      /** @scenario Server error keeps the dialog open and shows the error */
+      it("keeps the dialog open and shows nothing the server wrote", async () => {
+        state.changeRejectsWith = {
+          message: "AUTH0_CLIENT_SECRET scope missing",
+          data: { httpStatus: 500 },
+        };
+        const host = renderSection();
+
+        await openChangePassword();
+        await fillAndSubmit();
+
+        await waitFor(() => expect(host.recording.failures).toHaveLength(1));
+        expect(host.recording.failures[0]).toMatchObject({
+          fallbackTitle: "Couldn't change your password",
+        });
+        expect(host.recording.failures[0]?.description).toBeUndefined();
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+      });
+    });
+
+    describe("when the dialog is cancelled", () => {
+      /** @scenario Cancel button closes the dialog without submitting */
+      it("closes without calling the server", async () => {
+        renderSection();
+
+        await openChangePassword();
+        await userEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+
+        await waitFor(() => expect(screen.queryByLabelText(/Current Password/i)).toBeNull());
+        expect(calls.changePassword).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the dialog is reopened", () => {
+      /** @scenario Reopening the dialog clears any previously-typed values */
+      it("starts with the new password field empty", async () => {
+        renderSection();
+
+        await openChangePassword();
+        await userEvent.type(screen.getByLabelText(/^New Password$/i), "half-typed-secret");
+        await userEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+        await waitFor(() => expect(screen.queryByLabelText(/Current Password/i)).toBeNull());
+        await openChangePassword();
+
+        expect((screen.getByLabelText(/^New Password$/i) as HTMLInputElement).value).toBe("");
       });
     });
 
     describe("when the server rejects the current password", () => {
+      /** @scenario Wrong current password keeps the dialog open and shows an error */
       it("keeps the dialog open and carries the server's own sentence", async () => {
         state.changeRejectsWith = {
           message: "Current password is incorrect",
@@ -310,6 +363,18 @@ describe("given a self-hosted deployment behind an enterprise provider", () => {
     renderSection();
 
     expect(screen.getByTestId("password-action").textContent).toMatch(/Set a password/i);
+  });
+
+  /** @scenario The dialog asks for current + new password in both modes */
+  it("asks an Auth0 database identity for its current password as well", async () => {
+    state.authProvider = "auth0";
+    state.accounts = [{ id: "acc-db", provider: "auth0", providerAccountId: "auth0|abc" }];
+    renderSection();
+
+    await openChangePassword();
+
+    expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Confirm New Password/i)).toBeTruthy();
   });
 
   it("offers nothing under Auth0 to an account holding no database identity there", () => {

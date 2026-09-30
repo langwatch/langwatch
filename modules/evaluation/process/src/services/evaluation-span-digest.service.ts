@@ -1,4 +1,4 @@
-import type { Span, Trace, TraceApi } from "@langwatch/trace-contract";
+import type { Trace, TraceApi } from "@langwatch/trace-contract";
 
 import type { EvaluationSpanDigest } from "../app/evaluation.members.ts";
 
@@ -9,16 +9,13 @@ import type { EvaluationSpanDigest } from "../app/evaluation.members.ts";
  */
 const EVALUATION_THREAD_VIEW = "steps";
 
+type DigestRenderers = Pick<TraceApi, "renderReadableTrace" | "renderThreadTranscript">;
+
 /**
- * The budget a thread is rendered under for `formatted_traces`: well inside
- * the judge's default 128k-token limit even for JSON-dense tool results, so a
- * long thread is shortened turn by turn rather than skipped or cut blind.
+ * The `formatted_trace` and `formatted_traces` texts an evaluator reads,
+ * rendered under the judge's budget: a long trace keeps its tool calls and
+ * errors first, a long thread shortens turn by turn, and neither is skipped.
  */
-export const EVALUATION_THREAD_DIGEST_MAX_TOKENS = 64_000;
-
-type DigestRenderers = Pick<TraceApi, "formatSpansDigest" | "renderThreadTranscript">;
-
-/** The `formatted_trace` and `formatted_traces` texts an evaluator reads, rendered by trace. */
 export class EvaluationSpanDigestService implements EvaluationSpanDigest {
   static create(traces: DigestRenderers): EvaluationSpanDigestService {
     return new EvaluationSpanDigestService(traces);
@@ -26,22 +23,24 @@ export class EvaluationSpanDigestService implements EvaluationSpanDigest {
 
   private constructor(private readonly traces: DigestRenderers) {}
 
-  format(spans: Span[]): Promise<string> {
-    return this.traces.formatSpansDigest({ spans });
+  format({ trace, maxTokens }: { trace: Trace; maxTokens: number }): Promise<string> {
+    return this.traces.renderReadableTrace({ trace, maxTokens });
   }
 
   formatThread({
     threadKey,
     traces,
+    maxTokens,
   }: {
     threadKey: string;
     traces: readonly Trace[];
+    maxTokens: number;
   }): Promise<string> {
     return this.traces.renderThreadTranscript({
       threadKey,
       traces: traces.toSorted((a, b) => a.timestamps.started_at - b.timestamps.started_at),
       view: EVALUATION_THREAD_VIEW,
-      maxTokens: EVALUATION_THREAD_DIGEST_MAX_TOKENS,
+      maxTokens,
     });
   }
 }

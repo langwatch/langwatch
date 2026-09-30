@@ -10,6 +10,8 @@ export {
 } from "./email-sender.ts";
 export { MailRender } from "./mail-render.ts";
 export { mailTemplates } from "./templates/index.ts";
+export { digestUpdateSchema } from "./templates/digest-parts.tsx";
+export type { DigestUpdate } from "./templates/digest-parts.tsx";
 export { propsFormSchema, renderMailTemplate } from "./templates/registry.ts";
 export type { MailFixture, MailTemplate } from "./templates/registry.ts";
 export { expressive } from "./templates/email-layout.tsx";

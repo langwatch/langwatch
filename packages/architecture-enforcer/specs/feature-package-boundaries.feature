@@ -85,6 +85,13 @@ Feature: Feature package boundary lint
     Then each forbidden dependency is reported
 
   @unit @architecture
+  Scenario: A contract manifest cannot declare a server runtime
+    Given a contract package.json declares eventing, a raw store client or a process runtime
+    And no contract source imports it
+    When architecture lint checks the package
+    Then the declared dependency is reported
+
+  @unit @architecture
   Scenario: Feature contracts remain transport-neutral
     Given governed feature source imports a Hono-specific Zod adapter
     When architecture lint checks the package
@@ -326,3 +333,10 @@ Feature: Feature package boundary lint
     And the second declares the first as a devDependency
     When architecture lint checks the fixture workspace
     Then it reports a package cycle, because Nx orders tasks over devDependencies too
+
+  @unit @architecture
+  Scenario: A cycle through a framework package is a package cycle
+    Given a feature contract depends on a package under packages/
+    And that package depends back on the contract
+    When architecture lint checks the fixture workspace
+    Then it reports the package cycle, although the framework package is no feature package

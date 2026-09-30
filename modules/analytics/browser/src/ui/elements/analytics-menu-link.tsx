@@ -64,7 +64,12 @@ export const MenuLink = ({
     >
       <HStack width="full" gap={2} minWidth={0}>
         {icon}
-        <Text fontSize="sm" truncate minWidth={0}>
+        <Text
+          fontSize="sm"
+          truncate
+          minWidth={0}
+          title={typeof children === "string" ? children : void 0}
+        >
           {children}
         </Text>
         <Spacer />

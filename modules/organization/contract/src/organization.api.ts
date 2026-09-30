@@ -10,21 +10,21 @@ import type { Instant } from "@langwatch/time";
 
 import type { GroupDetail, GroupListItem, GroupMembershipView } from "./group.responses.ts";
 import type {
-  AddOrganizationGroupBindingInput,
+  AddOrganizationGroupGrantInput,
   ApplyOrganizationGroupEditsInput,
   ChangeOrganizationGroupMemberInput,
   CreateOrganizationGroupInput,
   DeleteOrganizationGroupInput,
   GetOrganizationGroupInput,
   OrganizationGroup,
-  OrganizationGroupBinding,
+  OrganizationGroupGrant,
   OrganizationGroupDetails,
   OrganizationGroupPage,
   OrganizationGroupSummary,
   ListMemberOrganizationGroupsInput,
   ListOrganizationGroupsInput,
   RenameOrganizationGroupInput,
-  RemoveOrganizationGroupBindingInput,
+  RemoveOrganizationGroupGrantInput,
 } from "./group.ts";
 import type {
   JoinRequestAdmitted,
@@ -531,13 +531,13 @@ export interface OrganizationApi {
   ): Promise<void>;
   addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
   removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
-  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]>;
-  addGroupBinding(
-    input: Omit<AddOrganizationGroupBindingInput, "actor">,
+  listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupGrant[]>;
+  addGroupGrant(
+    input: Omit<AddOrganizationGroupGrantInput, "actor">,
     by: OrganizationCaller,
-  ): Promise<OrganizationGroupBinding>;
-  removeGroupBinding(
-    input: Omit<RemoveOrganizationGroupBindingInput, "actor">,
+  ): Promise<OrganizationGroupGrant>;
+  removeGroupGrant(
+    input: Omit<RemoveOrganizationGroupGrantInput, "actor">,
     by: OrganizationCaller,
   ): Promise<void>;
   applyGroupEdits(
@@ -545,7 +545,7 @@ export interface OrganizationApi {
     by: OrganizationCaller,
   ): Promise<void>;
   resolveBindingScopeNames(
-    input: Readonly<{ organizationId: string; bindings: readonly OrganizationGroupBinding[] }>,
+    input: Readonly<{ organizationId: string; bindings: readonly OrganizationGroupGrant[] }>,
   ): Promise<ReadonlyMap<string, string>>;
   getPersonalWorkspaceFeatures(
     input: Omit<PersonalWorkspaceFeaturesInput, "callerUserId">,

@@ -39,6 +39,7 @@ describe("voice session token", () => {
     });
 
     describe("when the signature does not match the secret", () => {
+      /** @scenario "A finish with an invalid or expired session token is refused" */
       it("refuses as an invalid session", () => {
         const token = signVoiceSessionToken({
           payload: PAYLOAD,
@@ -72,6 +73,7 @@ describe("voice session token", () => {
     });
 
     describe("when the token has expired", () => {
+      /** @scenario "A finish with an invalid or expired session token is refused" */
       it("refuses as an invalid session", () => {
         const token = signVoiceSessionToken({
           payload: PAYLOAD,

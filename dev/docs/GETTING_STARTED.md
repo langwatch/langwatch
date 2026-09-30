@@ -115,7 +115,7 @@ Go data-plane services share another (`go`). It is a launcher, not a process
 role: each application still parses its own config and composes its own graph,
 and `dev:api` + `dev:worker` still run them apart when you need the production
 process shape. Both lanes restart on change, debounced by
-`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (750 ms), so a burst of edits is one restart.
+`LANGWATCH_DEV_WATCH_DEBOUNCE_MS` (2 s, at most 30 s after the first change), one restart at a time.
 
 Every port derives from `PORT` (default 5560): the ui lane binds it, the api
 `PORT + 1000`, the worker's metrics listener `PORT - 2561`, the gateway

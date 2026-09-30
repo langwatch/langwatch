@@ -18,7 +18,7 @@ import {
 /**
  * Whether the caller holds a membership on this team — `organization.getAll`
  * narrows `team.members` to the caller's own row, synthesizing one from
- * a RoleBinding when the legacy membership row is absent.
+ * a grant when the legacy membership row is absent.
  */
 export function userBelongsToTeam(team: Pick<UiScopeTeam, "members">, userId: string): boolean {
   return team.members?.some((member) => member.userId === userId) ?? false;

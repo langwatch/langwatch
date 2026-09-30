@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
-import { ApiKeyBindingIdService } from "../api-key-binding-id.service.ts";
+import { ApiKeyGrantIdService } from "../api-key-grant-id.service.ts";
 import { ApiKeyTokenService } from "../api-key-token.service.ts";
 import { ApiKeyService } from "../api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
@@ -69,7 +69,7 @@ function setup(rows: ApiKeyRow[], options: { childrenUnreadable?: boolean } = {}
     grants,
     organizations: createApiFixture<OrganizationApi>({}),
     projects: createApiFixture<ProjectApi>({}),
-    bindingIds: ApiKeyBindingIdService.create(),
+    bindingIds: ApiKeyGrantIdService.create(),
     legacyGrants: LegacyApiKeyGrantService.create({
       authz,
       grants,

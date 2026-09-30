@@ -1,4 +1,4 @@
-import { Button, Text, VStack } from "@chakra-ui/react";
+import { Button, Text } from "@chakra-ui/react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signOut, useSession } from "../../behavior/auth-client.tsx";
@@ -27,31 +27,29 @@ function SsoTestCompleteCard() {
 
   return (
     <AuthCard title="That test sign-in worked">
-      <VStack width="full" align="stretch" gap="14px">
-        <Text color="fg.muted">
-          Your identity provider signed you in
-          {signedInAs ? <> as {signedInAs}</> : null}, which is exactly what the test was for.
-        </Text>
-        <Text color="fg.muted">
-          That address is not a member of {organizationName ?? "your organization"} yet, because the
-          connection is not turned on, so there is nothing here for it to do. Sign back in as
-          yourself to finish turning the connection on.
-        </Text>
-        <Button
-          className="lw-front-door-primary"
-          width="full"
-          minHeight="44px"
-          fontSize="14px"
-          fontWeight={600}
-          backgroundColor="frontDoor.action"
-          color="frontDoor.onAction"
-          _hover={{ backgroundColor: "frontDoor.actionHover" }}
-          onClick={() => void signOut()}
-          data-testid="sso-test-complete-sign-out"
-        >
-          Sign back in as yourself
-        </Button>
-      </VStack>
+      <Text color="fg.muted">
+        Your identity provider signed you in
+        {signedInAs ? <> as {signedInAs}</> : null}, which is exactly what the test was for.
+      </Text>
+      <Text color="fg.muted">
+        That address is not a member of {organizationName ?? "your organization"} yet, because the
+        connection is not turned on, so there is nothing here for it to do. Sign back in as yourself
+        to finish turning the connection on.
+      </Text>
+      <Button
+        className="lw-front-door-primary"
+        width="full"
+        minHeight="44px"
+        fontSize="14px"
+        fontWeight={600}
+        backgroundColor="frontDoor.action"
+        color="frontDoor.onAction"
+        _hover={{ backgroundColor: "frontDoor.actionHover" }}
+        onClick={() => void signOut()}
+        data-testid="sso-test-complete-sign-out"
+      >
+        Sign back in as yourself
+      </Button>
     </AuthCard>
   );
 }

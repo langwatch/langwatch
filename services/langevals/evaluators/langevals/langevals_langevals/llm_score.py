@@ -116,7 +116,7 @@ class CustomLLMScoreEvaluator(
                                 "properties": {
                                     "reasoning": {
                                         "type": "string",
-                                        "description": "use this field to break down the task and explain your reasoning in multiple sub-scores, using it to combine into a final score",
+                                        "description": "A short justification, written before the score: the parts of the task, the evidence in the content for each (quote the values or name the tool result), and how they combine into the final score",
                                     },
                                     "final_score": {
                                         "type": "number",
@@ -125,7 +125,7 @@ class CustomLLMScoreEvaluator(
                                 },
                                 "required": ["reasoning", "final_score"],
                             },
-                            "description": "Record the evaluation: a short reasoning first, then the final score.",
+                            "description": "Record the evaluation: a short justification that cites the evidence in the content, then the final score.",
                         },
                     },
                 ],

@@ -63,7 +63,7 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   // A float or an integer: the grammar already refused anything else, so Number() reads it whole.
   Number: (n) => Number(n.sourceString),
   Boolean: (b) => b.sourceString === "True",
-  null: (_) => null,
+  null: (_1) => null,
   AngleBracket: (_1, content, _2) => `<${content.sourceString}>`,
   UUID: (uuid, b, c) => uuid.sourceString + b.sourceString + c.sourceString,
   identifier: (first, rest) => first.sourceString + rest.sourceString,

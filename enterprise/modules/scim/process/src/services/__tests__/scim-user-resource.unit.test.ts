@@ -305,6 +305,7 @@ describe("the organization's own directory resource", () => {
   });
 
   /** @scenario "Inactive directory resources remain readable without granting access" */
+  /** @scenario An inactive directory resource can be deleted without a membership */
   it("keeps an inactive resource readable, editable and deletable without membership", async () => {
     const store = new DirectoryStore();
     store.accounts.set("user-0", account({ id: "user-0", email: "member@example.test" }));

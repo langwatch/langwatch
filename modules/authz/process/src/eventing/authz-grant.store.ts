@@ -16,11 +16,7 @@ import { z } from "zod";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
-import {
-  BindingMissingError,
-  DuplicateBindingError,
-  type RoleBindingWrite,
-} from "../repositories/authz-grant.repository.ts";
+import { BindingMissingError, type GrantWrite } from "../repositories/authz-grant.repository.ts";
 import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
@@ -70,7 +66,7 @@ export type LedgerWriteSource = GrantEventSource;
 const CONVERGENCE_POLL_MS = 250;
 const CONVERGENCE_TIMEOUT_MS = 8_000;
 
-export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId"> & {
+export type LedgerBindingAttach = Omit<GrantWrite, "organizationId"> & {
   /** Internal generation captured by a membership transaction. Callers that
    *  create the membership before emitting leave this unset; the writer reads
    *  and locks the live row itself. */
@@ -193,7 +189,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     bindings: LedgerBindingAttach[];
     actor: LedgerActor;
     source?: LedgerWriteSource;
-    onDuplicate: "reject" | "skip";
+    onDuplicate: "attach" | "skip";
     /**
      * A caller-derived command id, for writes that are not a user action and therefore have no
      * retry to remember one (decision 23: migration-shaped writers derive theirs from the
@@ -329,8 +325,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }: {
     organizationId: string;
     bindings: LedgerBindingAttach[];
-    onDuplicate: "reject" | "skip";
+    onDuplicate: "attach" | "skip";
   }): Promise<{ fresh: LedgerBindingAttach[]; duplicates: string[] }> {
+    if (onDuplicate === "attach") return { fresh: bindings, duplicates: [] };
     // ONE query for the whole batch, keyed by the identity tuples: a
     // `findFirst` per binding made a SCIM sync of 200 seats 200 round trips.
     // `OR` over the same tuple the per-binding lookup built, so the rows it
@@ -350,9 +347,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       // storage yet, so there is none to name.
       const existingId = seen.has(key) ? binding.bindingId : existingByIdentity.get(key);
       if (existingId !== undefined) {
-        if (onDuplicate === "reject") {
-          throw new DuplicateBindingError();
-        }
         duplicates.push(existingId);
         continue;
       }
@@ -534,8 +528,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
 
   /**
    * UPDATE the role one binding carries, keeping its identity. A binding with
-   * no live grant is missing; a sibling already holding the target role at the
-   * same scope is a duplicate.
+   * no live grant is missing; a sibling holding the target role is allowed.
    */
   async changeBindingRole({
     organizationId,
@@ -546,7 +539,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }: {
     organizationId: string;
     bindingId: string;
-    role: RoleBindingWrite["role"];
+    role: GrantWrite["role"];
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {
@@ -564,19 +557,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
 
     const to = roleKeyFor({ role, customRoleId });
     if (row.roleKey === to) return;
-    const sibling = await liveGrants(this.options.database).findFirst({
-      where: {
-        organizationId,
-        principalType: row.principalType,
-        principalId: row.principalId,
-        scopeType: row.scopeType,
-        scopeId: row.scopeId,
-        roleKey: to,
-        id: { not: bindingId },
-      },
-      select: { id: true },
-    });
-    if (sibling) throw new DuplicateBindingError();
 
     await (
       await this.commands()

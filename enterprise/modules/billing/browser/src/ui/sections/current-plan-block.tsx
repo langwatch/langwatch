@@ -1,8 +1,14 @@
 /**
  * Current Plan Block - displays the active subscription
  */
-import { Badge, Box, Button, Card, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Alert, Button, HStack, SimpleGrid, Text } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
+import {
+  SettingList,
+  SettingRow,
+  SettingsCard,
+  StatusChip,
+} from "@langwatch/design-system/settings-card";
 import { Check } from "lucide-react";
 
 import { PricingSummary } from "../../ui/elements/pricing-summary.tsx";
@@ -36,129 +42,105 @@ export function CurrentPlanBlock({
   deprecatedNotice?: boolean;
   contactSalesUrl?: string;
 }) {
+  const hasActions = onManageSubscription || contactSalesUrl;
   return (
-    <Card.Root data-testid="current-plan-block" borderWidth={1} borderColor="border">
-      <Card.Body paddingY={5} paddingX={6}>
-        <VStack align="stretch" gap={5}>
-          <Flex justifyContent="space-between" alignItems="flex-start">
-            <VStack align="start" gap={1}>
-              <HStack gap={3}>
-                <Text fontWeight="semibold" fontSize="lg">
-                  {planName}
-                </Text>
-                <Badge
-                  colorPalette="blue"
-                  variant="outline"
-                  borderRadius="md"
-                  paddingX={2}
-                  paddingY={0.5}
-                  fontSize="xs"
-                >
-                  Current
-                </Badge>
-                {upgradeRequired && (
-                  <Badge
-                    colorPalette="orange"
-                    variant="subtle"
-                    borderRadius="md"
-                    paddingX={2}
-                    paddingY={0.5}
-                    fontSize="xs"
-                  >
-                    Upgrade required
-                  </Badge>
-                )}
-              </HStack>
-              {pricing && (
-                <PricingSummary
-                  totalPrice={pricing.totalPrice}
-                  seatCount={pricing.seatCount}
-                  perSeatPrice={pricing.perSeatPrice}
-                />
-              )}
-            </VStack>
-            <VStack align="end" gap={0}>
-              <Text color="fg.muted" fontSize="sm">
-                Members / Seats
-              </Text>
-              {onUserCountClick ? (
-                <Box
-                  as="button"
-                  onClick={onUserCountClick}
-                  textDecoration="underline"
-                  _hover={{ color: "blue.fg", cursor: "pointer" }}
-                  color="fg"
-                >
-                  <Text fontWeight="semibold" fontSize="lg" data-testid="user-count-link">
-                    {maxSeats != null ? `${userCount}/${maxSeats}` : userCount}
-                  </Text>
-                </Box>
-              ) : (
-                <Text fontWeight="semibold" fontSize="lg" color="fg" data-testid="user-count-link">
-                  {maxSeats != null ? `${userCount}/${maxSeats}` : userCount}
-                </Text>
-              )}
-            </VStack>
-          </Flex>
-          {features && (
-            <SimpleGrid
-              data-testid="current-plan-features-grid"
-              templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
-              gap={3}
-            >
-              {features.map((feature, index) => (
-                <HStack key={index} gap={2}>
-                  <Check size={16} color="var(--chakra-colors-blue-solid)" />
-                  <Text fontSize="sm" color="fg.muted">
-                    {feature}
-                  </Text>
-                </HStack>
-              ))}
-            </SimpleGrid>
-          )}
-          {deprecatedNotice && (
-            <Box data-testid="tiered-deprecated-notice" paddingTop={1}>
-              <Text fontSize="sm" color="fg.muted">
-                You are on a legacy tiered pricing model.{" "}
-                <Link
-                  href="/settings/plans"
-                  fontWeight="semibold"
-                  color="fg"
-                  _hover={{ color: "fg" }}
-                >
-                  Update your plan
-                </Link>{" "}
-                to move to seat and usage billing.
-              </Text>
-            </Box>
-          )}
-          {onManageSubscription && (
+    <SettingsCard
+      data-testid="current-plan-block"
+      title={planName}
+      tone="ok"
+      hint={
+        pricing && (
+          <PricingSummary
+            totalPrice={pricing.totalPrice}
+            seatCount={pricing.seatCount}
+            perSeatPrice={pricing.perSeatPrice}
+          />
+        )
+      }
+      badge={
+        <HStack gap={2}>
+          <StatusChip label="Current" tone="good" />
+          {upgradeRequired && <StatusChip label="Upgrade required" tone="warning" />}
+        </HStack>
+      }
+      actions={
+        hasActions ? (
+          <>
+            {onManageSubscription && (
+              <Button
+                data-testid="manage-subscription-button"
+                variant="outline"
+                size="sm"
+                onClick={onManageSubscription}
+                loading={isManageLoading}
+                disabled={isManageLoading}
+              >
+                Manage subscription
+              </Button>
+            )}
+            {contactSalesUrl && (
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                colorPalette="orange"
+                data-testid="contact-sales-button"
+              >
+                <Link unstyled href={contactSalesUrl} isExternal>
+                  Contact us to upgrade
+                </Link>
+              </Button>
+            )}
+          </>
+        ) : undefined
+      }
+    >
+      <SettingList>
+        <SettingRow label="Members / seats">
+          <Text fontSize="13px" fontWeight={600} fontVariantNumeric="tabular-nums">
+            {maxSeats != null ? `${userCount} / ${maxSeats}` : userCount}
+          </Text>
+          {onUserCountClick && (
             <Button
-              data-testid="manage-subscription-button"
+              data-testid="user-count-link"
               variant="outline"
-              size="sm"
-              onClick={onManageSubscription}
-              loading={isManageLoading}
-              disabled={isManageLoading}
+              size="xs"
+              onClick={onUserCountClick}
             >
-              Manage Subscription
+              Manage seats
             </Button>
           )}
-          {contactSalesUrl && (
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              colorPalette="orange"
-              data-testid="contact-sales-button"
-            >
-              <Link href={contactSalesUrl} isExternal fontWeight="semibold">
-                Contact us to Upgrade
-              </Link>
-            </Button>
-          )}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+        </SettingRow>
+      </SettingList>
+      {features && (
+        <SimpleGrid
+          data-testid="current-plan-features-grid"
+          templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
+          gap={2}
+          color="fg.muted"
+        >
+          {features.map((feature) => (
+            <HStack key={feature} gap={2} alignItems="start">
+              <Check size={16} />
+              <Text fontSize="sm">{feature}</Text>
+            </HStack>
+          ))}
+        </SimpleGrid>
+      )}
+      {deprecatedNotice && (
+        <Alert.Root status="info" data-testid="tiered-deprecated-notice">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>
+              You are on a legacy tiered pricing model.{" "}
+              <Link href="/settings/plans" color="orange.fg">
+                Update your plan →
+              </Link>{" "}
+              to move to seat and usage billing.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+    </SettingsCard>
   );
 }

@@ -42,12 +42,7 @@ export function CodexSignIn({
     onConnected,
   });
   const { phase, connected } = signIn;
-  const failedCode =
-    phase.name === "error"
-      ? phase.timedOut
-        ? "codex_sign_in_timed_out"
-        : "codex_sign_in_failed"
-      : null;
+  const failedCode = phase.name === "error" ? failureCodeOf({ timedOut: phase.timedOut }) : null;
   const reportFailure = useEffectEvent((code: NonNullable<typeof failedCode>) => onFailed?.(code));
   useEffect(() => {
     if (failedCode) reportFailure(failedCode);
@@ -171,6 +166,10 @@ function PendingApprovalPanel({
       </HStack>
     </VStack>
   );
+}
+
+function failureCodeOf({ timedOut }: { timedOut: boolean }) {
+  return timedOut ? "codex_sign_in_timed_out" : "codex_sign_in_failed";
 }
 
 function startLabel({ phase, guided }: { phase: CodexSignInPhase; guided: boolean }): string {

@@ -6,6 +6,9 @@ import type {
 } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import {
+  DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+  DOMAIN_CLAIMED_EVENT_TYPE,
+  emptySsoConnection,
   type IdentifierFact,
   type IdentityHistoryEntry,
   LINK_CONFIRMED_EVENT_TYPE,
@@ -13,6 +16,9 @@ import {
   LINK_REJECTED_EVENT_TYPE,
   type LinkProposalRecord,
   PROPOSE_LINK_COMMAND_TYPE,
+  reduceSsoConnection,
+  type IdentityCommand,
+  type IdentityFactInput,
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
@@ -24,13 +30,19 @@ import { MemoryIdentityHistoryRepository } from "../repositories/memory/memory.i
 import { MemoryIdentityLookupRepository } from "../repositories/memory/memory.identity-lookup.repository.ts";
 import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
+import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
+import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import {
   IdentityLookupService,
   type IdentityLookupServiceDeps,
 } from "../services/identity-lookup.service.ts";
-import type { IdentityService } from "../services/identity.service.ts";
+import { IdentityService } from "../services/identity.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
+import { fact, headsWith, InMemoryHeads, USER } from "./support/in-memory-heads.ts";
+import { InMemoryReservations } from "./support/in-memory-reservations.ts";
+import { InMemoryUsers } from "./support/in-memory-users.ts";
 
 /**
  * D05 tier 1 end to end at the read surface: the real service, the real
@@ -559,5 +571,186 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
       expect(auditLog.rows[0]?.action).toBe("identityLookup.confirmProposedSignIn");
       expect(store.identityEvents.map((event) => event.type)).toEqual([LINK_PROPOSED_EVENT_TYPE]);
     });
+  });
+});
+
+describe("identity lookup, what an operator sees waiting on a person", () => {
+  /** @scenario "Outstanding invitations are listed with what is left of them" */
+  it("lists an unaccepted invitation with organization, sender and expiry, and flags one past its expiry", async () => {
+    reads.users.set("user_sam", { userId: "user_sam", name: "Sam", email: "sam@acme.com" });
+    reads.invitations.push(
+      {
+        inviteId: "inv_live",
+        email: "sam@acme.com",
+        organizationId: "org_acme",
+        organizationName: "Acme",
+        invitedByName: "Riley",
+        status: "PENDING",
+        expiresAtMs: 5_000,
+      },
+      {
+        inviteId: "inv_old",
+        email: "sam@acme.com",
+        organizationId: "org_globex",
+        organizationName: "Globex",
+        invitedByName: "Jo",
+        status: "PENDING",
+        expiresAtMs: 500,
+      },
+    );
+    const lookup = IdentityLookupService.create({
+      reads,
+      history: new EmptyIdentityHistory(),
+      router: { route: async () => CONNECTED_ROUTE },
+      identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
+      links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
+      sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
+        listBrowserSessions: async () => [],
+      }),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+      platformOperators: new FakeOperators(new Set([OLIVE.userId])),
+      auditLog,
+      rateLimiter: noopRateLimiter(),
+      now: () => 1_000,
+    });
+
+    const detail = await lookup.getLookupPerson({
+      userId: "user_sam",
+      address: "sam@acme.com",
+      operator: OLIVE,
+    });
+
+    expect(detail.waiting.invitations).toEqual([
+      expect.objectContaining({
+        inviteId: "inv_live",
+        organizationName: "Acme",
+        invitedByName: "Riley",
+        expiresAtMs: 5_000,
+        isExpired: false,
+      }),
+      expect.objectContaining({
+        inviteId: "inv_old",
+        organizationName: "Globex",
+        invitedByName: "Jo",
+        expiresAtMs: 500,
+        isExpired: true,
+      }),
+    ]);
+  });
+});
+
+describe("identity lookup, detaching a sign-in method", () => {
+  class RecordingLedger implements IdentityLedger {
+    commits: { command: IdentityCommand; facts: IdentityFactInput[] }[] = [];
+
+    async commit({ command, facts }: { command: IdentityCommand; facts: IdentityFactInput[] }) {
+      this.commits.push({ command, facts });
+      return facts.map((stated) => ({ ...stated, occurredAt: command.data.occurredAtMs }));
+    }
+  }
+
+  /** @scenario "Detaching a method somebody has a replacement for takes effect and is recorded" */
+  it("records olive on the detachment and leaves only the work method signing sam in", async () => {
+    const heads = new InMemoryHeads();
+    heads.heads.set(
+      USER,
+      headsWith(
+        fact({ identifierId: "idf_work", value: "sam@acme.com", domain: "acme.com" }),
+        fact({ identifierId: "idf_personal", value: "sam@home.example", domain: "home.example" }),
+      ),
+    );
+    const ledger = new RecordingLedger();
+    const identity = IdentityService.create(
+      IdentityGuardsService.create({
+        heads,
+        users: new InMemoryUsers(),
+        reservations: new InMemoryReservations(),
+        identifiers: CryptoIdentifierIdentityService.create(),
+      }),
+      ledger,
+    );
+    const lookup = IdentityLookupService.create({
+      reads,
+      history: new EmptyIdentityHistory(),
+      router: { route: async () => CONNECTED_ROUTE },
+      identity: () => identity,
+      links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
+      sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({}),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+      platformOperators: new FakeOperators(new Set([OLIVE.userId])),
+      auditLog,
+      rateLimiter: noopRateLimiter(),
+    });
+
+    await lookup.detachLookupMethod({
+      userId: USER,
+      identifierId: "idf_personal",
+      operator: OLIVE,
+    });
+
+    expect(auditLog.rows[0]).toMatchObject({
+      userId: OLIVE.userId,
+      action: "identityLookup.detachMethod",
+      targetId: USER,
+    });
+    expect(ledger.commits).toHaveLength(1);
+    expect(ledger.commits[0]?.facts[0]).toMatchObject({
+      data: { identifierId: "idf_personal", actor: { type: "user", id: OLIVE.userId } },
+    });
+    heads.fold(USER, ledger.commits[0]?.facts ?? []);
+    expect(heads.heads.get(USER)?.identifiers.idf_personal?.state).toBe("DETACHED");
+    expect(heads.heads.get(USER)?.identifiers.idf_work?.state).toBe("VERIFIED");
+    await expect(
+      heads.getActiveIdentifierByValue({ normalizedValue: "sam@home.example" }),
+    ).rejects.toMatchObject({ code: "identity_identifier_not_found" });
+    await expect(
+      heads.getActiveIdentifierByValue({ normalizedValue: "sam@acme.com" }),
+    ).resolves.toEqual({ userId: USER, identifierId: "idf_work" });
+  });
+});
+
+describe("identity lookup, the claims queue and how long a claim waited", () => {
+  const ANA = { type: "user" as const, id: "user_ana" };
+
+  function claimedAt({ connectionId, claimedAtMs }: { connectionId: string; claimedAtMs: number }) {
+    return reduceSsoConnection({
+      state: { ...emptySsoConnection({ connectionId }), organizationId: `org_${connectionId}` },
+      fact: {
+        type: DOMAIN_CLAIMED_EVENT_TYPE,
+        data: { connectionId, domain: `${connectionId}.example`, actor: ANA, source: "self-serve" },
+        occurredAt: claimedAtMs,
+      },
+    });
+  }
+
+  /** @scenario "How long a claim waited is recorded from the day the queue exists" */
+  it("opens the longest-waiting claim first, and a decision records how long it waited", async () => {
+    store.ssoConnections.set("newer", claimedAt({ connectionId: "newer", claimedAtMs: 9_000 }));
+    store.ssoConnections.set("older", claimedAt({ connectionId: "older", claimedAtMs: 2_000 }));
+    store.organizationNames.set("org_older", "Older Co");
+    store.organizationNames.set("org_newer", "Newer Co");
+
+    const queue = await service.findDomainClaimQueue({ operator: OLIVE });
+
+    expect(queue.map((claim) => claim.domain)).toEqual(["older.example", "newer.example"]);
+    expect(queue.map((claim) => claim.waitingSinceMs)).toEqual([2_000, 9_000]);
+
+    const decided = reduceSsoConnection({
+      state: claimedAt({ connectionId: "older", claimedAtMs: 2_000 }),
+      fact: {
+        type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        data: {
+          connectionId: "older",
+          domain: "older.example",
+          actor: { type: "user", id: "user_ops" },
+          authority: "platform-operator",
+          source: "self-serve",
+        },
+        occurredAt: 5_000,
+      },
+    });
+    expect(decided.domainClaims).toEqual([
+      expect.objectContaining({ domain: "older.example", state: "APPROVED", waitedMs: 3_000 }),
+    ]);
   });
 });

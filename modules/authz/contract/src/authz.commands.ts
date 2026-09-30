@@ -10,11 +10,7 @@ import {
   legacyBindingRoleSchema,
   resourceGrantTermsSchema,
 } from "./authz-grant.events.ts";
-import {
-  grantableAuthzScopeRefSchema,
-  roleBindingScopeTypeSchema,
-  teamUserRoleSchema,
-} from "./authz.ts";
+import { grantableAuthzScopeRefSchema, grantScopeTierSchema, teamUserRoleSchema } from "./authz.ts";
 
 export const ATTACH_GRANT_COMMAND_TYPE = "lw.authz_grant.attach" as const;
 export const CHANGE_GRANT_ROLE_COMMAND_TYPE = "lw.authz_grant.change_role" as const;
@@ -199,7 +195,7 @@ export const authzLedgerBindingAttachSchema = z
     principal: authzLedgerBindingPrincipalSchema,
     role: teamUserRoleSchema,
     customRoleId: z.string().min(1).nullable(),
-    scopeType: roleBindingScopeTypeSchema,
+    scopeType: grantScopeTierSchema,
     scopeId: z.string().min(1),
     /** When the binding stops granting; the writing service refuses a moment already passed. */
     expiresAtMs: z.number().int().optional(),
@@ -246,7 +242,9 @@ export const authzAttachBindingsInputSchema = z
     bindings: z.array(authzLedgerBindingAttachSchema),
     actor: grantsLedgerActorSchema,
     source: authzLedgerWriteSourceSchema.optional(),
-    onDuplicate: z.enum(["reject", "skip"]),
+    /** `attach` writes every binding, identical ones included (bindings are
+     *  never unique); `skip` leaves out one the principal already holds. */
+    onDuplicate: z.enum(["attach", "skip"]),
     commandId: z.string().min(1).optional(),
     occurredAtMs: z.number().int().nonnegative().optional(),
     awaitProjection: z.boolean().optional(),
@@ -421,7 +419,7 @@ export const authzBindingFilterSchema = z
     groupId: z.string().min(1).optional(),
     apiKeyId: z.string().min(1).optional(),
     customRoleId: z.union([z.string().min(1), authzStringSetFilterSchema]).optional(),
-    scopeType: roleBindingScopeTypeSchema.optional(),
+    scopeType: grantScopeTierSchema.optional(),
     scopeId: z.string().min(1).optional(),
     id: z.union([z.string().min(1), authzBindingIdFilterSchema]).optional(),
   })

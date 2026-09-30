@@ -734,7 +734,7 @@ langwatch teams members add team_01HZ... user_01HZX... user_01HZY... --role MEMB
 langwatch teams members remove team_01HZ... user_01HZX...
 ```
 
-`--copy-members-from` adds every member of the source team with the role they hold there. A member holding only a custom role is listed as not copied; bind it with `langwatch role-bindings create`. `teams members add` takes several users; one that cannot be added does not stop the rest, and the command fails naming it.
+`--copy-members-from` adds every member of the source team with the role they hold there. A member holding only a custom role is listed as not copied; grant it with `langwatch grants create`. `teams members add` takes several users; one that cannot be added does not stop the rest, and the command fails naming it.
 
 ### Groups
 
@@ -787,32 +787,43 @@ langwatch roles delete <custom_role_id>
 
 `langwatch roles update` replaces the permission set with the `--permission` flags you pass, so send the full list you want the role to end up with. A role something still holds cannot be deleted: the error says how many bindings and assignments are in the way.
 
-### Role bindings
+### Grants
 
-A binding is one sentence: this principal has this role, here. Users, groups and API keys are all principals.
+A grant is one sentence: this principal holds this role, here. Users, groups and API keys are all principals. Built-in roles are `admin`, `member` and `viewer`; a custom role is its id.
 
 ```bash
-langwatch role-bindings list
-langwatch role-bindings list --principal-type user --principal-id user_01HZX...
-langwatch role-bindings list --scope-type PROJECT --scope-id proj_01HZX...
+langwatch roles list --built-in    # admin, member and viewer
+langwatch roles list --no-built-in # custom roles only
 
-langwatch role-bindings create \
+langwatch grants list
+langwatch grants list --principal-type user --principal-id user_01HZX...
+langwatch grants list --scope-type project --scope-id proj_01HZX... --status active
+
+langwatch grants create \
   --principal-type group --principal-id group_01HZ... \
-  --role MEMBER \
-  --scope-type TEAM --scope-id team_01HZ...
+  --role member \
+  --scope-type team --scope-id team_01HZ... \
+  --idempotency-key onboard-group-01HZ
 
-# A service credential, scoped to one project through a custom role
-langwatch role-bindings create \
+# A service credential, scoped to one project through a custom role, with an end date
+langwatch grants create \
   --principal-type api-key --principal-id key_01HZX... \
-  --role CUSTOM --custom-role-id <custom_role_id> \
-  --scope-type PROJECT --scope-id proj_01HZX...
+  --role <custom_role_id> \
+  --scope-type project --scope-id proj_01HZX... \
+  --expires-at 2027-01-01T00:00:00Z
 
-langwatch role-bindings update <binding_id> --role ADMIN
-
-langwatch role-bindings delete <binding_id>
+langwatch grants get <grant_id>
+langwatch grants change-role <grant_id> --role admin
+langwatch grants revoke <grant_id>
 ```
 
-Creating a binding that already exists reports `role_binding_already_exists` rather than making a second one, so a provisioning script can run twice. Updating changes only the role a binding grants; the principal and the scope are the binding's identity, so moving a grant means deleting one binding and creating another.
+`grants list` prints one page; pass the `--cursor` it prints to read the next. Each create makes a new grant, so a provisioning script that may run twice passes `--idempotency-key`: a repeat with the same key and flags returns the first grant. `change-role` changes only the role; the principal and the scope are the grant's identity, so moving a grant means revoking it and creating another.
+
+You cannot grant a role carrying permissions you do not hold at that scope, and an API key is judged by its own permissions, not its owner's. The refusal, `grant_exceeds_caller_permissions`, lists the permissions you lack under **Details**. See [Roles & access](/platform/roles-and-access).
+
+### Role bindings (deprecated)
+
+`langwatch role-bindings list|create|update|delete` still works against the same records, and prints a deprecation warning on stderr pointing to `langwatch grants`. Move scripts to `grants`; the flags map as in the [migration table](/api-reference/role-bindings/overview#migrating-to-grants).
 
 ### SCIM tokens
 

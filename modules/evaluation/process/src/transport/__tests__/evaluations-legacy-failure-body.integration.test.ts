@@ -6,9 +6,21 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { describe, expect, it } from "vitest";
+import type * as observabilityModule from "@langwatch/observability";
+import { describe, expect, it, vi } from "vitest";
 
 import { evaluationsLegacyRest } from "../evaluations-legacy.rest.ts";
+
+const loggerSpies = vi.hoisted(() => ({
+  warn: vi.fn(),
+  info: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof observabilityModule>()),
+  createLogger: () => loggerSpies,
+}));
 
 const DRIVER_MESSAGE =
   "Can't reach database server at `clickhouse.internal.langwatch:8443` (P1001)";
@@ -58,6 +70,23 @@ describe("given the legacy evaluation batch log", () => {
       const body = await response.json();
       expect(JSON.stringify(body)).not.toContain("clickhouse.internal.langwatch");
       expect(body).toEqual({ error: "Internal server error" });
+    });
+  });
+
+  describe("when the body is not a valid batch", () => {
+    it("answers 400 and logs the refusal at warn, never error", async () => {
+      loggerSpies.warn.mockClear();
+      loggerSpies.error.mockClear();
+      const post = mount(() => Promise.reject(new Error("the write must not be reached")));
+
+      const response = await post({ run_id: 42 });
+
+      expect(response.status).toBe(400);
+      expect(loggerSpies.warn).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: PROJECT_ID }),
+        "invalid log_results data received",
+      );
+      expect(loggerSpies.error).not.toHaveBeenCalled();
     });
   });
 

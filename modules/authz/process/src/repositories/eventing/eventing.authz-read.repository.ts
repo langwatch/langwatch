@@ -3,7 +3,7 @@ import type {
   AuthzPrincipalRef,
   BindingRoleKey,
   CollectedBinding,
-  RoleBindingScopeType,
+  GrantScopeTier,
   ShareableResourceKind,
 } from "@langwatch/authz-contract";
 import { type Instant, fromDate } from "@langwatch/time";
@@ -27,7 +27,7 @@ const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
 /** The three scope tiers a `CollectedBinding` can carry. RESOURCE rows are
  *  the share tier (findShareLinks) and PLATFORM rows are dormant facts that
  *  no PR-3 decision reads, so neither belongs in a binding list. */
-const BINDING_SCOPE_TYPES: readonly RoleBindingScopeType[] = ["ORGANIZATION", "TEAM", "PROJECT"];
+const BINDING_SCOPE_TYPES: readonly GrantScopeTier[] = ["ORGANIZATION", "TEAM", "PROJECT"];
 
 type BindingGrantRow = {
   roleKey: string | null;
@@ -426,7 +426,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return null;
   }
 
-  private isBindingScope(scopeType: string): scopeType is RoleBindingScopeType {
+  private isBindingScope(scopeType: string): scopeType is GrantScopeTier {
     return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
   }
 

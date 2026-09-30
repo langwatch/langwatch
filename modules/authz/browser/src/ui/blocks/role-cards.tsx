@@ -115,8 +115,8 @@ export function CustomRoleCard({
     name: string;
     description: string | null;
     permissions: readonly string[];
-    /** As the wire carries it. */
-    createdAt: string;
+    /** As the wire carries it; null on a built-in role. */
+    createdAt: string | null;
   };
   holders: readonly Holder[];
   scopes: readonly GrantScope[];
@@ -222,9 +222,11 @@ export function CustomRoleCard({
           <RoleHolderStrip holders={holders} people={people} />
         </CardSection>
 
-        <Text fontSize="xs" color="fg.subtle">
-          Created {format(role.createdAt, "d MMM yyyy")}
-        </Text>
+        {role.createdAt && (
+          <Text fontSize="xs" color="fg.subtle">
+            Created {format(role.createdAt, "d MMM yyyy")}
+          </Text>
+        )}
       </Card.Body>
     </Card.Root>
   );

@@ -1,4 +1,4 @@
-import { Button, createListCollection, HStack, Spacer } from "@chakra-ui/react";
+import { createListCollection, HStack, Spacer } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Select } from "@langwatch/design-system/select";
@@ -30,7 +30,7 @@ export function SubscriptionPageHeader({
 }) {
   return (
     <PageLayout.Header>
-      <PageLayout.Heading>Billing</PageLayout.Heading>
+      <PageLayout.Heading>Subscription</PageLayout.Heading>
       <Spacer />
       <HStack gap={4} alignItems="center">
         {showPlanPickers && (
@@ -68,11 +68,11 @@ export function SubscriptionPageHeader({
             </Select.Root>
           </>
         )}
-        <Link href="/settings/plans">
-          <Button variant="ghost" size="sm" color="fg.muted">
+        <PageLayout.HeaderButton asChild>
+          <Link unstyled href="/settings/plans">
             All plans <ArrowRight size={14} />
-          </Button>
-        </Link>
+          </Link>
+        </PageLayout.HeaderButton>
       </HStack>
     </PageLayout.Header>
   );

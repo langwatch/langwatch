@@ -481,6 +481,6 @@ export function permissionsByArea(
     area,
     permissions: permissions
       .filter((permission) => resourceCopy(splitPermission(permission).resource).area === area)
-      .sort(),
+      .toSorted(),
   })).filter((group) => group.permissions.length > 0);
 }

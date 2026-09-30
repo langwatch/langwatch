@@ -62,6 +62,12 @@ For whoever is committing:
 - Never `git stash` in a shared checkout. The stash stack is global and a bare
   `stash push` takes every other agent's work with it.
 - Never open a PR or push unless the task says to.
+- Keep a PR body short: the squash merge makes it the commit message, and
+  release-please drops the whole commit from every release when a body line
+  starts like `word(` (for example `` `if(count(...)`` ``). Put run-throughs,
+  screenshot tables and long notes in a PR comment instead. If a merged PR was
+  skipped, add a `BEGIN_COMMIT_OVERRIDE` block of plain conventional lines at
+  the top of its body and re-run `release-please-sdks`.
 
 Generated and baseline files are dirty by default and cannot be sliced cleanly.
 Do not sweep them into someone else's commit; say which rows you closed and let

@@ -112,8 +112,6 @@ func writeAPIError(w http.ResponseWriter, status int, message string) {
 
 // listObjects reads every stored object's sidecar; a sidecar without its bytes is skipped.
 func (s *Server) listObjects() []objectInfo {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	sidecars, _ := filepath.Glob(filepath.Join(s.cfg.DataDir, "*.json"))
 	out := []objectInfo{}
 	for _, sidecar := range sidecars {
@@ -176,9 +174,10 @@ func (s *Server) lookup(w http.ResponseWriter, r *http.Request) (objectInfo, boo
 		writeAPIError(w, http.StatusBadRequest, "bucket and key are required")
 		return objectInfo{}, false
 	}
-	s.mu.Lock()
-	info, ok := readObject(s.path(obj) + ".json")
-	s.mu.Unlock()
+	target := s.path(obj)
+	unlock := s.lockObject(target)
+	info, ok := readObject(target + ".json")
+	unlock()
 	if !ok {
 		writeAPIError(w, http.StatusNotFound, "no such object")
 	}

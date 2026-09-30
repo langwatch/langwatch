@@ -58,7 +58,7 @@ export function BatchEvaluationV2EvaluationSummary({
       flexShrink={0}
     >
       <HStack width="100%" paddingY={4} paddingX={6} gap={5}>
-        {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
+        {Object.values(run.summary.evaluations).map((evaluation) => {
           return (
             <React.Fragment key={evaluation.name}>
               <VStack align="start" gap={1}>

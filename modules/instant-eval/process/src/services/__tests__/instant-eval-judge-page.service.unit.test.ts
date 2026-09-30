@@ -97,7 +97,8 @@ class PagedKeys implements Pick<InstantEvalRowSourceService, "keys"> {
   }): Promise<InstantEvalKeyPage> {
     const { after } = input;
     const start = after
-      ? this.all.findIndex((key) => key.traceId === after.traceId && key.spanId === after.spanId) + 1
+      ? this.all.findIndex((key) => key.traceId === after.traceId && key.spanId === after.spanId) +
+        1
       : 0;
     const end = start + input.limit;
 
@@ -331,7 +332,10 @@ describe("given a statement with two rows per trace", () => {
   describe("when the run is driven to its end with a page that cuts a trace in two", () => {
     /** @scenario "A run over several rows per trace judges every row" */
     it("judges every row once, none skipped by the page boundary", async () => {
-      const keys = ["t1", "t2", "t3"].flatMap((traceId) => [rowKey(traceId, "s1"), rowKey(traceId, "s2")]);
+      const keys = ["t1", "t2", "t3"].flatMap((traceId) => [
+        rowKey(traceId, "s1"),
+        rowKey(traceId, "s2"),
+      ]);
       const { service, judge } = await judging({
         keySource: new PagedKeys(keys),
         rows: keys.map((key) => ({
@@ -353,7 +357,7 @@ describe("given a statement with two rows per trace", () => {
         input = { ...input, afterTraceId: outcome.cursor, afterSpanId: outcome.cursorSpanId };
       }
 
-      expect(judge.requests.map((request) => request.text).sort()).toEqual(
+      expect(judge.requests.map((request) => request.text).toSorted()).toEqual(
         keys.map((key) => `${key.traceId}/${key.spanId}`),
       );
     });

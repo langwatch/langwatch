@@ -121,7 +121,7 @@ export function SignInErrorScreen() {
   if (bounceTo) {
     return (
       <AuthCard title="Taking you to your organization's sign-in">
-        <HStack gap={3}>
+        <HStack gap={3} justify="center">
           <Spinner size="sm" color="frontDoor.detail" />
           <Text color="fg.muted">One moment.</Text>
         </HStack>
@@ -140,11 +140,11 @@ export function SignInErrorScreen() {
   return (
     <AuthCard title="Taking you back to sign in">
       <VStack width="full" align="stretch" gap={4}>
-        <HStack gap={3}>
+        <HStack gap={3} justify="center">
           <Spinner size="sm" color="frontDoor.detail" />
           <Text color="fg.muted">One moment.</Text>
         </HStack>
-        <Text fontSize="13px" color="fg.muted">
+        <Text fontSize="13px" color="fg.muted" textAlign="center">
           If nothing happens,{" "}
           <Box
             asChild

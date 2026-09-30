@@ -59,7 +59,7 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
       team: {
         getTeamsWithMembers: invalidator("team.getTeamsWithMembers"),
         getTeamWithMembers: invalidator("team.getTeamWithMembers"),
-        getTeamsWithRoleBindings: invalidator("team.getTeamsWithRoleBindings"),
+        getTeamsWithGrants: invalidator("team.getTeamsWithGrants"),
       },
     }),
     team: {
@@ -141,7 +141,7 @@ describe("given the create-project drawer", () => {
         "limits.getUsage",
         "team.getTeamsWithMembers",
         "team.getTeamWithMembers",
-        "team.getTeamsWithRoleBindings",
+        "team.getTeamsWithGrants",
       ]);
     });
 

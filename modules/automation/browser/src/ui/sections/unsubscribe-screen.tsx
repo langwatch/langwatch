@@ -5,6 +5,7 @@
  */
 
 import { Button, Center, Spinner } from "@chakra-ui/react";
+import { Link } from "@langwatch/browser-host/link";
 import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
 import { useState } from "react";
 
@@ -32,7 +33,9 @@ export default function UnsubscribeScreen({ token }: { token: string }) {
         <BrandedCard
           title="Link not valid"
           intro="This unsubscribe link is invalid or has expired."
-        />
+        >
+          <GoToLangWatch />
+        </BrandedCard>
       );
     }
     if (resolved.isLoading || !resolved.data) {
@@ -55,7 +58,9 @@ export default function UnsubscribeScreen({ token }: { token: string }) {
                   resolved.data.triggerName ?? "this notification"
                 }.`
           }
-        />
+        >
+          <GoToLangWatch />
+        </BrandedCard>
       );
     }
     return (
@@ -80,4 +85,13 @@ export default function UnsubscribeScreen({ token }: { token: string }) {
   }
 
   return <BrandedCardPage>{renderUnsubscribeCard()}</BrandedCardPage>;
+}
+
+/** The one way onward from a finished or refused unsubscribe. */
+function GoToLangWatch() {
+  return (
+    <Button variant="outline" asChild>
+      <Link href="/">Go to LangWatch</Link>
+    </Button>
+  );
 }
