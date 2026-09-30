@@ -58,7 +58,7 @@ export const beforeUserCreate: NonNullable<
   >["before"]
 > = async (user) => {
   if (user.deactivatedAt) {
-    logger.warn({ email: user.email }, "Blocked signup: user is deactivated");
+    logger.warn("Blocked signup: user is deactivated");
     return false;
   }
   // No-op: org auto-assignment happens in the after-create hook so that we

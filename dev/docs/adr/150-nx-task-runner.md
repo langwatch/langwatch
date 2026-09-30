@@ -311,5 +311,8 @@ changed. Each such reader declares the globs in the `reads` table in
 `dev/nx/test-reads-plugin.mjs`, keyed by package name; the plugin exposes them
 as the `testReads` named input that `test` and `test:unit` take, so adding a
 reader is one row. The rows come from tracing real test runs, not from guessing.
+
+CI keeps the table true: `package-suites` loads `dev/nx/test-reads-hook.cjs` into the suites a
+change reaches, and `.github/scripts/check-test-reads.ts` fails the leg with the row to add.
 `@langwatch/test-harness` runs `git ls-files` over every tracked file, so its
 `test` is `cache: false`.

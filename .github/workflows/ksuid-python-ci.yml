@@ -57,7 +57,7 @@ jobs:
       - name: Run tests
         working-directory: packages/ksuid-python
         run: |
-          uv sync --dev
+          uv sync --dev --extra dev
           uv run pytest tests/ -v
 
       - name: Build package

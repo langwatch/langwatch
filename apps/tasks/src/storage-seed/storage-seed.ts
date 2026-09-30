@@ -57,7 +57,7 @@ const ADMIN_LOCAL_PART = "admin";
 const ADMIN_PASSWORD = "LocalHavenAdmin!2026";
 const ADMIN_NAME = "Haven Local Admin";
 
-/** Accounts of their own for the tools, so none answers the admin's passkey offer or sessions. */
+/** The tools' own accounts, so no tool answers the admin's passkey offer or sessions. */
 const TOOL_USERS = [
   { id: "local-dev-fuzz-ui-user", localPart: "fuzz-ui", name: "Fuzz UI" },
   { id: "local-dev-passkey-probe-user", localPart: "passkey-probe", name: "Passkey Probe" },
@@ -655,7 +655,7 @@ async function seedModelProviderFromEnv({
   const parsed = def.keysSchema.safeParse(keys);
   if (!parsed.success || missing.length > 0) {
     logger.info(
-      { provider, apiKey: def.apiKey, missing },
+      { provider, apiKeyEnvVar: def.apiKey, missing },
       "model provider skipped: its API key is set but the key set is incomplete",
     );
     return;

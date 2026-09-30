@@ -160,7 +160,7 @@
         "cache": true,
         "dependsOn": ["^build"],
         "inputs": [
-          "production",
+          "sdkBuild",
           "!{projectRoot}/src/internal/generated/**/*",
           "^production",
           "{workspaceRoot}/feature-map.json",
