@@ -1,5 +1,7 @@
+import type * as ObservabilityModule from "@langwatch/observability";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as AuthMiddlewareModule from "~/app/api/middleware/auth";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 
 // Mock TraceService to verify routing goes through it
@@ -48,7 +50,8 @@ vi.mock("~/server/traces/trace-formatting", () => ({
     .mockReturnValue("Input: hello\nOutput: world"),
 }));
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof ObservabilityModule>()),
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -73,8 +76,7 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 // strategy runs the real authMiddleware. Mock it to a passthrough so these
 // unit tests exercise the handler logic with an injected project, not real auth.
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual = await importOriginal<typeof AuthMiddlewareModule>();
   return {
     ...actual,
     authMiddleware: async (

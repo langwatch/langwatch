@@ -6,7 +6,7 @@ import { readFetchFailure } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatRelativeTime } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -74,7 +74,7 @@ export const listSimulationRunsCommand = async (options: {
         `${endpoint}/api/simulation-runs?${params.toString()}`,
         {
           method: "GET",
-          headers: buildAuthHeaders({ apiKey }),
+          headers: buildRequestHeaders({ apiKey }),
         },
       );
 

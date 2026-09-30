@@ -1,5 +1,7 @@
+import type * as ObservabilityModule from "@langwatch/observability";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as AuthMiddlewareModule from "~/app/api/middleware/auth";
 
 const mockRecordSpan = vi.fn().mockResolvedValue(undefined);
 
@@ -39,7 +41,8 @@ vi.mock("~/server/traces/trace-formatting", () => ({
   formatTraceSummaryDigest: vi.fn().mockReturnValue("digest"),
 }));
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof ObservabilityModule>()),
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -61,8 +64,7 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 });
 
 vi.mock("~/app/api/middleware/auth", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/app/api/middleware/auth")>();
+  const actual = await importOriginal<typeof AuthMiddlewareModule>();
   return {
     ...actual,
     authMiddleware: async (
