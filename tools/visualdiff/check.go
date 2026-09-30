@@ -52,6 +52,10 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 		fmt.Fprintln(streams.Err, "visualdiff check:", err)
 		return ExitOperational
 	}
+	if err := RunnerPreflight(ctx, parsed.root); err != nil {
+		fmt.Fprintln(streams.Err, "visualdiff check:", err)
+		return ExitOperational
+	}
 	times := checkTimes{}
 	side, err := checkSide(ctx, parsed, &times, streams.Err)
 	if err != nil {
@@ -82,6 +86,11 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 		}
 	}, OnPhase: progress.phase})
 	fmt.Fprintf(streams.Err, "check: phase flows %s, compare and close %s\n", progress.flowsTook().Round(time.Second), progress.windDown().Round(time.Second))
+	if failure := runnerFailure(stream, runErr); failure != "" {
+		fmt.Fprintln(streams.Err, "visualdiff check:", failure)
+		_ = os.WriteFile(filepath.Join(plan.OutDir, "check-report.md"), []byte("# visualdiff check\n\nRUNNER FAILED: "+failure+"\n"), 0o600)
+		return ExitOperational
+	}
 	outcome := results.outcome(checkOutcomeInputs{flows: config.Flows, done: done, diffs: stream.Diffs, held: held, took: time.Since(started)})
 	outcome.text += timingBlock(times, stream.Phases, time.Since(began))
 	fmt.Fprint(streams.Out, outcome.text)
@@ -99,6 +108,20 @@ func checkCommand(ctx context.Context, args []string, streams Streams) int {
 		return ExitFindings
 	}
 	return ExitClean
+}
+
+// runnerFailure names a runner that drove no candidate page, so a dead browser
+// reads as one failure rather than every flow UNPROVEN.
+func runnerFailure(stream RunnerStream, runErr error) string {
+	for _, capture := range stream.Captures {
+		if capture.Side != "base" {
+			return ""
+		}
+	}
+	if runErr != nil {
+		return "runner drove no page: " + runErr.Error()
+	}
+	return "runner drove no page and reported no error"
 }
 
 func parseCheckFlags(args []string, stderr io.Writer) (checkFlags, error) {

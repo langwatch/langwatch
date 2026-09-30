@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -149,5 +150,19 @@ func TestSharedStackLockMakesASecondLaneWait(t *testing.T) {
 	(<-acquired)()
 	if !strings.Contains(waited.String(), "waiting") {
 		t.Fatalf("the waiting lane said nothing: %q", waited.String())
+	}
+}
+
+func TestARunnerThatDroveNoCandidatePageIsOneRunnerFailure(t *testing.T) {
+	replayed := RunnerStream{Captures: []Capture{{Side: "base"}}}
+	if got := runnerFailure(replayed, errors.New("exit status 1")); got == "" {
+		t.Fatal("base replays alone must count as a runner failure")
+	}
+	if got := runnerFailure(RunnerStream{}, nil); got == "" {
+		t.Fatal("an empty stream must count as a runner failure")
+	}
+	drove := RunnerStream{Captures: []Capture{{Side: "base"}, {Side: "candidate"}}}
+	if got := runnerFailure(drove, errors.New("exit status 1")); got != "" {
+		t.Fatalf("a runner that drove pages is not a runner failure: %s", got)
 	}
 }
