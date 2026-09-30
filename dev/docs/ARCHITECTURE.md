@@ -255,6 +255,12 @@ test doubles go through the module's own test seams.
 One unowned service has one owning module: evaluation owns the langevals boundary — its endpoint,
 the S3 staging of large payloads and their config — and topic and workflow reach langevals through
 `EvaluationApi` (Alex, 2026-09-25).
+Workflow owns the NLP engine boundary the same way. The per-project studio fleet
+(`LANGWATCH_NLP_LAMBDA_CONFIG`) is workflow's own declared `Secret.load` handle, parsed at boot;
+its shared ARN cache and its staged oversized payloads are workflow repositories over the `redis`
+and `objectStorage` members, as evaluation stages langevals payloads. Precedence is main's: a
+named fleet wins, a named fleet that cannot be used refuses every run by name rather than falling
+back, no fleet and an address runs at the address, and neither refuses by name (Alex, 2026-09-30).
 Notification owns mail outright: its config, its provider and its sending. There is no mail member;
 auth, identity, user, automation and billing send through `NotificationApi.sendEmail`, which takes
 intent (`undisclosedRecipients`, `unsubscribe: { url }`, `replyless: { tag }`, which notification
