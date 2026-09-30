@@ -42,7 +42,7 @@ describe("given a signed-in reader", () => {
 
       expect(screen.getByTestId("profile-details-section")).toBeTruthy();
       expect(screen.getByTestId("sign-in-methods-summary")).toBeTruthy();
-      expect(screen.getByTestId("browser-sessions-section")).toBeTruthy();
+      expect(screen.getByTestId("browser-sessions-settings-section")).toBeTruthy();
       expect(screen.getByTestId("personal-api-keys-summary")).toBeTruthy();
     });
   });

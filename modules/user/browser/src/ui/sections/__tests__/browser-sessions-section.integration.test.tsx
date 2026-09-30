@@ -84,7 +84,7 @@ describe("given the browsers somebody is signed in on", () => {
         host: fakePersonalWorkspaceHost(),
       });
 
-      const band = within(screen.getByTestId("browser-sessions-section"));
+      const band = within(screen.getByTestId("browser-sessions-settings-section"));
       expect(band.getAllByText(/Chrome on macOS/).length).toBe(2);
       expect(band.getAllByText(/Email and password/).length).toBe(2);
       expect(band.getByText("This browser")).toBeTruthy();
@@ -111,8 +111,8 @@ describe("given the browsers somebody is signed in on", () => {
         host: fakePersonalWorkspaceHost(),
       });
 
-      const band = within(screen.getByTestId("browser-sessions-section"));
-      const buttons = band.getAllByRole("button", { name: "Sign out" });
+      const band = within(screen.getByTestId("browser-sessions-settings-section"));
+      const buttons = band.getAllByRole("button", { name: /^Sign out/ });
       expect(buttons.length).toBe(1);
       await userEvent.click(buttons[0]!);
 

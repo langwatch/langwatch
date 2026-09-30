@@ -32,7 +32,7 @@ export function BrowserSessionsSection() {
   const now = nowInstant();
 
   return (
-    <VStack align="start" gap={4} width="full" data-testid="browser-sessions-section">
+    <VStack align="start" gap={4} width="full" data-testid="browser-sessions-settings-section">
       <VStack align="start" gap={1}>
         <HStack gap={2}>
           <Monitor size={18} />
@@ -54,19 +54,25 @@ export function BrowserSessionsSection() {
 
       <VStack align="stretch" gap={2} width="full">
         {listed.map((session) => (
-          <HStack key={session.sessionId} width="full" gap={3} alignItems="start">
+          <HStack
+            key={session.sessionId}
+            width="full"
+            gap={3}
+            alignItems="start"
+            data-testid="browser-session-row"
+          >
             <Monitor size={16} />
             <VStack align="start" gap={0}>
               <HStack gap={2}>
                 <Text fontSize="sm">{browserSessionLabel(session.userAgent)}</Text>
                 {session.current && (
-                  <Badge colorPalette="green" size="sm">
+                  <Badge colorPalette="green" size="sm" data-testid="current-session-chip">
                     This browser
                   </Badge>
                 )}
                 {!session.current &&
                   isSessionStale({ lastActiveAt: session.lastActiveAt, now }) && (
-                    <Badge colorPalette="orange" size="sm">
+                    <Badge colorPalette="orange" size="sm" data-testid="stale-session-chip">
                       Not used lately
                     </Badge>
                   )}
@@ -83,6 +89,7 @@ export function BrowserSessionsSection() {
               <Button
                 size="xs"
                 variant="outline"
+                aria-label={`Sign out ${browserSessionLabel(session.userAgent)}`}
                 onClick={() => void end(session.sessionId)}
                 disabled={endSession.isPending}
               >
