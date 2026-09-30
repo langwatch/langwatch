@@ -103,20 +103,25 @@ func Run(ctx context.Context, opts Options) error {
 	llm := llmexecutor.New(dispatcheradapter.New(disp))
 	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
 
-	// The evaluator runtime calls models through the same dispatcher.
-	evaluatorsHandler, shutdownEvaluators, err := nlpgo.NewEvaluatorsHandler(ctx, nlpgo.EvaluatorsOptions{
-		Config:     cfg,
-		Deps:       deps,
-		Dispatcher: disp,
-	})
-	if err != nil {
-		return err
+	// The evaluator runtime is opt-in: without its internal secret (haven's
+	// +go-evaluators sets one) nothing is built and /go/evaluators stays unmounted.
+	var evaluatorsHandler http.Handler
+	if cfg.InternalSecret != "" {
+		handler, shutdownEvaluators, err := nlpgo.NewEvaluatorsHandler(ctx, nlpgo.EvaluatorsOptions{
+			Config:     cfg,
+			Deps:       deps,
+			Dispatcher: disp,
+		})
+		if err != nil {
+			return err
+		}
+		evaluatorsHandler = handler
+		defer func() {
+			flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = shutdownEvaluators(flushCtx)
+		}()
 	}
-	defer func() {
-		flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = shutdownEvaluators(flushCtx)
-	}()
 	deps.Evaluators = evaluatorsHandler
 
 	// Playground proxy uses the SAME dispatcher (no second Bifrost
