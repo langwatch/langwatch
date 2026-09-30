@@ -55,6 +55,9 @@ export const automationApiActionParamsSchema = z.object({
   // carry it or a hostile client can forge audit attribution
   // (builder5015-002 / applyr-002).
   members: z.string().array().optional(),
+  // The named connection a Slack automation delivers through (ARCHITECTURE.md §3).
+  // When set, the legacy secret fields below are ignored and never stored.
+  slackIntegrationId: z.string().optional(),
   slackWebhook: z.string().optional(),
   // ADR-041 Slack bot delivery. `slackBotToken` arrives as plaintext (or the
   // "kept" sentinel / blank on edit) and is encrypted server-side before
@@ -93,6 +96,8 @@ export const automationApiCreateInputSchema = z.object({
     // createdByUserId is server-stamped — do not accept from wire
     // (builder5015-002 / applyr-002).
     members: z.string().array().optional(),
+    slackIntegrationId: z.string().optional(),
+    slackChannelId: z.string().optional(),
     slackWebhook: z.string().optional(),
     datasetId: z.string().optional(),
     datasetMapping: z
@@ -144,10 +149,10 @@ export const automationApiToggleTriggerInputSchema = z.object({
 });
 export type AutomationApiToggleTriggerInput = z.infer<typeof automationApiToggleTriggerInputSchema>;
 
+/** The channels a connection's bot can see; a webhook connection lists nothing (`no_token`). */
 export const automationApiListSlackChannelsInputSchema = z.object({
   projectId: z.string(),
-  botToken: z.string().nullable().default(null),
-  automationId: z.string().optional(),
+  slackIntegrationId: z.string(),
 });
 export type AutomationApiListSlackChannelsInput = z.infer<
   typeof automationApiListSlackChannelsInputSchema
@@ -194,6 +199,10 @@ export const automationApiTestFireInputSchema = z.object({
   /** The saved automation being edited, so a kept (un-retyped) bot token
    *  can be loaded + decrypted for the test fire. */
   automationId: z.string().optional(),
+  /** The draft's Slack connection. Wins over `webhook` and
+   *  `botDestination.botToken`; a bot connection still needs
+   *  `botDestination.channelId`. */
+  slackIntegrationId: z.string().optional(),
   // Present when the draft is a custom-graph alert: the test message
   // then renders the alert-shaped example context + alert defaults,
   // matching what a real fire sends. Detail fields only shape the

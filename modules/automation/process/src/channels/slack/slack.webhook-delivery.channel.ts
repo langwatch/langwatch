@@ -5,6 +5,7 @@ import {
 } from "@langwatch/automation-contract";
 import { DispatchError, toDispatchError } from "@langwatch/eventing";
 import type { TraceRecord } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import { tracePath } from "../../rules/automation-platform-url.rules.ts";
 
@@ -42,7 +43,54 @@ function assertSlackWebhookUrl(url: string, triggerName: string): void {
   throw new DispatchError({
     message: `Refusing to dispatch Slack webhook for trigger "${triggerName}": URL is not a genuine https://hooks.slack.com/services/ endpoint`,
     retryable: false,
+    customerMessage:
+      "That is not a Slack incoming webhook URL. It must start with https://hooks.slack.com/.",
   });
+}
+
+const REVOKED_WEBHOOK =
+  "Slack no longer accepts this webhook: it was revoked or its app was removed. Create a new incoming webhook in Slack and paste its URL here.";
+
+const SLACK_WEBHOOK_REFUSALS: Record<string, string> = {
+  invalid_token: REVOKED_WEBHOOK,
+  no_service: REVOKED_WEBHOOK,
+  no_active_hooks: REVOKED_WEBHOOK,
+  no_team: REVOKED_WEBHOOK,
+  team_disabled: REVOKED_WEBHOOK,
+  channel_not_found:
+    "The channel this webhook posts to no longer exists. Create a new incoming webhook for an active channel.",
+  channel_is_archived:
+    "The channel this webhook posts to is archived. Create a new incoming webhook for an active channel.",
+  action_prohibited: "A Slack admin has blocked this webhook from posting.",
+  posting_to_general_channel_denied:
+    "Only Slack admins can post to this channel. Create the webhook for another channel.",
+};
+
+const slackWebhookErrorSchema = z.object({
+  code: z.string(),
+  original: z
+    .object({ response: z.object({ status: z.number(), data: z.unknown() }).optional() })
+    .optional(),
+});
+
+/** What the author can do about an incoming-webhook failure; empty when Slack is silent. */
+export function findSlackWebhookErrorExplanation(error: unknown): string[] {
+  const parsed = slackWebhookErrorSchema.safeParse(error);
+  if (!parsed.success) return [];
+  if (parsed.data.code === "slack_webhook_request_error") {
+    return ["Slack could not be reached. Try again in a moment."];
+  }
+  const response = parsed.data.original?.response;
+  if (!response) return [];
+  const refusal =
+    typeof response.data === "string" ? SLACK_WEBHOOK_REFUSALS[response.data.trim()] : undefined;
+  if (refusal) return [refusal];
+  if ([403, 404, 410].includes(response.status)) return [REVOKED_WEBHOOK];
+  if (response.status === 429) {
+    return ["Slack is rate limiting this webhook. Try again in a minute."];
+  }
+  if (response.status >= 500) return ["Slack is having trouble right now. Try again shortly."];
+  return [];
 }
 
 export interface SlackWebhookTransport {
@@ -183,6 +231,7 @@ async function deliverSlackWebhook(
   } catch (err) {
     throw toDispatchError(err, {
       message: `Slack webhook dispatch failed for trigger "${triggerName}"`,
+      customerMessage: findSlackWebhookErrorExplanation(err)[0],
     });
   }
 }
@@ -203,6 +252,7 @@ async function deliverRenderedSlackMessage(
   } catch (err) {
     throw toDispatchError(err, {
       message: `Slack webhook dispatch failed for trigger "${triggerName}"`,
+      customerMessage: findSlackWebhookErrorExplanation(err)[0],
     });
   }
 }

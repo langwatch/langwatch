@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
- * Integrations screen for organization managers: connection status, install
- * address construction, and failed round-trip handling.
+ * The Integrations screen's GitHub card for organization managers: connection status,
+ * install address construction, failed round-trip handling, and what a member sees instead.
  */
 
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -50,6 +51,14 @@ vi.mock("../../../behavior/github-api.ts", () => ({
       },
     },
   },
+}));
+
+vi.mock("../slack-card.tsx", () => ({ SlackCard: () => null }));
+
+vi.mock("@langwatch/langy-browser-kit", () => ({
+  LangyCodeAccessPreference: ({ standalone }: { standalone?: boolean }) => (
+    <div data-testid={standalone ? "langy-code-access-standalone" : "langy-code-access-inline"} />
+  ),
 }));
 
 const installation = (overrides: Record<string, unknown> = {}) => ({
@@ -200,5 +209,28 @@ describe("given the organization is still arriving", () => {
 
     expect(screen.getByTestId("integrations-loading")).toBeInTheDocument();
     expect(screen.queryByText("GitHub")).not.toBeInTheDocument();
+  });
+});
+
+describe("given a member who does not manage the organization", () => {
+  const member = () => new FakeGithubHost({ permissions: ["organization:view"] });
+
+  it("shows no GitHub card and asks no connection status, but keeps Langy's choice on the page", () => {
+    renderWithGithubHost(<IntegrationsScreen />, member());
+
+    expect(screen.queryByTestId("github-connection-card")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect GitHub" })).not.toBeInTheDocument();
+    expect(calls.statusQuery).not.toHaveBeenCalled();
+    expect(screen.getByTestId("langy-code-access-standalone")).toBeInTheDocument();
+  });
+});
+
+describe("given an organization manager", () => {
+  it("renders Langy's choice inside the GitHub card", () => {
+    renderWithGithubHost(<IntegrationsScreen />);
+
+    expect(
+      within(screen.getByTestId("github-connection-card")).getByTestId("langy-code-access-inline"),
+    ).toBeInTheDocument();
   });
 });

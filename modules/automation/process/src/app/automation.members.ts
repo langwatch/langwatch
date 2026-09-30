@@ -31,15 +31,11 @@ import type {
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
+import type { SlackDestinationService } from "../services/slack-destination.service.ts";
 
 // Re-exported: several files in this module still import these names from
 // here rather than from where they are actually declared.
-export type {
-  AutomationGraphNotifier,
-  AutomationNotificationDelivery,
-  AutomationSlackBotTokenDecryptor,
-};
+export type { AutomationGraphNotifier, AutomationNotificationDelivery, SlackDestinationService };
 export interface AutomationClock {
   now(): Instant;
 }
@@ -384,7 +380,7 @@ export type GraphTriggerEvaluationDeps = {
   triggerSent: GraphTriggerSentRepository;
   notifier: AutomationGraphNotifier;
   logger: AutomationLogger;
-  slackTokens: AutomationSlackBotTokenDecryptor;
+  slackDestinations: SlackDestinationService;
   dispatchErrors: AutomationDispatchError;
   clock: AutomationClock;
   baseHost: string;

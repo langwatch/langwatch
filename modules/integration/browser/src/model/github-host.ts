@@ -1,6 +1,6 @@
 /**
- * Host port for the Integrations screen: application capabilities with external
- * navigation support for connecting/disconnecting on GitHub.
+ * Host port for the Integrations screen's GitHub card: application capabilities
+ * with external navigation for connecting and disconnecting on GitHub.
  */
 
 import { createContext, useContext } from "react";
@@ -32,6 +32,9 @@ export abstract class GithubHostApi {
   abstract scope(): GithubHostScope;
 
   abstract route(): GithubRouteReading;
+
+  /** Whether the reader holds this grant; fails closed while it loads. */
+  abstract hasPermission(permission: string): boolean;
 
   /**
    * Rewrites the query string in place. The install round-trip lands back
@@ -75,6 +78,3 @@ export function useGithubHost(): GithubHostApi {
   }
   return host;
 }
-
-/** The grant the platform page asked for, unchanged. */
-export const INTEGRATIONS_PAGE_PERMISSION = "organization:manage";

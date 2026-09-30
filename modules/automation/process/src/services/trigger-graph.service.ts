@@ -12,7 +12,7 @@ import type {
   AutomationDispatchError,
   AutomationGraphNotifier,
   AutomationLogger,
-  AutomationSlackBotTokenDecryptor,
+  SlackDestinationService,
   AutomationClock,
   AutomationRunawaySignals,
 } from "../app/automation.members.ts";
@@ -21,6 +21,7 @@ import type { AutomationRunawayRepository } from "../repositories/automation-run
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
 import { RunawayContainmentService } from "./runaway-containment.service.ts";
@@ -41,7 +42,8 @@ export class AutomationGraphService {
     triggerSent: GraphTriggerSentRepository;
     notifier: AutomationGraphNotifier;
     logger: AutomationLogger;
-    slackTokens: AutomationSlackBotTokenDecryptor;
+    slackDestinations: SlackDestinationService;
+    slackConnections: Pick<AutomationSlackConnectionService, "updateConnectionClaim">;
     dispatchErrors: AutomationDispatchError;
     runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals;
     clock: AutomationClock;
@@ -56,7 +58,7 @@ export class AutomationGraphService {
         triggerSent: input.triggerSent,
         notifier: input.notifier,
         logger: input.logger,
-        slackTokens: input.slackTokens,
+        slackDestinations: input.slackDestinations,
         dispatchErrors: input.dispatchErrors,
         clock: input.clock,
         baseHost: input.baseHost,
@@ -71,6 +73,7 @@ export class AutomationGraphService {
         runaway: input.runaway,
         clock: input.clock,
         triggers: input.triggers,
+        slackConnections: input.slackConnections,
       }),
     );
   }

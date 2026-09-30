@@ -7,6 +7,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AutomationApi } from "@langwatch/automation-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
@@ -45,6 +46,9 @@ function console({
       identity: createApiFixture<IdentityApi>({
         registeredMigrations: () => [migration("sso-domain-ownership")],
         userMigrations: () => [],
+      }),
+      automations: createApiFixture<AutomationApi>({
+        registeredMigrations: () => [migration("automations-slack-connections")],
       }),
       auditLog: createApiFixture<AuditLogApi>({
         record: async () => ({ id: "audit", occurredAt: 0 }),
@@ -94,6 +98,7 @@ describe("buildSystemMigrations", () => {
       expect(overview.map((migration) => migration.name)).toEqual([
         "authz-grants-genesis-import",
         "sso-domain-ownership",
+        "automations-slack-connections",
       ]);
     });
   });

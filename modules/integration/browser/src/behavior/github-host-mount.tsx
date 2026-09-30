@@ -1,6 +1,6 @@
 /**
- * GitHub's answer to the port its screen declares: every method projects a
- * `@langwatch/browser-host` capability, so the module mounts it, not the
+ * Integration's answer to the GitHub port its screen declares: every method projects a
+ * `@langwatch/browser-host` capability, so integration mounts it, not the
  * application. ARCHITECTURE.md §10.1.
  */
 
@@ -9,6 +9,7 @@ import {
   useUiScope,
   type UiFeedback,
   type UiRoute,
+  type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import { uiLeaveTo, uiOpenExternal } from "@langwatch/browser-host/navigation";
 import { useMemo, type ReactNode } from "react";
@@ -27,6 +28,7 @@ class CapabilityGithubHost extends GithubHostApi {
       organizationId: string | undefined;
       route: UiRoute;
       feedback: UiFeedback;
+      session: UiSession;
     },
   ) {
     super();
@@ -39,6 +41,10 @@ class CapabilityGithubHost extends GithubHostApi {
   route(): GithubRouteReading {
     const reading = this.deps.route.reading();
     return { params: reading.params, query: reading.query };
+  }
+
+  hasPermission(permission: string): boolean {
+    return this.deps.session.hasPermission(permission);
   }
 
   setQuery(
@@ -67,11 +73,17 @@ class CapabilityGithubHost extends GithubHostApi {
  * is what `mounts.load` resolves.
  */
 export default function GithubHostMount({ children }: { children?: ReactNode }) {
-  const { feedback, route } = useUiCapabilities();
+  const { feedback, route, session } = useUiCapabilities();
   const { organizationId } = useUiScope().activeScope();
   const host = useMemo(
-    () => new CapabilityGithubHost({ organizationId: organizationId ?? void 0, route, feedback }),
-    [organizationId, route, feedback],
+    () =>
+      new CapabilityGithubHost({
+        organizationId: organizationId ?? void 0,
+        route,
+        feedback,
+        session,
+      }),
+    [organizationId, route, feedback, session],
   );
   return <GithubHostProvider value={host}>{children}</GithubHostProvider>;
 }

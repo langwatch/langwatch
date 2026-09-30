@@ -9,6 +9,7 @@ import type { AutomationClock, AutomationRunawaySignals } from "../app/automatio
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 
 export { RUNAWAY_PAUSE_REASON };
 
@@ -24,18 +25,33 @@ type RunawayCollaborator = AutomationRunawayRepository &
 
 /** Private, process-lifetime collaborator for claim-gated containment. */
 export class RunawayContainmentService {
-  private constructor(
-    private readonly runaway: RunawayCollaborator,
-    private readonly triggers: TriggerRepository,
-    private readonly clock: AutomationClock,
-  ) {}
+  private readonly runaway: RunawayCollaborator;
+  private readonly triggers: TriggerRepository;
+  private readonly clock: AutomationClock;
+  private readonly slackConnections: Pick<
+    AutomationSlackConnectionService,
+    "updateConnectionClaim"
+  >;
+
+  private constructor(input: {
+    runaway: RunawayCollaborator;
+    triggers: TriggerRepository;
+    clock: AutomationClock;
+    slackConnections: Pick<AutomationSlackConnectionService, "updateConnectionClaim">;
+  }) {
+    this.runaway = input.runaway;
+    this.triggers = input.triggers;
+    this.clock = input.clock;
+    this.slackConnections = input.slackConnections;
+  }
 
   static create(input: {
     runaway: RunawayCollaborator;
     triggers: TriggerRepository;
     clock: AutomationClock;
+    slackConnections: Pick<AutomationSlackConnectionService, "updateConnectionClaim">;
   }): RunawayContainmentService {
-    return new RunawayContainmentService(input.runaway, input.triggers, input.clock);
+    return new RunawayContainmentService(input);
   }
 
   async handle(input: AutomationPersistCapBreach): Promise<void> {
@@ -108,13 +124,21 @@ export class RunawayContainmentService {
       return;
     }
 
-    await this.triggers.update({
+    const paused = await this.triggers.update({
       id: input.trigger.id,
       projectId: input.projectId,
       active: false,
       pausedReason: RUNAWAY_PAUSE_REASON,
       pausedAt: toDate(now),
     });
+    if (paused.action === "SEND_SLACK_MESSAGE" && !paused.deleted) {
+      await this.slackConnections.updateConnectionClaim({
+        projectId: input.projectId,
+        trigger: { id: paused.id, name: paused.name },
+        before: { actionParams: paused.actionParams, active: true },
+        after: { actionParams: paused.actionParams, active: false },
+      });
+    }
     this.runaway.onAutoPaused(RUNAWAY_PAUSE_REASON);
     this.runaway.error(
       {

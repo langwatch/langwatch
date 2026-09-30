@@ -7,7 +7,7 @@ import type {
   TraceRecord,
   TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { AutomationSlackSecretsService } from "../../services/automation-slack-secrets.service.ts";
+import { SlackDestinationService } from "../../services/slack-destination.service.ts";
 import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
 import type { AutomationClock } from "../../app/automation.members.ts";
 import {
@@ -435,7 +435,10 @@ export function createSettlementFixture(trigger: TriggerSummary): {
       store: emailCapStore,
       fallback: MemoryAutomationEmailCapRepository.create(),
     }),
-    slack: AutomationSlackSecretsService.create(crypto),
+    slackDestinations: SlackDestinationService.create({
+      slack: { findUsableSlackSecret: async () => [] },
+      crypto,
+    }),
     webhooks: AutomationWebhookSecretsService.create(crypto),
     clock,
     observability,

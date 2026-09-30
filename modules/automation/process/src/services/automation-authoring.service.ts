@@ -50,6 +50,7 @@ import { isDispatchError } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import type { Monitor, MonitorApi } from "@langwatch/monitor-contract";
+import { SlackIntegrationMissingError } from "@langwatch/slack-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
@@ -71,7 +72,9 @@ import {
 } from "../rules/automation-authoring.rules.ts";
 import { buildRetryAfterMessage } from "../rules/retry-after-message.rules.ts";
 import type { AutomationRulesService } from "./automation-rules.service.ts";
+import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import type { AutomationService } from "./automation.service.ts";
+import type { SlackDestinationService } from "./slack-destination.service.ts";
 
 /**
  * The app's KSUID resource for a trigger row (`KSUID_RESOURCES.TRIGGER`). The
@@ -91,6 +94,10 @@ export interface AutomationAuthoringCollaborators {
   monitors: MonitorApi;
   providers: AutomationProviderSecrets;
   slackChannels: AutomationSlackDirectory;
+  /** Where a Slack test fire or channel listing posts, the way a real delivery resolves it. */
+  slackDestinations: SlackDestinationService;
+  /** Points a save's Slack params at a connection before the provider persists them. */
+  slackConnections: AutomationSlackConnectionService;
   traceFilters: AutomationTraceFilterCompiler;
   limits: AutomationCallCounter;
 }
@@ -192,15 +199,14 @@ export class AutomationAuthoringService {
   async listSlackChannels(
     input: AutomationApiListSlackChannelsInput,
   ): Promise<SlackChannelListing> {
-    const token = await this.resolveSlackBotToken({
-      typed: input.botToken,
-      automationId: input.automationId,
+    const [destination] = await this.collaborators.slackDestinations.findSlackDestination({
       projectId: input.projectId,
+      actionParams: { slackIntegrationId: input.slackIntegrationId },
     });
 
-    if (!token) return { channels: [], error: "no_token", gaps: [] };
+    if (destination?.kind !== "bot") return { channels: [], error: "no_token", gaps: [] };
 
-    return this.collaborators.slackChannels.list(token);
+    return this.collaborators.slackChannels.list(destination.token);
   }
 
   /**
@@ -235,7 +241,10 @@ export class AutomationAuthoringService {
     }
 
     if (input.action === TriggerAction.SEND_SLACK_MESSAGE) {
-      if (!input.actionParams.slackWebhook) throw new MissingSlackWebhookError();
+      // A connection id or a legacy secret, stored as a connection id (ARCHITECTURE.md §3).
+      if (!input.actionParams.slackIntegrationId && !input.actionParams.slackWebhook) {
+        throw new MissingSlackWebhookError();
+      }
       // Recipients are checked by RFC shape only, the same rule `save` applies:
       // external addresses are intentionally allowed and the UI badges them, so
       // create and edit cannot disagree about what an author may type.
@@ -252,6 +261,7 @@ export class AutomationAuthoringService {
       projectId: input.projectId,
       lastRunAt: toDate(nowInstant()),
       notificationCadence: resolveCadenceForCreate(input.action, input.notificationCadence),
+      actorId: author.id,
     });
 
     return this.redactForRead(trigger);
@@ -330,7 +340,13 @@ export class AutomationAuthoringService {
     }
 
     const stored = await this.collaborators.providers.persistActionParamsFor(existing.action, {
-      incoming: jsonObjectSchema.parse(parsed.data),
+      incoming: await this.connectSlackParams({
+        action: existing.action,
+        projectId: command.projectId,
+        actorId: `svc_${command.projectId}`,
+        actionParams: jsonObjectSchema.parse(parsed.data),
+        stored: existing.actionParams,
+      }),
       loadExisting: async () => existing.actionParams,
     });
     const creator = jsonObjectSchema.safeParse(existing.actionParams).data?.createdByUserId;
@@ -396,7 +412,7 @@ export class AutomationAuthoringService {
       await this.countTestFire({ channel: input.channel, author });
 
       const recipients = this.testFireRecipients({ channel: input.channel, author });
-      const botDestination = await this.testFireSlackBot(input);
+      const { botDestination, webhook } = await this.testFireSlack(input);
       const webhookDestination = await this.testFireWebhook(input);
       const project = await this.collaborators.rules.getProjectIdentity(input.projectId);
 
@@ -406,7 +422,7 @@ export class AutomationAuthoringService {
         project,
         draft: input.draft,
         recipients,
-        webhook: input.webhook,
+        webhook,
         botDestination,
         webhookDestination,
         graphAlert: input.graphAlert,
@@ -443,19 +459,25 @@ export class AutomationAuthoringService {
 
     // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt the secrets and
     // resolve the "keep what is there" sentinels against the saved row.
+    const loadExisting = async () =>
+      input.triggerId
+        ? (
+            await this.collaborators.automation.findById({
+              triggerId: input.triggerId,
+              projectId: input.projectId,
+            })
+          )?.actionParams
+        : undefined;
     const storedActionParams = await this.collaborators.providers.persistActionParamsFor(
       input.action,
       {
-        incoming: parsedActionParams,
-        loadExisting: async () =>
-          input.triggerId
-            ? (
-                await this.collaborators.automation.findById({
-                  triggerId: input.triggerId,
-                  projectId: input.projectId,
-                })
-              )?.actionParams
-            : undefined,
+        incoming: await this.connectSlackParams({
+          action: input.action,
+          projectId: input.projectId,
+          actorId: author.id,
+          actionParams: parsedActionParams,
+        }),
+        loadExisting,
       },
     );
 
@@ -515,18 +537,7 @@ export class AutomationAuthoringService {
       }
 
       if (isGraphAlert) {
-        // Graph alerts only support notify channels - there is no
-        // "ADD_TO_DATASET on a metric crossing a threshold" experience.
-        if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) {
-          throw new GraphAlertChannelUnsupportedError();
-        }
-        if (!input.graphAlert) throw new GraphAlertThresholdRequiredError();
-        if (!input.alertType) throw new GraphAlertSeverityRequiredError();
-
-        await this.collaborators.rules.assertCustomGraphInProject({
-          customGraphId: input.customGraphId ?? "",
-          projectId: input.projectId,
-        });
+        await assertGraphAlertDraft({ input, rules: this.collaborators.rules });
       }
 
       // A report sends a rendered notification on a schedule - notify channels
@@ -544,7 +555,21 @@ export class AutomationAuthoringService {
       // pass narrows by action, so a SEND_EMAIL save cannot store a dataset
       // configuration and ADD_TO_DATASET cannot persist an empty datasetId.
       const perAction = this.collaborators.providers.actionParamsSchemaFor(input.action);
-      const parsed = perAction.safeParse(input.actionParams);
+      // A Slack row not yet migrated, saved without its secret retyped, keeps the
+      // stored one, which the connect step then moves into a connection.
+      const parsed = perAction.safeParse(
+        input.action === TriggerAction.SEND_SLACK_MESSAGE && input.triggerId
+          ? this.collaborators.slackConnections.withKeptLegacySlackSecret({
+              actionParams: jsonObjectSchema.parse(input.actionParams),
+              stored: (
+                await this.collaborators.automation.findById({
+                  triggerId: input.triggerId,
+                  projectId: input.projectId,
+                })
+              )?.actionParams,
+            })
+          : input.actionParams,
+      );
 
       if (!parsed.success) {
         throw new InvalidActionParamsError(
@@ -796,27 +821,74 @@ export class AutomationAuthoringService {
     return [args.author.email];
   }
 
-  /** The freshly-typed bot token, or the saved automation's stored one. */
-  private async testFireSlackBot(
-    input: AutomationApiTestFireInput,
-  ): Promise<{ token: string; channel: string } | null> {
-    if (input.channel !== "slack" || !input.botDestination) return null;
+  /**
+   * The Slack destination a test fire posts to, resolved as a real delivery
+   * does: the draft's connection, else a freshly typed legacy token, else the
+   * saved automation's own resolution. The kind decides the surface.
+   */
+  private async testFireSlack(input: AutomationApiTestFireInput): Promise<{
+    botDestination: { token: string; channel: string } | null;
+    webhook: string | null;
+  }> {
+    if (input.channel !== "slack") return { botDestination: null, webhook: input.webhook };
+    const channel = input.botDestination?.channelId.trim() ?? "";
 
-    const channel = input.botDestination.channelId.trim();
-    const token = await this.resolveSlackBotToken({
-      typed: input.botDestination.botToken,
-      automationId: input.automationId,
-      projectId: input.projectId,
-    });
-
-    if (!token || !channel) {
-      throw new TestFireUnavailableError(
-        "slack",
-        "Add a Slack bot token and channel before sending a test fire.",
-      );
+    if (input.slackIntegrationId) {
+      const destination = await this.collaborators.slackDestinations.getSlackDestination({
+        projectId: input.projectId,
+        actionParams: { slackIntegrationId: input.slackIntegrationId },
+      });
+      if (destination.kind === "webhook") return { botDestination: null, webhook: destination.url };
+      if (!channel) throw pickSlackChannel();
+      return { botDestination: { token: destination.token, channel }, webhook: input.webhook };
     }
+    if (!input.botDestination) return { botDestination: null, webhook: input.webhook };
 
-    return { token, channel };
+    const typed = input.botDestination.botToken?.trim();
+    const token = typed || (await this.savedSlackBotToken(input));
+    if (!token) throw new SlackIntegrationMissingError();
+    if (!channel) throw pickSlackChannel();
+    return { botDestination: { token, channel }, webhook: input.webhook };
+  }
+
+  /** The saved automation's bot token, through the same resolution delivery uses. */
+  private async savedSlackBotToken(input: AutomationApiTestFireInput): Promise<string | undefined> {
+    const saved = input.automationId
+      ? await this.collaborators.automation.findById({
+          triggerId: input.automationId,
+          projectId: input.projectId,
+        })
+      : null;
+    const [destination] = await this.collaborators.slackDestinations.findSlackDestination({
+      projectId: input.projectId,
+      actionParams: saved?.actionParams,
+    });
+    return destination?.kind === "bot" ? destination.token : undefined;
+  }
+
+  /** Main's `connectSlackParams`: a Slack save points at a connection before persist. */
+  private async connectSlackParams({
+    action,
+    projectId,
+    actorId,
+    actionParams,
+    stored,
+  }: {
+    action: AutomationAction;
+    projectId: string;
+    actorId: string;
+    actionParams: Record<string, unknown>;
+    stored?: unknown;
+  }): Promise<Record<string, unknown>> {
+    if (action !== TriggerAction.SEND_SLACK_MESSAGE) return actionParams;
+    return this.collaborators.slackConnections.connectActionParams({
+      projectId,
+      actorId,
+      actionParams:
+        stored === undefined
+          ? actionParams
+          : this.collaborators.slackConnections.withKeptLegacySlackSecret({ actionParams, stored }),
+    });
   }
 
   /**
@@ -873,25 +945,29 @@ export class AutomationAuthoringService {
 
     return signingSecrets.length > 0 ? { ...destination, signingSecrets } : destination;
   }
+}
 
-  /** The typed token if there is one, otherwise the saved automation's. */
-  private async resolveSlackBotToken(args: {
-    typed: string | null | undefined;
-    automationId: string | undefined;
-    projectId: string;
-  }): Promise<string | null> {
-    const typed = args.typed?.trim() || null;
+/** A bot test fire needs a channel to post in. */
+/** A graph alert notifies only, and names its threshold, severity and a graph of its project. */
+async function assertGraphAlertDraft({
+  input,
+  rules,
+}: {
+  input: AutomationApiUpsertInput;
+  rules: AutomationRulesService;
+}): Promise<void> {
+  if (!NOTIFY_TRIGGER_ACTIONS.has(input.action)) throw new GraphAlertChannelUnsupportedError();
+  if (!input.graphAlert) throw new GraphAlertThresholdRequiredError();
+  if (!input.alertType) throw new GraphAlertSeverityRequiredError();
 
-    if (typed) return typed;
-    if (!args.automationId) return null;
+  await rules.assertCustomGraphInProject({
+    customGraphId: input.customGraphId ?? "",
+    projectId: input.projectId,
+  });
+}
 
-    const saved = await this.collaborators.automation.findById({
-      triggerId: args.automationId,
-      projectId: args.projectId,
-    });
-
-    return this.collaborators.providers.findDecryptedSlackBotToken(saved?.actionParams ?? {});
-  }
+function pickSlackChannel(): TestFireUnavailableError {
+  return new TestFireUnavailableError("slack", "Pick a Slack channel before sending a test fire.");
 }
 
 /** Whether an email draft carries a recipient list to check the shape of. */

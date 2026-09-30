@@ -1,43 +1,20 @@
 /**
- * GitHub connection settings card: connect, view installations, manage. Moved
- * from platform/app; chrome, permissions, navigation delegated to host.
+ * The GitHub card: connect the app, see the accounts it reaches, disconnect.
+ * Reads github through `GithubHostApi` and a client from github's contract.
+ * Spec: specs/integrations/github-connection.feature.
  */
 
-import { Badge, Button, Card, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { UiSlot } from "@langwatch/browser-host/slots";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { useEffect, useState } from "react";
+import { Badge, Button, Card, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { LangyCodeAccessPreference } from "@langwatch/langy-browser-kit";
+import { useState } from "react";
 import { GitHub } from "react-feather";
 
 import { githubApi } from "../../behavior/github-api.ts";
 import { useGithubHost } from "../../model/github-host.ts";
-import {
-  GITHUB_ERROR_QUERY_KEY,
-  githubInstallAddress,
-} from "../../model/github-install-address.ts";
+import { githubInstallAddress } from "../../model/github-install-address.ts";
 import { GithubInstallationRow } from "../elements/github-installation-row.tsx";
 
-export default function IntegrationsScreen() {
-  const host = useGithubHost();
-  const organizationId = host.scope().organizationId;
-
-  return (
-    <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Integrations</PageLayout.Heading>
-      </PageLayout.Header>
-      <VStack align="stretch" gap={6} paddingTop={4}>
-        {organizationId ? (
-          <GithubConnectionCard organizationId={organizationId} />
-        ) : (
-          <Skeleton data-testid="integrations-loading" height="120px" />
-        )}
-      </VStack>
-    </>
-  );
-}
-
-function GithubConnectionCard({ organizationId }: { organizationId: string }) {
+export function GithubCard({ organizationId }: { organizationId: string }) {
   const host = useGithubHost();
   const status = githubApi.github.getConnectionStatus.useQuery({ organizationId });
 
@@ -62,23 +39,6 @@ function GithubConnectionCard({ organizationId }: { organizationId: string }) {
       host.failed({ error, fallbackTitle: "Could not disconnect GitHub" });
     },
   });
-
-  const reportedError = host.route().query[GITHUB_ERROR_QUERY_KEY];
-  useEffect(() => {
-    if (typeof reportedError !== "string" || reportedError.length === 0) return;
-
-    host.failed({
-      error: void 0,
-      fallbackTitle: "GitHub installation failed",
-      description: reportedError,
-    });
-    // Reported once. Left in the address it would be reported again on every
-    // reload, which is the platform page's own reason for dropping it here.
-    host.setQuery({ [GITHUB_ERROR_QUERY_KEY]: void 0 }, { replace: true });
-    // Keyed only on the error value: the host is rebuilt whenever the address
-    // changes, so depending on it would re-run this on the write above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportedError]);
 
   const installAddress = githubInstallAddress(status.data?.installUrl);
   const configured = status.data?.configured ?? true;
@@ -156,7 +116,7 @@ function GithubConnectionCard({ organizationId }: { organizationId: string }) {
           )}
 
           {/* How Langy reaches this person's code, once they chose (ADR-129). */}
-          <UiSlot name="langyCodeAccessPreference" props={{}} />
+          <LangyCodeAccessPreference />
         </VStack>
       </Card.Body>
     </Card.Root>

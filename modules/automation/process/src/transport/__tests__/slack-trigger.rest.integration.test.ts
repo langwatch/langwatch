@@ -4,7 +4,8 @@
  * real REST runtime, refusing through the process's canonical boundary.
  * @see specs/automations/slack-trigger-rest-api.feature
  */
-import type { AutomationApi } from "@langwatch/automation-contract";
+import { InvalidActionParamsError, type AutomationApi } from "@langwatch/automation-contract";
+import { SlackIntegrationMissingError } from "@langwatch/slack-contract";
 import { describe, expect, it } from "vitest";
 
 import { slackAutomationRest } from "../slack-trigger.rest.ts";
@@ -61,6 +62,7 @@ describe("given the Slack alert door", () => {
       expect(api.created).toEqual([
         {
           projectId: "project_1",
+          actorId: "user_owner",
           action: "SEND_SLACK_MESSAGE",
           name: "Billing alerts",
           message: undefined,
@@ -77,7 +79,10 @@ describe("given the Slack alert door", () => {
     it("answers the handled validation refusal, never the 500 that told a caller to retry", async () => {
       const api = mount();
 
-      const response = await api.post("/api/trigger/slack", { name: "No webhook" });
+      const response = await api.post("/api/trigger/slack", {
+        name: "No webhook",
+        alert_type: "CRITICAL",
+      });
       const body = await response.json();
 
       expect(response.status).toBe(422);
@@ -144,6 +149,108 @@ describe("given the Slack alert door", () => {
 
       expect(response.status).toBe(500);
       expect(await response.json()).toMatchObject({ code: "internal_error" });
+    });
+  });
+});
+
+describe("given the Slack alert door and a Slack connection", () => {
+  const alert = { name: "Billing alerts", alert_type: "CRITICAL" };
+
+  describe("when the body names a webhook connection", () => {
+    /** @scenario "A Slack alert is created through a webhook connection" */
+    it("creates the automation pointing at that connection, with no secret", async () => {
+      const api = mount();
+
+      const response = await api.post("/api/trigger/slack", {
+        ...alert,
+        slack_connection_id: "conn-hook",
+      });
+
+      expect(response.status).toBe(200);
+      expect(api.created[0]?.actionParams).toEqual({ slackIntegrationId: "conn-hook" });
+    });
+  });
+
+  describe("when the body names a bot connection and a channel", () => {
+    /** @scenario "A Slack alert is created through a bot connection and a channel" */
+    it("creates the automation pointing at that connection and channel", async () => {
+      const api = mount();
+
+      const response = await api.post("/api/trigger/slack", {
+        ...alert,
+        slack_connection_id: "conn-bot",
+        slack_channel_id: "C123",
+      });
+
+      expect(response.status).toBe(200);
+      expect(api.created[0]?.actionParams).toEqual({
+        slackIntegrationId: "conn-bot",
+        slackChannelId: "C123",
+      });
+    });
+  });
+
+  describe("when a bot connection is named without a channel", () => {
+    /** @scenario "A Slack alert through a bot connection needs a channel" */
+    it("answers the unusable-configuration refusal", async () => {
+      const api = mount(async () => {
+        throw new InvalidActionParamsError(
+          "A Slack channel is required for a bot connection.",
+          "slackChannelId",
+        );
+      });
+
+      const response = await api.post("/api/trigger/slack", {
+        ...alert,
+        slack_connection_id: "conn-bot",
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "invalid_action_params" });
+    });
+  });
+
+  describe("when the connection is not one the project can use", () => {
+    /** @scenario "A Slack alert naming a connection the project cannot use is refused" */
+    it("answers the integration-missing refusal", async () => {
+      const api = mount(async () => {
+        throw new SlackIntegrationMissingError();
+      });
+
+      const response = await api.post("/api/trigger/slack", {
+        ...alert,
+        slack_connection_id: "elsewhere",
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "slack_integration_missing" });
+    });
+  });
+
+  describe("when the body names no destination, or two", () => {
+    /** @scenario "A Slack alert naming no destination is refused" */
+    it("refuses a body with neither", async () => {
+      const api = mount();
+
+      const response = await api.post("/api/trigger/slack", alert);
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(api.created).toEqual([]);
+    });
+
+    /** @scenario "A Slack alert naming two destinations is refused" */
+    it("refuses a body with both", async () => {
+      const api = mount();
+
+      const response = await api.post("/api/trigger/slack", {
+        ...alert,
+        slack_connection_id: "conn-hook",
+        slack_webhook: "https://hooks.slack.com/services/abc",
+      });
+
+      expect(response.status).toBe(422);
+      expect(api.created).toEqual([]);
     });
   });
 });

@@ -39,6 +39,7 @@ import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
+import type { AutomationSlackConnectionService } from "./automation-slack-connection.service.ts";
 import type { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
 import type { ReportScheduleService } from "./report-schedule.service.ts";
@@ -65,6 +66,7 @@ export class AutomationService {
   private readonly graph: AutomationGraphService;
   private readonly templates: AutomationTemplateService;
   private readonly persistCaps: AutomationPersistCapService;
+  private readonly slackConnections: AutomationSlackConnectionService;
 
   private constructor({
     triggers,
@@ -79,6 +81,7 @@ export class AutomationService {
     graph,
     templates,
     persistCaps,
+    slackConnections,
   }: {
     triggers: TriggerRepository;
     history: TriggerFireHistoryRepository;
@@ -92,6 +95,7 @@ export class AutomationService {
     graph: AutomationGraphService;
     templates: AutomationTemplateService;
     persistCaps: AutomationPersistCapService;
+    slackConnections: AutomationSlackConnectionService;
   }) {
     this.triggers = triggers;
     this.history = history;
@@ -105,6 +109,7 @@ export class AutomationService {
     this.graph = graph;
     this.templates = templates;
     this.persistCaps = persistCaps;
+    this.slackConnections = slackConnections;
     this.activeCache = ActiveTriggerCacheService.create({ triggers, clock });
   }
 
@@ -121,6 +126,7 @@ export class AutomationService {
     graph: AutomationGraphService;
     templates: AutomationTemplateService;
     persistCaps: AutomationPersistCapService;
+    slackConnections: AutomationSlackConnectionService;
   }): AutomationService {
     return new AutomationService({
       triggers: deps.triggers,
@@ -135,6 +141,7 @@ export class AutomationService {
       graph: deps.graph,
       templates: deps.templates,
       persistCaps: deps.persistCaps,
+      slackConnections: deps.slackConnections,
     });
   }
 
@@ -206,42 +213,84 @@ export class AutomationService {
     return this.triggers.findAllByProjectId(input);
   }
 
+  /** A Slack create is pointed at a connection first, then claims it (ARCHITECTURE.md §3). */
   async create(input: CreateTriggerCommand): Promise<Trigger> {
-    const trigger = await this.triggers.create(createTriggerCommandSchema.parse(input));
+    const { actorId, ...command } = createTriggerCommandSchema.parse(input);
+    const actionParams =
+      command.action === "SEND_SLACK_MESSAGE"
+        ? await this.slackConnections.connectActionParams({
+            projectId: command.projectId,
+            actorId: actorId ?? `svc_${command.projectId}`,
+            actionParams: command.actionParams,
+          })
+        : command.actionParams;
+    const trigger = await this.triggers.create({ ...command, actionParams });
+    await this.updateSlackClaim({ before: undefined, after: trigger });
     await this.invalidate(input.projectId);
 
     return trigger;
   }
 
   async update(input: UpdateTriggerCommand): Promise<Trigger> {
-    const trigger = await this.triggers.update(updateTriggerCommandSchema.parse(input));
+    const command = updateTriggerCommandSchema.parse(input);
+    const before = await this.triggers.findById({
+      triggerId: command.id,
+      projectId: command.projectId,
+    });
+    const trigger = await this.triggers.update(command);
+    await this.updateSlackClaim({ before: before ?? undefined, after: trigger });
     await this.invalidate(input.projectId);
 
     return trigger;
   }
 
   async archive(input: { triggerId: string; projectId: string }): Promise<Trigger> {
-    await this.getById(input);
+    const before = await this.getById(input);
     const trigger = await this.triggers.update({
       id: input.triggerId,
       projectId: input.projectId,
       active: false,
     });
+    await this.updateSlackClaim({ before, after: trigger });
     await this.invalidate(input.projectId);
 
     return trigger;
   }
 
   async softDeleteById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
+    const before = await this.triggers.findById(input);
     const trigger = await this.triggers.update({
       id: input.triggerId,
       projectId: input.projectId,
       active: false,
       deleted: true,
     });
+    await this.updateSlackClaim({ before: before ?? undefined, after: undefined });
     await this.invalidate(input.projectId);
 
     return trigger;
+  }
+
+  /** Moves a Slack trigger's connection claim across one write; a failed claim fails the save. */
+  private async updateSlackClaim({
+    before,
+    after,
+  }: {
+    before: Trigger | undefined;
+    after: Trigger | undefined;
+  }): Promise<void> {
+    const trigger = after ?? before;
+    const live = (row: Trigger | undefined) =>
+      row && !row.deleted && row.action === "SEND_SLACK_MESSAGE"
+        ? { actionParams: row.actionParams, active: row.active }
+        : undefined;
+    if (!trigger || (!live(before) && !live(after))) return;
+    await this.slackConnections.updateConnectionClaim({
+      projectId: trigger.projectId,
+      trigger: { id: trigger.id, name: trigger.name },
+      before: live(before),
+      after: live(after),
+    });
   }
 
   findByCustomGraphId(input: {

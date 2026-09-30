@@ -12,7 +12,6 @@ import {
   type GraphTriggerEvaluationReason,
   type GraphTriggerEvaluationResult,
   type GraphTriggerSweepCandidate,
-  type SlackActionParams,
   type SlackChannelListing,
 } from "@langwatch/automation-contract";
 import {
@@ -59,11 +58,8 @@ import {
   type AutomationSettlementTraceFilters,
 } from "../services/automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
-import {
-  AutomationSlackSecretsService,
-  type AutomationSecretCrypto,
-  type AutomationSlackBotTokenDecryptor,
-} from "../services/automation-slack-secrets.service.ts";
+import type { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
+import type { AutomationSecretCrypto } from "../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
 import { AutomationEmailCapService } from "../services/email-cap.service.ts";
 import { GraphAlertDispatchService } from "../services/graph-alert-dispatch.service.ts";
@@ -76,6 +72,7 @@ import {
   type ReportDispatchDeps,
 } from "../services/report-dispatch.service.ts";
 import { RunawayContainmentService } from "../services/runaway-containment.service.ts";
+import type { SlackDestinationService } from "../services/slack-destination.service.ts";
 import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
 import type {
   AutomationAuditSink,
@@ -107,6 +104,9 @@ export type AutomationProcessMembers = Readonly<{
 
 type AutomationInfrastructureInput = Readonly<{
   members: AutomationProcessMembers;
+  /** Where every Slack delivery goes, over `SlackApi` (ARCHITECTURE.md §3). */
+  slackDestinations: SlackDestinationService;
+  slackConnections: AutomationSlackConnectionService;
   /** Every mail automation sends goes out through notification, which writes the envelope. */
   notifications: Pick<NotificationService, "sendEmail">;
   auditLog: AuditLogApi;
@@ -150,7 +150,8 @@ export function buildAutomationInfrastructure(
     clock,
     notifier: buildGraphAlertNotifier({ ...input, providers, clock, delivery, emailCaps }),
     logger: new ApiAutomationLogger(members.logger),
-    slackTokens: new ApiAutomationSlackTokens(providers),
+    slackDestinations: input.slackDestinations,
+    slackConnections: input.slackConnections,
     dispatchErrors: new ApiAutomationDispatchErrors(),
     heartbeat: new UnmeasuredApiAutomationHeartbeat(),
     runaway: new UncontainedApiAutomationRunaway(members.logger),
@@ -290,19 +291,6 @@ class ApiAutomationLogger implements AutomationLogger {
 
   warn(fields: Record<string, unknown>, message: string): void {
     this.logger.warn(fields, message);
-  }
-}
-
-/**
- * The stored Slack bot token, read through the SAME registry the authoring
- * redaction path uses — one cipher, so a token stored by one door is
- * readable by the other.
- */
-class ApiAutomationSlackTokens implements AutomationSlackBotTokenDecryptor {
-  constructor(private readonly providers: AutomationProviderRegistryService) {}
-
-  findDecryptedToken(params: SlackActionParams): string | null {
-    return this.providers.findDecryptedSlackBotToken(params);
   }
 }
 
@@ -512,6 +500,9 @@ export function createAutomationSettlement(input: {
    */
   delivery: AutomationNotificationDelivery;
   emailCaps: AutomationEmailCapService;
+  slackDestinations: SlackDestinationService;
+  /** Releases a runaway-paused Slack automation's connection claim. */
+  slackConnections: Pick<AutomationSlackConnectionService, "updateConnectionClaim">;
   crypto: AutomationSecretCrypto;
   /** The deployment's own origin; every link in a digest is built from it. */
   baseHost: string;
@@ -577,6 +568,7 @@ export function createAutomationSettlement(input: {
       runaway: createRunaway(ledger),
       triggers: repositories.triggers,
       clock,
+      slackConnections: input.slackConnections,
     });
   }
 
@@ -601,7 +593,7 @@ export function createAutomationSettlement(input: {
       }),
       delivery: input.delivery,
       emailCaps: input.emailCaps,
-      slack: AutomationSlackSecretsService.create(input.crypto),
+      slackDestinations: input.slackDestinations,
       webhooks: AutomationWebhookSecretsService.create(input.crypto),
       clock,
       observability: input.observability,
@@ -811,7 +803,7 @@ export function createAutomationReportDispatcher(input: {
   analytics: Pick<AnalyticsApi, "getTimeseries">;
   traces: Pick<TraceApi, "readTraceList" | "translateTraceFilter">;
   delivery: AutomationNotificationDelivery;
-  crypto: AutomationSecretCrypto;
+  slackDestinations: SlackDestinationService;
   suppression: { filterSuppressed: ReportDispatchDeps["filterSuppressedRecipients"] };
   baseHost: string;
 }): ReportDispatcher {
@@ -828,7 +820,7 @@ export function createAutomationReportDispatcher(input: {
       repositories.triggers.findById({ triggerId, projectId }),
     findProject: (projectId) => input.projects.findById(projectId),
     delivery: input.delivery,
-    slackProvider: AutomationSlackSecretsService.create(input.crypto),
+    slackDestinations: input.slackDestinations,
     filterSuppressedRecipients: (recipients) => input.suppression.filterSuppressed(recipients),
     listReportTraces: createReportTraceList({ traces: input.traces, baseHost: input.baseHost }),
     loadReportCharts: (chartInput) => charts.loadReportCharts(chartInput),

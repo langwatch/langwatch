@@ -21,6 +21,7 @@ import {
 } from "../repositories/graph-trigger-sent.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
 import { GraphTriggerEvaluatorService } from "../services/graph-trigger-evaluator.service.ts";
+import { createTestSlackDestinations } from "./testing.ts";
 
 class DispatchError extends Error {
   constructor(options: { message: string; retryable: boolean }) {
@@ -282,7 +283,7 @@ function makeHarness({
       info: () => undefined,
       warn: () => undefined,
     },
-    slackTokens: { findDecryptedToken: () => null } as never,
+    slackDestinations: createTestSlackDestinations(),
     dispatchErrors: {
       isTerminal: (error: unknown) => (error as { retryable?: unknown }).retryable === false,
       createTerminal: (message: string) => new Error(message),

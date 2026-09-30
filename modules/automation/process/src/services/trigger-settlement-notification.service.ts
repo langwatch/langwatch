@@ -4,8 +4,6 @@ import {
   buildTemplateContext,
   renderTriggerSlack,
   renderWebhookBody,
-  slackActionParamsSchema,
-  slackDeliveryMethodOf,
   type TemplateMatchInput,
   type TemplateContext,
   type TriggerSummary,
@@ -22,10 +20,10 @@ import {
   type AutomationSettlementTraceRepository,
 } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
-import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
+import type { SlackDestinationService } from "./slack-destination.service.ts";
 import {
   TriggerSettlementEmailService,
   type SettlementNotificationCandidate,
@@ -40,7 +38,10 @@ type NotificationComposition = {
   confirmation: AutomationSettlementMatchConfirmation;
   delivery: AutomationNotificationDelivery;
   emailCaps: AutomationEmailCapService;
-  slack: AutomationSlackProvider;
+  slackDestinations: Pick<
+    SlackDestinationService,
+    "findSlackDestination" | "getMissingDispatchError"
+  >;
   webhooks: AutomationWebhookProvider;
   clock: AutomationClock;
   observability: AutomationSettlementObservability;
@@ -345,16 +346,24 @@ export class TriggerSettlementNotificationService {
     projectId: string;
     context: () => TemplateContext;
   }): Promise<void> {
-    const parsed = slackActionParamsSchema.safeParse(input.trigger.actionParams);
-    if (!parsed.success) {
-      throw actionParamsError(input.trigger);
+    // Its connection, else its own legacy secret (ARCHITECTURE.md §3); nothing dead-letters.
+    const [destination] = await this.composition.slackDestinations.findSlackDestination({
+      projectId: input.projectId,
+      actionParams: input.trigger.actionParams,
+    });
+    if (!destination) {
+      throw this.composition.slackDestinations.getMissingDispatchError({
+        triggerName: input.trigger.name,
+      });
     }
 
-    if (slackDeliveryMethodOf(parsed.data) === "bot") {
-      const token = this.composition.slack.findDecryptedToken(parsed.data);
-      const channel = parsed.data.slackChannelId?.trim();
-      if (!token || !channel) {
-        throw actionParamsError(input.trigger);
+    if (destination.kind === "bot") {
+      const { token, channel } = destination;
+      if (!channel) {
+        throw new DispatchError({
+          message: `Slack bot connection for trigger "${input.trigger.name}" is missing its channel`,
+          retryable: false,
+        });
       }
 
       const rendered = await renderTriggerSlack({
@@ -382,7 +391,7 @@ export class TriggerSettlementNotificationService {
         context: input.context(),
       });
       await this.composition.delivery.sendSlackWebhook({
-        webhook: parsed.data.slackWebhook ?? "",
+        webhook: destination.url,
         triggerName: input.trigger.name,
         payload: rendered.payload,
       });
@@ -391,7 +400,7 @@ export class TriggerSettlementNotificationService {
     }
 
     await this.composition.delivery.sendLegacySlackWebhook({
-      webhook: parsed.data.slackWebhook ?? "",
+      webhook: destination.url,
       triggerData: input.triggerData,
       triggerName: input.trigger.name,
       projectSlug: input.projectSlug,

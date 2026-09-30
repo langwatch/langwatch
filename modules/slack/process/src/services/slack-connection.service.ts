@@ -9,7 +9,9 @@ import {
   SlackConnectionInUseError,
   SlackIntegrationInvalidTokenError,
   SlackIntegrationMissingError,
+  defaultSlackConnectionName,
   isSlackWebhookUrl,
+  slackSecretHint,
   type SlackConnectionDeleted,
   type SlackConnectionKind,
   type SlackConnectionList,
@@ -33,11 +35,7 @@ import type {
   SlackConnectionRepository,
   SlackScope,
 } from "../repositories/slack-connection.repository.ts";
-import {
-  defaultSlackConnectionName,
-  slackSecretFingerprint,
-  slackSecretHint,
-} from "../rules/slack-secret-fingerprint.rules.ts";
+import { slackSecretFingerprint } from "../rules/slack-secret-fingerprint.rules.ts";
 
 /** Where a project sits: what an ORGANIZATION connection is checked against. */
 export interface SlackProjectScope {

@@ -12,8 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const preference = vi.hoisted(() => ({ current: null as "github" | null }));
 const clearPreference = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../behavior/langy-api.ts", () => ({
-  api: {
+vi.mock("../../../behavior/langy-code-access-api.ts", () => ({
+  langyCodeAccessApi: {
     langy: {
       getCodeAccessPreference: {
         useQuery: () => ({
@@ -28,7 +28,7 @@ vi.mock("../../../behavior/langy-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1", name: "Acme Corp" },
     project: { id: "p_1", slug: "acme" },
@@ -74,5 +74,28 @@ describe("given nothing was remembered", () => {
   it("says nothing, because there is no choice to change", () => {
     renderBlock();
     expect(screen.queryByText("Langy uses GitHub for code changes")).toBeNull();
+  });
+});
+
+describe("given a member who does not manage the organization", () => {
+  beforeEach(() => {
+    preference.current = "github";
+  });
+
+  /** @scenario "The remembered choice can be cleared from the integrations settings" */
+  it("still shows the remembered choice in a card of its own, outside the GitHub card, and clears it", () => {
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyCodeAccessPreference standalone />
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByText("Langy code access")).toBeDefined();
+    expect(screen.getByText("Langy uses GitHub for code changes")).toBeDefined();
+    fireEvent.click(screen.getByText("Change"));
+    expect(clearPreference).toHaveBeenCalledWith({
+      projectId: "p_1",
+      preference: null,
+    });
   });
 });

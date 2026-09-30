@@ -22,6 +22,8 @@ const legacyGraph = <T extends Graph>(graph: T) => ({ ...graph, kind: "builder" 
 /** Read-side hydration shape for the alert bell on the graph card header. */
 type AlertActionParams = {
   members?: string[];
+  slackIntegrationId?: string;
+  slackChannelId?: string;
   seriesName?: string;
   threshold: number;
   operator: string;
@@ -165,7 +167,12 @@ function alertOf(trigger: Trigger): GraphAlert {
     seriesName: parameters.seriesName || "",
     type: trigger.alertType,
     action: trigger.action,
-    actionParams: { members: parameters.members, seriesName: parameters.seriesName },
+    actionParams: {
+      members: parameters.members,
+      slackIntegrationId: parameters.slackIntegrationId,
+      slackChannelId: parameters.slackChannelId,
+      seriesName: parameters.seriesName,
+    },
     triggerId: trigger.id,
   };
 }

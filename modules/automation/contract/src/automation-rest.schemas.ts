@@ -63,15 +63,47 @@ export const automationRestDeletedSchema = z.object({
 });
 
 /** The body `/api/trigger/slack` reads, in its own spelling. */
-export const slackAutomationRestInputSchema = z.object({
-  slack_webhook: z.string().url().describe("Incoming webhook URL the alert is posted to"),
-  name: z.string().describe("How the trigger is listed in the app"),
-  message: z.string().optional().describe("Extra line included with each alert"),
-  filters: automationFiltersSchema
-    .default({})
-    .describe("Which traces the trigger fires on. An empty object fires on all of them."),
-  alert_type: automationRestAlertTypeSchema,
-});
+export const slackAutomationRestInputSchema = z
+  .object({
+    slack_webhook: z
+      .string()
+      .url()
+      .optional()
+      .describe(
+        "Incoming webhook URL the alert is posted to. It is stored as a Slack connection this " +
+          "project can use (an existing one holding the same URL, else a new project connection). " +
+          "Send this or `slack_connection_id`, not both.",
+      ),
+    slack_connection_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "The Slack connection the alert posts through: an organization connection or one of " +
+          "this project's, as `GET /api/slack-connections` and `langwatch slack-connection list` " +
+          "list them. Send this or `slack_webhook`, not both.",
+      ),
+    slack_channel_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        "The channel a bot connection posts in; required with one. Invite the LangWatch app to it first.",
+      ),
+    name: z.string().describe("How the trigger is listed in the app"),
+    message: z.string().optional().describe("Extra line included with each alert"),
+    filters: automationFiltersSchema
+      .default({})
+      .describe("Which traces the trigger fires on. An empty object fires on all of them."),
+    alert_type: automationRestAlertTypeSchema,
+  })
+  .refine(
+    (body) => (body.slack_webhook === undefined) !== (body.slack_connection_id === undefined),
+    {
+      message: "Send exactly one of slack_webhook or slack_connection_id.",
+      path: ["slack_connection_id"],
+    },
+  );
 
 /** The one sentence `/api/trigger/slack` answers a successful create with. */
 export const slackAutomationRestCreatedSchema = z.object({ message: z.string() });

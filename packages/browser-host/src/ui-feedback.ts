@@ -200,11 +200,12 @@ export class BrowserUiFeedback extends UiFeedback {
     super();
   }
 
-  succeeded({ title, description, id }: UiSuccessNotice): void {
+  succeeded({ title, description, id, action }: UiSuccessNotice): void {
     this.target.create({
       ...(id ? { id } : {}),
       title,
       ...(description ? { description } : {}),
+      ...(action ? { action: { label: action.label, onClick: action.run } } : {}),
       type: "success",
     });
   }

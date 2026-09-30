@@ -63,6 +63,8 @@ import {
 import { NotificationService } from "@langwatch/notification-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { sessionSecret } from "@langwatch/secrets";
+import { SlackApi } from "@langwatch/slack-contract";
+import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
@@ -74,6 +76,7 @@ import {
   type AutomationsPipeline,
 } from "../eventing/automation.pipeline.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
+import { SlackConnectionMigration } from "../migrations/legacy-import.slack-connection.migration.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
@@ -89,7 +92,7 @@ import {
 import { AutomationRunawayMetricsOtelService } from "../services/automation-runaway-metrics-otel.service.ts";
 import { AutomationRunawayService } from "../services/automation-runaway.service.ts";
 import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
-import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
+import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
 import { AutomationTriggerMatchDispatcherService } from "../services/automation-trigger-match-dispatcher.service.ts";
@@ -97,6 +100,8 @@ import type { AutomationWebhookStoredParams } from "../services/automation-webho
 import { AutomationService } from "../services/automation.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
 import { ReportScheduleService } from "../services/report-schedule.service.ts";
+import { SlackConnectionMigrationService } from "../services/slack-connection-migration.service.ts";
+import { SlackDestinationService } from "../services/slack-destination.service.ts";
 import { AutomationGraphService } from "../services/trigger-graph.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
@@ -161,8 +166,6 @@ export interface AutomationProviderSecrets {
   ): Promise<unknown>;
   /** Stored params with every secret stripped, for a row on its way out. */
   redactActionParamsFor(action: AutomationAction, params: unknown): unknown;
-  /** The stored Slack bot token in the clear, or nothing when none is stored. */
-  findDecryptedSlackBotToken(actionParams: unknown): string | null;
   /** The stored webhook header values in the clear, by header name. */
   decryptWebhookHeaders(stored: AutomationWebhookStoredParams): Record<string, string>;
   /** The stored webhook signing secrets in the clear, newest first. */
@@ -214,7 +217,9 @@ export type AutomationInfrastructure = Readonly<{
   clock: AutomationClock;
   notifier: AutomationGraphNotifier;
   logger: AutomationLogger;
-  slackTokens: AutomationSlackBotTokenDecryptor;
+  slackDestinations: SlackDestinationService;
+  /** Points a Slack save at a connection and moves its claim (ARCHITECTURE.md §3). */
+  slackConnections: AutomationSlackConnectionService;
   dispatchErrors: AutomationDispatchError;
   heartbeat: AutomationHeartbeat;
   runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals;
@@ -253,6 +258,8 @@ type AutomationDependencies = Readonly<{
   authorization: typeof AuthzApi;
   /** Where every mail automation sends goes out; notification writes the envelope. */
   notifications: typeof NotificationService;
+  /** The Slack connections a Slack automation delivers through and claims. */
+  slack: typeof SlackApi;
 }>;
 
 /** Peers only `create` composes (settlement's and mail's); `fromInfrastructure` never sees them. */
@@ -261,7 +268,8 @@ type AutomationSettlementPeer =
   | "datasets"
   | "annotations"
   | "authorization"
-  | "notifications";
+  | "notifications"
+  | "slack";
 
 /** {@link AutomationDependencies}, resolved to the peer Apps `fromInfrastructure` itself reads. */
 type AutomationRuntimeDependencies = Omit<
@@ -307,6 +315,8 @@ export class AutomationApp implements AutomationApi {
     authorization: AuthzApi,
     /** Where every mail automation sends goes out; notification owns the gateway. */
     notifications: NotificationService,
+    /** The Slack connections a Slack automation delivers through and claims. */
+    slack: SlackApi,
   };
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
@@ -320,8 +330,13 @@ export class AutomationApp implements AutomationApi {
    */
   static create(setup: AutomationSetup): Promise<AutomationApp> {
     return setup.secrets.into(AutomationApp.secrets.unsubscribe, (unsubscribeSigningSecret) => {
+      const { slack, projects } = setup.dependencies;
+      const crypto = setup.members.encryption;
+      const slackConnections = AutomationSlackConnectionService.create({ slack, projects, crypto });
       const infrastructure = buildAutomationInfrastructure({
         members: setup.members,
+        slackDestinations: SlackDestinationService.create({ slack, crypto }),
+        slackConnections,
         notifications: setup.dependencies.notifications,
         auditLog: setup.dependencies.auditLog,
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
@@ -345,9 +360,18 @@ export class AutomationApp implements AutomationApi {
         analytics: setup.dependencies.analytics,
         traces: setup.dependencies.traces,
         delivery: infrastructure.delivery,
-        crypto: setup.members.encryption,
+        slackDestinations: infrastructure.slackDestinations,
         suppression: automation.#automation,
         baseHost: setup.members.publicBaseUrl ?? "",
+      });
+      automation.#migration = SlackConnectionMigration.create({
+        pass: SlackConnectionMigrationService.create({
+          triggers: setup.repositories.triggers,
+          projects,
+          slack,
+          slackConnections,
+          crypto,
+        }),
       });
       return automation;
     });
@@ -377,6 +401,8 @@ export class AutomationApp implements AutomationApi {
       }),
       delivery: infrastructure.delivery,
       emailCaps: infrastructure.emailCaps,
+      slackDestinations: infrastructure.slackDestinations,
+      slackConnections: infrastructure.slackConnections,
       crypto: members.encryption,
       baseHost: members.publicBaseUrl ?? "",
       observability: AutomationSettlementObservabilityService.create({
@@ -445,7 +471,8 @@ export class AutomationApp implements AutomationApi {
       notifier: members.notifier,
       triggerSent: repositories.graphTriggerSent,
       logger: members.logger,
-      slackTokens: members.slackTokens,
+      slackDestinations: members.slackDestinations,
+      slackConnections: members.slackConnections,
       dispatchErrors: members.dispatchErrors,
       runaway: members.runaway,
       clock: members.clock,
@@ -472,6 +499,7 @@ export class AutomationApp implements AutomationApi {
         delivery: members.testFire,
       }),
       persistCaps,
+      slackConnections: members.slackConnections,
     });
     const rules = AutomationRulesService.create({
       automation,
@@ -490,6 +518,8 @@ export class AutomationApp implements AutomationApi {
         monitors: dependencies.monitors,
         providers: members.providers,
         slackChannels: members.slackChannels,
+        slackDestinations: members.slackDestinations,
+        slackConnections: members.slackConnections,
         traceFilters: members.traceFilters,
         limits: members.limits,
       }),
@@ -515,6 +545,7 @@ export class AutomationApp implements AutomationApi {
   }
 
   #automation: AutomationService;
+  #migration: SlackConnectionMigration | undefined;
   #rules: AutomationRulesService;
   #authoring: AutomationAuthoringService;
   #monitors: MonitorApiContract;
@@ -722,6 +753,16 @@ export class AutomationApp implements AutomationApi {
   /** When each report next runs and last ran, as the scheduler knows it. */
   getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]> {
     return this.#automation.getReportSchedules(input);
+  }
+
+  registeredMigrations(): readonly SystemMigration[] {
+    if (!this.#migration) {
+      throw new Error(
+        "This AutomationApp was composed from already-built services, so it holds no migration: " +
+          "compose it through AutomationApp.create to answer its registered migrations.",
+      );
+    }
+    return [this.#migration];
   }
 
   /** The Slack conversations a bot token can see, for the channel picker. */

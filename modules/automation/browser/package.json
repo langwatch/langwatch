@@ -37,6 +37,7 @@
     "react-icons": "catalog:",
     "react-markdown": "catalog:",
     "remark-gfm": "catalog:",
+    "zod": "catalog:",
     "zustand": "catalog:"
   },
   "devDependencies": {

@@ -1,10 +1,10 @@
 /**
- * Test harness for Integrations screen that records port interactions:
+ * Test harness for the Integrations screen that records port interactions:
  * departures, external opens, query writes, and failures.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render } from "@testing-library/react";
+import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
@@ -30,6 +30,8 @@ export class FakeGithubHost extends GithubHostApi {
     private readonly options: {
       scope?: Partial<GithubHostScope>;
       query?: Readonly<Record<string, string | undefined>>;
+      /** Grants the reader holds; every grant when omitted. */
+      permissions?: readonly string[];
     } = {},
   ) {
     super();
@@ -41,6 +43,10 @@ export class FakeGithubHost extends GithubHostApi {
 
   route(): GithubRouteReading {
     return { params: {}, query: this.options.query ?? {} };
+  }
+
+  hasPermission(permission: string): boolean {
+    return this.options.permissions?.includes(permission) ?? true;
   }
 
   setQuery(
@@ -67,7 +73,7 @@ export class FakeGithubHost extends GithubHostApi {
 export function renderWithGithubHost(
   element: ReactElement,
   host: FakeGithubHost = new FakeGithubHost(),
-) {
+): RenderResult & { host: FakeGithubHost } {
   return {
     host,
     ...render(

@@ -6,16 +6,18 @@ import {
   annotationQueueProvider as annotationQueueShared,
   datasetProvider as datasetShared,
   emailProvider as emailShared,
-  MissingSlackBotTokenError,
+  slackActionParamsSchema,
   slackProvider as slackShared,
   TriggerAction,
   WEBHOOK_HEADER_VALUE_KEPT,
   webhookActionParamsSchema,
   webhookProvider as webhookShared,
   type SharedDef,
-  type SlackActionParams,
 } from "@langwatch/automation-contract";
-import type { ZodTypeAny } from "zod";
+import { z, type ZodTypeAny } from "zod";
+
+/** The Slack fields without the save-time refinement: a persist reads, it does not refuse. */
+const slackStoredFieldsSchema = z.object(slackActionParamsSchema.shape);
 
 import {
   AutomationSlackSecretsService,
@@ -126,11 +128,6 @@ export class AutomationProviderRegistryService {
     return server.redactActionParams ? server.redactActionParams(params) : params;
   }
 
-  /** The Slack bot token behind a delivery, or null when none is stored. */
-  findDecryptedSlackBotToken(actionParams: unknown): string | null {
-    return this.slack.findDecryptedToken((actionParams ?? {}) as SlackActionParams);
-  }
-
   /** The custom headers a webhook delivery carries. */
   decryptWebhookHeaders(stored: AutomationWebhookStoredParams): Record<string, string> {
     return this.webhooks.decryptHeaders(stored);
@@ -145,18 +142,10 @@ export class AutomationProviderRegistryService {
     const slack = this.slack;
     return {
       action: TriggerAction.SEND_SLACK_MESSAGE,
-      persistActionParams: async ({ incoming, loadExisting }: PersistActionParamsArgs) => {
-        const params = incoming as SlackActionParams;
-        const existing =
-          params.slackDelivery === "bot"
-            ? ((await loadExisting()) as SlackActionParams | undefined)
-            : undefined;
-        if (slack.tokenMissing({ incoming: params, existing })) {
-          throw new MissingSlackBotTokenError();
-        }
-        return slack.persist({ incoming: params, existing });
-      },
-      redactActionParams: (params) => slack.redact((params ?? {}) as SlackActionParams),
+      // Every caller has already held the payload to the full, refined schema.
+      persistActionParams: async ({ incoming }: PersistActionParamsArgs) =>
+        slack.persist({ incoming: slackStoredFieldsSchema.parse(incoming) }),
+      redactActionParams: (params) => slack.redact(params),
     };
   }
 

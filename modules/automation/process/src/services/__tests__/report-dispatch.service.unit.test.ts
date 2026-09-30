@@ -15,10 +15,10 @@ import { fromDate } from "@langwatch/time";
 import type { TraceApi, TraceListItem } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { createTestSlackDestinations } from "../../__tests__/testing.ts";
 import { createReportTraceList } from "../../app/automation-composition.build.ts";
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { toReportTraceRow } from "../../rules/report-trace-row.rules.ts";
-import { AutomationSlackProvider } from "../../services/automation-slack-secrets.service.ts";
 import { ReportChartService } from "../report-chart.service.ts";
 import {
   ReportDispatchService,
@@ -62,12 +62,6 @@ class FakeMailGateway extends AutomationNotificationDelivery {
   }
   async sendWebhook(): Promise<never> {
     throw new Error("A report never sends a webhook.");
-  }
-}
-
-class NoSlackTokens extends AutomationSlackProvider {
-  findDecryptedToken(): string | null {
-    return null;
   }
 }
 
@@ -131,7 +125,7 @@ function makeDeps({
     findTrigger: async () => trigger,
     findProject: async () => PROJECT,
     delivery: mail,
-    slackProvider: new NoSlackTokens(),
+    slackDestinations: createTestSlackDestinations(),
     filterSuppressedRecipients: async ({ emails }) => emails,
     listReportTraces:
       listReportTraces ??

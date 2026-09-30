@@ -6176,6 +6176,9 @@ importers:
       remark-gfm:
         specifier: 'catalog:'
         version: 4.0.1(supports-color@10.2.2)
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -9006,27 +9009,12 @@ importers:
 
   modules/github/browser:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
-      '@langwatch/browser-host':
-        specifier: workspace:*
-        version: link:../../../packages/browser-host
-      '@langwatch/design-system':
-        specifier: workspace:*
-        version: link:../../../packages/design-system
-      '@langwatch/github-contract':
-        specifier: workspace:*
-        version: link:../contract
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
       react:
         specifier: ^19.2.7
         version: 19.2.8
-      react-feather:
-        specifier: 'catalog:'
-        version: 2.0.10(react@19.2.8)
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -9567,13 +9555,70 @@ importers:
 
   modules/integration/browser:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/authz-browser-kit':
+        specifier: workspace:*
+        version: link:../../authz/browser-kit
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
+      '@langwatch/github-contract':
+        specifier: workspace:*
+        version: link:../../github/contract
+      '@langwatch/langy-browser-kit':
+        specifier: workspace:*
+        version: link:../../langy/browser-kit
+      '@langwatch/slack-browser-kit':
+        specifier: workspace:*
+        version: link:../../slack/browser-kit
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-feather:
+        specifier: 'catalog:'
+        version: 2.0.10(react@19.2.8)
+      react-icons:
+        specifier: 'catalog:'
+        version: 5.7.0(react@19.2.8)
     devDependencies:
+      '@chakra-ui/react':
+        specifier: 'catalog:'
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: 'catalog:'
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
+      '@testing-library/jest-dom':
+        specifier: 'catalog:'
+        version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.1)
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 'catalog:'
+        version: 14.6.1(@testing-library/dom@10.4.1)
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: 'catalog:'
+        version: 30.0.1(@noble/hashes@2.2.0)
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -9764,6 +9809,12 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../contract

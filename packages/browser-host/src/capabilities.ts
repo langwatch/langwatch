@@ -50,6 +50,7 @@ export type UiSuccessNotice = {
   description?: string;
   /** Dedupes repeats of the same action. */
   id?: string;
+  action?: { label: string; run: () => void };
 };
 
 /**

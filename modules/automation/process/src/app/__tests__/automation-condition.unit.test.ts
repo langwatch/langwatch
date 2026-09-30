@@ -115,8 +115,8 @@ describe("given a graph alert or a scheduled report", () => {
         automation.create({
           id: "trigger_new",
           name: "Latency alert",
-          action: "SEND_SLACK_MESSAGE",
-          actionParams: { slackWebhook: "https://hooks.slack.com/services/abc" },
+          action: "SEND_EMAIL",
+          actionParams: { members: ["ops@acme.test"] },
           filters: {},
           projectId: "project_1",
           message: null,

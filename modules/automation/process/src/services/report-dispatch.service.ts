@@ -1,6 +1,4 @@
 import {
-  type SlackActionParams,
-  slackDeliveryMethodOf,
   REPORT_TRIGGER_DEFAULTS,
   renderTriggerEmail,
   renderTriggerSlack,
@@ -17,7 +15,7 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { Cron } from "croner";
 
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
-import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
+import type { SlackDestinationService } from "./slack-destination.service.ts";
 
 const logger = createLogger("langwatch:report-dispatch");
 
@@ -33,8 +31,11 @@ export interface ReportDispatchDeps {
    * a report Slack message rides the same fenced transport.
    */
   delivery: AutomationNotificationDelivery;
-  /** Reads the stored bot token off the trigger's Slack action parameters. */
-  slackProvider: AutomationSlackProvider;
+  /** Where the report's Slack message goes: its connection, else its own legacy secret. */
+  slackDestinations: Pick<
+    SlackDestinationService,
+    "findSlackDestination" | "getMissingDispatchError"
+  >;
   filterSuppressedRecipients: (params: {
     projectId: string;
     triggerId: string;
@@ -252,7 +253,7 @@ async function deliverReport({
   }
 
   if (trigger.action === "SEND_SLACK_MESSAGE") {
-    return deliverReportSlack({ deps, trigger, context, params });
+    return deliverReportSlack({ deps, trigger, context });
   }
 
   logger.warn(
@@ -315,26 +316,53 @@ async function deliverReportEmail({
 async function deliverReportSlack({
   deps,
   trigger,
-  params,
   context,
 }: {
   deps: ReportDispatchDeps;
   trigger: Trigger;
-  params: { slackWebhook?: string };
   context: ReportTemplateContext;
 }): Promise<boolean> {
   const templateType: SlackTemplateType | null =
     trigger.templates.slackTemplateType === "block_kit" ? "block_kit" : "string";
 
-  // ADR-041: a bot connection posts via the Web API with the gate open.
-  const slackParams = (trigger.actionParams ?? {}) as SlackActionParams;
-  if (slackDeliveryMethodOf(slackParams) === "bot") {
-    return deliverReportSlackBot({ deps, trigger, context, templateType, slackParams });
+  const logContext = { projectId: trigger.projectId, triggerId: trigger.id };
+
+  // A report's connection, else its own legacy secret (ARCHITECTURE.md §3).
+  const [destination] = await deps.slackDestinations.findSlackDestination({
+    projectId: trigger.projectId,
+    actionParams: trigger.actionParams,
+  });
+  if (!destination) {
+    logger.warn(
+      { ...logContext, code: "slack_integration_missing" },
+      "Report has no usable Slack connection and no secret of its own — nothing sent",
+    );
+    return false;
   }
 
-  const webhook = params.slackWebhook ?? null;
-  if (!webhook) {
-    return false;
+  if (destination.kind === "bot") {
+    if (!destination.channel) {
+      logger.warn(
+        { ...logContext, code: "slack_channel_missing" },
+        "Report is configured for Slack bot delivery but has no channel — nothing sent",
+      );
+      return false;
+    }
+    // ADR-041: a bot connection posts via the Web API with the gate open.
+    const rendered = await renderTriggerSlack({
+      templateType,
+      template: trigger.templates.slackTemplate,
+      context,
+      defaults: REPORT_TRIGGER_DEFAULTS,
+      allowGatedBlocks: true,
+    });
+    await deps.delivery.sendSlackBot({
+      token: destination.token,
+      channel: destination.channel,
+      payload: rendered.payload,
+      triggerName: trigger.name,
+    });
+    return true;
   }
 
   const rendered = await renderTriggerSlack({
@@ -344,45 +372,9 @@ async function deliverReportSlack({
     defaults: REPORT_TRIGGER_DEFAULTS,
   });
   await deps.delivery.sendSlackWebhook({
-    webhook,
+    webhook: destination.url,
     triggerName: trigger.name,
     payload: rendered.payload,
-  });
-
-  return true;
-}
-
-async function deliverReportSlackBot({
-  deps,
-  trigger,
-  context,
-  templateType,
-  slackParams,
-}: {
-  deps: ReportDispatchDeps;
-  trigger: Trigger;
-  context: ReportTemplateContext;
-  templateType: SlackTemplateType | null;
-  slackParams: SlackActionParams;
-}): Promise<boolean> {
-  const token = deps.slackProvider.findDecryptedToken(slackParams);
-  const channel = slackParams.slackChannelId?.trim();
-  if (!token || !channel) {
-    return false;
-  }
-
-  const rendered = await renderTriggerSlack({
-    templateType,
-    template: trigger.templates.slackTemplate,
-    context,
-    defaults: REPORT_TRIGGER_DEFAULTS,
-    allowGatedBlocks: true,
-  });
-  await deps.delivery.sendSlackBot({
-    token,
-    channel,
-    payload: rendered.payload,
-    triggerName: trigger.name,
   });
 
   return true;

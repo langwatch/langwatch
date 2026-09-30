@@ -22,13 +22,10 @@ import {
 } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { AutomationGraphActivityService } from "../services/automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
-import {
-  AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
-  type AutomationSecretCrypto,
-} from "../services/automation-slack-secrets.service.ts";
+import type { AutomationSecretCrypto } from "../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
 import type { AutomationEmailCapService } from "../services/email-cap.service.ts";
+import type { SlackDestinationService } from "../services/slack-destination.service.ts";
 import type {
   AutomationClock,
   AutomationDispatchError,
@@ -67,6 +64,8 @@ export function composeAutomationGraphActivity(input: {
   delivery: AutomationNotificationDelivery;
   /** Reads the Slack bot tokens and webhook secrets this deployment wrote. */
   crypto: AutomationSecretCrypto;
+  /** Where every Slack delivery goes, over `SlackApi` (ARCHITECTURE.md §3). */
+  slackDestinations: SlackDestinationService;
   emailCaps: AutomationEmailCapService;
   logger: AutomationLogger;
   /** How the process's queue tells a permanent failure from a retryable one. */
@@ -92,9 +91,7 @@ export function composeAutomationGraphActivity(input: {
     analytics: input.analytics,
     delivery: input.delivery,
     webhooks: AutomationWebhookSecretsService.create(input.crypto),
-    slackTokens: AutomationSlackBotTokenDecryptorService.create(
-      AutomationSlackSecretsService.create(input.crypto),
-    ),
+    slackDestinations: input.slackDestinations,
     emailCaps: input.emailCaps,
     logger: input.logger,
     dispatchErrors: input.dispatchErrors,

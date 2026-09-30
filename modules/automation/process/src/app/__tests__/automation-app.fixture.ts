@@ -12,6 +12,10 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
+import {
+  createTestSlackConnections,
+  createTestSlackDestinations,
+} from "../../__tests__/testing.ts";
 import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
@@ -170,7 +174,8 @@ export function createCanonicalAutomationApp(): {
     logger,
     runaway,
     testFire,
-    slackTokens: { findDecryptedToken: vi.fn() },
+    slackDestinations: createTestSlackDestinations(),
+    slackConnections: createTestSlackConnections(),
     dispatchErrors: { isTerminal: vi.fn(), createTerminal: vi.fn() },
     heartbeat: { findClickHouseClient: vi.fn() },
     persistCaps: MemoryAutomationPersistCapRepository.create(),
@@ -180,7 +185,6 @@ export function createCanonicalAutomationApp(): {
       ),
       persistActionParamsFor: vi.fn(async (_action, args) => args.incoming),
       redactActionParamsFor: vi.fn((_action, params) => params),
-      findDecryptedSlackBotToken: vi.fn(() => null),
       decryptWebhookHeaders: vi.fn(() => ({})),
       decryptWebhookSigningSecrets: vi.fn(() => []),
     },

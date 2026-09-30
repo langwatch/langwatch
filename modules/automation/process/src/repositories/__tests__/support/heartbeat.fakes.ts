@@ -39,6 +39,14 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
     return unavailable();
   }
 
+  findSlackTriggers(): Promise<Trigger[]> {
+    return unavailable();
+  }
+
+  replaceActionParamsIfUnchanged(): Promise<boolean> {
+    return unavailable();
+  }
+
   findClaimedTraceIds(): Promise<Set<string>> {
     return unavailable();
   }

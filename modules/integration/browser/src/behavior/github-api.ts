@@ -1,7 +1,6 @@
 /**
- * The Integrations screen's tRPC hooks. The `github` segment is load-bearing —
- * tRPC hashes it into the cache key. Package's one ADR-004 exception: its
- * `@langwatch/api/web` import is the only one in the package.
+ * The GitHub card's tRPC hooks, derived from github's contract. The `github`
+ * segment is load-bearing: tRPC hashes it into the cache key.
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";

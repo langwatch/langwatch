@@ -479,14 +479,15 @@ export function buildSystemMigrations({
 }: Pick<OpsSystemMigrationsOptions, "database" | "redis" | "isSaaS"> & {
   /** The clickhouse member's private routes (§7), read when a cohort or pass asks, not at boot. */
   routes: () => ReadonlyMap<string, string>;
-  dependencies: Pick<OpsAppDependencies, "identity" | "authz" | "auditLog">;
+  dependencies: Pick<OpsAppDependencies, "identity" | "authz" | "automations" | "auditLog">;
   passRequests: Pick<SystemMigrationPassRequestsService, "request">;
 }): OpsSystemMigrationRunner {
-  const { identity, authz, auditLog } = dependencies;
-  // Main's registry order: the authorization engine's import, then identity's D04.
+  const { identity, authz, automations, auditLog } = dependencies;
+  // Main's registry order: authorization's import, identity's D04, then Slack connections.
   const organizationMigrations = () => [
     ...authz.registeredMigrations(),
     ...identity.registeredMigrations(),
+    ...automations.registeredMigrations(),
   ];
   const passes = OpsSystemMigrations.create({
     database,

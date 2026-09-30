@@ -20,12 +20,9 @@ import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prism
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
 import { AutomationGraphDeliveryService } from "../automation-graph-delivery.service.ts";
-import {
-  AutomationSlackSecretsService,
-  AutomationSlackBotTokenDecryptorService,
-  type AutomationSecretCrypto,
-} from "../automation-slack-secrets.service.ts";
+import type { AutomationSecretCrypto } from "../automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.service.ts";
+import { SlackDestinationService } from "../slack-destination.service.ts";
 
 /**
  * Spec: modules/automation/specs/graph-alert-worker-composition.feature
@@ -76,9 +73,10 @@ function compose(
     analytics: breachingAnalytics(),
     delivery,
     webhooks: AutomationWebhookSecretsService.create(secrets),
-    slackTokens: AutomationSlackBotTokenDecryptorService.create(
-      AutomationSlackSecretsService.create(secrets),
-    ),
+    slackDestinations: SlackDestinationService.create({
+      slack: { findUsableSlackSecret: async () => [] },
+      crypto: secrets,
+    }),
     emailCaps: AutomationEmailCapService.create({
       store: MemoryAutomationEmailCapRepository.create(),
       fallback: MemoryAutomationEmailCapRepository.create(),

@@ -3,8 +3,6 @@ import { createHash } from "node:crypto";
 import {
   buildGraphAlertTemplateContext,
   type GraphTriggerEvaluationResult,
-  type SlackActionParams,
-  slackDeliveryMethodOf,
   isNoDataPredicate,
 } from "@langwatch/automation-contract";
 
@@ -57,7 +55,7 @@ export class GraphTriggerAlertDeliveryService {
       });
     }
 
-    const botDestination = this.botDestination(plan);
+    const { botDestination, slackWebhook } = await this.slackDestination(plan);
     const previousFire = await plan.request.deps.triggerSent.findLatestForGraphAlert({
       triggerId: plan.request.triggerId,
       projectId: plan.request.projectId,
@@ -77,30 +75,38 @@ export class GraphTriggerAlertDeliveryService {
       values,
       project,
       botDestination,
+      slackWebhook,
       previousFireId: previousFire?.id ?? null,
       claimId: claim.id,
     });
   }
 
-  private botDestination(plan: GraphEvaluationPlan): { token: string; channel: string } | null {
+  /**
+   * Where a Slack alert posts, resolved through its connection (ARCHITECTURE.md
+   * §3). A Slack alert with nowhere to post dead-letters: no retry can fix it.
+   */
+  private async slackDestination(plan: GraphEvaluationPlan): Promise<{
+    botDestination: { token: string; channel: string } | null;
+    slackWebhook: string | null;
+  }> {
     if (plan.trigger.action !== "SEND_SLACK_MESSAGE") {
-      return null;
+      return { botDestination: null, slackWebhook: plan.params.slackWebhook ?? null };
     }
-
-    const params = (plan.trigger.actionParams ?? {}) as SlackActionParams;
-    if (slackDeliveryMethodOf(params) !== "bot") {
-      return null;
+    const [destination] = await plan.request.deps.slackDestinations.findSlackDestination({
+      projectId: plan.request.projectId,
+      actionParams: plan.trigger.actionParams,
+    });
+    if (destination?.kind === "webhook")
+      return { botDestination: null, slackWebhook: destination.url };
+    if (destination?.kind === "bot" && destination.channel) {
+      return {
+        botDestination: { token: destination.token, channel: destination.channel },
+        slackWebhook: null,
+      };
     }
-
-    const token = plan.request.deps.slackTokens.findDecryptedToken(params);
-    const channel = params.slackChannelId?.trim();
-    if (!token || !channel) {
-      throw plan.request.deps.dispatchErrors.createTerminal(
-        `Slack bot connection for alert "${plan.trigger.name}" is missing its token or channel — the alert cannot be delivered.`,
-      );
-    }
-
-    return { token, channel };
+    throw plan.request.deps.dispatchErrors.createTerminal(
+      `Slack delivery for alert "${plan.trigger.name}" has no usable connection: it is missing its token or channel, so the alert cannot be delivered.`,
+    );
   }
 
   private async dispatch({
@@ -108,6 +114,7 @@ export class GraphTriggerAlertDeliveryService {
     values,
     project,
     botDestination,
+    slackWebhook,
     previousFireId,
     claimId,
   }: {
@@ -115,6 +122,7 @@ export class GraphTriggerAlertDeliveryService {
     values: GraphSeriesEvaluation;
     project: { id: string; name: string; slug: string };
     botDestination: { token: string; channel: string } | null;
+    slackWebhook: string | null;
     previousFireId: string | null;
     claimId: string;
   }): Promise<GraphTriggerEvaluationResult> {
@@ -125,7 +133,7 @@ export class GraphTriggerAlertDeliveryService {
         project,
         context: this.context(plan, values, project),
         recipients: plan.params.members ?? [],
-        slackWebhook: plan.params.slackWebhook ?? null,
+        slackWebhook,
         botDestination,
         fireDigest: graphAlertFireDigest({
           triggerId: plan.request.triggerId,

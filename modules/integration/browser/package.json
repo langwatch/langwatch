@@ -19,11 +19,36 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@langwatch/ui-kernel": "workspace:*"
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/github-contract": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
+    "@langwatch/slack-browser-kit": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "react": "catalog:",
+    "react-feather": "catalog:",
+    "react-icons": "catalog:"
   },
   "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
     "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   }
 }

@@ -47,6 +47,15 @@ export abstract class TriggerRepository {
     projectId: string;
     customGraphIds: string[];
   }): Promise<Trigger[]>;
+  /** Every undeleted Slack automation of these projects, oldest first. */
+  abstract findSlackTriggers(input: { projectIds: readonly string[] }): Promise<Trigger[]>;
+  /** Replaces `actionParams` only while they still equal `expected`; false when the row changed. */
+  abstract replaceActionParamsIfUnchanged(input: {
+    triggerId: string;
+    projectId: string;
+    expected: unknown;
+    actionParams: Record<string, unknown>;
+  }): Promise<boolean>;
   abstract create(input: CreateTriggerCommand): Promise<Trigger>;
   abstract update(input: UpdateTriggerCommand): Promise<Trigger>;
 }

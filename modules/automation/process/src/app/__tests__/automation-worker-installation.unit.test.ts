@@ -25,6 +25,7 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import type { SlackApi } from "@langwatch/slack-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
@@ -108,6 +109,7 @@ function process(role: "api" | "worker", eventing: EventSourcing, installed: Ins
       annotation: installed.annotation ?? createApiFixture<AnnotationApi>(),
       authz: installed.authz ?? createApiFixture<AuthzApi>(),
       notification: installed.notification ?? createApiFixture<NotificationService>(),
+      slack: createApiFixture<SlackApi>(),
     });
 }
 
