@@ -41,6 +41,8 @@ export interface PlanSide {
   mailUrl?: string;
   /** fixtures are the ids this side's seed generated; they win over the plan's. */
   fixtures?: Record<string, string>;
+  /** readySelector is the header control this side shows once signed in; absent, the shared one. */
+  readySelector?: string;
   /** staticDir holds this side's prebuilt UI; absent, the side is captured from its dev server. */
   staticDir?: string;
 }

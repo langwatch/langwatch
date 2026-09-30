@@ -14,7 +14,7 @@ import {
   type Viewport,
 } from "./protocol.ts";
 import { StepRecorder, type Drained } from "./recorder.ts";
-import { InFlightTracker, shouldIgnoreRequest } from "./settle.ts";
+import { InFlightTracker, isPageReady, readyMarker, shouldIgnoreRequest } from "./settle.ts";
 import { serveBuiltUi } from "./static-ui.ts";
 
 /** Animations and carets are the largest source of pixel noise between two identical screens. */
@@ -47,8 +47,8 @@ export const contextOptions = ({
   ...(storageState === undefined ? {} : { storageState }),
 });
 
-/** LOADING_WAIT_MILLIS bounds the wait for skeletons after the network settles. */
-const LOADING_WAIT_MILLIS = 5000;
+/** LOADING_WAIT_MILLIS bounds the wait for the ready marker and no skeletons after settling. */
+const LOADING_WAIT_MILLIS = 30_000;
 
 /** LOADING_POLL_MILLIS paces that wait: six pages polling every frame starve the renderer. */
 const LOADING_POLL_MILLIS = 100;
@@ -107,10 +107,12 @@ const isDocumentLoad = ({ request, page }: { request: Request; page: Page }): bo
   return request.frame() === page.mainFrame();
 };
 
-/** SideExtras are what only a browser-opened Side carries: a way to a cookieless page, its own context. */
+/** SideExtras are what only a browser-opened Side carries: a cookieless page, its own context. */
 export interface SideExtras {
   openAnonymous?: () => Promise<Side>;
   owns?: BrowserContext;
+  /** readySelector overrides the shared signed-in header marker for this side. */
+  readySelector?: string;
 }
 
 /** Side is one running stack, with its page and everything that page reported. */
@@ -159,7 +161,8 @@ export class Side {
 
   /** openAnonymous is a fresh page of this stack with no cookies: a share link, a revoked key. */
   async openAnonymous(): Promise<Side> {
-    if (this.extras.openAnonymous === undefined) throw new Error("this side cannot open an anonymous page");
+    if (this.extras.openAnonymous === undefined)
+      throw new Error("this side cannot open an anonymous page");
     return this.extras.openAnonymous();
   }
 
@@ -246,11 +249,14 @@ export class Side {
     }
     const stillLoading = await this.page
       .waitForFunction(
-        // An unmounted shell has no skeleton either; textContent forces no layout.
-        (selector: string) =>
-          document.querySelectorAll(selector).length === 0 &&
-          (document.body?.textContent ?? "").trim() !== "",
-        LOADING_SELECTOR,
+        isPageReady,
+        {
+          loading: LOADING_SELECTOR,
+          ready: readyMarker({
+            path: new URL(this.page.url()).pathname,
+            selector: this.extras.readySelector,
+          }),
+        },
         { timeout: LOADING_WAIT_MILLIS, polling: LOADING_POLL_MILLIS },
       )
       .then(
@@ -382,13 +388,17 @@ export class SideBrowser {
     const page = await this.context.newPage();
     return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
       openAnonymous: async () => this.openAnonymousPage(),
+      readySelector: this.definition.readySelector,
     });
   }
 
   private async openAnonymousPage(): Promise<Side> {
     const context = await this.freshContext();
     const page = await context.newPage();
-    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, { owns: context });
+    return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
+      owns: context,
+      readySelector: this.definition.readySelector,
+    });
   }
 
   async close(): Promise<void> {

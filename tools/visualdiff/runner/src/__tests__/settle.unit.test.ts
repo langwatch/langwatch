@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { InFlightTracker, LONG_LIVED_MILLIS, shouldIgnoreRequest } from "../settle.ts";
+import {
+  InFlightTracker,
+  isPageReady,
+  LONG_LIVED_MILLIS,
+  readyMarker,
+  shouldIgnoreRequest,
+  USER_MENU_SELECTOR,
+} from "../settle.ts";
 
 const settings = { quietMillis: 500, deadlineMillis: 8000 };
 
@@ -122,6 +129,49 @@ describe("Feature: Visual diff between two refs", () => {
         expect(tracker.decide(LONG_LIVED_MILLIS + 500).quiet).toBe(true);
         expect(tracker.longLived(LONG_LIVED_MILLIS)).toEqual(["http://app/api/poll"]);
         expect(tracker.inFlight(LONG_LIVED_MILLIS)).toEqual([]);
+      });
+    });
+  });
+});
+
+describe("Feature: Visual diff between two refs", () => {
+  describe("given a screen waiting on the signed-in header", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    const page = ({ header }: { header: boolean }) => {
+      class Shown {}
+      vi.stubGlobal("HTMLElement", Shown);
+      const marker = Object.assign(new Shown(), { getClientRects: () => [{}] });
+      vi.stubGlobal("document", {
+        body: { textContent: "Traces" },
+        querySelectorAll: () => [],
+        querySelector: () => (header ? marker : null),
+      });
+    };
+
+    describe("when the ready marker is missing", () => {
+      /** @scenario The runner settles on the in-flight request count rather than a fixed wait */
+      it("is not ready", () => {
+        page({ header: false });
+        expect(isPageReady({ loading: ".x", ready: USER_MENU_SELECTOR })).toBe(false);
+      });
+    });
+
+    describe("when the marker is visible", () => {
+      it("is ready", () => {
+        page({ header: true });
+        expect(isPageReady({ loading: ".x", ready: USER_MENU_SELECTOR })).toBe(true);
+      });
+    });
+
+    describe("when the route is public", () => {
+      it("needs no marker, and a side's own selector wins on signed-in routes", () => {
+        expect(readyMarker({ path: "/share/abc" })).toBe("");
+        expect(readyMarker({ path: "/auth/signin" })).toBe("");
+        expect(readyMarker({ path: "/p/traces" })).toBe(USER_MENU_SELECTOR);
+        expect(readyMarker({ path: "/p/traces", selector: "#me" })).toBe("#me");
+        page({ header: false });
+        expect(isPageReady({ loading: ".x", ready: "" })).toBe(true);
       });
     });
   });

@@ -133,3 +133,28 @@ export class InFlightTracker<Key> {
     return since;
   }
 }
+
+/**
+ * USER_MENU_SELECTOR is the signed-in header control both stacks render: main's
+ * AppHeaderUserMenu and the branch's app-header-user-menu share its aria-label prefix.
+ */
+export const USER_MENU_SELECTOR = 'button[aria-label^="Open user menu"]';
+
+/** Signed-out and public screens have no signed-in header, so no ready marker. */
+const HEADERLESS_PATH = /^\/(auth|share|invite|onboarding)(\/|$)/;
+
+/** readyMarker is the selector a screen must show before it counts as loaded, "" for none. */
+export const readyMarker = ({ path, selector }: { path: string; selector?: string }): string =>
+  HEADERLESS_PATH.test(path) ? "" : (selector ?? USER_MENU_SELECTOR);
+
+/**
+ * isPageReady runs inside the page (Playwright serialises it): no loading element, a
+ * non-empty body, and the ready marker visible when there is one.
+ */
+export const isPageReady = ({ loading, ready }: { loading: string; ready: string }): boolean => {
+  if (document.querySelectorAll(loading).length > 0) return false;
+  if ((document.body?.textContent ?? "").trim() === "") return false;
+  if (ready === "") return true;
+  const marker = document.querySelector(ready);
+  return marker instanceof HTMLElement && marker.getClientRects().length > 0;
+};
