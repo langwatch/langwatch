@@ -1,4 +1,8 @@
 import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+} from "@langwatch/analytics-contract/chart-grid";
+import {
   DASHBOARD_KSUID_RESOURCE,
   dashboardCreateInputSchema,
   dashboardIdSchema,
@@ -9,7 +13,7 @@ import {
   GRAPH_KSUID_RESOURCE,
   graphCreateInputSchema,
   graphIdSchema,
-  graphLayoutSchema,
+  graphPlacementSchema,
   GraphNotFoundError,
   graphUpdateInputSchema,
   projectIdSchema,
@@ -31,8 +35,8 @@ import type {
 const defaultLayout: GraphLayout = {
   gridColumn: 0,
   gridRow: 0,
-  colSpan: 1,
-  rowSpan: 1,
+  colSpan: CHART_GRID_DEFAULT_COL_SPAN,
+  rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
 };
 
 /** The project's dashboards and the chart-builder graphs placed on them. */
@@ -187,20 +191,18 @@ export class DashboardService {
       await this.getById({ projectId: parsed.projectId, dashboardId: parsed.dashboardId });
     }
 
-    const lastGridRow =
-      parsed.dashboardId === undefined
-        ? undefined
-        : await this.#repository.findLastGraphGridRow({
+    const nextGridRow =
+      requestedLayout?.gridRow === undefined && parsed.dashboardId !== undefined
+        ? await this.#repository.findNextFreeGridRow({
             projectId: parsed.projectId,
             dashboardId: parsed.dashboardId,
-          });
+          })
+        : undefined;
 
-    const layout = graphLayoutSchema.parse({
+    const layout = graphPlacementSchema.parse({
       ...defaultLayout,
-      ...input.layout,
-      ...(input.layout?.gridRow === undefined && parsed.dashboardId !== undefined
-        ? { gridRow: (lastGridRow ?? -1) + 1 }
-        : {}),
+      ...requestedLayout,
+      ...(nextGridRow === undefined ? {} : { gridRow: nextGridRow }),
     });
 
     return this.#repository.createGraph({
@@ -247,7 +249,7 @@ export class DashboardService {
     graphId: string;
     layout: GraphLayout;
   }): Promise<Graph> {
-    const layout = graphLayoutSchema.parse(input.layout);
+    const layout = graphPlacementSchema.parse(input.layout);
 
     const ref = graphRef(input);
 
@@ -264,7 +266,7 @@ export class DashboardService {
 
     const layouts = input.layouts.map((item) => ({
       graphId: graphIdSchema.parse(item.graphId),
-      layout: graphLayoutSchema.parse(item.layout),
+      layout: graphPlacementSchema.parse(item.layout),
     }));
 
     for (const item of layouts) {
