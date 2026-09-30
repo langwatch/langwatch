@@ -255,7 +255,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
   const secretSnippets = useMemo(() => secretSnippetCalls(parts), [parts]);
   // The notifications offer (`offer_notifications`). The answer lives on the account, so the
   // card reads it there and a reload shows what was chosen.
-  const offersNotifications = useMemo(() => offerNotificationsCallId(parts) !== null, [parts]);
+  const offerCallId = useMemo(() => offerNotificationsCallId(parts), [parts]);
   const pullRequestLinks = useMemo(() => pullRequestLinksFromToolParts(parts), [parts]);
   // The live turn prefers the manager's typed plan snapshot; settled ones do not subscribe.
   const livePlan = useLangyStore((s) => (isStreaming ? s.turnPlan : null));
@@ -274,7 +274,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
     codeAccessCall,
     codeAccessDescribe,
     secretSnippets,
-    offersNotifications,
+    offerCallId,
     pullRequestLinks,
     plan,
     feedbackDirective,
@@ -307,7 +307,7 @@ function answerHasContent(reading: AnswerReading): boolean {
     reading.runs.some((run) => run.kind === "say") ||
     reading.codeAccessCall ||
     cardCount > 0 ||
-    reading.offersNotifications ||
+    reading.offerCallId !== null ||
     reading.showsActivity ||
     reading.plan,
   );
@@ -406,7 +406,7 @@ function AssistantMessage(props: MessageContentProps) {
           </LangyCardBoundary>
         ) : null}
         {reading.runs.map((run, index) => renderRun({ run, index, view }))}
-        <AnswerCards props={props} reading={reading} />
+        <AnswerCards props={props} />
         {/* The reply the user cut short says so, whatever it managed to say first. */}
         {interrupted && !isStreaming ? <MutedAnswerLine>Interrupted</MutedAnswerLine> : null}
         {showsFeedbackPrompt({ props, reading }) ? (
@@ -438,7 +438,8 @@ function isRecordedMessage(message: UIMessage): boolean {
 
 /**
  * The cards one call raised, drawn where the call ran: its pull requests (each once per message),
- * its proposal, the question it waits on, the code access ask and a secret snippet.
+ * its proposal, the question it waits on, the code access ask, a secret snippet and the
+ * notifications offer, which comes before long work so the work streams in below it.
  */
 function callCardsOf({
   props,
@@ -494,6 +495,11 @@ function callCardsOf({
         <LangySecretSnippetCard organizationId={organizationId} call={call} />
       </LangyCardBoundary>
     )),
+    reading.offerCallId !== null && offerNotificationsCallId([part]) === reading.offerCallId ? (
+      <LangyCardBoundary key="notifications-offer" scope="the notifications card">
+        <LangyNotificationsOfferCard />
+      </LangyCardBoundary>
+    ) : null,
   ];
 }
 
@@ -540,24 +546,13 @@ function progressCardOf({
   );
 }
 
-/**
- * The cards that close the turn rather than sit at a call: the pull request a guided path opened,
- * and the notifications offer.
- */
-function AnswerCards({ props, reading }: { props: MessageContentProps; reading: AnswerReading }) {
+/** The card that closes the turn rather than sit at a call: the guided path's pull request. */
+function AnswerCards({ props }: { props: MessageContentProps }) {
+  if (!props.guidedPullRequest || !guidedPathCompletedIn(props.message.parts)) return null;
   return (
-    <>
-      {props.guidedPullRequest && guidedPathCompletedIn(props.message.parts) ? (
-        <LangyCardBoundary scope="the pull request card">
-          <LangyGuidedPrCard {...props.guidedPullRequest} />
-        </LangyCardBoundary>
-      ) : null}
-      {reading.offersNotifications ? (
-        <LangyCardBoundary scope="the notifications card">
-          <LangyNotificationsOfferCard />
-        </LangyCardBoundary>
-      ) : null}
-    </>
+    <LangyCardBoundary scope="the pull request card">
+      <LangyGuidedPrCard {...props.guidedPullRequest} />
+    </LangyCardBoundary>
   );
 }
 

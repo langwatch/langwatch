@@ -27,6 +27,12 @@ Feature: Langy notifies the person when it needs them or has finished
       And it offers "Enable notifications" and "No thanks, I'll check back"
 
     @integration
+    Scenario: The offer stays where Langy made it while the work goes on below it
+      Given Langy called the offer_notifications tool and then kept working in the same turn
+      When the message renders
+      Then the offer card sits right after the call, before the reply that closes the turn
+
+    @integration
     Scenario: Enabling asks the browser and turns Langy notifications on
       Given the notifications offer card is showing
       When I click "Enable notifications"
