@@ -161,7 +161,7 @@ func seedCheckStack(ctx context.Context, stack Stack, booted bool, times *checkT
 }
 
 // seedSources are the files whose change changes what a seed writes.
-var seedSources = []string{"seed.go", "seed_flow.go", "seed_entities.go"}
+var seedSources = []string{"seed.go", "seed_flow.go", "seed_entities.go", "seed_catalogue.go"}
 
 // seedKey names a stack's database and the seed code that filled it, or "" when unreadable.
 func seedKey(stack Stack) string {

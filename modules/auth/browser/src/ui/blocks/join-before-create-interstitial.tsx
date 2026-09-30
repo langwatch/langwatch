@@ -1,4 +1,4 @@
-import { Button, Text, VStack } from "@chakra-ui/react";
+import { Button, Text } from "@chakra-ui/react";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { useEffect } from "react";
 
@@ -6,6 +6,7 @@ import {
   type JoinableOrganization,
   resolveJoinBeforeCreate,
 } from "../../model/join-before-create.ts";
+import { AuthCard } from "../elements/auth-card.tsx";
 
 /** Offer to join existing organization before creating workspace; joining leads. */
 export function JoinBeforeCreateInterstitial({
@@ -58,21 +59,21 @@ export function JoinBeforeCreateInterstitial({
 
   if (decision.outcome === "awaiting_approval") {
     return (
-      <VStack width="full" align="stretch" gap={4} data-testid="join-before-create">
-        <Text>
+      <AuthCard title="Your request is waiting">
+        <Text data-testid="join-before-create">
           Your request to join {decision.organization.name} is waiting for one of their
           administrators. We will email you either way.
         </Text>
         <Button variant="outline" width="full" onClick={onCreateWorkspace}>
           Create a new organization anyway
         </Button>
-      </VStack>
+      </AuthCard>
     );
   }
 
   return (
-    <VStack width="full" align="stretch" gap={4} data-testid="join-before-create">
-      <Text>
+    <AuthCard title="Join your colleagues">
+      <Text data-testid="join-before-create">
         Your colleagues are already on LangWatch. Join them instead of starting a separate
         workspace.
       </Text>
@@ -89,7 +90,7 @@ export function JoinBeforeCreateInterstitial({
       <Button variant="outline" width="full" onClick={onCreateWorkspace}>
         Create a new organization
       </Button>
-    </VStack>
+    </AuthCard>
   );
 }
 

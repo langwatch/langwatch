@@ -98,7 +98,6 @@ describe("ForgotPassword page", () => {
       // hold a form.
       expect(container.querySelector("[data-auth-card]")).toBeTruthy();
       expect(container.querySelector("[data-auth-card-logo]")).toBeTruthy();
-      expect(container.querySelector(".lw-front-door-card")).toBeTruthy();
       expect(container.querySelector("button.lw-front-door-primary")).toBeTruthy();
       // The board's field, not the app's: a small mono label, no helper line
       // restating it in different words.

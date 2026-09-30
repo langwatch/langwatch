@@ -10,6 +10,7 @@ import { acceptInviteResultSchema } from "../../model/accept-invite-result.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { SecondaryActionLink } from "../elements/secondary-action-link.tsx";
 import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
 
 /** Invitation landing: handles signed-out, signed-in, and expired cases. */
@@ -30,7 +31,7 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
   if (!landing.data) {
     return (
       <AuthCard title="Invitation">
-        <HStack gap={3} data-testid="invite-loading">
+        <HStack gap={3} justify="center" data-testid="invite-loading">
           <Spinner size="sm" color="orange.500" />
           <Text color="fg.muted">Looking up your invitation…</Text>
         </HStack>
@@ -64,6 +65,7 @@ function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: stri
   return (
     <AuthCard title="Invitation">
       <Text data-testid="invite-dead-end">This invitation is no longer available.</Text>
+      <SecondaryActionLink href="/auth/signin" label="Go to sign in" />
     </AuthCard>
   );
 }
@@ -81,10 +83,13 @@ function ExpiredInvite({ error, inviteCode }: { error: unknown; inviteCode: stri
       <VStack width="full" align="stretch" gap={4}>
         <HandledErrorAlert error={error} fallbackTitle="This invitation has expired" />
         {ask.isSuccess ? (
-          <Text data-testid="invite-refresh-asked" color="fg.muted">
-            We let the organization know. You will get a fresh invitation by email once somebody
-            there sends it.
-          </Text>
+          <>
+            <Text data-testid="invite-refresh-asked" color="fg.muted" textAlign="center">
+              We let the organization know. You will get a fresh invitation by email once somebody
+              there sends it.
+            </Text>
+            <SecondaryActionLink href="/auth/signin" label="Go to sign in" />
+          </>
         ) : (
           <>
             {ask.error ? (
@@ -93,16 +98,15 @@ function ExpiredInvite({ error, inviteCode }: { error: unknown; inviteCode: stri
                 fallbackTitle="Couldn't ask for a new invitation"
               />
             ) : null}
-            <HStack>
-              <Button
-                colorPalette="orange"
-                loading={ask.isPending}
-                data-testid="invite-ask-again"
-                onClick={() => ask.mutate({ inviteCode })}
-              >
-                Ask for a new invitation
-              </Button>
-            </HStack>
+            <Button
+              colorPalette="orange"
+              width="full"
+              loading={ask.isPending}
+              data-testid="invite-ask-again"
+              onClick={() => ask.mutate({ inviteCode })}
+            >
+              Ask for a new invitation
+            </Button>
           </>
         )}
       </VStack>

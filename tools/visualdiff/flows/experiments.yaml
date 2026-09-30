@@ -632,7 +632,7 @@ flows:
           text: /^Execution Time$/
 
   - id: experiment-results-page-run-summary
-    title: Open an SDK experiment's results and read its run, evaluator column, answers and the compare and chart controls
+    title: Open an SDK experiment's results and read its run, evaluator column, answers and the compare and export controls
     setup:
       - post: /api/experiment/init
         body:
@@ -684,7 +684,7 @@ flows:
           text: Exact match
       - action: expect
         with:
-          testId: toggle-charts-button
+          text: Export to CSV
       - action: expect
         with:
           testId: compare-button

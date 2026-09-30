@@ -1,7 +1,8 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react";
 
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
+import { SecondaryActionLink } from "../../ui/elements/secondary-action-link.tsx";
 import { FrontDoorShell } from "./front-door-shell.tsx";
 
 /**
@@ -30,25 +31,23 @@ function VerifyEmailCard() {
         title="This link is incomplete"
         intro="Some email clients cut long links in half. Open the one in your inbox again, or copy the whole address into your browser."
       >
-        <VStack align="stretch" gap={3} data-testid="verify-email-incomplete">
-          <Text color="fg.muted">
-            If it keeps arriving broken, ask for a fresh verification email from the window where
-            you requested this one.
-          </Text>
-        </VStack>
+        <Text color="fg.muted" data-testid="verify-email-incomplete">
+          If it keeps arriving broken, ask for a fresh verification email from the window where you
+          requested this one.
+        </Text>
+        <SecondaryActionLink href="/auth/signin" label="Back to sign in" />
       </AuthCard>
     );
   }
 
   return (
     <AuthCard title="Almost there">
-      <VStack align="stretch" gap={3} data-testid="verify-email-landing">
-        <Text>
-          Return to the window where you requested this verification to finish confirming your email
-          address.
-        </Text>
-        <Text color="fg.muted">Opening this link on its own does not confirm anything.</Text>
-      </VStack>
+      <Text data-testid="verify-email-landing">
+        Return to the window where you requested this verification to finish confirming your email
+        address.
+      </Text>
+      <Text color="fg.muted">Opening this link on its own does not confirm anything.</Text>
+      <SecondaryActionLink href="/auth/signin" label="Back to sign in" />
     </AuthCard>
   );
 }

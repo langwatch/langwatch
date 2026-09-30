@@ -164,6 +164,14 @@ func Seed(ctx context.Context, request SeedRequest) (SeedResult, error) {
 		keep("flow fixtures", started, fixtures, warnings)
 		return nil
 	})
+	if identity := request.Identity; identity.Email != "" && identity.Password != "" {
+		group.Go(func() error {
+			started := time.Now()
+			warnings := seedCatalogue(groupCtx, catalogueRequest{client: client, apiURL: request.APIURL, key: key, identity: identity})
+			keep("catalogue", started, nil, warnings)
+			return nil
+		})
+	}
 	if err := group.Wait(); err != nil {
 		return result, err
 	}
@@ -258,6 +266,8 @@ type postSpec struct {
 	body   any
 	method string
 	bearer string
+	// headers are sent as given, after the credential.
+	headers map[string]string
 }
 
 func post(ctx context.Context, client *http.Client, spec postSpec) error {
@@ -282,8 +292,11 @@ func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byt
 	outgoing.Header.Set("Content-Type", "application/json")
 	if spec.bearer != "" {
 		outgoing.Header.Set("Authorization", "Bearer "+spec.bearer)
-	} else {
+	} else if spec.key != "" {
 		outgoing.Header.Set("X-Auth-Token", spec.key)
+	}
+	for name, value := range spec.headers {
+		outgoing.Header.Set(name, value)
 	}
 	response, err := client.Do(outgoing)
 	if err != nil {
@@ -291,7 +304,7 @@ func postReading(ctx context.Context, client *http.Client, spec postSpec) ([]byt
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 300 {
-		detail, _ := io.ReadAll(io.LimitReader(response.Body, 400))
+		detail, _ := io.ReadAll(io.LimitReader(response.Body, 4000))
 		return nil, fmt.Errorf("%s answered %d: %s", spec.url, response.StatusCode, bytes.TrimSpace(detail))
 	}
 	return io.ReadAll(io.LimitReader(response.Body, 1<<20))

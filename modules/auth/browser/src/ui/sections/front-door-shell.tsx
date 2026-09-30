@@ -1,5 +1,6 @@
 import "../../model/ambient.d.ts";
 import { Box, Flex } from "@chakra-ui/react";
+import { BrandedCardPage } from "@langwatch/design-system/branded-card";
 import type { ReactNode } from "react";
 
 import "../elements/auth-front-door.css";
@@ -40,62 +41,49 @@ export function FrontDoorShell({
       backgroundColor="frontDoor.ground"
       minHeight="100vh"
       width="full"
-      overflowX="hidden"
+      overflowX="clip"
     >
       <LogoHandoff />
       {/* Renders nothing until somebody double-taps the castle. Mounted here
           so it exists exactly where the front door exists — same flag, same
           screens — and nowhere else. */}
       <CastleSnake />
-      <FrontDoorGround protect={headline ? "left" : "center"} />
       {headline ? (
-        // Capped at the site's content width and centred, so a big monitor
-        // widens the field around the conversation rather than flinging the
-        // headline and the card to opposite edges of it. Both doors keep the
-        // same seats — words on the left, card on the right — so crossing
-        // between them only changes what is said, never where anything is.
-        <Flex
-          position="relative"
-          zIndex={1}
-          direction={{ base: "column", md: "row" }}
-          align="stretch"
-          minHeight="100vh"
-          width="full"
-          maxWidth="1440px"
-          marginX="auto"
-        >
-          <FrontDoorValuePanel
-            headline={headline}
-            headlineAccent={headlineAccent}
-            tagline={tagline}
-            trustStrip={trustStrip}
-          />
+        <>
+          <FrontDoorGround protect="left" />
+          {/* Capped at the site's content width and centred, so a big monitor
+              widens the field around the conversation. Both doors keep the
+              same seats: words on the left, card on the right. */}
           <Flex
-            flex="1"
-            justify="center"
-            align={{ base: "flex-start", md: "center" }}
-            paddingX={{ base: 0, sm: 4, md: 10 }}
-            paddingBottom={10}
-            data-testid="front-door-card-column"
+            position="relative"
+            zIndex={1}
+            direction={{ base: "column", md: "row" }}
+            align="stretch"
+            minHeight="100vh"
+            width="full"
+            maxWidth="1440px"
+            marginX="auto"
           >
-            {children}
+            <FrontDoorValuePanel
+              headline={headline}
+              headlineAccent={headlineAccent}
+              tagline={tagline}
+              trustStrip={trustStrip}
+            />
+            <Flex
+              flex="1"
+              justify="center"
+              align={{ base: "flex-start", md: "center" }}
+              paddingX={{ base: 0, sm: 4, md: 10 }}
+              paddingBottom={10}
+              data-testid="front-door-card-column"
+            >
+              {children}
+            </Flex>
           </Flex>
-        </Flex>
+        </>
       ) : (
-        <Flex
-          position="relative"
-          zIndex={1}
-          direction="column"
-          align="center"
-          justify={{ base: "flex-start", md: "center" }}
-          minHeight="100vh"
-          width="full"
-          paddingX={{ base: 0, sm: 4 }}
-          paddingBottom={10}
-          data-testid="front-door-card-column"
-        >
-          {children}
-        </Flex>
+        <BrandedCardPage ground={<FrontDoorGround protect="center" />}>{children}</BrandedCardPage>
       )}
     </Box>
   );

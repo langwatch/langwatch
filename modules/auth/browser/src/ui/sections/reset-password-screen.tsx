@@ -242,7 +242,7 @@ function PostResetPasskeyOffer({
   }
   if (state === "added") {
     return (
-      <VStack width="full" align="stretch" gap="6px">
+      <VStack width="full" align="stretch" gap="6px" textAlign="center">
         <Text fontSize="13.5px" fontWeight={600} data-testid="reset-passkey-added">
           Passkey added
         </Text>
@@ -254,7 +254,13 @@ function PostResetPasskeyOffer({
     );
   }
   return (
-    <VStack width="full" align="stretch" gap="10px" data-testid="post-reset-passkey-offer">
+    <VStack
+      width="full"
+      align="stretch"
+      gap="10px"
+      textAlign="center"
+      data-testid="post-reset-passkey-offer"
+    >
       <Text fontSize="13px" lineHeight="1.6" color="fg.muted">
         Next time, skip the password. A passkey uses the fingerprint, face or screen lock your
         device already has, and there is nothing to forget.
