@@ -1,6 +1,8 @@
-import type { SlackConnection, SlackFieldRefusal } from "@langwatch/slack-browser-kit";
+import type { SlackConnection } from "@langwatch/slack-browser-kit";
 import type { SlackConnectionKind, SlackConnectionScopeType } from "@langwatch/slack-contract";
 import { useState } from "react";
+
+import type { SlackFieldRefusal } from "../model/slack-connection-refusals.ts";
 
 export interface ConnectionScope {
   scopeType: SlackConnectionScopeType;

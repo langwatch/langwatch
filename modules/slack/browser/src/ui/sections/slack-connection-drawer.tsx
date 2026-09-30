@@ -7,9 +7,9 @@ import {
   type SlackConnection,
   type SlackConnectionList,
   type SlackConnectionSaved,
-  slackApi,
 } from "@langwatch/slack-browser-kit";
 
+import { slackApi } from "../../behavior/slack-api.ts";
 import { useDeleteSlackConnection } from "../../behavior/use-delete-slack-connection.ts";
 import { useSaveSlackConnection } from "../../behavior/use-save-slack-connection.ts";
 import { SlackConnectionForm } from "../blocks/slack-connection-form.tsx";

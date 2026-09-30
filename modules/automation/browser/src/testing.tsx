@@ -52,6 +52,8 @@ export type AutomationHostRecording = {
    * only WHICH overlay a click asked for, and with what.
    */
   drawerOpens: RecordedAutomationDrawerOpen[];
+  /** How many times a section closed the drawer stack. */
+  drawerCloses: number;
   /**
    * The dataset hand-overs a section asked for, with handlers attached. A
    * sub-flow only means something once one of its two endings happens, so
@@ -109,6 +111,7 @@ export class FakeAutomationHost extends AutomationHost {
         navigations: [],
         queries: [],
         drawerOpens: [],
+        drawerCloses: 0,
         datasetHandovers: [],
         slackConnectionHandovers: [],
         successes: [],
@@ -238,6 +241,10 @@ export class FakeAutomationHost extends AutomationHost {
       drawer: request.drawer,
       params: request.params ?? {},
     });
+  }
+
+  closeDrawer(): void {
+    this.recording.drawerCloses += 1;
   }
 
   createDataset(handover: AutomationDatasetHandover): void {

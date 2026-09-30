@@ -28,7 +28,20 @@ export const automationWeb = defineWebModule("automation")
     automation: {
       load: async () => ({
         default: (await import("./features/authoring/ui/sections/automation-drawer.tsx"))
-          .AutomationDrawer,
+          .RegisteredAutomationDrawer,
+      }),
+    },
+    /** Links minted before the authoring drawer replaced the filter-only one still open it. */
+    editAutomationFilter: {
+      load: async () => ({
+        default: (await import("./features/authoring/ui/sections/automation-drawer.tsx"))
+          .RegisteredAutomationDrawer,
+      }),
+    },
+    viewAutomation: {
+      load: async () => ({
+        default: (await import("./features/authoring/ui/sections/view-automation-drawer.tsx"))
+          .RegisteredViewAutomationDrawer,
       }),
     },
   })

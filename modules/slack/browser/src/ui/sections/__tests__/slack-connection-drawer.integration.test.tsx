@@ -49,8 +49,7 @@ const state = vi.hoisted(() => ({
   closeDrawer: vi.fn(),
 }));
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../behavior/slack-api.ts", () => ({
   slackApi: {
     useUtils: () => ({ slackIntegration: { list: { invalidate: vi.fn() } } }),
     slackIntegration: {

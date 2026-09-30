@@ -4,13 +4,11 @@
  * activity is what the address names. The declaration answers it the same way.
  */
 
-import type * as SlackKit from "@langwatch/slack-browser-kit";
 import { cleanup, screen } from "@testing-library/react";
 import type { ComponentType } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<typeof SlackKit>()),
+vi.mock("../behavior/slack-api.ts", () => ({
   slackApi: { slackIntegration: { list: { useQuery: () => ({ data: undefined }) } } },
 }));
 

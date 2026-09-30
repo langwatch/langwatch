@@ -76,6 +76,7 @@ class CapabilityAutomationHost extends AutomationHost {
       feedback: UiFeedback;
       openRegisteredDrawer: ReturnType<typeof useDrawer>["openDrawer"];
       goBackDrawer: ReturnType<typeof useDrawer>["goBack"];
+      closeRegisteredDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
       organizations: readonly AutomationOrganizationGraph[];
       hasEmailProvider: boolean;
     },
@@ -147,6 +148,10 @@ class CapabilityAutomationHost extends AutomationHost {
     });
   }
 
+  closeDrawer(): void {
+    this.members.closeRegisteredDrawer();
+  }
+
   /** The one sub-flow this family runs: the dataset module's own drawer, hands over and returns. */
   createDataset(handover: {
     created: (dataset: AutomationDatasetCreation) => void;
@@ -210,7 +215,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
   const { session, navigation, route, feedback } = useUiCapabilities();
   const { organizationId, projectId } = useUiScope().activeScope();
   const scopeHost: UiScopeHost | undefined = useUiScope().scopeHost();
-  const { openDrawer: openRegisteredDrawer, goBack } = useDrawer();
+  const { openDrawer: openRegisteredDrawer, goBack, closeDrawer } = useDrawer();
   const deployment = useUiDeployment();
 
   const hostScope = useMemo<AutomationScope>(
@@ -236,6 +241,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
         feedback,
         openRegisteredDrawer,
         goBackDrawer: goBack,
+        closeRegisteredDrawer: closeDrawer,
         organizations,
         hasEmailProvider: deployment.hasEmailProvider,
       }),
@@ -248,6 +254,7 @@ export default function AutomationHostMount({ children }: { children?: ReactNode
       feedback,
       openRegisteredDrawer,
       goBack,
+      closeDrawer,
       organizations,
       deployment.hasEmailProvider,
     ],

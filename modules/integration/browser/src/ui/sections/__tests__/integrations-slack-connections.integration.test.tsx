@@ -32,8 +32,7 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+vi.mock("../../../behavior/slack-api.ts", () => ({
   slackApi: {
     slackIntegration: {
       list: {

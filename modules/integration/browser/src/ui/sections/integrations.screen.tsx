@@ -6,12 +6,12 @@
 
 import { Skeleton, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { LangyCodeAccessPreference } from "@langwatch/langy-browser-kit";
 import { useEffect } from "react";
 
 import { useGithubHost } from "../../model/github-host.ts";
 import { GITHUB_ERROR_QUERY_KEY } from "../../model/github-install-address.ts";
 import { GithubCard } from "./github-card.tsx";
+import { LangyCodeAccess } from "./langy-code-access.tsx";
 import { SlackCard } from "./slack-card.tsx";
 
 export default function IntegrationsScreen() {
@@ -48,7 +48,7 @@ export default function IntegrationsScreen() {
             {managesOrganization ? (
               <GithubCard organizationId={organizationId} />
             ) : (
-              <LangyCodeAccessPreference standalone />
+              <LangyCodeAccess standalone />
             )}
           </>
         ) : (

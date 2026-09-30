@@ -190,6 +190,15 @@ function cadenceTodo(draft: AutomationDraft): string {
 }
 
 /**
+ * The registry's `automation` and `editAutomationFilter`: an address carries no `onClose`, so
+ * closing closes the drawer stack, as main's drawer did with its own `closeDrawer`.
+ */
+export function RegisteredAutomationDrawer(props: UiAutomationDrawerProps) {
+  const host = useAutomationHost();
+  return <AutomationDrawer {...props} onClose={() => host.closeDrawer()} />;
+}
+
+/**
  * Orchestrator for the staged automation authoring drawer (ADR-036): owns
  * the data-loading lifecycle and preview/test-fire/upsert mutations, and
  * renders the drawer plus the Filters and Configuration secondaries.

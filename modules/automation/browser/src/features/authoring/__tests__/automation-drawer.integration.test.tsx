@@ -3,7 +3,6 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { TriggerAction } from "@langwatch/automation-contract";
-import type * as SlackKit from "@langwatch/slack-browser-kit";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
@@ -12,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AutomationToast } from "../../../behavior/automation-feedback.ts";
 import { AutomationHostProvider } from "../../../model/automation-host.ts";
 import { fakeAutomationHost } from "../../../testing.tsx";
-import { AutomationDrawer } from "../ui/sections/automation-drawer.tsx";
+import { AutomationDrawer, RegisteredAutomationDrawer } from "../ui/sections/automation-drawer.tsx";
 import { useAutomationStore } from "../ui/sections/automation-store.ts";
 import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
 
@@ -133,8 +132,7 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
 // ADR-093 §5a: the connections the project lists; read at render, so a test sets it first.
 let mockSlackConnections: { id: string; name: string }[] | undefined;
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<typeof SlackKit>()),
+vi.mock("../../../behavior/slack-api.ts", () => ({
   slackApi: {
     slackIntegration: {
       list: {
@@ -492,6 +490,20 @@ describe("AutomationDrawer", () => {
   // setup, cleanup, setup. The draft outlives the drawer in a singleton store,
   // so anything that decides "reset or keep" has to answer the same way each
   // time or the replay wipes a draft the author is coming back to.
+  describe("given the drawer opened straight from an address, which carries no onClose", () => {
+    describe("when the author closes an untouched create", () => {
+      it("closes the drawer stack through the host", async () => {
+        const user = userEvent.setup();
+        render(<RegisteredAutomationDrawer onClose={mockCloseDrawer} />, { wrapper: Wrapper });
+
+        await user.click(await screen.findByRole("button", { name: /close/i }));
+
+        expect(host.recording.drawerCloses).toBe(1);
+        expect(mockCloseDrawer).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given React replays the drawer's effects, as it does in development", () => {
     // StrictMode has to sit OUTSIDE the Chakra provider. Nested inside it, the
     // replay never runs and the test passes against the bug it is written for.

@@ -1,12 +1,10 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
-import {
-  readInUseRefusal,
-  type SlackConnection,
-  type SlackConnectionInUse,
-  slackApi,
-} from "@langwatch/slack-browser-kit";
+import { type SlackConnection } from "@langwatch/slack-browser-kit";
 import { useState } from "react";
+
+import { readInUseRefusal, type SlackConnectionInUse } from "../model/slack-connection-refusals.ts";
+import { slackApi } from "./slack-api.ts";
 
 /**
  * Deletes one connection. A connection automations still claim is refused (409

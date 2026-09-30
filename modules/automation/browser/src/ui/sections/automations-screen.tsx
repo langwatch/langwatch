@@ -12,7 +12,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Monitor as StoredMonitor } from "@langwatch/monitor-contract";
-import { type NamedSlackConnection, slackApi } from "@langwatch/slack-browser-kit";
+import { type NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import { toEpochMs } from "@langwatch/time";
 import { useMemo, useState } from "react";
 import { Calendar, Edit2, Eye, Filter, MoreVertical, Plus, Trash, Zap } from "react-feather";
@@ -20,6 +20,7 @@ import { Calendar, Edit2, Eye, Filter, MoreVertical, Plus, Trash, Zap } from "re
 import { api, type RouterOutputs } from "../../behavior/automation-api.ts";
 import { useAutomationToaster, useShowErrorToast } from "../../behavior/automation-feedback.ts";
 import { useOrganizationTeamProject } from "../../behavior/automation-session.ts";
+import { slackApi } from "../../behavior/slack-api.ts";
 import {
   type ConditionSource,
   presetLabels,

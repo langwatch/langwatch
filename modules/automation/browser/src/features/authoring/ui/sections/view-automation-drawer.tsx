@@ -16,12 +16,14 @@ import {
 } from "@langwatch/automation-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type NamedSlackConnection, slackApi } from "@langwatch/slack-browser-kit";
+import { type NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import { Calendar, TrendingUp } from "react-feather";
 
 import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
 import { api } from "../../../../behavior/automation-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import { slackApi } from "../../../../behavior/slack-api.ts";
+import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
 import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
 import { EmailList, type TriggerActionParams } from "../../../overview/index.ts";
@@ -49,6 +51,21 @@ interface ViewAutomationDrawerProps {
   onClose: () => void;
   /** Hands over to the editor, which the registry answers to as `automation`. */
   onEdit: (automationId: string) => void;
+}
+
+/**
+ * The registry's `viewAutomation`, as main registered it: Edit hands over to the `automation`
+ * drawer on the same automation, and closing closes the stack.
+ */
+export function RegisteredViewAutomationDrawer({ automationId }: { automationId: string }) {
+  const host = useAutomationHost();
+  return (
+    <ViewAutomationDrawer
+      automationId={automationId}
+      onClose={() => host.closeDrawer()}
+      onEdit={(id) => host.openDrawer({ drawer: "automation", params: { automationId: id } })}
+    />
+  );
 }
 
 export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAutomationDrawerProps) {

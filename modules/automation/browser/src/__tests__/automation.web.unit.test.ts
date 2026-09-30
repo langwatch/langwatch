@@ -4,7 +4,8 @@ import { createUi, installedDrawerLoaders } from "@langwatch/ui-kernel";
 import { describe, expect, it } from "vitest";
 
 import { automationWeb } from "../automation.web.ts";
-import { AutomationDrawer } from "../features/authoring/ui/sections/automation-drawer.tsx";
+import { RegisteredAutomationDrawer } from "../features/authoring/ui/sections/automation-drawer.tsx";
+import { RegisteredViewAutomationDrawer } from "../features/authoring/ui/sections/view-automation-drawer.tsx";
 
 function browserDocument() {
   const mount = document.createElement("div");
@@ -30,7 +31,24 @@ describe("given a browser that installs automation", () => {
     it("answers with the automation drawer", async () => {
       const loaded = await installedDrawerLoaders([automationWeb]).automation?.();
 
-      expect(loaded).toEqual({ default: AutomationDrawer });
+      expect(loaded).toEqual({ default: RegisteredAutomationDrawer });
+    });
+  });
+
+  describe("when an address names the drawer the API used to hand out", () => {
+    /** @scenario "A link issued before the drawer changed still opens the automation" */
+    it("answers with the automation authoring drawer", async () => {
+      const loaded = await installedDrawerLoaders([automationWeb]).editAutomationFilter?.();
+
+      expect(loaded).toEqual({ default: RegisteredAutomationDrawer });
+    });
+  });
+
+  describe("when an address names the automation viewer, as a row click or Langy writes it", () => {
+    it("answers with the registered viewer", async () => {
+      const loaded = await installedDrawerLoaders([automationWeb]).viewAutomation?.();
+
+      expect(loaded).toEqual({ default: RegisteredViewAutomationDrawer });
     });
   });
 

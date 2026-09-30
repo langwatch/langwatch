@@ -9576,9 +9576,15 @@ importers:
       '@langwatch/langy-browser-kit':
         specifier: workspace:*
         version: link:../../langy/browser-kit
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/slack-browser-kit':
         specifier: workspace:*
         version: link:../../slack/browser-kit
+      '@langwatch/slack-contract':
+        specifier: workspace:*
+        version: link:../../slack/contract
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
@@ -9721,6 +9727,9 @@ importers:
       '@langwatch/slack-browser-kit':
         specifier: workspace:*
         version: link:../../slack/browser-kit
+      '@langwatch/slack-contract':
+        specifier: workspace:*
+        version: link:../../slack/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9815,9 +9824,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
@@ -13845,6 +13851,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/error-presentation':
+        specifier: workspace:*
+        version: link:../../../packages/error-presentation
       '@langwatch/slack-browser-kit':
         specifier: workspace:*
         version: link:../browser-kit
@@ -13854,6 +13863,9 @@ importers:
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -13894,21 +13906,12 @@ importers:
 
   modules/slack/browser-kit:
     dependencies:
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../../../packages/api
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/slack-contract':
         specifier: workspace:*
         version: link:../contract
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'

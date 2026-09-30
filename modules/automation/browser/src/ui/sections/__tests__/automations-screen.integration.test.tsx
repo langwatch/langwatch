@@ -5,7 +5,6 @@
  */
 
 import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
-import type * as SlackKit from "@langwatch/slack-browser-kit";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -60,8 +59,7 @@ vi.mock("../../../behavior/automation-api.ts", () => {
   return { api, automationApi: api };
 });
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<typeof SlackKit>()),
+vi.mock("../../../behavior/slack-api.ts", () => ({
   slackApi: {
     slackIntegration: { list: { useQuery: () => ({ data: undefined, isLoading: false }) } },
   },

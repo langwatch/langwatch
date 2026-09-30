@@ -4,7 +4,6 @@
  * The list-page defects of #6716 (no delete confirmation, the wrong noun, row
  * actions with no accessible name) on the merged list (ADR-093 §1).
  */
-import type * as SlackKit from "@langwatch/slack-browser-kit";
 import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -28,9 +27,9 @@ vi.mock("../../../behavior/automation-api.ts", async () => {
   return { api: fixture.listPagesApi() };
 });
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => {
+vi.mock("../../../behavior/slack-api.ts", async () => {
   const fixture = await vi.importActual<typeof ListPagesFixture>("./list-pages.fixture.ts");
-  return { ...(await importOriginal<typeof SlackKit>()), slackApi: fixture.listPagesSlackApi() };
+  return { slackApi: fixture.listPagesSlackApi() };
 });
 
 function renderPage(section: AutomationSection) {

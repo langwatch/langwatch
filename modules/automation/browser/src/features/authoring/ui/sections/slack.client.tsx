@@ -20,12 +20,12 @@ import {
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { slackApi } from "@langwatch/slack-browser-kit";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
 
 import { api } from "../../../../behavior/automation-api.ts";
 import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
+import { slackApi } from "../../../../behavior/slack-api.ts";
 import type {
   ConfigFormProps,
   NotifyClientDef,

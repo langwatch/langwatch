@@ -23,13 +23,14 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import {
   maskedSecret,
   type SlackConnection,
-  slackApi,
   slackConnectionKindLabel,
   slackConnectionScopeLabel,
   usedByLabel,
 } from "@langwatch/slack-browser-kit";
 import { FaSlack } from "react-icons/fa";
 import { LuChevronRight, LuPlus } from "react-icons/lu";
+
+import { slackApi } from "../../behavior/slack-api.ts";
 
 export function SlackCard() {
   const { project } = useOrganizationTeamProject();

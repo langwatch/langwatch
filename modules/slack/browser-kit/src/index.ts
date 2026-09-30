@@ -1,8 +1,7 @@
 /**
- * The Slack pieces peers render: the client, the connection copy, the picker's options and the
- * setup callout.
+ * The Slack pieces peers render: the connection copy, the picker's options and the setup
+ * callout. Each consumer derives its own client from `@langwatch/slack-contract` (§3.4 rule 3).
  */
-export { slackApi } from "./slack-api.ts";
 export { useCopySlackAppManifest } from "./behavior/use-copy-slack-app-manifest.ts";
 export {
   NEW_CONNECTION,

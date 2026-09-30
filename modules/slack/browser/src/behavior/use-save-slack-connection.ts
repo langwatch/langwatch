@@ -1,13 +1,9 @@
 import { toaster } from "@langwatch/browser-host/toaster";
-import {
-  readFieldRefusal,
-  readInUseRefusal,
-  type SlackConnection,
-  type SlackConnectionSaved,
-  slackApi,
-} from "@langwatch/slack-browser-kit";
+import { type SlackConnection, type SlackConnectionSaved } from "@langwatch/slack-browser-kit";
 import { useState } from "react";
 
+import { readFieldRefusal, readInUseRefusal } from "../model/slack-connection-refusals.ts";
+import { slackApi } from "./slack-api.ts";
 import type { SlackConnectionDraft } from "./use-slack-connection-form-state.ts";
 
 /**

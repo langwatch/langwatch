@@ -4,7 +4,6 @@
  * stubbed; the editors are asserted through their wrapper test ids.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type * as SlackKit from "@langwatch/slack-browser-kit";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -78,8 +77,7 @@ vi.mock("../../../behavior/automation-feedback.ts", () => ({
       fallbackTitle ?? "Something went wrong",
 }));
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<typeof SlackKit>()),
+vi.mock("../../../behavior/slack-api.ts", () => ({
   slackApi: {
     slackIntegration: {
       list: {

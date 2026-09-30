@@ -112,6 +112,9 @@ export abstract class AutomationHost {
     params?: Readonly<Record<string, string | undefined>>;
   }): void;
 
+  /** Closes the open drawer and its whole stack, as a registered drawer's own close does. */
+  abstract closeDrawer(): void;
+
   /** Hands over to dataset drawer and returns with created dataset; reports dataset via
    *  handover callback and navigates back rather than closing the stack. */
   abstract createDataset(handover: {

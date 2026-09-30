@@ -1,4 +1,3 @@
-import type * as SlackKit from "@langwatch/slack-browser-kit";
 import { cleanup, screen } from "@testing-library/react";
 /**
  * @vitest-environment jsdom
@@ -7,7 +6,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
-import { ViewAutomationDrawer } from "../ui/sections/view-automation-drawer.tsx";
+import {
+  RegisteredViewAutomationDrawer,
+  ViewAutomationDrawer,
+} from "../ui/sections/view-automation-drawer.tsx";
 import type * as ViewDrawerFixture from "./view-drawer.fixture.ts";
 import { resetViewDrawerState, viewDrawerState } from "./view-drawer.fixture.ts";
 
@@ -30,9 +32,9 @@ vi.mock("../../../behavior/automation-api.ts", async () => {
   return { api: fixture.viewDrawerApi() };
 });
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => {
+vi.mock("../../../behavior/slack-api.ts", async () => {
   const fixture = await vi.importActual<typeof ViewDrawerFixture>("./view-drawer.fixture.ts");
-  return { ...(await importOriginal<typeof SlackKit>()), slackApi: fixture.viewDrawerSlackApi() };
+  return { slackApi: fixture.viewDrawerSlackApi() };
 });
 
 const onClose = vi.fn();
@@ -338,6 +340,28 @@ describe("ViewAutomationDrawer", () => {
 
         expect(screen.getByText("Watches a trace filter")).toBeDefined();
         expect(screen.getByText(/This automation has not fired yet\./)).toBeDefined();
+      });
+    });
+  });
+
+  describe("given the viewer opened at its registered address", () => {
+    beforeEach(() => {
+      viewDrawerState.trigger = graphAlert;
+    });
+
+    describe("when the reader presses Edit", () => {
+      /** @scenario "The automation viewer hands over to the editor at its registered address" */
+      it("opens the automation drawer on the same automation", async () => {
+        const host = fakeAutomationHost();
+        renderWithAutomationHost(<RegisteredViewAutomationDrawer automationId="trigger_1" />, {
+          host,
+        });
+
+        await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+        expect(host.recording.drawerOpens).toEqual([
+          { drawer: "automation", params: { automationId: "trigger_1" } },
+        ]);
       });
     });
   });

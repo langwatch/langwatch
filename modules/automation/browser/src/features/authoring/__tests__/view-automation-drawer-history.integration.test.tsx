@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
  */
-import type * as SlackKit from "@langwatch/slack-browser-kit";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -34,9 +33,9 @@ vi.mock("../../../behavior/automation-api.ts", async () => {
   return { api: fixture.viewDrawerApi() };
 });
 
-vi.mock("@langwatch/slack-browser-kit", async (importOriginal) => {
+vi.mock("../../../behavior/slack-api.ts", async () => {
   const fixture = await vi.importActual<typeof ViewDrawerFixture>("./view-drawer.fixture.ts");
-  return { ...(await importOriginal<typeof SlackKit>()), slackApi: fixture.viewDrawerSlackApi() };
+  return { slackApi: fixture.viewDrawerSlackApi() };
 });
 
 const onClose = vi.fn();

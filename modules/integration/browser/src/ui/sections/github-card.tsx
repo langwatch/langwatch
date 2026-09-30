@@ -5,7 +5,6 @@
  */
 
 import { Badge, Button, Card, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { LangyCodeAccessPreference } from "@langwatch/langy-browser-kit";
 import { useState } from "react";
 import { GitHub } from "react-feather";
 
@@ -13,6 +12,7 @@ import { githubApi } from "../../behavior/github-api.ts";
 import { useGithubHost } from "../../model/github-host.ts";
 import { githubInstallAddress } from "../../model/github-install-address.ts";
 import { GithubInstallationRow } from "../elements/github-installation-row.tsx";
+import { LangyCodeAccess } from "./langy-code-access.tsx";
 
 export function GithubCard({ organizationId }: { organizationId: string }) {
   const host = useGithubHost();
@@ -116,7 +116,7 @@ export function GithubCard({ organizationId }: { organizationId: string }) {
           )}
 
           {/* How Langy reaches this person's code, once they chose (ADR-129). */}
-          <LangyCodeAccessPreference />
+          <LangyCodeAccess />
         </VStack>
       </Card.Body>
     </Card.Root>

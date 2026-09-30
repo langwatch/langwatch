@@ -5,9 +5,10 @@
  */
 import type { WireOf } from "@langwatch/api/web";
 import type { NextFiring } from "@langwatch/automation-contract";
-import { slackApi, type SlackConnection } from "@langwatch/slack-browser-kit";
+import { type SlackConnection } from "@langwatch/slack-browser-kit";
 
 import { api } from "../../../behavior/langy-api.ts";
+import { slackApi } from "../../../behavior/slack-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import {
   type LangyAutomationRecord,

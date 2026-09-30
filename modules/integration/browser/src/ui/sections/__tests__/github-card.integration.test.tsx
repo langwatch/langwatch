@@ -55,8 +55,8 @@ vi.mock("../../../behavior/github-api.ts", () => ({
 
 vi.mock("../slack-card.tsx", () => ({ SlackCard: () => null }));
 
-vi.mock("@langwatch/langy-browser-kit", () => ({
-  LangyCodeAccessPreference: ({ standalone }: { standalone?: boolean }) => (
+vi.mock("../langy-code-access.tsx", () => ({
+  LangyCodeAccess: ({ standalone }: { standalone?: boolean }) => (
     <div data-testid={standalone ? "langy-code-access-standalone" : "langy-code-access-inline"} />
   ),
 }));

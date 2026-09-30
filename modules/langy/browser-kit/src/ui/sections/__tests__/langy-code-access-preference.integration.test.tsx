@@ -1,101 +1,49 @@
 /**
  * @vitest-environment jsdom
  *
- * The remembered code-access choice shows on the Integrations screen only once one is stored —
- * a settings page offering to change a choice nobody made is noise.
+ * The remembered code-access choice, as the Integrations screen shows it once one is stored.
  * @see specs/langy/langy-code-access.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const preference = vi.hoisted(() => ({ current: null as "github" | null }));
-const clearPreference = vi.hoisted(() => vi.fn());
-
-vi.mock("../../../behavior/langy-code-access-api.ts", () => ({
-  langyCodeAccessApi: {
-    langy: {
-      getCodeAccessPreference: {
-        useQuery: () => ({
-          data: { preference: preference.current },
-          refetch: vi.fn(),
-        }),
-      },
-      setCodeAccessPreference: {
-        useMutation: () => ({ mutate: clearPreference, isPending: false }),
-      },
-    },
-  },
-}));
-
-vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
-  useOrganizationTeamProject: () => ({
-    organization: { id: "org-1", name: "Acme Corp" },
-    project: { id: "p_1", slug: "acme" },
-  }),
-}));
-
 import { LangyCodeAccessPreference } from "../langy-code-access-preference.tsx";
 
-afterEach(cleanup);
-beforeEach(() => clearPreference.mockClear());
+const onClear = vi.fn();
 
-const renderBlock = () =>
+afterEach(cleanup);
+beforeEach(() => onClear.mockClear());
+
+const renderBlock = ({ standalone }: { standalone?: boolean }) =>
   render(
     <ChakraProvider value={defaultSystem}>
-      <LangyCodeAccessPreference />
+      <LangyCodeAccessPreference standalone={standalone} isClearing={false} onClear={onClear} />
     </ChakraProvider>,
   );
 
 describe("given GitHub was remembered for code changes", () => {
-  beforeEach(() => {
-    preference.current = "github";
-  });
+  describe("when the reader presses Change in the GitHub section", () => {
+    /** @scenario "The remembered choice can be cleared from the integrations settings" */
+    it("says so, and asks to clear the choice", () => {
+      renderBlock({});
 
-  /** @scenario "The remembered choice can be cleared from the integrations settings" */
-  it("says so in the GitHub section, and clears the choice", () => {
-    renderBlock();
+      expect(screen.getByText("Langy uses GitHub for code changes")).toBeDefined();
+      fireEvent.click(screen.getByText("Change"));
 
-    expect(screen.getByText("Langy uses GitHub for code changes")).toBeDefined();
-    fireEvent.click(screen.getByText("Change"));
-
-    expect(clearPreference).toHaveBeenCalledWith({
-      projectId: "p_1",
-      preference: null,
+      expect(onClear).toHaveBeenCalledTimes(1);
     });
   });
-});
 
-describe("given nothing was remembered", () => {
-  beforeEach(() => {
-    preference.current = null;
-  });
+  describe("when it stands in a card of its own, outside the GitHub card", () => {
+    /** @scenario "The remembered choice can be cleared from the integrations settings" */
+    it("titles the card and still asks to clear the choice", () => {
+      renderBlock({ standalone: true });
 
-  it("says nothing, because there is no choice to change", () => {
-    renderBlock();
-    expect(screen.queryByText("Langy uses GitHub for code changes")).toBeNull();
-  });
-});
+      expect(screen.getByText("Langy code access")).toBeDefined();
+      fireEvent.click(screen.getByText("Change"));
 
-describe("given a member who does not manage the organization", () => {
-  beforeEach(() => {
-    preference.current = "github";
-  });
-
-  /** @scenario "The remembered choice can be cleared from the integrations settings" */
-  it("still shows the remembered choice in a card of its own, outside the GitHub card, and clears it", () => {
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <LangyCodeAccessPreference standalone />
-      </ChakraProvider>,
-    );
-
-    expect(screen.getByText("Langy code access")).toBeDefined();
-    expect(screen.getByText("Langy uses GitHub for code changes")).toBeDefined();
-    fireEvent.click(screen.getByText("Change"));
-    expect(clearPreference).toHaveBeenCalledWith({
-      projectId: "p_1",
-      preference: null,
+      expect(onClear).toHaveBeenCalledTimes(1);
     });
   });
 });
