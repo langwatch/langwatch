@@ -24,10 +24,10 @@
   ],
   "references": [
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../../billing/contract/tsconfig.build.json"
     },
     {
-      "path": "../../billing/contract/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/evaluation/contract/tsconfig.build.json"

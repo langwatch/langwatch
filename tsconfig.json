@@ -52,6 +52,9 @@
       "path": "modules/analytics/process/tsconfig.json"
     },
     {
+      "path": "apps/analyticssim-web/tsconfig.json"
+    },
+    {
       "path": "modules/annotation/browser/tsconfig.json"
     },
     {
@@ -740,9 +743,6 @@
     },
     {
       "path": "apps/voicesim-web/tsconfig.json"
-    },
-    {
-      "path": "apps/analyticssim-web/tsconfig.json"
     },
     {
       "path": "modules/webhook/contract/tsconfig.json"

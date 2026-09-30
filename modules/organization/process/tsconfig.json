@@ -63,6 +63,12 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/mail/tsconfig.declarations.json"
+    },
+    {
+      "path": "../../notification/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
@@ -106,12 +112,6 @@
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/mail/tsconfig.declarations.json"
-    },
-    {
-      "path": "../../notification/contract/tsconfig.build.json"
     }
   ]
 }
