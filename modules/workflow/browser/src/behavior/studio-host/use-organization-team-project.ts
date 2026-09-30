@@ -4,7 +4,7 @@
 
 import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { Temporal } from "@langwatch/time";
-import { useWorkflowHost, type WorkflowCopyTarget } from "@langwatch/workflow-browser-kit";
+import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import type { Project } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
@@ -23,10 +23,6 @@ export type StudioScopeReading = {
   projectId: string | undefined;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions: string[]) => boolean;
-  /**
-   * Every project the reader may replicate into, already derived by the host.
-   */
-  copyTargets: readonly WorkflowCopyTarget[];
   modelProviders: RouterOutputs["modelProvider"]["getAllForProject"] | undefined;
   /** False while the composing application is still resolving the scope. */
   isResolved: boolean;
@@ -87,7 +83,6 @@ export function useOrganizationTeamProject(
       hasPermission: (permission: string) => host.hasPermission(permission),
       hasAnyPermission: (permissions: string[]) =>
         permissions.some((permission) => host.hasPermission(permission)),
-      copyTargets: host.copyTargets({ permission: "workflows:create" }),
       modelProviders: modelProviders.data,
       isResolved: scope.isResolved ?? !!scope.projectId,
       isLoading: !(scope.isResolved ?? !!scope.projectId),

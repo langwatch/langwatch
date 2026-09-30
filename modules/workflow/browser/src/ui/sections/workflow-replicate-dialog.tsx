@@ -30,7 +30,8 @@ export function WorkflowReplicateDialog({
   const [selected, setSelected] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
 
-  const targets = host.copyTargets({ permission: "workflows:create" });
+  // Read only while open: each target costs one permissions read per project.
+  const targets = open ? host.copyTargets({ permission: "workflows:create" }) : [];
   const collection = createListCollection({
     items: targets.map((target) => ({ label: target.name, value: target.id })),
   });

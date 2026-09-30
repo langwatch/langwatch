@@ -9,7 +9,7 @@ import { authzOwnStandingSchema, type AuthzOwnStanding } from "@langwatch/authz-
 import { UiCopyTargets, type UiCopyTarget } from "@langwatch/browser-host/capabilities";
 import type { UiScopeOrganization } from "@langwatch/organization-contract";
 import { useQueries } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { uiCopyCandidates, uiCopyTargets, type UiCopyCandidate } from "../model/ui-copy-targets.ts";
 import type { UiFeatureApiTransport } from "./ui-scope-queries.ts";
@@ -30,9 +30,15 @@ function landedGrants(
 export type UiCopyTargetsReading = {
   readonly candidates: readonly UiCopyCandidate[] | undefined;
   readonly grants: ReadonlyMap<string, readonly string[]>;
+  /** Starts the grants reads; called by the first screen that asks for targets. */
+  readonly want: () => void;
 };
 
-/** One grants read per candidate project, cached under the key auth's own read uses. */
+/**
+ * One grants read per candidate project, cached under the key auth's own read uses.
+ * Nothing is read until a screen asks, as main read them only inside a copy dialog:
+ * mounted at the root, every page load cost one read per project in the organization.
+ */
 export function useUiCopyTargetsReading({
   transport,
   organizations,
@@ -48,8 +54,14 @@ export function useUiCopyTargetsReading({
     [organizations, userId],
   );
 
+  const [wanted, setWanted] = useState(false);
+  // Deferred: a screen asks while rendering, when setting another component's state is refused.
+  const want = useCallback(() => {
+    if (!wanted) queueMicrotask(() => setWanted(true));
+  }, [wanted]);
+
   const landed = useQueries({
-    queries: (candidates ?? []).map(({ projectId }) => {
+    queries: (wanted && candidates ? candidates : []).map(({ projectId }) => {
       const input = { projectId };
       return {
         queryKey: [
@@ -81,7 +93,7 @@ export function useUiCopyTargetsReading({
     [candidates, landed],
   );
 
-  return useMemo(() => ({ candidates, grants }), [candidates, grants]);
+  return useMemo(() => ({ candidates, grants, want }), [candidates, grants, want]);
 }
 
 export class BrowserUiCopyTargets extends UiCopyTargets {
@@ -90,7 +102,8 @@ export class BrowserUiCopyTargets extends UiCopyTargets {
   }
 
   targets(permission: string): readonly UiCopyTarget[] | undefined {
-    const { candidates, grants } = this.reading;
+    const { candidates, grants, want } = this.reading;
+    want();
     if (!candidates) return void 0;
     return uiCopyTargets({
       candidates,
@@ -100,7 +113,7 @@ export class BrowserUiCopyTargets extends UiCopyTargets {
   }
 }
 
-/** The capability over one render's reading. Pure: every read it needs has landed or not. */
+/** The capability over one render's reading; asking for targets starts the grants reads. */
 export function createBrowserUiCopyTargets({
   reading,
 }: {

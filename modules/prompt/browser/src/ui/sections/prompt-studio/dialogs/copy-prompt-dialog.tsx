@@ -31,7 +31,8 @@ export const CopyPromptDialog = ({
 
   if (!project) return null;
 
-  const projects = host.copyTargets().map((target) => ({
+  // Read only while open: each target costs one permissions read per project.
+  const projects = (open ? host.copyTargets() : []).map((target) => ({
     value: target.id,
     label: target.teamName ? `${target.teamName} / ${target.name}` : target.name,
     hasCreatePermission: target.canCreate,

@@ -30,7 +30,8 @@ export function EvaluatorReplicateDialog({
   const [selected, setSelected] = useState<string[]>([]);
   const copyEvaluator = evaluatorApi.evaluators.copy.useMutation();
 
-  const targets = host.copyTargets();
+  // Read only while open: each target costs one permissions read per project.
+  const targets = open ? host.copyTargets() : [];
   const collection = createListCollection({
     items: targets.map((target) => ({ label: target.name, value: target.id })),
   });

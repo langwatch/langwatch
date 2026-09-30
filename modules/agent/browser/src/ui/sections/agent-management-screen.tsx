@@ -71,7 +71,8 @@ class ScreenComposition implements AgentPageComposition {
       <AgentReplicateDialog
         open={input.open}
         agentName={input.agentName}
-        projects={input.projects}
+        // Read only while open: each target costs one permissions read per project.
+        projects={input.open ? this.host.copyTargets() : []}
         isLoading={input.isLoading}
         onClose={input.onClose}
         onCopy={async (projectId) => {
@@ -250,7 +251,6 @@ export function AgentManagementScreen() {
           agents,
           items,
           isLoading: agentsQuery.isLoading,
-          copyProjects: [...host.copyTargets()],
         }}
         navigation={navigation}
         feedback={feedback}

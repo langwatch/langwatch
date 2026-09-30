@@ -241,7 +241,6 @@ function renderPage(browser: TestAgentBrowser, lifecycle = new TestLifecycle()) 
           agents: browser,
           items: [wireAgent],
           isLoading: false,
-          copyProjects: [{ label: "Project 2", value: "project_2", hasCreatePermission: true }],
         }}
         navigation={new TestNavigation()}
         feedback={new TestFeedback()}
@@ -332,7 +331,6 @@ describe("AgentManagementPage", () => {
               agents: browser,
               items: [],
               isLoading: false,
-              copyProjects: [],
             }}
             navigation={new EmptyNavigation()}
             feedback={new TestFeedback()}

@@ -27,12 +27,6 @@ import type { AgentClient, ConnectedAgentBrowser } from "../../model/agent-clien
  */
 export type AgentWithFields = WireOf<StoredAgentWithFields>;
 
-export type AgentCopyProject = {
-  label: string;
-  value: string;
-  hasCreatePermission: boolean;
-};
-
 export type AgentArchiveDialogInput = {
   open: boolean;
   agentName: string;
@@ -48,7 +42,6 @@ export type AgentCopyDialogInput = {
   agentId: string;
   agentName: string;
   sourceProjectId: string;
-  projects: AgentCopyProject[];
   isLoading: boolean;
   onClose: () => void;
   onCopy: (targetProjectId: string) => Promise<void>;
@@ -83,7 +76,6 @@ export type AgentManagementData = {
   agents: AgentClient;
   items: AgentWithFields[];
   isLoading: boolean;
-  copyProjects: AgentCopyProject[];
 };
 
 export interface AgentManagementNavigation {
@@ -255,7 +247,6 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
         agentId: agentForCopy?.id ?? "",
         agentName: agentForCopy?.name ?? "",
         sourceProjectId: props.data.projectId,
-        projects: props.data.copyProjects,
         isLoading: isCopying,
         onClose: () => setAgentForCopy(null),
         onCopy: handleCopy,

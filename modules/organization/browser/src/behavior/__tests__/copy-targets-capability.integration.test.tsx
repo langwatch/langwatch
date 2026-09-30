@@ -66,11 +66,14 @@ function grantingTransport(): { transport: UiFeatureApiTransport; asked: string[
 function TargetsProbe({
   transport,
   organizations,
+  asks,
 }: {
   transport: UiFeatureApiTransport;
   organizations: readonly UiScopeOrganization[] | undefined;
+  asks: boolean;
 }) {
   const reading = useUiCopyTargetsReading({ transport, organizations, userId: "user_1" });
+  if (!asks) return <p>not asked</p>;
   const targets = createBrowserUiCopyTargets({ reading }).targets("evaluations:manage");
   if (!targets) return <p>no answer</p>;
   return (
@@ -84,12 +87,15 @@ function TargetsProbe({
   );
 }
 
-function renderProbe(organizations: readonly UiScopeOrganization[] | undefined) {
+function renderProbe(
+  organizations: readonly UiScopeOrganization[] | undefined,
+  { asks = true }: { asks?: boolean } = {},
+) {
   const { transport, asked } = grantingTransport();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <TargetsProbe transport={transport} organizations={organizations} />
+      <TargetsProbe transport={transport} organizations={organizations} asks={asks} />
     </QueryClientProvider>,
   );
   return { asked };
@@ -107,6 +113,17 @@ describe("given a reader who may manage evaluations in one of their projects and
       expect(screen.getByText("Acme / Engineering / Batch: closed")).toBeTruthy();
       expect(screen.queryByText(/Billing/)).toBeNull();
       expect(asked.toSorted()).toEqual(["proj_closed", "proj_open"]);
+    });
+  });
+
+  describe("when no screen has asked for copy targets", () => {
+    /** @scenario "Each replication target is graded by my own permissions in that project" */
+    it("reads no project's permissions", async () => {
+      const { asked } = renderProbe(GRAPH, { asks: false });
+
+      expect(await screen.findByText("not asked")).toBeTruthy();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(asked).toEqual([]);
     });
   });
 
