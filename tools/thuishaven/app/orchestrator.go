@@ -582,7 +582,7 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
 	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
-	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
+	env := append(append(st.OverlayEnv(), o.credentialEnv(st.Slug, p.WorktreeDir)...), "DOTENV_CONFIG_QUIET=true")
 	jobs := prepShellsFor(st.Layout)
 	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
 	// the services boot. Owned here so `pnpm dev` is simply `haven up`.

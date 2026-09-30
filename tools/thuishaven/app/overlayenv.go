@@ -79,8 +79,13 @@ func (o *Orchestrator) stackByWorktree(worktreeDir string) (domain.Stack, bool) 
 // StackEnv returns the resolved overlay for this worktree's registered stack —
 // the exact KEY=VALUE set every supervised child is started with.
 func (o *Orchestrator) StackEnv(p UpParams) ([]string, error) {
+	// A named slug wins: one checkout can run several stacks (visualdiff's
+	// check stack beside the developer's), and a tool reading one names it.
+	if st, ok := o.stackBySlug(p.ExplicitSlug); ok && p.ExplicitSlug != "" {
+		return o.toolEnv(st), nil
+	}
 	if st, ok := o.stackByWorktree(p.WorktreeDir); ok {
-		return st.OverlayEnv(), nil
+		return o.toolEnv(st), nil
 	}
 	slug, err := o.resolveSlug(p)
 	if err != nil {
@@ -90,7 +95,7 @@ func (o *Orchestrator) StackEnv(p UpParams) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("no stack is registered for this worktree — run `haven up` here first")
 	}
-	return st.OverlayEnv(), nil
+	return o.toolEnv(st), nil
 }
 
 // Env prints this worktree's overlay for a shell to consume:

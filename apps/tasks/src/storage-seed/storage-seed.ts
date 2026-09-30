@@ -4,7 +4,7 @@
  * API tokens — plaintext identical everywhere, only the bcrypt hash differs.
  */
 
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
 import { DEFAULT_LICENSE_PUBLIC_KEY as PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
@@ -71,6 +71,8 @@ const PUBLIC_TOKEN_ROLE_DESCRIPTION =
   "Restricted role for the static local-dev public ingestion token (traces:create only)";
 
 const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
+
+const SCIM_TOKEN_ID = "local-dev-scim-token";
 
 /** The prompt tag `resolveLangyPrompt` reads by default. */
 const DEFAULT_PROMPT_TAG = "production";
@@ -320,6 +322,15 @@ export async function storageSeed({ connections, environment }: TaskInput): Prom
     });
   }
 
+  // haven mints this per stack (HAVEN_SEED_SCIM_TOKEN) so the diff tools can call SCIM.
+  if (environment.HAVEN_SEED_SCIM_TOKEN) {
+    await seedScimToken({
+      prisma,
+      organizationId: organization.id,
+      token: environment.HAVEN_SEED_SCIM_TOKEN,
+    });
+  }
+
   if (environment.HAVEN_SEED_PRESET === "demo") {
     await seedDemoPlatform({
       prisma,
@@ -345,6 +356,33 @@ export async function storageSeed({ connections, environment }: TaskInput): Prom
     },
     "seeded the static local dev identity",
   );
+}
+
+/**
+ * An organization-wide SCIM token under the pepper-free sha256 digest main's
+ * older rows use, so it verifies whichever pepper the stack resolves.
+ */
+async function seedScimToken({
+  prisma,
+  organizationId,
+  token,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+  token: string;
+}): Promise<void> {
+  const hashedToken = createHash("sha256").update(token).digest("hex");
+  await prisma.scimToken.upsert({
+    where: { id: SCIM_TOKEN_ID },
+    create: {
+      id: SCIM_TOKEN_ID,
+      organizationId,
+      hashedToken,
+      hashScheme: "sha256",
+      description: "haven local SCIM token",
+    },
+    update: { hashedToken, hashScheme: "sha256" },
+  });
 }
 
 /**

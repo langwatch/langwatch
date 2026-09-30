@@ -67,7 +67,7 @@ func goCombinedShell(repoRoot string, services []string, shouldWatch bool) strin
 // the overlay env (hostname URLs + ports) onto each child and giving each Go
 // service its SERVER_ADDR.
 func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, langyDockerHost string) []Child {
-	base := st.OverlayEnv()
+	base := append(st.OverlayEnv(), o.credentialEnv(st.Slug, repoDir)...)
 	logDir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
 	logPath := func(name string) string {
 		return filepath.Join(logDir, name+".log")

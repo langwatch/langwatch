@@ -71,6 +71,14 @@ func runScenariosSubcommand(ctx context.Context, args []string, out streams) int
 	if runDir == "" {
 		runDir = filepath.Join(".apidiff", "scenarios-"+time.Now().Format("20060102-150405"))
 	}
+	if probe.a != "" && probe.b == "" {
+		filled, err := fillHavenCredentials(ctx, probe.a, &probe.keys)
+		if err != nil {
+			fmt.Fprintln(out.stderr, "scenarios: haven credentials:", err)
+		} else if len(filled) > 0 {
+			fmt.Fprintln(out.stderr, "scenarios: took from the haven stack:", strings.Join(filled, ", "))
+		}
+	}
 	return runScenarioPhase(ctx, scenarios.options(probe, runDir, out.stderr), out.stdout, out.stderr)
 }
 

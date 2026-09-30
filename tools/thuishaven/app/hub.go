@@ -92,6 +92,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 		_ = os.RemoveAll(combined)
 	}
 	o.removeStackHome(slug)
+	o.removeStackCredentials(slug)
 	fmt.Printf("stack %q destroyed (database %s dropped)\n", slug, db)
 	return nil
 }

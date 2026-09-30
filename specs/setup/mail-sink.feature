@@ -76,6 +76,12 @@ Feature: Local mail sink (mailsim)
     # haven never silently rewires mail the developer deliberately routed
     # elsewhere; the sink still catches whatever is addressed to it directly.
 
+  @unit
+  Scenario: A provider key with no provider named does not keep mail off the sink
+    Given a `.env` that sets SENDGRID_API_KEY but names no EMAIL_PROVIDER
+    When the stack is planned
+    Then haven injects SMTP settings pointing the app at the sink
+
   # --- Reading mail from the CLI -------------------------------------------
 
   @unit

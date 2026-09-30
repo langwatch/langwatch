@@ -308,13 +308,13 @@ func LaneEnv(lane string) string {
 	return "LANGWATCH_LANE=" + lane
 }
 
-// MailProviderEnvVars are the env keys that mean a developer configured an
-// outgoing-mail provider explicitly. Any one of them present in the resolved
-// environment means haven must inject nothing: silently rewiring mail a
-// developer deliberately routed to SendGrid, Resend, SES or a hand-rolled SMTP
-// endpoint would send their test traffic somewhere they did not choose.
+// MailProviderEnvVars are the env keys that mean a developer chose where mail
+// goes: a named EMAIL_PROVIDER, an SMTP endpoint, or SES switched on. Any one
+// set means haven injects nothing. A bare SENDGRID_API_KEY or RESEND_API_KEY
+// is a credential, not a choice (often a copied template line), and haven's
+// EMAIL_PROVIDER=smtp outranks it, so local mail stays on the machine.
 var MailProviderEnvVars = []string{
-	"EMAIL_PROVIDER", "SMTP_URL", "SMTP_HOST", "SENDGRID_API_KEY", "RESEND_API_KEY", "USE_AWS_SES",
+	"EMAIL_PROVIDER", "SMTP_URL", "SMTP_HOST", "USE_AWS_SES",
 }
 
 // HasEmailProviderConfigured reports whether resolved — the environment the

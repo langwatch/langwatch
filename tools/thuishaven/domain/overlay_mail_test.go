@@ -39,3 +39,13 @@ func TestHasEmailProviderConfiguredIsFalseWithNoneOfTheKeysSet(t *testing.T) {
 		t.Fatal("an unrelated env var must not read as a configured provider")
 	}
 }
+
+// @scenario "A stack with the mail lane sends its email into the sink"
+func TestMailSMTPEnvInjectsOverABareProviderKey(t *testing.T) {
+	for _, key := range []string{"SENDGRID_API_KEY", "RESEND_API_KEY"} {
+		env := MailSMTPEnv(map[string]string{key: "copied-from-a-template"}, 45510)
+		if got := valueOf(env, "EMAIL_PROVIDER"); got != "smtp" {
+			t.Fatalf("with only %s set, EMAIL_PROVIDER = %q, want smtp", key, got)
+		}
+	}
+}

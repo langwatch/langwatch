@@ -184,7 +184,7 @@ func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]stri
 		// whatever `.env` names: the guards above would have vouched for `st`
 		// while the seed ran somewhere else entirely. Fill those gaps from the
 		// endpoints just ensured.
-		return devNodeEnv(withMissingEnv(reg.OverlayEnv(), ensured)), nil
+		return devNodeEnv(append(withMissingEnv(reg.OverlayEnv(), ensured), o.credentialEnv(slug, reg.WorktreeDir)...)), nil
 	}
 	return devNodeEnv(ensured), nil
 }
@@ -241,7 +241,7 @@ func (o *Orchestrator) seedEnv(p UpParams) []string {
 	var env []string
 	if slug, err := o.resolveSlug(p); err == nil {
 		if st, ok := o.stackBySlug(slug); ok {
-			env = st.OverlayEnv()
+			env = append(st.OverlayEnv(), o.credentialEnv(slug, st.WorktreeDir)...)
 		}
 	}
 	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {

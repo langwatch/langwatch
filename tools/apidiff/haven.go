@@ -305,6 +305,11 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 		report, err := state.havenStatus(ctx, plan)
 		if err == nil {
 			if baseURL, ready := havenStackReady(report, plan.slug); ready {
+				for _, stack := range report.Stacks {
+					if stack.Slug == plan.slug {
+						rememberAppOrigin(baseURL, stack)
+					}
+				}
 				instance.URL = baseURL
 				instance.MailURL = havenMailURL(report, plan.slug)
 				state.logf("haven %s: %s ready at %s", instance.Name, plan.slug, baseURL)

@@ -8,9 +8,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/havenrun"
 )
 
 // Credentials one side mints during the run, never shared with the other:
@@ -99,7 +103,28 @@ func sessionHeaders(credentials sideCredentials, baseURL string, fallback map[st
 // browserOrigin is the origin an instance trusts: BASE_HOST names localhost,
 // while the run addresses it by loopback IP.
 func browserOrigin(baseURL string) string {
-	return strings.Replace(strings.TrimSuffix(baseURL, "/"), "://127.0.0.1:", "://localhost:", 1)
+	trimmed := strings.TrimSuffix(baseURL, "/")
+	if origin, ok := appOrigins.Load(trimmed); ok {
+		if text, isText := origin.(string); isText {
+			return text
+		}
+	}
+	return strings.Replace(trimmed, "://127.0.0.1:", "://localhost:", 1)
+}
+
+// appOrigins maps a haven stack's loopback API URL to its routed app origin:
+// better-auth trusts only BASE_HOST, so a localhost Origin is refused 403.
+var appOrigins sync.Map
+
+// rememberAppOrigin records the app origin browser requests to baseURL send.
+func rememberAppOrigin(baseURL string, stack havenrun.StackStatus) {
+	appURL, ok := stack.ServiceURL(havenrun.AppService)
+	if !ok {
+		return
+	}
+	if parsed, err := url.Parse(appURL); err == nil && parsed.Host != "" {
+		appOrigins.Store(strings.TrimSuffix(baseURL, "/"), parsed.Scheme+"://"+parsed.Host)
+	}
 }
 
 // isWidgetPath names the dashboard-widget family, which the run addresses in

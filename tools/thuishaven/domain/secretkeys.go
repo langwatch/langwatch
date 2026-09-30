@@ -57,6 +57,10 @@ var havenSeedCredentialKeys = []string{
 	"LANGWATCH_ADMIN_PASSWORD",
 	"LANGWATCH_PRIVATE_ACCESS_TOKEN",
 	"LANGWATCH_PUBLIC_ACCESS_TOKEN",
+	"HAVEN_SEED_SCIM_TOKEN",
+	"LANGWATCH_INSTANCE_ADMIN_API_KEY",
+	"ANTHROPIC_API_KEY",
+	"JEV_API_KEY",
 }
 
 // SecretClasses scans the checkout at repoRoot for every declared secret and
