@@ -13,6 +13,13 @@ This page also covers the deployment-wide provider configured through
 installation that already uses them. Changing an organization's connection
 and changing the deployment's default provider are separate actions.
 
+On a licensed installation, a domain added in the setup page is verified right
+away, with no DNS record or file to publish. A domain belongs to one
+organization per installation. When the installation has more than one
+organization, only a platform operator listed in `ADMIN_EMAILS` adds a domain
+without proof; other organization administrators still complete the DNS or
+file check.
+
 ## Upgrading an existing installation
 
 Identity and access migrations run automatically as the app starts, one

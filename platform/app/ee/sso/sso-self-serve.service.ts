@@ -17,6 +17,7 @@ import {
   SsoActivationTestSignInMissingError,
   type SsoArrivalPolicy,
   SsoConnectionAlreadyRegisteredError,
+  SsoConnectionDomainTakenError,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
   type SsoDomainClaim,
@@ -76,7 +77,10 @@ const ACTIVATABLE_STATES: readonly string[] = ["VERIFIED"];
 
 /**
  * Self-serve commands pass through the aggregate's guarded lifecycle.
- * Every deployment requires published domain proof; only operators attest domains.
+ * The hosted service, and an organization administrator on a self-hosted
+ * installation with several organizations, prove a domain by publishing a
+ * record or file. Elsewhere on a self-hosted installation the licence is the
+ * proof. Only operators attest domains.
  */
 
 /**
@@ -87,7 +91,13 @@ const ACTIVATABLE_STATES: readonly string[] = ["VERIFIED"];
  * captured together.
  */
 export interface SsoSelfServeContextPort {
-  resolve(args: { organizationId: string }): Promise<SsoSelfServeContext>;
+  /** `actorId` is who is asking, or null when no one in particular is: on an
+   *  installation with several organizations, a platform operator is offered
+   *  a proof an organization administrator is not. */
+  resolve(args: {
+    organizationId: string;
+    actorId: string | null;
+  }): Promise<SsoSelfServeContext>;
 }
 
 /**
@@ -276,6 +286,9 @@ export interface SsoSelfServeServiceDeps {
   discovery: SsoIssuerDiscoveryPort;
   /** Whether anybody has actually come back through the connection. */
   testSignIns: SsoTestSignInLookup;
+  /** The installation's licence key, hashed into the proof when the licence
+   *  is what verifies a domain. */
+  licenseProof: SsoLicenseProofPort;
   /** The ways back in, read-only. */
   breakGlass: SsoBreakGlassReadPort;
   /** Who they can be granted to, and who holds the ones that exist. */
@@ -304,11 +317,14 @@ export class SsoSelfServeService {
    */
   async getSetup({
     organizationId,
+    viewerId = null,
   }: {
     organizationId: string;
+    /** Who is looking, so the proof offered is the one they may use. */
+    viewerId?: string | null;
   }): Promise<SelfServeSetupView> {
     const availability = ssoSelfServeAvailability(
-      await this.deps.context.resolve({ organizationId }),
+      await this.deps.context.resolve({ organizationId, actorId: viewerId }),
     );
     const { migration, state, legacy } = await this.setupState({
       organizationId,
@@ -960,7 +976,12 @@ export class SsoSelfServeService {
     } as const;
   }
 
-  /** Records a claim; only published proof can verify it. */
+  /**
+   * Records a claim. Where the installation's licence is the proof (a
+   * self-hosted installation with one organization, or a platform operator
+   * on one with several), the claim is approved and verified in the same
+   * request. Everywhere else it waits for a published proof.
+   */
   async claimDomain({
     organizationId,
     connectionId,
@@ -971,27 +992,97 @@ export class SsoSelfServeService {
     connectionId: string;
     domain: string;
     actor: SelfServeActor;
-  }): Promise<{ waitsForReview: boolean; disputed: boolean }> {
-    await this.requireAvailable({ organizationId });
+  }): Promise<{
+    waitsForReview: boolean;
+    disputed: boolean;
+    verified: boolean;
+  }> {
+    const availability = await this.requireAvailable({
+      organizationId,
+      actorId: actor.userId,
+    });
     // Keep the surface's tenant refusal consistent; the aggregate also enforces it.
     await this.requireOrganizationConnection({ organizationId, connectionId });
+    const provesWithLicense = availability.proof === "license-token";
+    // One organization per domain on an installation. With the licence as
+    // the proof there is no reviewer to hand a dispute to, so a domain another
+    // organization holds is refused before anything is recorded.
+    if (
+      provesWithLicense &&
+      (await this.isDisputed({ organizationId, domain }))
+    ) {
+      throw new SsoConnectionDomainTakenError(
+        `connection ${connectionId}: ${normalizeDomain(domain)} is already held by another organization on this installation`,
+      );
+    }
     await this.deps.connections().claimDomain({
       ...this.command({ organizationId, connectionId, actor }),
       domain,
     });
+    if (provesWithLicense) {
+      await this.proveWithLicense({
+        organizationId,
+        connectionId,
+        domain,
+        actor,
+      });
+      return { waitsForReview: false, disputed: false, verified: true };
+    }
     const disputed = await this.isDisputed({ organizationId, domain });
-    return { waitsForReview: disputed, disputed };
+    return { waitsForReview: disputed, disputed, verified: false };
+  }
+
+  /**
+   * Verify the domain with the installation's licence as the proof. The
+   * licence decides a waiting claim in the same commit, the way a published
+   * record does, so the history reads the same on every tier. A ceremony
+   * already asked for is not asked again, so a request that stopped part
+   * way finishes on the next press. The guards decide whether the licence
+   * may speak here at all.
+   */
+  private async proveWithLicense({
+    organizationId,
+    connectionId,
+    domain,
+    actor,
+  }: DomainProofCommand): Promise<void> {
+    const normalized = normalizeDomain(domain);
+    const connections = this.deps.connections();
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
+    if (state.verifiedDomains.includes(normalized)) return;
+    const pending = state.pendingVerification;
+    if (pending?.domain !== normalized || pending.method !== "license-token") {
+      const licenseKey = await this.deps.licenseProof.currentLicenseKey();
+      if (!licenseKey) {
+        throw new SsoLicenseRequiredError(
+          `organization ${organizationId}: the installation holds no genuine license`,
+        );
+      }
+      await connections.requestVerification({
+        ...this.command({ organizationId, connectionId, actor }),
+        domain: normalized,
+        method: "license-token",
+        tokenHash: `sha256:${sha256Hex(licenseKey)}`,
+        expiresAtMs: null,
+      });
+    }
+    await connections.verifyDomain({
+      ...this.command({ organizationId, connectionId, actor }),
+      domain: normalized,
+    });
   }
 
   /**
    * Ask to prove a domain.
    *
-   * A licence makes the feature available; it is not evidence that the
-   * organization controls a domain. Every self-serve installation therefore
-   * issues the same record to publish,
-   * and returns its value ONCE — the fact carries only the hash, so a
-   * customer who loses the value asks for a fresh record rather than reading
-   * an old one back out of us.
+   * Where the licence is the proof, this finishes the verification and
+   * answers `proved`. Everywhere else it issues the record to publish and
+   * returns its value ONCE. The fact carries only the hash, so a customer
+   * who loses the value asks for a fresh record rather than reading an old
+   * one back out of us.
    */
   async proveDomain({
     organizationId,
@@ -1006,8 +1097,20 @@ export class SsoSelfServeService {
   }): Promise<
     { proved: true } | { proved: false; record: SelfServeIssuedDnsRecord }
   > {
-    await this.requireAvailable({ organizationId });
+    const availability = await this.requireAvailable({
+      organizationId,
+      actorId: actor.userId,
+    });
     await this.requireClaimProvable({ organizationId, connectionId, domain });
+    if (availability.proof === "license-token") {
+      await this.proveWithLicense({
+        organizationId,
+        connectionId,
+        domain,
+        actor,
+      });
+      return { proved: true };
+    }
 
     const value = mintVerificationToken();
     const expiresAtMs = this.now() + SSO_DNS_PROOF_TTL_MS;
@@ -1135,11 +1238,13 @@ export class SsoSelfServeService {
    */
   private async requireAvailable({
     organizationId,
+    actorId = null,
   }: {
     organizationId: string;
+    actorId?: string | null;
   }): Promise<Extract<SsoSelfServeAvailability, { available: true }>> {
     const availability = ssoSelfServeAvailability(
-      await this.deps.context.resolve({ organizationId }),
+      await this.deps.context.resolve({ organizationId, actorId }),
     );
     if (availability.available) return availability;
     if (availability.refusal === "not_opted_in") {
@@ -1149,8 +1254,8 @@ export class SsoSelfServeService {
     }
     throw new SsoLicenseRequiredError(
       availability.refusal === "license_restart_required"
-        ? `organization ${organizationId}: a licence was activated after this process started`
-        : `organization ${organizationId}: the installation holds no genuine licence`,
+        ? `organization ${organizationId}: a license was activated after this process started`
+        : `organization ${organizationId}: the installation holds no genuine license`,
     );
   }
 

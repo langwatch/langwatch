@@ -37,7 +37,10 @@ import {
 } from "@ee/sso/sso-connection-reads.prisma.repository";
 import { PrismaSsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.prisma.repository";
 import { SsoConnectionTeardownDispatcher } from "@ee/sso/sso-connection-teardown";
-import { LicenseDomainClaimAuthority } from "@ee/sso/sso-self-serve-adapters";
+import {
+  LicenseDomainClaimAuthority,
+  PrismaOrganizationCount,
+} from "@ee/sso/sso-self-serve-adapters";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -1060,7 +1063,9 @@ export function initializeDefaultApp(options?: {
       bindings: ssoBreakGlass(),
     }),
     ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
-    ssoLicenseAuthority: new LicenseDomainClaimAuthority(),
+    ssoLicenseAuthority: new LicenseDomainClaimAuthority({
+      organizations: new PrismaOrganizationCount(prisma),
+    }),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read
     // are the same `ScimSyncState` rows, so composing them separately would

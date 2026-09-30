@@ -32,7 +32,10 @@ import {
   prepareSsoDomainProofWaveringEmail,
 } from "~/server/mailer/ssoDomainProofEmails";
 import type { SsoBreakGlassWarningNotifier } from "./break-glass.repository";
-import type { SsoLicenseAuthorityRepository } from "./sso-connection.repository";
+import type {
+  SsoLicenseAuthorityRepository,
+  SsoPlatformOperatorRepository,
+} from "./sso-connection.repository";
 import { errorCodeOf } from "./sso-domain-file-lookup";
 import type {
   SsoDomainReproofTarget,
@@ -69,11 +72,42 @@ const logger = createLogger("langwatch:identity:sso-self-serve");
 export class LicenseDomainClaimAuthority
   implements SsoLicenseAuthorityRepository
 {
-  constructor(private readonly isHosted: () => boolean = () => !!env.IS_SAAS) {}
+  private readonly isHosted: () => boolean;
+  private readonly organizations: OrganizationCountPort;
+
+  constructor({
+    organizations,
+    isHosted = () => !!env.IS_SAAS,
+  }: {
+    organizations: OrganizationCountPort;
+    isHosted?: () => boolean;
+  }) {
+    this.organizations = organizations;
+    this.isHosted = isHosted;
+  }
 
   async licenseAuthorizesDomainClaims(): Promise<boolean> {
     if (this.isHosted()) return false;
     return platformSSOAllowed();
+  }
+
+  async hostsSingleOrganization(): Promise<boolean> {
+    if (this.isHosted()) return false;
+    return (await this.organizations.countOrganizations()) <= 1;
+  }
+}
+
+/** How many organizations the installation holds. Cross-organization on
+ *  purpose: the answer is about the installation, not about one tenant. */
+export interface OrganizationCountPort {
+  countOrganizations(): Promise<number>;
+}
+
+export class PrismaOrganizationCount implements OrganizationCountPort {
+  constructor(private readonly prisma: Pick<PrismaClient, "organization">) {}
+
+  async countOrganizations(): Promise<number> {
+    return this.prisma.organization.count();
   }
 }
 
@@ -124,20 +158,35 @@ export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
       /** The frozen gate. Injected so a test can hold an installation that
        *  started unlicensed without restarting a process. */
       licensedAtStartup?: () => Promise<boolean>;
+      /** The same port the guards ask, so the screen and the rule agree on
+       *  how many organizations the installation holds. */
+      licenseAuthority: Pick<
+        SsoLicenseAuthorityRepository,
+        "hostsSingleOrganization"
+      >;
+      platformOperators: SsoPlatformOperatorRepository;
     },
   ) {}
 
   async resolve({
     organizationId,
+    actorId,
   }: {
     organizationId: string;
+    actorId: string | null;
   }): Promise<SsoSelfServeContext> {
     const isHosted = this.deps.isHosted ?? (() => !!env.IS_SAAS);
     const deployment = isHosted() ? "hosted" : "self-hosted";
     const licensed = await (
       this.deps.licensedAtStartup ?? platformSSOAllowed
     )();
+    const { singleOrganization, actorIsPlatformOperator } =
+      deployment === "self-hosted" && licensed
+        ? await this.whoTheLicenseSpeaksFor({ actorId })
+        : { singleOrganization: false, actorIsPlatformOperator: false };
     return {
+      singleOrganization,
+      actorIsPlatformOperator,
       deployment,
       licensed: deployment === "self-hosted" ? licensed : false,
       licenseActivatedSinceStart:
@@ -154,6 +203,28 @@ export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
               distinctId: organizationId,
             })
           : false,
+    };
+  }
+
+  /** Asked only on a licensed self-hosted installation, and the operator
+   *  only where there is more than one organization for it to matter. */
+  private async whoTheLicenseSpeaksFor({
+    actorId,
+  }: {
+    actorId: string | null;
+  }): Promise<{
+    singleOrganization: boolean;
+    actorIsPlatformOperator: boolean;
+  }> {
+    const singleOrganization =
+      await this.deps.licenseAuthority.hostsSingleOrganization();
+    if (singleOrganization || actorId === null) {
+      return { singleOrganization, actorIsPlatformOperator: false };
+    }
+    return {
+      singleOrganization,
+      actorIsPlatformOperator:
+        await this.deps.platformOperators.isPlatformOperator({ actorId }),
     };
   }
 }

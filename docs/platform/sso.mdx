@@ -46,6 +46,14 @@ turn it on.
    people who match the verified domains. Select **Confirm choice**.
 7. Select **Go live** when the setup checks are complete.
 
+On a self-hosted installation with an Enterprise license, the domain step is
+named **Add your domain** and a domain you add is verified right away, with no
+DNS record or file to publish. Each domain belongs to one organization per
+installation, so a domain another organization already holds is refused. When
+the installation has more than one organization, only a platform operator
+listed in `ADMIN_EMAILS` adds a domain this way. Other organization
+administrators complete the DNS or file check.
+
 The connection stays in its current setup state when you leave the page. A
 connection that is not active does not route sign-ins yet. An active connection
 routes people who match its verified domains; the local way back in remains

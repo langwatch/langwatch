@@ -33,6 +33,8 @@ const HOSTED_OPTED_IN: SsoSelfServeContext = {
   licensed: false,
   licenseActivatedSinceStart: false,
   optedIn: true,
+  singleOrganization: false,
+  actorIsPlatformOperator: false,
 };
 
 const HOSTED_NOT_OPTED_IN: SsoSelfServeContext = {

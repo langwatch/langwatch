@@ -61,8 +61,8 @@ export function GoLiveSection({
             administrator to discover the second half by browsing. */}
         <Text color="fg.muted" fontSize="sm">
           Next, let your identity provider create and remove accounts here as
-          people join and leave. Set the provisioning token — or paste the one
-          your provider already has — and point it at us.
+          people join and leave. Set the provisioning token, or paste the one
+          your provider already has, and point it at us.
         </Text>
         <Link href="/settings/authentication/connectors">
           <Button size="sm" variant="outline">

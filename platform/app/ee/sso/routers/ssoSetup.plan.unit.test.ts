@@ -287,6 +287,7 @@ describe("the organization's single sign-on setup surface", () => {
       ).resolves.toBeDefined();
       expect(mockSelfServe.getSetup).toHaveBeenCalledWith({
         organizationId: "org_acme",
+        viewerId: "user_ana",
       });
     });
   });

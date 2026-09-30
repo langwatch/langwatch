@@ -99,8 +99,9 @@ export function isSsoConnectionInSetup(state: string): boolean {
 }
 
 /**
- * How a domain claim is proved. Self-hosted installations that cannot
- * publish a TXT record prove ownership with their license token instead.
+ * How a domain claim is proved. A self-hosted installation proves a claimed
+ * domain with its license (`license-token`), with nothing to publish; on an
+ * installation with several organizations only a platform operator may.
  *
  * `https-file` is the published-proof ceremony's second channel: the same
  * minted token, served by the domain at the well-known path instead of
@@ -1353,10 +1354,15 @@ export function reduceSsoConnection({
             state.pendingVerification.method === "dns-txt"
               ? state.pendingVerification.tokenHash
               : null,
+          // A licence ceremony's hash is the hash of the installation's
+          // licence key. It is kept as the evidence and never as a
+          // `tokenHash`, because nothing published it and nothing should
+          // ever go looking for it on the domain.
           evidenceRef:
             legacyImport?.evidenceRef ??
             (state.pendingVerification?.domain === fact.data.domain &&
-            state.pendingVerification.method === "dns-txt"
+            (state.pendingVerification.method === "dns-txt" ||
+              state.pendingVerification.method === "license-token")
               ? state.pendingVerification.tokenHash
               : null),
           note: null,
@@ -1608,7 +1614,8 @@ export type SsoDomainOwnershipQualification =
  * The one qualification used wherever domain control grants authority.
  *
  * `verifiedDomains` is compatibility/routing history, not evidence. A licence
- * token speaks for an installation. A grandfathered configuration qualifies
+ * token speaks for a self-hosted installation and qualifies with the
+ * licence's hash and the person who claimed it. A grandfathered configuration qualifies
  * only with the exact provenance captured by its one-time legacy import.
  * Published proofs must retain their ceremony hash and time.
  * An operator attestation must retain the authenticated human, time, bounded
@@ -1657,6 +1664,23 @@ export function qualifySsoDomainOwnership({
       proof.verifiedAtMs <= 0 ||
       !evidenceRef.success ||
       !note.success ||
+      verifier?.type !== "user" ||
+      verifier.id === null
+    ) {
+      return { status: "UNKNOWN", reason: "incomplete" };
+    }
+    return { status: "QUALIFIED", proof };
+  }
+
+  // A self-hosted installation's licence, recorded by the person who claimed
+  // the domain. The guards only state it on a licensed self-hosted
+  // installation, and on one with several organizations only for a
+  // platform operator.
+  if (proof.method === "license-token") {
+    const verifier = proof.verifier;
+    if (
+      proof.verifiedAtMs <= 0 ||
+      !proof.evidenceRef ||
       verifier?.type !== "user" ||
       verifier.id === null
     ) {

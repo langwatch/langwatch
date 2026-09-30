@@ -1823,9 +1823,9 @@ const presentations = {
     },
   },
   join_auto_not_licensed: {
-    title: "Automatic joining needs a licence",
+    title: "Automatic joining needs a license",
     describe: () =>
-      "Colleagues can still ask to join and you approve them. To let them in without asking, add a licence.",
+      "Colleagues can still ask to join and you approve them. To let them in without asking, add a license.",
   },
   join_policy_not_licensed: {
     // Read by an administrator opening the door, so it says what they can
@@ -2876,12 +2876,12 @@ const presentations = {
       "Copy the whole certificate from your identity provider, including the BEGIN and END lines, and paste it again.",
   },
   sso_license_required: {
-    // Names activating a licence and nothing else. An environment variable,
+    // Names activating a license and nothing else. An environment variable,
     // a hostname or a service name would be useless to whoever is reading
     // and an internals leak on a screen an administrator opens.
-    title: "Single sign-on needs an active licence",
+    title: "Single sign-on needs an active license",
     describe: () =>
-      "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+      "Activate an enterprise license on this installation, then restart it, and you can set single sign-on up here.",
   },
   sso_domain_claim_pending: {
     // Reached by one claim only now: one on a domain somebody else already
