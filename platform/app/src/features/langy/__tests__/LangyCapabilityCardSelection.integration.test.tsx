@@ -428,3 +428,56 @@ describe("given the CLI averaged latency split by model", () => {
     });
   });
 });
+
+/** A distinct count of `metric` per day, as the analytics API answers it. */
+function dailyDistinctPayload(metric: string, values: number[]) {
+  return {
+    currentPeriod: values.map((v, i) => ({
+      date: `2026-09-2${8 + i}`,
+      [`0/${metric}/cardinality`]: v,
+    })),
+    previousPeriod: [],
+    metric,
+    aggregation: "cardinality",
+  };
+}
+
+describe("given the CLI counted distinct ids per day", () => {
+  beforeEach(preferReducedMotion);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const renderDaily = (metric: string) =>
+    renderCall(
+      settledCall({
+        name: "langwatch.analytics.query",
+        resource: "analytics",
+        verb: "query",
+        payload: dailyDistinctPayload(metric, [3, 4]),
+      }),
+    );
+
+  describe("when it counted traces", () => {
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("totals the days, since each trace falls on one", () => {
+      renderDaily("metadata.trace_id");
+
+      expect(screen.getByText("7")).toBeTruthy();
+    });
+  });
+
+  describe("when it counted users", () => {
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("never totals the days, since a user can come back", () => {
+      renderDaily("metadata.user_id");
+
+      expect(screen.queryByText("7")).toBeNull();
+      expect(
+        screen.getByText(
+          /spans several periods or groups, so it has no single/,
+        ),
+      ).toBeTruthy();
+    });
+  });
+});

@@ -44,16 +44,32 @@ function sumNumbers(record: Record<string, unknown>): number | null {
   return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) : null;
 }
 
-/**
- * Aggregations whose values add up across buckets and groups: the daily totals
- * of a sum make the period's sum. An average, a minimum, a maximum, a median or
- * a percentile does not, so those are never combined. An unnamed aggregation is
- * the API's default count.
- */
-const ADDITIVE_AGGREGATIONS = new Set(["sum", "count", "cardinality", "terms"]);
+/** Whether values add up across time buckets, and across groups. */
+type Additivity = { acrossTime: boolean; acrossGroups: boolean };
 
-const isAdditiveAggregation = (aggregation: string | null): boolean =>
-  aggregation == null || ADDITIVE_AGGREGATIONS.has(aggregation);
+const SUMMABLE_AGGREGATIONS = new Set(["sum", "count"]);
+const DISTINCT_AGGREGATIONS = new Set(["cardinality", "terms"]);
+
+/**
+ * When the values of an aggregation may be added up. A sum or a count always
+ * adds up (an unnamed aggregation is the API's default count). A distinct count
+ * adds up across time only for trace ids, since each trace falls in one bucket;
+ * a user or thread seen on two days would be counted twice. It never adds up
+ * across groups, since one trace can carry two models. An average, a minimum, a
+ * maximum, a median or a percentile never adds up.
+ */
+function additivityOf(
+  aggregation: string | null,
+  metric: string | null,
+): Additivity {
+  if (aggregation == null || SUMMABLE_AGGREGATIONS.has(aggregation)) {
+    return { acrossTime: true, acrossGroups: true };
+  }
+  if (DISTINCT_AGGREGATIONS.has(aggregation)) {
+    return { acrossTime: metric === "metadata.trace_id", acrossGroups: false };
+  }
+  return { acrossTime: false, acrossGroups: false };
+}
 
 /** Running totals over a period's buckets, and how many values each holds. */
 class BucketTally {
@@ -91,18 +107,23 @@ class BucketTally {
   }
 
   /**
-   * The period's figure. A non-additive aggregation has one only when a single
-   * value was read: summing two averages is not their average.
+   * The period's figure: the sum of what was read, where those values add up.
+   * Otherwise only a single value is a figure: summing two averages is not
+   * their average.
    */
-  headline(additive: boolean): number | null {
-    if (additive || this.valueCount === 1) return this.total;
-    return null;
+  headline({ acrossTime, acrossGroups }: Additivity): number | null {
+    if (this.valueCount === 1) return this.total;
+    const summable = this.groupBy ? acrossGroups && acrossTime : acrossTime;
+    return summable ? this.total : null;
   }
 
-  /** Per-group figures, keeping for a non-additive aggregation only the groups read once. */
-  groups(additive: boolean): AnalyticsGroup[] {
+  /**
+   * Per-group figures. A group's values are its time buckets, so it keeps a
+   * figure when those add up, or when it was read once.
+   */
+  groups({ acrossTime }: Additivity): AnalyticsGroup[] {
     return [...this.groupTotals.entries()]
-      .filter(([key]) => additive || this.groupCounts.get(key) === 1)
+      .filter(([key]) => acrossTime || this.groupCounts.get(key) === 1)
       .map(([key, value]) => ({ key, value }))
       .sort((a, b) => b.value - a.value);
   }
@@ -130,9 +151,10 @@ function parseAnalyticsJson(output: unknown): ParsedAnalytics | null {
     if (isRecord(bucket)) tally.addBucket(bucket);
   }
   const aggregation = stringOrNull(document.aggregation);
-  const additive = isAdditiveAggregation(aggregation);
+  const metric = stringOrNull(document.metric);
+  const additive = additivityOf(aggregation, metric);
   return {
-    metric: stringOrNull(document.metric),
+    metric,
     aggregation,
     // A time-series card's primary number is the requested period total, not
     // its final partial bucket (which would make “77 traces” look like “2”).

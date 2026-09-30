@@ -68,15 +68,33 @@ export function humanMetric(metric: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/**
- * Aggregations whose values add up across groups and buckets. The groups of a
- * sum add up to the sum; the groups of an average, a minimum, a maximum, a
- * median or a percentile do not, so those are drawn one line per group.
- */
-const ADDITIVE_AGGREGATIONS = new Set(["sum", "count", "cardinality", "terms"]);
+/** Whether values add up across time buckets, and across groups. */
+type Additivity = { acrossTime: boolean; acrossGroups: boolean };
 
-const isAdditive = (aggregation: string | undefined): boolean =>
-  aggregation == null || ADDITIVE_AGGREGATIONS.has(aggregation);
+const SUMMABLE_AGGREGATIONS = new Set(["sum", "count"]);
+const DISTINCT_AGGREGATIONS = new Set(["cardinality", "terms"]);
+
+/**
+ * When the values of an aggregation may be added up. A sum or a count always
+ * adds up (no aggregation named is the API's default count). A distinct count
+ * adds up across time only for trace ids, since each trace falls in one bucket;
+ * a user seen on two days would be counted twice. It never adds up across
+ * groups, since one trace can carry two models. An average, a minimum, a
+ * maximum, a median or a percentile never adds up, so groups are drawn one
+ * line each and the period is never totalled.
+ */
+function additivityOf(
+  aggregation: string | undefined,
+  metric: string,
+): Additivity {
+  if (aggregation == null || SUMMABLE_AGGREGATIONS.has(aggregation)) {
+    return { acrossTime: true, acrossGroups: true };
+  }
+  if (DISTINCT_AGGREGATIONS.has(aggregation)) {
+    return { acrossTime: metric === "metadata.trace_id", acrossGroups: false };
+  }
+  return { acrossTime: false, acrossGroups: false };
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
@@ -189,16 +207,34 @@ export function toTimeseriesShape({
   aggregation?: string;
 }): TimeseriesShape | null {
   const title = humanMetric(metric);
+  const { acrossTime, acrossGroups } = additivityOf(aggregation, metric);
 
-  if (!isAdditive(aggregation)) {
+  if (!acrossGroups) {
     // One point is a number, not a trend (see below), so a series needs two.
     const series = seriesPerGroup(currentPeriod, title).filter(
       (s) => s.points.length >= 2,
     );
     if (series.length === 0) return null;
-    // No "this period vs previous" headline: it adds up the points, and the
-    // points of an average do not add up to anything.
-    return { series, title, unit: unitFor(metric) };
+    const previous = seriesPerGroup(previousPeriod, title);
+    // The "this period vs previous" headline adds up one line's points, so it
+    // is only drawn for a single line whose points add up.
+    const single = series.length === 1 && series[0]!.name === title;
+    const baseline = previous.find((s) => s.name === title);
+    return {
+      series,
+      title,
+      unit: unitFor(metric),
+      ...(acrossTime && single && baseline && baseline.points.length > 0
+        ? {
+            comparison: {
+              label: "This period",
+              value: sum(series[0]!.points),
+              baselineLabel: "Previous period",
+              baseline: sum(baseline.points),
+            },
+          }
+        : {}),
+    };
   }
 
   const current = pointsOf(currentPeriod);

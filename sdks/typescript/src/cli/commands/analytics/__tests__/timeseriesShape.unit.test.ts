@@ -191,6 +191,65 @@ describe("given a grouped average over several days", () => {
   });
 });
 
+describe("given a distinct count over several days", () => {
+  const daily = (metric: string, values: [number, number]) =>
+    values.map((v, i) => ({
+      date: day(`2026-09-2${8 + i}`),
+      [`0/${metric}/cardinality`]: v,
+    }));
+
+  describe("when it counts users", () => {
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("draws the daily counts with no period total, since a user can return", () => {
+      const shape = toTimeseriesShape({
+        currentPeriod: daily("metadata.user_id", [3, 4]),
+        previousPeriod: daily("metadata.user_id", [2, 2]),
+        metric: "metadata.user_id",
+        aggregation: "cardinality",
+      });
+
+      expect(shape?.series[0]?.points.map((p) => p.v)).toEqual([3, 4]);
+      expect(shape?.comparison).toBeUndefined();
+    });
+  });
+
+  describe("when it counts traces", () => {
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("totals the period, since each trace falls on one day", () => {
+      const shape = toTimeseriesShape({
+        currentPeriod: daily("metadata.trace_id", [3, 4]),
+        previousPeriod: daily("metadata.trace_id", [2, 2]),
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+      });
+
+      expect(shape?.comparison).toMatchObject({ value: 7, baseline: 4 });
+    });
+
+    /** @scenario A distinct count is added up only where each id falls once */
+    it("draws one line per model when split by model, since a trace can carry two", () => {
+      const shape = toTimeseriesShape({
+        currentPeriod: [3, 4].map((v, i) => ({
+          date: day(`2026-09-2${8 + i}`),
+          "metadata.model": {
+            "gpt-5-mini": { "0/metadata.trace_id/cardinality": v },
+            "gpt-5.6-terra": { "0/metadata.trace_id/cardinality": 1 },
+          },
+        })),
+        previousPeriod: [],
+        metric: "metadata.trace_id",
+        aggregation: "cardinality",
+      });
+
+      expect(shape?.series.map((s) => s.name)).toEqual([
+        "gpt-5-mini",
+        "gpt-5.6-terra",
+      ]);
+      expect(shape?.comparison).toBeUndefined();
+    });
+  });
+});
+
 describe("given a flat average over several days", () => {
   describe("when it is shaped for the timeseries card", () => {
     it("draws the daily averages as one line named after the metric", () => {
