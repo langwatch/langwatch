@@ -1981,6 +1981,8 @@ A permission denial explains itself where authz denies (Alex, 2026-09-30): authz
 asks the engine's `explain` for the roles that would grant the permission, best-effort under a 250ms
 deadline, and puts the role labels on the `HandledError`'s `meta`; the presentation registry renders
 the sentence, and a failed or late explanation leaves the plain denial.
+A REST error body carries its fields (`type`, `code`, `message`, …) at the root, never nested under an
+`error` key (Alex, 2026-09-30); `GET /api/api-keys` keeps main's `{ data: [...] }` list envelope.
 
 ---
 
