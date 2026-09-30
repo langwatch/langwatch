@@ -1,0 +1,316 @@
+# Online evaluation drawers the list and create flows never open: the evaluator chooser, the
+# evaluator settings drawer, the variable mapping dropdown, and the edit and create drawers at
+# trace and thread level. Copy comes from main's OnlineEvaluationDrawer and GuardrailsDrawer.
+# No flow calls a model. lingua/language_detection has one input, `output`: a trace-level
+# evaluation maps it by itself, a thread-level one leaves it unmapped (main only infers at trace
+# level), which is what raises the "needs mapping" warning and the Configure button.
+flows:
+  - id: online-eval-choose-evaluator-list
+    title: Select Evaluator opens the Choose Evaluator list with New Evaluator and the project's evaluators
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: New Online Evaluation
+      - action: click
+        with:
+          text: Trace Level
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: expect
+        with:
+          text: Choose Evaluator
+      - action: expect
+        with:
+          testId: new-evaluator-button
+      - action: expect
+        with:
+          testId: evaluator-card-{evaluatorId}
+          timeout: "20000"
+      - action: expect
+        with:
+          text: /Updated/
+
+  - id: online-eval-evaluator-settings-drawer
+    title: Picking an evaluator opens its settings drawer with the name and its variables mapped
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: New Online Evaluation
+      - action: click
+        with:
+          text: Trace Level
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: click
+        with:
+          testId: evaluator-card-{evaluatorId}
+      - action: expect
+        with:
+          text: Evaluator Name
+      - action: expect
+        with:
+          text: /^Variables$/
+      - action: expect
+        with:
+          testId: source-mapping-tag
+          hasText: output
+      - action: expect
+        with:
+          text: /^\s*Select Evaluator\s*$/
+
+  - id: online-eval-variable-mapping-dropdown
+    title: At thread level the unmapped variable opens a dropdown of thread sources
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: New Online Evaluation
+      - action: click
+        with:
+          text: Thread Level
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: click
+        with:
+          testId: evaluator-card-{evaluatorId}
+      - action: expect
+        with:
+          testId: missing-mapping-input
+      - action: click
+        with:
+          selector: '[data-testid="missing-mapping-input"] input'
+      - action: expect
+        with:
+          testId: mapping-dropdown
+      - action: expect
+        with:
+          testId: field-option-thread_id
+
+  - id: online-eval-new-drawer-thread-level
+    title: A thread-level evaluation with its variable mapped shows sampling and the thread idle time
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: New Online Evaluation
+      - action: click
+        with:
+          text: Thread Level
+      - action: expect
+        with:
+          text: Evaluate all traces in a thread together
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: click
+        with:
+          testId: evaluator-card-{evaluatorId}
+      - action: click
+        with:
+          selector: '[data-testid="missing-mapping-input"] input'
+      - action: click
+        with:
+          testId: field-option-thread_id
+      - action: click
+        with:
+          text: /^\s*Select Evaluator\s*$/
+      - action: expect
+        with:
+          text: /^Preconditions \(Optional\)/
+      - action: expect
+        with:
+          text: /^Sampling \(Optional\)/
+      - action: expect
+        with:
+          text: Thread Idle Time
+      - action: expect
+        with:
+          text: /^\s*Create Online Evaluation\s*$/
+
+  - id: online-eval-edit-drawer-trace-level
+    title: Edit an online evaluation at trace level and read its level, sampling and preconditions
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-mon-{uid}
+          checkType: lingua/language_detection
+          evaluatorId: "{evaluatorId}"
+          parameters: {}
+          level: trace
+        as:
+          monitorId: id
+          monitorName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          text: Edit Online Evaluation
+      - action: expect
+        with:
+          text: Evaluate each trace individually as it arrives
+      - action: expect
+        with:
+          text: /^Preconditions \(Optional\)/
+      - action: expect
+        with:
+          text: /^Sampling \(Optional\)/
+      - action: expect
+        with:
+          text: /^\s*Save Changes\s*$/
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: level
+          equals: trace
+
+  - id: online-eval-edit-drawer-thread-level
+    title: Edit an online evaluation at thread level and see the unmapped field warning with Configure
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-mon-{uid}
+          checkType: lingua/language_detection
+          evaluatorId: "{evaluatorId}"
+          parameters: {}
+          level: thread
+          threadIdleTimeout: 300
+        as:
+          monitorId: id
+          monitorName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          text: Edit Online Evaluation
+      - action: expect
+        with:
+          text: Evaluate all traces in a thread together
+      - action: expect
+        with:
+          text: Thread Idle Time
+      - action: expect
+        with:
+          text: /needs? mapping/
+      - action: expect
+        with:
+          text: Configure how evaluator inputs map to trace data
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: level
+          equals: thread
+
+  - id: online-eval-new-guardrail-drawer
+    title: Set up Guardrail opens New Guardrail with no evaluator chosen, and Select Evaluator lists them
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: Set up Guardrail
+      - action: expect
+        with:
+          text: New Guardrail
+      - action: expect
+        with:
+          text: Select an evaluator to use as a guardrail
+      - action: expect
+        with:
+          text: Integration Code
+          equals: "0"
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: expect
+        with:
+          text: Choose Evaluator
+      - action: expect
+        with:
+          testId: evaluator-card-{evaluatorId}
+          timeout: "20000"

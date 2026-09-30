@@ -418,6 +418,12 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
+        // The widget chart frame is the API's framed document; unproxied it falls to the SPA shell.
+        "^/sandbox/chart-frame(?:\\?.*)?$": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
         "^/mcp/health(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,

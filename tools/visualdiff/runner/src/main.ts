@@ -91,7 +91,7 @@ const captureSide = async ({
   const side = first.name;
   const max = Math.max(width(plan.concurrency?.routes), width(plan.concurrency?.flows));
   const lanes: Lanes = {
-    open: async () => browser.openLane(),
+    open: async (options) => browser.openLane(options),
     width: max,
     throttle: new Throttle(side, max),
   };

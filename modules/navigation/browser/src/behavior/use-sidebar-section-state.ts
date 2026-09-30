@@ -10,6 +10,11 @@ import {
 export const getSidebarSectionStorageKey = (id: string) =>
   `langwatch:main-sidebar-section:${id}:expanded:v1`;
 
+const readSaved = ({ id, defaultExpanded }: { id: string; defaultExpanded: boolean }) => {
+  const saved = window.localStorage.getItem(getSidebarSectionStorageKey(id));
+  return saved === "true" || saved === "false" ? saved === "true" : defaultExpanded;
+};
+
 export const useSidebarSectionState = ({
   id,
   defaultExpanded,
@@ -17,18 +22,13 @@ export const useSidebarSectionState = ({
   id: string;
   defaultExpanded: boolean;
 }) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isExpanded, setIsExpanded] = useState(() => readSaved({ id, defaultExpanded }));
   const override = useSyncExternalStore(subscribeSidebarSectionOverrides, () =>
     getSidebarSectionOverride(id),
   );
 
   useEffect(() => {
-    const savedPreference = window.localStorage.getItem(getSidebarSectionStorageKey(id));
-    setIsExpanded(
-      savedPreference === "true" || savedPreference === "false"
-        ? savedPreference === "true"
-        : defaultExpanded,
-    );
+    setIsExpanded(readSaved({ id, defaultExpanded }));
   }, [defaultExpanded, id]);
 
   const toggleSection = () => {

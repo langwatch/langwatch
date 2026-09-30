@@ -62,9 +62,17 @@ flows:
     title: Open a seeded trace and read its spans
     steps:
       - action: sendTrace
-      - action: openTrace
+      - action: go
         with:
-          traceId: trace_visualdiff_0
+          path: /{slug}/traces/{trace}
+      - action: expect
+        with:
+          text: Answer 0
+          timeout: "30000"
+      - action: expect
+        with:
+          text: Trace not found
+          equals: "0"
       - action: click
         with:
           text: /^\s*Trace\s*$/
@@ -262,3 +270,67 @@ flows:
       - action: expect
         with:
           text: Visual Diff
+
+  # The home greets, draws the traces overview and offers the docs; the account's passkey nudge
+  # is answered first, so it never covers the page the screenshot is meant to judge.
+  - id: home-loaded-nudge-dismissed
+    title: The home loads with its greeting, traces overview and docs, the passkey nudge answered
+    steps:
+      - action: sendTrace
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          text: /Good (morning|afternoon|evening)/
+          timeout: "20000"
+      - action: wait
+        with:
+          millis: "2000"
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Not now\s*$/
+          optional: "true"
+      - action: expect
+        with:
+          text: Traces overview
+          timeout: "30000"
+      - action: expect
+        with:
+          text: Docs and guides
+      - action: expect
+        with:
+          text: Sign in faster next time
+          equals: "0"
+
+  - id: home-command-palette
+    title: Focusing the home search opens the palette with Ask Langy, recent items and navigation
+    steps:
+      - action: go
+        with:
+          path: /{slug}
+      - action: expect
+        with:
+          text: /Good (morning|afternoon|evening)/
+          timeout: "20000"
+      - action: wait
+        with:
+          millis: "2000"
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Not now\s*$/
+          optional: "true"
+      - action: click
+        with:
+          selector: 'input[placeholder$="jump to anything"]'
+      - action: expect
+        with:
+          text: Ask about the project in plain language
+      - action: expect
+        with:
+          text: /^Navigation$/
+      - action: expect
+        with:
+          text: Explore traces and spans

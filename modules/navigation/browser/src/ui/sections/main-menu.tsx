@@ -212,13 +212,16 @@ function TestSection({
 }: ProjectSectionProps & { pendingAnnotationCount: number | undefined }) {
   // One destination replaces the Simulations group, and the two cannot both
   // be offered: they address the same runs through different routes, so a menu
-  // holding both would give a person two links to the same work.
+  // holding both would give a person two links to the same work. Neither shows
+  // while the flag is still loading, so the group never flips on arrival.
   const host = useNavigationHost();
-  const agentTestingEnabled = host.featureFlag("release_ui_agent_testing_v2_enabled").enabled;
+  const { enabled: agentTestingEnabled, isLoading: agentTestingFlagLoading } = host.featureFlag(
+    "release_ui_agent_testing_v2_enabled",
+  );
 
   return (
     <SidebarSection id="test" label="Test" showExpanded={showExpanded}>
-      {agentTestingEnabled ? (
+      {!agentTestingFlagLoading && agentTestingEnabled && (
         <PageMenuLink
           path={projectNavItems.agent_testing.path}
           icon={featureIcons.agent_testing.icon}
@@ -227,7 +230,8 @@ function TestSection({
           isActive={pathname.includes("/agent-testing")}
           showLabel={showExpanded}
         />
-      ) : (
+      )}
+      {!agentTestingFlagLoading && !agentTestingEnabled && (
         <SimulationsMenuGroup project={project} pathname={pathname} showExpanded={showExpanded} />
       )}
 

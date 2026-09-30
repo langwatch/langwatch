@@ -77,9 +77,16 @@ describe("EvaluatorListItem", () => {
 describe("EvaluatorListEmptyState", () => {
   it("uses the caller's item label and action", () => {
     const onCreateNew = vi.fn();
-    render(<EvaluatorListEmptyState onCreateNew={onCreateNew} itemLabel="comparison" />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <EvaluatorListEmptyState
+        onCreateNew={onCreateNew}
+        itemLabel="comparison"
+        hasHiddenAll={false}
+      />,
+      {
+        wrapper: Wrapper,
+      },
+    );
 
     expect(screen.getByText("No comparisons yet")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("create-first-evaluator-button"));

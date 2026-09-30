@@ -121,6 +121,11 @@ const isDocumentLoad = ({ request, page }: { request: Request; page: Page }): bo
 export interface SideExtras {
   openAnonymous?: () => Promise<Side>;
   owns?: BrowserContext;
+  /**
+   * live is a flow's page: each `goto` freezes the browser clock at that moment, so data the
+   * flow created a step ago is never in the page's future. Routes keep the plan's time.
+   */
+  live?: boolean;
   /** readySelector overrides the shared signed-in header marker for this side. */
   readySelector?: string;
 }
@@ -194,6 +199,7 @@ export class Side {
   /** goto opens a path on this side; the tracker forgets the document it leaves. */
   async goto(path: string): Promise<void> {
     this.tracker.navigated(Date.now());
+    if (this.extras.live === true) await this.page.context().clock.setFixedTime(Date.now());
     await this.page.goto(this.baseUrl + path, { waitUntil: "commit", timeout: 20_000 });
   }
 
@@ -433,13 +439,15 @@ export class SideBrowser {
   /**
    * openLane is one job's page, in a context of its own carrying the signed-in session as it
    * stood at the first call; disposing the Side closes the context and frees its renderer.
+   * A `live` lane (a flow) re-freezes its clock at every `goto` instead of at the plan's time.
    */
-  async openLane(): Promise<Side> {
+  async openLane({ live = false }: { live?: boolean } = {}): Promise<Side> {
     this.session ??= this.context.storageState();
     const context = await this.freshContext(await this.session);
     const page = await context.newPage();
     return new Side(this.definition.name, this.definition.baseUrl, page, this.settle, {
       owns: context,
+      live,
       openAnonymous: async () => this.openAnonymousPage(),
       readySelector: this.definition.readySelector,
     });

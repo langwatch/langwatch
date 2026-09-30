@@ -19,7 +19,13 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
 
 const PROJECT: NavigationProject = { id: "project-1", slug: "demo", name: "Demo" };
 
-function renderMenu({ agentTestingEnabled }: { agentTestingEnabled: boolean }) {
+function renderMenu({
+  agentTestingEnabled,
+  isLoading = false,
+}: {
+  agentTestingEnabled: boolean;
+  isLoading?: boolean;
+}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <WithStubNavigationHost
@@ -30,7 +36,7 @@ function renderMenu({ agentTestingEnabled }: { agentTestingEnabled: boolean }) {
           flags: {
             release_ui_agent_testing_v2_enabled: {
               enabled: agentTestingEnabled,
-              isLoading: false,
+              isLoading,
             },
           },
         }}
@@ -67,6 +73,15 @@ describe("the Agent Testing destination in the main menu", () => {
       expect(simulationsGroupTrigger()).toBeNull();
       expect(linkNamed("Scenarios")).toBeNull();
       expect(linkNamed("Runs")).toBeNull();
+    });
+  });
+
+  describe("given the Agent Testing release flag is still loading", () => {
+    it("shows neither Agent Testing nor the Simulations group", () => {
+      renderMenu({ agentTestingEnabled: false, isLoading: true });
+
+      expect(linkNamed("Agent Testing")).toBeNull();
+      expect(simulationsGroupTrigger()).toBeNull();
     });
   });
 

@@ -268,24 +268,35 @@ export default function AnnotationScoresScreen() {
           )}
         </HStack>
         {getAllAnnotationScores.data?.length === 0 ? (
-          <NoDataInfoBlock
-            title="No scoring setup yet"
-            description="Add new scoring metrics for your annotations."
-            docsInfo={
-              <Text>
-                To learn more about scores and how to use them, please visit our{" "}
-                <Link
-                  color="orange.400"
-                  href="https://docs.langwatch.ai/features/annotations#annotation-scoring"
-                  isExternal
+          <Box width="full">
+            <NoDataInfoBlock
+              title="No scoring setup yet"
+              description="Add new scoring metrics for your annotations."
+              docsInfo={
+                <Text>
+                  To learn more about scores and how to use them, please visit our{" "}
+                  <Link
+                    color="orange.400"
+                    href="https://docs.langwatch.ai/features/annotations#annotation-scoring"
+                    isExternal
+                  >
+                    documentation
+                  </Link>
+                  .
+                </Text>
+              }
+              icon={<ThumbsUp />}
+            >
+              {canManage && (
+                <PageLayout.HeaderButton
+                  onClick={() => host.openEditor()}
+                  data-testid="annotation-score-empty-add"
                 >
-                  documentation
-                </Link>
-                .
-              </Text>
-            }
-            icon={<ThumbsUp />}
-          />
+                  <Plus /> Add new score metric
+                </PageLayout.HeaderButton>
+              )}
+            </NoDataInfoBlock>
+          </Box>
         ) : (
           <AnnotationScoresTable
             scores={getAllAnnotationScores.data}

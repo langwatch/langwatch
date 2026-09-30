@@ -46,11 +46,11 @@ const CATALOGUE: OperatorFeatureFlagCatalogueRead = {
 
 afterEach(cleanup);
 
-function renderView() {
+function renderView(catalogue: OperatorFeatureFlagCatalogueRead = CATALOGUE) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <OperatorFeatureFlagCatalogueView
-        catalogue={CATALOGUE}
+        catalogue={catalogue}
         canManage={true}
         onSetEnabled={vi.fn()}
         onClear={vi.fn()}
@@ -78,5 +78,14 @@ describe("given an operator opens the feature flags page", () => {
 
     expect(screen.getAllByRole("button", { name: "Specific targeting" })).toHaveLength(2);
     expect(screen.queryByText(/^Target \(/)).toBeNull();
+  });
+
+  it("prints the last edit day first, whatever the browser locale", () => {
+    const flags = CATALOGUE.flags.map((flag, index) =>
+      index === 0 ? { ...flag, storedValue: true, updatedAt: "2026-08-26T12:00:00.000Z" } : flag,
+    );
+    renderView({ ...CATALOGUE, flags });
+
+    expect(screen.getByText(/^26\/08\/2026 \d{2}:\d{2}:\d{2}$/)).toBeTruthy();
   });
 });

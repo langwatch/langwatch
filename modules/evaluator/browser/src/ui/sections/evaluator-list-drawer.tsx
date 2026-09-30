@@ -62,13 +62,18 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     { enabled: !!projectId && isOpen },
   );
 
+  const hiddenEvaluatorIds = new Set(props.hiddenEvaluatorIds ?? []);
+  const hasHiddenAll =
+    (evaluatorsQuery.data?.length ?? 0) > 0 &&
+    evaluatorsQuery.data?.every((evaluator) => hiddenEvaluatorIds.has(evaluator.id)) === true;
+  const listed = evaluatorsQuery.data?.filter((evaluator) => !hiddenEvaluatorIds.has(evaluator.id));
   const evaluators = props.filterEvaluatorType
-    ? evaluatorsQuery.data?.filter(
+    ? listed?.filter(
         (evaluator) =>
           (evaluator.config as { evaluatorType?: string } | null)?.evaluatorType ===
           props.filterEvaluatorType,
       )
-    : evaluatorsQuery.data?.filter((evaluator) => {
+    : listed?.filter((evaluator) => {
         const evaluatorType = (evaluator.config as { evaluatorType?: string } | null)
           ?.evaluatorType;
         return (
@@ -139,7 +144,11 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
                 </HStack>
               )}
               {showEmptyState && (
-                <EvaluatorListEmptyState onCreateNew={onCreateNew} itemLabel={itemLabel} />
+                <EvaluatorListEmptyState
+                  onCreateNew={onCreateNew}
+                  itemLabel={itemLabel}
+                  hasHiddenAll={hasHiddenAll}
+                />
               )}
               {showEvaluators &&
                 evaluators?.map((evaluator) => (

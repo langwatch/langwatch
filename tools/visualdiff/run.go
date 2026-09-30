@@ -682,6 +682,13 @@ func (run *session) captureEditions(ctx context.Context, baselines map[Edition]B
 		seeded = ""
 	}
 	switcher := newEditionSwitch(deps.Run, deps.Environ, seeded)
+	if options.UseHaven {
+		defer func() {
+			if err := switcher.Restore(context.WithoutCancel(ctx), run.editionStacks()); err != nil {
+				fmt.Fprintf(run.streams.Err, "edition: enterprise not restored: %v\n", err)
+			}
+		}()
+	}
 	for _, edition := range options.Editions {
 		rows, err := run.captureEdition(ctx, editionPass{switcher: switcher, edition: edition, baseline: baselines[edition]})
 		total.Rows = append(total.Rows, rows...)

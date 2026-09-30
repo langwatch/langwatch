@@ -32,6 +32,16 @@ vi.mock("../../../../behavior/home-api.ts", () => ({
     },
   },
 }));
+vi.mock("../../../../behavior/lent-peers.tsx", () => ({
+  PendingJoinRequests: () => null,
+  GuidedOnboardingOffer: (props: { space: string; spaceInUse?: boolean | null }) => (
+    <div
+      data-testid="guided-offer"
+      data-space={props.space}
+      data-in-use={String(props.spaceInUse)}
+    />
+  ),
+}));
 vi.mock("../components/langy-home-hero.tsx", () => ({
   LangyHomeHero: () => <div data-testid="lantern" />,
 }));
@@ -143,6 +153,31 @@ describe("HomePage composition", () => {
       expect(screen.getByTestId("recent-items")).toBeDefined();
       expect(screen.getByTestId("onboarding-checklist")).toBeDefined();
       expect(screen.queryByTestId("lantern")).toBeNull();
+    });
+  });
+
+  describe("given the classic home is the resolved composition", () => {
+    it("offers guided onboarding under the header for a project with no data", () => {
+      gates.isNewProject = true;
+      renderHome();
+
+      const offer = screen.getByTestId("guided-offer");
+      expect(offer.dataset.space).toBe("project");
+      expect(offer.dataset.inUse).toBe("false");
+    });
+
+    it("tells the offer a project with data is already in use", () => {
+      gates.isNewProject = false;
+      renderHome();
+
+      expect(screen.getByTestId("guided-offer").dataset.inUse).toBe("true");
+    });
+
+    it("leaves the offer to the hero on the Langy home", () => {
+      gates.composition = "langy";
+      renderHome();
+
+      expect(screen.queryByTestId("guided-offer")).toBeNull();
     });
   });
 

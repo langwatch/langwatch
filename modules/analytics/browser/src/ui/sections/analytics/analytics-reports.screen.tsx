@@ -74,8 +74,20 @@ function ReportsContent() {
     { enabled: !!projectId && !!activeDashboardId },
   );
 
+  // `graphs.getAll` answers builder rows only; the placed widgets come from their own list.
+  const widgetsQuery = api.dashboardWidgets.list.useQuery(
+    { projectId },
+    { enabled: !!projectId && !!activeDashboardId && customChartPlaygroundEnabled },
+  );
+  const widgets = (widgetsQuery.data ?? []).filter(
+    (widget) => widget.dashboardId === activeDashboardId,
+  );
+  const widgetIds = new Set(widgets.map((widget) => widget.id));
+
   const deleteGraph = api.graphs.delete.useMutation();
+  const deleteWidget = api.dashboardWidgets.delete.useMutation();
   const batchUpdateLayouts = api.graphs.batchUpdateLayouts.useMutation();
+  const batchUpdateWidgetLayouts = api.dashboardWidgets.batchUpdateLayouts.useMutation();
   const renameDashboard = api.dashboards.rename.useMutation();
 
   const handleTitleSave = (newTitle: string) => {
@@ -95,6 +107,20 @@ function ReportsContent() {
   };
 
   const handleGraphDelete = (graphId: string) => {
+    if (widgetIds.has(graphId)) {
+      deleteWidget.mutate(
+        { projectId, id: graphId },
+        {
+          onSuccess: () => {
+            void widgetsQuery.refetch();
+          },
+          onError: (error) => {
+            showErrorToast({ error, fallbackTitle: "Couldn't delete this widget" });
+          },
+        },
+      );
+      return;
+    }
     deleteGraph.mutate(
       { projectId, id: graphId },
       {
@@ -109,8 +135,24 @@ function ReportsContent() {
   };
 
   const handleGraphsPlacementChange = (placements: ChartGridPlacement[]) => {
+    const widgetLayouts = placements.filter((placement) => widgetIds.has(placement.graphId));
+    if (widgetLayouts.length > 0) {
+      batchUpdateWidgetLayouts.mutate(
+        { projectId, layouts: widgetLayouts },
+        {
+          onSuccess: () => {
+            void widgetsQuery.refetch();
+          },
+          onError: (error) => {
+            showErrorToast({ error, fallbackTitle: "Couldn't save the dashboard layout" });
+          },
+        },
+      );
+    }
+    const graphLayouts = placements.filter((placement) => !widgetIds.has(placement.graphId));
+    if (graphLayouts.length === 0) return;
     batchUpdateLayouts.mutate(
-      { projectId, layouts: placements },
+      { projectId, layouts: graphLayouts },
       {
         onSuccess: () => {
           void graphsQuery.refetch();
@@ -138,11 +180,14 @@ function ReportsContent() {
     setGranularity(graphId, granularitySeconds);
   };
 
-  const graphs = (graphsQuery.data ?? []).map((graph) => {
-    const picked = granularityByGraphId[graph.id];
-    return picked === undefined ? graph : { ...graph, granularitySeconds: picked };
-  });
-  const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading;
+  const graphs = [
+    ...(graphsQuery.data ?? []).map((graph) => {
+      const picked = granularityByGraphId[graph.id];
+      return picked === undefined ? graph : { ...graph, granularitySeconds: picked };
+    }),
+    ...widgets,
+  ];
+  const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading && !widgetsQuery.isLoading;
 
   // Legacy builder route — used when the playground flag is off (or still
   // loading), matching main's Add-chart handler.
@@ -217,7 +262,7 @@ function ReportsContent() {
                 onGraphDelete={handleGraphDelete}
                 onGraphGranularityChange={handleGraphGranularityChange}
                 onGraphsPlacementChange={handleGraphsPlacementChange}
-                deletingGraphId={deleteGraph.isPending ? (deleteGraph.variables?.id ?? null) : null}
+                deletingGraphId={pendingDeleteId({ mutations: [deleteGraph, deleteWidget] })}
               />
             )}
           </Box>
@@ -226,6 +271,14 @@ function ReportsContent() {
       </DashboardRefreshedAtContext.Provider>
     </AnalyticsLayout>
   );
+}
+
+function pendingDeleteId({
+  mutations,
+}: {
+  mutations: readonly { isPending: boolean; variables?: { id: string } }[];
+}): string | null {
+  return mutations.find((mutation) => mutation.isPending)?.variables?.id ?? null;
 }
 
 /**

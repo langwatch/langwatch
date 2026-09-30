@@ -10,6 +10,8 @@ import { useMemo, type MouseEvent } from "react";
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { GraphFilterIndicator } from "../elements/graph-filter-indicator.tsx";
+import { CHART_GRID_DRAG_HANDLE_CLASS } from "./chart-grid.tsx";
+import { EditableWidgetName } from "./editable-widget-name.tsx";
 import { GraphCardMenu } from "./graph-card-menu.tsx";
 
 type GraphCardTrigger = { id: string; active: boolean; alertType: string | null };
@@ -79,6 +81,10 @@ interface GraphCardHeaderProps {
   isDragging?: boolean;
   dragAttributes?: DraggableAttributes;
   dragListeners?: SyntheticListenerMap;
+  /** When present, the menu's Edit runs this in place instead of navigating away. */
+  onEdit?: () => void;
+  /** Renames a dashboard widget from its title; builder titles stay plain text. */
+  onRename?: (name: string) => void;
   onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
   isDeleting: boolean;
@@ -99,6 +105,8 @@ export function GraphCardHeader({
   isDragging,
   dragAttributes,
   dragListeners,
+  onEdit,
+  onRename,
   onGranularityChange,
   onDelete,
   isDeleting,
@@ -134,7 +142,9 @@ export function GraphCardHeader({
     !isWorkbenchChart && !isDashboardWidget && !!(graphId && graphId !== "custom" && graph);
 
   return (
+    // The header is the card's drag handle: the grid only starts a move from this class.
     <HStack
+      className={CHART_GRID_DRAG_HANDLE_CLASS}
       {...dragAttributes}
       {...dragListeners}
       align="center"
@@ -142,9 +152,20 @@ export function GraphCardHeader({
       cursor={isDragging ? "grabbing" : "grab"}
     >
       <BarChart2 color="orange" />
-      <Heading size="sm" marginLeft={2}>
-        {displayName}
-      </Heading>
+      {isDashboardWidget && onRename ? (
+        <EditableWidgetName
+          name={displayName}
+          id={graphId}
+          onRename={onRename}
+          fontSize="sm"
+          fontWeight="bold"
+          shouldTruncate
+        />
+      ) : (
+        <Heading size="sm" marginLeft={2}>
+          {displayName}
+        </Heading>
+      )}
       <Spacer />
 
       {isSavedGraph && <GraphCardAlertButton graphId={graphId} graph={graph} trigger={trigger} />}
@@ -161,6 +182,8 @@ export function GraphCardHeader({
         projectSlug={projectSlug}
         dashboardId={dashboardId}
         isWorkbenchChart={isWorkbenchChart}
+        isDashboardWidget={isDashboardWidget}
+        {...(onEdit ? { onEdit } : {})}
         {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
         {...(onGranularityChange ? { onGranularityChange } : {})}
         onDelete={onDelete}

@@ -35,6 +35,7 @@ export function LinkedStat({
       cursor={href ? "pointer" : void 0}
       _hover={href ? { bg: "bg.subtle" } : void 0}
       borderRadius="md"
+      flexShrink={0}
       padding={2}
       transition="background 0.1s"
       data-testid={testId}

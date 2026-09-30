@@ -10,6 +10,9 @@ import type { Collect } from "./screens.ts";
 /** The offer only mounts once the app shell has left its splash, which r14 showed takes over 2s. */
 const PASSKEY_SIGN_IN_PROBE_MILLIS = 20_000;
 
+/** The run's own account is answered once, so no later capture meets the offer (it mounts late). */
+const PASSKEY_PRIMARY_PROBE_MILLIS = 6000;
+
 /** offerAbsent names the precondition the capture needs, so a red step says what to restore. */
 const offerAbsent = ({ email, failure }: { email: string; failure: string }): string =>
   `no passkey offer after a password sign-in as ${email}: the account answered it within 30 days, ` +
@@ -119,6 +122,7 @@ const capturePasskeyOffer = async ({
     if (shown) await declinePasskeyOffer({ page: side.page, probeMillis: 0 });
     return;
   }
+  await declinePasskeyOffer({ page: side.page, probeMillis: PASSKEY_PRIMARY_PROBE_MILLIS });
   const probe = await side.openAnonymous();
   try {
     const emails = [probeEmail, plan.credential.email, ...(plan.credential.fallbackEmails ?? [])];

@@ -1,0 +1,86 @@
+# Evaluator drawers the prod comparison could not judge: the category chooser and a built-in
+# evaluator's edit drawer with its entity toggles. Labels and test ids are main's
+# (EvaluatorCategorySelectorDrawer, EvaluatorEditorShared).
+flows:
+  - id: eval-evaluator-category-drawer-lists-categories
+    title: New Evaluator opens the category chooser with every category, and Cancel
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          text: New Evaluator
+      - action: expect
+        with:
+          text: Choose Evaluator Category
+      - action: expect
+        with:
+          testId: evaluator-category-expected_answer
+          hasText: Compare output against expected values (exact match, similarity)
+      - action: expect
+        with:
+          testId: evaluator-category-llm_judge
+          hasText: Use LLM to evaluate quality based on criteria
+      - action: expect
+        with:
+          testId: evaluator-category-rag
+          hasText: Evaluate retrieval and generation quality
+      - action: expect
+        with:
+          testId: evaluator-category-quality
+          hasText: Check language, structure, and formatting
+      - action: expect
+        with:
+          testId: evaluator-category-safety
+          hasText: Check for PII, prompt injection, and harmful content
+      - action: expect
+        with:
+          testId: evaluator-category-code
+      - action: expect
+        with:
+          text: /^\s*Cancel\s*$/
+
+  - id: eval-evaluator-edit-pii-drawer-entities
+    title: Open a Presidio PII evaluator from its card menu and read its entity toggles and Save Changes
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-pii-{uid}
+          config:
+            evaluatorType: presidio/pii_detection
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          selector: '[data-testid="evaluator-card-{evaluatorId}"] .js-inner-menu'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          text: Presidio PII Detection
+          timeout: "15000"
+      - action: expect
+        with:
+          testId: evaluator-name-input
+      - action: expect
+        with:
+          text: Entities
+      - action: expect
+        with:
+          text: /^\s*Credit Card\s*$/
+      - action: expect
+        with:
+          text: /^\s*Email Address\s*$/
+      - action: expect
+        with:
+          text: /^\s*Save Changes\s*$/
+      - action: expect
+        with:
+          text: /^\s*Cancel\s*$/

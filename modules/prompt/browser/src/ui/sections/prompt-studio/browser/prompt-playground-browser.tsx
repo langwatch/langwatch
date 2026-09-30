@@ -52,7 +52,12 @@ export function PromptPlaygroundBrowser() {
           maxWidth={windows.length > 1 ? `calc((100vw - 340px) / ${windows.length})` : "auto"}
           paddingTop={0}
         >
-          <DraggableTabsBrowser.TabBar tabIds={tabbedWindow.tabs.map((tab) => tab.id)}>
+          <DraggableTabsBrowser.TabBar
+            tabIds={tabbedWindow.tabs.map((tab) => tab.id)}
+            height="48px"
+            flexShrink={0}
+            paddingRight={6}
+          >
             {/* The switcher lives inside the strip, not in the toolbar below,
                 because the toolbar only renders for the active pane - and a
                 pane you are not working in still has tabs worth reaching. */}

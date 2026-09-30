@@ -1,11 +1,11 @@
 # Observability: the trace explorer, trace sharing, annotations and the analytics query surface.
 #
 # Every name carries {uid}, so any number of flows share one stack. The seed is
-# expected to provide {errorTrace} (a trace whose root span failed) and
-# {conversationTrace} (a trace in a thread with two or more turns) beside the
+# expected to provide {errorTrace} (a trace whose root span failed) beside the
 # plain {trace}, to enable trace sharing for the project, and to leave at
 # least one active annotation score and one organisation member so a queue can
 # be created. The queue flows pick the first option of each picker.
+# The conversation flows open trace_visualdiff_turn_0, the first turn of the seeded two-turn thread.
 # Steps use handles both trees share (aria labels, button words, placeholders,
 # anchor-comment-button, tab and lens words).
 # trace-llm-call-in-drawer posts a fixed trace id in setup (a setup {uid} is not the flow's) and its
@@ -176,7 +176,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/traces/{conversationTrace}
+          path: /{slug}/traces/trace_visualdiff_turn_0
       - action: click
         with:
           text: /^Conversation$/
@@ -195,7 +195,7 @@ flows:
           selector: 'button:text-is("Save")'
       - action: expect
         with:
-          api: /api/annotations/trace/{conversationTrace}
+          api: /api/annotations/trace/trace_visualdiff_turn_0
           field: data
           contains: vd-note-{uid}
       - action: go
@@ -206,7 +206,7 @@ flows:
           text: vd-note-{uid}
       - action: go
         with:
-          path: /{slug}/traces/{conversationTrace}
+          path: /{slug}/traces/trace_visualdiff_turn_0
       - action: click
         with:
           text: /^Conversation$/
@@ -223,7 +223,7 @@ flows:
           selector: 'button:text-is("Update")'
       - action: expect
         with:
-          api: /api/annotations/trace/{conversationTrace}
+          api: /api/annotations/trace/trace_visualdiff_turn_0
           field: data
           contains: vd-note-{uid}-edited
       - action: click
@@ -623,7 +623,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/traces/{conversationTrace}
+          path: /{slug}/traces/trace_visualdiff_turn_0
       - action: click
         with:
           text: /^Conversation/

@@ -321,3 +321,90 @@ flows:
       - action: expect
         with:
           text: vd-code-rename-{uid}-done
+
+  # States the prod comparison could not judge: the type chooser with all five kinds and the
+  # HTTP agent's own edit drawer. A connected agent's details drawer needs an SDK process
+  # registered over the connect websocket, which no flow step opens, so it is not covered here.
+  - id: agent-type-chooser-offers-every-connection-type
+    title: New Agent opens the connection type chooser with HTTP, Voice, Code, Workflow and Connect from code, and Cancel
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: expect
+        with:
+          text: Choose Agent Connection Type
+      - action: expect
+        with:
+          testId: agent-type-http
+          hasText: Connect to an external API endpoint to process requests
+      - action: expect
+        with:
+          testId: agent-type-voice
+          hasText: Voice Agent
+      - action: expect
+        with:
+          testId: agent-type-code
+          hasText: Code Agent
+      - action: expect
+        with:
+          testId: agent-type-workflow
+          hasText: Create a new workflow for custom agent logic
+      - action: expect
+        with:
+          testId: agent-type-connected
+      - action: expect
+        with:
+          text: /^\s*Cancel\s*$/
+
+  - id: agent-http-edit-drawer-tabs-and-test-agent
+    title: Open a saved HTTP agent and read its Body, Auth, Headers and Test tabs, with the Test agent panel
+    setup:
+      - post: /api/agents
+        body:
+          name: vd-httpdrawer-{uid}
+          type: http
+          config:
+            url: https://example.com/vd-httpdrawer-{uid}
+            method: POST
+        as:
+          agentId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: vd-httpdrawer-{uid}
+      - action: expect
+        with:
+          testId: agent-name-input
+      - action: expect
+        with:
+          testId: url-input
+      - action: expect
+        with:
+          text: Request Body Template
+      - action: click
+        with:
+          text: /^Auth$/
+      - action: click
+        with:
+          text: /^Headers$/
+      - action: click
+        with:
+          text: /^Test$/
+      - action: expect
+        with:
+          testId: agent-test
+          hasText: Test agent
+          timeout: "15000"
+      - action: expect
+        with:
+          testId: agent-test-message
+      - action: expect
+        with:
+          testId: agent-test-run

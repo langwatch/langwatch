@@ -89,6 +89,15 @@ func (switcher *editionSwitch) Set(ctx context.Context, edition Edition, stacks 
 	return nil
 }
 
+// Restore puts the stacks back to enterprise after a pass nulled the license, so a shared
+// stack never keeps a free plan for the next capture. It does nothing when no pass touched them.
+func (switcher *editionSwitch) Restore(ctx context.Context, stacks []EditionStack) error {
+	if len(switcher.licenses) == 0 {
+		return nil
+	}
+	return switcher.Set(ctx, EditionEnterprise, stacks)
+}
+
 func (switcher *editionSwitch) setOne(ctx context.Context, edition Edition, stack EditionStack) error {
 	url, err := switcher.databaseURL(ctx, stack)
 	if err != nil {
