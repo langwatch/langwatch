@@ -15,6 +15,7 @@ export type FeatureCatalogueEntry = {
 
 export type PackageKind =
   | FeaturePackageRole
+  | "library"
   | "application"
   | "dev-runtime"
   | "enterprise-root"

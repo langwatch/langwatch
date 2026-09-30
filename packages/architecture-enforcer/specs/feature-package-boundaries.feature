@@ -110,6 +110,19 @@ Feature: Feature package boundary lint
     Then it fails and identifies the other feature's contract as the allowed boundary
 
   @unit @architecture
+  Scenario: A module library is portable and any module may depend on it
+    Given a module library that depends on its own contract and another module's library
+    And another module's process and browser packages that depend on it
+    When architecture lint checks the packages
+    Then no package-role, cross-feature or feature-layout violation is reported
+
+  @unit @architecture
+  Scenario: A module library depends on nothing but its contract, libraries and framework-free packages
+    Given a module library that depends on its own process package, another module's contract and react
+    When architecture lint checks the library
+    Then each of those dependencies is reported as a package-role violation
+
+  @unit @architecture
   Scenario: Core packages cannot import enterprise implementations
     Given a core package imports an enterprise package
     When architecture lint checks the importer

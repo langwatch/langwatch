@@ -29,7 +29,7 @@ const STORES = [
   },
 ];
 
-const MODULE_ROLES = new Set(["contract", "process", "browser", "browser-kit"]);
+const MODULE_ROLES = new Set(["contract", "process", "browser", "browser-kit", "library"]);
 const REPOSITORY_REGISTRY = /^repositories\/[^/]+\.registry\.ts$/;
 
 function isGoverned(file) {

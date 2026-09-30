@@ -44,7 +44,8 @@ function featurePackage({
   capability = "service",
 }: {
   feature: string;
-  role: "contract" | "process" | "browser";
+  /** `query-language` stands for any module library folder. */
+  role: "contract" | "process" | "browser" | "query-language";
   name?: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -372,6 +373,56 @@ describe("feature package boundary lint", () => {
         ({ policy }) => policy === "feature-source-filename",
       ),
     ).toEqual([]);
+  });
+
+  /** @scenario A module library is portable and any module may depend on it */
+  it("accepts a library on its own contract and another library, depended on by any module", () => {
+    featurePackage({ feature: "workflow", role: "contract" });
+    featurePackage({ feature: "workflow", role: "query-language" });
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({
+      feature: "agent",
+      role: "query-language",
+      dependencies: {
+        "@langwatch/agent-contract": "workspace:*",
+        "@langwatch/workflow-query-language": "workspace:*",
+        zod: "^4.4.3",
+      },
+    });
+    featurePackage({
+      feature: "workflow",
+      role: "process",
+      dependencies: { "@langwatch/agent-query-language": "workspace:*" },
+    });
+    featurePackage({
+      feature: "workflow",
+      role: "browser",
+      dependencies: { "@langwatch/agent-query-language": "workspace:*" },
+    });
+
+    const boundaryPolicies = new Set(["package-role", "cross-feature", "feature-layout"]);
+    expect(policies().filter((policy) => boundaryPolicies.has(policy))).toEqual([]);
+  });
+
+  /** @scenario A module library depends on nothing but its contract, libraries and framework-free packages */
+  it("rejects a library on an implementation, a peer's contract or a runtime", () => {
+    featurePackage({ feature: "workflow", role: "contract" });
+    featurePackage({ feature: "agent", role: "process" });
+    featurePackage({
+      feature: "agent",
+      role: "query-language",
+      dependencies: {
+        "@langwatch/agent-process": "workspace:*",
+        "@langwatch/workflow-contract": "workspace:*",
+        react: "^19.0.0",
+      },
+    });
+
+    const refused = lintWorkspace({ root, declarations: false })
+      .filter(({ policy, file }) => policy === "package-role" && file.includes("query-language"))
+      .map(({ specifier }) => specifier)
+      .toSorted((a, b) => a.localeCompare(b));
+    expect(refused).toEqual(["@langwatch/agent-process", "@langwatch/workflow-contract", "react"]);
   });
 
   /** @scenario Cross-feature collaboration uses only contracts */

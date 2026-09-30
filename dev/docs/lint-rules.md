@@ -797,6 +797,9 @@ Messages:
 - `kitLeaf`
   - what: `{{specifier}}` is a browser package, and a browser kit is a leaf.
   - fix: Import only contracts, `@langwatch/design-system` and `@langwatch/browser-host` here; take what `{{specifier}}` provides as a prop from the consumer.
+- `libraryRuntime`
+  - what: `{{specifier}}` is a runtime, framework or another package's implementation, and this is a module's portable, framework-free library.
+  - fix: Import only this module's contract, other module libraries and framework-free packages here; move the code that needs `{{specifier}}` into the module's process or browser package.
 - `packageEscape`
   - what: `{{specifier}}` resolves outside `{{packageRoot}}`, so this package depends on a file it does not own.
   - fix: Replace `{{specifier}}` with the target's package name — `@langwatch/<module>-<contract|process|browser|browser-kit>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.
