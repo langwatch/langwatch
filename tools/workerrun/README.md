@@ -20,17 +20,17 @@ Each fires `-n` items. Ids are stable across runs (`collector-0007`); the wire i
 per-run tag, so a run never reads back an earlier run's data. `-seed` fixes the fire order
 and each item's variant.
 
-| family | fires | proven by | worker path |
-|---|---|---|---|
-| otlp | `POST /api/otel/v1/traces`, 1-5 spans | `GET /api/traces/{id}` has the input | trace_processing |
-| collector | `POST /api/collector`, 2 spans; 5% 256 KiB input, 10% inline image | `GET /api/traces/{id}` has the answer | trace_processing |
-| evaluation | collector trace with an SDK evaluation, half guardrails | the evaluation reads back `processed` on the trace | custom-evaluation sync → evaluation_processing |
-| monitor | an evaluator + monitor (`langevals/basic`); the collector traces | each collector trace gets the monitor's evaluation, terminal status | evaluationTrigger → evaluation_processing |
-| annotation | `POST /api/annotations/trace/{id}` on each collector trace | `GET /api/annotations/trace/{id}` has the comment | trace_processing `addAnnotation` (not readable: see below) |
-| scenario | `POST /api/scenario-events` started + finished | `GET /api/simulation-runs/{id}` says `SUCCESS` | simulation_processing |
-| batch | `POST /api/evaluations/batch/log_results`, 1-8 rows | the run is listed by `GET /api/experiments/runs?experimentSlug=` | experiment_run_processing |
-| automation | a dataset + `ADD_TO_DATASET` trigger on a run label; labelled OTLP traces with an explicit origin (the collector stamps none, so its traces wait 5 min for the fallback) | each trace id is a row of the dataset | triggerMatch → automations |
-| analytics | nothing more | `POST /api/analytics/timeseries` counts every collector trace fired | trace rollup projection |
+| family     | fires                                                                                                                                                                    | proven by                                                           | worker path                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| otlp       | `POST /api/otel/v1/traces`, 1-5 spans                                                                                                                                    | `GET /api/traces/{id}` has the input                                | trace_processing                                           |
+| collector  | `POST /api/collector`, 2 spans; 5% 256 KiB input, 10% inline image                                                                                                       | `GET /api/traces/{id}` has the answer                               | trace_processing                                           |
+| evaluation | collector trace with an SDK evaluation, half guardrails                                                                                                                  | the evaluation reads back `processed` on the trace                  | custom-evaluation sync → evaluation_processing             |
+| monitor    | an evaluator + monitor (`langevals/basic`); the collector traces                                                                                                         | each collector trace gets the monitor's evaluation, terminal status | evaluationTrigger → evaluation_processing                  |
+| annotation | `POST /api/annotations/trace/{id}` on each collector trace                                                                                                               | `GET /api/annotations/trace/{id}` has the comment                   | trace_processing `addAnnotation` (not readable: see below) |
+| scenario   | `POST /api/scenario-events` started + finished                                                                                                                           | `GET /api/simulation-runs/{id}` says `SUCCESS`                      | simulation_processing                                      |
+| batch      | `POST /api/evaluations/batch/log_results`, 1-8 rows                                                                                                                      | the run is listed by `GET /api/experiments/runs?experimentSlug=`    | experiment_run_processing                                  |
+| automation | a dataset + `ADD_TO_DATASET` trigger on a run label; labelled OTLP traces with an explicit origin (the collector stamps none, so its traces wait 5 min for the fallback) | each trace id is a row of the dataset                               | triggerMatch → automations                                 |
+| analytics  | nothing more                                                                                                                                                             | `POST /api/analytics/timeseries` counts every collector trace fired | trace rollup projection                                    |
 
 The first half fires as fast as `-concurrency` allows (burst), the rest at `-steady-rate`
 a second. Read-back runs alongside, a round at most every 2 s, so lag has that resolution.

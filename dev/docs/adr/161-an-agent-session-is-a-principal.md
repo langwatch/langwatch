@@ -7,8 +7,8 @@
 **Builds on:** [ADR-092](092-unified-authorization-engine.md) §4 (principals,
 not bolt-ons — the `{actor, subject}` shape), §9 (the owner ceiling,
 `effective(key) = grants(key) ∩ grants(owner)`, which shipped), §12 (the epoch
-ladder and its L2 passport), and the "What falls out for free" entry *Agent
-principals*, which this ADR implements. Nothing in ADR-092 is superseded.
+ladder and its L2 passport), and the "What falls out for free" entry _Agent
+principals_, which this ADR implements. Nothing in ADR-092 is superseded.
 [ADR-047](047-langy-foundations.md) §B (the caller-scoped Langy session key —
 the decision that got the algebra right and the storage wrong; this keeps the
 former and replaces the latter).
@@ -52,11 +52,11 @@ be exact about which:
   (`mintLangySessionApiKey`,
   `platform/app/src/server/app-layer/langy/langyApiKey.ts:271-392`, the
   ownership line at `:377-378`). The entry point refuses outright for a
-  credential with no owning user — *"Langy acts as a person, and the access
-  decision is made per user"* (`langyApiKeyIdentity.ts:70-105`).
+  credential with no owning user — _"Langy acts as a person, and the access
+  decision is made per user"_ (`langyApiKeyIdentity.ts:70-105`).
 
-So the headline property of the free-list entry — *a Langy tool call can never
-exceed the human who asked* — is not something this ADR introduces. It is
+So the headline property of the free-list entry — _a Langy tool call can never
+exceed the human who asked_ — is not something this ADR introduces. It is
 already true, and true **live** rather than as a snapshot: the ceiling re-reads
 the owner's current bindings on every request
 (`server/rbac/role-binding-resolver.ts:656-663`, engine path at `:692-699`;
@@ -76,12 +76,12 @@ which keeps it in its environment for the life of the worker
 (`services/langyagent/adapters/opencode/provision.go:486-494`).
 `LANGY_SESSION_KEY_TTL_MS` is six hours (`langyApiKey.ts:55`). Because a reused
 worker keeps the key it booted with, many of those rows are never used: the
-service's own comment reports *"41 keys minted, 14 ever used"* on a dev box
+service's own comment reports _"41 keys minted, 14 ever used"_ on a dev box
 (`LangyCredentialService.ts`, the `getOrProvision` docstring), and the
 `mintSessionKey` seam exists to stop paying for the rest. That sprawl needs
 machinery of its own — a name-and-tenant-gated system revocation path
 (`langyApiKey.ts:128-182`), an expiry reaper (`:202-224`) whose docstring
-explains it is *"not redundant with revoke-on-death"* because a SIGKILLed
+explains it is _"not redundant with revoke-on-death"_ because a SIGKILLed
 manager runs no cleanup, and a counter for reaped keys as the tell that the
 fast path broke. All of it exists to manage a credential we mint only because
 there was no principal shape to mint instead.
@@ -110,7 +110,7 @@ convention is `metadata.impersonatorId` written by the tRPC path
 codebase that distinguishes a Langy write from an ordinary integration is
 `workbenchActorFrom`, on the experiments surface
 (`platform/app/src/server/experiments/workbenchActor.ts:28`), and it does so by
-comparing the key's *name* (`isLangySessionKey`,
+comparing the key's _name_ (`isLangySessionKey`,
 `platform/app/src/server/api-key/token-resolver.ts:191`). Everywhere else, a
 prompt Langy rewrote for alice is recorded as alice rewriting it. **"Langy did
 X on behalf of alice" is not a fact this system stores.**
@@ -119,15 +119,15 @@ X on behalf of alice" is not a fact this system stores.**
 plane sends the Go manager a turn payload carrying both `actorUserId` — a plain
 JSON field (`services/langyagent/transport/rpc/handlers.go:65,139`,
 `transport/rpc/rpc.go:51`) — and the minted key inside `credentials`. The
-manager authenticates the *caller* with a shared bearer secret
+manager authenticates the _caller_ with a shared bearer secret
 (`transport/rpc/http.go:111-121`) and then believes the asserted
 `actorUserId`, which drives worker-pool signature, worker reuse and OTel
 attribution (`app/workerpool/pool.go:474,782`,
 `adapters/otelrelay/otelrelay.go:494-495`, where it is stamped as
 `end_user.id`). Authority, meanwhile, comes only from the key. Our own code
 names this as a trap: the doc comment on `resolveLangyKeyIdentity` says the
-identity there is derived from the credential *"and never a value taken from
-the request body, which is the trap the internal relay plane fell into"*
+identity there is derived from the credential _"and never a value taken from
+the request body, which is the trap the internal relay plane fell into"_
 (`langyApiKeyIdentity.ts:47-56`). It is contained today — the manager can
 revoke but cannot mint (`langyApiKey.ts:119-122`) — but two sources for one
 identity is the confused-deputy shape in miniature, and it exists because the
@@ -178,7 +178,7 @@ cross that boundary.** The stored `ApiKey` is not there because anyone wanted a
 row; it is there because a row was the only thing we had that a worker could
 present.
 
-So the design cannot be "no token". It has to be "a token that *is* the
+So the design cannot be "no token". It has to be "a token that _is_ the
 principal" — self-describing, verifiable without a lookup, and short enough
 that its existence is not an outstanding grant. ADR-092 §12 already specifies
 that object as the L2 rung of the epoch ladder: a signed passport carrying
@@ -214,7 +214,7 @@ written as the pair whose halves are equal:
 `authority` is not decoration. ADR-092 §4 gives the `{actor, subject}` shape
 but not the direction — an actor who caps and an actor who merely signs the
 record are opposite semantics over identical data, and a field that has to be
-inferred from the actor's *kind* will be inferred wrongly the first time a
+inferred from the actor's _kind_ will be inferred wrongly the first time a
 third kind appears. It is declared at the edge, where the reason for the pair
 is known, and it is part of what the passport signs.
 
@@ -254,8 +254,8 @@ wrong: today the held subset is computed once, at mint
 (`langyApiKey.ts:312-343`), and the live ceiling only rescues it in the
 shrinking direction.
 
-**So an agent session tracks the subject in *both* directions, and that is a
-deliberate departure from ADR-092 §9's asymmetry.** §9 makes a *scoped* API key
+**So an agent session tracks the subject in _both_ directions, and that is a
+deliberate departure from ADR-092 §9's asymmetry.** §9 makes a _scoped_ API key
 shrink with a demoted owner but never grow with a promoted one, because the key
 was minted with a declared, narrower intent that a promotion must not silently
 widen. An agent session has no such intent to preserve: nobody chose its
@@ -283,7 +283,7 @@ name, and that means rows: a grant per session, an offboarding sweep that has
 to enumerate them, a dormant-binding detector that has to know they are
 supposed to be dormant, and a new class of orphan when a turn dies. The whole
 point of the composition is that the session holds nothing of its own. ADR-092's
-free-list entry says *ephemeral*, and this is the concrete reason it is right.
+free-list entry says _ephemeral_, and this is the concrete reason it is right.
 
 What does get storage is exactly one thing per agent kind, never per session:
 
@@ -354,7 +354,7 @@ file that one code path reads.
 ```
 
 The passport is ADR-092 §12's L2 object with the pair in its claims. Its
-verification cost is why this is affordable per *turn* rather than per session:
+verification cost is why this is affordable per _turn_ rather than per session:
 today's mint is a Postgres write inside an interactive transaction on the
 critical path of a chat POST, and the reason it is paid only once per worker is
 an optimisation that exists precisely because it is expensive. A passport is
@@ -409,7 +409,7 @@ are not equivalent:
 ```
 
 Today's `api_key_permission_not_delegable` is **not an authorization control**,
-and the ADR is not pretending to promote one. It fires strictly *after* the
+and the ADR is not pretending to promote one. It fires strictly _after_ the
 ceiling has already denied the request — `if (!allowed)
 refuseApiKeyCeiling(...)` at
 `platform/app/src/server/api-key/auth-middleware.ts:687` — and its only job is
@@ -441,7 +441,7 @@ Two explanation gaps close as part of this, because shipping a denial reason
 nothing can render is how we got here:
 
 - `AuthzEngine.explain` grows the branch it lacks, for `owner-ceiling` and
-  `agent-ceiling` both: a ceiling denial must say *the ceiling refused it*, not
+  `agent-ceiling` both: a ceiling denial must say _the ceiling refused it_, not
   list the subject's bindings as if each fell short.
 - `explainDenial` stops hard-coding a user principal
   (`denial-explanation.ts:157`) and takes the **subject** of the pair. For a
@@ -483,13 +483,13 @@ data.
 **The invoking user's session expires mid-run.** Today the agent's authority
 outlives the session that created it by up to six hours, and nothing
 revalidates: `resolveLangyActorSession` builds the acting session with
-`expires` set to *now*, with the comment that *"nothing downstream renews or
-revalidates it"* (`langyApiKeyActorSession.ts`). Grants are not session-scoped,
+`expires` set to _now_, with the comment that _"nothing downstream renews or
+revalidates it"_ (`langyApiKeyActorSession.ts`). Grants are not session-scoped,
 so the owner ceiling does not catch this — a signed-out user still holds every
 binding they held. **Decided:** the passport's `exp` is the minimum of the turn
 budget and the subject's session expiry. A person who has gone home did not ask
-for anything, and an agent whose whole premise is *acting for someone who
-asked* should not outlive the asking. The cost is stated in Consequences: a
+for anything, and an agent whose whole premise is _acting for someone who
+asked_ should not outlive the asking. The cost is stated in Consequences: a
 long-running turn dies when the session does, and work that should survive that
 is the autonomous case, which this ADR does not cover.
 
@@ -498,7 +498,7 @@ with `denialReason: "agent-role-missing"` and `fault: "platform"` (ADR-045).
 Not customer-actionable: the copy must not suggest widening a role or asking an
 admin, because neither helps and both send someone to a door that does not open
 — the exact failure `ApiKeyPermissionNotDelegableError` was written to stop.
-Note this is a *new* failure mode that today's shape cannot have, because today
+Note this is a _new_ failure mode that today's shape cannot have, because today
 the agent's half is compiled code that cannot be absent. Trading a compile-time
 guarantee for a row is a real cost of §3 and is listed as one.
 
@@ -608,14 +608,14 @@ reads that as "decide alone" (`authz.service.ts:387-421`, pinned by
 `owner-ceiling.unit.test.ts`). Second, ADR-092 §9 already flags the adjacent
 escape — service keys with zero bindings defaulting to org-wide ADMIN — as one
 the engine closes by requiring explicit bindings at creation. So an autonomous
-agent principal has to arrive *with* its bindings and a named human accountable
+agent principal has to arrive _with_ its bindings and a named human accountable
 for them, and designing that accountability is the work. Until it is done, an
 agent with no invoking user stays out of scope and keeps using an
 explicitly-bound service credential.
 
 **Credentials the agent carries that are not platform permissions.** Context #6:
 the org-scoped GitHub installation token is minted with no user check, and this
-ADR does not change that. The principal shape makes the *platform* half exact
+ADR does not change that. The principal shape makes the _platform_ half exact
 and leaves the third-party half exactly where it is. Bounding it needs its own
 decision — plausibly a per-user GitHub identity, plausibly a narrower
 installation scope, plausibly an explicit `github:*` grain in the registry that
@@ -643,7 +643,7 @@ scenario "An impersonated request records both identities".
 
 - [ADR-092](092-unified-authorization-engine.md) §4 (the `{actor, subject}`
   shape), §9 (the owner ceiling), §12 (the epoch ladder and the L2 passport),
-  and the "What falls out for free" entry *Agent principals*.
+  and the "What falls out for free" entry _Agent principals_.
 - [ADR-047](047-langy-foundations.md) §B — the caller-scoped per-session key
   whose storage this replaces and whose algebra it keeps.
 - The ceiling as implemented: `packages/authz/src/engine.ts:98-143`

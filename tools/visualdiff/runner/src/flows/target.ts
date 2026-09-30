@@ -35,7 +35,9 @@ export const targetOf = ({
     target = root.locator(`[data-testid^="${quoted(args.testIdPrefix)}"]`);
   } else if (args.label !== undefined) {
     const regex = /^\/.+\/[dgimsuvy]*$/.test(args.label);
-    target = regex ? root.getByLabel(asRegExp(args.label)) : root.getByLabel(args.label, { exact: true });
+    target = regex
+      ? root.getByLabel(asRegExp(args.label))
+      : root.getByLabel(args.label, { exact: true });
   } else if (args.selector !== undefined) {
     target = root.locator(args.selector);
   } else {

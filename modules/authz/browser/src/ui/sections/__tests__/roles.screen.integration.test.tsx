@@ -7,7 +7,6 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-
 type MutationOptions = {
   onSuccess?: () => void;
   onError?: (error: unknown) => void;

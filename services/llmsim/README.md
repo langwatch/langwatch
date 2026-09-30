@@ -19,13 +19,13 @@ LLMSIM_ADDR=:5595 haven simulator llm   # standalone, on :5595 by default
 Routing is by path suffix, so `/v1/chat/completions`, `/chat/completions` and
 Azure's `/openai/deployments/{d}/chat/completions` all answer.
 
-| Path suffix               | Dialect                                                        |
-| ------------------------- | -------------------------------------------------------------- |
-| `/chat/completions`       | OpenAI chat completions, JSON or SSE (`stream`, `stream_options.include_usage`) |
-| `/messages`               | Anthropic messages, JSON or SSE (`message_start` ... `message_stop`) |
-| `/messages/count_tokens`  | Anthropic token count                                          |
-| `/embeddings`             | OpenAI embeddings, float or base64, at `dimensions` (default 1536) |
-| `GET /models`             | model list, in Anthropic's shape when `anthropic-version` is sent |
+| Path suffix              | Dialect                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `/chat/completions`      | OpenAI chat completions, JSON or SSE (`stream`, `stream_options.include_usage`) |
+| `/messages`              | Anthropic messages, JSON or SSE (`message_start` ... `message_stop`)            |
+| `/messages/count_tokens` | Anthropic token count                                                           |
+| `/embeddings`            | OpenAI embeddings, float or base64, at `dimensions` (default 1536)              |
+| `GET /models`            | model list, in Anthropic's shape when `anthropic-version` is sent               |
 
 The OpenAI Responses API is not served: the gateway turns a Responses call to
 an OpenAI provider with a base URL into chat completions before it leaves.
@@ -47,7 +47,7 @@ an OpenAI provider with a base URL into chat completions before it leaves.
   and the last message is not a tool result, half of all prompts call the first
   tool. Arguments are drawn from the tool's JSON schema.
 - **Langy mode** (model name containing `langy-echo`, or `X-Llmsim-Mode:
-  langy`): no Markov text; llmsim does what the last user message says.
+langy`): no Markov text; llmsim does what the last user message says.
   - A plain message is echoed back verbatim, streaming included.
   - `/tool <name> <json args>` lines are tool calls, exactly as written;
     several lines make several calls in one turn. Other lines are text.
@@ -66,12 +66,12 @@ an OpenAI provider with a base URL into chat completions before it leaves.
 
 ## Switches
 
-| Switch                                   | Effect                                        |
-| ---------------------------------------- | --------------------------------------------- |
-| `X-Llmsim-Seed: <value>`                 | pins the random source, whatever the prompt   |
-| `X-Llmsim-Seed: random`                  | a fresh source per call (load and fuzz tests) |
-| `X-Llmsim-Error: 429` / model `...error-500...` | answers that status in the caller's error shape |
-| `X-Llmsim-Mode: langy` / model `...langy-echo...` | Langy mode                            |
+| Switch                                            | Effect                                          |
+| ------------------------------------------------- | ----------------------------------------------- |
+| `X-Llmsim-Seed: <value>`                          | pins the random source, whatever the prompt     |
+| `X-Llmsim-Seed: random`                           | a fresh source per call (load and fuzz tests)   |
+| `X-Llmsim-Error: 429` / model `...error-500...`   | answers that status in the caller's error shape |
+| `X-Llmsim-Mode: langy` / model `...langy-echo...` | Langy mode                                      |
 
 The gateway forwards no custom headers upstream, so through the product use
 the model-name forms. The console's settings tab sets a forced error and a

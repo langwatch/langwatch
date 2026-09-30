@@ -29,7 +29,9 @@ describe.skipIf(!installed)("Feature: flows name elements by test id", () => {
 
     expect(await targetOf({ root: page, args: { testId: "save" } }).count()).toBe(1);
     expect(await targetOf({ root: page, args: { testIdPrefix: "row-" } }).count()).toBe(2);
-    expect(await targetOf({ root: page, args: { testIdPrefix: "row-", hasText: "Beta" } }).count()).toBe(1);
+    expect(
+      await targetOf({ root: page, args: { testIdPrefix: "row-", hasText: "Beta" } }).count(),
+    ).toBe(1);
     expect(await targetOf({ root: page, args: { label: "Close dialog" } }).count()).toBe(1);
     expect(() => targetOf({ root: page, args: {} })).toThrow("name the element");
     await page.close();

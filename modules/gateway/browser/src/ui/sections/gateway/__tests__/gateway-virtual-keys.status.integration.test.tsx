@@ -183,7 +183,9 @@ describe("virtual keys status column", () => {
 
       const row = screen.getByTestId("vk-status-vk-paused").closest("tr");
       expect(row).not.toBeNull();
-      await userEvent.click(within(row as HTMLElement).getByRole("button", { name: /^Actions for / }));
+      await userEvent.click(
+        within(row as HTMLElement).getByRole("button", { name: /^Actions for / }),
+      );
 
       await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
       expect(screen.getByText("View traces")).toBeInTheDocument();

@@ -568,16 +568,16 @@ against fixture JSON, light and dark, at 1280 and 390 wide.
 
 The daemon's JSON, which the console reads:
 
-| Route                             | What                                                  |
-| --------------------------------- | ----------------------------------------------------- |
-| `GET /api/hub`                    | the machine: memory, stacks, idle worktrees, reaping  |
-| `GET /api/stacks/<slug>`          | one stack home; 404 with a hub link for unknown slugs |
-| `GET /api/logs?stack=&service=`   | the log view's captured lines                         |
-| `POST /api/stacks/<slug>/api-key` | reveals the local API key (same-origin only)          |
-| `POST /api/stacks/<slug>/restart` | bounces a live stack                                  |
-| `POST /api/stacks/<slug>/down`    | stops a stack and keeps its databases                 |
+| Route                             | What                                                               |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `GET /api/hub`                    | the machine: memory, stacks, idle worktrees, reaping               |
+| `GET /api/stacks/<slug>`          | one stack home; 404 with a hub link for unknown slugs              |
+| `GET /api/logs?stack=&service=`   | the log view's captured lines                                      |
+| `POST /api/stacks/<slug>/api-key` | reveals the local API key (same-origin only)                       |
+| `POST /api/stacks/<slug>/restart` | bounces a live stack                                               |
+| `POST /api/stacks/<slug>/down`    | stops a stack and keeps its databases                              |
 | `POST /api/stacks/<slug>/destroy` | stops a stack and drops its databases; body `{"confirm":"<slug>"}` |
-| `POST /api/worktrees/start`       | brings a stopped worktree up                          |
+| `POST /api/worktrees/start`       | brings a stopped worktree up                                       |
 
 ## More of what haven does
 
