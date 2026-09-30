@@ -19,13 +19,16 @@ export class SlackConnectionMigration implements SystemMigration {
 
   async migrateTenant({
     tenantId,
+    signal,
   }: {
     tenantId: string;
+    signal?: AbortSignal;
   }): Promise<TenantMigrationOutcome> {
     const projects = await prisma.project.findMany({
       where: { team: { organizationId: tenantId } },
       select: { id: true },
     });
+    signal?.throwIfAborted();
     const outcome = await migrateOrganization({
       organizationId: tenantId,
       projectIds: projects.map((project) => project.id),
