@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
+import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
 import {
@@ -41,6 +42,16 @@ import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
 /** The transport a new voice agent is reached through, until phone lands. */
 const DEFAULT_TRANSPORT: VoiceTransport = "elevenlabs_convai";
+
+/**
+ * Which way a phone call goes. "inbound" = the agent answers and greets first;
+ * "outbound" = the agent places the call and waits for the caller to speak.
+ */
+type CallDirection = "inbound" | "outbound";
+
+/** A new phone target places calls and waits for the caller, matching the
+ *  schema default so an unchanged form keeps today's behavior. */
+const DEFAULT_CALL_DIRECTION: CallDirection = "outbound";
 
 /** The settings route that adds a model provider key. Top-level, no slug. */
 const MODEL_PROVIDERS_ROUTE = "/settings/model-providers";
@@ -136,6 +147,7 @@ type VoiceForm = {
   transport: VoiceTransport;
   agentId: string;
   phoneNumber: string;
+  callDirection: CallDirection;
 };
 
 /** The form values seeded from a saved agent's stored config. */
@@ -147,12 +159,14 @@ function formFromAgent(agentData: {
     transport?: VoiceTransport;
     agentId?: string;
     phoneNumber?: string;
+    callDirection?: CallDirection;
   };
   return {
     name: agentData.name ?? "",
     transport: config.transport ?? DEFAULT_TRANSPORT,
     agentId: config.agentId ?? "",
     phoneNumber: config.phoneNumber ?? "",
+    callDirection: config.callDirection ?? DEFAULT_CALL_DIRECTION,
   };
 }
 
@@ -164,6 +178,9 @@ function formFromDraft(projectId: string): VoiceForm {
     transport: draft?.transport ?? DEFAULT_TRANSPORT,
     agentId: draft?.agentId ?? "",
     phoneNumber: draft?.phoneNumber ?? "",
+    // The draft (create flow) never persists the phone-only call direction; a
+    // new phone target starts as outbound.
+    callDirection: DEFAULT_CALL_DIRECTION,
   };
 }
 
@@ -332,6 +349,9 @@ function useVoiceFormState({
   const [transport, setTransport] = useState<VoiceTransport>(DEFAULT_TRANSPORT);
   const [voiceAgentId, setVoiceAgentId] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [callDirection, setCallDirection] = useState<CallDirection>(
+    DEFAULT_CALL_DIRECTION,
+  );
   const formInitializedRef = useRef(false);
   const lastAgentIdRef = useRef<string | undefined>(undefined);
 
@@ -353,6 +373,7 @@ function useVoiceFormState({
     setTransport(initial.transport);
     setVoiceAgentId(initial.agentId);
     setPhoneNumber(initial.phoneNumber);
+    setCallDirection(initial.callDirection);
     formInitializedRef.current = true;
   }, [agentData, agentId, isCreating, isOpen, projectId]);
 
@@ -383,6 +404,8 @@ function useVoiceFormState({
     setVoiceAgentId,
     phoneNumber,
     setPhoneNumber,
+    callDirection,
+    setCallDirection,
   };
 }
 
@@ -471,6 +494,7 @@ function submitVoiceAgent({
     transport: VoiceTransport;
     voiceAgentId: string;
     phoneNumber: string;
+    callDirection: CallDirection;
   };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
@@ -478,7 +502,11 @@ function submitVoiceAgent({
   if (!projectId || !isValid) return;
   const config =
     form.transport === "phone"
-      ? { transport: form.transport, phoneNumber: form.phoneNumber.trim() }
+      ? {
+          transport: form.transport,
+          phoneNumber: form.phoneNumber.trim(),
+          callDirection: form.callDirection,
+        }
       : { transport: form.transport, agentId: form.voiceAgentId.trim() };
   const savedAgentId = agentId ?? createdAgentRowId;
   if (savedAgentId) {
@@ -518,6 +546,7 @@ function useSaveVoiceAgent({
     transport: VoiceTransport;
     voiceAgentId: string;
     phoneNumber: string;
+    callDirection: CallDirection;
   };
   createMutation: ReturnType<typeof api.agents.create.useMutation>;
   updateMutation: ReturnType<typeof api.agents.update.useMutation>;
@@ -804,6 +833,8 @@ function VoiceAgentDrawerBody({
           setVoiceAgentId={form.setVoiceAgentId}
           phoneNumber={form.phoneNumber}
           setPhoneNumber={form.setPhoneNumber}
+          callDirection={form.callDirection}
+          setCallDirection={form.setCallDirection}
           hasTwilioKey={editor.hasTwilioKey}
           hasElevenLabsKey={editor.hasElevenLabsKey}
           hasAttemptedSubmit={editor.hasAttemptedSubmit}
@@ -901,21 +932,29 @@ function VoiceAgentTalkView({
 }
 
 /**
- * The transports offered in the "Reached via" select. Phone stays hidden until
- * the project has a Twilio provider in Settings > Model Providers, but an agent
- * already configured as phone still lists it so its own transport renders (the
- * gate is on the OPTION, not on an existing target).
+ * The transports offered in the "Reached via" select. Every transport is
+ * always rendered as an option; phone is disabled and labelled "Unavailable"
+ * until the project has a Twilio provider in Settings > Model Providers, but
+ * an agent already configured as phone keeps its own transport selectable
+ * (the gate is on the OPTION, not on an existing target).
  */
-function visibleTransportsFor({
+function transportOptionsFor({
   hasTwilioKey,
   transport,
 }: {
   hasTwilioKey: boolean;
   transport: VoiceTransport;
-}): readonly VoiceTransport[] {
-  return VOICE_TRANSPORTS.filter(
-    (t) => t !== "phone" || hasTwilioKey || transport === "phone",
-  );
+}): readonly { value: VoiceTransport; label: string; disabled: boolean }[] {
+  return VOICE_TRANSPORTS.map((t) => {
+    const disabled = t === "phone" && !hasTwilioKey && transport !== "phone";
+    return {
+      value: t,
+      label: disabled
+        ? `${VOICE_TRANSPORT_LABELS[t]} (Unavailable)`
+        : VOICE_TRANSPORT_LABELS[t],
+      disabled,
+    };
+  });
 }
 
 function VoiceAgentForm({
@@ -927,6 +966,8 @@ function VoiceAgentForm({
   setVoiceAgentId,
   phoneNumber,
   setPhoneNumber,
+  callDirection,
+  setCallDirection,
   hasTwilioKey,
   hasElevenLabsKey,
   hasAttemptedSubmit,
@@ -939,6 +980,8 @@ function VoiceAgentForm({
   setVoiceAgentId: (value: string) => void;
   phoneNumber: string;
   setPhoneNumber: (value: string) => void;
+  callDirection: CallDirection;
+  setCallDirection: (value: CallDirection) => void;
   hasTwilioKey: boolean;
   hasElevenLabsKey: boolean;
   hasAttemptedSubmit: boolean;
@@ -949,11 +992,10 @@ function VoiceAgentForm({
   const phoneNumberInvalid =
     hasAttemptedSubmit && !E164_PHONE_PATTERN.test(phoneNumber.trim());
   const isPhone = transport === "phone";
-  const visibleTransports = visibleTransportsFor({
+  const transportOptions = transportOptionsFor({
     hasTwilioKey,
     transport,
   });
-  const transportOptionsDisabled = visibleTransports.length <= 1;
   return (
     <VStack
       gap={4}
@@ -976,15 +1018,15 @@ function VoiceAgentForm({
 
       <Field.Root>
         <Field.Label>Reached via</Field.Label>
-        <NativeSelect.Root disabled={transportOptionsDisabled}>
+        <NativeSelect.Root>
           <NativeSelect.Field
             value={transport}
             onChange={(e) => setTransport(e.target.value as VoiceTransport)}
             data-testid="voice-agent-transport-select"
           >
-            {visibleTransports.map((t) => (
-              <option key={t} value={t}>
-                {VOICE_TRANSPORT_LABELS[t]}
+            {transportOptions.map((o) => (
+              <option key={o.value} value={o.value} disabled={o.disabled}>
+                {o.label}
               </option>
             ))}
           </NativeSelect.Field>
@@ -992,18 +1034,32 @@ function VoiceAgentForm({
         </NativeSelect.Root>
         {!hasTwilioKey && !isPhone && (
           <Field.HelperText data-testid="voice-agent-phone-hint">
-            To reach an agent by phone, add Twilio in Settings &gt; Model
-            Providers.
+            To reach an agent by phone, add Twilio in Settings &gt;{" "}
+            <Link
+              href="/settings/model-providers"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="voice-agent-model-providers-link"
+            >
+              Model Providers
+            </Link>
+            .
           </Field.HelperText>
         )}
       </Field.Root>
 
       {isPhone ? (
-        <PhoneNumberField
-          phoneNumber={phoneNumber}
-          setPhoneNumber={setPhoneNumber}
-          invalid={phoneNumberInvalid}
-        />
+        <>
+          <PhoneNumberField
+            phoneNumber={phoneNumber}
+            setPhoneNumber={setPhoneNumber}
+            invalid={phoneNumberInvalid}
+          />
+          <CallDirectionField
+            callDirection={callDirection}
+            setCallDirection={setCallDirection}
+          />
+        </>
       ) : (
         <ElevenLabsAgentIdField
           voiceAgentId={voiceAgentId}
@@ -1013,6 +1069,61 @@ function VoiceAgentForm({
         />
       )}
     </VStack>
+  );
+}
+
+/**
+ * Which way the phone call goes. Inbound targets greet on connect (the run
+ * opens with the agent's turn); outbound targets wait for the caller. Rendered
+ * only for the phone transport, and — like the phone number — never persisted
+ * to the create draft.
+ */
+function CallDirectionField({
+  callDirection,
+  setCallDirection,
+}: {
+  callDirection: CallDirection;
+  setCallDirection: (value: CallDirection) => void;
+}) {
+  return (
+    <Field.Root>
+      <Field.Label>Call direction</Field.Label>
+      <RadioGroup
+        value={callDirection}
+        onValueChange={(d: { value: string | null }) => {
+          if (d.value === "inbound" || d.value === "outbound") {
+            setCallDirection(d.value);
+          }
+        }}
+        data-testid="voice-agent-call-direction"
+        size="sm"
+      >
+        <VStack align="start" gap={2}>
+          <Radio
+            value="inbound"
+            data-testid="voice-agent-call-direction-inbound"
+          >
+            <VStack align="start" gap={0}>
+              <Text fontSize="sm">Inbound</Text>
+              <Text fontSize="xs" color="fg.muted">
+                The agent answers calls and greets first.
+              </Text>
+            </VStack>
+          </Radio>
+          <Radio
+            value="outbound"
+            data-testid="voice-agent-call-direction-outbound"
+          >
+            <VStack align="start" gap={0}>
+              <Text fontSize="sm">Outbound</Text>
+              <Text fontSize="xs" color="fg.muted">
+                The agent places calls and waits for the caller to speak first.
+              </Text>
+            </VStack>
+          </Radio>
+        </VStack>
+      </RadioGroup>
+    </Field.Root>
   );
 }
 

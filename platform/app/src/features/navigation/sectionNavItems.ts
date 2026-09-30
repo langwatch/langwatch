@@ -37,6 +37,8 @@ export interface SectionNavItemData {
    * presentations agree on what exists.
    */
   featureFlag?: FrontendFeatureFlag;
+  /** The `data-tour` target the guided tour spotlights on this entry. */
+  tourId?: string;
   /**
    * Listed under a labelled group in the navigation-v2 sidebar, after
    * every ungrouped entry. The legacy section rail has no grouping
@@ -51,6 +53,7 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     href: "/gateway/virtual-keys",
     includePath: "/gateway/virtual-keys",
     icon: KeyRound,
+    tourId: "nav-virtual-keys",
   },
   {
     label: "Model Providers",

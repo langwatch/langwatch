@@ -89,6 +89,90 @@ describe("searchTracesCommand()", () => {
 		mockProcessExit();
 	});
 
+	describe("when a filter is given", () => {
+		/** @scenario "The CLI sends a filter and keeps free text separate" */
+		it("sends the filter and the text query as two different things", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({
+				filter: "status:error",
+				query: "refund",
+			});
+
+			const body = mockSearch.mock.calls[0]?.[0] as {
+				filter?: string;
+				query?: string;
+			};
+			expect(body.filter).toBe("status:error");
+			expect(body.query).toBe("refund");
+		});
+
+		it("sends no filter key when none was given", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({ query: "refund" });
+
+			const body = mockSearch.mock.calls[0]?.[0] as { filter?: string };
+			expect(body.filter).toBeUndefined();
+		});
+
+		/**
+		 * A filter that parses and matches nothing is almost always a value
+		 * spelled the way a person would spell it, which is the one question the
+		 * facets command answers.
+		 *
+		 */
+		/** @scenario "An empty filtered result points at the facets command" */
+		it("points an empty result at the facets command", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({ filter: "model:gpt5" });
+
+			const printed = vi
+				.mocked(console.log)
+				.mock.calls.map((call) => String(call[0] ?? ""))
+				.join("\n");
+			expect(printed).toContain("langwatch trace facets");
+		});
+	});
+
+	describe("when the window is given", () => {
+		it("reads epoch milliseconds as the instant they are", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({
+				startDate: "1789000000000",
+				endDate: "2026-09-20T06:00:00.000Z",
+			});
+
+			const body = mockSearch.mock.calls[0]?.[0] as {
+				startDate?: number;
+				endDate?: number;
+			};
+			expect(body.startDate).toBe(1789000000000);
+			expect(body.endDate).toBe(Date.parse("2026-09-20T06:00:00.000Z"));
+		});
+
+		it("refuses a value that is neither an instant nor epoch milliseconds", async () => {
+			await expect(
+				searchTracesCommand({ startDate: "last tuesday" }),
+			).rejects.toThrow(ProcessExitError);
+			expect(mockSearch).not.toHaveBeenCalled();
+		});
+	});
+
 	describe("when traces are found", () => {
 		it("calls search and prints results", async () => {
 			mockSearch.mockResolvedValue({
@@ -153,6 +237,65 @@ describe("searchTracesCommand()", () => {
 			expect(log.mock.calls.flat().join("\n")).not.toContain(
 				"searched for as words",
 			);
+			expect(log.mock.calls.flat().join("\n")).not.toContain("redacted");
+		});
+	});
+
+	// An email address never survives ingestion under the default privacy
+	// settings, so a search for one reads like the customer never wrote in.
+	describe("when a query carrying an email address finds nothing", () => {
+		let log: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+		});
+
+		afterEach(() => {
+			log.mockRestore();
+		});
+
+		/** @scenario An email-shaped query that finds nothing explains redaction */
+		it("says email addresses are redacted and what to search by instead", async () => {
+			await searchTracesCommand({ query: "priya.raman@northwind.example" });
+
+			const printed = log.mock.calls.flat().join("\n");
+			expect(printed).toContain("redacted");
+			expect(printed).toContain("data privacy");
+		});
+
+		/** @scenario The machine document carries the hint */
+		it("puts the same hint on the machine document", async () => {
+			await searchTracesCommand({
+				query: "priya.raman@northwind.example",
+				format: "json",
+			});
+
+			const printed = log.mock.calls.flat().join("\n");
+			const document = JSON.parse(printed) as { hint?: string; traces: unknown[] };
+			expect(document.traces).toEqual([]);
+			expect(document.hint).toContain("redacted");
+		});
+
+		/** @scenario The machine document carries the hint */
+		it("adds no hint to a document that holds traces", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [{ traceId: "t1" }],
+				pagination: { totalHits: 1 },
+			});
+
+			await searchTracesCommand({
+				query: "priya.raman@northwind.example",
+				format: "json",
+			});
+
+			const document = JSON.parse(log.mock.calls.flat().join("\n")) as {
+				hint?: string;
+			};
+			expect(document.hint).toBeUndefined();
 		});
 	});
 

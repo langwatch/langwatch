@@ -37,59 +37,6 @@ function projection() {
   });
 }
 
-/** One priced gateway outcome, as the ingest seam appends it. */
-function confirmedEvent({
-  costNanoUsd,
-  principalUserId = "user_ada",
-  model = "openai/gpt-5-mini",
-  occurredAt = DAY_MS,
-  id = `evt-${costNanoUsd}-${principalUserId}`,
-}: {
-  costNanoUsd: number;
-  principalUserId?: string;
-  model?: string;
-  occurredAt?: number;
-  id?: string;
-}) {
-  return {
-    id,
-    type: "lw.gateway.spend.confirmed",
-    tenantId: TENANT,
-    aggregateId: `gwreq-${id}`,
-    occurredAt,
-    data: {
-      gateway_request_id: `gwreq-${id}`,
-      occurred_at: occurredAt,
-      tenantId: TENANT,
-      organization_id: "org_acme",
-      virtual_key_id: "vk_1",
-      principal_user_id: principalUserId,
-      end_user_id: "",
-      trace_id: "",
-      request_type: "chat",
-      labels: [],
-      metadata: "",
-      admitted_at: occurredAt,
-      team_id: "",
-      model,
-      model_provider_id: "openai",
-      usage: {
-        input_tokens: 100,
-        output_tokens: 20,
-        cache_read_input_tokens: 0,
-        cache_creation_input_tokens: 0,
-        reasoning_tokens: 0,
-        input_audio_tokens: 0,
-        output_audio_tokens: 0,
-        input_chars: 0,
-      },
-      rate_version: "registry@2026-08-01",
-      duration_ms: 120,
-      cost_nano_usd: costNanoUsd,
-    },
-  } as never;
-}
-
 /**
  * One pulled observation of one provider bucket.
  *
@@ -107,7 +54,8 @@ function observedEvent({
   observedAtMs,
   occurredAtMs = DAY_MS,
   costStatus = "estimate",
-  id = `evt-pulled-${observedAtMs}`,
+  id = `evt-pulled-${restatementKey}-${observedAtMs}`,
+  tenantId = TENANT,
   rawActorId,
   agentId,
 }: {
@@ -119,6 +67,7 @@ function observedEvent({
   occurredAtMs?: number;
   costStatus?: "exact" | "estimate";
   id?: string;
+  tenantId?: string;
   /** Omitted by default: the legacy shape, from before spend named a spender. */
   rawActorId?: string;
   /** Omitted by default, same legacy contract as `rawActorId` (#7881). */
@@ -127,7 +76,7 @@ function observedEvent({
   return {
     id,
     type: "lw.obs.pulled_usage.observed",
-    tenantId: TENANT,
+    tenantId,
     aggregateId: restatementKey,
     occurredAt: occurredAtMs,
     data: {
@@ -137,7 +86,7 @@ function observedEvent({
       ingestionSourceId: "src_1",
       organizationId: "org_acme",
       teamId: "team_platform",
-      projectId: TENANT,
+      projectId: tenantId,
       model: "anthropic/claude-sonnet-5",
       tokensInput: 1_000,
       tokensOutput: 200,
@@ -167,33 +116,43 @@ function fold(events: unknown[]): GovernanceCostRollupState {
 }
 
 describe("governanceCostRollupKey", () => {
-  describe("given two gateway outcomes that differ only by spender", () => {
+  describe("given two pulled items that differ only by spender", () => {
     /** @scenario "Two spenders with identical numbers stay two rows after compaction" */
     it("puts each spender in its own group", () => {
       const ada = governanceCostRollupKey(
-        confirmedEvent({ costNanoUsd: 5_000, principalUserId: "user_ada" }),
+        observedEvent({
+          costNanoMinor: 5_000,
+          observedAtMs: DAY_MS,
+          rawActorId: "user_ada",
+        }),
       );
       const grace = governanceCostRollupKey(
-        confirmedEvent({ costNanoUsd: 5_000, principalUserId: "user_grace" }),
+        observedEvent({
+          costNanoMinor: 5_000,
+          observedAtMs: DAY_MS,
+          rawActorId: "user_grace",
+        }),
       );
       expect(ada).not.toBe(grace);
     });
   });
 
-  describe("given two outcomes on the same day and dimensions", () => {
+  describe("given two items on the same day and dimensions", () => {
     it("puts them in one group so the day is one row", () => {
       const morning = governanceCostRollupKey(
-        confirmedEvent({
-          costNanoUsd: 5_000,
-          occurredAt: Date.parse("2026-08-01T01:00:00.000Z"),
-          id: "a",
+        observedEvent({
+          costNanoMinor: 5_000,
+          observedAtMs: DAY_MS,
+          occurredAtMs: Date.parse("2026-08-01T01:00:00.000Z"),
+          restatementKey: "bucket-a",
         }),
       );
       const evening = governanceCostRollupKey(
-        confirmedEvent({
-          costNanoUsd: 7_000,
-          occurredAt: Date.parse("2026-08-01T23:59:59.000Z"),
-          id: "b",
+        observedEvent({
+          costNanoMinor: 7_000,
+          observedAtMs: DAY_MS,
+          occurredAtMs: Date.parse("2026-08-01T23:59:59.000Z"),
+          restatementKey: "bucket-b",
         }),
       );
       expect(morning).toBe(evening);
@@ -201,17 +160,17 @@ describe("governanceCostRollupKey", () => {
 
     it("splits the group at the UTC day boundary", () => {
       const lastMoment = governanceCostRollupKey(
-        confirmedEvent({
-          costNanoUsd: 1,
-          occurredAt: Date.parse("2026-08-01T23:59:59.999Z"),
-          id: "a",
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          occurredAtMs: Date.parse("2026-08-01T23:59:59.999Z"),
         }),
       );
       const firstMoment = governanceCostRollupKey(
-        confirmedEvent({
-          costNanoUsd: 1,
-          occurredAt: Date.parse("2026-08-02T00:00:00.000Z"),
-          id: "b",
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          occurredAtMs: Date.parse("2026-08-02T00:00:00.000Z"),
         }),
       );
       expect(lastMoment).not.toBe(firstMoment);
@@ -220,29 +179,33 @@ describe("governanceCostRollupKey", () => {
 
   describe("given the same dimensions under two tenants", () => {
     it("never shares a group across tenants", () => {
-      const mine = governanceCostRollupKey(confirmedEvent({ costNanoUsd: 1 }));
-      const theirs = governanceCostRollupKey({
-        ...(confirmedEvent({ costNanoUsd: 1 }) as never as Record<
-          string,
-          unknown
-        >),
-        tenantId: "proj_someone_else",
-      } as never);
+      const mine = governanceCostRollupKey(
+        observedEvent({ costNanoMinor: 1, observedAtMs: DAY_MS }),
+      );
+      const theirs = governanceCostRollupKey(
+        observedEvent({
+          costNanoMinor: 1,
+          observedAtMs: DAY_MS,
+          tenantId: "proj_someone_else",
+        }),
+      );
       expect(mine).not.toBe(theirs);
     });
   });
 
-  describe("given a gateway event and a pulled event", () => {
-    // The two lanes are two writers of one table. If they could ever address
-    // the same row they would race and each would overwrite the other's total.
-    it("never shares a group between the gateway and pulled lanes", () => {
-      const gateway = governanceCostRollupKey(
-        confirmedEvent({ costNanoUsd: 1 }),
-      );
-      const pulled = governanceCostRollupKey(
-        observedEvent({ costNanoMinor: 1, observedAtMs: DAY_MS }),
-      );
-      expect(gateway).not.toBe(pulled);
+  describe("given a gateway spend event", () => {
+    // The metered lane is read straight off its own per-request ledger; this
+    // fold has no branch for it any more. Addressing one anyway would file
+    // money under a cell the cost screen never reads, so the fold refuses
+    // loudly rather than guessing a cell.
+    it("refuses to address a cell for it", () => {
+      expect(() =>
+        governanceCostRollupKey({
+          type: "lw.gateway.spend.confirmed",
+          tenantId: TENANT,
+          data: { occurred_at: DAY_MS, model: "openai/gpt-5-mini" },
+        }),
+      ).toThrow(/lw\.gateway\.spend\.confirmed/);
     });
   });
 
@@ -327,12 +290,20 @@ describe("governanceCostRollupKey", () => {
 });
 
 describe("GovernanceCostRollupFoldProjection", () => {
-  describe("given several gateway outcomes on one day and dimension combination", () => {
+  describe("given several pulled items on one day and dimension combination", () => {
     /** @scenario "A day's spend lands as one summary row per dimension combination" */
-    it("holds the sum of those outcomes as the day's amount", () => {
+    it("holds the sum of those items as the day's amount", () => {
       const state = fold([
-        confirmedEvent({ costNanoUsd: 5_000_000_000, id: "a" }),
-        confirmedEvent({ costNanoUsd: 7_340_000_000, id: "b" }),
+        observedEvent({
+          costNanoMinor: 5_000_000_000,
+          observedAtMs: DAY_MS,
+          restatementKey: "bucket-a",
+        }),
+        observedEvent({
+          costNanoMinor: 7_340_000_000,
+          observedAtMs: DAY_MS,
+          restatementKey: "bucket-b",
+        }),
       ]);
       expect(governanceCostRollupTotals(state).amountNanoUsd).toBe(
         12_340_000_000,
@@ -341,62 +312,49 @@ describe("GovernanceCostRollupFoldProjection", () => {
     });
 
     it("keeps the provider's business day, not the ingest day", () => {
-      const state = fold([confirmedEvent({ costNanoUsd: 1_000 })]);
+      const state = fold([
+        observedEvent({
+          costNanoMinor: 1_000,
+          observedAtMs: Date.parse("2026-08-03T04:00:00.000Z"),
+        }),
+      ]);
       expect(state.day).toBe("2026-08-01");
     });
 
-    it("states the currency rather than leaving it implied", () => {
-      const state = fold([confirmedEvent({ costNanoUsd: 1_000 })]);
+    it("states the currency and the lane rather than leaving them implied", () => {
+      const state = fold([
+        observedEvent({ costNanoMinor: 1_000, observedAtMs: DAY_MS }),
+      ]);
       expect(state.currencyCode).toBe(GOVERNANCE_COST_CURRENCY_USD);
-      expect(state.costSource).toBe(GOVERNANCE_COST_SOURCE.GATEWAY);
+      expect(state.costSource).toBe(GOVERNANCE_COST_SOURCE.PULLED);
     });
   });
 
-  describe("given a failed outcome that still consumed tokens", () => {
-    // Partial usage before a mid-stream failure is real spend on several
-    // providers, and the shipped budget ledger debits it (gatewayDebits mints
-    // `debits:failed` as readily as `debits:confirmed`). The rollup counts the
-    // same money the ledger charges for, or the two disagree by construction.
-    it("counts the money a failure already cost", () => {
-      const failed = {
-        ...(confirmedEvent({ costNanoUsd: 900, id: "f" }) as never as Record<
-          string,
-          unknown
-        >),
-        type: "lw.gateway.spend.failed",
-      } as never;
-      (failed as unknown as { data: Record<string, unknown> }).data.error = {
-        type: "provider_timeout",
-        http_status: 504,
-      };
-      expect(governanceCostRollupTotals(fold([failed])).amountNanoUsd).toBe(
-        900,
-      );
-    });
-  });
-
-  describe("given an admission or a settlement", () => {
-    // Neither carries a cost, and their dimensions are pre-resolution — the
-    // gateway only settles model and provider after dispatch — so grouping
-    // them would file a permanent amount-less row beside the real one.
-    //
+  describe("given the events the fold subscribes to", () => {
     // The list stays EXACT rather than becoming a "does not include" check.
     // Exactness is what makes an accidental subscription fail here, and a
     // subscription is not a thing anyone adds by accident twice.
     //
-    // The retraction belongs on it and is not a counter-example to the rule
-    // above: it is not pre-resolution and it does not lack a cost. It carries
-    // the retracted cell's own resolved dimensions and states its amount as
-    // zero on purpose, so it addresses one existing cell rather than filing a
-    // new amount-less one. Leaving it off is what breaks the fold — the
-    // projection would never see the event that withdraws a superseded charge.
-    it("does not react to the events that carry no money", () => {
+    // The retraction belongs on it: it carries the retracted cell's own
+    // resolved dimensions and states its amount as zero on purpose, so it
+    // addresses one existing cell rather than filing a new amount-less one.
+    // Leaving it off is what breaks the fold — the projection would never see
+    // the event that withdraws a superseded charge.
+    it("reacts to the two pulled events and nothing else", () => {
       expect(projection().eventTypes).toEqual([
-        "lw.gateway.spend.confirmed",
-        "lw.gateway.spend.failed",
         "lw.obs.pulled_usage.observed",
         "lw.obs.pulled_usage.retracted",
       ]);
+    });
+
+    // The metered lane once folded here too, writing gateway cells the cost
+    // screen never read. It is served from its own per-request ledger now, so
+    // a gateway subscription reappearing on this fold is the regression.
+    it("subscribes to no gateway event", () => {
+      const gatewayTypes = projection().eventTypes.filter((type) =>
+        type.startsWith("lw.gateway."),
+      );
+      expect(gatewayTypes).toEqual([]);
     });
   });
 
@@ -410,13 +368,15 @@ describe("GovernanceCostRollupFoldProjection", () => {
   });
 
   describe("given a figure the provider stated in another currency", () => {
-    // Both wave-1 producers emit USD. The rule still has to hold before the
-    // first non-USD producer arrives, or it arrives to a table that has been
-    // silently reading its figures as dollars.
     it("reports no dollar amount rather than passing the foreign figure off as dollars", () => {
-      const state = fold([confirmedEvent({ costNanoUsd: 5_000 })]);
-      const inEuros = { ...state, currencyCode: "EUR" };
-      const totals = governanceCostRollupTotals(inEuros);
+      const state = fold([
+        observedEvent({
+          costNanoMinor: 5_000,
+          currencyCode: "EUR",
+          observedAtMs: DAY_MS,
+        }),
+      ]);
+      const totals = governanceCostRollupTotals(state);
       expect(totals.amountNanoUsd).toBe(null);
       expect(totals.amountNanoMinor).toBe(5_000);
     });
@@ -490,40 +450,30 @@ describe("GovernanceCostRollupFoldProjection", () => {
   describe("given events arriving out of business-time order", () => {
     // The executor's re-fold loads history by `context.aggregateId`
     // (foldProjectionExecutor.ts) — the EVENT's aggregate, which for this fold
-    // is one gateway request or one pulled item, never the day-wide group the
-    // key names. A re-fold would therefore rebuild the day out of one
-    // request's events and throw the rest of the day away. The fold's
-    // accumulators commute and its restatement rule keys on data the event
-    // carries (`observedAtMs`), so there is nothing a replay could derive.
+    // is one pulled item, never the day-wide group the key names. A re-fold
+    // would therefore rebuild the day out of one item's events and throw the
+    // rest of the day away. The fold's accumulators commute and its
+    // restatement rule keys on data the event carries (`observedAtMs`), so
+    // there is nothing a replay could derive.
     it("declines the out-of-order re-fold that would load the wrong population", () => {
       expect(projection().options.refoldOnOutOfOrder).toBe(false);
     });
 
-    it("reaches the same total whichever order the outcomes arrive in", () => {
-      const forwards = fold([
-        confirmedEvent({
-          costNanoUsd: 300,
-          occurredAt: Date.parse("2026-08-01T01:00:00.000Z"),
-          id: "a",
-        }),
-        confirmedEvent({
-          costNanoUsd: 700,
-          occurredAt: Date.parse("2026-08-01T02:00:00.000Z"),
-          id: "b",
-        }),
-      ]);
-      const backwards = fold([
-        confirmedEvent({
-          costNanoUsd: 700,
-          occurredAt: Date.parse("2026-08-01T02:00:00.000Z"),
-          id: "b",
-        }),
-        confirmedEvent({
-          costNanoUsd: 300,
-          occurredAt: Date.parse("2026-08-01T01:00:00.000Z"),
-          id: "a",
-        }),
-      ]);
+    it("reaches the same total whichever order the items arrive in", () => {
+      const first = observedEvent({
+        costNanoMinor: 300,
+        restatementKey: "bucket-a",
+        observedAtMs: Date.parse("2026-08-02T01:00:00.000Z"),
+        id: "a",
+      });
+      const second = observedEvent({
+        costNanoMinor: 700,
+        restatementKey: "bucket-b",
+        observedAtMs: Date.parse("2026-08-02T02:00:00.000Z"),
+        id: "b",
+      });
+      const forwards = fold([first, second]);
+      const backwards = fold([second, first]);
       // The value first, then the equality. `toBe` is Object.is, so NaN
       // equals NaN — an assertion of equality alone passes for a fold that
       // read the money field under a name the events do not carry, which is

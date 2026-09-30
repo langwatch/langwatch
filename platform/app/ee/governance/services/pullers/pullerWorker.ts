@@ -335,6 +335,15 @@ export type IngestionPullRunReport = {
    */
   completeness: "complete" | "truncated";
   /**
+   * Set when the adapter banked progress over a page it could not read at all.
+   *
+   * Carried up unchanged, and absent stays absent. It is what lets the run
+   * status count the failure while keeping the advance: a completion is the
+   * only way the banked events and cursor survive, so without this the source
+   * would read as working while collecting a fraction of its window.
+   */
+  unreadPage?: true;
+  /**
    * The instant the source is known to have been read up to, or null when the
    * adapter states none.
    *
@@ -463,6 +472,10 @@ export async function runIngestionPull(params: {
     eventCount: result.events.length,
     errorCount: result.errorCount,
     completeness: result.completeness ?? "complete",
+    // Absent unless the adapter says so, for the reason the two fields above
+    // are optional: a report that invents an answer is worse than one that
+    // says nothing.
+    ...(result.unreadPage === true ? { unreadPage: true as const } : {}),
     readThroughAt: readThroughInstant(result),
   };
 }

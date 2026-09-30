@@ -183,6 +183,27 @@ function isReissuedElsewhere(
   );
 }
 
+/**
+ * The envelope every command payload carries alongside its event data.
+ *
+ * Named on the withdrawal's dispatcher because the compiler is the only thing
+ * that can catch its absence. The command is resolved late, through a mutable
+ * holder that is filled once the pipeline exists, so a payload missing these
+ * two fields type-checks at the holder and then fails validation at send time
+ * — losing the withdrawal with nothing but a log line to show for it.
+ *
+ * A type alias rather than an interface, deliberately: the command payload is
+ * constrained to `Record<string, unknown>`, and only an alias carries the
+ * implicit index signature that satisfies it. As an interface this widens back
+ * into the cast it exists to remove.
+ */
+export type RetractCommandEnvelope = {
+  /** The org's hidden governance project — the tenant of the command. */
+  tenantId: string;
+  /** What the command is dated by; for a withdrawal, the day it corrects. */
+  occurredAt: number;
+};
+
 export interface PulledUsageLedgerProcessDeps {
   budgetCHRepository: GatewayBudgetClickHouseRepository;
   /**
@@ -191,7 +212,7 @@ export interface PulledUsageLedgerProcessDeps {
    * `spendSettlement` takes its send this way.
    */
   sendRetractPulledUsage: (
-    data: PulledUsageRetractedEventData,
+    data: PulledUsageRetractedEventData & RetractCommandEnvelope,
   ) => Promise<void>;
   /**
    * Read at EMIT time, per organization, never cached across a run. A kill
@@ -261,6 +282,15 @@ export function runRetractPulledUsage(deps: PulledUsageLedgerProcessDeps) {
     );
 
     await deps.sendRetractPulledUsage({
+      // The command carries the envelope as well as the cell. `tenantId` and
+      // `occurredAt` are required on every command payload, and a withdrawal
+      // that omitted them was rejected by schema validation before it could
+      // become an event — no retraction reached the fold, and no corrected day
+      // was ever put back on the drift check's list.
+      tenantId: payload.tenant_id,
+      // The day this CORRECTS, matching the event data below and the
+      // observation path, which dates its command by the charge's own moment.
+      occurredAt: payload.occurred_at_ms,
       restatementKey: payload.restatement_key,
       source: payload.source,
       ingestionSourceId: payload.ingestion_source_id,
@@ -398,7 +428,9 @@ function writePayloadFor(
 
 /**
  * One instance per usage item. The event is already whole, so the handler
- * freezes exactly one deterministic write intent and keeps no state.
+ * freezes exactly one deterministic write intent. The only state it keeps is
+ * the cell the charge was last filed in, so a later pull that moves the same
+ * charge elsewhere can withdraw the version it leaves behind.
  *
  * The intent key is the restatement key plus the observation instant, which is
  * what keeps a correction from colliding with the figure it corrects: two
@@ -429,7 +461,15 @@ export function pulledUsageLedgerPM(
         // into another currency, and that is exactly the observation the
         // ledger has no dollar figure for — returning early on it would blind
         // the detector to its own headline case.
-        const filed = state.filedCell;
+        // `?? null`: instances persisted before this state carried a
+        // `filedCell` hold `{}`, and the runtime hands stored state back
+        // verbatim rather than merging it over the initial state. Such a row
+        // has never filed a cell we can name, so it is treated exactly like a
+        // first observation. The price is the lost-process-store degradation
+        // described in the file header: a reissue seen on that first
+        // post-fix observation is not withdrawn, and that day carries the
+        // charge twice until the next correction.
+        const filed = state.filedCell ?? null;
         const reissued = filed !== null && isReissuedElsewhere(filed, record);
         const intents = reissued
           ? [

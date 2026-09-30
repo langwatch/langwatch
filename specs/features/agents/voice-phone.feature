@@ -83,6 +83,30 @@ Feature: Voice agents: reach an agent by phone
     Then connecting and disconnecting are delegated to the SDK's own adapter
 
   # ---------------------------------------------------------------------------
+  # Turn-taking on the call (#8014 — the caller must get more than one turn)
+  # ---------------------------------------------------------------------------
+  # Twilio streams a frame every 20 ms for the whole call, silence included, and
+  # signals no turn boundary. The SDK adapter gates inbound audio on speech so a
+  # pause reaches the runtime as a gap; the phone transport sets how long that
+  # gap must be before the callee's turn ends. See ADR-131 "Turn-taking".
+
+  @unit
+  Scenario: The default phone factory ends the callee's turn on a phone-length pause
+    Given the default Twilio agent factory builds an adapter for a phone target
+    When the SDK constructs its own adapter for that target
+    Then the adapter is built with the phone transport's response tail-silence, longer than the SDK's default
+    And the SDK's inbound speech gate is left enabled at its default
+
+  @integration @unimplemented
+  # Verified live against a real phone number, not by an automated test — see
+  # the PR's Human verification section.
+  Scenario: A phone call against a talkative callee gives the caller several turns
+    Given a phone target whose callee pauses between sentences
+    When a scenario with a minimum of three turns runs against it
+    Then the callee's turn ends on tail silence, not on the hard ceiling or the hang-up
+    And the simulated caller speaks at least three times on a single trace
+
+  # ---------------------------------------------------------------------------
   # Whole-call audio (#8014 — "they can listen to the whole call")
   # ---------------------------------------------------------------------------
 
@@ -99,10 +123,22 @@ Feature: Voice agents: reach an agent by phone
     Then it returns nothing and the drawer shows no whole-call player
 
   @unit
-  Scenario: VOICE_PUBLIC_BASE_URL is optional and falls back to the app's public base host
-    Given VOICE_PUBLIC_BASE_URL is not set
-    When the runner resolves the public base URL
-    Then it uses the app's own public base host, and a set VOICE_PUBLIC_BASE_URL overrides it
+  Scenario: A phone run fails fast when only the app's base host is available
+    Given VOICE_PUBLIC_BASE_URL is not set but the app's BASE_HOST is
+    When the phone transport builds the outbound adapter
+    Then it refuses to build the adapter and fails the run, naming the missing VOICE_PUBLIC_BASE_URL and the cloudflared tunnel remedy rather than dialling the app's own host, which runs no voice media listener
+
+  @unit
+  Scenario: A phone run fails fast when no public base URL is available at all
+    Given neither VOICE_PUBLIC_BASE_URL nor BASE_HOST is set
+    When the phone transport builds the outbound adapter
+    Then it refuses to build the adapter and fails the run rather than dialling a URL nothing answers
+
+  @unit
+  Scenario: A phone call's scenario child never binds the worker's media port
+    Given the parent worker's own VOICE_WS_PORT is set in the environment
+    When the phone transport builds the SDK adapter
+    Then the adapter is always given an OS-assigned port, never the worker's own port
 
   # ---------------------------------------------------------------------------
   # Phone run failures
@@ -121,6 +157,48 @@ Feature: Voice agents: reach an agent by phone
     When Twilio rejects the outbound call
     Then the run fails with a message prefixed by the phone transport's connect-rejected prefix
     And the caller adapter is disconnected
+
+  # ---------------------------------------------------------------------------
+  # Per-call nonce handoff (the phone transport parent/child IPC race)
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A phone call fails loudly when the parent never acknowledges the nonce
+    Given a phone target with a valid Twilio credential
+    When the run registers the call's nonce and the parent process never acknowledges it
+    Then connect waits on the registration and never places the call
+
+  @unit
+  Scenario: A phone call fails loudly when the parent refuses the nonce
+    Given a phone target with a valid Twilio credential
+    When the parent process refuses to register the call's nonce
+    Then the refusal surfaces as the run's error and no call is placed
+    And the caller adapter is disconnected
+
+  @unit
+  Scenario: A phone call fails fast when the listener refuses the socket mid-dial
+    Given a phone call whose nonce was registered and dialling has started
+    When the media listener refuses the upgrade because the nonce has expired
+    Then connect fails immediately with the refusal reason instead of waiting out the call
+    And the caller adapter is disconnected
+
+  @unit
+  Scenario: A phone call registers its stream nonce with the parent before dialling
+    Given a phone transport about to dial
+    When it connects
+    Then it registers the call's nonce and awaits the parent's ack before placeCall runs
+
+  @unit
+  Scenario: A registered nonce lets the real Twilio upgrade through
+    Given the child registered its nonce with the parent
+    When Twilio's dial-back arrives on that nonce
+    Then the upgrade routes to a handoff, not a 403
+
+  @unit
+  Scenario: An unregistered nonce is refused 403
+    Given the child never registered its nonce with the parent
+    When Twilio's dial-back arrives on that nonce
+    Then the upgrade is refused as an unknown nonce
 
   # ---------------------------------------------------------------------------
   # No browser call over phone
@@ -143,11 +221,11 @@ Feature: Voice agents: reach an agent by phone
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: The Phone number option appears only when a Twilio provider is configured
+  Scenario: The Phone number option is always listed, disabled and marked Unavailable without a Twilio provider
     Given the voice agent editor with no Twilio provider in the project
-    Then the "Reached via" list offers no Phone number option, and a hint points at Settings > Model Providers
+    Then the "Reached via" list offers a disabled Phone number (Unavailable) option, and a hint links to Settings > Model Providers that opens in a new tab
     When the project has a Twilio provider
-    Then the "Reached via" list offers the Phone number option
+    Then the "Reached via" list offers the Phone number option enabled
 
   @integration
   Scenario: A phone target's drawer explains why Talk to it is off
@@ -160,31 +238,53 @@ Feature: Voice agents: reach an agent by phone
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: The voice worker reads its three infrastructure environment variables
+  Scenario: The voice worker reads its infrastructure environment variables
     Given the voice worker environment with no variables set
     When the worker environment is read
-    Then voice worker only is off and the websocket port defaults to 3300
-    And only the literal "true" turns voice worker only on
+    Then the websocket port defaults to 3300 and no public base URL is set
 
   @unit
-  Scenario: A voice worker refuses to start without a public base URL
-    Given the voice worker environment with voice worker only on and no public base URL
+  Scenario: A public base URL must be an https origin
+    Given a public base URL is configured
     When the worker environment is read
-    Then it fails because the worker cannot be reached without a public origin
+    Then an https origin is accepted and reported, and a non-https origin is rejected
 
   @unit
-  Scenario: A voice worker boots only the voice subsystems
-    Given voice worker only is on
+  Scenario: A voice worker opens a quick tunnel when no public base URL is configured
+    Given no public base URL is configured and the tunnel fallback is left on
+    When the worker environment is read and its public URL is resolved
+    Then it does not fail, opens a cloudflared quick tunnel on the websocket port
+    And it waits until the tunnel's host resolves before treating it as ready
+
+  @unit
+  Scenario: A voice worker's public URL tunnel fails fast when it never becomes reachable
+    Given a cloudflared quick tunnel has been opened
+    When its host never resolves before the readiness timeout elapses
+    Then the tunnel is closed and the worker fails, naming the tunnel URL and the timeout
+
+  @unit
+  Scenario: A voice worker's quick tunnel is closed on worker shutdown
+    Given a cloudflared quick tunnel is open and ready
+    When the worker closes it on shutdown
+    Then the underlying tunnel's own close is called
+
+  @unit
+  Scenario: An explicit public base URL always wins over the tunnel fallback
+    Given an explicit https public base URL is configured and the tunnel fallback is on
+    When the worker environment is read
+    Then the explicit public base URL is reported and the tunnel is never opened
+
+  @unit
+  Scenario: A worker's own voice boot failure does not take the worker down
+    Given a worker whose voice tunnel or media listener boot step fails
+    When the worker boots
+    Then the failure is logged and the rest of the worker boots normally
+
+  @unit
+  Scenario: A worker's boot plan always includes the voice media listener
+    Given any worker's boot environment
     When the worker boot plan is resolved
-    Then it boots the scenario processor, the media listener and metrics
-    And it skips ingestion, anomaly, governance, poller and telemetry
-
-  @unit
-  Scenario: A voice worker runs only voice jobs
-    Given a scenario execution pool that accepts only voice jobs
-    When a non-voice job is submitted
-    Then the pool refuses it so another pod runs it
-    And a voice job submitted to the same pool starts
+    Then it boots the voice media listener alongside every other subsystem
 
   @unit
   Scenario: The media listener answers its health check and refuses everything else
@@ -206,10 +306,28 @@ Feature: Voice agents: reach an agent by phone
     Then the upgrade is closed with forbidden before any audio
 
   @unit
+  Scenario: A dial-back arriving after ring delay is still accepted
+    Given a nonce registered to a child
+    When Twilio's dial-back arrives after the callee's ring delay, any time up to the SDK's own connect-wait deadline
+    Then the nonce is still consumed successfully
+
+  @unit
+  Scenario: A nonce that outlives the SDK's own wait window is still refused
+    Given a nonce registered to a child
+    When it outlives even the SDK's own connect-wait window
+    Then it is still refused as expired
+
+  @unit
   Scenario: The media listener hands a valid call's socket to its scenario child
     Given the voice media listener is running with a nonce registered to a child
     When an upgrade arrives on that nonce's media path
     Then the raw socket is handed to the registered child
+
+  @unit
+  Scenario: The child feeds a handed-off Twilio socket into its own adapter
+    Given the parent has handed off Twilio's media socket to the child over IPC
+    When the child receives it
+    Then it forwards the received socket into the adapter's own upgrade handler
 
   @integration
   Scenario: A handed-off media socket arrives at the scenario child process
@@ -217,3 +335,113 @@ Feature: Voice agents: reach an agent by phone
     And a nonce registered to that child
     When an upgrade arrives on that nonce's media path
     Then the child receives the socket handle and the bytes read during the upgrade
+
+  # ---------------------------------------------------------------------------
+  # Cloudflared binary on PATH (the SDK spawns a bare `cloudflared`)
+  # ---------------------------------------------------------------------------
+  # The scenario SDK opens its quick tunnel with a bare-command spawn, a PATH
+  # lookup. Before the worker opens a tunnel it makes the cloudflared binary
+  # reachable on PATH, downloading it only as a fallback, and surfaces any
+  # failure so the run error names the real cause.
+
+  @unit
+  Scenario: cloudflared already on PATH is used as-is
+    Given a cloudflared binary is already reachable on PATH
+    When the worker ensures cloudflared is available
+    Then it uses the one on PATH and downloads nothing
+
+  @unit
+  Scenario: A present cloudflared binary is put on PATH without downloading
+    Given no cloudflared is on PATH but its binary is already present on disk
+    When the worker ensures cloudflared is available
+    Then it makes that binary reachable on PATH without downloading
+
+  @unit
+  Scenario: A missing cloudflared binary is downloaded then put on PATH
+    Given no cloudflared is on PATH and its binary is missing from disk
+    When the worker ensures cloudflared is available
+    Then it downloads the binary and makes it reachable on PATH
+
+  @unit
+  Scenario: A cloudflared download failure surfaces as a tunnel binary error
+    Given no cloudflared is on PATH and the fallback download fails
+    When the worker ensures cloudflared is available
+    Then it fails with a tunnel binary error naming the underlying cause
+
+  @unit
+  Scenario: A cloudflared download that hangs is abandoned
+    Given no cloudflared is on PATH and the fallback download never completes
+    When the worker ensures cloudflared is available
+    Then it abandons the download after the timeout and fails with a tunnel binary error
+
+  @unit
+  Scenario: An unresolvable cloudflared package surfaces as a tunnel binary error
+    Given the cloudflared package cannot be resolved
+    When the worker ensures cloudflared is available
+    Then it fails with a tunnel binary error naming the resolution failure
+
+  @unit
+  Scenario: cloudflared resolves through the langwatch SDK scope first
+    Given the langwatch SDK scope can resolve the cloudflared package
+    When the worker resolves cloudflared across its scopes
+    Then it uses the langwatch scope's package and tries no later scope
+
+  @unit
+  Scenario: cloudflared falls back to the scenario scope when the langwatch scope fails
+    Given the langwatch scope cannot resolve cloudflared but the scenario scope can
+    When the worker resolves cloudflared across its scopes
+    Then it uses the scenario scope's package
+
+  @unit
+  Scenario: cloudflared unresolvable from every scope names all tried scopes
+    Given no scope can resolve the cloudflared package
+    When the worker resolves cloudflared across its scopes
+    Then it fails with an error naming every scope it tried
+
+  @unit
+  Scenario: A voice worker puts cloudflared on PATH before opening its quick tunnel
+    Given a voice worker about to open its quick tunnel
+    When it opens the tunnel
+    Then it makes cloudflared reachable on PATH before spawning the tunnel
+
+  @unit
+  Scenario: A voice worker's tunnel fails to open when the cloudflared binary is unavailable
+    Given cloudflared cannot be made reachable on PATH
+    When a voice worker tries to open its quick tunnel
+    Then it never spawns the tunnel and the open fails
+
+  @unit
+  Scenario: A failed voice tunnel boot records its reason for the phone run error
+    Given a voice worker whose quick tunnel fails to open
+    When the worker boots
+    Then it records why the tunnel failed for a later phone run to read
+
+  @unit
+  Scenario: A phone run's missing-URL error names the worker's tunnel failure reason
+    Given the worker recorded why its public URL tunnel failed to open
+    When the phone transport builds the outbound adapter with no public base URL
+    Then the run error names that recorded reason rather than a generic message
+
+  # ---------------------------------------------------------------------------
+  # Inbound call direction (scenario#995, scenario#992 — inbound agents greet on connect)
+  # ---------------------------------------------------------------------------
+
+  @e2e
+  Scenario: An inbound agent that greets on connect opens the call
+    Given a phone target whose agent greets as soon as the call connects
+    And the call direction is set to inbound for that target and saved
+    When a scenario run places the call
+    Then the callee's greeting is recorded as the first turn of the conversation
+    And the simulator's first line is spoken only after the greeting ends, and replies to it
+    And the run completes without the callee asking whether anyone is there
+
+  # ---------------------------------------------------------------------------
+  # Callee transcript in the run conversation (scenario#994)
+  # ---------------------------------------------------------------------------
+
+  @e2e
+  Scenario: Callee turns show their transcript in the run conversation
+    Given a phone target and a scenario that runs several turns
+    When the run finishes and its conversation is viewed
+    Then every callee turn shows an audio player with its transcript beside it, the same way the simulator's turns do
+    And the transcript text matches what the judge was given for that turn

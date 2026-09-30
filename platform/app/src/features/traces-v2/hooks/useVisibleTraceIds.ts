@@ -1,7 +1,6 @@
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
 
 export interface VisibleTraceIds {
   /** Set of traceIds currently rendered in the list. */
@@ -28,13 +27,13 @@ export function useVisibleTraceIds(): VisibleTraceIds {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useUtils();
 
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const page = useFilterStore((s) => s.page);
-  const pageSize = useFilterStore((s) => s.pageSize);
-  const pageCursor = useFilterStore((s) => s.pageCursors[s.page]);
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
-  const sort = useViewStore((s) => s.sort);
-  const grouping = useViewStore((s) => s.grouping);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
+  const page = useExplorerStore((s) => s.page);
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  const pageCursor = useExplorerStore((s) => s.pageCursors[s.page]);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
+  const sort = useExplorerStore((s) => s.sort);
+  const grouping = useExplorerStore((s) => s.grouping);
 
   // Mirror useTraceListQuery's key EXACTLY or the cache read misses: the
   // sessions lens pins the trace list to its first batch and stores opaque

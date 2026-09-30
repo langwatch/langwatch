@@ -30,6 +30,63 @@ describe("langyTranscriptRuns", () => {
     });
   });
 
+  describe("given lines said with the say tool between the calls", () => {
+    const say = (id: string, value: string) => ({
+      type: "tool-say",
+      toolCallId: id,
+      state: "output-available",
+      input: { text: value },
+      output: "Said.",
+    });
+
+    /** @scenario "A line said with the say tool is drawn where the call happened" */
+    it("keeps each said line in its own run, in place, out of the activity", () => {
+      const runs = langyTranscriptRuns([
+        tool("t1"),
+        tool("t2"),
+        say("s1", "I found a LangGraph agent in app/graph.py."),
+        say("s2", "I opened a pull request with the tracing change."),
+        tool("t3"),
+        say("s3", "All ready!"),
+        text(""),
+      ]);
+
+      expect(runs.map((run) => run.kind)).toEqual([
+        "activity",
+        "say",
+        "activity",
+        "say",
+        "answer",
+      ]);
+      expect(runs[0]!.parts).toHaveLength(2);
+      expect(runs[1]!.parts).toHaveLength(2);
+      expect(runs[3]!.parts).toHaveLength(1);
+    });
+
+    /** @scenario "A card raised by a call sits where the call ran" */
+    it("ends the activity run on a question, so its card sits before the calls that follow the answer", () => {
+      const question = {
+        type: "tool-question",
+        toolCallId: "q1",
+        state: "output-available",
+        input: {
+          questions: [{ question: "Go?", options: [{ label: "Yes" }] }],
+        },
+        output: "answered",
+      };
+      const runs = langyTranscriptRuns([
+        tool("t1"),
+        question,
+        tool("t2"),
+        tool("t3"),
+      ]);
+
+      expect(runs.map((run) => run.kind)).toEqual(["activity", "activity"]);
+      expect(runs[0]!.parts).toEqual([tool("t1"), question]);
+      expect(runs[1]!.parts).toHaveLength(2);
+    });
+  });
+
   describe("given consecutive parts of the same kind", () => {
     it("keeps them in one run", () => {
       const runs = langyTranscriptRuns([

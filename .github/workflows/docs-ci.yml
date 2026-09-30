@@ -209,6 +209,9 @@ jobs:
       - name: Regenerate docs/skills pages
         run: bash docs/scripts/sync-prompts.sh
 
+      - name: Regenerate the usage report dictionary page
+        run: bash docs/scripts/generate-usage-report-dictionary.sh
+
       - name: Regenerate llms.txt
         run: cd docs && node llms.txt.cjs
 
@@ -227,6 +230,7 @@ jobs:
           if ! git diff --exit-code \
             $SKILL_PAGES \
             docs/llms.txt docs/llms-full.txt \
+            docs/self-hosting/usage-report-dictionary.mdx \
             docs/api-reference/openapiLangWatch.json docs/docs.json; then
             STALE=1
           fi
@@ -243,6 +247,7 @@ jobs:
             echo ""
             echo "ERROR: Generated files are stale. Please run:"
             echo "  bash docs/scripts/sync-prompts.sh"
+            echo "  bash docs/scripts/generate-usage-report-dictionary.sh"
             echo "  cd docs && node llms.txt.cjs"
             echo "  cd docs && make sync-api-spec && make generate-api-reference"
             echo "Then commit the updated files."

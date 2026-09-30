@@ -277,6 +277,58 @@ function unliftableSpanEvent(): SpanReceivedEvent {
 }
 
 describe("codingAgentSpanFactsDispatch", () => {
+  describe("when a codex helper thread's request span arrives stamped", () => {
+    /** @scenario "a codex helper thread's request span marks its session as auxiliary" */
+    it("contributes the auxiliary fact keyed by the helper's thread id", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        rawSpanEvent({
+          name: "turn/start",
+          spanId: "helper-request",
+          scopeName: "codex_cli_rs",
+          attributes: {
+            "rpc.method": "turn/start",
+            "rpc.request_id":
+              "temporary-structured-turn-5581615c-011e-4318-8146-70bcca34af4a",
+            // The tokio worker id codex stamps, never the session.
+            "thread.id": "13",
+            "langwatch.thread.id": "01a09a08-9915-7450-bedb-bb08c55160d3",
+          },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      const [contribution] = dispatched;
+      expect(contribution!.agent).toBe("codex");
+      expect(contribution!.sessionId).toBe(
+        "01a09a08-9915-7450-bedb-bb08c55160d3",
+      );
+      expect(contribution!.sessionKeySource).toBe("provider");
+      expect(contribution!.facts["langwatch.session.auxiliary"]).toBe(true);
+    });
+
+    it("declines the same request span under a foreign scope", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      await subscriber.handle(
+        rawSpanEvent({
+          name: "turn/start",
+          spanId: "foreign-request",
+          scopeName: "com.acme.pipeline",
+          attributes: {
+            "rpc.request_id": "temporary-structured-turn-x",
+            "langwatch.thread.id": "01a09a08-9915-7450-bedb-bb08c55160d3",
+          },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(0);
+    });
+  });
+
   describe("when a coding-agent span carries the session key", () => {
     /** @scenario a session assembles from spans, logs and metrics */
     it("contributes span facts keyed by the provider session", async () => {

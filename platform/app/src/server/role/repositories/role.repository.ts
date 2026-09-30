@@ -12,8 +12,14 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
-import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import {
+  GrantsAccessListingRepository,
+  toCustomRoleShape,
+} from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
+import {
+  liveGrants,
+  liveRoles,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { RoleDuplicateNameError, RoleNotFoundError } from "../errors";
@@ -51,43 +57,41 @@ export class RoleRepository {
      * transaction client.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    // Listing reads go through the per-organization fork (ADR-092,
-    // delivery-plan PR 3 follow-up): a cut-over organization's role editor
-    // lists from the ledger's own Role head.
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+    // Role and binding listings read the authoritative ledger projections.
+    private readonly accessListing: GrantsAccessListingRepository = new GrantsAccessListingRepository(
       prisma,
     ),
   ) {}
 
   async findAllByOrganization(organizationId: string) {
-    return this.prisma.customRole.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: "desc" },
+    const roles = await liveRoles(this.prisma).findMany({
+      where: { organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
+      orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     });
+    return roles.map((role) => toCustomRoleShape(role));
   }
 
   async findUserCreatedByOrganization(organizationId: string) {
-    // Through the per-organization fork (ADR-092, delivery-plan PR 3
-    // follow-up): a cut-over organization's role editor is served from the
-    // ledger's own Role head.
+    // Role definitions are served from the ledger's live Role head.
     return this.accessListing.findUserCreatedRoles({ organizationId });
   }
 
   async findById(roleId: string) {
-    return this.prisma.customRole.findUnique({
+    const role = await liveRoles(this.prisma).findFirst({
       where: { id: roleId },
     });
+    return role ? toCustomRoleShape(role) : null;
   }
 
   async findByIdInOrg(roleId: string, organizationId: string) {
-    return this.prisma.customRole.findUnique({
+    return liveRoles(this.prisma).findFirst({
       where: { id: roleId, organizationId },
       select: { id: true, permissions: true },
     });
   }
 
   async findAssignableByIds(roleIds: string[], organizationId: string) {
-    return this.prisma.customRole.findMany({
+    return liveRoles(this.prisma).findMany({
       where: {
         id: { in: roleIds },
         organizationId,
@@ -105,20 +109,13 @@ export class RoleRepository {
     roleIds: string[],
     organizationId: string,
   ) {
-    return this.prisma.customRole.findMany({
+    return liveRoles(this.prisma).findMany({
       where: {
         id: { in: roleIds },
         organizationId,
         kind: CUSTOM_ROLE_KIND.CUSTOM,
       },
       select: { id: true, permissions: true },
-    });
-  }
-
-  async findByIdWithUsers(roleId: string) {
-    return this.prisma.customRole.findUnique({
-      where: { id: roleId },
-      include: { assignedUsers: true },
     });
   }
 
@@ -134,32 +131,13 @@ export class RoleRepository {
     roleId: string;
     organizationId: string;
   }) {
-    return this.prisma.customRole.findFirst({
+    const role = await liveRoles(this.prisma).findFirst({
       where: { id: roleId, organizationId, kind: CUSTOM_ROLE_KIND.CUSTOM },
     });
+    return role ? toCustomRoleShape(role) : null;
   }
 
-  async findByIdWithUsersInOrg({
-    roleId,
-    organizationId,
-  }: {
-    roleId: string;
-    organizationId: string;
-  }) {
-    return this.prisma.customRole.findFirst({
-      where: { id: roleId, organizationId },
-      include: { assignedUsers: true },
-    });
-  }
-
-  /**
-   * The role bindings in this organization that reference this role.
-   *
-   * Organization-scoped because the tenancy middleware requires it of every
-   * `RoleBinding` query. `deleteIfUnused` asks a wider question in raw SQL, so
-   * a count of zero here does not mean the delete will go through; see
-   * `RoleService.deleteRoleRow`, which settles that by re-reading the role.
-   */
+  /** Non-user live grants that reference this role. User grants are counted separately. */
   async countRoleBindings({
     roleId,
     organizationId,
@@ -167,14 +145,34 @@ export class RoleRepository {
     roleId: string;
     organizationId: string;
   }): Promise<number> {
-    return this.prisma.roleBinding.count({
-      where: { customRoleId: roleId, organizationId },
+    const grants = await liveGrants(this.prisma).findMany({
+      where: {
+        organizationId,
+        roleKey: `custom:${roleId}`,
+        principalType: { not: "USER" },
+      },
+      select: { id: true },
     });
+    return grants.length;
   }
 
-  /** The legacy `TeamUser.assignedRoleId` holders of a role. */
-  async countAssignedUsers(roleId: string): Promise<number> {
-    return this.prisma.teamUser.count({ where: { assignedRoleId: roleId } });
+  /** Active user grants are the runtime equivalent of assigned users. */
+  async countUserBindings({
+    roleId,
+    organizationId,
+  }: {
+    roleId: string;
+    organizationId: string;
+  }): Promise<number> {
+    const grants = await liveGrants(this.prisma).findMany({
+      where: {
+        organizationId,
+        roleKey: `custom:${roleId}`,
+        principalType: "USER",
+      },
+      select: { id: true },
+    });
+    return grants.length;
   }
 
   /**
@@ -193,10 +191,8 @@ export class RoleRepository {
    * left standing, and the caller is told so rather than finding it gone.
    *
    * The role row is scoped to the organization; the reference checks are not.
-   * There are no database foreign keys here, so a binding in another
-   * organization can point at this role, and an organization-scoped check
-   * would delete the role out from under it and leave a dangling reference
-   * that silently resolves to the built-in permission bag.
+   * A grant in another organization can point at this role, and an
+   * organization-scoped check would delete the role out from under it.
    */
   async deleteIfUnused({
     roleId,
@@ -207,36 +203,32 @@ export class RoleRepository {
     organizationId: string;
     actor: LedgerActor;
   }): Promise<boolean> {
-    // Raw SQL on purpose: the reference check spans every organization (a
-    // binding in another org can point at this role, see the doc block), and
-    // the tenancy guard rightly refuses a cross-org `roleBinding.count` on
-    // the model client.
-    const [role, holderRows, assignedUsers] = await Promise.all([
-      this.prisma.customRole.findFirst({
+    // Raw SQL on purpose: the reference check spans every organization, and
+    // live grants are projection facts without Prisma relations.
+    const [role, holderRows] = await Promise.all([
+      liveRoles(this.prisma).findFirst({
         where: { id: roleId, organizationId },
         select: { id: true },
       }),
       this.prisma.$queryRaw<
         { count: bigint }[]
-      >`-- @tenancy: the delete refuses while ANY organization's binding still references the role (relationMode = "prisma" has no FK to refuse for us)
-        SELECT COUNT(*) AS count FROM "RoleBinding" WHERE "customRoleId" = ${roleId}`,
-      this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
+      >`-- @tenancy: the delete refuses while ANY organization's live grant references the role
+        SELECT COUNT(*) AS count
+        FROM "Grant"
+        WHERE "roleKey" = ${`custom:${roleId}`}
+          AND "revokedAt" IS NULL`,
     ]);
     const holders = Number(holderRows[0]?.count ?? 0n);
-    if (!role || holders > 0 || assignedUsers > 0) return false;
+    if (!role || holders > 0) return false;
 
     await this.writer.deleteRole({ organizationId, roleId, actor });
     return true;
   }
 
   async findByNameAndOrganization(name: string, organizationId: string) {
-    return this.prisma.customRole.findUnique({
-      where: {
-        organizationId_name: {
-          organizationId,
-          name,
-        },
-      },
+    return this.prisma.role.findFirst({
+      where: { organizationId, name },
+      select: { id: true },
     });
   }
 
@@ -313,7 +305,7 @@ export class RoleRepository {
     params: UpdateRoleParams;
     actor: LedgerActor;
   }): Promise<CustomRole> {
-    const existing = await this.prisma.customRole.findUnique({
+    const existing = await liveRoles(this.prisma).findFirst({
       where: { id: roleId },
     });
     if (!existing) {
@@ -351,7 +343,7 @@ export class RoleRepository {
       actor,
     });
     return {
-      ...existing,
+      ...toCustomRoleShape(existing),
       name,
       description,
       permissions: permissions as Prisma.JsonValue,
@@ -376,8 +368,8 @@ export class RoleRepository {
     name: string;
     exceptRoleId: string | null;
   }): Promise<void> {
-    const collision = await this.prisma.customRole.findUnique({
-      where: { organizationId_name: { organizationId, name } },
+    const collision = await this.prisma.role.findFirst({
+      where: { organizationId, name },
       select: { id: true },
     });
     if (collision && collision.id !== exceptRoleId) {
@@ -392,15 +384,21 @@ export class RoleRepository {
     roleId: string;
     apiKeyId: string;
   }): Promise<boolean> {
-    const role = await this.prisma.customRole.findFirst({
-      where: {
-        id: roleId,
-        roleBindings: { every: { apiKeyId } },
-        assignedUsers: { none: {} },
-      },
-      select: { id: true },
+    const role = await liveRoles(this.prisma).findFirst({
+      where: { id: roleId },
+      select: { organizationId: true },
     });
-    return role !== null;
+    if (!role) return false;
+    const bindings = await this.accessListing.findBindingRows({
+      organizationId: role.organizationId,
+      where: {
+        roleKey: `custom:${roleId}`,
+      },
+    });
+    return (
+      bindings.length > 0 &&
+      bindings.every(({ apiKeyId: holderId }) => holderId === apiKeyId)
+    );
   }
 
   async deleteExclusiveToApiKey({
@@ -418,15 +416,8 @@ export class RoleRepository {
     awaitProjection?: boolean;
   }) {
     if (roleIds.length === 0) return;
-    // Revoke this api key's CUSTOM grants on these roles FIRST. The
-    // customRoleId FK is ON DELETE SET NULL, but the
-    // RoleBinding_custom_role_check constraint forbids a CUSTOM binding with a
-    // null customRoleId, so deleting the role while its binding still exists
-    // throws. Once the grant is gone the role can be deleted cleanly (and an
-    // exclusive role is left with zero bindings). Grants of a revoked key are
-    // void anyway — the key row survives (revokedAt) as the audit record.
-    // Shared roles (grants from other keys remain) fail the exclusivity check
-    // below and are correctly kept.
+    // Revoke this API key's custom grants first. Shared roles remain when live
+    // grants from another principal still reference them.
     await this.writer.revokeBindingsWhere({
       organizationId,
       where: { apiKeyId, customRoleId: { in: roleIds } },
@@ -435,20 +426,14 @@ export class RoleRepository {
     });
 
     for (const roleId of roleIds) {
-      const [holders, assignedUsers] = await Promise.all([
-        // organizationId is load-bearing: the tenancy guard refuses a
-        // RoleBinding query whose only api-key predicate is `{ not: ... }`,
-        // and a system_api_key role's bindings live in its own organization.
-        this.prisma.roleBinding.count({
-          where: {
-            organizationId,
-            customRoleId: roleId,
-            apiKeyId: { not: apiKeyId },
-          },
-        }),
-        this.prisma.teamUser.count({ where: { assignedRoleId: roleId } }),
-      ]);
-      if (holders > 0 || assignedUsers > 0) continue;
+      const holders = await this.accessListing.findBindingRows({
+        organizationId,
+        where: {
+          roleKey: `custom:${roleId}`,
+          NOT: { principalType: "API_KEY", principalId: apiKeyId },
+        },
+      });
+      if (holders.length > 0) continue;
       await this.writer.deleteRole({
         organizationId,
         roleId,
@@ -474,14 +459,16 @@ export class RoleRepository {
     organizationId: string;
     teamId: string;
   }) {
-    return this.prisma.roleBinding.findFirst({
+    const [binding] = await this.accessListing.findBindingRows({
+      organizationId,
       where: {
-        userId,
-        organizationId,
+        principalType: "USER",
+        principalId: userId,
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: teamId,
       },
     });
+    return binding ?? null;
   }
 
   async findTeamMembersWithUsers({
@@ -491,15 +478,11 @@ export class RoleRepository {
     organizationId: string;
     teamId: string;
   }) {
-    return this.prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
-        userId: { not: null },
-      },
-      include: { user: true },
+    const bindings = await this.accessListing.findTeamMemberBindings({
+      organizationId,
+      teamIds: [teamId],
     });
+    return bindings.get(teamId) ?? [];
   }
 
   async findUserCustomRoleBinding({
@@ -511,16 +494,19 @@ export class RoleRepository {
     organizationId: string;
     teamId: string;
   }) {
-    return this.prisma.roleBinding.findFirst({
+    const [binding] = await this.accessListing.findBindingRows({
+      organizationId,
       where: {
-        userId,
-        organizationId,
+        principalType: "USER",
+        principalId: userId,
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: teamId,
-        customRoleId: { not: null },
+        roleKey: { startsWith: "custom:" },
       },
-      select: { customRoleId: true },
     });
+    return binding?.customRoleId != null
+      ? { customRoleId: binding.customRoleId }
+      : null;
   }
 
   private requireFullClient(): PrismaClient {

@@ -101,13 +101,13 @@ export function FieldsDefinition({
     name: "fields",
   });
 
-  // The type vocabulary a field row can pick. Image is only meaningful on
-  // inputs (e.g. dataset columns fed into a node), matching the prior
-  // selector. Labels come from the shared TYPE_LABELS so Text/Number/...
+  // The type vocabulary a field row can pick. Image and file are only
+  // meaningful on inputs (e.g. dataset columns fed into a node), matching the
+  // prior selector. Labels come from the shared TYPE_LABELS so Text/Number/...
   // read the same everywhere.
   const typeOptions: FieldTypeOption[] = (
     field === "inputs"
-      ? ["str", "image", "float", "bool", "dict", "list"]
+      ? ["str", "image", "file", "float", "bool", "dict", "list"]
       : ["str", "float", "bool", "dict", "list"]
   ).map((value) => ({ value, label: getTypeLabel(value) }));
 

@@ -77,6 +77,16 @@ export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
 }
 
 /**
+ * True when `getConfig()` would return a config: inside a `runWithConfig()`
+ * callback, or after `initConfig()`. Never logs and never throws, so a caller
+ * can check before initializing.
+ */
+export function hasConfig(): boolean {
+  const state = getGlobalState();
+  return !!state.configStorage.getStore() || !!state.globalConfig;
+}
+
+/**
  * Returns the current config: the per-request scoped config if inside
  * a `runWithConfig()` callback, otherwise the global config.
  */

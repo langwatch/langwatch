@@ -85,6 +85,12 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/auth/verify-email")),
   },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Where a single sign-on test lands: the tester holds a session the
+  // connection has not admitted, so the orgless bootstrap is the wrong answer.
+  {
+    path: "/auth/sso-test-complete",
+    ...page(() => import("./pages/auth/sso-test-complete")),
+  },
   // Join before create (ADR-117 §6): a new account passes through here on its
   // way to making an organization. Renders nothing until D12 fills it.
   { path: "/auth/join", ...page(() => import("./pages/auth/join")) },
@@ -122,6 +128,10 @@ const routes: RouteObject[] = [
     children: [
       { path: "/settings", ...page(() => import("./pages/settings")) },
       {
+        // Role Bindings became a tab of Roles. The address keeps resolving so
+        // old bookmarks and links do not dead-end; the page it loads renders
+        // <Navigate>, not a `loader` redirect, because loaders do not run on a
+        // cold load of the SPA — which is exactly how a stale link arrives.
         path: "/settings/role-bindings",
         ...page(() => import("./pages/settings/role-bindings")),
       },
@@ -146,16 +156,31 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/audit-log")),
       },
       {
-        path: "/settings/authentication",
-        ...page(() => import("./pages/settings/authentication")),
+        path: "/settings/profile",
+        ...page(() => import("./pages/settings/profile")),
       },
       {
+        path: "/settings/security",
+        ...page(() => import("./pages/settings/security")),
+      },
+      {
+        // Groups became the second tab of Directory. Same shape as
+        // role-bindings above: the address keeps resolving, and the page it
+        // loads renders <Navigate> rather than a `loader` redirect.
         path: "/settings/groups",
         ...page(() => import("./pages/settings/groups")),
       },
       {
         path: "/settings/license",
         ...page(() => import("./pages/settings/license")),
+      },
+      {
+        path: "/settings/connect",
+        ...page(() => import("./pages/settings/connect")),
+      },
+      {
+        path: "/settings/checkup",
+        ...page(() => import("./pages/settings/checkup")),
       },
       {
         path: "/settings/members",
@@ -182,12 +207,37 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/api-keys")),
       },
       {
+        path: "/settings/directory",
+        ...page(() => import("./pages/settings/directory")),
+      },
+      {
+        // The old protocol-named address, forwarding onto the page it became.
         path: "/settings/scim",
         ...page(() => import("./pages/settings/scim")),
       },
       {
         path: "/settings/secrets",
         ...page(() => import("./pages/settings/secrets")),
+      },
+      {
+        path: "/settings/access",
+        ...page(() => import("./pages/settings/access")),
+      },
+      {
+        // The identity provider's own journey and the connectors that
+        // provision people are routes rather than modes of the overview —
+        // see `AuthenticationLayout`. Registered before the index so the
+        // more specific path is matched first.
+        path: "/settings/authentication/provider",
+        ...page(() => import("./pages/settings/authentication/provider")),
+      },
+      {
+        path: "/settings/authentication/connectors",
+        ...page(() => import("./pages/settings/authentication/connectors")),
+      },
+      {
+        path: "/settings/authentication",
+        ...page(() => import("./pages/settings/authentication")),
       },
       {
         path: "/settings/subscription",
@@ -725,6 +775,22 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/sso-connections",
     ...page(() => import("./pages/ops/backoffice/sso-connections")),
+  },
+  {
+    path: "/ops/backoffice/licenses",
+    ...page(() => import("./pages/ops/backoffice/licenses")),
+  },
+  {
+    path: "/ops/backoffice/self-hosted-instances",
+    ...page(() => import("./pages/ops/backoffice/self-hosted-instances")),
+  },
+  {
+    path: "/ops/backoffice/identity-lookup",
+    ...page(() => import("./pages/ops/backoffice/identity-lookup")),
+  },
+  {
+    path: "/ops/backoffice/directory-sync",
+    ...page(() => import("./pages/ops/backoffice/directory-sync")),
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

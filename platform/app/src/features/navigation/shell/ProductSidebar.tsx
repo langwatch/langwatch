@@ -240,6 +240,7 @@ function SectionItemsNav({
       icon={item.icon}
       label={item.label}
       href={item.href}
+      tourId={item.tourId}
       isActive={
         item.includePath
           ? isPathUnder({ pathname, base: item.includePath })
@@ -344,6 +345,7 @@ export function SidebarContent({
       <VStack
         ref={scrollRegionRef}
         data-testid="sidebar-scroll-region"
+        data-tour="sidebar"
         width="full"
         paddingX={3}
         paddingTop={surface === "settings" ? 1.5 : 0}

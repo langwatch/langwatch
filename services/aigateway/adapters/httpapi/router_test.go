@@ -26,8 +26,8 @@ type mockAuth struct {
 	resolveFn func(ctx context.Context, token string) (*domain.Bundle, error)
 }
 
-func (m *mockAuth) Resolve(ctx context.Context, token string) (*domain.Bundle, error) {
-	return m.resolveFn(ctx, token)
+func (m *mockAuth) Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
+	return m.resolveFn(ctx, key.Token)
 }
 
 type mockProvider struct {

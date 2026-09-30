@@ -173,7 +173,11 @@ Your receiver does three things, in order:
 2. **Dedup by envelope `id`** and ingest. Delivery is at least once and ids are stable, so an upsert keyed on `id` is enough; retries and replays become no-ops. Each delivery also carries `X-LangWatch-Delivery-Id` and `X-LangWatch-Delivery-Attempt`.
 3. **Handle the settled pair.** A `gateway.request.settled` event books a request whose outcome never arrived, 30 minutes after admission, with `needs_reconciliation: true`. If a `gateway.request.completed` later arrives for the same `gateway_request_id`, replace the settled row with it. Never sum the pair. Field-by-field payload docs: [Billing & spend events](/ai-gateway/billing-events#the-event-payload).
 
-Money discipline: store `cost.nano_usd` as an integer, sum integers, round once at invoice time. The `usage` object on a delivered event has five fields: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` and `reasoning_tokens`. Reasoning tokens are reported for display and are never priced separately.
+Money discipline: store `cost.nano_usd` as an integer, sum integers, round once at invoice time.
+
+The `usage` object on a delivered event has eight fields: `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `reasoning_tokens`, `input_image_tokens`, `output_image_tokens` and `image_count`. Every field is always present, and a request that did not use a bucket reports it as 0. Reasoning tokens are reported for display and are never priced separately.
+
+The token buckets are disjoint. An image generation reports `output_tokens` 0 and its render under `output_image_tokens`, so reading `output_tokens` alone sees none of the image traffic. Reconcile every field, but price only the billable ones: each is charged once at its own rate, and `reasoning_tokens` and `image_count` carry no rate at all.
 
 A delivery that fails is retried after 1 minute, 5 minutes, 30 minutes, 2 hours, 6 hours, 12 hours, then every 12 hours, 11 attempts in total. A `Retry-After` header on your response is honoured as a floor.
 

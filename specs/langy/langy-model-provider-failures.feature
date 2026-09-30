@@ -19,7 +19,18 @@ Feature: A turn that the model provider refused says so
     Scenario: A rate-limited model reads as the provider being busy
       Given a turn that failed because the model provider is rate limiting
       When the customer reads the card
-      Then it says the provider is rate limiting and to wait a moment
+      Then it says the provider is rate limiting and to wait a minute, or to pick a model with more room
+      And it offers to try again
+
+    # The proxy files a provider-native failure body under its own code with
+    # the provider's discriminant beneath it, and only falls back to the
+    # status reason when the body names nothing. A tokens-per-minute limit
+    # on a small Azure deployment answers a guided turn exactly that way.
+    @unit
+    Scenario: A rate limit filed under the provider's own code reads the same way
+      Given a turn that failed with the proxy's upstream code carrying the provider's own rate limit code, and no status reason
+      When the customer reads the card
+      Then it is the provider card saying the provider is rate limiting
       And it offers to try again
 
     @unit

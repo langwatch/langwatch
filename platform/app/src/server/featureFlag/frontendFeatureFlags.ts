@@ -120,14 +120,15 @@ export const FRONTEND_FEATURE_FLAGS = [
   // keeps a project on the Simulations pages, which are untouched while it
   // is off. The backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
-  // The identifier-first front door: the sign-in, sign-up and invitation
-  // screens (D13, ADR-117). Deliberately NOT a PostHog flag — every screen it
-  // governs is reached SIGNED OUT, and `featureFlag.isEnabled` is a protected
-  // procedure that answers 401 rather than false to a visitor with no session.
-  // It resolves from this browser's own override, set by `?ff_<flag>=on` and
-  // remembered locally, and falls back to the deployment's `IDENTITY_ROUTER_V2`
-  // when no override is set. See useIdentityFrontDoor.
-  "release_ui_identity_front_door_enabled",
+  // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the
+  // bar shows a contact-us popover instead of starting a run. See
+  // specs/traces-v2/instant-eval-search.feature.
+  "release_instant_evals",
+  // The guided onboarding variant (spec:
+  // specs/features/onboarding/guided-onboarding-variant.feature). Read on the
+  // welcome flow with the user's id, which is what the percentage rollout
+  // rule buckets on, so the same user lands in the same variant every time.
+  "experiment_onboarding_langy_guided",
 ] as const;
 
 /**

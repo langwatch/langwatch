@@ -65,7 +65,7 @@ describe("given the Add source menu", () => {
         "Workato",
         "Microsoft Copilot Studio",
         "OpenAI Admin",
-        "Anthropic Admin API (usage & cost)",
+        "Anthropic Admin API",
         "Databricks AI/BI Genie",
         "Custom S3 audit log",
         "Custom HTTP audit-log API",
@@ -90,6 +90,19 @@ describe("given the Add source menu", () => {
       ]) {
         expect(screen.queryByText(withheld)).toBeNull();
       }
+    });
+
+    /** @scenario "A type is named after the product, not after what it returns" */
+    it("names the Anthropic type after the product, not after its reports", async () => {
+      renderMenu({ isEnterprise: true });
+      await openMenu();
+
+      // The label was "Anthropic Admin API (usage & cost)". A menu is for
+      // picking a product; which report a source pulls is a question the
+      // composer asks two fields later, where the admin can actually answer
+      // it. The parenthetical was an answer offered where no choice was.
+      expect(screen.getByText("Anthropic Admin API")).toBeTruthy();
+      expect(screen.queryByText(/usage\s*&\s*cost/i)).toBeNull();
     });
 
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */

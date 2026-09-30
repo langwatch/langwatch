@@ -7,7 +7,7 @@
  * repository whose tenancy is asserted against an in-memory fake is asserting
  * the fake's `filter`, not the SQL that ships.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { nanoid } from "nanoid";

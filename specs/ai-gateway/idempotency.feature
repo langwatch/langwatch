@@ -159,6 +159,26 @@ Feature: Idempotency-Key on the control-plane creates
     # rather than elapsed time, so the key recovers in seconds when the holder
     # really is gone and never while it is merely slow.
 
+  @integration
+  Scenario: Two retries taking over one silent claim resolve to one winner
+    Given a receipt whose claim stopped reporting itself alive
+    When two retries take the claim over at the same moment
+    Then one of them holds the claim
+    And the other is sent back to re-read the receipt
+    # The database decides, not the process: the write that waited on the
+    # row lock re-checks the claim it was taking over against the row as the
+    # winner left it, and finds a different claim there.
+
+  @integration
+  Scenario: A takeover that waited on the original's response is refused
+    Given a receipt whose claim stopped reporting itself alive
+    And a retry is taking the claim over
+    When the original stores its response first
+    Then the retry is sent back to re-read the receipt
+    And the receipt holds the original's response under the original's claim
+    # The retry then replays that response, rather than running the create a
+    # second time under a key that already has an answer.
+
   @integration @rest
   Scenario: A replaced request cannot overwrite the receipt that replaced it
     Given a claim taken over while the request holding it was still running

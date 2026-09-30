@@ -244,6 +244,23 @@ describe("given the create drawer for a pull-mode conversation source", () => {
 
       expect(screen.getAllByText("Advanced")).toHaveLength(1);
     });
+
+    /** @scenario "The description field asks for a description" */
+    it("asks for the name and the description in the same shape", () => {
+      renderComposer();
+
+      // The description used to prompt "What this fleet covers + who owns it":
+      // two particular facts, asked for with a word that appears nowhere else
+      // an admin can see. The two fields sit on top of each other, so the
+      // mismatched shape was visible without reading either of them.
+      expect(
+        screen.getByPlaceholderText("Display name for this source"),
+      ).toBeTruthy();
+      expect(
+        screen.getByPlaceholderText("Description for this source"),
+      ).toBeTruthy();
+      expect(screen.queryByPlaceholderText(/fleet/i)).toBeNull();
+    });
   });
 
   describe("when the source type declares no advanced parser fields of its own", () => {

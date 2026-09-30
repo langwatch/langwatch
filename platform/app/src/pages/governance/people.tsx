@@ -444,6 +444,7 @@ function PeopleTabsSection({
 
   return (
     <Tabs.Root
+      data-tour="gov-people"
       value={tab}
       onValueChange={({ value }) => onSelectTab(value)}
       variant="line"

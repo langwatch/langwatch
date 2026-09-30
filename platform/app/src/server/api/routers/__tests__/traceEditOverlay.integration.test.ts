@@ -8,6 +8,7 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "../../../../utils/testUtils";
 import { globalForApp } from "../../../app-layer/app";
@@ -68,6 +69,31 @@ describe("Trace edit overlay storage", () => {
       userId: string;
       role: TeamUserRole;
     }) => {
+      await cleanupTestRows(prisma, [
+        [
+          "grant",
+          {
+            organizationId,
+            principalType: "USER",
+            principalId: userId,
+            scopeType: "TEAM",
+            scopeId: teamId,
+          },
+        ],
+      ]);
+      await cleanupTestRows(prisma, [
+        [
+          "roleBinding",
+          { organizationId, userId, scopeType: "TEAM", scopeId: teamId },
+        ],
+      ]);
+      await seedRoleBinding(prisma, {
+        organizationId,
+        userId,
+        role,
+        scopeType: "TEAM",
+        scopeId: teamId,
+      });
       await prisma.teamUser.upsert({
         where: { userId_teamId: { userId, teamId: project.teamId } },
         update: { role },
@@ -128,6 +154,15 @@ describe("Trace edit overlay storage", () => {
           traceId: { startsWith: TRACE_ID_PREFIX },
         },
       ],
+      [
+        "grant",
+        {
+          organizationId,
+          principalType: "USER",
+          principalId: { in: reviewers },
+        },
+      ],
+      ["roleBinding", { organizationId, userId: { in: reviewers } }],
       ["teamUser", { userId: { in: reviewers }, teamId }],
       ["organizationUser", { userId: { in: reviewers }, organizationId }],
       ["user", { id: { in: reviewers } }],

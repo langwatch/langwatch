@@ -50,23 +50,6 @@ export type SpawnFunction = (jobData: ExecutionJobData) => Promise<void>;
 /** Called when the pool skips a cancelled job. Responsible for writing the terminal event. */
 export type OnSkipCancelledFn = (jobData: ExecutionJobData) => void;
 
-/**
- * A job this pool does not run was submitted to it. Thrown from {@link
- * ScenarioExecutionPool.submit} so the caller (the execute-intent handler) hands
- * the run back to the outbox, which retries it on a pod whose pool does accept
- * it. This is how VOICE_WORKER_ONLY keeps a voice worker off non-voice jobs
- * (and, symmetrically, could keep a normal worker off voice jobs) without a
- * separate BullMQ queue: one queue, an admission predicate at the processor.
- */
-export class JobNotAcceptedByPoolError extends Error {
-  constructor(scenarioRunId: string) {
-    super(
-      `Execution pool does not accept scenarioRunId=${scenarioRunId}; outbox will retry on another pod`,
-    );
-    this.name = "JobNotAcceptedByPoolError";
-  }
-}
-
 export class ScenarioExecutionPool {
   private readonly _running = new Map<string, ChildProcess>();
   /**
@@ -88,28 +71,18 @@ export class ScenarioExecutionPool {
    * unchanged.
    */
   private readonly _voiceGate: VoiceConcurrencyGate | null;
-  /**
-   * Admission predicate: a submitted job this returns false for is refused (see
-   * {@link JobNotAcceptedByPoolError}). Absent = accept every job, which keeps
-   * every existing pool and its tests unchanged; VOICE_WORKER_ONLY sets it to
-   * "voice jobs only".
-   */
-  private readonly _acceptJob: ((jobData: ExecutionJobData) => boolean) | null;
   private _spawnFn: SpawnFunction | null = null;
   private _onSkipCancelled: OnSkipCancelledFn | null = null;
 
   constructor({
     concurrency,
     voiceGate,
-    acceptJob,
   }: {
     concurrency: number;
     voiceGate?: VoiceConcurrencyGate;
-    acceptJob?: (jobData: ExecutionJobData) => boolean;
   }) {
     this._concurrency = concurrency;
     this._voiceGate = voiceGate ?? null;
-    this._acceptJob = acceptJob ?? null;
   }
 
   /** Set the spawn function. Called once during wiring (after deps are available). */
@@ -209,12 +182,6 @@ export class ScenarioExecutionPool {
    * Starts immediately if capacity available, buffers if full.
    */
   submit(jobData: ExecutionJobData): void {
-    // Refuse a job this pool does not run BEFORE any state changes, so the
-    // caller can hand it back to the outbox for another pod. Throwing (rather
-    // than dropping) is what keeps the run alive across the reroute.
-    if (this._acceptJob && !this._acceptJob(jobData)) {
-      throw new JobNotAcceptedByPoolError(jobData.scenarioRunId);
-    }
     // Skip if already cancelled before we even start
     if (this._cancelled.has(jobData.scenarioRunId)) {
       logger.info(

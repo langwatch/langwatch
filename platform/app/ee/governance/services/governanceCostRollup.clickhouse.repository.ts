@@ -70,8 +70,13 @@ export interface GovernanceCostRollupRestatementIndexRow {
   EventTimestamp: number;
 }
 
-/** The columns that make a row's identity, in sort-key order. */
-const KEY_COLUMNS = [
+/**
+ * The columns that make a row's identity, in sort-key order. Exported so a
+ * test can hold it against the table's own `ORDER BY` in migration 00092 and
+ * against the fold's key field order — three copies of one contract that
+ * nothing else forces to agree.
+ */
+export const KEY_COLUMNS = [
   "TenantId",
   "Day",
   "CostSource",
@@ -638,6 +643,14 @@ export class GovernanceCostRollupClickHouseRepository {
     fromDay: string;
     /** Inclusive, `YYYY-MM-DD`. */
     toDay: string;
+    /**
+     * Which lane to read. The metered lane now reads the gateway ledger
+     * directly, so the cost screen passes `pulled` and the fold's leftover
+     * gateway rows in this table are counted by nothing. Optional so a caller
+     * wanting every lane (a diagnostic, a test) still can; unset means no
+     * `CostSource` predicate.
+     */
+    costSource?: string;
   }): Promise<
     Array<{
       day: string;
@@ -832,6 +845,7 @@ export class GovernanceCostRollupClickHouseRepository {
                   AND Day >= {fromday:Date}
                   AND Day <= {today:Date}
                   AND Version = {version:String}
+                  ${input.costSource ? "AND CostSource = {costsource:String}" : ""}
                 GROUP BY ${KEY_COLUMNS.join(", ")}
               )
             )
@@ -847,6 +861,7 @@ export class GovernanceCostRollupClickHouseRepository {
         today: input.toDay,
         version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
         usd: GOVERNANCE_COST_CURRENCY_USD,
+        ...(input.costSource ? { costsource: input.costSource } : {}),
       },
       format: "JSONEachRow",
     });

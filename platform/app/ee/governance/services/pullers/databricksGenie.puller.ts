@@ -1050,9 +1050,11 @@ function readWarehouseCost({
  * one filters `usage_metadata.warehouse_id IS NOT NULL` because it prices
  * warehouse hours, and the rows this one reads carry no warehouse id at all.
  * Databricks bills Genie's own metered usage under
- * `billing_origin_product = 'GENIE'`, attributed to `identity_metadata.run_as`,
- * with `usage_metadata.genie.surface` and `.channel` describing where the
- * usage came from.
+ * `billing_origin_product = 'GENIE'`, attributed to `identity_metadata.run_as`
+ * — the identity the workload ran as, which is the job or query owner and not
+ * necessarily the person who typed the question.
+ * `usage_metadata.genie.surface` and `.channel` describe where the usage came
+ * from.
  *
  * Grouped by person, day and SKU — and NOT by surface or channel. Those two are
  * how Databricks describes the usage, not what it bills, and the grouping here
@@ -1333,7 +1335,9 @@ function withoutZeroPrice(row: PaidGenieBillRow): PaidGenieBillRow {
 /**
  * One bill row as the event the ledger and the audit sink read.
  *
- * The person the bill names is the actor; the price line is the model; there
+ * The identity the bill names in `run_as` is the actor — the owner the
+ * workload ran as, not necessarily whoever asked the question, and the only
+ * person Databricks puts on the charge. The price line is the model; there
  * is no agent, because the bill names no space and no warehouse ran it — a
  * warehouse id here would put compute on the agents screen as if it were a
  * thing people talk to. The day is the event's timestamp, so the record seam

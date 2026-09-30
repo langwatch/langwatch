@@ -440,7 +440,7 @@ Feature: Pulled provider usage becomes visible, attributed cost
     And no bill row is recorded
 
   @unit
-  Scenario: A paid Genie charge lands on the person who ran it, for that day and that price line
+  Scenario: A paid Genie charge lands on the identity the bill names as run_as, for that day and that price line
     Given a Genie source with the paid bill read switched on
     And the workspace bills a person's Genie usage on a day under a price line that has a list price
     When the source runs

@@ -193,9 +193,11 @@ Feature: License-Gated SSO
   Scenario: Unlicensed-mode signup does not auto-join a domain-matched organization
     Given an unlicensed self-hosted deployment running in email mode
     And an organization configured with a matching SSO domain
-    When a new user signs up with an email address on that domain
-    Then the account is created
-    And the user is not added to that organization
+    And a created user has an email address on that domain
+    When the user-create hook and credential-account hook sequence run
+    Then the credential-account hook sequence is accepted
+    And exactly one signup milestone is tracked for the created user
+    And no membership, grant, invitation, or join request is created
 
   @unit @unimplemented
   Scenario: An unlicensed deployment cannot switch an organization to automatic joining

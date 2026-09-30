@@ -27,8 +27,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("../../stores/filterStore", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
+vi.mock("../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 10, to: 20, label: undefined } }),
 }));
 

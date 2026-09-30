@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import {
   type Audience,
   type Disposition,
@@ -19,12 +18,8 @@ vi.mock("~/server/data-privacy/dataPrivacyPolicy.service", () => ({
   getDataPrivacyPolicyService: vi.fn(),
 }));
 
-const mockOrgService = {
-  getUserOrgRoleByTeamId: vi.fn(),
-};
-
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ organizations: mockOrgService }),
+  getApp: () => ({}),
   // Reached through the TtlCache these paths read; null keeps it in-memory.
   tryGetApp: () => null,
 }));
@@ -33,7 +28,13 @@ const mockPrisma = {
   project: {
     findUniqueOrThrow: vi.fn(),
   },
-  roleBinding: {
+  grant: {
+    findMany: vi.fn(),
+  },
+  roleBinding: { findMany: vi.fn() },
+  teamUser: { findMany: vi.fn() },
+  organizationUser: { findFirst: vi.fn() },
+  groupMembership: {
     findMany: vi.fn(),
   },
 } as any;
@@ -88,8 +89,11 @@ describe("getUserProtectionsForProject", () => {
     vi.clearAllMocks();
     mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
       teamId: "team-1",
+      ownerUserId: null,
+      team: { organizationId: "org-1" },
     });
     mockPolicy(PLATFORM_DEFAULT_DATA_PRIVACY);
+    mockPrisma.groupMembership.findMany.mockResolvedValue([]);
   });
 
   const protections = () =>
@@ -98,10 +102,14 @@ describe("getUserProtectionsForProject", () => {
       { projectId: "project-1" },
     );
 
-  describe("when the user has a team RoleBinding", () => {
+  describe("when the user has a team grant", () => {
     beforeEach(() => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.MEMBER },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          roleKey: "member",
+          principalType: "USER",
+          principalId: "user-rolebinding-only",
+        },
       ]);
     });
 
@@ -111,15 +119,17 @@ describe("getUserProtectionsForProject", () => {
       expect(result.canSeeCapturedOutput).toBe(true);
     });
 
-    it("queries roleBinding with the project's team scope", async () => {
+    it("queries live grants with the project's team scope", async () => {
       await protections();
-      expect(mockPrisma.roleBinding.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.grant.findMany).toHaveBeenCalledWith({
         where: {
-          userId: "user-rolebinding-only",
-          scopeType: RoleBindingScopeType.TEAM,
+          organizationId: "org-1",
+          scopeType: "TEAM",
           scopeId: "team-1",
+          revokedAt: null,
+          principalType: { in: ["USER", "GROUP"] },
         },
-        select: { role: true },
+        select: { roleKey: true, principalType: true, principalId: true },
       });
     });
 
@@ -136,10 +146,14 @@ describe("getUserProtectionsForProject", () => {
     });
   });
 
-  describe("when the user has an ADMIN team RoleBinding", () => {
+  describe("when the user has an admin team grant", () => {
     beforeEach(() => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: TeamUserRole.ADMIN },
+      mockPrisma.grant.findMany.mockResolvedValue([
+        {
+          roleKey: "admin",
+          principalType: "USER",
+          principalId: "user-rolebinding-only",
+        },
       ]);
     });
 
@@ -167,27 +181,28 @@ describe("getUserProtectionsForProject", () => {
     });
   });
 
-  describe("when the user has no team RoleBinding", () => {
+  describe("when the user has no team grant", () => {
     beforeEach(() => {
-      mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+      mockPrisma.grant.findMany.mockResolvedValue([]);
     });
 
     it("denies captured content for a non-member", async () => {
-      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue(null);
       const result = await protections();
       expect(result.canSeeCapturedInput).toBe(false);
       expect(result.canSeeCapturedOutput).toBe(false);
     });
 
-    it("grants captured content via the org MEMBER fallback", async () => {
-      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("MEMBER");
+    it("does not restore access from an old admin binding", async () => {
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { userId: "user-rolebinding-only", teamId: "team-1", role: "ADMIN" },
+      ]);
       const result = await protections();
-      expect(result.canSeeCapturedInput).toBe(true);
-      expect(result.canSeeCapturedOutput).toBe(true);
+      expect(result.canSeeCapturedInput).toBe(false);
+      expect(result.canSeeCapturedOutput).toBe(false);
+      expect(mockPrisma.roleBinding.findMany).not.toHaveBeenCalled();
     });
 
-    it("treats an org MEMBER as a non-admin for admin-only restrictions", async () => {
-      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("MEMBER");
+    it("denies admin-only content without an admin grant", async () => {
       mockPolicy(
         policyRestricting({
           input: { disposition: "restrict", audience: ADMINS },
@@ -197,19 +212,25 @@ describe("getUserProtectionsForProject", () => {
       expect(result.canSeeCapturedInput).toBe(false);
     });
 
-    it("treats an org ADMIN as an admin for admin-only restrictions", async () => {
-      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("ADMIN");
+    it("does not infer admin access from an organization role", async () => {
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        userId: "user-rolebinding-only",
+        organizationId: "org-1",
+        role: "ADMIN",
+      });
       mockPolicy(
         policyRestricting({
           input: { disposition: "restrict", audience: ADMINS },
         }),
       );
       const result = await protections();
-      expect(result.canSeeCapturedInput).toBe(true);
+      expect(result.canSeeCapturedInput).toBe(false);
     });
 
-    it("denies captured content for an org EXTERNAL", async () => {
-      mockOrgService.getUserOrgRoleByTeamId.mockResolvedValue("EXTERNAL");
+    it("does not restore access from an old team membership", async () => {
+      mockPrisma.teamUser.findMany.mockResolvedValue([
+        { userId: "user-rolebinding-only", teamId: "team-1", role: "MEMBER" },
+      ]);
       const result = await protections();
       expect(result.canSeeCapturedInput).toBe(false);
       expect(result.canSeeCapturedOutput).toBe(false);

@@ -248,7 +248,7 @@ function MySettingsPage() {
           >
             <Tabs.List marginBottom={3}>
               <Tabs.Trigger value="keys">Virtual keys</Tabs.Trigger>
-              <Tabs.Trigger value="devices">Devices</Tabs.Trigger>
+              <Tabs.Trigger value="devices">Devices and keys</Tabs.Trigger>
             </Tabs.List>
 
             <Tabs.Content value="keys">
