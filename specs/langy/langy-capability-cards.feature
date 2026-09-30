@@ -43,6 +43,13 @@ Feature: Langy renders domain-capability cards for tool calls
     And the model's own figure sits beside it, captioned by the model's name
     And the card never shows the aggregation name or a count of result buckets
 
+  @integration @unit
+  Scenario: A grouped average is never summed into one figure
+    When Langy averages a metric split by model, with the models averaging 1 and 3
+    Then the metrics card shows each model's average beside its name
+    And it never shows their sum as the period's figure
+    And the CLI draws one line per model instead of one summed line, with no period-over-period total
+
   @unit
   Scenario: A metrics card names its aggregation in words
     When Langy reads a metric aggregated as a total, an average, a minimum, a maximum, a median or a percentile

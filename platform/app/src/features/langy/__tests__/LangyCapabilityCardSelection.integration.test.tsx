@@ -346,3 +346,53 @@ describe("given the CLI counted the project's traces split by model", () => {
     });
   });
 });
+
+/**
+ * `--metric avg-latency --group-by metadata.model --time-scale full`: one
+ * bucket, each model's average nested under the dimension. Averages of groups
+ * do not add up, so the card must not draw their sum as the period's figure.
+ */
+function averageLatencyByModelPayload() {
+  return {
+    currentPeriod: [
+      {
+        date: "full",
+        "metadata.model": {
+          "gpt-5-mini": { "0/performance.completion_time/avg": 1 },
+          "gpt-5.6-terra": { "0/performance.completion_time/avg": 3 },
+        },
+      },
+    ],
+    previousPeriod: [],
+    metric: "performance.completion_time",
+    aggregation: "avg",
+  };
+}
+
+describe("given the CLI averaged latency split by model", () => {
+  beforeEach(preferReducedMotion);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  describe("when the panel renders the call", () => {
+    /** @scenario A grouped average is never summed into one figure */
+    it("draws each model's average and no summed headline", () => {
+      renderCall(
+        settledCall({
+          name: "langwatch.analytics.query",
+          resource: "analytics",
+          verb: "query",
+          payload: averageLatencyByModelPayload(),
+        }),
+      );
+
+      expect(screen.getByText("gpt-5-mini")).toBeTruthy();
+      expect(screen.getByText("gpt-5.6-terra")).toBeTruthy();
+      expect(screen.getByText("1")).toBeTruthy();
+      expect(screen.getByText("3")).toBeTruthy();
+      expect(screen.queryByText("4")).toBeNull();
+      expect(screen.queryByText("average")).toBeNull();
+    });
+  });
+});

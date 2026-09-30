@@ -166,6 +166,7 @@ export const queryAnalyticsCommand = async (options: {
           currentPeriod: result.currentPeriod,
           previousPeriod: result.previousPeriod,
           metric,
+          aggregation,
         }) ?? {}),
       },
       table: () => {

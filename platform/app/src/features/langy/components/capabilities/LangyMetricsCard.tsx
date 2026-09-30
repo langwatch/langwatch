@@ -44,14 +44,28 @@ function sumNumbers(record: Record<string, unknown>): number | null {
   return values.length > 0 ? values.reduce((sum, v) => sum + v, 0) : null;
 }
 
-/** Running totals over a period's buckets. */
+/**
+ * Aggregations whose values add up across buckets and groups: the daily totals
+ * of a sum make the period's sum. An average, a minimum, a maximum, a median or
+ * a percentile does not, so those are never combined. An unnamed aggregation is
+ * the API's default count.
+ */
+const ADDITIVE_AGGREGATIONS = new Set(["sum", "count", "cardinality", "terms"]);
+
+const isAdditiveAggregation = (aggregation: string | null): boolean =>
+  aggregation == null || ADDITIVE_AGGREGATIONS.has(aggregation);
+
+/** Running totals over a period's buckets, and how many values each holds. */
 class BucketTally {
   total: number | null = null;
+  valueCount = 0;
   groupBy: string | null = null;
   readonly groupTotals = new Map<string, number>();
+  readonly groupCounts = new Map<string, number>();
 
   add(value: number): void {
     this.total = (this.total ?? 0) + value;
+    this.valueCount += 1;
   }
 
   addBucket(bucket: Record<string, unknown>): void {
@@ -72,11 +86,23 @@ class BucketTally {
         groupKey,
         (this.groupTotals.get(groupKey) ?? 0) + value,
       );
+      this.groupCounts.set(groupKey, (this.groupCounts.get(groupKey) ?? 0) + 1);
     }
   }
 
-  groups(): AnalyticsGroup[] {
+  /**
+   * The period's figure. A non-additive aggregation has one only when a single
+   * value was read: summing two averages is not their average.
+   */
+  headline(additive: boolean): number | null {
+    if (additive || this.valueCount === 1) return this.total;
+    return null;
+  }
+
+  /** Per-group figures, keeping for a non-additive aggregation only the groups read once. */
+  groups(additive: boolean): AnalyticsGroup[] {
     return [...this.groupTotals.entries()]
+      .filter(([key]) => additive || this.groupCounts.get(key) === 1)
       .map(([key, value]) => ({ key, value }))
       .sort((a, b) => b.value - a.value);
   }
@@ -103,16 +129,18 @@ function parseAnalyticsJson(output: unknown): ParsedAnalytics | null {
   for (const bucket of period) {
     if (isRecord(bucket)) tally.addBucket(bucket);
   }
+  const aggregation = stringOrNull(document.aggregation);
+  const additive = isAdditiveAggregation(aggregation);
   return {
     metric: stringOrNull(document.metric),
-    aggregation: stringOrNull(document.aggregation),
+    aggregation,
     // A time-series card's primary number is the requested period total, not
     // its final partial bucket (which would make “77 traces” look like “2”).
-    latest: tally.total,
+    latest: tally.headline(additive),
     points: period.length,
     empty: period.length === 0 || tally.total == null,
     groupBy: tally.groupBy,
-    groups: tally.groups(),
+    groups: tally.groups(additive),
   };
 }
 
@@ -235,6 +263,53 @@ function metricOfInput(input: unknown): string | undefined {
   return typeof metric === "string" ? metric : undefined;
 }
 
+/** A line of muted copy standing in for the figures. */
+function MetricsNote({ children }: { children: string }) {
+  return (
+    <Text textStyle="xs" color="fg.muted">
+      {children}
+    </Text>
+  );
+}
+
+/** The card's body: the figures, or the sentence that says why there are none. */
+function MetricsBody({
+  parsed,
+  metrics,
+  footnote,
+}: {
+  parsed: ParsedAnalytics;
+  metrics: LangyTurnMetric[];
+  footnote: string;
+}) {
+  if (isUnreadable(parsed)) {
+    return (
+      <MetricsNote>
+        Couldn't read this result. Open Analytics to see it.
+      </MetricsNote>
+    );
+  }
+  if (parsed.empty) return <MetricsNote>No data for this period.</MetricsNote>;
+  if (metrics.length === 0) {
+    return (
+      <MetricsNote>
+        This result spans several periods or groups, so it has no single figure.
+        Open Analytics to see each one.
+      </MetricsNote>
+    );
+  }
+  return (
+    <VStack align="stretch" gap={1.5}>
+      <StreamingStatCard metrics={metrics} />
+      {footnote ? (
+        <Text textStyle="2xs" color="fg.subtle">
+          {footnote}
+        </Text>
+      ) : null}
+    </VStack>
+  );
+}
+
 export function LangyMetricsCard({
   input,
   output,
@@ -259,24 +334,7 @@ export function LangyMetricsCard({
       // worse than no link, because it looks like it would.
       deepLink={false}
     >
-      {isUnreadable(parsed) ? (
-        <Text textStyle="xs" color="fg.muted">
-          Couldn&apos;t read this result. Open Analytics to see it.
-        </Text>
-      ) : parsed.empty || metrics.length === 0 ? (
-        <Text textStyle="xs" color="fg.muted">
-          No data for this period.
-        </Text>
-      ) : (
-        <VStack align="stretch" gap={1.5}>
-          <StreamingStatCard metrics={metrics} />
-          {footnote ? (
-            <Text textStyle="2xs" color="fg.subtle">
-              {footnote}
-            </Text>
-          ) : null}
-        </VStack>
-      )}
+      <MetricsBody parsed={parsed} metrics={metrics} footnote={footnote} />
     </LangyCapabilityCard>
   );
 }

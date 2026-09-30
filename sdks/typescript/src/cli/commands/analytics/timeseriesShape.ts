@@ -69,10 +69,24 @@ export function humanMetric(metric: string): string {
 }
 
 /**
- * The measure in a bucket. Everything except `date` is a measure; with a
- * `groupBy` there are several, and they are summed — the chart is one line per
- * period, and a total is the only reading of several groups that is true
- * regardless of which groups happened to be present on a given day.
+ * Aggregations whose values add up across groups and buckets. The groups of a
+ * sum add up to the sum; the groups of an average, a minimum, a maximum, a
+ * median or a percentile do not, so those are drawn one line per group.
+ */
+const ADDITIVE_AGGREGATIONS = new Set(["sum", "count", "cardinality", "terms"]);
+
+const isAdditive = (aggregation: string | undefined): boolean =>
+  aggregation == null || ADDITIVE_AGGREGATIONS.has(aggregation);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+
+/**
+ * The measure in a bucket, for an additive aggregation. Everything except
+ * `date` is a measure; with a `groupBy` there are several, and they are summed:
+ * the chart is one line per period, and a total is the only reading of several
+ * groups that is true regardless of which groups happened to be present on a
+ * given day.
  *
  * A grouped bucket nests its measures under the dimension and then the group
  * (`{ "metadata.model": { "gpt-5-mini": { "0/...": 7 } } }`), so objects are
@@ -119,6 +133,46 @@ function pointsOf(buckets: readonly AnalyticsBucket[]): TimeseriesPoint[] {
   return points;
 }
 
+/** The one finite number directly inside `record`, or null if it holds none or several. */
+function singleNumber(record: Record<string, unknown>): number | null {
+  const values = Object.values(record).filter(
+    (v): v is number => typeof v === "number" && Number.isFinite(v),
+  );
+  return values.length === 1 ? values[0]! : null;
+}
+
+/**
+ * The series for a non-additive aggregation: nothing is added up. A flat bucket
+ * holds the period's one measure, drawn as `title`; a grouped bucket gives each
+ * group its own series, named by the group.
+ */
+function seriesPerGroup(
+  buckets: readonly AnalyticsBucket[],
+  title: string,
+): TimeseriesSeries[] {
+  const byName = new Map<string, TimeseriesPoint[]>();
+  const push = (name: string, point: TimeseriesPoint) => {
+    const points = byName.get(name) ?? [];
+    points.push(point);
+    byName.set(name, points);
+  };
+  for (const bucket of buckets) {
+    const t = dayOf(bucket);
+    if (t === null) continue;
+    const { date: _date, ...measures } = bucket;
+    const flat = singleNumber(measures);
+    if (flat !== null) push(title, { t, v: flat });
+    for (const groups of Object.values(measures)) {
+      if (!isRecord(groups)) continue;
+      for (const [group, groupMeasures] of Object.entries(groups)) {
+        const v = isRecord(groupMeasures) ? singleNumber(groupMeasures) : null;
+        if (v !== null) push(group, { t, v });
+      }
+    }
+  }
+  return [...byName.entries()].map(([name, points]) => ({ name, points }));
+}
+
 const sum = (points: readonly TimeseriesPoint[]): number =>
   points.reduce((total, point) => total + point.v, 0);
 
@@ -126,11 +180,27 @@ export function toTimeseriesShape({
   currentPeriod,
   previousPeriod,
   metric,
+  aggregation,
 }: {
   currentPeriod: readonly AnalyticsBucket[];
   previousPeriod: readonly AnalyticsBucket[];
   metric: string;
+  /** How the metric was aggregated. Only additive ones are summed. */
+  aggregation?: string;
 }): TimeseriesShape | null {
+  const title = humanMetric(metric);
+
+  if (!isAdditive(aggregation)) {
+    // One point is a number, not a trend (see below), so a series needs two.
+    const series = seriesPerGroup(currentPeriod, title).filter(
+      (s) => s.points.length >= 2,
+    );
+    if (series.length === 0) return null;
+    // No "this period vs previous" headline: it adds up the points, and the
+    // points of an average do not add up to anything.
+    return { series, title, unit: unitFor(metric) };
+  }
+
   const current = pointsOf(currentPeriod);
   // One point is a number, not a trend. Drawing an axis under it dresses a
   // single reading up as a shape, which is the failure this card exists to fix
@@ -138,7 +208,6 @@ export function toTimeseriesShape({
   if (current.length < 2) return null;
 
   const previous = pointsOf(previousPeriod);
-  const title = humanMetric(metric);
 
   return {
     series: [{ name: title, points: current }],

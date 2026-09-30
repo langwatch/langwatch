@@ -142,6 +142,81 @@ describe("toTimeseriesShape", () => {
   });
 });
 
+describe("given a grouped average over several days", () => {
+  const byModel = (mini: number, terra: number) => ({
+    "metadata.model": {
+      "gpt-5-mini": { "0/performance.completion_time/avg": mini },
+      "gpt-5.6-terra": { "0/performance.completion_time/avg": terra },
+    },
+  });
+  const shape = () =>
+    toTimeseriesShape({
+      currentPeriod: [
+        { date: day("2026-09-28"), ...byModel(1, 3) },
+        { date: day("2026-09-29"), ...byModel(2, 4) },
+      ],
+      previousPeriod: [
+        { date: day("2026-09-26"), ...byModel(1, 1) },
+        { date: day("2026-09-27"), ...byModel(1, 1) },
+      ],
+      metric: "performance.completion_time",
+      aggregation: "avg",
+    });
+
+  describe("when it is shaped for the timeseries card", () => {
+    /** @scenario A grouped average is never summed into one figure */
+    it("draws one line per model instead of summing the averages", () => {
+      expect(shape()?.series).toEqual([
+        {
+          name: "gpt-5-mini",
+          points: [
+            { t: "2026-09-28", v: 1 },
+            { t: "2026-09-29", v: 2 },
+          ],
+        },
+        {
+          name: "gpt-5.6-terra",
+          points: [
+            { t: "2026-09-28", v: 3 },
+            { t: "2026-09-29", v: 4 },
+          ],
+        },
+      ]);
+    });
+
+    /** @scenario A grouped average is never summed into one figure */
+    it("adds no period-over-period total", () => {
+      expect(shape()?.comparison).toBeUndefined();
+    });
+  });
+});
+
+describe("given a flat average over several days", () => {
+  describe("when it is shaped for the timeseries card", () => {
+    it("draws the daily averages as one line named after the metric", () => {
+      const shape = toTimeseriesShape({
+        currentPeriod: [
+          { date: day("2026-09-28"), "0/performance.completion_time/avg": 5 },
+          { date: day("2026-09-29"), "0/performance.completion_time/avg": 7 },
+        ],
+        previousPeriod: [],
+        metric: "performance.completion_time",
+        aggregation: "avg",
+      });
+
+      expect(shape?.series).toEqual([
+        {
+          name: "Completion time",
+          points: [
+            { t: "2026-09-28", v: 5 },
+            { t: "2026-09-29", v: 7 },
+          ],
+        },
+      ]);
+    });
+  });
+});
+
 describe("unitFor", () => {
   describe("given a metric path", () => {
     it("reads the unit off the metric, never off the values", () => {
