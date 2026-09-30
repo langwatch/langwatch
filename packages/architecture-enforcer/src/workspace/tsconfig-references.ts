@@ -3,6 +3,8 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 import ts from "typescript";
 
+import { sourceText } from "./module-graph.ts";
+
 /**
  * Derives every TypeScript project reference from the pnpm workspace
  * manifests; a cyclic web-group member produces through the group solution
@@ -56,11 +58,20 @@ type Manifest = {
   scripts?: Record<string, string>;
 };
 
-function readJsonc(file: string): Record<string, unknown> {
-  const parsed = ts.parseConfigFileTextToJson(file, readFileSync(file, "utf8"));
-  const config: unknown = parsed.config;
+/** Parsed configs, reused while the text is unchanged: a run asks for one config per edge. */
+const parsedConfigs = new Map<string, { text: string; config: Record<string, unknown> }>();
 
-  return typeof config === "object" && config !== null ? (config as Record<string, unknown>) : {};
+function readJsonc(file: string): Record<string, unknown> {
+  const text = sourceText({ file });
+  const known = parsedConfigs.get(file);
+  if (known?.text === text) return known.config;
+
+  const parsed: unknown = ts.parseConfigFileTextToJson(file, text).config;
+  const config =
+    typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  parsedConfigs.set(file, { text, config });
+
+  return config;
 }
 
 function referencePaths(config: Record<string, unknown>, key: string): string[] {

@@ -4,6 +4,7 @@ import { POLICIES } from "./policies/index.ts";
 import type { PolicyDefinition } from "./policies/index.ts";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types.ts";
 import { changedSourceFiles } from "./workspace/changed-files.ts";
+import { duringOneReading } from "./workspace/module-graph.ts";
 import { buildWorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 
@@ -135,10 +136,10 @@ export function lintPolicies(
 ): ArchitectureViolation[] {
   const root = snapshot.root;
 
-  const violations = [
+  const violations = duringOneReading(() => [
     ...snapshot.discoveryViolations,
     ...policies.flatMap((policy) => policy.run(snapshot)),
-  ];
+  ]);
 
   return violations
     .map((violation) => ({

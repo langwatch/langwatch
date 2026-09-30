@@ -81,8 +81,34 @@ const parsedSources = new Map<string, Cached<ParsedSource>>();
  */
 const syntaxTrees = new Map<string, Cached<{ tree: WeakRef<ts.SourceFile>; parents: boolean }>>();
 
-function fresh(entry: Cached<unknown> | undefined, file: string): boolean {
+type Stamp = { mtimeMs: number; ctimeMs: number; size: number };
+
+/** Stats taken during one policy run: a run reads one state of the tree, so one stat per file. */
+let runStats: Map<string, Stamp> | undefined;
+
+/** Runs `read` against one reading of the tree; nested calls join the outer reading. */
+export function duringOneReading<T>(read: () => T): T {
+  if (runStats) return read();
+  runStats = new Map();
+  try {
+    return read();
+  } finally {
+    runStats = void 0;
+  }
+}
+
+function currentStats(file: string): Stamp {
+  const known = runStats?.get(file);
+  if (known) return known;
+
   const stats = statSync(file);
+  runStats?.set(file, stats);
+
+  return stats;
+}
+
+function fresh(entry: Cached<unknown> | undefined, file: string): boolean {
+  const stats = currentStats(file);
 
   return (
     entry?.mtimeMs === stats.mtimeMs &&
@@ -92,7 +118,7 @@ function fresh(entry: Cached<unknown> | undefined, file: string): boolean {
 }
 
 function stamp<T>(file: string, value: T): Cached<T> {
-  const stats = statSync(file);
+  const stats = currentStats(file);
 
   return { value, mtimeMs: stats.mtimeMs, ctimeMs: stats.ctimeMs, size: stats.size };
 }
