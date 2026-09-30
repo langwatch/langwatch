@@ -1,8 +1,8 @@
 Feature: The package-boundaries lint rule
   Which workspace package may import which, and which runtime a package role
   may touch at all, over the module tree ARCHITECTURE.md §3 describes: every
-  module's contract, process, browser and browser-kit package, core and
-  enterprise. Each shape of violation has its own id, so the reported id names
+  module's contract, process, browser and browser-kit package and its portable
+  libraries, core and enterprise. Each shape of violation has its own id, so the reported id names
   the actual mistake and its fix names the door to use instead.
 
   Background:
@@ -72,6 +72,30 @@ Feature: The package-boundaries lint rule
     Given a contract module that imports a node runtime module
     When the package-boundaries rule runs over it
     Then it reports contractRuntime with the import specifier
+
+  @unit
+  Scenario: A module library importing a runtime or implementation is reported as libraryRuntime
+    Given a module's portable library that imports node, react, a framework package, its own process or browser package, or another module's contract
+    When the package-boundaries rule runs over it
+    Then it reports libraryRuntime at that import
+
+  @unit
+  Scenario: A module library importing its own contract and other libraries is left alone
+    Given a module's portable library that imports its own contract, another module's library and zod
+    When the package-boundaries rule runs over it
+    Then it reports nothing
+
+  @unit
+  Scenario: Process, browser, kit and application code may import any module's library
+    Given a service, a browser module, a browser kit and an application file that import another module's library
+    When the package-boundaries rule runs over them
+    Then it reports nothing
+
+  @unit
+  Scenario: A contract importing its module's library is reported as contractRuntime
+    Given a contract module that imports its own module's library
+    When the package-boundaries rule runs over it
+    Then it reports contractRuntime
 
   @unit
   Scenario: Core code importing an enterprise implementation is reported as coreImportsEnterprise

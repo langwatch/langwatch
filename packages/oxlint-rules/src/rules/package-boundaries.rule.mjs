@@ -133,11 +133,21 @@ function runtimeFinding(file, specifier) {
   if (BROWSER_ROLES.has(file.role) && (node || server)) return "browserImportsProcess";
   if (file.role === "process" && browser) return "processImportsBrowser";
   if (file.role === "browser-kit" && KIT_FETCH.test(specifier)) return "kitFetches";
+  if (file.role === "library" && (node || server || browser)) return "libraryRuntime";
 
   return undefined;
 }
 
+/** A library takes its own module's contract and other libraries, nothing else (§2). */
+function libraryDirectionFinding(file, target) {
+  if (target.role === "library") return undefined;
+  if (target.role === "contract" && target.module === file.module) return undefined;
+
+  return "libraryRuntime";
+}
+
 function directionFinding(file, target) {
+  if (file.role === "library") return libraryDirectionFinding(file, target);
   if (file.role === "contract" && target.role !== "contract") return "contractRuntime";
   if (BROWSER_ROLES.has(file.role) && target.role === "process") return "browserImportsProcess";
   if (file.role === "process" && BROWSER_ROLES.has(target.role)) return "processImportsBrowser";
@@ -204,7 +214,8 @@ function peerData(target) {
 }
 
 function crossModuleFinding({ file, target, subpath, node }) {
-  if (target.role === "contract" || target.module === file.module) return undefined;
+  const isPortable = target.role === "contract" || target.role === "library";
+  if (isPortable || target.module === file.module) return undefined;
   if (target.role === "browser-kit" && BROWSER_ROLES.has(file.role)) return undefined;
   if (isTestSeam(file, subpath, target) || isPeerInstallation({ file, target, subpath, node })) {
     return undefined;
@@ -361,6 +372,10 @@ export const boundaryRule = defineRule({
     coreImportsEnterprise: {
       what: "`{{specifier}}` is an enterprise module's implementation, and this is core code.",
       fix: "Depend on that module's peer `*Api` from its contract instead; the enterprise module installs like any other and the process resolves the peer (ARCHITECTURE.md §11).",
+    },
+    libraryRuntime: {
+      what: "`{{specifier}}` is a runtime, framework or another package's implementation, and this is a module's portable, framework-free library.",
+      fix: "Import only this module's contract, other module libraries and framework-free packages here; move the code that needs `{{specifier}}` into the module's process or browser package.",
     },
     retiredPackageRuntime: {
       what: "`{{specifier}}` is a retired runtime or package entry point.",

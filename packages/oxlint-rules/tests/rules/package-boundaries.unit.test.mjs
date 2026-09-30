@@ -11,6 +11,7 @@ const workspace = createFixtureWorkspace({
         process: {},
         browser: { exports: ["./declaration"] },
         "browser-kit": {},
+        "query-language": {},
       },
     },
     project: {
@@ -19,6 +20,7 @@ const workspace = createFixtureWorkspace({
         process: { exports: [".", "./testing"] },
         browser: { exports: ["./declaration", "./surfaces/project-picker"] },
         "browser-kit": {},
+        "query-language": {},
       },
     },
     scenario: {
@@ -57,6 +59,7 @@ const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 const SERVICE_TEST = "modules/agent/process/src/services/__tests__/agent.integration.test.ts";
 const BROWSER = "modules/agent/browser/src/behavior/agent-list.ts";
 const KIT = "modules/agent/browser-kit/src/agent-card.tsx";
+const LIBRARY = "modules/agent/query-language/src/parse.ts";
 
 describe("given package-boundaries", () => {
   describe("when a browser package imports another module's browser package", () => {
@@ -194,6 +197,55 @@ describe("given package-boundaries", () => {
           " Keep only schemas, types, errors and the `*Api` token here; move the code that needs" +
           " `node:fs` into this module's process package, or into its browser package when it is a browser import.",
       );
+    });
+  });
+
+  describe("when a module library imports a runtime or an implementation package", () => {
+    /** @scenario "A module library importing a runtime or implementation is reported as libraryRuntime" */
+    it("reports libraryRuntime for node, react, framework and implementation packages", () => {
+      for (const specifier of [
+        "node:fs",
+        "react",
+        "@langwatch/process-server",
+        "@langwatch/agent-process",
+        "@langwatch/agent-browser/declaration",
+        "@langwatch/agent-browser-kit",
+        "@langwatch/project-contract",
+      ]) {
+        expect(ids(LIBRARY, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
+      }
+    });
+
+    /** @scenario "A module library importing its own contract and other libraries is left alone" */
+    it("leaves its own contract, another library and a framework-free package alone", () => {
+      const code = [
+        'import type { Agent } from "@langwatch/agent-contract";',
+        'import { parse } from "@langwatch/project-query-language";',
+        'import { z } from "zod";',
+      ].join("\n");
+
+      expect(report(LIBRARY, code)).toEqual([]);
+    });
+  });
+
+  describe("when a package imports a module library", () => {
+    /** @scenario "Process, browser, kit and application code may import any module's library" */
+    it("leaves process, browser, kit and application imports alone", () => {
+      const code = 'import { parse } from "@langwatch/project-query-language";';
+
+      for (const filename of [SERVICE, BROWSER, KIT, "apps/api/src/main.ts"]) {
+        expect(report(filename, code)).toEqual([]);
+      }
+    });
+
+    /** @scenario "A contract importing its module's library is reported as contractRuntime" */
+    it("reports contractRuntime when the contract imports it", () => {
+      expect(
+        ids(
+          "modules/agent/contract/src/agent.commands.ts",
+          'import { parse } from "@langwatch/agent-query-language";',
+        ),
+      ).toEqual(["contractRuntime"]);
     });
   });
 
