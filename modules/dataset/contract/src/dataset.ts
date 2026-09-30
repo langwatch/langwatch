@@ -1,4 +1,5 @@
 import { resolveRequestBound } from "@langwatch/plans";
+import { storedObjectIdSchema } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 
 export const datasetColumnTypeSchema = z.enum([
@@ -337,7 +338,7 @@ export type CreateDatasetFromUploadResult = Pick<Dataset, "createdAt" | "updated
 export const createDatasetFromStoredObjectInputSchema = z.object({
   projectId: z.string().min(1),
   name: z.string().min(1),
-  storedObjectId: z.string().min(1),
+  storedObjectId: storedObjectIdSchema,
   columnTypes: datasetConfirmColumnsSchema.optional(),
 });
 export type CreateDatasetFromStoredObjectInput = z.infer<
@@ -355,7 +356,7 @@ export type DatasetImportStarted = z.infer<typeof datasetImportStartedSchema>;
 export const appendStoredObjectToDatasetInputSchema = z.object({
   projectId: z.string().min(1),
   slugOrId: z.string().min(1),
-  storedObjectId: z.string().min(1),
+  storedObjectId: storedObjectIdSchema,
 });
 export type AppendStoredObjectToDatasetInput = z.infer<
   typeof appendStoredObjectToDatasetInputSchema

@@ -7,7 +7,7 @@ export const GRAPH_KSUID_RESOURCE = "graph";
 export const DASHBOARD_WIDGET_KSUID_RESOURCE = "widget";
 
 export const graphIdSchema = z.string().min(1);
-export const graphNameSchema = z.string().trim().min(1).max(255);
+export const graphNameSchema = z.string().trim().min(1);
 export const graphPayloadSchema = z.record(z.string(), z.unknown());
 export const graphFiltersSchema = z.record(z.string(), z.unknown());
 

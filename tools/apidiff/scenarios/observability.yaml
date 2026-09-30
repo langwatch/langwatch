@@ -2226,7 +2226,7 @@
   expect: {"status": 200, "body": {"traceId": "vdt{uid}"}}
   verify:
     - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200, "contains": ["first-{uid}", "second-{uid}"]}}
-- id: traces-metadata-overwrites-existing-key
+- id: traces-metadata-keeps-existing-key-first-value
   endpoint: PATCH /api/traces/{traceId}/metadata
   setup:
     - {"request": "POST /api/collector", "body": {"trace_id": "vdt{uid}", "spans": [{"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}], "metadata": {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}}}
@@ -2236,7 +2236,7 @@
   request: {"path": "/api/traces/vdt{uid}/metadata", "body": {"metadata": {"vd_key": "new-{uid}"}}}
   expect: {"status": 200}
   verify:
-    - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200, "contains": "new-{uid}", "notContains": "old-{uid}"}}
+    - {"request": "GET /api/traces/vdt{uid}", "eventually": "60s", "expect": {"status": 200, "contains": "old-{uid}", "notContains": "new-{uid}"}}
 - id: trace-share-reads-back-trace-intact
   endpoint: POST /api/trace/{id}/share
   setup:

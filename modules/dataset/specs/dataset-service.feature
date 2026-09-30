@@ -110,6 +110,12 @@ Feature: Shared Dataset service
     Then the stored update matches the dataset by its id and its project
     And the multitenancy guard lets the update through
 
+  @unit @regression
+  Scenario: An import naming a stored object id no store can hold is refused as invalid input
+    Given an import request whose storedObjectId contains a NUL character
+    When it is validated at the contract
+    Then it is refused before any dataset or store is queried
+
   Rule: The Datasets pages are served from the browser application
 
     # Both pages moved out of platform/app with the family. What the application

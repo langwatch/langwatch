@@ -100,4 +100,32 @@ describe("TraceAttributeAccumulationService", () => {
       expect(state.attributes["langwatch.reserved.causality_depth"]).toBe("1");
     });
   });
+
+  describe("given a metadata update span naming a key the trace already carries", () => {
+    /** @scenario "A metadata update does not replace a key the trace already carries" */
+    it("keeps the first value, as main's fold does", () => {
+      const service = TraceAttributeAccumulationService.create(TraceOriginService.create());
+      const state = createInitState();
+
+      for (const [spanId, value] of [
+        ["span-1", "old"],
+        ["span-2", "new"],
+      ] as const) {
+        state.attributes = service.accumulateAttributes({
+          state,
+          span: {
+            ...createTestSpan({ spanId }),
+            resourceAttributes: { "langwatch.metadata.vd_key": value },
+          },
+          outputSource: "test",
+          inputIsFallback: false,
+          outputIsFallback: false,
+          inputMediaRefs: null,
+          outputMediaRefs: null,
+        });
+      }
+
+      expect(state.attributes["metadata.vd_key"]).toBe("old");
+    });
+  });
 });

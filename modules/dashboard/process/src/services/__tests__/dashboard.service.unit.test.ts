@@ -176,4 +176,43 @@ describe("DashboardService", () => {
       ).rejects.toBeInstanceOf(GraphNotFoundError);
     });
   });
+
+  describe("given a graph created with an empty dashboard id", () => {
+    /** @scenario "A graph created with an empty dashboard id is placed on no dashboard" */
+    it("stores it on no dashboard", async () => {
+      const { service } = serviceWith();
+
+      const created = await service.createGraph({
+        projectId: PROJECT,
+        name: "Latency",
+        graph: {},
+        dashboardId: "",
+      });
+
+      expect(created.dashboardId).toBeNull();
+    });
+  });
+
+  describe("given a graph name of twenty thousand characters", () => {
+    const name = "A".repeat(20_000);
+
+    /** @scenario "A graph name has no length limit" */
+    it("renames a known graph to it", async () => {
+      const { service } = serviceWith();
+      const graph = await service.createGraph({ projectId: PROJECT, name: "Latency", graph: {} });
+
+      const updated = await service.updateGraph({ projectId: PROJECT, graphId: graph.id, name });
+
+      expect(updated.name).toBe(name);
+    });
+
+    /** @scenario "A graph name has no length limit" */
+    it("answers an unknown graph as not found rather than as invalid", async () => {
+      const { service } = serviceWith();
+
+      await expect(
+        service.updateGraph({ projectId: PROJECT, graphId: "graph_missing", name }),
+      ).rejects.toBeInstanceOf(GraphNotFoundError);
+    });
+  });
 });

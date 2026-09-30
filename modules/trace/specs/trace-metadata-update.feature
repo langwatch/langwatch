@@ -16,3 +16,10 @@ Feature: Updating a trace's metadata after it was sent
     Given an API key for a project
     When the key sends PATCH /api/traces/{traceId}/metadata with no metadata keys
     Then the request is refused as invalid and nothing is recorded
+
+  @unit
+  Scenario: A metadata update does not replace a key the trace already carries
+    Given a trace whose metadata already holds a custom key
+    When a later update sends a new value for that key
+    Then the trace keeps the value it first carried, as on main
+    And keys the trace did not carry yet are added

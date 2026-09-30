@@ -20,6 +20,17 @@ Feature: Shared Dashboard service
     When the Dashboard service creates a graph without a row
     Then the graph is assigned grid row 3
 
+  @unit
+  Scenario: A graph created with an empty dashboard id is placed on no dashboard
+    When the Dashboard service creates a graph with an empty dashboard id
+    Then the graph belongs to no dashboard
+
+  @unit
+  Scenario: A graph name has no length limit
+    When the Dashboard service renames a known graph to a name of twenty thousand characters
+    Then the graph is renamed
+    And renaming an unknown graph that way throws GraphNotFoundError
+
   @integration
   Scenario: Builder and workbench rows remain isolated
     When a graph operation reads a project
