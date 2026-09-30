@@ -1,18 +1,11 @@
-/**
- * ADR-092 decision 25 — the credential half of the permission seam: what an
- * API key may do, as opposed to what a signed-in user may do
- * (`permission-decision.repository.ts`). A separate repository because it is
- * a separate legacy seam (`role-binding-resolver.ts`, the
- * `ApiKey ∩ owning user` ceiling) with its own module graph; the service
- * composes both.
- */
+/** Adapts the grants engine to the permission service contract. */
 import type { AuthzPermission } from "@langwatch/authz";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   resolveApiKeyPermission,
   resolveApiKeyPermissionProjectBatch,
   type ScopeRef,
-} from "~/server/rbac/role-binding-resolver";
+} from "~/server/app-layer/authz/credential-permissions";
 
 /** The tenancy coordinates of a project, for scoping a credential check. */
 export type ProjectScope = {
@@ -45,8 +38,8 @@ export type ApiKeyProjectDecisionsQuery = {
 export interface CredentialDecisionRepository {
   /**
    * Whether an API-key credential holds `permission` at `scope`:
-   * `effective = ApiKey.bindings ∩ owning user's bindings`, the resolution
-   * the legacy `resolveApiKeyPermission` performs.
+   * `effective = key grants ∩ owner grants`, the resolution
+   * `resolveApiKeyPermission` performs.
    */
   findApiKeyDecision(check: ApiKeyPermissionCheck): Promise<boolean>;
 
@@ -67,7 +60,7 @@ export interface CredentialDecisionRepository {
   findProjectScope(params: { projectId: string }): Promise<ProjectScope | null>;
 }
 
-export class ForkAwareCredentialDecisionRepository
+export class EngineCredentialDecisionRepository
   implements CredentialDecisionRepository
 {
   constructor(private readonly prisma: PrismaClient) {}

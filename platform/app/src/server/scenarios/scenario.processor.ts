@@ -55,6 +55,11 @@ import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
+import {
+  handleVoiceNonceRegisterMessage,
+  isVoiceNonceRegisterMessage,
+} from "./voice/voice-nonce-handoff";
+import { getVoiceNonceRegistry } from "./voice/voice-nonce-registry";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -88,11 +93,20 @@ export interface AgentInstanceRecorder {
   }): Promise<void>;
 }
 
+/** Marks a run as ended at the maximum call duration on the run's record. */
+export interface CutAtLimitRecorder {
+  recordCutAtLimit(params: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<void>;
+}
+
 /** Dependencies for the scenario processor's job outcome handling */
 export interface ProcessorDependencies {
   scenarioLookup: ScenarioLookup;
   failureEmitter: FailureEmitter;
   agentInstanceRecorder: AgentInstanceRecorder;
+  cutAtLimitRecorder: CutAtLimitRecorder;
 }
 
 // ============================================================================
@@ -123,17 +137,27 @@ export function createProcessorDependencies(): ProcessorDependencies {
           occurredAt: Date.now(),
         }),
     },
+    cutAtLimitRecorder: {
+      recordCutAtLimit: ({ projectId, scenarioRunId }) =>
+        getApp().simulations.recordCutAtLimit({
+          tenantId: projectId,
+          scenarioRunId,
+          occurredAt: Date.now(),
+        }),
+    },
   };
 }
 
 /**
- * Handle a job that ran to the end: record which connected agent instance
- * answered it, when one did.
+ * Handle a job that ran to the end: record the post-exit facts the child
+ * learned during the run — which connected agent instance answered it, and
+ * whether the call was cut at the maximum duration.
  *
- * The run's own finished event comes from the child through the SDK; the
- * instance is what the parent learns from the child's result line, so it is
- * recorded here, after the child exits. A failure to record it is logged and
- * not raised: the run is complete, and the instance is a detail of it.
+ * The run's own finished event comes from the child through the SDK; these
+ * facts are what the parent learns from the child's result line, so they are
+ * recorded here, after the child exits. Each is independent: a run can carry
+ * either, both, or neither. A failure to record one is logged and not raised —
+ * the run is complete, and each is a detail of it.
  */
 export async function handleSucceededJobResult({
   jobData,
@@ -144,18 +168,33 @@ export async function handleSucceededJobResult({
   result: ScenarioExecutionResult;
   deps: ProcessorDependencies;
 }): Promise<void> {
-  if (!result.agentInstance) return;
-  try {
-    await deps.agentInstanceRecorder.recordAgentInstance({
-      projectId: jobData.projectId,
-      scenarioRunId: jobData.scenarioRunId,
-      agentInstance: result.agentInstance,
-    });
-  } catch (err) {
-    logger.warn(
-      { err, scenarioRunId: jobData.scenarioRunId },
-      "Could not record the agent instance that served the run",
-    );
+  if (result.agentInstance) {
+    try {
+      await deps.agentInstanceRecorder.recordAgentInstance({
+        projectId: jobData.projectId,
+        scenarioRunId: jobData.scenarioRunId,
+        agentInstance: result.agentInstance,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, scenarioRunId: jobData.scenarioRunId },
+        "Could not record the agent instance that served the run",
+      );
+    }
+  }
+
+  if (result.isCutAtLimit) {
+    try {
+      await deps.cutAtLimitRecorder.recordCutAtLimit({
+        projectId: jobData.projectId,
+        scenarioRunId: jobData.scenarioRunId,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, scenarioRunId: jobData.scenarioRunId },
+        "Could not record that the run was cut at the call limit",
+      );
+    }
   }
 }
 
@@ -502,6 +541,61 @@ export async function executeScenarioRun(
 }
 
 /**
+ * Wire the parent's side of the voice nonce handoff onto a spawned child:
+ * answer the child's nonce-registration IPC message by writing it into this
+ * process's registry and acking. This process is exactly the one the
+ * voice-ws-listener reads (both boot together on every worker, see
+ * worker-boot-plan.ts), so the registration and the eventual `consume()`
+ * lookup share memory by construction. Only ever called for a voice child —
+ * every other target's child has no IPC channel to listen on.
+ */
+function registerVoiceNonceHandoffListener(child: ChildProcess): void {
+  child.on("message", (message: unknown) => {
+    if (!isVoiceNonceRegisterMessage(message)) return;
+    const ack = handleVoiceNonceRegisterMessage({
+      message,
+      child,
+      registry: getVoiceNonceRegistry(),
+    });
+    child.send?.(ack);
+  });
+}
+
+/**
+ * Spawn the scenario's child process, wiring the voice nonce handoff channel
+ * (see {@link registerVoiceNonceHandoffListener}) when the target is voice.
+ * A voice target's child mints its own Twilio stream nonce and must tell the
+ * parent about it before dialling — that round trip needs a Node IPC
+ * channel, absent from every other target's plain pipe stdio. Isolated here
+ * so the voice-only stdio/IPC branching does not live in the caller.
+ */
+function spawnScenarioChild({
+  command,
+  args,
+  childEnv,
+  packageRoot,
+  isVoiceChild,
+}: {
+  command: string;
+  args: string[];
+  childEnv: NodeJS.ProcessEnv;
+  packageRoot: string;
+  isVoiceChild: boolean;
+}): ChildProcess {
+  const child: ChildProcess = spawn(command, args, {
+    env: childEnv,
+    stdio: isVoiceChild
+      ? ["pipe", "pipe", "pipe", "ipc"]
+      : ["pipe", "pipe", "pipe"],
+    cwd: packageRoot,
+  });
+  if (isVoiceChild) {
+    registerVoiceNonceHandoffListener(child);
+  }
+  return child;
+}
+
+/**
  * Spawn a child process to execute the scenario with isolated OTEL context.
  */
 async function spawnScenarioChildProcess(
@@ -533,6 +627,13 @@ async function spawnScenarioChildProcess(
       jobData,
       labels: childProcessData.scenario.labels,
       telemetry,
+      // Voice-only: the caller's OpenAI / ElevenLabs keys reach the SDK's TTS
+      // and transcription clients through the child env. Narrowed here so no
+      // other target ever receives them.
+      callerEnv:
+        childProcessData.adapterData?.type === "voice"
+          ? childProcessData.adapterData.callerEnv
+          : undefined,
     });
 
     const packageRoot = resolveAppPackageRoot();
@@ -541,11 +642,14 @@ async function spawnScenarioChildProcess(
       packageRoot,
       nodeEnv: process.env.NODE_ENV,
     });
+    const isVoiceChild = childProcessData.adapterData?.type === "voice";
     log("info", "Spawning scenario child process", { command, args });
-    const child: ChildProcess = spawn(command, args, {
-      env: childEnv,
-      stdio: ["pipe", "pipe", "pipe"],
-      cwd: packageRoot,
+    const child = spawnScenarioChild({
+      command,
+      args,
+      childEnv,
+      packageRoot,
+      isVoiceChild,
     });
     log("info", "Child process spawned", {
       pid: child.pid,

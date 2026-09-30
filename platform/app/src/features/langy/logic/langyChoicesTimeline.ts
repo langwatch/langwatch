@@ -5,8 +5,13 @@
  * the right answer for free: scrub before the selection and the question is
  * open, scrub past it and the card is locked.
  *
+ * A choices card reaches the panel two ways, and both are message PARTS: the
+ * `question` tool call the agent makes mid-turn, and a stamped card part read
+ * back from the durable record. Prose is never one of them, so the timeline
+ * reads parts only.
+ *
  * Per message, in conversation order:
- *   - an assistant message contributes a `question` entry per choices block
+ *   - an assistant message contributes a `question` entry per choices card
  *     it carries (its OWN prose never supersedes its own question);
  *   - a user message carrying selection parts contributes those selections
  *     (its "Chose: X" text is part of the answer, not a second exchange);
@@ -19,7 +24,6 @@ import {
   parseLangyChoiceSelectionPart,
 } from "@langwatch/langy";
 
-import { langyAnswerSegmentsFromText } from "./langyAnswerSegments";
 import { isQuestionToolPart, questionToolCardParts } from "./langyQuestionTool";
 
 interface MessageLike {
@@ -27,33 +31,6 @@ interface MessageLike {
   parts?: readonly unknown[];
   /** `{recorded: true}` marks a message read back from the durable fold. */
   metadata?: unknown;
-}
-
-/**
- * The choices blocks an UNSTAMPED assistant message renders — the copy this
- * browser streamed, whose fences the relay never got to stamp for it (see
- * `langyAnswerSegmentsFromText`). The timeline has to see exactly what the
- * renderer draws: a question the reader can see but that never reached the
- * timeline derives as "never recorded", so the card renders permanently
- * closed and the reader watches Langy ask a question it will not accept an
- * answer to.
- */
-function streamedChoicesBlockIds(message: MessageLike): string[] {
-  const recorded =
-    (message.metadata as { recorded?: boolean } | undefined)?.recorded === true;
-  if (recorded) return [];
-  const text = (message.parts ?? [])
-    .filter(
-      (part): part is { type: "text"; text: string } =>
-        (part as { type?: string }).type === "text",
-    )
-    .map((part) => part.text)
-    .join("\n\n");
-  return (langyAnswerSegmentsFromText(text) ?? []).flatMap((segment) =>
-    segment.type === "card" && segment.part.card.kind === "choices"
-      ? [segment.part.blockId]
-      : [],
-  );
 }
 
 export function langyChoicesTimeline(
@@ -82,12 +59,6 @@ export function langyChoicesTimeline(
             timeline.push({ kind: "question", blockId: questionCard.blockId });
             sawQuestion = true;
           }
-        }
-      }
-      if (!sawQuestion) {
-        for (const blockId of streamedChoicesBlockIds(message)) {
-          timeline.push({ kind: "question", blockId });
-          sawQuestion = true;
         }
       }
       if (!sawQuestion) timeline.push({ kind: "message" });

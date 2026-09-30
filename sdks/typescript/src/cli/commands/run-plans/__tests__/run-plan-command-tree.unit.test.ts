@@ -76,6 +76,7 @@ describe("the run plan and test suite commands, given the CLI command tree", () 
     expect(subcommands).toEqual([
       "list",
       "create",
+      "update",
       "get",
       "rename",
       "archive",

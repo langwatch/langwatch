@@ -43,6 +43,48 @@ export type ChunkOffset = {
 };
 
 /**
+ * Read a persisted `chunkOffsets` JSON value back as a typed, VALIDATED offsets
+ * array — or an empty array, meaning "do not trust this index, fall back to
+ * `chunkCount`".
+ *
+ * All-or-nothing on purpose. A half-written array (an interrupted migration
+ * that somehow committed) has entries that pass a per-entry check and entries
+ * that do not, and keeping only the survivors is worse than keeping none: a
+ * paged read would serve an empty page against a positive `rowCount`, and a
+ * search would scan only the chunks the surviving entries describe and report
+ * "no matches" for rows the pager still displays. Both callers reject the whole
+ * array on one bad entry so the same dataset cannot answer two ways.
+ */
+export const readValidChunkOffsets = (chunkOffsets: unknown): ChunkOffset[] => {
+  const raw = Array.isArray(chunkOffsets)
+    ? (chunkOffsets as unknown as ChunkOffset[])
+    : [];
+  const valid =
+    raw.length > 0 &&
+    raw.every(
+      (o) =>
+        o != null &&
+        Number.isInteger(o.index) &&
+        // Chunk keys are built by zero-padding the index, so a negative one
+        // addresses no object: the read comes back empty and that chunk's rows
+        // go missing from a dataset that still reports having them.
+        o.index >= 0 &&
+        Number.isFinite(o.startRow) &&
+        Number.isFinite(o.endRow) &&
+        o.endRow >= o.startRow,
+    ) &&
+    // Each chunk named once. The two readers of this array key off different
+    // parts of it, so a repeated index makes the dataset answer two ways: the
+    // paged read selects entries by row range and fetches whatever `index`
+    // each one names, so it reads the duplicated chunk twice and never reads
+    // the one no entry names; a search deduplicates the indexes and reads it
+    // once. The grid then shows a row that the search reports no match for,
+    // which is the failure a user cannot make sense of.
+    new Set(raw.map((o) => o.index)).size === raw.length;
+  return valid ? raw : [];
+};
+
+/**
  * Lightweight per-chunk metadata — everything `chunkedMeta` needs to build the
  * PG-authoritative addressing WITHOUT the chunk's `jsonl` payload (I-MEM). The
  * streaming normalize writer maps each freshly-written `DatasetChunk` to this

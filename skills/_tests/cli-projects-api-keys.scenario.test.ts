@@ -10,7 +10,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   setupLocalCli,
-  toolCallFix,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -169,7 +168,6 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
               ),
               scenario.agent(),
               (state) => {
-                toolCallFix(state);
 
                 const allText = state.messages
                   .map((m) =>
@@ -254,7 +252,6 @@ describe("LangWatch CLI Projects & API Keys — Agent Usability", () => {
               ),
               scenario.agent(),
               (state) => {
-                toolCallFix(state);
 
                 const allText = state.messages
                   .map((m) =>

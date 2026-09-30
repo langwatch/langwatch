@@ -197,12 +197,25 @@ func TestLLMProxy(t *testing.T) {
 			t.Fatalf("first SSE line = %q", line)
 		}
 		close(firstEventRead) // the upstream may now send the second event
-		rest, err := io.ReadAll(reader)
-		if err != nil {
-			t.Fatalf("read remainder: %v", err)
+		// The second event is read on its own, not by draining to the end of the
+		// stream: what this test proves is that the write arrives, and a drain
+		// also waits for the stream to end cleanly, which the upstream server is
+		// free to cut short.
+		var second string
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				t.Fatalf("read the second SSE event: %v", err)
+			}
+			// The blank line after an event ends it and carries nothing.
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			second = line
+			break
 		}
-		if !strings.Contains(string(rest), "data: two") {
-			t.Errorf("second SSE event missing from the stream: %q", rest)
+		if !strings.Contains(second, "data: two") {
+			t.Errorf("second SSE event missing from the stream: %q", second)
 		}
 	})
 
@@ -238,7 +251,7 @@ func TestLLMTargetURL(t *testing.T) {
 }
 
 // The proxy's error capture is the wire that lets a turn's terminal frame name
-// the REAL cause instead of opencode's laundered prose. Contract: EVERY >=400
+// the REAL cause instead of the agent's laundered prose. Contract: EVERY >=400
 // answer leaves a capture for LastLLMError — a herr envelope losslessly, a
 // provider-native body as a safe handled upstream error; a later success — or a
 // new turn — clears it; the body always reaches the worker's SDK

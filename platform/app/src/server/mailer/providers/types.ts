@@ -5,6 +5,8 @@ export type EmailAttachment = {
 };
 
 export type EmailContent = {
+  /** Stable outbox delivery identity. Providers without deduplication remain at-least-once. */
+  idempotencyKey?: string;
   to: string | string[];
   subject: string;
   html: string;

@@ -65,9 +65,15 @@ class RagasResponseContextPrecisionEvaluator(
 
         llm, _ = prepare_llm(self, self.settings)
 
+        # Both scorers below read the question and the retrieved contexts, and
+        # the contexts are the bulk of a RAG payload, so the guard has to count
+        # them. Which of output and expected_output is scored depends on the
+        # same condition the scorer is picked by.
         skip = check_max_tokens(
-            output=entry.output,
+            input=entry.input,
+            output=None if entry.expected_output else entry.output,
             expected_output=entry.expected_output,
+            contexts=entry.contexts,
             settings=self.settings,
         )
         if skip:

@@ -95,8 +95,10 @@ export function parseToolModeFlag(
       if (mode) flagOverride = mode;
       // Skip the value token too (whether or not it parsed) so a bare
       // `--tool-mode gateway` never leaks `gateway` to the child as a
-      // stray positional.
-      if (value !== undefined) i++;
+      // stray positional. A following option is a missing value, not the
+      // mode: taking it would drop the `--help` of `--tool-mode --help` and
+      // start a session where the user asked for help.
+      if (value !== undefined && !value.startsWith("-")) i++;
       continue;
     }
     if (arg.startsWith(`${TOOL_MODE_FLAG}=`)) {

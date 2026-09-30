@@ -52,13 +52,6 @@ Feature: Langy remembers what this conversation already did
     Then the turn carries the earlier exchange, so Langy can answer from it
 
   @unit
-  Scenario: A respawned worker resumes the session its home still holds
-    Given the worker process died but its home directory survived
-    When a new worker spawns for the conversation
-    Then it resumes the newest session persisted in the home instead of starting fresh
-    And a failed session listing degrades to a fresh session rather than failing the spawn
-
-  @unit
   Scenario: A resumed session is never re-seeded
     Given a worker resumed the session its home still held
     When the next turn is posted

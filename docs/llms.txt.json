@@ -32,7 +32,6 @@
     "use-cases/*.mdx",
     "user-events/*.mdx",
     "optimization-studio/*.mdx",
-    "better-agents/*.mdx",
     "prompts/*.mdx",
     "skills/*.mdx",
     "langy/*.mdx",

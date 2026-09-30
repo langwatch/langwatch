@@ -284,7 +284,7 @@ describe("services/runtime", () => {
 			// Simulate a .env scaffolded while the assistant was on: the file keeps
 			// its lines (they are the user's knobs), the processes must not see them.
 			envFileContent = {
-				OPENCODE_AGENT_URL: "http://localhost:5564",
+				LANGY_AGENT_URL: "http://localhost:5564",
 				FEATURE_FLAG_FORCE_ENABLE: "release_langy_enabled,other_flag",
 			};
 			try {
@@ -293,7 +293,7 @@ describe("services/runtime", () => {
 					string,
 					string
 				>;
-				expect(childEnv.OPENCODE_AGENT_URL).toBeUndefined();
+				expect(childEnv.LANGY_AGENT_URL).toBeUndefined();
 				expect(childEnv.FEATURE_FLAG_FORCE_ENABLE).toBe("other_flag");
 				expect(childEnv.LANGWATCH_ENABLE_LANGY).toBe("false");
 			} finally {
@@ -325,7 +325,7 @@ describe("services/runtime", () => {
 				string
 			>;
 			expect(childEnv.LANGWATCH_ENABLE_LANGY).toBe("false");
-			expect(childEnv.OPENCODE_AGENT_URL).toBeUndefined();
+			expect(childEnv.LANGY_AGENT_URL).toBeUndefined();
 			// And the person running the install is told why.
 			const warning = events.find(
 				(e) =>

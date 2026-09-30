@@ -933,7 +933,7 @@
   "src/server/api/routers/__tests__/organization.base-key-redaction.integration.test.ts": 601,
   "src/server/api/routers/__tests__/organization.getAll.adminViaBindingPromotion.integration.test.ts": 82,
   "src/server/api/routers/__tests__/organization.getAll.teamMembershipEnrichment.integration.test.ts": 194,
-  "src/server/api/routers/__tests__/organization.invites.integration.test.ts": 897,
+  "src/server/api/routers/__tests__/invite.integration.test.ts": 897,
   "src/server/api/routers/__tests__/organization.member-roles.planLimit.integration.test.ts": 163,
   "src/server/api/routers/__tests__/organization.setMemberDisabled.integration.test.ts": 145,
   "src/server/api/routers/__tests__/personal-workspace-invariants.integration.test.ts": 860,

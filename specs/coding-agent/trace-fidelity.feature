@@ -56,6 +56,19 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     Then the trace belongs to the session's conversation
     And a turn span that names no session keeps the turn's own id
 
+  # The turn span is not the only carrier: every codex log record names the
+  # session too. The session fold keys a turn off that record, so a turn whose
+  # turn span never landed still moved the session row's last update, while
+  # its trace, filed under no conversation, was invisible to the replay and
+  # the conversation strip. Opening the session showed the previous turn.
+
+  @unit
+  Scenario: A codex turn is filed under its session by its log records alone
+    Given a codex log record that names its conversation
+    When the record is canonicalised
+    Then the trace belongs to the session's conversation
+    And a codex log record that names no conversation files the trace nowhere
+
   # --- Reasoning effort (the request setting, not the token count) -----------
 
   @unit
@@ -192,12 +205,80 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     When the span is ingested
     Then the span is filtered out and not stored
 
+  # Newer codex releases report their spans under the app-server's scope name
+  # instead of the originator's. Same emitter, same span names and attributes,
+  # so the same filter applies.
+
+  @unit
+  Scenario: Codex app-server sessions get the same noise filter as the TUI
+    Given a codex Path B infrastructure span (auth, rollout persistence, file read) under the codex-app-server scope
+    When the span is ingested
+    Then the span is filtered out and not stored
+    And a session_task.turn span or a gen_ai usage span under the same scope is kept
+
+  @unit
+  Scenario: A codex app-server turn carries its model and tokens
+    Given a codex session_task.turn span under the codex-app-server scope carrying model and codex.turn.token_usage
+    When the span is canonicalised
+    Then the model and token counts are lifted onto gen_ai attributes
+    And the turn's handle_responses span is flagged so its usage is not counted twice
+
   @unit
   Scenario: Codex tool spans are filtered so a tool call never mints its own trace
     Given a codex Path B tool span whose parent span lives in another trace
     When the span is ingested
     Then the span is filtered out and not stored
     And the tool call is still shown in the terminal view from its tool_result log
+
+  # --- Codex helper threads -------------------------------------------------
+  # Codex 0.154's TUI starts the thread title generator and the recap as
+  # hidden ephemeral threads through its in-process app-server. The request
+  # spans that start and drive them carry request ids minted by its temporary
+  # structured request helper (`temporary-structured-<uuid>` on thread/start,
+  # `temporary-structured-turn-<uuid>` on turn/start). The request span names
+  # no thread, but its app_server.serialized_request_queue child does, and the
+  # two end together, so they arrive in one export batch. Ingestion reads the
+  # helper's thread id off the child, stamps it on the request span, and keeps
+  # that one app-server span; the helper's turn span and log events, exported
+  # in other batches, need no stamp because the session fold absorbs facts in
+  # any order.
+
+  @unit
+  Scenario: A codex temporary structured request names its helper thread
+    Given one export batch holding a codex turn/start span whose request id says temporary structured
+    And the app_server.serialized_request_queue child that names the thread it queued on
+    When the batch is read for helper threads
+    Then the request span is mapped to that thread id
+    And a request span whose child is not in the batch is mapped to nothing
+
+  @unit
+  Scenario: A codex helper request and its queue child split across scope entries still join
+    Given one export request whose codex turn/start span and its queue child sit under different scope entries
+    When the request is read for helper threads
+    Then the request span is mapped to the thread id the child names
+    And a request span under a scope that is not codex is mapped to nothing
+
+  @unit
+  Scenario: The codex helper request span is stored with its thread id
+    Given a codex helper thread's request span and its queue child in one batch
+    When the batch is ingested
+    Then the request span is stored carrying the helper's thread id
+    And the queue child is filtered out
+    And the helper's turn span, ingested in a later batch, is stored as it came
+
+  @unit
+  Scenario: A codex app-server helper request is stored with its thread id
+    Given a codex helper thread's request span and its queue child exported under the app-server scope
+    When the batch is ingested
+    Then the request span is stored carrying the helper's thread id and marks its session auxiliary
+    And the user's own request span under that scope is filtered out
+
+  @unit
+  Scenario: A codex turn of the user's own is not marked
+    Given a codex turn/start span whose request id is the client's own counter
+    When the turn's spans are ingested
+    Then the request span is filtered out
+    And the turn span is stored without a thread id stamp
 
   @unit
   Scenario: Opencode infrastructure spans are filtered out at ingestion
@@ -213,7 +294,7 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
 
   @unit
   Scenario: Spans from other instrumentation scopes are never filtered
-    Given a span from any scope other than codex_cli_rs or opencode
+    Given a span from any scope other than codex's (codex_cli_rs, codex_exec, codex-app-server) or opencode
     When the span is ingested
     Then the span is kept regardless of its name or attributes
 

@@ -32,6 +32,14 @@ Feature: Agent REST API
     When I call GET /api/v1/agents
     Then I receive a paginated response with 0 agents
 
+  @integration
+  Scenario: A listed connected agent carries its owner and whether the caller can choose it
+    Given "support-agent" in "development" has a row owned by a person and a row scoped to a host
+    When I call GET /api/v1/agents with a project key
+    Then both rows are in the answer
+    And the personal row carries its owner and reads as not selectable
+    And the host-scoped row reads as selectable
+
   # ── Create Agent ─────────────────────────────────────────────
 
   @integration

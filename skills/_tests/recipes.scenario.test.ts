@@ -1,4 +1,4 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -9,8 +9,6 @@ import { openai } from "@ai-sdk/openai";
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
-  toolCallFix,
-  assertSkillWasRead,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
@@ -115,7 +113,6 @@ describe("Recipes", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "generate-rag-dataset");
 
             // Find CSV or Python dataset files
@@ -215,7 +212,6 @@ describe("Recipes", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "test-compliance");
 
             // Find test files (Python or TypeScript)
@@ -314,7 +310,6 @@ describe("Recipes", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "debug-instrumentation");
 
             // Verify the agent used the langwatch CLI for trace inspection

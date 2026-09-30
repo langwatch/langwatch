@@ -170,6 +170,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       const dispatchCancel = createCancelExecutionHandler({
+        getAttachedEvaluators: async () => new Map(),
         getPool: () => null,
         commands: () => {
           throw new Error("unused: the cancel intent never reports an outcome");
@@ -420,6 +421,9 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         },
         agentInstanceRecorder: {
           recordAgentInstance: async () => undefined,
+        },
+        cutAtLimitRecorder: {
+          recordCutAtLimit: vi.fn(async () => {}),
         },
       };
 

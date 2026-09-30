@@ -84,6 +84,19 @@ type Tenant struct {
 	// the log of what just happened is the reason they are looking.
 	apps   []*Application
 	events []Event
+	// provisioning is where this tenant sends its directory — a real service
+	// provider's SCIM address and the token that provider issued (see
+	// provisioning.go) — and lastProvisioning is what the last push or
+	// read-back made of it. Like apps and events, neither is directory state,
+	// so Reset leaves them alone: putting the seeded users back is not a
+	// reason to forget where they were going.
+	provisioning     ProvisioningTarget
+	lastProvisioning *ProvisioningOutcome
+	// scaleNote is what the last generate, churn or sync did, kept for the
+	// same reason lastProvisioning is: a form post ends in a redirect, and the
+	// answer to "what did that do?" has to survive it. Its own lock, because
+	// a sync writes it while holding none of the tenant's.
+	scaleNote scaleNote
 	// samlpSubjects makes the tenant mint Auth0-broker-style subjects
 	// (samlp|idpsim-t<n>|<user id>) so the app's SAML-brokered-login handling
 	// can be exercised over plain OIDC, the way Auth0 delivers it.

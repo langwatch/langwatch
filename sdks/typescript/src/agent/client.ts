@@ -32,14 +32,22 @@ import {
   type RefusedFrame,
   type RegisterAgent,
   type RegisterInstance,
+  type RegisteredAgent,
   type RegisteredFrame,
 } from "./protocol";
 import { AgentParameterError, type ParameterReader } from "./schema";
 import {
+  describeError,
+  NoWebSocketError,
+  openTransportSocket,
+  RECONNECT_BASE_MS,
+  RECONNECT_MAX_MS,
+  reconnectDelayMs,
+  watchdogDelayMs,
+} from "./reconnect";
+import {
   type AgentTransport,
   defaultSocketFactory,
-  HttpLongPollSocket,
-  NoWebSocketError,
   resolveTransport,
   type SocketFactory,
   type SocketLike,
@@ -72,27 +80,8 @@ export interface AgentClientConfig {
   failureNoticeIntervalMs?: number;
 }
 
-export const RECONNECT_BASE_MS = 1_000;
-export const RECONNECT_MAX_MS = 30_000;
 /** The unreachable-endpoint warning repeats at most this often. */
 export const FAILURE_NOTICE_INTERVAL_MS = 5 * 60_000;
-
-/** The delay before reconnect attempt `attempt` (0-based), with jitter, in the 1 s to 30 s window. */
-export function reconnectDelayMs({
-  attempt,
-  baseMs = RECONNECT_BASE_MS,
-  maxMs = RECONNECT_MAX_MS,
-  random = Math.random,
-}: {
-  attempt: number;
-  baseMs?: number;
-  maxMs?: number;
-  random?: () => number;
-}): number {
-  const exponential = Math.min(maxMs, baseMs * 2 ** Math.min(attempt, 16));
-  const jittered = exponential * (0.75 + random() * 0.5);
-  return Math.round(Math.min(maxMs, Math.max(baseMs, jittered)));
-}
 
 const NOT_CONNECTED = "not connected to LangWatch";
 
@@ -141,9 +130,6 @@ const SHUTDOWN_SIGNALS = ["SIGINT", "SIGTERM"] as const;
 type ShutdownSignal = (typeof SHUTDOWN_SIGNALS)[number];
 
 const CLOSE_GRACE_MS = 500;
-
-const describeError = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 export class AgentClient {
   private readonly agents: AgentRuntime[] = [];
@@ -342,10 +328,13 @@ export class AgentClient {
     if (this.stopped || this.socket) return;
     let socket: SocketLike;
     try {
-      socket =
-        this.activeTransport === "http"
-          ? new HttpLongPollSocket({ url: this.httpUrl, headers: this.headers })
-          : this.openSocket({ url: this.url, headers: this.headers });
+      socket = openTransportSocket({
+        transport: this.activeTransport,
+        websocketUrl: this.url,
+        httpUrl: this.httpUrl,
+        headers: this.headers,
+        socketFactory: this.openSocket,
+      });
     } catch (error) {
       if (error instanceof NoWebSocketError) {
         this.giveUp(
@@ -440,7 +429,7 @@ export class AgentClient {
       } catch {
         // The close event follows either way.
       }
-    }, Math.max(15_000, this.heartbeatIntervalMs * 3));
+    }, watchdogDelayMs(this.heartbeatIntervalMs));
   }
 
   private registerFrame(): ClientFrame {
@@ -524,6 +513,8 @@ export class AgentClient {
       this.logger.info(
         `agent "${entry.name}" (${entry.environment}) is online${entry.url ? `: ${entry.url}` : ""}`,
       );
+      const scopeNote = scopeBanner(entry);
+      if (scopeNote) this.logger.info(scopeNote);
       for (const note of entry.parameterNotes) this.logger.warn(`agent "${entry.name}": ${note}`);
     }
     this.armWatchdog();
@@ -813,3 +804,22 @@ export function sharedClientForTests(): AgentClient | null {
 
 /** The shutdown handlers as installed, so a test can drive a signal without raising it. */
 export const shutdownForTests = { onShutdownSignal, onBeforeExit };
+
+/**
+ * What the process prints under "is online" when the agent is not shared. A
+ * personal agent is invisible to every other key, which is the surprise this
+ * line prevents; a host-scoped one is reachable by the whole project.
+ */
+const scopeBanner = (entry: RegisteredAgent): string | null => {
+  switch (entry.scope.kind) {
+    case "shared":
+      return null;
+    case "owner":
+      return (
+        `agent "${entry.name}" is personal to the owner of this API key; only their runs can target it. ` +
+        `Set LANGWATCH_AGENT_ENVIRONMENT to a shared name such as dev-shared to share it with the project`
+      );
+    case "host":
+      return `agent "${entry.name}" is scoped to this machine (${entry.scope.hostLabel}); anyone in the project can target it`;
+  }
+};

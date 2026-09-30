@@ -26,15 +26,21 @@ vi.mock("~/server/app-layer/app", async () => {
   return appPermissionsMock();
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 // The router's imperative check goes through the app-layer facade.
 vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => {
@@ -134,6 +140,11 @@ const storedRows = [
 
 function makeCaller() {
   const ctx = createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
     session: {
       user: { id: "test-user-id" },
       expires: "1",

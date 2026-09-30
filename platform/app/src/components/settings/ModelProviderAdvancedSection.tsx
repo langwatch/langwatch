@@ -10,11 +10,24 @@ import {
 } from "@chakra-ui/react";
 import { LuChevronDown } from "react-icons/lu";
 
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import {
+  parseSkipListInput,
+  skipListToInput,
+} from "~/server/modelProviders/langySkipPermissions";
+
 import { SmallLabel } from "../SmallLabel";
 
 /**
- * Editable advanced (gateway) draft. The parent form owns this state so
- * the drawer's single Save persists basic + advanced together in one
+ * The accordion item the Advanced section renders into. Exported so the parent
+ * form can expand the section to show an error it has to put on a field
+ * inside it.
+ */
+export const ADVANCED_ACCORDION_VALUE = "advanced";
+
+/**
+ * Editable advanced draft. The parent form owns this state so the drawer's
+ * single Save persists basic + advanced together in one
  * `api.modelProvider.update` mutation.
  *
  * Numeric inputs stay as raw strings until submit time so half-typed
@@ -27,6 +40,8 @@ export interface ModelProviderAdvancedDraft {
   rateLimitRpd: string;
   fallbackPriorityGlobal: string;
   providerConfigJson: string;
+  /** One pattern per line, exactly as the operator typed it. */
+  skipPermissionsModels: string;
 }
 
 export const EMPTY_ADVANCED_DRAFT: ModelProviderAdvancedDraft = {
@@ -35,6 +50,7 @@ export const EMPTY_ADVANCED_DRAFT: ModelProviderAdvancedDraft = {
   rateLimitRpd: "",
   fallbackPriorityGlobal: "",
   providerConfigJson: "",
+  skipPermissionsModels: "",
 };
 
 export function intToInput(value: number | null | undefined): string {
@@ -62,6 +78,7 @@ export function draftFromProvider(initial: {
   rateLimitRpd: number | null;
   fallbackPriorityGlobal: number | null;
   providerConfig: unknown;
+  langySkipPermissionsModels: string[] | null;
 }): ModelProviderAdvancedDraft {
   return {
     rateLimitRpm: intToInput(initial.rateLimitRpm),
@@ -69,6 +86,7 @@ export function draftFromProvider(initial: {
     rateLimitRpd: intToInput(initial.rateLimitRpd),
     fallbackPriorityGlobal: intToInput(initial.fallbackPriorityGlobal),
     providerConfigJson: jsonToInput(initial.providerConfig),
+    skipPermissionsModels: skipListToInput(initial.langySkipPermissionsModels),
   };
 }
 
@@ -83,6 +101,17 @@ export interface ParsedAdvancedPayload {
   rateLimitRpd: number | null;
   fallbackPriorityGlobal: number | null;
   providerConfig: Record<string, unknown> | null;
+}
+
+/**
+ * The skip-permissions list the payload carries: one entry per non-empty
+ * line. An empty result clears the stored list, which returns the provider to
+ * its default.
+ */
+export function parseSkipPermissionsDraft(
+  draft: ModelProviderAdvancedDraft,
+): string[] {
+  return parseSkipListInput(draft.skipPermissionsModels);
 }
 
 export function parseAdvancedDraft(
@@ -113,11 +142,13 @@ export function parseAdvancedDraft(
 }
 
 /**
- * Advanced (Gateway) accordion on the ModelProvider drawer. Collapsed by
- * default — the gateway-only knobs (rate limits, fallback priority,
- * provider config) sit out of sight on first setup, and only the
- * gateway audience expands them. Health/circuit state are read-only
- * below the editable fields when present.
+ * Advanced accordion on the ModelProvider drawer. Collapsed by default, so
+ * the knobs nobody needs on first setup stay out of sight.
+ *
+ * Two audiences share it. `showGatewayFields` adds the gateway-only knobs
+ * (rate limits, fallback priority, provider config, and the read-only health
+ * state); `showSkipPermissionsField` adds the models allowed to skip Langy's
+ * permission checks. Either one on its own is enough to render the section.
  *
  * State is owned by the parent form; this component is pure UI. The
  * Save button at the bottom of the drawer persists basic + advanced in
@@ -128,6 +159,10 @@ export function ModelProviderAdvancedSection({
   draft,
   onDraftChange,
   jsonError,
+  skipPermissionsError,
+  skipPermissionsPlaceholder,
+  showGatewayFields,
+  showSkipPermissionsField,
   initial,
   accordionValue,
   onAccordionValueChange,
@@ -136,6 +171,12 @@ export function ModelProviderAdvancedSection({
   draft: ModelProviderAdvancedDraft;
   onDraftChange: (next: ModelProviderAdvancedDraft) => void;
   jsonError: string | null;
+  /** Field-level refusal for the skip-permissions list, from the server. */
+  skipPermissionsError: string | null;
+  /** The provider's own default list, shown when the field is empty. */
+  skipPermissionsPlaceholder: string;
+  showGatewayFields: boolean;
+  showSkipPermissionsField: boolean;
   initial: {
     healthStatus?: string | null;
     circuitOpenedAt?: Date | string | null;
@@ -146,7 +187,7 @@ export function ModelProviderAdvancedSection({
    * Controlled accordion expansion. Lifted so the parent form can
    * auto-expand on malformed JSON at Save time — otherwise the inline
    * `jsonError` renders inside collapsed content and the user gets no
-   * feedback. `[]` = collapsed, `["advanced-gateway"]` = expanded.
+   * feedback. `[]` = collapsed, `[ADVANCED_ACCORDION_VALUE]` = expanded.
    */
   accordionValue: string[];
   onAccordionValueChange: (value: string[]) => void;
@@ -169,127 +210,172 @@ export function ModelProviderAdvancedSection({
       value={accordionValue}
       onValueChange={(details) => onAccordionValueChange(details.value)}
     >
-      <Accordion.Item value="advanced-gateway" width="full">
+      <Accordion.Item value={ADVANCED_ACCORDION_VALUE} width="full">
         <Accordion.ItemTrigger paddingY={2}>
           <HStack width="full" justify="space-between">
-            <SmallLabel>Advanced (Gateway)</SmallLabel>
+            <SmallLabel>Advanced</SmallLabel>
             <Accordion.ItemIndicator>
               <LuChevronDown />
             </Accordion.ItemIndicator>
           </HStack>
         </Accordion.ItemTrigger>
         <Accordion.ItemContent>
-          {!modelProviderId ? (
-            <Box width="full" paddingY={2}>
-              <Text fontSize="xs" color="gray.500">
-                Save the provider first to configure rate limits and routing
-                hints.
-              </Text>
-            </Box>
-          ) : (
-            <VStack align="start" width="full" gap={3} paddingTop={2}>
-              <HStack width="full" align="start" gap={3}>
-                <Field.Root>
-                  <SmallLabel>RPM</SmallLabel>
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="No cap"
-                    value={draft.rateLimitRpm}
-                    onChange={(e) => setField("rateLimitRpm")(e.target.value)}
-                  />
-                  <Field.HelperText>Requests per minute.</Field.HelperText>
-                </Field.Root>
-
-                <Field.Root>
-                  <SmallLabel>TPM</SmallLabel>
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="No cap"
-                    value={draft.rateLimitTpm}
-                    onChange={(e) => setField("rateLimitTpm")(e.target.value)}
-                  />
-                  <Field.HelperText>Tokens per minute.</Field.HelperText>
-                </Field.Root>
-
-                <Field.Root>
-                  <SmallLabel>RPD</SmallLabel>
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="No cap"
-                    value={draft.rateLimitRpd}
-                    onChange={(e) => setField("rateLimitRpd")(e.target.value)}
-                  />
-                  <Field.HelperText>Requests per day.</Field.HelperText>
-                </Field.Root>
-              </HStack>
-
+          <VStack align="start" width="full" gap={3} paddingTop={2}>
+            {showSkipPermissionsField && (
               <Field.Root>
-                <SmallLabel>Fallback priority</SmallLabel>
-                <Input
-                  type="number"
-                  placeholder="Auto"
-                  value={draft.fallbackPriorityGlobal}
-                  onChange={(e) =>
-                    setField("fallbackPriorityGlobal")(e.target.value)
-                  }
-                />
-                <Field.HelperText>
-                  Order used when a Virtual Key has no Routing Policy. Lower
-                  tries first. Tiebreak by creation order.
-                </Field.HelperText>
-              </Field.Root>
-
-              <Field.Root>
-                <SmallLabel>Provider config (JSON)</SmallLabel>
+                <HStack gap={0}>
+                  <SmallLabel>
+                    Models allowed to skip Langy permission checks
+                  </SmallLabel>
+                  <FieldInfoTooltip
+                    testId="skip-permissions-models-info"
+                    description="Langy can run commands on a developer's machine without asking when the conversation runs on one of these models. Leave the field empty to use the models this provider trusts by default."
+                  />
+                </HStack>
                 <Textarea
                   rows={4}
-                  placeholder={`{\n  "region": "us-east-1"\n}`}
+                  aria-label="Models allowed to skip Langy permission checks"
+                  placeholder={skipPermissionsPlaceholder}
                   fontFamily="mono"
                   fontSize="xs"
-                  value={draft.providerConfigJson}
+                  value={draft.skipPermissionsModels}
                   onChange={(e) =>
-                    setField("providerConfigJson")(e.target.value)
+                    setField("skipPermissionsModels")(e.target.value)
                   }
                 />
-                {jsonError ? (
+                {skipPermissionsError ? (
                   <Text fontSize="xs" color="red.500">
-                    {jsonError}
+                    {skipPermissionsError}
                   </Text>
                 ) : (
-                  <Field.HelperText>
-                    Provider-specific routing hints. Bedrock region, Azure
-                    deployment override, etc.
-                  </Field.HelperText>
+                  <Field.HelperText>One pattern per line.</Field.HelperText>
                 )}
               </Field.Root>
+            )}
+            {showGatewayFields &&
+              (!modelProviderId ? (
+                <Box width="full" paddingY={2}>
+                  <Text fontSize="xs" color="gray.500">
+                    Save the provider first to configure rate limits and routing
+                    hints.
+                  </Text>
+                </Box>
+              ) : (
+                <>
+                  <HStack width="full" align="start" gap={3}>
+                    <Field.Root>
+                      <SmallLabel>RPM</SmallLabel>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="No cap"
+                        value={draft.rateLimitRpm}
+                        onChange={(e) =>
+                          setField("rateLimitRpm")(e.target.value)
+                        }
+                      />
+                      <Field.HelperText>Requests per minute.</Field.HelperText>
+                    </Field.Root>
 
-              <Box
-                width="full"
-                borderTop="1px solid"
-                borderColor="border.muted"
-                paddingTop={2}
-              >
-                <SmallLabel>Health (read-only)</SmallLabel>
-                <VStack align="start" gap={1} fontSize="xs" color="fg.muted">
-                  <Text>Status: {initial.healthStatus ?? "UNKNOWN"}</Text>
-                  <Text>
-                    Last checked: {formatDate(initial.lastHealthCheckAt)}
-                  </Text>
-                  <Text>
-                    Circuit opened: {formatDate(initial.circuitOpenedAt)}
-                  </Text>
-                  {initial.disabledAt && (
-                    <Text color="red.500">
-                      Disabled at: {formatDate(initial.disabledAt)}
-                    </Text>
-                  )}
-                </VStack>
-              </Box>
-            </VStack>
-          )}
+                    <Field.Root>
+                      <SmallLabel>TPM</SmallLabel>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="No cap"
+                        value={draft.rateLimitTpm}
+                        onChange={(e) =>
+                          setField("rateLimitTpm")(e.target.value)
+                        }
+                      />
+                      <Field.HelperText>Tokens per minute.</Field.HelperText>
+                    </Field.Root>
+
+                    <Field.Root>
+                      <SmallLabel>RPD</SmallLabel>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="No cap"
+                        value={draft.rateLimitRpd}
+                        onChange={(e) =>
+                          setField("rateLimitRpd")(e.target.value)
+                        }
+                      />
+                      <Field.HelperText>Requests per day.</Field.HelperText>
+                    </Field.Root>
+                  </HStack>
+
+                  <Field.Root>
+                    <SmallLabel>Fallback priority</SmallLabel>
+                    <Input
+                      type="number"
+                      placeholder="Auto"
+                      value={draft.fallbackPriorityGlobal}
+                      onChange={(e) =>
+                        setField("fallbackPriorityGlobal")(e.target.value)
+                      }
+                    />
+                    <Field.HelperText>
+                      Order used when a Virtual Key has no Routing Policy. Lower
+                      tries first. Tiebreak by creation order.
+                    </Field.HelperText>
+                  </Field.Root>
+
+                  <Field.Root>
+                    <SmallLabel>Provider config (JSON)</SmallLabel>
+                    <Textarea
+                      rows={4}
+                      placeholder={`{\n  "region": "us-east-1"\n}`}
+                      fontFamily="mono"
+                      fontSize="xs"
+                      value={draft.providerConfigJson}
+                      onChange={(e) =>
+                        setField("providerConfigJson")(e.target.value)
+                      }
+                    />
+                    {jsonError ? (
+                      <Text fontSize="xs" color="red.500">
+                        {jsonError}
+                      </Text>
+                    ) : (
+                      <Field.HelperText>
+                        Provider-specific routing hints. Bedrock region, Azure
+                        deployment override, etc.
+                      </Field.HelperText>
+                    )}
+                  </Field.Root>
+
+                  <Box
+                    width="full"
+                    borderTop="1px solid"
+                    borderColor="border.muted"
+                    paddingTop={2}
+                  >
+                    <SmallLabel>Health (read-only)</SmallLabel>
+                    <VStack
+                      align="start"
+                      gap={1}
+                      fontSize="xs"
+                      color="fg.muted"
+                    >
+                      <Text>Status: {initial.healthStatus ?? "UNKNOWN"}</Text>
+                      <Text>
+                        Last checked: {formatDate(initial.lastHealthCheckAt)}
+                      </Text>
+                      <Text>
+                        Circuit opened: {formatDate(initial.circuitOpenedAt)}
+                      </Text>
+                      {initial.disabledAt && (
+                        <Text color="red.500">
+                          Disabled at: {formatDate(initial.disabledAt)}
+                        </Text>
+                      )}
+                    </VStack>
+                  </Box>
+                </>
+              ))}
+          </VStack>
         </Accordion.ItemContent>
       </Accordion.Item>
     </Accordion.Root>

@@ -296,7 +296,12 @@ export async function generateTraceAction(
       lastProviderError = e;
       lastError = e instanceof Error ? e.message : "Unknown generation error.";
       logger.error(
-        { projectId: input.projectId, attempt, lastError, err: e },
+        providerErrorLogPayload({
+          projectId: input.projectId,
+          attempt,
+          error: e,
+          model: model.modelId,
+        }),
         "AI action generation failed",
       );
       continue;
@@ -343,6 +348,37 @@ export async function generateTraceAction(
       ? summarizeProviderError(lastProviderError, { model: model.modelId })
       : { reason: lastError, lastQuery },
   );
+}
+
+/**
+ * What a provider failure is allowed to put in the log.
+ *
+ * A rejected key makes the provider's own response body the credential (see
+ * `ai-query.summarize-provider-error.unit.test.ts`), so the log line carries
+ * the same curated fields the customer-facing disclosure carries and none of
+ * the provider's text. Every `logger.error` on a provider path builds its
+ * payload here, so there is one place to read and one place to change.
+ */
+export function providerErrorLogPayload({
+  projectId,
+  attempt,
+  error,
+  model,
+}: {
+  projectId: string;
+  attempt?: number;
+  error: unknown;
+  model?: string;
+}): {
+  projectId: string;
+  attempt?: number;
+  providerError: AiActionErrorDetails;
+} {
+  return {
+    projectId,
+    ...(attempt === undefined ? {} : { attempt }),
+    providerError: summarizeProviderError(error, model ? { model } : undefined),
+  };
 }
 
 /**
@@ -425,6 +461,467 @@ export function summarizeProviderError(
     ...(model ? { model } : {}),
     ...(httpStatus ? { httpStatus } : {}),
   };
+}
+
+/** Which unit an Instant Eval judges, decided from the lens the search ran in. */
+export type InstantEvalSearchTarget = "traces" | "threads" | "llm_spans";
+
+/** What a project already captures, so a question is not asked twice. */
+export interface KnownProjectSignals {
+  /** Evaluator names with results on the project in the window. */
+  evaluators: readonly string[];
+  /** Event names seen on the project in the window. */
+  events: readonly string[];
+}
+
+export interface InstantEvalQuestionInput {
+  projectId: string;
+  /** The sentence the user typed, bare words only. */
+  text: string;
+  target: InstantEvalSearchTarget;
+  known: KnownProjectSignals;
+}
+
+/**
+ * Either a judge question, or a filter the model preferred because an
+ * existing evaluator or event on the project already answers the sentence.
+ */
+export type InstantEvalQuestionResult =
+  | {
+      kind: "question";
+      instructions: string;
+      /** What counts as yes, and what counts as no, in that order. */
+      criteria: [string, string];
+    }
+  | { kind: "filter"; query: string; reason: string };
+
+const instantEvalQuestionSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("question"),
+    instructions: z
+      .string()
+      .min(1)
+      .max(600)
+      .describe(
+        "The judge question, one or two sentences, asked of a single trace or conversation.",
+      ),
+    yes: z
+      .string()
+      .min(1)
+      .max(300)
+      .describe("What a yes looks like in the text being judged."),
+    no: z
+      .string()
+      .min(1)
+      .max(300)
+      .describe("What a no looks like in the text being judged."),
+  }),
+  z.object({
+    kind: z.literal("filter"),
+    query: z
+      .string()
+      .min(1)
+      .describe(
+        "A trace query using an evaluator or event the project already has.",
+      ),
+    reason: z
+      .string()
+      .min(1)
+      .max(200)
+      .describe("One sentence naming the evaluator or event that answers it."),
+  }),
+]);
+
+/**
+ * Rewrite a sentence into a judge question with yes/no criteria, or point at
+ * an evaluator or event the project already has when one answers the same
+ * thing. Raises {@link AiQueryProviderError} when the model does not answer
+ * usably; the caller decides what the search does then.
+ */
+export async function generateInstantEvalQuestion(
+  input: InstantEvalQuestionInput,
+): Promise<InstantEvalQuestionResult> {
+  const model = await getVercelAIModel({
+    projectId: input.projectId,
+    featureKey: "traces.ai_search",
+  });
+  let object: z.infer<typeof instantEvalQuestionSchema>;
+  try {
+    const generated = await generateObject({
+      model,
+      schemaName: "InstantEvalQuestion",
+      schemaDescription:
+        "A yes/no judge question over one trace, or a filter using an existing evaluator or event.",
+      schema: instantEvalQuestionSchema,
+      system: buildInstantEvalQuestionPrompt(input),
+      prompt: input.text,
+      maxRetries: 1,
+    });
+    object = generated.object;
+  } catch (e) {
+    logger.error(
+      providerErrorLogPayload({
+        projectId: input.projectId,
+        error: e,
+        model: model.modelId,
+      }),
+      "Instant Eval question generation failed",
+    );
+    throw new AiQueryProviderError(
+      summarizeProviderError(e, { model: model.modelId }),
+    );
+  }
+  if (object.kind === "filter") {
+    const validation = validateQuery(object.query);
+    if (!validation.ok) {
+      throw new AiQueryProviderError({
+        reason: validation.error,
+        lastQuery: object.query,
+      });
+    }
+    return { kind: "filter", query: object.query, reason: object.reason };
+  }
+  return {
+    kind: "question",
+    instructions: object.instructions,
+    criteria: [object.yes, object.no],
+  };
+}
+
+function buildInstantEvalQuestionPrompt(
+  input: InstantEvalQuestionInput,
+): string {
+  const unit =
+    input.target === "threads"
+      ? "a whole conversation (every turn between the user and the assistant)"
+      : input.target === "llm_spans"
+        ? "a single model call (its input and output)"
+        : "a single trace (one request to the AI application, with its spans)";
+  const evaluators =
+    input.known.evaluators.length > 0
+      ? input.known.evaluators.join(", ")
+      : "(none)";
+  const events =
+    input.known.events.length > 0 ? input.known.events.join(", ") : "(none)";
+  return `You turn an operator's sentence into a question a judge model answers
+with yes or no about ${unit}. The operator typed the sentence into a trace
+search bar, so it describes what they want to find, not a full question.
+
+Reply with a JSON object matching the \`InstantEvalQuestion\` schema.
+
+# Prefer what the project already records
+
+The project already has these evaluator results: ${evaluators}
+and these event names: ${events}
+
+If one of them answers the sentence, reply with kind \`filter\` and a trace
+query using it, plus a one-sentence \`reason\` naming it. Evaluator filters
+look like \`evaluator:<name> AND evaluatorVerdict:fail\` or
+\`evaluator:<name> AND evaluatorScore:<0.5\`; event filters look like
+\`event:<name>\`. Use only names from the lists above, spelled exactly.
+
+# Otherwise write the question
+
+Reply with kind \`question\`:
+- \`instructions\`: one or two sentences, second person, asked of the text
+  being judged. Say what to look for, not how the search bar works.
+- \`yes\`: what a yes looks like in the text.
+- \`no\`: what a no looks like in the text.
+
+Keep the operator's words where they are precise ("refund", "German"),
+replace vague ones with observable behaviour ("annoyed" becomes "the user
+expresses frustration, repeats a request, or complains about the answer").
+
+# Examples
+
+"annoyed users" →
+{"kind":"question","instructions":"Does the user express frustration or annoyance at any point in the conversation?","yes":"The user complains, repeats a request with emphasis, or uses words like frustrated, useless, ridiculous.","no":"The user stays neutral or satisfied throughout."}
+
+"answers that promise a refund" →
+{"kind":"question","instructions":"Does the assistant promise or confirm a refund?","yes":"The assistant states a refund will be issued or has been issued.","no":"The assistant explains a policy, declines, or never mentions a refund."}
+
+With evaluators including "ragas/faithfulness":
+"hallucinated answers" →
+{"kind":"filter","query":"evaluator:ragas/faithfulness AND evaluatorVerdict:fail","reason":"The faithfulness evaluator already flags unsupported answers."}`;
+}
+
+/** Where a typed sentence goes when the classifier is not there to say. */
+export type SearchRouteDecision =
+  | { route: "filter"; query: string }
+  | {
+      route: "instant_eval";
+      instructions: string;
+      criteria: [string, string];
+    }
+  | { route: "free_text" }
+  | { route: "langy" };
+
+export interface SearchRouteInput {
+  projectId: string;
+  /** The sentence the user typed, bare words only. */
+  text: string;
+  timeRange: { from: number; to: number };
+  target: InstantEvalSearchTarget;
+  known: KnownProjectSignals;
+  /** Whether the Langy route is open to this user at all. */
+  isLangyAvailable: boolean;
+  /** Whether Instant Evals are released for the project. */
+  isInstantEvalAvailable: boolean;
+}
+
+const searchRouteSchema = z.discriminatedUnion("route", [
+  z.object({
+    route: z.literal("filter"),
+    query: z
+      .string()
+      .describe("The trace query language string that expresses the sentence."),
+  }),
+  z.object({
+    route: z.literal("instant_eval"),
+    instructions: z.string().min(1).max(600),
+    yes: z.string().min(1).max(300),
+    no: z.string().min(1).max(300),
+  }),
+  z.object({ route: z.literal("free_text") }),
+  z.object({ route: z.literal("langy") }),
+]);
+
+type SearchRouteObject = z.infer<typeof searchRouteSchema>;
+
+/** A model answer that closes the loop, or the reason to ask again. */
+type SearchRouteAttempt =
+  | { done: SearchRouteDecision }
+  | { retry: { lastQuery: string; lastError: string } };
+
+function interpretSearchRouteObject({
+  decision,
+  isLangyAvailable,
+  isInstantEvalAvailable,
+}: {
+  decision: SearchRouteObject;
+  isLangyAvailable: boolean;
+  isInstantEvalAvailable: boolean;
+}): SearchRouteAttempt {
+  switch (decision.route) {
+    case "filter": {
+      const validation = validateQuery(decision.query);
+      if (validation.ok) {
+        return { done: { route: "filter", query: decision.query } };
+      }
+      return {
+        retry: { lastQuery: decision.query, lastError: validation.error },
+      };
+    }
+    case "instant_eval":
+      if (!isInstantEvalAvailable) return { done: { route: "free_text" } };
+      return {
+        done: {
+          route: "instant_eval",
+          instructions: decision.instructions,
+          criteria: [decision.yes, decision.no],
+        },
+      };
+    case "langy":
+      return { done: { route: isLangyAvailable ? "langy" : "free_text" } };
+    case "free_text":
+      return { done: { route: "free_text" } };
+  }
+}
+
+/** The system prompt, with the previous parse failure appended on a retry. */
+function searchRouteSystemPrompt({
+  systemPrompt,
+  retry,
+}: {
+  systemPrompt: string;
+  retry: { lastQuery: string; lastError: string } | null;
+}): string {
+  if (!retry) return systemPrompt;
+  return `${systemPrompt}\n\nThe previous attempt produced query "${retry.lastQuery}" which failed to parse: ${retry.lastError}\nReturn a valid query this time.`;
+}
+
+/** One structured call to the model, or the provider failure it raised. */
+async function askSearchRoute({
+  model,
+  system,
+  text,
+}: {
+  model: Awaited<ReturnType<typeof getVercelAIModel>>;
+  system: string;
+  text: string;
+}): Promise<
+  | { decision: SearchRouteObject }
+  | { providerError: { error: unknown; message: string } }
+> {
+  try {
+    const { object } = await generateObject({
+      model,
+      schemaName: "SearchRoute",
+      schemaDescription:
+        "Where a typed search sentence goes: a trace filter, a judge question, a literal phrase, or the assistant.",
+      schema: searchRouteSchema,
+      system,
+      prompt: text,
+      maxRetries: 1,
+    });
+    return { decision: object };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown generation error.";
+    return { providerError: { error, message } };
+  }
+}
+
+/**
+ * One model call that both decides the route and builds what the route
+ * needs, for deployments without the classifier. Same field catalogue and
+ * grammar as {@link generateTraceAction}, so a `filter` answer is the same
+ * query the composer would have written. A `filter` answer that does not
+ * parse is retried; every other failure raises {@link AiQueryProviderError}.
+ */
+export async function generateSearchRoute(
+  input: SearchRouteInput,
+): Promise<SearchRouteDecision> {
+  const fieldsBlock = await buildFieldsBlock(input);
+  const systemPrompt = buildSearchRoutePrompt({ fieldsBlock, input });
+  const model = await getVercelAIModel({
+    projectId: input.projectId,
+    featureKey: "traces.ai_search",
+  });
+
+  let retry: { lastQuery: string; lastError: string } | null = null;
+  let providerError: { error: unknown; message: string } | null = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const asked = await askSearchRoute({
+      model,
+      system: searchRouteSystemPrompt({ systemPrompt, retry }),
+      text: input.text,
+    });
+    if ("providerError" in asked) {
+      providerError = asked.providerError;
+      retry = null;
+      logger.error(
+        providerErrorLogPayload({
+          projectId: input.projectId,
+          attempt,
+          error: asked.providerError.error,
+          model: model.modelId,
+        }),
+        "Search route generation failed",
+      );
+      continue;
+    }
+    const outcome = interpretSearchRouteObject({
+      decision: asked.decision,
+      isLangyAvailable: input.isLangyAvailable,
+      isInstantEvalAvailable: input.isInstantEvalAvailable,
+    });
+    if ("done" in outcome) return outcome.done;
+    providerError = null;
+    retry = outcome.retry;
+    logger.info(
+      { projectId: input.projectId, attempt, ...retry },
+      "Search route query failed validation, retrying",
+    );
+  }
+
+  throw new AiQueryProviderError(
+    providerError
+      ? summarizeProviderError(providerError.error, { model: model.modelId })
+      : {
+          reason: retry?.lastError ?? "Unknown error",
+          lastQuery: retry?.lastQuery ?? "",
+        },
+  );
+}
+
+function buildSearchRoutePrompt({
+  fieldsBlock,
+  input,
+}: {
+  fieldsBlock: string;
+  input: SearchRouteInput;
+}): string {
+  const evaluators =
+    input.known.evaluators.length > 0
+      ? input.known.evaluators.join(", ")
+      : "(none)";
+  const events =
+    input.known.events.length > 0 ? input.known.events.join(", ") : "(none)";
+  const langyRoute = input.isLangyAvailable
+    ? `4. **\`langy\`**: the sentence needs several steps, reasoning over
+   many traces, or data the filters cannot reach ("why did errors spike
+   this morning", "compare this week with last week", "summarise what
+   changed"). The assistant takes it as a question.`
+    : `4. \`langy\` is not available to this operator; never pick it.`;
+  const instantEvalRoute = input.isInstantEvalAvailable
+    ? `2. **\`instant_eval\`**: finding the traces needs reading each one and
+   judging it ("annoyed users", "answers that promise a refund",
+   "conversations in German"), and no evaluator or event below already
+   captures it. Write the judge question: \`instructions\` (one or two
+   sentences, second person, about one ${
+     input.target === "threads" ? "conversation" : "trace"
+}), \`yes\` and \`no\` (what each looks like in the text).`
+    : `2. \`instant_eval\` is not available on this project; never pick it. A
+   sentence that needs a judgement is a \`filter\` when an evaluator or
+   event below answers it, and \`free_text\` otherwise.`;
+  const judgementExample = input.isInstantEvalAvailable
+    ? `{"route":"instant_eval","instructions":"Does the user express frustration or annoyance at any point?","yes":"The user complains, repeats a request with emphasis, or uses words like frustrated or useless.","no":"The user stays neutral or satisfied throughout."}`
+    : `{"route":"free_text"}`;
+  return `You decide what an operator's search-bar sentence is, and build what it
+needs. The operator is looking at a list of LLM traces and typed words
+without \`field:value\` syntax. Reply with a JSON object matching the
+\`SearchRoute\` schema.
+
+# The four routes
+
+1. **\`filter\`**: the sentence can be written in the trace query language
+   with the fields below ("errors from gpt-4 over five seconds",
+   "traces with negative feedback"). Build the \`query\`.
+${instantEvalRoute}
+3. **\`free_text\`**: the sentence is a literal string to find in the
+   traces ("order 4521", "cannot connect to database", a quoted error).
+${langyRoute}
+
+When a sentence is a plain filter and also a judgement, prefer \`filter\`.
+When it is a judgement and an evaluator or event below already answers
+it, prefer \`filter\` with that evaluator or event.
+
+The project already has these evaluator results: ${evaluators}
+and these event names: ${events}
+
+# The trace query language, for the \`filter\` route
+
+${QUERY_SYNTAX_DOC}
+
+## Fields available (with sample values)
+
+${fieldsBlock}
+
+# Hard rules
+
+- Use ONLY the fields listed above; drop an attribute you cannot map
+  rather than guess a field name.
+- The view already has a time-range selector. Do NOT include date or time
+  clauses; "today" and "last hour" are not part of the query.
+- AND, OR, NOT in uppercase. Value-side OR with parens:
+  \`status:(error OR warning)\`. Wildcards with \`*\`. Ranges as
+  \`[low TO high]\` or comparisons.
+- No code fences, no prose, no extra JSON fields.
+
+# Examples
+
+"errors from gpt-4 over five seconds" →
+{"route":"filter","query":"status:error AND model:gpt-4* AND duration:>5000"}
+
+"annoyed users" →
+${judgementExample}
+
+"cannot connect to database" →
+{"route":"free_text"}
+
+"why did errors spike this morning" →
+{"route":"${input.isLangyAvailable ? "langy" : "free_text"}"}`;
 }
 
 function buildActionSystemPrompt(fieldsBlock: string): string {

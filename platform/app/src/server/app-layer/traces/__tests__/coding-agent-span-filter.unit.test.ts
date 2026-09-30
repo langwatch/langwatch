@@ -15,6 +15,28 @@ describe("shouldFilterCodingAgentSpan", () => {
         ).toBe(false);
       });
 
+      /** @scenario "The codex helper request span is stored with its thread id" */
+      it("keeps a turn/start request span once ingestion stamped a helper thread id on it", () => {
+        expect(
+          shouldFilterCodingAgentSpan({
+            scopeName: "codex_cli_rs",
+            spanName: "turn/start",
+            attributeKeys: ["rpc.request_id", "langwatch.thread.id"],
+          }),
+        ).toBe(false);
+      });
+
+      /** @scenario "A codex turn of the user's own is not marked" */
+      it("drops a turn/start request span that carries no stamp", () => {
+        expect(
+          shouldFilterCodingAgentSpan({
+            scopeName: "codex_cli_rs",
+            spanName: "turn/start",
+            attributeKeys: ["rpc.request_id", "thread.id"],
+          }),
+        ).toBe(true);
+      });
+
       it("keeps a model-call span carrying gen_ai usage", () => {
         expect(
           shouldFilterCodingAgentSpan({
@@ -109,6 +131,66 @@ describe("shouldFilterCodingAgentSpan", () => {
           ).toBe(false);
         }
       });
+    });
+  });
+});
+
+describe("shouldFilterCodingAgentSpan for the codex-app-server scope", () => {
+  describe("when the span is ingested", () => {
+    /** @scenario "Codex app-server sessions get the same noise filter as the TUI" */
+    it("drops the app-server wire's infra spans", () => {
+      for (const spanName of [
+        "auth",
+        "persist_rollout_items",
+        "fs.read_file",
+        "account/rateLimits/read",
+        "realtime_conversation.running_state",
+        "append_items",
+      ]) {
+        expect(
+          shouldFilterCodingAgentSpan({
+            scopeName: "codex-app-server",
+            spanName,
+            attributeKeys: ["code.file.path", "thread.id", "busy_ns"],
+          }),
+        ).toBe(true);
+      }
+    });
+
+    /** @scenario "Codex app-server sessions get the same noise filter as the TUI" */
+    it("keeps the turn rollup and usage-bearing response spans", () => {
+      expect(
+        shouldFilterCodingAgentSpan({
+          scopeName: "codex-app-server",
+          spanName: "session_task.turn",
+          attributeKeys: ["model", "codex.turn.token_usage.input_tokens"],
+        }),
+      ).toBe(false);
+      expect(
+        shouldFilterCodingAgentSpan({
+          scopeName: "codex-app-server",
+          spanName: "handle_responses",
+          attributeKeys: ["gen_ai.usage.input_tokens"],
+        }),
+      ).toBe(false);
+    });
+
+    /** @scenario "Codex app-server sessions get the same noise filter as the TUI" */
+    it("keeps turn/start only once a helper thread id is stamped on it", () => {
+      expect(
+        shouldFilterCodingAgentSpan({
+          scopeName: "codex-app-server",
+          spanName: "turn/start",
+          attributeKeys: ["rpc.request_id", "thread.id"],
+        }),
+      ).toBe(true);
+      expect(
+        shouldFilterCodingAgentSpan({
+          scopeName: "codex-app-server",
+          spanName: "turn/start",
+          attributeKeys: ["rpc.request_id", "langwatch.thread.id"],
+        }),
+      ).toBe(false);
     });
   });
 });

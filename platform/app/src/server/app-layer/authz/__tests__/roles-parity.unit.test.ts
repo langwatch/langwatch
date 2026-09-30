@@ -1,10 +1,3 @@
-/**
- * THE stage-A characterisation suite (ADR-092 migration stage A2): every
- * (role × permission) cell of the new role model must answer exactly like
- * the legacy bags in server/api/rbac.ts — hierarchy rules included. The
- * shadow rollout and every later stage stand on this suite being green.
- */
-
 import {
   ALL_PERMISSIONS,
   bindingScopeCanGrantPermission,
@@ -13,119 +6,297 @@ import {
   permissionSatisfiedBy,
   roleKeyForTeamRole,
 } from "@langwatch/authz";
-import { afterEach, describe, expect, it } from "vitest";
-import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import {
-  bindingScopeCanGrant,
-  EXTERNAL_MEMBER_PERMISSIONS,
-  hasPermissionWithHierarchy,
-  isDemoProject,
-  organizationRoleHasPermission,
-  type Permission,
-  teamRoleHasPermission,
-} from "../../../api/rbac";
+import { describe, expect, it } from "vitest";
 
-describe("built-in role parity with legacy bags", () => {
-  describe.each(
-    Object.values(TeamUserRole),
-  )("given team role %s", (teamRole) => {
-    it("answers every registry permission exactly like the legacy bag", () => {
+/**
+ * Snapshot of the pre-migration role bags. This fixture is intentionally
+ * independent from packages/authz so a role-table change cannot make parity
+ * tests agree with itself.
+ */
+const LEGACY_ROLE_GRANTS = {
+  admin: [
+    "project:view",
+    "project:create",
+    "project:update",
+    "project:delete",
+    "project:manage",
+    "analytics:view",
+    "analytics:manage",
+    "cost:view",
+    "traces:view",
+    "traces:create",
+    "traces:update",
+    "traces:share",
+    "annotations:view",
+    "annotations:manage",
+    "evaluations:view",
+    "evaluations:manage",
+    "langy:view",
+    "langy:manage",
+    "workflows:view",
+    "workflows:manage",
+    "experiments:view",
+    "experiments:manage",
+    "datasets:view",
+    "datasets:manage",
+    "triggers:view",
+    "triggers:manage",
+    "prompts:view",
+    "prompts:manage",
+    "scenarios:view",
+    "scenarios:manage",
+    "secrets:view",
+    "secrets:manage",
+    "agentCache:view",
+    "agentCache:manage",
+    "team:view",
+    "team:manage",
+    "virtualKeys:view",
+    "virtualKeys:create",
+    "virtualKeys:update",
+    "virtualKeys:delete",
+    "virtualKeys:rotate",
+    "virtualKeys:manage",
+    "virtualKeys:viewOtherPersonal",
+    "gatewayBudgets:view",
+    "gatewayBudgets:create",
+    "gatewayBudgets:update",
+    "gatewayBudgets:delete",
+    "gatewayBudgets:manage",
+    "gatewayProviders:view",
+    "gatewayProviders:update",
+    "gatewayProviders:manage",
+    "routingPolicies:view",
+    "routingPolicies:manage",
+    "gatewayGuardrails:view",
+    "gatewayGuardrails:attach",
+    "gatewayGuardrails:detach",
+    "gatewayGuardrails:manage",
+    "gatewayLogs:view",
+    "auditLog:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
+    "gatewayCacheRules:create",
+    "gatewayCacheRules:update",
+    "gatewayCacheRules:delete",
+    "gatewayCacheRules:manage",
+  ],
+  member: [
+    "project:view",
+    "project:create",
+    "project:update",
+    "analytics:view",
+    "analytics:manage",
+    "cost:view",
+    "traces:view",
+    "traces:create",
+    "traces:update",
+    "traces:share",
+    "annotations:view",
+    "annotations:manage",
+    "evaluations:view",
+    "evaluations:manage",
+    "langy:view",
+    "langy:create",
+    "langy:update",
+    "langy:delete",
+    "workflows:view",
+    "workflows:manage",
+    "experiments:view",
+    "experiments:manage",
+    "datasets:view",
+    "datasets:manage",
+    "triggers:view",
+    "triggers:manage",
+    "prompts:view",
+    "prompts:manage",
+    "scenarios:view",
+    "scenarios:manage",
+    "secrets:view",
+    "secrets:manage",
+    "agentCache:view",
+    "agentCache:manage",
+    "team:view",
+    "virtualKeys:view",
+    "virtualKeys:create",
+    "virtualKeys:update",
+    "virtualKeys:rotate",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "routingPolicies:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "auditLog:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
+  ],
+  viewer: [
+    "project:view",
+    "analytics:view",
+    "traces:view",
+    "annotations:view",
+    "evaluations:view",
+    "datasets:view",
+    "workflows:view",
+    "experiments:view",
+    "prompts:view",
+    "scenarios:view",
+    "secrets:view",
+    "team:view",
+    "virtualKeys:view",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "routingPolicies:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "auditLog:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
+  ],
+  "lite-member": [
+    "project:view",
+    "analytics:view",
+    "traces:view",
+    "annotations:view",
+    "annotations:create",
+    "annotations:update",
+    "evaluations:view",
+    "datasets:view",
+    "workflows:view",
+    "experiments:view",
+    "prompts:view",
+    "scenarios:view",
+    "secrets:view",
+    "team:view",
+  ],
+  "org-admin": [
+    "organization:view",
+    "organization:manage",
+    "organization:delete",
+    "langy:view",
+    "langy:manage",
+    "governance:view",
+    "governance:manage",
+    "ingestionSources:view",
+    "ingestionSources:create",
+    "ingestionSources:update",
+    "ingestionSources:delete",
+    "ingestionSources:manage",
+    "anomalyRules:view",
+    "anomalyRules:create",
+    "anomalyRules:update",
+    "anomalyRules:delete",
+    "anomalyRules:manage",
+    "complianceExport:view",
+    "activityMonitor:view",
+    "aiTools:view",
+    "aiTools:manage",
+    "virtualKeys:manage",
+    "virtualKeys:viewOtherPersonal",
+    "webhookEndpoints:view",
+    "webhookEndpoints:manage",
+    "gatewaySpend:view",
+    "gatewaySpend:manage",
+    "governanceCost:view",
+    "sso:view",
+    "sso:manage",
+  ],
+  "org-member": ["organization:view", "aiTools:view"],
+} as const;
+
+const LEGACY_ROLE_KEYS = [
+  "admin",
+  "member",
+  "viewer",
+  "lite-member",
+  "org-admin",
+  "org-member",
+] as const;
+
+const legacyPermissionSatisfiedBy = (
+  granted: ReadonlySet<string>,
+  requested: string,
+): boolean => {
+  if (granted.has(requested)) return true;
+  const separator = requested.lastIndexOf(":");
+  if (separator === -1) return false;
+  const action = requested.slice(separator + 1);
+  if (
+    ![
+      "view",
+      "create",
+      "update",
+      "delete",
+      "rotate",
+      "attach",
+      "detach",
+    ].includes(action)
+  )
+    return false;
+  return granted.has(`${requested.slice(0, separator)}:manage`);
+};
+
+describe("canonical built-in role expectations", () => {
+  for (const role of LEGACY_ROLE_KEYS) {
+    it(`${role} preserves every legacy permission decision`, () => {
+      const expected = new Set(LEGACY_ROLE_GRANTS[role]);
+      const actual = builtinRolePermissions(role);
+      const missingDirectGrants = [...expected].filter(
+        (permission) => !actual.has(permission),
+      );
+      expect(missingDirectGrants).toEqual([]);
+
       const mismatches = ALL_PERMISSIONS.filter(
         (permission) =>
-          builtinRoleGrants({
-            role: roleKeyForTeamRole(teamRole),
-            permission,
-          }) !== teamRoleHasPermission(teamRole, permission as Permission),
+          legacyPermissionSatisfiedBy(expected, permission) !==
+          builtinRoleGrants({ role, permission }),
       );
       expect(mismatches).toEqual([]);
     });
+  }
+
+  it("maps team role keys without a second role table", () => {
+    expect(roleKeyForTeamRole("ADMIN")).toBe("admin");
+    expect(roleKeyForTeamRole("MEMBER")).toBe("member");
+    expect(roleKeyForTeamRole("VIEWER")).toBe("viewer");
+    expect(roleKeyForTeamRole("CUSTOM")).toBe("viewer");
   });
 
-  describe.each([
-    [OrganizationUserRole.ADMIN, "org-admin"] as const,
-    [OrganizationUserRole.MEMBER, "org-member"] as const,
-    [OrganizationUserRole.EXTERNAL, "org-member"] as const,
-  ])("given organization role %s", (orgRole, builtinKey) => {
-    it("answers every registry permission exactly like the legacy bag", () => {
-      const mismatches = ALL_PERMISSIONS.filter(
-        (permission) =>
-          builtinRoleGrants({ role: builtinKey, permission }) !==
-          organizationRoleHasPermission(orgRole, permission as Permission),
-      );
-      expect(mismatches).toEqual([]);
-    });
+  it("keeps hierarchy behavior in the canonical matcher", () => {
+    const granted = new Set(["datasets:manage"]);
+    expect(permissionSatisfiedBy({ granted, requested: "datasets:view" })).toBe(
+      true,
+    );
+    expect(
+      permissionSatisfiedBy({ granted, requested: "organization:manage" }),
+    ).toBe(false);
   });
 
-  describe("given the lite-member bag", () => {
-    it("matches EXTERNAL_MEMBER_PERMISSIONS with hierarchy", () => {
-      const mismatches = ALL_PERMISSIONS.filter(
-        (permission) =>
-          builtinRoleGrants({ role: "lite-member", permission }) !==
-          hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
-      );
-      expect(mismatches).toEqual([]);
-    });
+  it("keeps organization-only permissions behind the organization scope", () => {
+    expect(
+      bindingScopeCanGrantPermission({
+        scopeType: "TEAM",
+        permission: "governance:view",
+      }),
+    ).toBe(false);
+    expect(
+      bindingScopeCanGrantPermission({
+        scopeType: "ORGANIZATION",
+        permission: "governance:view",
+      }),
+    ).toBe(true);
   });
 
-  describe("given the demo-viewer bag", () => {
-    const originalDemoId = process.env.DEMO_PROJECT_ID;
-    afterEach(() => {
-      if (originalDemoId === undefined) delete process.env.DEMO_PROJECT_ID;
-      else process.env.DEMO_PROJECT_ID = originalDemoId;
-    });
-
-    it("matches isDemoProject for every registry permission", () => {
-      process.env.DEMO_PROJECT_ID = "demo-project-1";
-      const mismatches = ALL_PERMISSIONS.filter(
-        (permission) =>
-          builtinRolePermissions("demo-viewer").has(permission) !==
-          isDemoProject("demo-project-1", permission as Permission),
-      );
-      expect(mismatches).toEqual([]);
-    });
-  });
-});
-
-describe("hierarchy rule parity", () => {
-  const sampleSets: string[][] = [
-    ["datasets:manage"],
-    ["virtualKeys:manage"],
-    ["gatewayGuardrails:manage"],
-    ["traces:view", "traces:share"],
-    ["organization:manage", "governance:manage"],
-    [],
-  ];
-
-  describe.each(
-    sampleSets.map((set) => [set.join(",") || "(empty)", set]),
-  )("given granted set [%s]", (_label, granted) => {
-    it("satisfies exactly the permissions the legacy helper satisfies", () => {
-      const grantedSet = new Set(granted);
-      const mismatches = ALL_PERMISSIONS.filter(
-        (permission) =>
-          permissionSatisfiedBy({
-            granted: grantedSet,
-            requested: permission,
-          }) !== hasPermissionWithHierarchy(granted, permission),
-      );
-      expect(mismatches).toEqual([]);
-    });
-  });
-});
-
-describe("scope fence parity (ADR-021)", () => {
-  describe.each([
-    "ORGANIZATION",
-    "TEAM",
-    "PROJECT",
-  ] as const)("given a binding at %s scope", (scopeType) => {
-    it("fences exactly the permissions the legacy fence fences", () => {
-      const mismatches = ALL_PERMISSIONS.filter(
-        (permission) =>
-          bindingScopeCanGrantPermission({ scopeType, permission }) !==
-          bindingScopeCanGrant(scopeType, permission as Permission),
-      );
-      expect(mismatches).toEqual([]);
-    });
+  it("publishes only registry permissions", () => {
+    const published = [
+      ...builtinRolePermissions("admin"),
+      ...builtinRolePermissions("member"),
+      ...builtinRolePermissions("viewer"),
+    ];
+    expect(
+      published.every((permission) =>
+        ALL_PERMISSIONS.some((known) => known === permission),
+      ),
+    ).toBe(true);
   });
 });

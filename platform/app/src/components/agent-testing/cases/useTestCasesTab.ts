@@ -18,6 +18,10 @@ import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useCan } from "~/hooks/useCan";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  type OpenSuiteEditorParams,
+  useOpenSuiteEditor,
+} from "../suite/useOpenSuiteEditor";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { useAgentTestingRouting } from "../useAgentTestingRouting";
 import { useAgentTestingStore } from "../useAgentTestingStore";
@@ -58,6 +62,8 @@ export type TestCasesTabBase = {
   onNewTestCase: (testSuiteId: string | null) => void;
   /** Opens the flow that connects the agent to be tested. */
   onConnectAgent: () => void;
+  /** Opens the suite editor on one suite, at one attachment when asked. */
+  openSuiteEditor: (params: OpenSuiteEditorParams) => void;
 };
 
 function useTestCasesTabBase(): TestCasesTabBase {
@@ -77,6 +83,7 @@ function useTestCasesTabBase(): TestCasesTabBase {
     () => openDrawer(AGENT_TYPE_SELECTOR_DRAWER),
     [openDrawer],
   );
+  const openSuiteEditor = useOpenSuiteEditor();
 
   return {
     projectId: project?.id ?? "",
@@ -89,6 +96,7 @@ function useTestCasesTabBase(): TestCasesTabBase {
     toggleRail,
     onNewTestCase,
     onConnectAgent,
+    openSuiteEditor,
   };
 }
 
@@ -127,10 +135,7 @@ export function useTestCasesTab(): TestCasesTabModel {
     selectedSuiteId: view.selectedSuite?.id ?? null,
     selectSuite,
   });
-  const suiteDialog = useSuiteNameDialog({
-    suites: data.suites,
-    suiteMutations,
-  });
+  const suiteDialog = useSuiteNameDialog({ suiteMutations });
 
   const caseMutations = useCaseMutations(projectId);
   const open = useCaseOpenActions();

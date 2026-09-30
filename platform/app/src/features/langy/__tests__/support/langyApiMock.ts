@@ -118,4 +118,6 @@ export const createTrpcUtils = ({
     detail: { setData: () => undefined },
   },
   github: { getConnectionStatus: { invalidate: () => Promise.resolve() } },
+  dashboardWidgets: { list: { invalidate: () => Promise.resolve() } },
+  graphs: { getAll: { invalidate: () => Promise.resolve() } },
 });

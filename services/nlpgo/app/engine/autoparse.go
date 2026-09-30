@@ -70,7 +70,7 @@ func autoparseValue(v any, ft dsl.FieldType) any {
 			return parsed
 		}
 	default:
-		// str, image, json_schema, chat_messages and the component-config
+		// str, image, file, json_schema, chat_messages and the component-config
 		// types (signature, llm, prompting_technique, dataset, code) are
 		// kept as their string form.
 	}

@@ -683,7 +683,7 @@ export class TraceService {
     projectId: string,
     threadIds: string[],
     protections: Protections,
-    opts?: { full?: boolean; withEditOverlay?: boolean },
+    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
@@ -699,7 +699,12 @@ export class TraceService {
             projectId,
             threadIds,
             protections,
-            { resolveBlobs: opts?.full },
+            {
+              resolveBlobs: opts?.full,
+              ...(opts?.maxTraces === undefined
+                ? {}
+                : { maxTraces: opts.maxTraces }),
+            },
           );
         const enriched = await this.enrichCodingAgentTraces(projectId, traces);
         if (!opts?.withEditOverlay) return enriched;

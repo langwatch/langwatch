@@ -50,7 +50,7 @@ const attrSkipTokenAccumulation = "langwatch.reserved.skip_token_accumulation"
 // genAIModelSignalKeys are the span attributes that mark a relayed span as a
 // model call for cost purposes. Only these spans get the non-billable and
 // usage-dedup stamps; tool and plumbing spans carry no cost to classify.
-// The ai.model.* pair is what opencode's Vercel AI SDK spans actually carry
+// The ai.model.* pair is what a Vercel AI SDK span actually carries
 // on the wire (verified against live exports); the gen_ai.* names only appear
 // after ingest canonicalisation, so matching them alone misses every real
 // worker batch.
@@ -168,7 +168,7 @@ func StampMediatedUsageDedup(td ptrace.Traces) {
 //
 //   - every span's trace id becomes the turn's trace id, so the worker's
 //     activity lands in the SAME trace as the app -> control-plane -> manager
-//     spans (opencode speaks no W3C propagation; this is where continuity is
+//     spans (a worker speaks no W3C propagation; this is where continuity is
 //     restored);
 //   - every ROOT span (empty parent span id) is parented on the turn's span;
 //     non-root spans keep their span ids and parent links, so the worker's own
@@ -198,7 +198,7 @@ func ReparentOTLP(payload []byte, conversationID, actorUserID string, turn trace
 
 // customerSpanNamePrefixes are the worker span families that carry customer
 // meaning — the ai-sdk gen-ai instrumentation the agent runtime emits around
-// model calls and tool executions. Everything else opencode exports (storage
+// model calls and tool executions. Everything else a worker exports (storage
 // plumbing, session bookkeeping) is operational noise a customer cannot act
 // on; it stays out of their project, and — verified live — its dropped
 // ancestors were breaking parentage for the spans that DO matter.
@@ -238,7 +238,7 @@ func ReparentTraces(td ptrace.Traces, conversationID, actorUserID string, turn t
 	turnSpanID := pcommon.SpanID(turn.SpanID())
 	// Span ids present in THIS batch. The worker's exporter emits its span
 	// forest across batches and omits some ancestors entirely (verified
-	// against opencode's real exports), so a span whose parent is not in the
+	// against a worker's real exports), so a span whose parent is not in the
 	// batch would hang off an id the customer's trace may never contain.
 	// Batch-local orphans re-parent onto the turn span alongside the roots.
 	batchSpanIDs := make(map[pcommon.SpanID]struct{})

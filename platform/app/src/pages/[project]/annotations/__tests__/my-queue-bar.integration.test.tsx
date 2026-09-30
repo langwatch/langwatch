@@ -24,6 +24,11 @@ type TestQueueItem = {
 const mocks = vi.hoisted(() => ({
   items: [] as unknown[],
   queuesLoading: false,
+  /**
+   * Whether the step being served is the item the reviewer has left, with the
+   * one the URL names still being read.
+   */
+  stepIsStale: false,
   canUpdateAnnotations: true,
   /** Which queue item the URL names, which is what the walk moves between. */
   query: {} as Record<string, string>,
@@ -37,13 +42,41 @@ const mocks = vi.hoisted(() => ({
   invalidateQueues: vi.fn(),
 }));
 
-vi.mock("~/hooks/useAnnotationQueues", () => ({
-  useAnnotationQueues: () => ({
-    assignedQueueItems: mocks.items,
-    totalCount: mocks.items.length,
-    scoreOptions: { data: [] },
-    queuesLoading: mocks.queuesLoading,
-  }),
+/**
+ * The walk reads one step at a time, so the fixture queue stands in for the
+ * server and the step is derived from it the way the procedure derives it:
+ * the item the URL names or the first one waiting, its rank, and the ids
+ * either side. Items the reviewer has finished leave the walk.
+ */
+vi.mock("~/hooks/useAnnotationQueueWalk", () => ({
+  useAnnotationQueueWalk: ({ queueItemId }: { queueItemId?: string }) => {
+    const pending = (
+      mocks.items as { id: string; doneAt: Date | null; trace: unknown }[]
+    ).filter((item) => !item.doneAt);
+    const asked = Math.max(
+      0,
+      pending.findIndex((item) => item.id === queueItemId),
+    );
+    // A stale step is the previous item still being served while the one the
+    // URL names is read — which is what `keepPreviousData` does in the hook.
+    // Deriving it from the URL instead would serve the item the reviewer asked
+    // for, and no test could then tell a held control from a useless one.
+    const index = mocks.stepIsStale ? Math.max(0, asked - 1) : asked;
+    const item = pending[index] ?? null;
+
+    return {
+      item,
+      position: item ? index + 1 : 0,
+      total: pending.length,
+      previousItemId: pending[index - 1]?.id ?? null,
+      nextItemId: item ? (pending[index + 1]?.id ?? null) : null,
+      // Nothing readable left is what ends the walk, which an empty queue and
+      // a queue of unresolvable traces both are.
+      queueFinished: pending.every((entry) => !entry.trace),
+      queueLoading: mocks.queuesLoading,
+      stepIsStale: mocks.stepIsStale,
+    };
+  },
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -106,7 +139,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       annotation: {
-        getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
+        getQueueWalkStep: { invalidate: mocks.invalidateQueues },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
@@ -237,6 +270,7 @@ const finishQueueWithHandoff = async ({ traceIds }: { traceIds: string[] }) => {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.queuesLoading = false;
+  mocks.stepIsStale = false;
   mocks.canUpdateAnnotations = true;
   mocks.query = {};
   mocks.openDrawers = [];
@@ -284,6 +318,40 @@ describe("given a reviewer walking their annotation queue", () => {
       renderPage();
 
       expect(screen.getByText("1 of 3")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reviewer has stepped on and the new item is still being read", () => {
+    /** @scenario "Nothing acts on the item I have just stepped off" */
+    it("holds every action that would otherwise act on the item left behind", () => {
+      // The URL already names the item asked for, while the step in hand is
+      // still the one being left. Acting now finishes, or annotates, the item
+      // the reviewer has stepped away from.
+      mocks.query = { "queue-item": "item-2" };
+      mocks.stepIsStale = true;
+      renderPage();
+
+      expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Edit trace/ })).toBeDisabled();
+      expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
+    });
+
+    /** @scenario "Nothing acts on the item I have just stepped off" */
+    it("holds the conversation, whose own controls would write to the item left behind", () => {
+      mocks.query = { "queue-item": "item-2" };
+      mocks.stepIsStale = true;
+      renderPage();
+
+      // Annotating, ticking a turn into the session and opening a turn all
+      // belong to the conversation rather than the bar, and annotating writes.
+      // The hold therefore sits on the subtree that hosts them, which is what
+      // the reviewer sees dim while the item they asked for is read.
+      const thread = screen
+        .getByTestId("conversation-view")
+        .closest("[aria-busy]");
+
+      expect(thread).toHaveAttribute("aria-busy", "true");
+      expect(thread).toHaveStyle({ pointerEvents: "none" });
     });
   });
 
@@ -697,6 +765,24 @@ describe("given a reviewer walking their annotation queue", () => {
         screen.getByRole("button", { name: "Remove from queue" }),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Skip" })).toBeInTheDocument();
+    });
+
+    describe("when the reviewer has stepped on and the new item is still being read", () => {
+      /** @scenario "Nothing acts on the item I have just stepped off" */
+      it("holds the card's own actions, which sit outside the bar's cover", () => {
+        // The card is drawn above the bar, in a different part of the page, so
+        // the cover that holds the bar's buttons while the next item is read
+        // cannot reach it. Where it lands next is read from the step in hand,
+        // and that step is still the one being stepped off.
+        mocks.stepIsStale = true;
+        renderPage();
+
+        expect(
+          screen.getByRole("button", { name: "Remove from queue" }),
+        ).toBeDisabled();
+        expect(screen.getByRole("button", { name: "Skip" })).toBeDisabled();
+        expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
+      });
     });
 
     /** @scenario "An item whose trace is gone says so and offers a way on" */

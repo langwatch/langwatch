@@ -4,7 +4,7 @@ const ChakraButton = chakra("button");
 
 import type React from "react";
 import { Checkbox } from "~/components/ui/checkbox";
-import { useSelectionStore } from "../../stores/selectionStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 
 interface SelectHeaderCheckboxProps {
   /** Every trace id currently rendered on this page across every row. */
@@ -14,9 +14,9 @@ interface SelectHeaderCheckboxProps {
 export const SelectHeaderCheckbox: React.FC<SelectHeaderCheckboxProps> = ({
   traceIds,
 }) => {
-  const traceIdSet = useSelectionStore((s) => s.traceIds);
-  const mode = useSelectionStore((s) => s.mode);
-  const setMany = useSelectionStore((s) => s.setMany);
+  const traceIdSet = useExplorerStore((s) => s.selection.traceIds);
+  const mode = useExplorerStore((s) => s.selection.mode);
+  const setMany = useExplorerStore((s) => s.setSelectedMany);
 
   if (traceIds.length === 0) return null;
 

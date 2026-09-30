@@ -258,6 +258,16 @@ message.
     - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
     - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
 {{- end }}
+{{- if .Values.lwql.enabled }}
+    - LWQL_CLICKHOUSE_PASSWORD         (lwql.enabled=true; app-Secret keys ONLY
+    - LWQL_POSTGRES_READER_PASSWORD     when you own this Secret — existingSecret
+                                        or autogen off. With autogen the chart
+                                        generates them into its own
+                                        {{ include "langwatch.lwql.passwordSecretName" . }} Secret
+                                        instead. Optional either way — if absent,
+                                        LangWatchQL simply stays unprovisioned
+                                        instead of failing. See Section 8.)
+{{- end }}
 {{- $langy := (index .Values "langyagent") }}
 {{- $langySecrets := $langy.secrets | default dict }}
 {{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
@@ -293,10 +303,21 @@ message.
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
       --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if or .Values.lwql.enabled (and $langy.chartManaged (not $langyOwnSecret)) }} \{{ end }}
+{{- end }}
+{{- if .Values.lwql.enabled }}
+      --from-literal=LWQL_CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)" \
+      --from-literal=LWQL_POSTGRES_READER_PASSWORD="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
 {{- end }}
 {{- if and $langy.chartManaged (not $langyOwnSecret) }}
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+{{- end }}
+{{- if .Values.lwql.enabled }}
+
+  (The two LWQL_*_PASSWORD lines above apply only to this operator-provided path.
+  With autogen the chart generates them into its own
+  {{ include "langwatch.lwql.passwordSecretName" . }} Secret — do not add them to
+  the app Secret in that case.)
 {{- end }}
 {{- if and $langy.chartManaged $langyOwnSecret }}
 
@@ -305,4 +326,78 @@ message.
 
     kubectl -n {{ .Release.Namespace }} create secret generic {{ $langySecretName }} \
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
+{{- end }}
+{{- if and .Values.clickhouse.chartManaged (not .Values.autogen.enabled) }}
+{{- $chSecret := include "langwatch.clickhouse.secretName" . }}
+
+  {{ $chSecret }} keys (chart-managed ClickHouse, autogen.enabled=false):
+  With autogen off, templates/clickhouse/url-secret.yaml does NOT render, so
+  the chart never creates the ClickHouse credentials Secret — you must
+  pre-create it. The app composes CLICKHOUSE_URL from `password`, and a
+  replicated cluster shares `clusterSecret` for inter-node/Keeper auth;
+  NOTES never documented these keys before.
+    - password         (ClickHouse `default` user password)
+    - clusterSecret    (inter-node/Keeper auth for replicated clusters)
+
+  Pre-create command:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ $chSecret }} \
+      --from-literal=password="$(openssl rand -hex 32)" \
+      --from-literal=clusterSecret="$(openssl rand -hex 32)"
+{{- end }}
+
+──────────────────────────────────────────────────────────────────────
+8. LangWatchQL (LWQL) — governed analytics SQL
+──────────────────────────────────────────────────────────────────────
+{{- if .Values.lwql.enabled }}
+The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
+until it is on for a project, queries are refused with `lwql_not_enabled`
+while the backend objects sit ready.
+
+The application owns the LangWatchQL access model in code. How it reaches
+ClickHouse depends on the posture:
+{{- if .Values.clickhouse.chartManaged }}
+
+  Chart-managed ClickHouse (this release): RENDERED delivery. A deploy-time
+  Job ({{ .Release.Name }}-lwql-access-render-<revision>) runs the app image,
+  renders the access model, and writes it into the Secret
+  {{ .Release.Name }}-lwql-clickhouse-access. Every ClickHouse pod mounts it at
+  users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml, so the
+  restricted identity, its profile, grants, row policies and the `lwql_postgres`
+  named collection land on EVERY replica — not just the one behind the Service.
+  No access SQL DDL runs, and the restricted langwatch_lwql identity holds no
+  ACCESS MANAGEMENT. (The image still grants the `default` admin user
+  access_management; rendered delivery never uses it — only `sql` mode does.)
+  On upgrade, the ClickHouse pods roll (carrying the LWQL catalog annotation) so
+  each re-mounts the freshly rendered Secret.
+
+  Install/upgrade with `--wait-for-jobs`: `helm --wait` does not wait for Jobs,
+  and the ClickHouse mount of that Secret is REQUIRED, so if the render Job fails
+  the ClickHouse pods stay ContainerCreating instead of coming up accessless.
+  With `--wait-for-jobs` the release fails on a bad render; otherwise confirm the
+  {{ .Release.Name }}-lwql-access-render-<revision> Job reached Complete yourself.
+{{- else }}
+
+  External / bring-your-own ClickHouse: SQL DDL (`sql` mode). The chart cannot
+  write your server's config files, so the app self-provisions the model with
+  SQL DDL at boot, deriving the target from CLICKHOUSE_URL. This needs the admin
+  user allowed access-management DDL (`access_management`,
+  `named_collection_control`), the server to declare the `custom_` settings
+  prefix, and
+  `access_control_improvements.settings_constraints_replace_previous=true`. Set
+  LWQL_ACCESS_MODEL_MODE=sql (see examples/overlays/clickhouse-external.yaml). In
+  `sql` mode on a multi-host cluster without replicated access storage the app
+  refuses (AC9); acknowledge a single node with
+  LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true.
+{{- end }}
+
+Either way, Section 7 lists the two passwords (LWQL_CLICKHOUSE_PASSWORD,
+LWQL_POSTGRES_READER_PASSWORD) the chart hands the app. The `lwql_postgres`
+bridge dials the PostgreSQL that DATABASE_URL points at, converging a read-only
+`lwql_ro` role; that role's owner must be allowed to CREATE/ALTER ROLE or the
+convergence logs and LangWatchQL stays refused (fail-closed). If provisioning
+cannot complete, LangWatchQL stays unavailable — nothing else breaks.
+{{- else }}
+Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned
+and the endpoints refuse every query.
 {{- end }}

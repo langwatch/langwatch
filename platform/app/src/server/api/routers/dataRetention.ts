@@ -38,6 +38,7 @@ async function assertRetentionPlanForProject(
   await assertRetentionPlan(ctx, organizationId);
 }
 
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import {
   INDEFINITE_RETENTION_DAYS,
   type RetentionCategory,
@@ -45,7 +46,6 @@ import {
   retentionDaysInputSchema,
 } from "~/server/data-retention/retentionPolicy.schema";
 import { SCOPE_TIERS } from "~/server/scopes/scope.types";
-import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInput = z.object({

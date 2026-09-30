@@ -134,7 +134,7 @@ describe("the better-auth before-hook as the ADR-117 enforcement backstop", () =
       vi.mocked(resolveAuthProvider).mockResolvedValue("email");
     });
 
-    it("leaves the whole route table alone without consulting the gate", async () => {
+    it("blocks raw sign-up and leaves the remaining routes alone without consulting the gate", async () => {
       const { env } = await import("~/env.mjs");
       const envMock = env as unknown as { NEXTAUTH_PROVIDER: string };
       const configured = envMock.NEXTAUTH_PROVIDER;
@@ -142,7 +142,11 @@ describe("the better-auth before-hook as the ADR-117 enforcement backstop", () =
       try {
         const statuses = await statusesByPath();
 
-        expect(Object.values(statuses).every((s) => s === null)).toBe(true);
+        const { "/sign-up/email": rawSignUp, ...otherRoutes } = statuses;
+        expect(rawSignUp).toBe(404);
+        expect(
+          Object.values(otherRoutes).every((status) => status === null),
+        ).toBe(true);
         expect(platformSSOAllowed).not.toHaveBeenCalled();
       } finally {
         envMock.NEXTAUTH_PROVIDER = configured;
