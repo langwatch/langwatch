@@ -335,6 +335,36 @@ describe("given an organization whose joiner seat is Developer (ADR-143)", () =>
       expect(prisma.processManagerOutbox.createMany).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
     });
+
+    it("audits the admission itself, since no grant will", async () => {
+      const prisma = fakePrisma({ joinerRole: "DEVELOPER" });
+      const membership = new PrismaJoinMembership(
+        prisma as never,
+        { attachBindings: vi.fn() } as never,
+      );
+
+      await membership.attachDefaultMembership({
+        userId: "user_sam",
+        organizationId: ORGANIZATION_ID,
+        joinRequestId: "jreq_dev",
+        commandId: "join-approve:jreq_dev:policy:domain-auto",
+        approvedByUserId: null,
+      });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          action: "organization.member.admitted",
+          userId: "user_sam",
+          actorUserId: null,
+          organizationId: ORGANIZATION_ID,
+          metadata: {
+            seat: "DEVELOPER",
+            joinRequestId: "jreq_dev",
+            via: "domain-join",
+          },
+        },
+      });
+    });
   });
 
   describe("when the admins are told a Developer joined", () => {

@@ -10,9 +10,15 @@ import { OrganizationUserRole } from "~/generated/prisma/client";
 import { PrismaSsoMembershipRepository } from "../sso-membership.prisma.repository";
 
 function fakePrisma({ joinerRole }: { joinerRole: OrganizationUserRole }) {
+  const organizationUser = { create: vi.fn(async () => ({})) };
+  const auditLog = { create: vi.fn(async () => ({})) };
   return {
     organization: { findUnique: vi.fn(async () => ({ joinerRole })) },
-    organizationUser: { create: vi.fn(async () => ({})) },
+    $transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+      callback({ organizationUser, auditLog }),
+    ),
+    organizationUser,
+    auditLog,
   };
 }
 
@@ -28,7 +34,7 @@ describe("given an organization whose joiner seat is Developer", () => {
           userId: "user_sam",
           organizationId: "org_acme",
         }),
-      ).resolves.toBe("created");
+      ).resolves.toEqual({ outcome: "created", seat: "DEVELOPER" });
 
       expect(prisma.organizationUser.create).toHaveBeenCalledWith({
         data: {
@@ -36,6 +42,25 @@ describe("given an organization whose joiner seat is Developer", () => {
           organizationId: "org_acme",
           role: OrganizationUserRole.DEVELOPER,
           pendingSsoGrantId: null,
+        },
+      });
+    });
+
+    it("audits the admission itself, since no grant will", async () => {
+      const prisma = fakePrisma({ joinerRole: OrganizationUserRole.DEVELOPER });
+      const repository = new PrismaSsoMembershipRepository(prisma as never);
+
+      await repository.createMembership({
+        userId: "user_sam",
+        organizationId: "org_acme",
+      });
+
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          action: "organization.member.admitted",
+          userId: "user_sam",
+          organizationId: "org_acme",
+          metadata: { seat: "DEVELOPER", via: "sso" },
         },
       });
     });
@@ -49,10 +74,12 @@ describe("given an organization that never changed the setting", () => {
       const prisma = fakePrisma({ joinerRole: OrganizationUserRole.MEMBER });
       const repository = new PrismaSsoMembershipRepository(prisma as never);
 
-      await repository.createMembership({
-        userId: "user_sam",
-        organizationId: "org_acme",
-      });
+      await expect(
+        repository.createMembership({
+          userId: "user_sam",
+          organizationId: "org_acme",
+        }),
+      ).resolves.toEqual({ outcome: "created", seat: "MEMBER" });
 
       expect(prisma.organizationUser.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -60,6 +87,8 @@ describe("given an organization that never changed the setting", () => {
           pendingSsoGrantId: expect.stringMatching(/^rolebinding_/),
         }),
       });
+      // The grant attached next is this admission's audit entry.
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
   });
 });

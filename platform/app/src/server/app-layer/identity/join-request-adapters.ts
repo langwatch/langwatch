@@ -21,6 +21,10 @@ import {
 import { AuthzGrantNotConfirmedError } from "~/server/app-layer/authz/errors";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { liveGrants } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "~/server/app-layer/identity/admission-audit";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   attachMembershipGrantIntentSchema,
@@ -122,8 +126,27 @@ export class PrismaJoinMembership implements JoinMembershipPort {
       if (membership.count !== 1) return void 0;
       // A Developer holds their personal team and nothing shared, so the
       // organisation-wide grant a Full member receives below is never
-      // written for one; the membership row alone is the admission.
-      if (joinerRole === OrganizationUserRole.DEVELOPER) return void 0;
+      // written for one; the membership row alone is the admission. The
+      // grant is also what reaches the audit page for a Full member, so the
+      // Developer admission writes its own row there instead.
+      if (joinerRole === OrganizationUserRole.DEVELOPER) {
+        await tx.auditLog.create({
+          data: {
+            action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+            userId,
+            actorUserId: approvedByUserId,
+            organizationId,
+            metadata: {
+              seat: OrganizationUserRole.DEVELOPER,
+              joinRequestId,
+              via: (approvedByUserId
+                ? "join-request-approved"
+                : "domain-join") satisfies DeveloperAdmissionVia,
+            },
+          },
+        });
+        return void 0;
+      }
 
       const insertedMembership = await tx.organizationUser.findUniqueOrThrow({
         where: { userId_organizationId: { userId, organizationId } },

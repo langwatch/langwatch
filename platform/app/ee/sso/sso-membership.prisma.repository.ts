@@ -6,8 +6,15 @@ import {
   Prisma,
   type PrismaClient,
 } from "~/generated/prisma/client";
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "~/server/app-layer/identity/admission-audit";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import type { PendingSsoAdmission } from "./sso-arrival.service";
+import type {
+  PendingSsoAdmission,
+  SsoMembershipWrite,
+} from "./sso-arrival.service";
 
 /**
  * The `OrganizationUser` rows the two single-sign-on sign-in decisions read
@@ -196,34 +203,51 @@ export class PrismaSsoMembershipRepository {
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<"created" | "already-present"> {
+  }): Promise<SsoMembershipWrite> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { joinerRole: true },
     });
-    const role =
+    const seat =
       organization?.joinerRole === OrganizationUserRole.DEVELOPER
         ? OrganizationUserRole.DEVELOPER
         : OrganizationUserRole.MEMBER;
     try {
-      await this.prisma.organizationUser.create({
-        data: {
-          userId,
-          organizationId,
-          role,
-          pendingSsoGrantId:
-            role === OrganizationUserRole.MEMBER
-              ? generate(KSUID_RESOURCES.ROLE_BINDING).toString()
-              : null,
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.organizationUser.create({
+          data: {
+            userId,
+            organizationId,
+            role: seat,
+            pendingSsoGrantId:
+              seat === OrganizationUserRole.MEMBER
+                ? generate(KSUID_RESOURCES.ROLE_BINDING).toString()
+                : null,
+          },
+        });
+        // A Full member's admission audits through the grant attached next;
+        // a Developer gets none, so the row is audited here (ADR-143).
+        if (seat === OrganizationUserRole.DEVELOPER) {
+          await tx.auditLog.create({
+            data: {
+              action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+              userId,
+              organizationId,
+              metadata: {
+                seat,
+                via: "sso" satisfies DeveloperAdmissionVia,
+              },
+            },
+          });
+        }
       });
-      return "created";
+      return { outcome: "created", seat };
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
-        return "already-present";
+        return { outcome: "already-present", seat };
       }
       throw err;
     }

@@ -65,18 +65,22 @@ const connection = (
 
 /** What the membership write answers, which is the seam three cases turn on. */
 type MembershipWrite = () => Promise<"created" | "already-present">;
+type JoinerSeat = "MEMBER" | "DEVELOPER";
 
 const serviceOver = ({
   row,
   member = false,
   pendingInvite = null,
   membership = async () => "created",
+  joinerSeat = "MEMBER",
   pendingAdmission = null,
 }: {
   row: SignInConnection | null;
   member?: boolean;
   pendingInvite?: { inviteId: string } | null;
   membership?: MembershipWrite;
+  /** The seat the organization hands to joiners (ADR-143). */
+  joinerSeat?: JoinerSeat;
   pendingAdmission?: PendingSsoAdmission | null;
 }) => {
   const migrations = createIdentityMigrationFixture();
@@ -86,13 +90,16 @@ const serviceOver = ({
     const outcome = await membership();
     if (outcome === "created") {
       findMembership.mockResolvedValue(true);
-      pending = {
-        grantId: "rb_admission",
-        occurredAtMs: 1_756_000_000_000,
-        state: "pending",
-      };
+      // A Developer gets no grant, so nothing is pending for them.
+      if (joinerSeat === "MEMBER") {
+        pending = {
+          grantId: "rb_admission",
+          occurredAtMs: 1_756_000_000_000,
+          state: "pending",
+        };
+      }
     }
-    return outcome;
+    return { outcome, seat: joinerSeat };
   });
   const findPendingAdmission = vi.fn(async () => pending && { ...pending });
   const completeAdmission = vi.fn(async () => {
@@ -506,6 +513,50 @@ describe("given a domain-matched organization to join", () => {
         organizationId: "org_acme",
         organizationName: "Acme",
       });
+    });
+  });
+
+  describe("when the organization's joiner seat is Developer (ADR-143)", () => {
+    /** @scenario The joiner seat setting lands SSO joiners as Developers */
+    it("tells the admins and announces the signup without attaching any grant", async () => {
+      const parts = serviceOver({ row: connection(), joinerSeat: "DEVELOPER" });
+
+      await parts.service.joinOrganization({
+        user: USER,
+        org: ORG,
+        domain: "acme.com",
+      });
+
+      expect(parts.attachBindings).not.toHaveBeenCalled();
+      expect(parts.joinedAutomatically).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        requesterUserId: "user_ana",
+        domain: "acme.com",
+      });
+      expect(parts.announceSignup).toHaveBeenCalledWith({
+        userName: "Ana",
+        userEmail: "ana@acme.com",
+        organizationName: "Acme",
+      });
+      expect(parts.startNurturing).toHaveBeenCalledTimes(1);
+    });
+
+    it("announces nothing when a concurrent callback already created the row", async () => {
+      const parts = serviceOver({
+        row: connection(),
+        joinerSeat: "DEVELOPER",
+        membership: async () => "already-present",
+      });
+
+      await parts.service.joinOrganization({
+        user: USER,
+        org: ORG,
+        domain: "acme.com",
+      });
+
+      expect(parts.joinedAutomatically).not.toHaveBeenCalled();
+      expect(parts.announceSignup).not.toHaveBeenCalled();
+      expect(parts.attachBindings).not.toHaveBeenCalled();
     });
   });
 

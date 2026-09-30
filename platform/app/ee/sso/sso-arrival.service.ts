@@ -29,6 +29,11 @@ export interface JoinedOrganization {
   name: string;
 }
 
+export interface SsoMembershipWrite {
+  outcome: "created" | "already-present";
+  seat: "MEMBER" | "DEVELOPER";
+}
+
 export interface PendingSsoAdmission {
   grantId: string;
   occurredAtMs: number;
@@ -42,14 +47,16 @@ export interface SsoMembershipPort {
     organizationId: string;
   }): Promise<boolean>;
   /**
-   * Makes them a MEMBER. Answers `"already-present"` rather than throwing
-   * when the row is already there — a concurrent OAuth callback or a retry
-   * created it, which is idempotent success and not a failure.
+   * Makes them a member on the organisation's joiner seat (ADR-143): a
+   * Full member with a grant intent pending, or a Developer with no grant at
+   * all. Answers `"already-present"` rather than throwing when the row is
+   * already there — a concurrent OAuth callback or a retry created it, which
+   * is idempotent success and not a failure.
    */
   createMembership(args: {
     userId: string;
     organizationId: string;
-  }): Promise<"created" | "already-present">;
+  }): Promise<SsoMembershipWrite>;
   findPendingAdmission(args: {
     userId: string;
     organizationId: string;
@@ -221,10 +228,25 @@ export class SsoArrivalService {
       return;
     }
 
-    await this.deps.memberships.createMembership({
+    const written = await this.deps.memberships.createMembership({
       userId: user.id,
       organizationId: org.id,
     });
+
+    if (written.seat === "DEVELOPER") {
+      // No grant, so no pending admission to resume and nothing for a retry
+      // to re-assert: the row is the whole admission (ADR-143). Only the
+      // arrival that created it announces; a concurrent callback that found
+      // it already there has nothing new to tell anyone.
+      if (written.outcome !== "created") return;
+      await this.deps.notifications.joinedAutomatically({
+        organizationId: org.id,
+        requesterUserId: user.id,
+        domain,
+      });
+      this.announceAutoJoin({ user, org, inviteId: null });
+      return;
+    }
 
     await this.resumeAdmission({ user, organizationId: org.id, domain });
   }
