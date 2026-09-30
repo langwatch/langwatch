@@ -132,6 +132,23 @@ describe("retryDelayMs", () => {
     it("reads no wait from a message that names none", () => {
       expect(namedWaitMs("Our servers are currently overloaded")).toBeUndefined();
     });
+
+    it("reads a wait named in minutes, alone or with seconds", () => {
+      expect(namedWaitMs("Please try again in 2m")).toBe(120_000);
+      expect(namedWaitMs("Please try again in 1m30s")).toBe(90_000);
+      expect(namedWaitMs("Please try again in 2 minutes")).toBe(120_000);
+      expect(
+        retryDelayMs({ attempt: 1, errorMessage: "Please try again in 2m", random: () => 0.5 }),
+      ).toBeNull();
+    });
+
+    it("reads a Retry-After date as the time left until it", () => {
+      const now = Date.parse("2026-09-30T12:00:00Z");
+      expect(namedWaitMs("503 Retry-After: Wed, 30 Sep 2026 12:00:05 GMT", now)).toBe(5_000);
+      expect(namedWaitMs("503 Retry-After: Wed, 30 Sep 2026 11:59:00 GMT", now)).toBeUndefined();
+      expect(namedWaitMs("503 Retry-After: someday", now)).toBeUndefined();
+      expect(namedWaitMs("503 Retry-After: 3 seconds. Slow down.", now)).toBe(3_000);
+    });
   });
 });
 

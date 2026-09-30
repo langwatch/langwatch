@@ -93,20 +93,55 @@ export function isTransientModelFailure(call: FailedModelCall): boolean {
   return TRANSIENT_PATTERN.test(message);
 }
 
+/** Milliseconds per unit a provider writes after "try again in". */
+function unitMs(unit: string): number {
+  const lower = unit.toLowerCase();
+  if (lower === "ms" || lower.startsWith("milli")) return 1;
+  if (lower === "m" || lower.startsWith("min")) return 60_000;
+  return 1_000;
+}
+
+const DURATION_PART =
+  /(\d+(?:\.\d+)?)\s*(ms|milliseconds?|minutes?|mins?|m|seconds?|secs?|s)(?![a-z])/iy;
+
+/** "2m", "1m30s", "820ms", "20 seconds": the parts written back to back, summed. */
+function durationMs(text: string): number | undefined {
+  let total = 0;
+  let matched = false;
+  DURATION_PART.lastIndex = 0;
+  for (;;) {
+    const part = DURATION_PART.exec(text);
+    if (!part?.[1] || !part[2]) break;
+    total += Number(part[1]) * unitMs(part[2]);
+    matched = true;
+    while (DURATION_PART.lastIndex < text.length && text[DURATION_PART.lastIndex] === " ") {
+      DURATION_PART.lastIndex++;
+    }
+  }
+  return matched ? total : undefined;
+}
+
+/** A Retry-After value: seconds, or an HTTP date read as the time left until it. */
+function retryAfterMs(value: string, now: number): number | undefined {
+  const seconds = /^\s*(\d+(?:\.\d+)?)(?![\d:/-]|\.\d)/.exec(value);
+  if (seconds?.[1]) return Number(seconds[1]) * 1_000;
+  const at = Date.parse(value);
+  if (Number.isNaN(at) || at <= now) return undefined;
+  return at - now;
+}
+
 /**
  * The wait a provider names in its message ("Please try again in 20s",
- * "try again in 820ms", "Retry-After: 3"), in milliseconds.
+ * "try again in 1m30s", "Retry-After: 3", a Retry-After date), in milliseconds.
  */
-export function namedWaitMs(errorMessage: string): number | undefined {
-  const inPhrase = /try again in\s+(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|sec|seconds?)\b/i.exec(
-    errorMessage,
-  );
-  if (inPhrase?.[1] && inPhrase[2]) {
-    const value = Number(inPhrase[1]);
-    return inPhrase[2].toLowerCase().startsWith("m") ? value : value * 1_000;
+export function namedWaitMs(errorMessage: string, now: number = Date.now()): number | undefined {
+  const inPhrase = /try again in\s+/i.exec(errorMessage);
+  if (inPhrase) {
+    const named = durationMs(errorMessage.slice(inPhrase.index + inPhrase[0].length));
+    if (named !== undefined) return named;
   }
-  const header = /retry[- ]after[":\s]+(\d+(?:\.\d+)?)/i.exec(errorMessage);
-  if (header?.[1]) return Number(header[1]) * 1_000;
+  const header = /retry[- ]after[":\s]+([^\n"]+)/i.exec(errorMessage);
+  if (header?.[1]) return retryAfterMs(header[1], now);
   return undefined;
 }
 
