@@ -12,6 +12,15 @@ import { StoredObjectsRepository } from "../stored-objects.repository.ts";
 
 const TABLE_NAME = "stored_objects" as const;
 
+/**
+ * The table is the read-only legacy index (ADR-158) and has no TenantId column: every
+ * statement here is scoped by project_id, which the tenant guard's text check cannot see.
+ */
+const LEGACY_INDEX_UNSCOPED = {
+  reason:
+    "Read-only legacy index under ADR-158: stored_objects has no TenantId column, so the statement is filtered by project_id.",
+} as const;
+
 const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
 
 /**
@@ -131,6 +140,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
           `,
           query_params: { projectId, id },
           format: "JSONEachRow",
+          unscoped: LEGACY_INDEX_UNSCOPED,
         });
 
         const rows = await result.json<Record<string, unknown>>();
@@ -198,6 +208,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
           `,
           query_params: { projectId },
           format: "JSONEachRow",
+          unscoped: LEGACY_INDEX_UNSCOPED,
         });
 
         const rows = await result.json<{ id: string; storage_uri: string }>();
@@ -206,61 +217,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
       },
     );
   };
-
-  /**
-   * Returns every latest stored-object row for one project.
-   */
-  async findLiveRowsByProjectPage({
-    projectId,
-    afterId,
-    limit,
-  }: {
-    projectId: string;
-    afterId?: string;
-    limit: number;
-  }): Promise<StoredObject[]> {
-    const client = await this.clickhouse.resolveClient(projectId);
-
-    const result = await client.query({
-      query: `
-        SELECT
-          t.id,
-          t.project_id,
-          t.purpose,
-          t.owner_kind,
-          t.owner_id,
-          t.media_type,
-          t.size_bytes,
-          t.sha256,
-          t.storage_uri,
-          t.created_at,
-          t.inserted_at
-        FROM ${TABLE_NAME} AS t
-        WHERE t.project_id = {projectId:String}
-          AND t.id > {afterId:String}
-          AND (t.project_id, t.id, t.inserted_at) IN (
-            SELECT project_id, id, max(inserted_at)
-            FROM ${TABLE_NAME}
-            WHERE project_id = {projectId:String}
-              AND id > {afterId:String}
-            GROUP BY project_id, id
-          )
-        ORDER BY t.id
-        LIMIT {limit:UInt32}
-      `,
-      query_params: { projectId, afterId: afterId ?? "", limit },
-      format: "JSONEachRow",
-    });
-    const rows = await result.json<Record<string, unknown>>();
-    return rows.map((raw) =>
-      storedObjectSchema.parse({
-        ...raw,
-        size_bytes: Number(raw.size_bytes),
-        created_at: clickHouseDate(raw.created_at),
-        inserted_at: clickHouseDate(raw.inserted_at),
-      }),
-    );
-  }
 
   /**
    * Sums `size_bytes` of the live rows owned by a project, optionally scoped to
@@ -308,6 +264,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
           `,
           query_params: purpose ? { projectId, purpose } : { projectId },
           format: "JSONEachRow",
+          unscoped: LEGACY_INDEX_UNSCOPED,
         });
 
         const rows = await result.json<{
@@ -323,44 +280,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
       },
     );
   }
-
-  /**
-   * Deletes every stored_objects row for a project (and optionally a single owner) via ClickHouse
-   * ALTER TABLE DELETE. An arrow instance property to match the base class's property-typed
-   * declaration (see `insert` above for why).
-   */
-  deleteByProject = async ({ projectId }: { projectId: string }): Promise<void> => {
-    return tracer.withActiveSpan(
-      "StoredObjectsRepository.deleteByProject",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "clickhouse",
-          "db.operation": "DELETE",
-          "tenant.id": projectId,
-        },
-      },
-      async () => {
-        const client = await this.clickhouse.resolveClient(projectId);
-
-        await client.exec({
-          query: `
-            ALTER TABLE ${TABLE_NAME}
-            DELETE WHERE project_id = {projectId:String}
-          `,
-          query_params: { projectId },
-          clickhouse_settings: {
-            // Wait until the mutation is at least submitted before we
-            // consider the call done; we do NOT wait for finalization
-            // (that can take minutes on big partitions). The follow-up
-            // SELECT in tests uses FINAL or polls for the SELECT-side
-            // visibility flip.
-            mutations_sync: "1",
-          },
-        });
-      },
-    );
-  };
 
   /**
    * Deletes a specific subset of stored-objects rows by id within a project. An arrow instance
@@ -389,6 +308,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
           `,
           query_params: { projectId, ids },
           clickhouse_settings: { mutations_sync: "1" },
+          unscoped: LEGACY_INDEX_UNSCOPED,
         });
       },
     );

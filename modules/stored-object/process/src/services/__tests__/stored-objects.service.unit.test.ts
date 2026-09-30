@@ -61,10 +61,7 @@ function makeRepository(): StoredObjectsRepository {
     insert: vi.fn().mockResolvedValue(undefined),
     tryFindById: vi.fn().mockResolvedValue(null),
     findAllByProject: vi.fn().mockResolvedValue([]),
-    deleteByProject: vi.fn().mockResolvedValue(undefined),
     deleteByIds: vi.fn().mockResolvedValue(undefined),
-    findLiveRowsByProjectPage: () =>
-      Promise.reject(new Error("findLiveRowsByProjectPage is not used here")),
     sumSizeBytesByProject: () =>
       Promise.reject(new Error("sumSizeBytesByProject is not used here")),
   };
@@ -451,7 +448,6 @@ describe("deleteOwnedBy", () => {
         ids: ["obj-1", "obj-2"],
       });
       // The old whole-project DELETE path must NOT be used — see retention contract.
-      expect(repo.deleteByProject).not.toHaveBeenCalled();
     });
   });
 
@@ -492,7 +488,6 @@ describe("deleteOwnedBy", () => {
       await service.deleteOwnedBy({ projectId: PROJECT_ID });
 
       expect(repo.deleteByIds).not.toHaveBeenCalled();
-      expect(repo.deleteByProject).not.toHaveBeenCalled();
     });
   });
 

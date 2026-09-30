@@ -101,11 +101,13 @@ export type StoredObjectsClickHouseClient = Readonly<{
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
+    unscoped?: { reason: string };
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
   exec(input: {
     query: string;
     query_params: Record<string, unknown>;
     clickhouse_settings?: Record<string, unknown>;
+    unscoped?: { reason: string };
   }): Promise<unknown>;
 }>;
 

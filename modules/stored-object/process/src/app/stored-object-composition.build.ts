@@ -79,11 +79,13 @@ class MemberStoredObjectsClickHouseClient implements StoredObjectsClickHouseClie
   async query(input: {
     query: string;
     query_params: Record<string, unknown>;
+    unscoped?: { reason: string };
   }): Promise<{ json<Result>(): Promise<Result[]> }> {
     const result = await this.clickhouse.query({
       tenantId: this.tenantId,
       sql: input.query,
       params: input.query_params,
+      unscoped: input.unscoped,
     });
     return { json: async <Result>() => result.rows as Result[] };
   }
@@ -92,11 +94,13 @@ class MemberStoredObjectsClickHouseClient implements StoredObjectsClickHouseClie
     query: string;
     query_params: Record<string, unknown>;
     clickhouse_settings?: Record<string, unknown>;
+    unscoped?: { reason: string };
   }): Promise<unknown> {
     return this.clickhouse.command({
       tenantId: this.tenantId,
       sql: input.query,
       params: input.query_params,
+      unscoped: input.unscoped,
       ...(input.clickhouse_settings
         ? { settings: input.clickhouse_settings as Record<string, string | number> }
         : {}),

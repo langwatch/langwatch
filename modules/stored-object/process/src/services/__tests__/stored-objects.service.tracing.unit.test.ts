@@ -54,10 +54,7 @@ function makeService(): StoredObjectsService {
       insert: vi.fn(async () => undefined),
       tryFindById: vi.fn(async () => row),
       findAllByProject: vi.fn(async () => []),
-      deleteByProject: vi.fn(async () => undefined),
       deleteByIds: vi.fn(async () => undefined),
-      findLiveRowsByProjectPage: () =>
-        Promise.reject(new Error("findLiveRowsByProjectPage is not used here")),
       sumSizeBytesByProject: () =>
         Promise.reject(new Error("sumSizeBytesByProject is not used here")),
     },

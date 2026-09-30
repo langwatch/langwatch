@@ -9,13 +9,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Hoisted mocks
 // ---------------------------------------------------------------------------
 
-const { mockInsert, mockQuery, mockQueryResult } = vi.hoisted(() => {
+const { mockInsert, mockQuery, mockExec, mockQueryResult } = vi.hoisted(() => {
   const queryResult = {
     json: vi.fn().mockResolvedValue([]),
   };
   return {
     mockInsert: vi.fn().mockResolvedValue(undefined),
     mockQuery: vi.fn().mockResolvedValue(queryResult),
+    mockExec: vi.fn().mockResolvedValue(undefined),
     mockQueryResult: queryResult,
   };
 });
@@ -36,6 +37,8 @@ vi.mock("langwatch", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
+import { TenantGuard, TenantScopeError } from "@langwatch/clickhouse-client";
+
 import type { StoredObjectsClickHouse } from "../../../app/stored-object.members.ts";
 import type { StoredObject } from "../../../rules/stored-object-row.rules.ts";
 import { ClickHouseStoredObjectsRepository } from "../stored-objects.repository.ts";
@@ -46,7 +49,7 @@ class FakeStoredObjectsClickHouse implements StoredObjectsClickHouse {
     return {
       insert: mockInsert,
       query: mockQuery,
-      exec: async () => undefined,
+      exec: mockExec,
     } as never;
   }
 }
@@ -159,40 +162,27 @@ describe("StoredObjectsRepository", () => {
     });
   });
 
-  describe("findLiveRowsByProjectPage()", () => {
-    it("returns parsed latest rows from a project-scoped query", async () => {
-      mockQueryResult.json.mockResolvedValue([
-        {
-          ...makeRow(),
-          size_bytes: "5",
-          created_at: "2025-01-01 00:00:00.000",
-          inserted_at: "2025-01-02 00:00:00.000",
-        },
-      ]);
+  describe("when any statement is sent against a table with no TenantId column", () => {
+    const tenantId = "proj-1";
 
-      const result = await repo.findLiveRowsByProjectPage({
-        projectId: "proj-1",
-        afterId: "previous-id",
-        limit: 250,
-      });
+    /** @scenario "Every legacy index statement declares itself unscoped" */
+    it("declares itself unscoped, or the tenant guard refuses it", async () => {
+      mockQueryResult.json.mockResolvedValue([]);
+      await repo.tryFindById({ projectId: tenantId, id: "x" });
+      await repo.findAllByProject({ projectId: tenantId });
+      await repo.sumSizeBytesByProject({ projectId: tenantId, purpose: "trace_content" });
+      await repo.deleteByIds({ projectId: tenantId, ids: ["x"] });
 
-      expect(mockQuery).toHaveBeenCalledOnce();
-      const call = mockQuery.mock.calls[0]![0];
-      expect(call.query_params).toEqual({
-        projectId: "proj-1",
-        afterId: "previous-id",
-        limit: 250,
-      });
-      expect(call.query).toContain("max(inserted_at)");
-      expect(call.query).toContain("WHERE t.project_id = {projectId:String}");
-      expect(call.query).toContain("t.id > {afterId:String}");
-      expect(call.query).toContain("LIMIT {limit:UInt32}");
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        project_id: "proj-1",
-        size_bytes: 5,
-      });
-      expect(result[0]?.inserted_at).toEqual(new Date("2025-01-02 00:00:00.000"));
+      const sent = [...mockQuery.mock.calls, ...mockExec.mock.calls].map(([call]) => call);
+      expect(sent).toHaveLength(4);
+      for (const call of sent) {
+        const request = { tenantId, sql: call.query, params: call.query_params };
+        expect(() => new TenantGuard().assert(request)).toThrow(TenantScopeError);
+        expect(() =>
+          new TenantGuard().assert({ ...request, unscoped: call.unscoped }),
+        ).not.toThrow();
+        expect(call.query).toContain("project_id = {projectId:String}");
+      }
     });
   });
 });

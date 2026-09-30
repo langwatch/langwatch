@@ -28,6 +28,18 @@ Feature: File reads answer through the installed stored-object module
     When a key for project B reads through a URL naming project A
     Then the route answers 403
 
+  @regression
+  Scenario: An unknown id on the legacy ClickHouse index answers not found, not unavailable
+    Given the legacy stored_objects index is read through the tenant guard
+    When the byte door reads an id that neither Postgres nor the index holds
+    Then the read fails as stored_object_not_found, which the route answers 404
+
+  @regression
+  Scenario: Every legacy index statement declares itself unscoped
+    Given the stored_objects table has no TenantId column
+    When the repository sends any of its statements
+    Then the tenant guard refuses it unless it declares why it is unscoped
+
   # Signed read URLs (Alex, 2026-09-30): REST is the key's and tRPC the session's, so the
   # browser asks tRPC for a short-lived URL whose signature is the credential.
 

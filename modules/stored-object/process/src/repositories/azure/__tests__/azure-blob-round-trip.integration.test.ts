@@ -137,10 +137,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           }),
           tryFindById: vi.fn(async ({ id }: { id: string }) => rows.get(id) ?? null),
           findAllByProject: vi.fn(async () => []),
-          deleteByProject: vi.fn(async () => undefined),
           deleteByIds: vi.fn(async () => undefined),
-          findLiveRowsByProjectPage: () =>
-            Promise.reject(new Error("findLiveRowsByProjectPage is not used here")),
           sumSizeBytesByProject: () =>
             Promise.reject(new Error("sumSizeBytesByProject is not used here")),
         },
