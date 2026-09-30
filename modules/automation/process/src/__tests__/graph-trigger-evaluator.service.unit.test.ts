@@ -889,6 +889,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a breach whose dispatch throws a typed DispatchError", () => {
+    /** @scenario "A terminally failing endpoint is not re-posted every evaluation" */
     it("keeps the claim when the failure is terminal (retryable: false), so a dead endpoint is not re-posted every evaluation", async () => {
       harness.dispatch.mockRejectedValue(
         new DispatchError({ message: "webhook revoked", retryable: false }),

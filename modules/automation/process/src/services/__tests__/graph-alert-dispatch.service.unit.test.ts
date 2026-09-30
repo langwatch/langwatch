@@ -284,6 +284,32 @@ describe("GraphAlertDispatchService.dispatch over a webhook", () => {
   });
 });
 
+describe("GraphAlertDispatchService.dispatch a retried fire over a webhook", () => {
+  describe("when the same fire is retried after a successful post", () => {
+    /** @scenario "A retry of a graph alert does not re-send to an endpoint already reached" */
+    it("does not contact the endpoint a second time", async () => {
+      const alert = input({
+        trigger: {
+          id: "trigger-1",
+          name: "High latency",
+          action: "SEND_WEBHOOK",
+          actionParams: { url: "https://hook.test", bodyTemplate: null },
+        },
+        recipients: [],
+      });
+      const first = dispatcherWith();
+      await first.service.dispatch(alert);
+
+      const retry = dispatcherWith({ alreadyClaimed: first.recorded.claimed });
+      const result = await retry.service.dispatch(alert);
+
+      expect(first.recorded.webhooks).toHaveLength(1);
+      expect(retry.recorded.webhooks).toHaveLength(0);
+      expect(result.didSend).toBe(true);
+    });
+  });
+});
+
 describe("GraphAlertDispatchService.dispatch over a Slack bot", () => {
   /** @scenario "A bot-token delivery posts Block Kit" */
   it("renders Block Kit blocks when no template type is configured", async () => {

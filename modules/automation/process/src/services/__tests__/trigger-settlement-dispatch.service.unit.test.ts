@@ -68,6 +68,7 @@ describe("AutomationSettlementDispatchService", () => {
     );
   });
 
+  /** @scenario "A saved custom email template is rendered in the delivered notification" */
   it("confirms, renders, sends, and claims only eligible notification candidates", async () => {
     const fixture = createSettlementFixture(emailTrigger());
     fixture.traces.summaries.set("trace-filtered", settlementSummary("trace-filtered"));
@@ -121,6 +122,47 @@ describe("AutomationSettlementDispatchService", () => {
     expect(dailyClaims[0]).toContain("trigger-a");
     expect(dailyClaims[1]).toContain("trigger-b");
     expect(dailyClaims[0]).not.toBe(dailyClaims[1]);
+  });
+
+  /** @scenario "A saved custom Slack template is rendered in the delivered notification" */
+  it("renders a saved Slack template into the webhook message it delivers", async () => {
+    const fixture = createSettlementFixture(
+      settlementTrigger("SEND_SLACK_MESSAGE", {
+        actionParams: { slackWebhook: "https://hooks.slack.com/services/T1/B1/secret" },
+        templates: {
+          slackTemplateType: "string",
+          slackTemplate: "Saved: {{ trigger.name }}",
+          emailSubjectTemplate: null,
+          emailBodyTemplate: null,
+        },
+      }),
+    );
+
+    await fixture.service.notifyDigest(
+      { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
+      settlementContext(),
+    );
+
+    expect(fixture.delivery.legacySlackWebhooks).toHaveLength(0);
+    expect(fixture.delivery.slackWebhooks).toHaveLength(1);
+    expect(fixture.delivery.slackWebhooks[0]).toMatchObject({
+      payload: { text: "Saved: Settlement test" },
+    });
+  });
+
+  /** @scenario "A trigger with no custom templates delivers the framework default" */
+  it("delivers the framework default email when no template is saved", async () => {
+    const fixture = createSettlementFixture(
+      settlementTrigger("SEND_EMAIL", { actionParams: { members: ["ops@example.com"] } }),
+    );
+
+    await fixture.service.notifyDigest(
+      { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
+      settlementContext(),
+    );
+
+    expect(fixture.delivery.emails).toHaveLength(0);
+    expect(fixture.delivery.legacyEmails).toHaveLength(1);
   });
 
   it("suppresses a notification already claimed in an earlier settlement window", async () => {

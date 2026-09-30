@@ -36,6 +36,7 @@ describe("AutomationSlackSecretsService.persist", () => {
 
   describe("when the params name no connection", () => {
     /** @scenario "A save with no connection stores no secret" */
+    /** @scenario "The bot token is protected at rest" */
     it("keeps no bot token, webhook URL or token-set flag", () => {
       for (const incoming of [
         { slackDelivery: "bot" as const, slackChannelId: "C1", slackBotToken: BOT_TOKEN },
@@ -54,6 +55,7 @@ describe("AutomationSlackSecretsService.persist", () => {
 
 describe("readableSlackActionParams", () => {
   /** @scenario "Reading an automation returns only its connection, method and channel" */
+  /** @scenario "The bot token is protected at rest" */
   it("returns only the connection, method and channel of a row not yet migrated", () => {
     const read = readableSlackActionParams({
       slackIntegrationId: "conn-1",

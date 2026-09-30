@@ -6,6 +6,7 @@ import type { SlackApi } from "@langwatch/slack-contract";
 
 import { MemorySlackWebApiChannel } from "../../channels/memory/memory.slack-web-api.channel.ts";
 import { MemorySlackRepositories } from "../../repositories/memory/memory.slack.repositories.ts";
+import type { SlackConnectionRepository } from "../../repositories/slack-connection.repository.ts";
 import { SlackConnectionClaimService } from "../slack-connection-claim.service.ts";
 import { SlackConnectionService } from "../slack-connection.service.ts";
 
@@ -57,8 +58,9 @@ const hexCipher = {
 };
 
 /** The service over memory twins; MANAGER holds every permission, VIEWER none. */
-export function composeSlack() {
-  const repositories = MemorySlackRepositories.create();
+export function composeSlack({ connections }: { connections?: SlackConnectionRepository } = {}) {
+  const memory = MemorySlackRepositories.create();
+  const repositories = connections ? { ...memory, connections } : memory;
   const webApi = MemorySlackWebApiChannel.create();
   const service = SlackConnectionService.create({
     connections: repositories.connections,

@@ -1272,3 +1272,31 @@ describe("AutomationDrawer", () => {
     });
   });
 });
+
+describe("given the Edit automation link an alert email carries", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    host = fakeAutomationHost();
+    mockServerTriggerRow = null;
+    mockGetTriggerByIdQuery.mockImplementation(() => ({
+      data: mockTriggerRow,
+      isLoading: false,
+      error: null,
+    }));
+    useAutomationStore.getState().reset();
+  });
+
+  afterEach(cleanup);
+
+  describe("when the recipient follows it into the application", () => {
+    /** @scenario "An alert email's Edit automation link opens the automation it names" */
+    it("opens the named automation and says the reader arrived from an email", async () => {
+      mockTriggerRow = savedRow({ name: "Refund errors" });
+
+      renderDrawer({ automationId: "trigger-1", source: "email-link" });
+
+      expect(await screen.findByText(/Opened from an email notification/)).toBeInTheDocument();
+      expect(await screen.findByDisplayValue("Refund errors")).toBeInTheDocument();
+    });
+  });
+});

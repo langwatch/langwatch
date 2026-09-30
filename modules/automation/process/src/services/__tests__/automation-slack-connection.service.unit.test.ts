@@ -118,6 +118,7 @@ describe("AutomationSlackConnectionService.connectActionParams", () => {
 });
 
 describe("AutomationSlackConnectionService.withKeptLegacySlackSecret", () => {
+  /** @scenario "Editing a bot automation without re-entering the token" */
   it("puts the row's stored bot token back, decrypted, when the save typed none", () => {
     const { service } = serviceOver([]);
 

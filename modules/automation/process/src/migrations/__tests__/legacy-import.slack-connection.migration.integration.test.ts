@@ -171,4 +171,190 @@ describe("SlackConnectionMigration", () => {
       expect(world.slack.connections).toEqual([]);
     });
   });
+
+  describe("given a project whose Slack integration was set up before this change", () => {
+    const existing = {
+      id: "conn-existing",
+      name: "Existing bot",
+      kind: "BOT",
+      projectId: PROJECT_ID,
+      secret: BOT_TOKEN,
+    } as const;
+
+    /** @scenario "A project's existing connection absorbs matching automations" */
+    it("points a same-token automation and a tokenless bot automation at it, creating no second", async () => {
+      const world = slackMigrationWorld();
+      world.slack.addConnection(existing);
+      await world.addAutomation({
+        id: "with-token",
+        actionParams: {
+          slackDelivery: "bot",
+          slackBotToken: fixtureCrypto.encrypt(BOT_TOKEN),
+          slackChannelId: "C1",
+        },
+      });
+      await world.addAutomation({
+        id: "tokenless",
+        actionParams: { slackDelivery: "bot", slackChannelId: "C2" },
+      });
+
+      await world.migration.migrateTenant({ tenantId: ORGANIZATION_ID });
+
+      for (const triggerId of ["with-token", "tokenless"]) {
+        const row = await world.triggers.findByIdOrThrow({ triggerId, projectId: PROJECT_ID });
+        expect(row.actionParams).toMatchObject({ slackIntegrationId: "conn-existing" });
+      }
+      expect(world.slack.connections).toEqual([existing]);
+    });
+
+    /** @scenario "Another project's connection is never widened or borrowed" */
+    it("gives another project's same-token automation a connection of its own project", async () => {
+      const world = slackMigrationWorld();
+      world.slack.addConnection(existing);
+      await world.addAutomation({
+        id: "elsewhere",
+        projectId: OTHER_PROJECT_ID,
+        actionParams: {
+          slackDelivery: "bot",
+          slackBotToken: fixtureCrypto.encrypt(BOT_TOKEN),
+          slackChannelId: "C1",
+        },
+      });
+
+      await world.migration.migrateTenant({ tenantId: ORGANIZATION_ID });
+
+      const row = await world.triggers.findByIdOrThrow({
+        triggerId: "elsewhere",
+        projectId: OTHER_PROJECT_ID,
+      });
+      const created = world.slack.connections.filter(({ id }) => id !== existing.id);
+      expect(created).toHaveLength(1);
+      expect(created[0]).toMatchObject({ projectId: OTHER_PROJECT_ID, secret: BOT_TOKEN });
+      expect(row.actionParams).toMatchObject({ slackIntegrationId: created[0]?.id });
+      expect(world.slack.connections).toContainEqual(existing);
+    });
+  });
+
+  describe("given an organization connection holding a webhook URL", () => {
+    /** @scenario "An organization connection holding the secret is reused as it is" */
+    it("links automations in two projects to it and creates no other", async () => {
+      const world = slackMigrationWorld();
+      const shared = {
+        id: "conn-org",
+        name: "Everyone",
+        kind: "INCOMING_WEBHOOK",
+        projectId: PROJECT_ID,
+        secret: WEBHOOK_URL,
+        organizationWide: true,
+      } as const;
+      world.slack.addConnection(shared);
+      await world.addAutomation({ id: "a", actionParams: { slackWebhook: WEBHOOK_URL } });
+      await world.addAutomation({
+        id: "b",
+        projectId: OTHER_PROJECT_ID,
+        actionParams: { slackWebhook: WEBHOOK_URL },
+      });
+
+      await world.migration.migrateTenant({ tenantId: ORGANIZATION_ID });
+
+      for (const [triggerId, projectId] of [
+        ["a", PROJECT_ID],
+        ["b", OTHER_PROJECT_ID],
+      ] as const) {
+        const row = await world.triggers.findByIdOrThrow({ triggerId, projectId });
+        expect(row.actionParams).toMatchObject({ slackIntegrationId: "conn-org" });
+      }
+      expect(world.slack.connections).toEqual([shared]);
+    });
+  });
+
+  describe("given rows the migration must not touch", () => {
+    /** @scenario "Automations the migration must not touch are left unchanged" */
+    it("leaves a deleted automation, an archived project's and one already on a bare connection", async () => {
+      const world = slackMigrationWorld({ archivedProjectIds: [OTHER_PROJECT_ID] });
+      await world.addAutomation({ id: "gone", actionParams: { slackWebhook: WEBHOOK_URL } });
+      await world.triggers.update({ id: "gone", projectId: PROJECT_ID, deleted: true });
+      await world.addAutomation({
+        id: "archived",
+        projectId: OTHER_PROJECT_ID,
+        actionParams: { slackWebhook: WEBHOOK_URL },
+      });
+      await world.addAutomation({
+        id: "bare",
+        actionParams: { slackIntegrationId: "conn-1", slackDelivery: "webhook" },
+      });
+      const before = {
+        gone: await world.triggers.findByIdOrThrow({ triggerId: "gone", projectId: PROJECT_ID }),
+        archived: await world.triggers.findByIdOrThrow({
+          triggerId: "archived",
+          projectId: OTHER_PROJECT_ID,
+        }),
+        bare: await world.triggers.findByIdOrThrow({ triggerId: "bare", projectId: PROJECT_ID }),
+      };
+
+      await world.migration.migrateTenant({ tenantId: ORGANIZATION_ID });
+
+      expect(
+        await world.triggers.findByIdOrThrow({ triggerId: "gone", projectId: PROJECT_ID }),
+      ).toEqual(before.gone);
+      expect(
+        await world.triggers.findByIdOrThrow({
+          triggerId: "archived",
+          projectId: OTHER_PROJECT_ID,
+        }),
+      ).toEqual(before.archived);
+      expect(
+        await world.triggers.findByIdOrThrow({ triggerId: "bare", projectId: PROJECT_ID }),
+      ).toEqual(before.bare);
+      expect(world.slack.connections).toEqual([]);
+    });
+  });
+
+  describe("given another run stores the secret after this one planned", () => {
+    /** @scenario "A concurrent run that stored the secret first is reused, not duplicated" */
+    it("links the automation to the stored connection and creates no second", async () => {
+      const world = slackMigrationWorld();
+      await world.addAutomation({ id: "hook", actionParams: { slackWebhook: WEBHOOK_URL } });
+      world.slack.beforeStore = async () =>
+        world.slack.addConnection({
+          id: "conn-rival",
+          name: "Stored by the rival run",
+          kind: "INCOMING_WEBHOOK",
+          projectId: PROJECT_ID,
+          secret: WEBHOOK_URL,
+        });
+
+      await world.migration.migrateTenant({ tenantId: ORGANIZATION_ID });
+
+      const row = await world.triggers.findByIdOrThrow({
+        triggerId: "hook",
+        projectId: PROJECT_ID,
+      });
+      expect(row.actionParams).toMatchObject({ slackIntegrationId: "conn-rival" });
+      expect(world.slack.connections.map(({ id }) => id)).toEqual(["conn-rival"]);
+    });
+  });
+
+  describe("given an automation edited after the pass planned it", () => {
+    /** @scenario "An automation edited while the migration runs is left as edited" */
+    it("keeps the edit, does not link it and reports it as changed during migration", async () => {
+      const world = slackMigrationWorld();
+      await world.addAutomation({ id: "hook", actionParams: { slackWebhook: WEBHOOK_URL } });
+      const edited = { slackWebhook: `${WEBHOOK_URL}-edited`, slackDelivery: "webhook" };
+      world.slack.beforeStore = async () => {
+        await world.triggers.update({ id: "hook", projectId: PROJECT_ID, actionParams: edited });
+      };
+
+      const outcome = await world.migration.migrateTenant({ tenantId: ORGANIZATION_ID });
+
+      const row = await world.triggers.findByIdOrThrow({
+        triggerId: "hook",
+        projectId: PROJECT_ID,
+      });
+      expect(row.actionParams).toEqual(edited);
+      expect(outcome).toMatchObject({
+        report: { linked: 0, skippedReasons: { "changed during migration": 1 } },
+      });
+    });
+  });
 });

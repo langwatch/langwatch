@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { MemorySlackConnectionRepository } from "../../repositories/memory/memory.slack-connection.repository.ts";
 import {
   MANAGER,
   ORG,
@@ -38,6 +39,21 @@ const projectWebhook = {
   scopeId: PROJECT,
   secret: WEBHOOK,
 } as const;
+
+/** Answers nothing to the next lookups, as a read does just before a rival's insert lands. */
+class BlindedConnections extends MemorySlackConnectionRepository {
+  blinded = 0;
+
+  override findAllByFingerprint(
+    input: Parameters<MemorySlackConnectionRepository["findAllByFingerprint"]>[0],
+  ) {
+    if (this.blinded > 0) {
+      this.blinded -= 1;
+      return Promise.resolve([]);
+    }
+    return super.findAllByFingerprint(input);
+  }
+}
 
 describe("SlackConnectionService", () => {
   /** @scenario Adding a bot connection for the organization */
@@ -292,6 +308,76 @@ describe("SlackConnectionService", () => {
         actorId: MANAGER,
       }),
     ).resolves.toEqual({ id: org.id, wasCreated: false });
+  });
+
+  /** @scenario "Two saves of one legacy secret racing in one project share one connection" */
+  it("answers the connection the rival stored first when its own insert is refused", async () => {
+    const connections = new BlindedConnections();
+    const { service } = composeSlack({ connections });
+    const save = (projectId: string) =>
+      service.findOrCreateSlackConnectionForSecret({
+        organizationId: ORG,
+        projectId,
+        kind: "INCOMING_WEBHOOK",
+        secret: WEBHOOK,
+        actorId: MANAGER,
+      });
+    const other = await save(OTHER_PROJECT);
+    const rival = await save(PROJECT);
+    const before = await connections.findAllUsableByProject({
+      organizationId: ORG,
+      projectId: PROJECT,
+    });
+
+    connections.blinded = 1;
+    const raced = await save(PROJECT);
+
+    expect(raced).toEqual({ id: rival.id, wasCreated: false });
+    expect(
+      await connections.findAllUsableByProject({ organizationId: ORG, projectId: PROJECT }),
+    ).toEqual(before);
+    expect((await connections.findById({ id: other.id })).map((row) => row.scopeType)).toEqual([
+      "PROJECT",
+    ]);
+  });
+
+  /** @scenario "Only an explicit organization-scoped create makes an organization connection" */
+  it("keeps saved legacy secrets project-scoped until an organization connection is created", async () => {
+    const { service, repositories } = composeSlack();
+    const save = (projectId: string) =>
+      service.findOrCreateSlackConnectionForSecret({
+        organizationId: ORG,
+        projectId,
+        kind: "INCOMING_WEBHOOK",
+        secret: WEBHOOK,
+        actorId: MANAGER,
+      });
+    const first = await save(PROJECT);
+    const second = await save(OTHER_PROJECT);
+    const projectRows = async () =>
+      (
+        await Promise.all(
+          [PROJECT, OTHER_PROJECT].map((projectId) =>
+            repositories.connections.findAllUsableByProject({
+              organizationId: ORG,
+              projectId,
+            }),
+          ),
+        )
+      ).flat();
+    const before = await projectRows();
+
+    expect(first.id).not.toBe(second.id);
+    expect(before.map((row) => row.scopeType)).toEqual(["PROJECT", "PROJECT"]);
+
+    const shared = await service.createSlackConnection({
+      ...projectWebhook,
+      scopeType: "ORGANIZATION",
+      scopeId: ORG,
+    });
+
+    expect(shared.scopeType).toBe("ORGANIZATION");
+    expect((await projectRows()).filter((row) => row.scopeType === "PROJECT")).toEqual(before);
   });
 
   /** @scenario A connection outside the automation's reach fails with a named cause */

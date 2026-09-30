@@ -25,6 +25,7 @@ const create = (
 describe("AutomationPublicApiService.create() for Slack", () => {
   describe("given a connection id and a channel", () => {
     /** @scenario "A Slack alert is created through a bot connection and a channel" */
+    /** @scenario "The API accepts a connection id" */
     it("points the automation at the connection and reads back no secret", async () => {
       const rig = createPublicApiRig({
         connections: [
@@ -43,6 +44,7 @@ describe("AutomationPublicApiService.create() for Slack", () => {
         slackDelivery: "bot",
         slackChannelId: "C123",
       });
+      expect(JSON.stringify(created)).toContain("slackintegration_bot");
       expect(JSON.stringify(created)).not.toContain(SECRETS.botToken);
     });
 
@@ -76,12 +78,16 @@ describe("AutomationPublicApiService.create() for Slack", () => {
 
   describe("given a legacy webhook URL", () => {
     /** @scenario "A Slack alert with a webhook URL is stored as a connection" */
+    /** @scenario "A legacy secret over the API is stored as a connection" */
     it("finds or creates a project connection and stores no secret of its own", async () => {
       const rig = createPublicApiRig();
       const created = await create(rig, { slackWebhook: SECRETS.webhookUrl });
       expect(rig.createdConnections).toEqual([
         { kind: "INCOMING_WEBHOOK", secret: SECRETS.webhookUrl },
       ]);
+      expect(rig.rows.get(created.id)?.actionParams).toMatchObject({
+        slackIntegrationId: "slackintegration_1",
+      });
       expect(JSON.stringify(rig.rows.get(created.id)?.actionParams)).not.toContain(
         SECRETS.webhookUrl,
       );

@@ -40,6 +40,7 @@ describe("renderTriggerSlack", () => {
   });
 
   describe("when a string template is provided", () => {
+    /** @scenario "A string Slack template is sent as plain text" */
     it("renders it as plain text", async () => {
       const slack = await renderTriggerSlack({
         templateType: "string",
@@ -94,6 +95,8 @@ describe("renderTriggerSlack", () => {
   });
 
   describe("when a Block Kit template renders valid JSON", () => {
+    /** @scenario "A Block Kit Slack template is sent as blocks" */
+    /** @scenario "Disallowed and interactive blocks are stripped" */
     it("sends a blocks payload through the allowlist", async () => {
       const template = JSON.stringify([
         {
@@ -149,6 +152,7 @@ describe("renderTriggerSlack", () => {
   });
 
   describe("when a Block Kit template renders invalid JSON", () => {
+    /** @scenario "Block Kit that is not valid JSON falls back to the default" */
     it("falls back to the default text and surfaces the error", async () => {
       const slack = await renderTriggerSlack({
         templateType: "block_kit",
@@ -174,6 +178,7 @@ describe("renderTriggerSlack", () => {
   });
 
   describe("when dispatched as a test fire", () => {
+    /** @scenario "Test-fire Slack carries a non-suppressible banner" */
     it("prepends a banner to a text message", async () => {
       const slack = await renderTriggerSlack({
         templateType: "string",

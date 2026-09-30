@@ -25,7 +25,10 @@ import type { AutomationService } from "../automation.service.ts";
 
 const SAVED_URL = "https://receiver.acme.test/hook";
 
-function authoringOverSavedWebhook({ deleted = false }: { deleted?: boolean } = {}) {
+function authoringOverSavedWebhook({
+  deleted = false,
+  limit = { allowed: true, resetAt: 0 },
+}: { deleted?: boolean; limit?: { allowed: boolean; resetAt: number } } = {}) {
   const testFire = vi.fn(async (_input: TestFireInput): Promise<TestFireResult> => ({
     channel: "webhook",
     recipientCount: 1,
@@ -65,7 +68,7 @@ function authoringOverSavedWebhook({ deleted = false }: { deleted?: boolean } = 
     slackDestinations: createTestSlackDestinations(),
     slackConnections: createTestSlackConnections(),
     traceFilters: { assertCompiles: () => undefined },
-    limits: { count: async () => ({ allowed: true, resetAt: 0 }) },
+    limits: { count: async () => limit },
     filterValidation: { assertWritable: async () => undefined },
     logger: new SilentLogger(),
   });
@@ -117,6 +120,23 @@ describe("a webhook test fire of a saved, signed automation", () => {
       });
       expect(testFire).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("a webhook test fire once the window's allowance is spent", () => {
+  /** @scenario "Test fires are rate limited" */
+  it("is declined, asking the author to retry later, and sends nothing", async () => {
+    const { authoring, testFire } = authoringOverSavedWebhook({
+      limit: { allowed: false, resetAt: Date.now() + 42_000 },
+    });
+
+    await expect(
+      authoring.testFire({ input: webhookTestFire(SAVED_URL), author: AUTHOR }),
+    ).rejects.toMatchObject({
+      code: "test_fire_rate_limited",
+      message: expect.stringMatching(/too many test fires/i),
+    });
+    expect(testFire).not.toHaveBeenCalled();
   });
 });
 

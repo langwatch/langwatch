@@ -84,6 +84,7 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
       );
     });
 
+    /** @scenario "Writing back what the API read moves a legacy webhook URL into a connection" */
     it("moves the stored URL into a project connection when the caller writes the response back", async () => {
       const rig = createPublicApiRig({ rows: [SECRET_ROWS.slackLegacyWebhook] });
       const read = await readTrigger(await rig.api.get("/api/triggers/trigger_slack"));
@@ -92,6 +93,9 @@ describe("Feature: delivery credentials survive the REST write paths redacted", 
       expect(rig.createdConnections).toEqual([
         { kind: "INCOMING_WEBHOOK", secret: SECRETS.webhookUrl },
       ]);
+      expect(rig.rows.get("trigger_slack")?.actionParams).toMatchObject({
+        slackIntegrationId: "slackintegration_1",
+      });
       expect(JSON.stringify(rig.rows.get("trigger_slack")?.actionParams)).not.toContain(
         SECRETS.webhookUrl,
       );

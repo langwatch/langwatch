@@ -6,6 +6,7 @@ import { makeContext, makeMatch } from "./fixtures.ts";
 
 describe("renderTriggerEmail", () => {
   describe("when no custom templates are provided", () => {
+    /** @scenario "Default email is rendered when no email templates are set" */
     it("renders the default subject naming the trigger and alert type", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: null,
@@ -55,6 +56,7 @@ describe("renderTriggerEmail", () => {
   });
 
   describe("when a custom subject template is provided", () => {
+    /** @scenario "A custom subject interpolates trigger and project variables" */
     it("interpolates project and trigger variables", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: "[{{ project.name }}] {{ trigger.alertType }}: {{ trigger.name }}",
@@ -67,6 +69,7 @@ describe("renderTriggerEmail", () => {
   });
 
   describe("when a custom body template uses Markdown", () => {
+    /** @scenario "A custom email body is written in Markdown and rendered to HTML" */
     it("renders the Markdown to HTML", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: null,
@@ -79,6 +82,7 @@ describe("renderTriggerEmail", () => {
   });
 
   describe("when the rendered subject exceeds the limit", () => {
+    /** @scenario "An over-long subject is clipped" */
     it("clips it with an ellipsis", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: "{{ trigger.name }}",
@@ -98,6 +102,7 @@ describe("renderTriggerEmail", () => {
   });
 
   describe("when a custom body template iterates matches", () => {
+    /** @scenario "The same template renders every entry for a digest dispatch" */
     it("renders one entry per match for a digest", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: null,
@@ -141,7 +146,20 @@ describe("renderTriggerEmail", () => {
     });
   });
 
+  describe("when a custom body template iterates a single-match dispatch", () => {
+    /** @scenario "A template iterating matches renders one entry for an immediate dispatch" */
+    it("renders exactly one entry", async () => {
+      const email = await renderTriggerEmail({
+        subjectTemplate: null,
+        bodyTemplate: "{% for m in matches %}- {{ m.trace.id }}\n{% endfor %}",
+        context: makeContext(),
+      });
+      expect(email.html.match(/<li>/g)).toHaveLength(1);
+    });
+  });
+
   describe("when a custom template throws while rendering", () => {
+    /** @scenario "A template that throws falls back to the default" */
     it("falls back to the default and surfaces the error", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: "{{ trigger.name | nonexistent_filter }}",
@@ -155,6 +173,7 @@ describe("renderTriggerEmail", () => {
   });
 
   describe("when a template references a missing variable", () => {
+    /** @scenario "A missing variable renders empty rather than failing" */
     it("renders empty for it and reports the full path", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: "{{ trigger.name }}{{ projct.name }}",
@@ -167,6 +186,7 @@ describe("renderTriggerEmail", () => {
   });
 
   describe("when dispatched as a test fire", () => {
+    /** @scenario "Test-fire email carries a non-suppressible banner" */
     it("prefixes the subject and prepends a body banner", async () => {
       const email = await renderTriggerEmail({
         subjectTemplate: null,

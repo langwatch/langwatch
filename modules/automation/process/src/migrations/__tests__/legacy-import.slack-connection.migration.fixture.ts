@@ -29,6 +29,8 @@ interface StoredConnection {
   kind: SlackConnectionKind;
   projectId: string;
   secret: string;
+  /** Held for the whole organization, reaching every project. */
+  organizationWide?: boolean;
 }
 
 /** Slack's side, in memory: connections by secret, and who claims which. */
@@ -36,6 +38,8 @@ export class SlackTwin {
   readonly connections: StoredConnection[] = [];
   readonly claims = new Map<string, Set<string>>();
   readonly actors: string[] = [];
+  /** Runs once, after the pass planned and before it stores anything: another writer's moment. */
+  beforeStore: (() => Promise<void>) | undefined;
 
   addConnection(connection: StoredConnection): void {
     this.connections.push(connection);
@@ -47,13 +51,13 @@ export class SlackTwin {
       canManageProject: false,
       canManageOrganization: false,
       connections: this.connections
-        .filter((connection) => connection.projectId === projectId)
+        .filter((connection) => connection.organizationWide || connection.projectId === projectId)
         .map((connection) => ({
           id: connection.id,
           name: connection.name,
           kind: connection.kind,
-          scopeType: "PROJECT",
-          scopeId: connection.projectId,
+          scopeType: connection.organizationWide ? "ORGANIZATION" : "PROJECT",
+          scopeId: connection.organizationWide ? ORGANIZATION_ID : connection.projectId,
           scopeName: connection.projectId,
           secretHint: connection.secret.slice(-4),
           slackTeamId: null,
@@ -74,9 +78,13 @@ export class SlackTwin {
     actorId: string;
   }): Promise<{ id: string; wasCreated: boolean }> {
     this.actors.push(input.actorId);
+    const rival = this.beforeStore;
+    this.beforeStore = undefined;
+    await rival?.();
     const [held] = this.connections.filter(
       (connection) =>
-        connection.projectId === input.projectId && connection.secret === input.secret,
+        connection.secret === input.secret &&
+        (connection.organizationWide || connection.projectId === input.projectId),
     );
     if (held) return { id: held.id, wasCreated: false };
     const id = `conn-${this.connections.length + 1}`;

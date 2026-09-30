@@ -415,7 +415,6 @@ const LEGACY_INERT: string[] = [
   "specs/analytics/posthog-cost-control.feature",
   "specs/auth/auth-signin-flows.feature",
   "specs/automations/dispatch-timing.feature",
-  "specs/automations/notification-templates.feature",
   "specs/automations/spam-prevention.feature",
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
   "specs/batch-evaluation-results/run-comparison.feature",

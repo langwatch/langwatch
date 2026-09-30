@@ -293,6 +293,93 @@ describe("ReportChartService.loadReportCharts", () => {
     });
   });
 
+  describe("given a dashboard whose panels genuinely have data", () => {
+    /** @scenario "A dashboard report with data delivers per-panel content" */
+    it("delivers real content for a summary panel and a grouped pie panel alike", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({
+            id: "summary-graph",
+            name: "Total traces",
+            graph: {
+              graphId: "summary-graph",
+              graphType: "summary",
+              series: [COUNT_SERIES],
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+          makeGraph({
+            id: "pie-graph",
+            name: "Traces by model",
+            graph: {
+              graphId: "pie-graph",
+              graphType: "donnut",
+              series: [COUNT_SERIES],
+              groupBy: "metadata.model",
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+        ],
+        timeseries: {
+          previousPeriod: [],
+          currentPeriod: [
+            {
+              date: "2026-07-11T09:00:00Z",
+              [COUNT_KEY]: 9,
+              "metadata.model": {
+                "gpt-5-mini": { [PIPED_COUNT_KEY]: 6 },
+                "claude-opus-4-8": { [PIPED_COUNT_KEY]: 3 },
+              },
+            },
+          ],
+        },
+      });
+
+      const [summary, pie] = await run({
+        deps,
+        source: { kind: "dashboard", dashboardId: "dash-1" },
+      });
+
+      expect(summary?.isEmpty).toBe(false);
+      expect(summary?.series[0]?.data.map((point) => point.value)).toEqual([9]);
+      expect(pie?.isEmpty).toBe(false);
+      expect(pie?.segments).toEqual([
+        { label: "gpt-5-mini", value: 6 },
+        { label: "claude-opus-4-8", value: 3 },
+      ]);
+    });
+  });
+
+  describe("given the period genuinely has no data", () => {
+    /** @scenario "'Nothing to show' appears only when the period is genuinely empty" */
+    it("marks a graph with no series configured empty, without running a query", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({
+            graph: {
+              graphId: "graph-1",
+              graphType: "line",
+              series: [],
+              includePrevious: false,
+              timeScale: 60,
+            },
+          }),
+        ],
+        timeseries: { previousPeriod: [], currentPeriod: [] },
+      });
+
+      const [chart] = await run({
+        deps,
+        source: { kind: "customGraph", customGraphId: "graph-1" },
+      });
+
+      expect(chart?.isEmpty).toBe(true);
+      expect(deps.getTimeseries).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a dashboard report", () => {
     it("returns one chart per panel", async () => {
       const deps = makeDeps({
