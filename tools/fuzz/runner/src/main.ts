@@ -21,6 +21,7 @@ const PROGRESS_MILLIS = 5000;
 /** UNBOUNDED_PASSES lets a timed run keep walking until its deadline. */
 const UNBOUNDED_PASSES = 1_000_000;
 const WATCHDOG_MILLIS = 120_000;
+const LANDING_MILLIS = 180_000;
 
 const stamp = (text: string): void =>
   note({ text: `[${new Date().toTimeString().slice(0, 8)}] ${text}`, err: process.stderr });
@@ -107,12 +108,24 @@ const openPages = async ({
 /** projectSlug is the address `/` lands on once signed in: the user's first project. */
 const projectSlug = async (side: Side): Promise<string> => {
   await side.goto("/");
+  // `/` redirects only once organization.getAll answers: tens of seconds for a busy admin.
+  await side.page
+    .waitForURL((url) => url.pathname !== "/", { timeout: LANDING_MILLIS })
+    .catch(() => undefined);
   await side.waitUntilQuiet();
   const [slug = ""] = new URL(side.page.url()).pathname.split("/").filter(Boolean);
   if (slug === "" || ["auth", "onboarding"].includes(slug)) {
     throw new Error(`no project to fuzz: signed in, but "/" lands on ${side.page.url()}`);
   }
   return slug;
+};
+
+/** visitsLine is visits/total on a pass-bounded run; a timed run's total is only a queue bound. */
+const visitsLine = ({ run, deadline }: { run: Run; deadline: number }): string => {
+  if (!Number.isFinite(deadline)) return `visits ${run.visits}/${run.total}`;
+  const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+  const clock = `${Math.floor(left / 60)}m${String(left % 60).padStart(2, "0")}s`;
+  return `visits ${run.visits} routes ${run.routesVisited}/${run.order.length} left ${clock}`;
 };
 
 /** Run is the state the lanes share: the queue of visits and what they have done so far. */
@@ -271,7 +284,7 @@ const walk = async ({
   });
   const progress = setInterval(() => {
     stamp(
-      `fuzz: visits ${run.visits}/${run.total} actions ${run.actions} findings ${sink.findings} distinct ${sink.distinct}`,
+      `fuzz: ${visitsLine({ run, deadline })} actions ${run.actions} findings ${sink.findings} distinct ${sink.distinct}`,
     );
   }, PROGRESS_MILLIS);
   const watchdog =

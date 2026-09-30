@@ -1,6 +1,7 @@
 package fuzz
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -18,6 +19,7 @@ type Observation struct {
 	JSONExpected bool // the operation documents an application/json 2xx response
 	SeparateOrg  bool // the cross-tenant oracle only holds against a real other tenant
 	LatencyCap   time.Duration
+	ForeignIDs   []string // the other tenant's ids the request addressed
 }
 
 // Hit is one oracle firing.
@@ -40,7 +42,7 @@ func Evaluate(observation Observation) []Hit {
 	if observation.Mutation.SchemaInvalid && success(observation.Status) {
 		hits = append(hits, Hit{Oracle: "accepting-forbidden", Message: fmt.Sprintf("%s body accepted with %d", observation.Mutation.Name, observation.Status)})
 	}
-	if observation.Mutation.Foreign && observation.SeparateOrg && success(observation.Status) && nonEmptyBody(observation.Body) {
+	if observation.Mutation.Foreign && observation.SeparateOrg && success(observation.Status) && leaksForeign(observation.Body, observation.ForeignIDs) {
 		hits = append(hits, Hit{Oracle: "cross-tenant", Message: fmt.Sprintf("another tenant's resource read with the fuzzer's key: %d", observation.Status)})
 	}
 	if observation.JSONExpected && success(observation.Status) && observation.Mutation.Name == "valid" && !json.Valid(observation.Body) {
@@ -54,24 +56,47 @@ func Evaluate(observation Observation) []Hit {
 
 func success(status int) bool { return status >= 200 && status < 300 }
 
-func nonEmptyBody(body []byte) bool {
-	trimmed := trimSpace(body)
-	return len(trimmed) > 0 && string(trimmed) != "{}" && string(trimmed) != "[]" && string(trimmed) != "null"
+// leaksForeign is a 2xx body that names an id of the other tenant the request
+// addressed and is not an empty list. ponytail: a leak that never echoes one of
+// those ids is missed; tag seeded rows with a marker if that ever matters.
+func leaksForeign(body []byte, foreignIDs []string) bool {
+	if emptyList(body) {
+		return false
+	}
+	for _, id := range foreignIDs {
+		if id != "" && bytes.Contains(body, []byte(`"`+id+`"`)) {
+			return true
+		}
+	}
+	return false
 }
 
-func trimSpace(body []byte) []byte {
-	start, end := 0, len(body)
-	for start < end && isSpace(body[start]) {
-		start++
+// emptyList is `[]`, or a wrapper object (no id of its own) whose every
+// top-level array is empty, like {"events":[],"nextCursor":null}.
+func emptyList(body []byte) bool {
+	var value any
+	if json.Unmarshal(body, &value) != nil {
+		return false
 	}
-	for end > start && isSpace(body[end-1]) {
-		end--
+	switch typed := value.(type) {
+	case []any:
+		return len(typed) == 0
+	case map[string]any:
+		if _, hasID := typed["id"]; hasID {
+			return false
+		}
+		arrays := 0
+		for _, field := range typed {
+			if list, isList := field.([]any); isList {
+				if len(list) > 0 {
+					return false
+				}
+				arrays++
+			}
+		}
+		return arrays > 0
 	}
-	return body[start:end]
-}
-
-func isSpace(character byte) bool {
-	return character == ' ' || character == '\n' || character == '\t' || character == '\r'
+	return false
 }
 
 func excerpt(body []byte) string {

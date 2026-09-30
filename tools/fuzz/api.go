@@ -41,6 +41,7 @@ type apiRun struct {
 	org       diffkit.ToolOrg
 	requests  int64
 	exercised sync.Map
+	foreign   sync.Map // collection path -> a real id listed there by the other tenant
 	mu        sync.Mutex
 	raw       []rawFinding
 }
@@ -189,13 +190,16 @@ func (run *apiRun) fuzz(ctx context.Context, jobs []job) {
 }
 
 func (run *apiRun) runJob(ctx context.Context, item job) {
-	request := run.build(item)
+	request, ok := run.build(ctx, item)
+	if !ok {
+		return
+	}
 	status, elapsed, body := run.do(ctx, request)
 	atomic.AddInt64(&run.requests, 1)
 	run.exercised.Store(item.op.Method+" "+item.op.Path, true)
 	hits := Evaluate(Observation{
 		Mutation: item.mutation, Status: status, Elapsed: elapsed, Body: body,
-		JSONExpected: true, SeparateOrg: run.org.Separate, LatencyCap: LatencyCap,
+		JSONExpected: true, SeparateOrg: run.org.Separate, LatencyCap: LatencyCap, ForeignIDs: request.foreign,
 	})
 	for _, hit := range hits {
 		run.record(item, request, status, hit)

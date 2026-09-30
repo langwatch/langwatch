@@ -1,6 +1,7 @@
 package fuzz
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -14,19 +15,30 @@ type builtRequest struct {
 	url     string
 	headers map[string]string
 	body    []byte
+	foreign []string // the other tenant's ids the request addresses, for the cross-tenant oracle
 }
 
 // build turns a job into a concrete request: the path filled with ids, the
 // query with valid values, the body synthesized then mutated, and the auth
-// header for the credential.
-func (run *apiRun) build(item job) builtRequest {
-	path := run.fillPath(item)
-	query := run.fillQuery(item)
+// header for the credential. False means a foreign-id job found no real
+// resource of another tenant to address, so it is not sent.
+func (run *apiRun) build(ctx context.Context, item job) (builtRequest, bool) {
+	path, foreign := run.fillPath(item), []string(nil)
+	if item.mutation.Foreign {
+		var ok bool
+		if path, foreign, ok = run.foreignPath(ctx, item); !ok {
+			return builtRequest{}, false
+		}
+	}
+	query, ok := run.fillQuery(item)
+	if !ok {
+		return builtRequest{}, false
+	}
 	target := run.apiURL + path
 	if query != "" {
 		target += "?" + query
 	}
-	return builtRequest{method: item.op.Method, url: target, headers: run.authHeader(item.auth), body: run.buildBody(item)}
+	return builtRequest{method: item.op.Method, url: target, headers: run.authHeader(item.auth), body: run.buildBody(item), foreign: foreign}, true
 }
 
 func (run *apiRun) fillPath(item job) string {
@@ -41,7 +53,7 @@ func (run *apiRun) fillPath(item job) string {
 	return path
 }
 
-func (run *apiRun) fillQuery(item job) string {
+func (run *apiRun) fillQuery(item job) (string, bool) {
 	values := url.Values{}
 	for _, param := range item.op.Params {
 		if param.In != "query" || !param.Required {
@@ -51,9 +63,13 @@ func (run *apiRun) fillQuery(item job) string {
 			values.Set(param.Name, fmt.Sprint(param.Example))
 			continue
 		}
-		values.Set(param.Name, run.idFor(param.Name, item.mutation))
+		value := run.idFor(param.Name, item.mutation)
+		if item.mutation.Foreign && value == syntheticID {
+			return "", false
+		}
+		values.Set(param.Name, value)
 	}
-	return values.Encode()
+	return values.Encode(), true
 }
 
 // idFor picks a value for a path or id-shaped query parameter: the fuzzer's own
@@ -75,12 +91,16 @@ func (run *apiRun) idFor(name string, mutation Mutation) string {
 			return diffkit.SeededOrganizationID
 		}
 		return run.org.OrgID
-	case strings.Contains(lower, "team"):
+	case strings.Contains(lower, "team") && !mutation.Foreign:
 		return run.org.TeamID
 	default:
-		return "fuzzer"
+		return syntheticID
 	}
 }
+
+// syntheticID fills an id the fuzzer has no real value for; the foreign-id
+// mutation never sends it, since it would read nothing of anybody's.
+const syntheticID = "fuzzer"
 
 func (run *apiRun) buildBody(item job) []byte {
 	if item.op.BodySchema == nil {
