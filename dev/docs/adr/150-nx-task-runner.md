@@ -46,8 +46,10 @@ installed. The whole configuration is one `nx.json` at the root declaring
 cache inputs, outputs and target ordering.
 
 Task inputs are declared so that the cache is correct for a source-resolving
-workspace. `typecheck` and `test` both take `["default", "^default"]`: a
-package's own files and the files of every package it depends on. This is the
+workspace. `typecheck` and `test` both take `["default", "^production"]`: a
+package's own files and the non-test files of every package it depends on
+(`production` is `default` minus `*.test.*` and the vitest configs; `__tests__`
+helpers stay, because `./testing` exports reach them). This is the
 property that matters here — because tests import dependency source directly,
 a cache keyed only on the package's own files would replay a stale pass after
 a dependency changed underneath it. `typecheck` additionally declares

@@ -8,9 +8,8 @@
       "{workspaceRoot}/pnpm-lock.yaml"
     ],
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
-    "sources": [
+    "production": [
       "default",
-      "!{projectRoot}/**/__tests__/**/*",
       "!{projectRoot}/**/*.test.ts",
       "!{projectRoot}/**/*.test.tsx",
       "!{projectRoot}/**/*.test.mts",
@@ -27,23 +26,23 @@
     "typecheck": {
       "cache": true,
       "dependsOn": ["^typecheck"],
-      "inputs": ["default", "^default"],
+      "inputs": ["default", "^production"],
       "outputs": ["{projectRoot}/dist"]
     },
     "build": {
       "cache": true,
       "dependsOn": ["^build"],
-      "inputs": ["sources", "^sources"],
+      "inputs": ["production", "^production"],
       "outputs": ["{projectRoot}/dist"]
     },
     "test": {
       "cache": true,
-      "inputs": ["default", "^default"],
+      "inputs": ["default", "^production"],
       "outputs": []
     },
     "test:unit": {
       "cache": true,
-      "inputs": ["default", "^default"],
+      "inputs": ["default", "^production"],
       "outputs": []
     },
     "lint": {
