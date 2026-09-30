@@ -24,6 +24,28 @@ describe("parseProcessConfig", () => {
     expect(config.github.apiUrl).toBe("https://api.github.com");
   });
 
+  /** @scenario "The process and every installed module become one parsed object" */
+  it("gives the process one root key and each declaring module its own, holding only its values", () => {
+    const process = {
+      name: "process",
+      config: Config.define((c) => ({ port: c.env("PORT", z.string().default("5560")) })),
+    } as const;
+    const billing = {
+      name: "billing",
+      config: Config.define((c) => ({ plan: c.env("BILLING_PLAN", z.string().default("free")) })),
+    } as const;
+
+    const config = parseProcessConfig({
+      owners: [process, github, billing],
+      environment: { PORT: "7000", GITHUB_APP_ID: "1207", BILLING_PLAN: "pro" },
+    });
+
+    expect(Object.keys(config).toSorted()).toEqual(["billing", "github", "process"]);
+    expect(config.process).toEqual({ port: "7000" });
+    expect(config.billing).toEqual({ plan: "pro" });
+    expect(config.github).toEqual({ appId: "1207", apiUrl: "https://api.github.com" });
+  });
+
   /** @scenario "A missing required value refuses naming its root, its field and its variable" */
   it("refuses naming owner.path and the env var, every miss at once", () => {
     const strict = {
