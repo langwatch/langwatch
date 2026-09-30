@@ -80,24 +80,72 @@
     "./dev/nx/workspace-plugin.mjs"
   ],
   "targetDefaults": {
-    "typecheck": {
-      "cache": true,
-      "inputs": [
-        "default",
-        "^production",
-        "npmDeps",
-        {
-          "externalDependencies": ["typescript"]
-        }
-      ],
-      "outputs": ["{projectRoot}/dist"]
-    },
+    "typecheck": [
+      {
+        "cache": true,
+        "inputs": [
+          "default",
+          "^production",
+          "npmDeps",
+          {
+            "externalDependencies": ["typescript"]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/dist/**/*.d.ts",
+          "{projectRoot}/dist/**/*.d.ts.map",
+          "{projectRoot}/dist/**/*.tsbuildinfo",
+          "{projectRoot}/dist/**/*.json"
+        ]
+      },
+      {
+        "filter": {
+          "projects": [
+            "@langwatch/ui",
+            "@langwatch/server",
+            "@langwatch/scenario-child",
+            "@langwatch/langyworker"
+          ]
+        },
+        "outputs": [
+          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
+          "{projectRoot}/dist/tsconfig.test.tsbuildinfo"
+        ]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/mail"]
+        },
+        "outputs": [
+          "{projectRoot}/dist/typecheck",
+          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
+          "{projectRoot}/dist/tsconfig.preview.tsbuildinfo"
+        ]
+      },
+      {
+        "filter": {
+          "projects": ["langwatch"]
+        },
+        "outputs": [
+          "{projectRoot}/dist/src",
+          "{projectRoot}/dist/__tests__",
+          "{projectRoot}/dist/*.config.*",
+          "{projectRoot}/dist/test-setup.*",
+          "{projectRoot}/dist/package.json",
+          "{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo"
+        ]
+      }
+    ],
     "build": [
       {
         "cache": true,
         "dependsOn": ["^build"],
         "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{projectRoot}/dist"]
+        "outputs": [
+          "{projectRoot}/dist",
+          "!{projectRoot}/dist/typecheck",
+          "!{projectRoot}/dist/tsconfig.{typecheck,test,preview}.tsbuildinfo"
+        ]
       },
       {
         "filter": {
@@ -121,7 +169,26 @@
           "{workspaceRoot}/packages/redaction/src/**/*",
           "jsBuild"
         ],
-        "outputs": ["{projectRoot}/dist", "{projectRoot}/src/internal/generated"]
+        "outputs": [
+          "{projectRoot}/dist",
+          "!{projectRoot}/dist/src",
+          "!{projectRoot}/dist/__tests__",
+          "!{projectRoot}/dist/*.config.*",
+          "!{projectRoot}/dist/test-setup.*",
+          "!{projectRoot}/dist/package.json",
+          "!{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
+          "{projectRoot}/src/internal/generated"
+        ]
+      },
+      {
+        "filter": {
+          "projects": ["@langwatch/ksuid"]
+        },
+        "outputs": [
+          "{projectRoot}/dist",
+          "!{projectRoot}/dist/**/*.d.ts.map",
+          "!{projectRoot}/dist/*.tsbuildinfo"
+        ]
       },
       {
         "filter": {
@@ -137,7 +204,11 @@
             "env": "EMIT_META"
           }
         ],
-        "outputs": ["{projectRoot}/dist"]
+        "outputs": [
+          "{projectRoot}/dist",
+          "!{projectRoot}/dist/typecheck",
+          "!{projectRoot}/dist/tsconfig.{typecheck,test,preview}.tsbuildinfo"
+        ]
       },
       {
         "filter": {

@@ -52,7 +52,8 @@ package's own files and the non-test files of every package it depends on
 helpers stay, because `./testing` exports reach them). This is the
 property that matters here — because tests import dependency source directly,
 a cache keyed only on the package's own files would replay a stale pass after
-a dependency changed underneath it. `typecheck` declares `outputs: ["{projectRoot}/dist"]` and no `dependsOn`
+a dependency changed underneath it. `typecheck` declares its emitted files as
+globs (amended 2026-09-30, see "cache correctness") and no `dependsOn`
 (amended 2026-09-30): each package's `tsc -b` builds the references it reads
 itself, and the workspace graph has cycles that `^typecheck` turned into a
 refused task graph. Parallel tasks may rebuild a shared reference at once.
@@ -261,6 +262,17 @@ them true; it depends on the SDK build because the referenced packages import
 its declarations. `lint:rules` (semgrep) and `test:scripts` (bats) run the
 Makefile recipes, as `lint:go` does; `herrgen` is a target of `go`. The
 Makefile targets of the same names call Nx.
+
+## Amendment, 2026-09-30: cache correctness
+
+**Two targets never own one directory.** A directory output is wiped on restore
+and captures whatever else sits in it, so a `typecheck` hit on `mail` deleted
+the `dist/index.js` its `build` wrote. `typecheck` outputs are globs over what
+`tsc -b` emits (`*.d.ts`, `*.d.ts.map`, `*.tsbuildinfo`, `*.json` under `dist`);
+`build` outputs `dist` minus typecheck's files (a negated entry makes a restore
+leave the rest alone). The seven projects with both targets whose emits differ
+from those defaults (the SDK, `mail`, `ksuid`, the apps, `langyworker`) have
+filtered entries naming each target's files.
 
 ## References
 
