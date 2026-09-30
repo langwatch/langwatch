@@ -198,7 +198,7 @@ The gateway cannot reach the control plane and has no cached bundle for the key.
 
 **What still works.** A key a pod has already resolved keeps serving. When its token expires while the control plane is unreachable, the pod extends the entry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default 300) on each failed refresh, up to `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the token expiry (default 21600, six hours). Past that cap the entry is evicted and the key answers 503.
 
-A key evicted by a change-feed event, such as the budget update every debit emits, keeps serving its last known config for up to one hour if the refetch fails.
+A key evicted by a change-feed event, such as the budget update every debit emits, keeps serving its last known config if the refetch fails for a transport reason (timeout, 5xx, network error). The fallback lasts up to one hour after the config was last confirmed by the control plane. Revoked, disabled, rotated, deleted and expired keys get no fallback.
 
 A key the pod has never seen has no cached bundle and fails at once. There is no cache warm-up on boot, so a pod added during an outage starts cold, and so does every pod after a rolling deploy.
 

@@ -225,11 +225,30 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       Then the fresh config replaces the last known one
 
     @unit
+    Scenario: a not-modified answer counts as a confirmation of the last known config
+      Given the cache holds a key whose config was last downloaded more than one hour ago
+      And the control plane has since answered a revalidation with 304 Not Modified
+      When the change feed evicts the key and the refetch times out
+      Then the last known config is served
+      And it may be served for up to one hour after that 304
+
+    @unit
     Scenario: the last known config expires one hour after it was last confirmed
       Given the cache evicted a key whose config was last confirmed more than one hour ago
       And the config fetch fails with a transport error
       When I send a request with that VK
       Then the request is rejected with error.type "auth_upstream_unavailable" (503, retryable)
+      And an entry that crosses the one hour mark while the refetch is running is not served either
+
+    @unit
+    Scenario: the fallback never outlives the key's own expiration date
+      Given the cache evicted a key after a budget update
+      And resolve-key answers with a token carrying the key's expiration date
+      But the config fetch times out
+      When I send a request with that VK
+      Then the last known config is served under the fresh token
+      And it stops being served at the key's expiration date
+      And a key whose date has already passed is refused with virtual_key_expired
 
     @unit
     Scenario: revoking, disabling or rotating a key leaves no fallback behind
@@ -241,7 +260,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
     @unit
     Scenario: a definitive rejection from the control plane is never overridden by the fallback
       Given the cache evicted a key after a budget update
-      When the control plane answers the refetch that the key is invalid
+      When the control plane answers the refetch that the key is invalid, or the config fetch finds it deleted (404)
       Then the request is rejected with that answer
       And the last known config is discarded
 

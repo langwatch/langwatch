@@ -790,15 +790,38 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     });
 
     /** @scenario "A slow spend read does not hold up the key's config" */
+    it("ships the stored spend even when the read ignores its signal", async () => {
+      const ignoresSignal = {
+        getSpendForBudgetsAcrossTenantsUntil: () =>
+          new Promise(() => undefined),
+      } as unknown as GatewayBudgetClickHouseRepository;
+      const vk = await new VirtualKeyRepository(prisma).findById(
+        VK_NO_PROJECT_ID,
+        ORG_ID,
+      );
+      const startedAt = Date.now();
+
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        ignoresSignal,
+      ).materialise(vk!);
+
+      expect(Date.now() - startedAt).toBeLessThan(
+        CONFIG_SPEND_READ_TIMEOUT_MS + 3_000,
+      );
+      const budget = bundle.budgets.find((b) => b.id === BUDGET_ID);
+      expect(budget?.spent_micro_usd).toBe(12_340_000);
+    });
+
+    /** @scenario "A slow spend read does not hold up the key's config" */
     it("ships the stored spend within the deadline and cancels the read", async () => {
       let readSignal: AbortSignal | undefined;
       const hangingSpendRead = {
-        getSpendForBudgetsAcrossTenants: (
-          _tenantIds: string[],
-          _budgets: unknown,
-          _now: Date,
-          { signal }: { signal?: AbortSignal } = {},
-        ) =>
+        getSpendForBudgetsAcrossTenantsUntil: ({
+          signal,
+        }: {
+          signal: AbortSignal;
+        }) =>
           new Promise((_resolve, reject) => {
             readSignal = signal;
             signal?.addEventListener("abort", () => reject(signal.reason), {

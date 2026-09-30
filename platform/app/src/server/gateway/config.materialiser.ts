@@ -23,7 +23,10 @@ import {
   resolveLangyMirrorTier,
 } from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
-import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import {
+  type GatewayBudgetClickHouseRepository,
+  settleBefore,
+} from "./budget.clickhouse.repository";
 import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";
 import {
   type ResolvedBudget,
@@ -533,9 +536,10 @@ export class GatewayConfigMaterialiser {
       // bucket's own: a GROUP budget read from the raw row would prefix-sum
       // every member's bucket, and the gateway would then cap each member
       // at what the whole group spent together.
-      const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+      const deadline = AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS);
+      const read = this.chRepo.getSpendForBudgetsAcrossTenantsUntil({
         tenantIds,
-        budgets
+        budgets: budgets
           // Templates have no single bucket to read; their per-user spend
           // is fetched request-side through the bucket-spend endpoint.
           .filter((r) => r.budget.scopeType !== "ATTRIBUTED_USER")
@@ -547,9 +551,9 @@ export class GatewayConfigMaterialiser {
             match: "exact" as const,
             periodFloorMs: budgetPeriodFloorMs(r.budget),
           })),
-        new Date(),
-        { signal: AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS) },
-      );
+        signal: deadline,
+      });
+      const spends = await settleBefore({ work: read, signal: deadline });
       const out = new Map<string, string>();
       for (const s of spends) {
         out.set(s.budgetId, s.spentUsd);

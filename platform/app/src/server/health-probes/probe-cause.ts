@@ -58,21 +58,25 @@ function causeFromString(text: string): string | undefined {
 }
 
 function leafCode(failure: object): string | undefined {
+  const inner = firstReason(failure);
+  return (inner && leafCode(inner)) ?? ownCode(failure);
+}
+
+function firstReason(failure: object): object | undefined {
   const reasons = (failure as { reasons?: unknown }).reasons;
-  if (Array.isArray(reasons) && reasons.length > 0) {
-    const inner: unknown = reasons[0];
-    if (inner && typeof inner === "object") {
-      const innerCode = leafCode(inner);
-      if (innerCode) return innerCode;
-    }
-  }
+  const inner: unknown = Array.isArray(reasons) ? reasons[0] : undefined;
+  return inner && typeof inner === "object" ? inner : undefined;
+}
+
+function ownCode(failure: object): string | undefined {
   const raw = readString(failure, "code");
-  const code = raw && /^[A-Z][A-Z0-9_]*$/.test(raw) ? raw.toLowerCase() : raw;
-  if (!code || code === "unknown") return undefined;
-  if (code.length > MAX_CAUSE_LENGTH || !CODE_SHAPE.test(code)) {
-    return undefined;
-  }
-  return code;
+  if (!raw) return undefined;
+  const code = /^[A-Z][A-Z0-9_]*$/.test(raw) ? raw.toLowerCase() : raw;
+  const isCode =
+    code !== "unknown" &&
+    code.length <= MAX_CAUSE_LENGTH &&
+    CODE_SHAPE.test(code);
+  return isCode ? code : undefined;
 }
 
 function readString(value: object, key: string): string | undefined {

@@ -105,8 +105,7 @@ func TestResolve_LastKnown_OlderThanMaxAge_FailsRetryable(t *testing.T) {
 
 	budgetUpdated(svc)
 	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, domain.ErrAuthUpstream), "expected auth_upstream_unavailable, got %v", err)
+	require.ErrorIs(t, err, domain.ErrAuthUpstream)
 }
 
 // @scenario "revoking, disabling or rotating a key leaves no fallback behind"
@@ -141,16 +140,129 @@ func TestResolve_RevokingChange_LeavesNoFallback(t *testing.T) {
 
 // @scenario "a definitive rejection from the control plane is never overridden by the fallback"
 func TestResolve_LastKnown_AuthRejectionWins(t *testing.T) {
-	fetcher := &fakeConfigFetcher{}
-	fetcher.returns = []resolverReturn{{err: herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)}}
-	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
-	rawKey := "vk-lw-rejected"
-	seedServedKey(t, svc, rawKey, "vk_rejected")
+	invalid := herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
+	for _, tc := range []struct {
+		name    string
+		resolve resolverReturn
+		cfgErr  error
+	}{
+		{"resolve-key rejects the key", resolverReturn{err: invalid}, nil},
+		{"the config fetch finds the key deleted", resolverReturn{bundle: freshBundle("vk_rejected", time.Now().Add(10*time.Minute))}, invalid},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fetcher := &fakeConfigFetcher{cfgErr: tc.cfgErr}
+			fetcher.returns = []resolverReturn{tc.resolve}
+			svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+			rawKey := "vk-lw-rejected"
+			seedServedKey(t, svc, rawKey, "vk_rejected")
+			budgetUpdated(svc)
+			require.Equal(t, 1, svc.lastKnown.Len())
+
+			_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+			require.ErrorIs(t, err, domain.ErrInvalidAPIKey)
+			assert.Zero(t, svc.lastKnown.Len(), "the rejected key's last known config is discarded")
+		})
+	}
+}
+
+// @scenario "the fallback never outlives the key's own expiration date"
+func TestResolve_LastKnown_KeepsTheFreshTokensExpiry(t *testing.T) {
+	expiresAt := time.Now().Add(20 * time.Minute)
+	fresh := freshBundle("vk_dated", time.Now().Add(10*time.Minute))
+	fresh.VirtualKeyExpiresAt = expiresAt
+	fetcher := &fakeConfigFetcher{cfgErr: context.DeadlineExceeded}
+	fetcher.returns = []resolverReturn{{bundle: fresh}}
+	svc, _ := newService(t, Options{
+		Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, RefreshThreshold: time.Second,
+	})
+	rawKey := "vk-lw-dated"
+	h := seedServedKey(t, svc, rawKey, "vk_dated")
 	budgetUpdated(svc)
-	require.Equal(t, 1, svc.lastKnown.Len())
+
+	got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+	require.NoError(t, err)
+	assert.Equal(t, "cred-known-good", got.Credentials[0].ID, "the config comes from the last known entry")
+	assert.True(t, got.VirtualKeyExpiresAt.Equal(expiresAt), "the expiry comes from the fresh resolution")
+	e, ok := svc.l1.Peek(h)
+	require.True(t, ok)
+	assert.False(t, e.hardExpiresAt.After(expiresAt), "the fallback stops at the key's own expiration date")
+}
+
+// @scenario "the fallback never outlives the key's own expiration date"
+func TestResolve_LastKnown_FreshResolutionAlreadyExpired_Refuses(t *testing.T) {
+	fresh := freshBundle("vk_ended", time.Now().Add(10*time.Minute))
+	fresh.VirtualKeyExpiresAt = time.Now().Add(-time.Second)
+	fetcher := &fakeConfigFetcher{cfgErr: context.DeadlineExceeded}
+	fetcher.returns = []resolverReturn{{bundle: fresh}}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	rawKey := "vk-lw-ended"
+	seedServedKey(t, svc, rawKey, "vk_ended")
+	budgetUpdated(svc)
 
 	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
-	require.Error(t, err)
-	assert.True(t, errors.Is(err, domain.ErrInvalidAPIKey), "expected invalid_api_key, got %v", err)
-	assert.Zero(t, svc.lastKnown.Len(), "the rejected key's last known config is discarded")
+	require.ErrorIs(t, err, domain.ErrKeyExpired)
+}
+
+// @scenario "the last known config expires one hour after it was last confirmed"
+func TestServeLastKnown_EntryThatLapsedDuringTheFetch_IsNotServed(t *testing.T) {
+	fetcher := &fakeConfigFetcher{}
+	svc, _ := newService(t, Options{Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher})
+	rawKey := "vk-lw-lapsed"
+	h := seedServedKey(t, svc, rawKey, "vk_lapsed")
+	budgetUpdated(svc)
+	e := svc.lastKnownFor(h)
+	require.NotNil(t, e)
+
+	e.mu.Lock()
+	e.configConfirmedAt = time.Now().Add(-DefaultLastKnownConfigMaxAge - time.Second)
+	e.mu.Unlock()
+
+	assert.Nil(t, svc.serveLastKnown(h, e, nil, context.DeadlineExceeded))
+	_, inL1 := svc.l1.Peek(h)
+	assert.False(t, inL1)
+}
+
+// notModifiedFetcher confirms every conditional refresh and times out every
+// unconditional one: a control plane that answers 304s from the key's
+// revision but cannot materialize a full config.
+type notModifiedFetcher struct {
+	fakeResolver
+}
+
+func (f *notModifiedFetcher) FetchConfig(_ context.Context, _, ifNoneMatch string) (domain.ConfigFetchResult, error) {
+	if ifNoneMatch != "" {
+		return domain.ConfigFetchResult{NotModified: true}, nil
+	}
+	return domain.ConfigFetchResult{}, context.DeadlineExceeded
+}
+
+// @scenario "a not-modified answer counts as a confirmation of the last known config"
+func TestResolve_LastKnown_WindowMeasuredFromLatest304(t *testing.T) {
+	fetcher := &notModifiedFetcher{}
+	fetcher.returns = []resolverReturn{{bundle: freshBundle("vk_confirmed", time.Now().Add(10*time.Minute))}}
+	svc, _ := newService(t, Options{
+		Resolver: &fetcher.fakeResolver, ConfigFetcher: fetcher, RefreshThreshold: time.Second,
+	})
+	rawKey := "vk-lw-confirmed"
+	h := seedServedKey(t, svc, rawKey, "vk_confirmed")
+	e, _ := svc.l1.Peek(h)
+	e.mu.Lock()
+	e.configConfirmedAt = time.Now().Add(-DefaultLastKnownConfigMaxAge - time.Minute)
+	e.mu.Unlock()
+
+	require.True(t, e.tryBeginConfigRefresh())
+	svc.refreshConfigBackground(h, e)
+	e.mu.Lock()
+	confirmedAt := e.configConfirmedAt
+	e.mu.Unlock()
+	require.WithinDuration(t, time.Now(), confirmedAt, time.Second, "a 304 is a confirmation from the control plane")
+
+	budgetUpdated(svc)
+	got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
+	require.NoError(t, err, "the fallback window is measured from the 304, not from the last full fetch")
+	assert.Equal(t, "cred-known-good", got.Credentials[0].ID)
+
+	cur, ok := svc.l1.Peek(h)
+	require.True(t, ok)
+	assert.WithinDuration(t, confirmedAt.Add(DefaultLastKnownConfigMaxAge), cur.hardExpiresAt, time.Second)
 }

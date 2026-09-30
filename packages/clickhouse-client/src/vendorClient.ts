@@ -170,6 +170,7 @@ export class VendorClientResilience {
         const result = (await this.withTransientRetry({
           run: () => client.query(params),
           operation: "query",
+          signal: abortSignalOf(params),
         })) as { json?: (...args: never[]) => unknown };
         const durationMs = now() - start;
         this.report.success({ operation: "query", durationMs, params });
@@ -232,11 +233,14 @@ export class VendorClientResilience {
   private withTransientRetry<R>({
     run,
     operation,
+    signal,
   }: {
     run: () => Promise<R>;
     operation: StatementOperation;
+    signal?: AbortSignal | undefined;
   }): Promise<R> {
     return runWithRetry(run, {
+      isAborted: () => signal?.aborted === true,
       // maxRetries counts retries after the first try; runWithRetry counts
       // tries.
       maxAttempts: this.maxRetries + 1,
@@ -324,4 +328,11 @@ export class VendorClientResilience {
     }) as R["json"];
     return result;
   }
+}
+
+/** The caller's `abort_signal`, so an abandoned statement is not retried. */
+function abortSignalOf(params: unknown): AbortSignal | undefined {
+  if (!params || typeof params !== "object") return undefined;
+  const signal = (params as { abort_signal?: unknown }).abort_signal;
+  return signal instanceof AbortSignal ? signal : undefined;
 }

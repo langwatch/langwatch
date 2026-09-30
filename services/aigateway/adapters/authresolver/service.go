@@ -19,7 +19,8 @@
 //
 // Last-known fallback: a change-feed eviction keeps the evicted entry aside,
 // and a cold refetch that fails for transport reasons serves it again for at
-// most LastKnownConfigMaxAge after its config was last confirmed. See
+// most DefaultLastKnownConfigMaxAge after its config was last confirmed (a
+// 304 counts as a confirmation). See
 // specs/ai-gateway/auth-cache.feature, Rule "A change-feed eviction keeps the
 // last known config as an outage fallback".
 package authresolver
@@ -492,9 +493,6 @@ type Options struct {
 	// linked, a binding reset) takes to be noticed. Default 30s. Negative
 	// disables.
 	LicenseRefusalTTL time.Duration
-	// LastKnownConfigMaxAge bounds the last-known fallback. Default
-	// DefaultLastKnownConfigMaxAge. Negative disables the fallback.
-	LastKnownConfigMaxAge time.Duration
 }
 
 // New creates the auth service.
@@ -525,9 +523,6 @@ func New(opts Options) (*Service, error) {
 	if opts.LicenseRefusalTTL == 0 {
 		opts.LicenseRefusalTTL = 30 * time.Second
 	}
-	if opts.LastKnownConfigMaxAge == 0 {
-		opts.LastKnownConfigMaxAge = DefaultLastKnownConfigMaxAge
-	}
 
 	l1, err := lru.New[[64]byte, *entry](opts.LRUSize)
 	if err != nil {
@@ -552,7 +547,7 @@ func New(opts Options) (*Service, error) {
 		licenseRefusals:   licenseRefusals,
 		licenseRefusalTTL: opts.LicenseRefusalTTL,
 		lastKnown:         lastKnown,
-		lastKnownMaxAge:   opts.LastKnownConfigMaxAge,
+		lastKnownMaxAge:   DefaultLastKnownConfigMaxAge,
 
 		resolver:         opts.Resolver,
 		configFetcher:    opts.ConfigFetcher,
@@ -688,60 +683,95 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 	bundle, err := s.resolver.ResolveKey(fetchCtx, key)
 	if err != nil {
 		if fallback != nil && classifyRefreshError(err) == classTransportFailure {
-			return s.serveLastKnown(h, fallback, err), nil
+			if served := s.serveLastKnown(h, fallback, nil, err); served != nil {
+				return served, nil
+			}
 		}
 		s.lastKnown.Remove(h)
 		s.rememberLicenseRefusal(key, h, err)
 		return nil, err
 	}
 	etag, cfgErr := s.populateConfig(fetchCtx, bundle)
-	if cfgErr != nil {
-		if fallback != nil {
-			return s.serveLastKnown(h, fallback, cfgErr), nil
-		}
-		// Cold miss with nothing to fall back on. Cache nothing: a bundle
-		// without its config is not a resolution result.
-		return nil, errConfigUnavailable(ctx, cfgErr)
+	if cfgErr == nil {
+		s.storeL1(h, bundle, etag)
+		return bundle, nil
 	}
-	s.storeL1(h, bundle, etag)
-	return bundle, nil
+	if classifyRefreshError(cfgErr) == classAuthRejection {
+		// The key was deleted between resolve-key and the config fetch.
+		s.lastKnown.Remove(h)
+		return nil, cfgErr
+	}
+	if fallback != nil {
+		if served := s.serveLastKnown(h, fallback, bundle, cfgErr); served != nil {
+			return served, nil
+		}
+		if bundle.KeyExpired(time.Now()) {
+			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
+		}
+	}
+	// Nothing to fall back on. Cache nothing: a bundle without its config is
+	// not a resolution result.
+	return nil, errConfigUnavailable(ctx, cfgErr)
 }
 
 // lastKnownFor returns the entry the change feed evicted for h when it may
-// still be served: its config was confirmed within lastKnownMaxAge, and
-// neither the key's own expiry nor the hard cap has passed. Anything else is
-// dropped.
+// still be served, dropping it otherwise.
 func (s *Service) lastKnownFor(h [64]byte) *entry {
 	e, ok := s.lastKnown.Peek(h)
 	if !ok {
 		return nil
 	}
-	e.mu.Lock()
-	confirmedAt, hard := e.configConfirmedAt, e.hardExpiresAt
-	e.mu.Unlock()
-	now := time.Now()
-	if s.lastKnownMaxAge <= 0 || e.bundle == nil || e.bundle.KeyExpired(now) ||
-		now.After(hard) || now.Sub(confirmedAt) > s.lastKnownMaxAge {
+	if !s.lastKnownUsable(e, time.Now()) {
 		s.lastKnown.Remove(h)
 		return nil
 	}
 	return e
 }
 
+// lastKnownUsable reports whether an evicted entry may be served at now: its
+// config was confirmed within lastKnownMaxAge, and neither the key's own
+// expiry nor the hard cap has passed.
+func (s *Service) lastKnownUsable(e *entry, now time.Time) bool {
+	e.mu.Lock()
+	confirmedAt, hard := e.configConfirmedAt, e.hardExpiresAt
+	e.mu.Unlock()
+	return e.bundle != nil && !e.bundle.KeyExpired(now) &&
+		!now.After(hard) && now.Sub(confirmedAt) <= s.lastKnownMaxAge
+}
+
 // serveLastKnown puts an evicted entry back in L1 after a failed refetch and
-// returns its bundle. The new entry keeps its confirmation time, carries no
-// ETag so the next refresh asks for the config outright, and its hard cap
-// never passes lastKnownMaxAge after that confirmation.
-func (s *Service) serveLastKnown(h [64]byte, old *entry, cause error) *domain.Bundle {
+// returns its bundle, or nil when the entry stopped being servable while the
+// refetch ran. When resolve-key answered (fresh non-nil), the fresh token and
+// its expiry are kept and only the config comes from the evicted entry. The
+// new entry carries no ETag, so the next refresh asks for the config
+// outright, and its hard cap never passes lastKnownMaxAge after the last
+// confirmation.
+func (s *Service) serveLastKnown(h [64]byte, old *entry, fresh *domain.Bundle, cause error) *domain.Bundle {
+	now := time.Now()
+	if !s.lastKnownUsable(old, now) {
+		s.lastKnown.Remove(h)
+		return nil
+	}
 	old.mu.Lock()
 	bundle, hard := old.bundle, old.hardExpiresAt
 	confirmedAt, acked := old.configConfirmedAt, old.budgetRollAckedFor
 	old.mu.Unlock()
 
+	if fresh != nil {
+		if fresh.KeyExpired(now) {
+			s.lastKnown.Remove(h)
+			return nil
+		}
+		merged := *fresh
+		merged.Config = bundle.Config
+		merged.Credentials = bundle.Credentials
+		bundle = &merged
+		_, hard = entryDeadlines(bundle, s.hardGrace)
+	}
 	if limit := confirmedAt.Add(s.lastKnownMaxAge); limit.Before(hard) {
 		hard = limit
 	}
-	soft := time.Now().Add(s.softBump)
+	soft := now.Add(s.softBump)
 	if soft.After(hard) {
 		soft = hard
 	}
@@ -756,7 +786,7 @@ func (s *Service) serveLastKnown(h [64]byte, old *entry, cause error) *domain.Bu
 	})
 	s.logger.Warn("auth_cache_serve_last_known",
 		zap.String("vk_id", bundle.VirtualKeyID),
-		zap.Duration("config_age", time.Since(confirmedAt)),
+		zap.Duration("config_age", now.Sub(confirmedAt)),
 		zap.Time("serve_until", hard),
 		zap.Error(cause),
 	)
