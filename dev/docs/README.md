@@ -9,6 +9,7 @@
 - **[WORKTREES.md](WORKTREES.md)** - working several branches at once without stacks colliding
 - **[RELEASES.md](RELEASES.md)** - release-please components, breaking-change scope, version pinning
 - **[LOW_RISK_PULL_REQUESTS.md](LOW_RISK_PULL_REQUESTS.md)** - what qualifies for the reduced review path
+- **[TOOLING.md](TOOLING.md)** - why we have the tools we have: pnpm, Nx and its cache, lint layers, Go dev scripts, haven's slots
 - **[lint-rules.md](lint-rules.md)** - every deterministic house rule and the tool that enforces it
 
 ## Reference directories
