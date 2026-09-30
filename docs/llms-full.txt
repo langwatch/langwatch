@@ -1019,7 +1019,9 @@ another member's sign-in methods there.
 
 ## Invite people
 
-Click **Invite people**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats, or **Developer** to invite them on Developer seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. A Developer joins no team, so the section disappears when that seat is ticked. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
+Click **Invite people**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats, or **Developer** to invite them on Developer seats.
+
+Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. A Developer joins no team, so the section disappears when that seat is ticked. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
 
 Click **Send invites**. When the deployment has no email provider, the button reads **Create invites** and you copy the invite link from the row menu instead. An invite link has the form `https://app.langwatch.ai/invite/accept?inviteCode=...` and works for 14 days. **Resend invitation** issues a new 14-day link, and **Revoke** cancels it.
 
@@ -1037,7 +1039,7 @@ provider:
 | **Approval required** | Someone with a verified company address can ask to join. You approve or reject the request in **Settings > Directory > People** |
 | **Automatic joining** | Someone on a domain you verified joins without approval and receives the seat chosen below |
 
-Under the door setting, **Seat for people who join** decides what a person admitted without an invitation lands on: **Member** (the default, a full seat that sees the shared projects) or **Developer** (a project of their own and nothing shared). The same choice applies to people your identity provider admits. Invitations always name their own seat and ignore this setting.
+Under the door setting, **Seat for people who join** decides what a person admitted without an invitation lands on: **Member** (the default, a full seat that sees the shared projects) or **Developer** (a project of their own, with access to no shared team or project). The same choice applies to people your identity provider admits. Invitations always name their own seat and ignore this setting.
 
 The **Account lockout** and **Session limits** cards in the same section apply
 to password sign-in for the organization. They remain available when you stop
@@ -1049,9 +1051,11 @@ A Lite Member is a read-only seat, counted apart from full seats. On a team or a
 
 ## Developers
 
-A Developer is a seat for somebody who needs their own place to work and nothing shared: a developer sending traces from Claude Code or another coding agent, for example. A Developer gets a personal project and everything a member can do inside it: send traces from the CLI, run queries and evaluations, manage its keys. A Developer cannot open, be invited to, or be added to any shared team or project, and cannot be given access through a group either. Developers are counted on the seat panel and never limited by the plan.
+A Developer is a seat for somebody who needs their own place to work and no access to the shared projects: a developer sending traces from Claude Code or another coding agent, for example. A Developer gets a personal project and everything a member can do inside it: send traces from the CLI, run queries and evaluations, manage its keys.
 
-Moving a member to a Developer seat removes their access to every shared team, shared project and the organization, and records each removal in the audit log. Their personal project, its traces and their API keys stay. A key that pointed at a shared project stops working on its own, because a key can never do more than its owner can. Moving a Developer to a Member seat gives them nothing on its own; add teams afterwards.
+A Developer cannot open, be invited to, or be added to any shared team or project, and cannot be given access through a group either. Developers are counted on the seat panel and never limited by the plan.
+
+Moving a member to a Developer seat removes their access to every shared team, shared project and the organization, and records each removal in the audit log. Their personal project, its traces and their API keys stay. A key that pointed at a shared project stops working on its own, because a key can never do more than its owner can. Moving a Developer to a Member seat grants no team access on its own; add teams afterwards.
 
 The CLI honours the seat too: `langwatch login` offers a Developer their personal project only and refuses a shared one.
 
@@ -1238,7 +1242,7 @@ counted.
 | **Admin** | Every permission on every team and project in the organization, plus the organization settings: members, teams, roles, groups, billing, the audit log, AI Governance, webhook endpoints and spend data |
 | **Member** | `organization:view` and `aiTools:view`. Access to a team or a project comes from a binding on that team or that project |
 | **Lite Member** | `organization:view` and `aiTools:view`. On a team or a project a Lite Member is capped at the Viewer permissions below, plus `annotations:create` and `annotations:update`, and never sees costs, the AI Gateway pages or the audit log |
-| **Developer** | `organization:view` and `aiTools:view`. Full permissions on their own personal project, and nothing on any shared team or project. An organization-scoped binding or a group binding grants a Developer nothing |
+| **Developer** | `organization:view` and `aiTools:view`. Full permissions on their own personal project, and no permission on any shared team or project. An organization-scoped binding or a group binding grants a Developer no permission |
 
 A Lite Member uses a Lite seat, which is counted separately from full seats. In the settings pages a Lite Member can only be given the Viewer role on a team or a project. A group binding above Viewer applies as Viewer for a Lite Member.
 
@@ -64248,7 +64252,9 @@ You never need a license just to run LangWatch. A license adds the enterprise ca
 <Note>
 An Enterprise license is priced per seat, so it carries the number of members you bought and the deployment enforces it. Everything else stays uncapped: volume, history, projects, teams, and every experimentation resource. Need more seats? [Talk to us](mailto:enterprise@langwatch.ai) and we reissue the license.
 
-Seats come in three kinds. Which of the first two a person occupies follows from what they can do rather than from a billing switch: someone who can change things holds a **full seat**, someone who can only read what the team produces holds a **lite seat**. Lite seats are counted separately, so read-only reviewers do not consume a full one. The third, a **Developer seat**, is for somebody who works in a project of their own and sees nothing shared; it is counted but never limited by the license. See [Seats](/platform/members-and-teams#lite-members) and [Developers](/platform/members-and-teams#developers).
+Seats come in three kinds. Which of the first two a person occupies follows from what they can do rather than from a billing switch: someone who can change things holds a **full seat**, someone who can only read what the team produces holds a **lite seat**. Lite seats are counted separately, so read-only reviewers do not consume a full one.
+
+The third, a **Developer seat**, is for somebody who works in a project of their own and sees no shared project; it is counted but never limited by the license. See [Seats](/platform/members-and-teams#lite-members) and [Developers](/platform/members-and-teams#developers).
 </Note>
 
 <Note>
