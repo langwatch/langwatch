@@ -197,7 +197,11 @@ describe("explainLangyError", () => {
             reasons: [
               {
                 kind: "llm_upstream_error",
-                meta: { http_status: 403, provider: "bedrock", body_kind: "json" },
+                meta: {
+                  http_status: 403,
+                  provider: "bedrock",
+                  body_kind: "json",
+                },
                 reasons: [{ kind: "access_denied" }],
               },
             ],
@@ -223,7 +227,11 @@ describe("explainLangyError", () => {
             reasons: [
               {
                 kind: "llm_upstream_error",
-                meta: { http_status: 404, provider: "openai", body_kind: "json" },
+                meta: {
+                  http_status: 404,
+                  provider: "openai",
+                  body_kind: "json",
+                },
                 reasons: [{ kind: "model_not_found" }],
               },
             ],
@@ -248,7 +256,11 @@ describe("explainLangyError", () => {
             reasons: [
               {
                 kind: "llm_upstream_error",
-                meta: { http_status: 400, provider: "bedrock", body_kind: "json" },
+                meta: {
+                  http_status: 400,
+                  provider: "bedrock",
+                  body_kind: "json",
+                },
                 reasons: [{ kind: "some_new_provider_code" }],
               },
             ],
