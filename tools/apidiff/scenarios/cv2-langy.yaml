@@ -1,0 +1,126 @@
+# Langy over an org key naming its project (a project key is unowned, and Langy acts as a person,
+# so it answers 403 langy_api_key_unowned): a turn accepted, continued and refused when malformed, and the local
+# workspace routes read with the key. Each scenario starts its own conversation in a project shard.
+
+- id: cv2-langy-turn-key-authed-is-accepted
+  endpoint: POST /api/langy/conversations
+  auth: org
+  shard: project
+  request:
+    path: /api/langy/conversations
+    headers: { "X-Project-Id": "{projectId}" }
+    body:
+      messages: [{ role: user, content: "cv2 question {uid}" }]
+      idempotencyKey: "cv2-turn-{uid}"
+  capture: { conversationId: conversationId }
+  expect:
+    status: 202
+    body: { conversationId: "<any>", turnId: "<any>" }
+  verify:
+    - request: POST /api/langy/conversations/{conversationId}/messages
+      eventually: 30s
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      body:
+        messages: [{ role: user, content: "cv2 follow up {uid}" }]
+        idempotencyKey: "cv2-turn-two-{uid}"
+      expect: { status: [202, 409] }
+
+- id: cv2-langy-turn-repeat-idempotency-key-is-one-turn
+  endpoint: POST /api/langy/conversations
+  auth: org
+  shard: project
+  setup:
+    - request: POST /api/langy/conversations
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      body:
+        messages: [{ role: user, content: "cv2 once {uid}" }]
+        idempotencyKey: "cv2-idem-{uid}"
+      capture: { conversationId: conversationId, turnId: turnId }
+      expect: { status: 202 }
+  request:
+    path: /api/langy/conversations
+    headers: { "X-Project-Id": "{projectId}" }
+    body:
+      messages: [{ role: user, content: "cv2 once {uid}" }]
+      idempotencyKey: "cv2-idem-{uid}"
+  expect:
+    status: 202
+    body: { conversationId: "{conversationId}", turnId: "{turnId}" }
+
+- id: cv2-langy-turn-refuses-malformed-body
+  endpoint: POST /api/langy/conversations
+  auth: org
+  shard: project
+  request:
+    path: /api/langy/conversations
+    headers: { "X-Project-Id": "{projectId}" }
+    body: { messages: "not a list" }
+  expect:
+    status: [400, 422]
+
+- id: cv2-langy-turn-continue-unknown-conversation-starts-a-new-one
+  endpoint: POST /api/langy/conversations/{conversationId}/messages
+  auth: org
+  shard: project
+  request:
+    path: /api/langy/conversations/cv2-missing-{uid}/messages
+    headers: { "X-Project-Id": "{projectId}" }
+    body:
+      messages: [{ role: user, content: "cv2 nobody home {uid}" }]
+      idempotencyKey: "cv2-missing-{uid}"
+  expect:
+    status: 202
+    body: { conversationId: "<any>", turnId: "<any>" }
+    notContains: "cv2-missing-{uid}"
+
+- id: cv2-langy-local-workspace-key-authed-reads-status
+  endpoint: GET /api/langy/local/workspace
+  auth: org
+  shard: project
+  setup:
+    - request: POST /api/langy/conversations
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      body:
+        messages: [{ role: user, content: "cv2 workspace {uid}" }]
+        idempotencyKey: "cv2-ws-{uid}"
+      capture: { conversationId: conversationId }
+      expect: { status: 202 }
+  request:
+    path: /api/langy/local/workspace
+    headers: { "X-Project-Id": "{projectId}" }
+    query: { conversationId: "{conversationId}" }
+  expect:
+    status: 200
+
+- id: cv2-langy-local-request-key-authed-is-recorded
+  endpoint: POST /api/langy/local/requests
+  auth: org
+  shard: project
+  setup:
+    - request: POST /api/langy/conversations
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      body:
+        messages: [{ role: user, content: "cv2 folder {uid}" }]
+        idempotencyKey: "cv2-req-{uid}"
+      capture: { conversationId: conversationId }
+      expect: { status: 202 }
+  request:
+    path: /api/langy/local/requests
+    headers: { "X-Project-Id": "{projectId}" }
+    body: { conversationId: "{conversationId}" }
+  expect:
+    status: [200, 201]
+
+- id: cv2-langy-wait-read-unknown-is-404
+  endpoint: GET /api/langy/waits/{waitId}
+  auth: org
+  shard: project
+  request:
+    path: /api/langy/waits/cv2-missing-{uid}
+    headers: { "X-Project-Id": "{projectId}" }
+  expect:
+    status: 404

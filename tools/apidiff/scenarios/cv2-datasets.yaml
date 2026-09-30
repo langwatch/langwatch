@@ -1,0 +1,163 @@
+# Datasets: whole round trips over REST (create, read back, change, delete, read back again).
+# Every name ends in {uid}; each scenario makes its own dataset, so none races a shared list.
+
+- id: cv2-dataset-lifecycle-create-rename-archive
+  endpoint: POST /api/dataset
+  shard: project
+  request:
+    path: /api/dataset
+    body:
+      name: "cv2-life-{uid}"
+      columnTypes: [{ name: input, type: string }]
+  capture: { datasetId: id, datasetSlug: slug }
+  expect:
+    status: 201
+    body: { name: "cv2-life-{uid}", id: "<any>", slug: "<any>" }
+  verify:
+    - request: GET /api/dataset/{datasetSlug}
+      eventually: 10s
+      expect: { status: 200, body: { id: "{datasetId}", name: "cv2-life-{uid}" } }
+    - request:
+        method: PATCH
+        path: /api/dataset/{datasetId}
+        body: { name: "cv2-renamed-{uid}" }
+      expect: { status: 200, body: { id: "{datasetId}", name: "cv2-renamed-{uid}" } }
+    - request: GET /api/dataset/{datasetId}
+      eventually: 10s
+      expect: { status: 200, body: { name: "cv2-renamed-{uid}" } }
+    - request: GET /api/dataset
+      expect: { status: 200, contains: "cv2-renamed-{uid}", notContains: "cv2-life-{uid}" }
+    - request: DELETE /api/dataset/{datasetId}
+      expect: { status: 200, body: { id: "{datasetId}", archived: true } }
+    - request: GET /api/dataset/{datasetId}
+      eventually: 10s
+      expect: { status: 404 }
+    - request: GET /api/dataset
+      expect: { status: 200, notContains: "cv2-renamed-{uid}" }
+
+- id: cv2-dataset-records-add-list-edit-delete
+  endpoint: POST /api/dataset/{slugOrId}/records
+  shard: project
+  setup:
+    - request: POST /api/dataset
+      body:
+        name: "cv2-rows-{uid}"
+        columnTypes: [{ name: input, type: string }, { name: score, type: number }]
+      capture: { datasetId: id }
+  request:
+    path: /api/dataset/{datasetId}/records
+    body:
+      entries:
+        - { input: "cv2 alpha {uid}", score: 1 }
+        - { input: "cv2 beta {uid}", score: 2 }
+  capture: { recordA: data.0.id, recordB: data.1.id }
+  expect:
+    status: 201
+    path: data
+    length: 2
+  verify:
+    - request: GET /api/dataset/{datasetId}/records
+      eventually: 10s
+      expect: { status: 200, path: data, length: 2, contains: ["cv2 alpha {uid}", "cv2 beta {uid}"] }
+    - request:
+        method: PATCH
+        path: /api/dataset/{datasetId}/records/{recordA}
+        body: { entry: { input: "cv2 alpha edited {uid}", score: 10 } }
+      expect: { status: 200, body: { id: "{recordA}" } }
+    - request: GET /api/dataset/{datasetId}/records
+      eventually: 10s
+      expect: { status: 200, contains: "cv2 alpha edited {uid}", notContains: "cv2 alpha {uid}" }
+    - request:
+        method: DELETE
+        path: /api/dataset/{datasetId}/records
+        body: { recordIds: ["{recordB}"] }
+      expect: { status: 200, body: { deletedCount: 1 } }
+    - request: GET /api/dataset/{datasetId}/records
+      eventually: 10s
+      expect: { status: 200, path: data, length: 1, notContains: "cv2 beta {uid}" }
+    - request: GET /api/dataset
+      expect: { status: 200, contains: "cv2-rows-{uid}" }
+  teardown:
+    - request: DELETE /api/dataset/{datasetId}
+
+- id: cv2-dataset-legacy-entries-append-reads-back
+  endpoint: POST /api/dataset/{slug}/entries
+  shard: project
+  setup:
+    - request: POST /api/dataset
+      body:
+        name: "cv2-legacy-{uid}"
+        columnTypes: [{ name: input, type: string }]
+      capture: { datasetId: id, datasetSlug: slug }
+  request:
+    path: /api/dataset/{datasetSlug}/entries
+    body: { entries: [{ input: "cv2 legacy row {uid}" }] }
+  expect:
+    status: 200
+    body: { success: true }
+  verify:
+    - request: GET /api/dataset/{datasetId}/records
+      eventually: 10s
+      expect: { status: 200, path: data, length: 1, contains: "cv2 legacy row {uid}" }
+  teardown:
+    - request: DELETE /api/dataset/{datasetId}
+
+- id: cv2-dataset-records-refuse-empty-batch
+  endpoint: POST /api/dataset/{slugOrId}/records
+  shard: project
+  setup:
+    - request: POST /api/dataset
+      body:
+        name: "cv2-empty-{uid}"
+        columnTypes: [{ name: input, type: string }]
+      capture: { datasetId: id }
+  request:
+    path: /api/dataset/{datasetId}/records
+    body: { entries: [] }
+  expect:
+    status: [400, 422]
+  verify:
+    - request: GET /api/dataset/{datasetId}/records
+      expect: { status: 200, path: data, length: 0 }
+  teardown:
+    - request: DELETE /api/dataset/{datasetId}
+
+- id: cv2-dataset-record-patch-unknown-id-creates
+  endpoint: PATCH /api/dataset/{slugOrId}/records/{recordId}
+  shard: project
+  setup:
+    - request: POST /api/dataset
+      body:
+        name: "cv2-upsert-{uid}"
+        columnTypes: [{ name: input, type: string }]
+      capture: { datasetId: id }
+  request:
+    method: PATCH
+    path: /api/dataset/{datasetId}/records/cv2-rec-{uid}
+    body: { entry: { input: "cv2 upserted {uid}" } }
+  expect:
+    status: 201
+    body: { id: "cv2-rec-{uid}" }
+  verify:
+    - request: GET /api/dataset/{datasetId}/records
+      eventually: 10s
+      expect: { status: 200, path: data, length: 1, contains: "cv2 upserted {uid}" }
+  teardown:
+    - request: DELETE /api/dataset/{datasetId}
+
+- id: cv2-dataset-read-unknown-is-404
+  endpoint: GET /api/dataset/{slugOrId}
+  shard: project
+  request:
+    path: /api/dataset/cv2-missing-{uid}
+  expect:
+    status: 404
+
+- id: cv2-dataset-archive-unknown-is-404
+  endpoint: DELETE /api/dataset/{slugOrId}
+  shard: project
+  request:
+    method: DELETE
+    path: /api/dataset/cv2-missing-{uid}
+  expect:
+    status: 404

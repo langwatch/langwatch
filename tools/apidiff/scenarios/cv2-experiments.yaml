@@ -1,0 +1,123 @@
+# Experiments: create and read back, an SDK run read back through the run routes, a restore that
+# writes forward, and a refused save that leaves the history alone. Results land through the
+# event pipeline, so the first read of a run waits up to 30 seconds.
+
+- id: cv2-experiment-create-read-list-workbench-state
+  endpoint: POST /api/experiments
+  shard: project
+  request:
+    path: /api/experiments
+    body: { name: "cv2-exp-{uid}" }
+  capture: { expId: id, expSlug: slug }
+  expect:
+    status: [200, 201]
+    body: { id: "<any>", slug: "<any>", version: 1 }
+  verify:
+    - request: GET /api/experiments/{expSlug}
+      eventually: 10s
+      expect: { status: 200, contains: "cv2-exp-{uid}" }
+    - request: GET /api/experiments
+      eventually: 10s
+      expect: { status: 200, contains: "cv2-exp-{uid}" }
+    - request: GET /api/experiments/{expSlug}/workbench-state
+      expect: { status: 200, body: { id: "{expId}", slug: "{expSlug}", name: "cv2-exp-{uid}", version: 1 } }
+    - request: GET /api/experiments/{expSlug}/versions
+      expect: { status: 200, path: versions, length: 1 }
+
+- id: cv2-experiment-restore-writes-forward
+  endpoint: POST /api/experiments/{slug}/versions/{version}/restore
+  shard: project
+  setup:
+    - request: POST /api/experiments
+      body: { name: "cv2-restore-{uid}" }
+      capture: { expSlug: slug }
+  request:
+    path: /api/experiments/{expSlug}/versions/1/restore
+    body: {}
+  expect:
+    status: [200, 201]
+    body: { version: "<any>" }
+  verify:
+    - request: GET /api/experiments/{expSlug}/versions
+      eventually: 10s
+      expect: { status: 200, path: versions, length: 2 }
+    - request: GET /api/experiments/{expSlug}/workbench-state
+      expect: { status: 200, body: { name: "cv2-restore-{uid}" } }
+
+- id: cv2-experiment-save-invalid-state-keeps-history
+  endpoint: PUT /api/experiments/{slug}/workbench-state
+  shard: project
+  setup:
+    - request: POST /api/experiments
+      body: { name: "cv2-badsave-{uid}" }
+      capture: { expSlug: slug }
+  request:
+    method: PUT
+    path: /api/experiments/{expSlug}/workbench-state
+    body: { state: { datasets: "not-a-list" }, commitMessage: "cv2-bad-{uid}" }
+  expect:
+    status: [400, 422]
+  verify:
+    - request: GET /api/experiments/{expSlug}/versions
+      expect: { status: 200, path: versions, length: 1, notContains: "cv2-bad-{uid}" }
+    - request: GET /api/experiments/{expSlug}/workbench-state
+      expect: { status: 200, body: { version: 1 } }
+
+- id: cv2-experiment-sdk-run-reads-back
+  endpoint: POST /api/evaluations/batch/log_results
+  shard: project
+  setup:
+    - request: POST /api/experiment/init
+      body:
+        experiment_slug: "cv2-run-{uid}"
+        experiment_name: "cv2-run-{uid}"
+        experiment_type: BATCH_EVALUATION_V2
+      capture: { expSlug: slug }
+      expect: { status: [200, 201] }
+  request:
+    path: /api/evaluations/batch/log_results
+    body:
+      experiment_slug: "{expSlug}"
+      run_id: "cv2-run-id-{uid}"
+      progress: 1
+      total: 1
+      dataset:
+        - index: 0
+          entry: { question: "cv2 question {uid}" }
+          predicted: { answer: "cv2 answer {uid}" }
+          cost: 0.001
+          duration: 100
+      evaluations:
+        - evaluator: cv2-exact
+          name: Exact match
+          status: processed
+          index: 0
+          score: 1
+          passed: true
+  expect:
+    status: [200, 201]
+  verify:
+    - request: GET /api/experiments/runs/cv2-run-id-{uid}/results
+      query: { experimentSlug: "{expSlug}" }
+      eventually: 30s
+      expect: { status: 200, contains: ["cv2 question {uid}", "cv2 answer {uid}", "cv2-exact"] }
+    - request: GET /api/experiments/runs
+      query: { experimentSlug: "{expSlug}" }
+      eventually: 30s
+      expect: { status: 200, contains: "cv2-run-id-{uid}" }
+
+- id: cv2-experiment-read-unknown-is-404
+  endpoint: GET /api/experiments/{slug}
+  shard: project
+  request:
+    path: /api/experiments/cv2-missing-{uid}
+  expect:
+    status: 404
+
+- id: cv2-experiment-run-read-unknown-is-404
+  endpoint: GET /api/experiments/runs/{runId}
+  shard: project
+  request:
+    path: /api/experiments/runs/cv2-missing-{uid}
+  expect:
+    status: 404
