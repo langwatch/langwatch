@@ -24,6 +24,11 @@ type Entry struct {
 	Contexts         json.RawMessage `json:"contexts,omitempty"`
 	ExpectedContexts json.RawMessage `json:"expected_contexts,omitempty"`
 	Conversation     json.RawMessage `json:"conversation,omitempty"`
+	// Golden, Candidates (a list of {id, output, cost?, duration?}) and
+	// RowIndex are select_best_compare's own fields.
+	Golden     *string         `json:"golden,omitempty"`
+	Candidates json.RawMessage `json:"candidates,omitempty"`
+	RowIndex   *int            `json:"row_index,omitempty"`
 }
 
 // TraceRequest continues the caller's trace into the tenant's project. With no

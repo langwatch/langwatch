@@ -20,7 +20,7 @@ type judges struct {
 }
 
 // judgePrepares are the langevals LLM-as-judge evaluators (plan §8.4);
-// select_best_compare waits on candidates reaching contract.Entry.
+// pairwise_compare stays unported (decision D11).
 func judgePrepares() map[string]func(json.RawMessage) (Score, error) {
 	counter, err := rules.NewTokenCounter()
 	j := &judges{tokens: counter, tokensErr: err}
@@ -33,6 +33,7 @@ func judgePrepares() map[string]func(json.RawMessage) (Score, error) {
 		"langevals/competitor_llm_function_call": WithSettings(rules.ParseCompetitorLLMFunctionCallSettings, j.scoreCompetitorFunctionCall),
 		"langevals/off_topic":                    WithSettings(rules.ParseOffTopicSettings, j.scoreOffTopic),
 		"langevals/query_resolution":             WithSettings(rules.ParseLLMEvaluatorSettings, j.scoreQueryResolution),
+		"langevals/select_best_compare":          WithSettings(rules.ParseSelectBestCompareSettings, scoreSelectBest),
 	}
 }
 
