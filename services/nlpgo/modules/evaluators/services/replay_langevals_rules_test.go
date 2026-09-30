@@ -1,0 +1,136 @@
+package services_test
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
+	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/rules"
+)
+
+// @scenario "The rule-based langevals evaluators answer as langevals answered"
+func TestReplayLangevalsRulesAnswerWhatLangevalsAnswered(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
+		replayFixtures(t, "langevals/basic", "langevals__basic.json", replayOptions{})
+	})
+	t.Run("competitor_blocklist", func(t *testing.T) {
+		replayFixtures(t, "langevals/competitor_blocklist", "langevals__competitor_blocklist.json", replayOptions{})
+	})
+	t.Run("valid_format at parity", func(t *testing.T) {
+		h := newHarness(t, contract.DefaultConfig(), 0)
+		for _, c := range validFormatCases(t, true) {
+			t.Run(c.Name, func(t *testing.T) {
+				got := evaluateValidFormat(t, h, c)
+				if c.Result.ErrorType != nil {
+					assert.Equal(t, *c.Result.ErrorType, got.ErrorType, "error_type")
+				}
+				if isSchemaError(&c) {
+					// str(SchemaError) is Python's text from its first byte; see the handoff.
+					require.NotNil(t, got.Details)
+					t.Logf("details differ by design: want %q, got %q", *c.Result.Details, *got.Details)
+					c.Result.Details = got.Details
+				}
+				compareResult(t, &c, got, replayOptions{DetailsPrefix: quotesPythonException})
+			})
+		}
+	})
+}
+
+// @scenario "A valid_format mode short of parity is reported, not hidden"
+func TestReplayValidFormatReportsModesShortOfParity(t *testing.T) {
+	h := newHarness(t, contract.DefaultConfig(), 0)
+	for _, c := range validFormatCases(t, false) {
+		got := evaluateValidFormat(t, h, c)
+		if !sameVerdict(&c, got) {
+			t.Logf("valid_format short of parity: %q", c.Name)
+		}
+	}
+}
+
+// quotesPythonException marks details that carry Python's own exception text.
+func quotesPythonException(c *fixtureCase) bool {
+	details := ""
+	if c.Result.Details != nil {
+		details = *c.Result.Details
+	}
+	for _, prefix := range []string{"Invalid JSON", "Invalid JSON Schema", "JSON Schema validation failed", "Invalid Python", "Invalid SQL"} {
+		if strings.HasPrefix(details, prefix+":") {
+			return true
+		}
+	}
+	return false
+}
+
+func isSchemaError(c *fixtureCase) bool {
+	return c.Result.ErrorType != nil && *c.Result.ErrorType == "SchemaError"
+}
+
+// validFormatCases are the recorded valid_format cases whose mode is (or is
+// not) marked at parity in rules.FormatAtParity.
+func validFormatCases(t *testing.T, atParity bool) []fixtureCase {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "testdata", "fixtures", "langevals__valid_format.json"))
+	require.NoError(t, err)
+	var cases []fixtureCase
+	require.NoError(t, json.Unmarshal(raw, &cases))
+	var selected []fixtureCase
+	for i := range cases {
+		settings, err := rules.ParseValidFormatSettings(settingsOrEmpty(cases[i].Settings))
+		require.NoError(t, err)
+		if rules.FormatAtParity(settings.Format) == atParity {
+			selected = append(selected, cases[i])
+		}
+	}
+	require.NotEmpty(t, selected)
+	return selected
+}
+
+func settingsOrEmpty(settings json.RawMessage) json.RawMessage {
+	if len(settings) == 0 {
+		return json.RawMessage(`{}`)
+	}
+	return settings
+}
+
+func evaluateValidFormat(t *testing.T, h harness, c fixtureCase) contract.Result {
+	t.Helper()
+	results, err := h.service.Evaluate(context.Background(), contract.EvaluateRequest{
+		Tenant:    contract.Tenant{ProjectID: "project_replay"},
+		Evaluator: "langevals/valid_format",
+		Entries:   []contract.Entry{c.Entry},
+		Settings:  settingsOrEmpty(c.Settings),
+	})
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	return results[0]
+}
+
+// sameVerdict compares status, passed, score and details up to Python's
+// exception text.
+func sameVerdict(c *fixtureCase, got contract.Result) bool {
+	want := c.Result
+	if want.Status != got.Status || !samePointee(want.Passed, got.Passed) || !samePointee(want.Score, got.Score) {
+		return false
+	}
+	if want.Details == nil || got.Details == nil {
+		return want.Details == got.Details
+	}
+	if quotesPythonException(c) {
+		return detailsHead(*want.Details) == detailsHead(*got.Details)
+	}
+	return *want.Details == *got.Details
+}
+
+func samePointee[T comparable](want, got *T) bool {
+	if want == nil || got == nil {
+		return want == got
+	}
+	return *want == *got
+}

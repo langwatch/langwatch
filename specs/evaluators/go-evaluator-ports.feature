@@ -4,20 +4,20 @@ Feature: Evaluators ported to the Go runtime answer as langevals answered
   evaluators call out with the tenant's own credentials only.
   Plan: dev/docs/plans/langevals-go-replacement.md §8, §11 Phase 2.
 
-  @unit @unimplemented
+  @unit
   Scenario: The rule-based langevals evaluators answer as langevals answered
     Given langevals' recorded answers for basic, competitor_blocklist and valid_format
     When the Go runtime evaluates the same entries with the same settings
     Then every status, score, passed and label matches
     And details match, up to the exception text Python wrote itself
 
-  @unit @unimplemented
+  @unit
   Scenario: A valid_format mode short of parity is reported, not hidden
     Given langevals' recorded valid_format answers for python and sql
     When the Go runtime evaluates them
     Then the cases that differ are listed by name in the test output
 
-  @unit @unimplemented
+  @unit
   Scenario: The ragas text metrics score as langevals scored
     Given langevals' recorded answers for bleu, rouge and the non-LLM context metrics
     When the Go runtime evaluates the same entries with the same settings

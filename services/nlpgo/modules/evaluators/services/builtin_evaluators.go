@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"maps"
 
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/contract"
 	"github.com/langwatch/langwatch/services/nlpgo/modules/evaluators/rules"
@@ -15,6 +16,8 @@ func BuiltinEvaluators() map[string]Evaluator {
 	prepares := map[string]func(json.RawMessage) (Score, error){
 		"langevals/exact_match": WithSettings(rules.ParseExactMatchSettings, scoreExactMatch),
 	}
+	maps.Copy(prepares, langevalsRulesPrepares())
+	maps.Copy(prepares, ragasTextPrepares())
 	evaluators := make(map[string]Evaluator, len(prepares))
 	definitions := rules.Definitions()
 	for i := range definitions {
