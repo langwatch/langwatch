@@ -45,13 +45,13 @@ export interface SsoUserResolutionInput {
 }
 
 /**
- * Which existing person an admitted assertion signs in as. `continue` leaves
- * the choice to the sign-in library's own rule; `OAuthAccountNotLinked` is
- * that library's refusal, kept so the screen reads what it always read.
+ * Which existing person an admitted assertion signs in as. `continue` leaves the choice to
+ * the sign-in library's own rule; `OAuthAccountNotLinked` is that library's refusal, kept so
+ * the screen reads what it always read. `confirmAddress`: confirm it in the link's own commit.
  */
 export type SsoUserResolution =
   | Readonly<{ action: "continue" }>
-  | Readonly<{ action: "link"; userId: string; profile: "preserve" }>
+  | Readonly<{ action: "link"; userId: string; profile: "preserve"; confirmAddress?: true }>
   | Readonly<{
       action: "reject";
       code: "OAuthAccountNotLinked" | "sso_existing_account_unconfirmed";

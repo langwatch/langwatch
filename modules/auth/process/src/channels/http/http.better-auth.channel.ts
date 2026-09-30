@@ -4,7 +4,11 @@ export type {
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/server";
 import { passkey } from "@better-auth/passkey";
-import type { SSOUserResolution, SSOUserResolutionInput } from "@better-auth/sso";
+import type {
+  SSOUserResolution,
+  SSOUserResolutionContext,
+  SSOUserResolutionInput,
+} from "@better-auth/sso";
 import { sso } from "@better-auth/sso";
 import {
   isCredentialMutationPath,
@@ -738,7 +742,7 @@ function ssoPlugin(assertions: SsoAssertionApi): ReturnType<typeof sso> {
     /** Somebody with no account who signs in through their employer's
      *  provider gets one; where they land is the arrival policy's business. */
     disableImplicitSignUp: false,
-    resolveUser: async (input) => resolveSsoUser({ assertions, input }),
+    resolveUser: async (input, context) => resolveSsoUser({ assertions, input, context }),
   });
 }
 
@@ -750,9 +754,11 @@ function ssoPlugin(assertions: SsoAssertionApi): ReturnType<typeof sso> {
 export async function resolveSsoUser({
   assertions,
   input,
+  context,
 }: {
   assertions: SsoAssertionApi;
   input: SSOUserResolutionInput;
+  context: SSOUserResolutionContext;
 }): Promise<SSOUserResolution> {
   try {
     const decision = await assertions.decide({
@@ -766,13 +772,21 @@ export async function resolveSsoUser({
     if (decision.action === "reject") return { action: "reject", code: decision.error.code };
 
     // Only an admitted assertion is linked to anybody (specs/identity/scim-sso-signin.feature).
-    return await assertions.resolveUser({
+    const resolution = await assertions.resolveUser({
       protocol: input.protocol,
       providerId: input.providerId,
       accountKey: input.accountKey,
       email: input.providerUser.email,
       emailVerified: input.providerUser.emailVerified,
     });
+    if (resolution.action !== "link" || !resolution.confirmAddress) return resolution;
+    // Inside the library's callback transaction, so a failed link leaves the address unconfirmed.
+    await context.database.update({
+      model: "user",
+      where: [{ field: "id", value: resolution.userId }],
+      update: { emailVerified: true },
+    });
+    return { action: "link", userId: resolution.userId, profile: resolution.profile };
   } catch (error) {
     /** We log our own failure because nobody else will: the plugin discards
      *  this error and answers `SSO_USER_RESOLUTION_FAILED` to the customer. */

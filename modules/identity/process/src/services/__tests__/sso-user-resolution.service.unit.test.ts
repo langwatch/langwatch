@@ -50,21 +50,25 @@ function createWorld({
   owners = [CONNECTION_ID],
   inactive = false,
   membership = "active",
+  state = "ACTIVE",
+  proof = PROOF,
 }: {
   hosted?: boolean;
   proved?: boolean;
   owners?: string[];
   inactive?: boolean;
   membership?: Membership;
+  state?: SsoConnectionState["state"];
+  proof?: SsoDomainVerification;
 } = {}) {
   const store = MemoryIdentityStore.create();
   const connection: SsoConnectionState = {
     ...emptySsoConnection({ connectionId: CONNECTION_ID }),
     organizationId: ORGANIZATION_ID,
-    state: "ACTIVE",
+    state,
     replacesConnectionId: REPLACED_ID,
     verifiedDomains: proved ? [DOMAIN] : [],
-    domainVerifications: proved ? [PROOF] : [],
+    domainVerifications: proved ? [proof] : [],
   };
   store.ssoConnections.set(CONNECTION_ID, connection);
   store.users.set(USER_ID, {
@@ -145,6 +149,12 @@ const bind = ({ store, userId = USER_ID }: { store: MemoryIdentityStore; userId?
     },
   ]);
 
+const LINKED_AND_CONFIRMED = {
+  action: "link",
+  userId: USER_ID,
+  profile: "preserve",
+  confirmAddress: true,
+} as const;
 const LINKED = { action: "link", userId: USER_ID, profile: "preserve" } as const;
 const NOT_LINKED = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 const UNCONFIRMED = { action: "reject", code: "sso_existing_account_unconfirmed" } as const;
@@ -288,6 +298,35 @@ describe("given a member this connection's directory provisioned", () => {
 });
 
 describe("given a password account whose address was never confirmed", () => {
+  describe("when the live connection has verified the account's domain", () => {
+    /** @scenario "A verified domain's identity provider links an unconfirmed password account" */
+    it("links the existing account and asks for its address to be confirmed", async () => {
+      const { service } = createWorld({ owners: [], proved: true });
+
+      await expect(service.resolveUser(assertion())).resolves.toEqual(LINKED_AND_CONFIRMED);
+    });
+  });
+
+  describe("when the connection in setup has verified the domain by licence", () => {
+    /** @scenario "The setup test sign-in links the registrant's unconfirmed password account" */
+    it("links the registrant's account and asks for its address to be confirmed", async () => {
+      const { service } = createWorld({
+        owners: [],
+        proved: true,
+        state: "DRAFT",
+        proof: {
+          ...PROOF,
+          method: "license-token",
+          actorId: USER_ID,
+          evidenceRef: "licence_1",
+          tokenHash: null,
+        },
+      });
+
+      await expect(service.resolveUser(assertion())).resolves.toEqual(LINKED_AND_CONFIRMED);
+    });
+  });
+
   describe("when the connection has not verified the account's domain", () => {
     /** @scenario "An unconfirmed account on a domain the connection has not verified is not linked" */
     it("refuses by name and leaves the address unconfirmed", async () => {

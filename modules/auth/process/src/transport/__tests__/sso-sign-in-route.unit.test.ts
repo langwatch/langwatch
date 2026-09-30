@@ -37,6 +37,14 @@ const assertionOf = (email: string) =>
     verifiedIdTokenClaims: {},
   }) as Parameters<typeof resolveSsoUser>[0]["input"];
 
+/** The library's transaction, recording what the resolver writes inside it. */
+const transaction = () => {
+  const update = vi.fn(async () => null);
+  const database = createApiFixture<TransactionContext["database"]>({ update });
+  return { update, context: { database } };
+};
+type TransactionContext = Parameters<typeof resolveSsoUser>[0]["context"];
+
 describe("given the single sign-on plugin this deployment mounts", () => {
   it("answers the sign-in door rather than 404, and names what it still needs", async () => {
     const { status, body } = await signInThroughSso({ callbackURL: "/" });
@@ -64,8 +72,35 @@ describe("given identity decides whether an assertion may become a session", () 
     });
 
     await expect(
-      resolveSsoUser({ assertions, input: assertionOf("person@acme.test") }),
+      resolveSsoUser({
+        assertions,
+        input: assertionOf("person@acme.test"),
+        context: transaction().context,
+      }),
     ).resolves.toEqual({ action: "link", userId: "user_1", profile: "preserve" });
+  });
+
+  /** @scenario "A verified domain's identity provider links an unconfirmed password account" */
+  it("confirms the address inside the library's transaction before linking", async () => {
+    const { update, context } = transaction();
+    const assertions = createApiFixture<SsoAssertionApi>({
+      decide: async () => ({ action: "continue" }),
+      resolveUser: async () => ({
+        action: "link",
+        userId: "user_1",
+        profile: "preserve",
+        confirmAddress: true,
+      }),
+    });
+
+    await expect(
+      resolveSsoUser({ assertions, input: assertionOf("person@acme.test"), context }),
+    ).resolves.toEqual({ action: "link", userId: "user_1", profile: "preserve" });
+    expect(update).toHaveBeenCalledWith({
+      model: "user",
+      where: [{ field: "id", value: "user_1" }],
+      update: { emailVerified: true },
+    });
   });
 
   it("asks with the subject the provider asserted, not the address alone", async () => {
@@ -75,6 +110,7 @@ describe("given identity decides whether an assertion may become a session", () 
     await resolveSsoUser({
       assertions: createApiFixture<SsoAssertionApi>({ decide, resolveUser }),
       input: assertionOf("person@acme.test"),
+      context: transaction().context,
     });
 
     expect(decide).toHaveBeenCalledWith({
@@ -102,7 +138,11 @@ describe("given identity decides whether an assertion may become a session", () 
     });
 
     await expect(
-      resolveSsoUser({ assertions, input: assertionOf("person@acme.test") }),
+      resolveSsoUser({
+        assertions,
+        input: assertionOf("person@acme.test"),
+        context: transaction().context,
+      }),
     ).resolves.toEqual({ action: "reject", code: error.code });
   });
 
@@ -117,7 +157,11 @@ describe("given identity decides whether an assertion may become a session", () 
       resolveUser,
     });
 
-    await resolveSsoUser({ assertions, input: assertionOf("person@acme.test") });
+    await resolveSsoUser({
+      assertions,
+      input: assertionOf("person@acme.test"),
+      context: transaction().context,
+    });
 
     expect(resolveUser).not.toHaveBeenCalled();
   });

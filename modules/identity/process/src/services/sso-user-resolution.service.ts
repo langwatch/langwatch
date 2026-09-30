@@ -175,10 +175,8 @@ export class SsoUserResolutionService {
       accountKey: input.accountKey,
     });
     if (contested) return REFUSE;
-    // Main confirms the address and links here, inside the library's callback
-    // transaction. Not ported: that write cannot share the transaction from
-    // this module, so the library's own rule still answers (refuses) the link.
-    return CONTINUE;
+    // The proof vouches for the address: confirmed and linked in the library's own commit.
+    return { action: "link", userId: user.id, profile: "preserve", confirmAddress: true };
   }
 
   private async resolveOwnedUser({
