@@ -8,9 +8,9 @@ import {
   type CliErrorDocumentRead,
   type LangWatchHandledErrorShape,
   isTerminalFailure,
-  parseCliJson,
   readCliErrorDocument,
-} from "@langwatch/langy-contract";
+} from "@langwatch/handled-error/langwatch-handled-error";
+import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
 

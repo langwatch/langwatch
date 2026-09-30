@@ -2,7 +2,7 @@ import {
   handledErrorFromThrown,
   toCliErrorDocument,
   type LangWatchHandledErrorShape,
-} from "@langwatch/langy-contract/cards/handled-error";
+} from "@langwatch/handled-error/langwatch-handled-error";
 /**
  * Error output: prose for humans, JSON for machines.
  * Both paths scrub messages through `redactSecrets` first; meta/reasons/kind are not scrubbed.

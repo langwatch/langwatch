@@ -1,4 +1,4 @@
-import type { LangWatchHandledErrorShape } from "@langwatch/langy-contract/cards/handled-error";
+import type { LangWatchHandledErrorShape } from "@langwatch/handled-error/langwatch-handled-error";
 /**
  * The code-keyed fallback table: exact-code hits, clean misses, and the rule
  * that advice the platform sent always beats advice the CLI shipped with.

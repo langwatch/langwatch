@@ -2,7 +2,7 @@ import {
   parseHandledError,
   type LangWatchHandledErrorShape,
   type LangWatchHandledErrorReason,
-} from "@langwatch/langy-contract/cards/handled-error";
+} from "@langwatch/handled-error/langwatch-handled-error";
 
 /**
  * A failure the platform NAMED.

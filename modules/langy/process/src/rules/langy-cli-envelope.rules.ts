@@ -4,13 +4,15 @@
  * @see src/features/langy/components/capabilities/capabilityRegistry.ts — the
  */
 import {
+  readCliErrorDocument,
+  toCliErrorDocument,
+} from "@langwatch/handled-error/langwatch-handled-error";
+import {
   type CliResultDigest,
   type CliToolResult,
   cliToolResultSchema,
   extractDigest,
   parseCliJson,
-  readCliErrorDocument,
-  toCliErrorDocument,
   toCliTextResult,
   toCliToolResult,
   type LangwatchCommand,

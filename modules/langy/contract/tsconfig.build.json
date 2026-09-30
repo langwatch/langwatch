@@ -8,7 +8,7 @@
       "@langwatch/langy-contract": ["./src/index.ts"]
     }
   },
-  "files": ["./src/index.ts", "./src/cards/index.ts", "./src/cards/handled-error.ts"],
+  "files": ["./src/index.ts", "./src/cards/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

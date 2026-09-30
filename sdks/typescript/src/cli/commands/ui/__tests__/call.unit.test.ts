@@ -11,7 +11,7 @@ vi.mock("../../../utils/apiKey", () => ({
 import {
   type LangWatchHandledErrorShape,
   readCliErrorDocument,
-} from "@langwatch/langy-contract/cards/handled-error";
+} from "@langwatch/handled-error/langwatch-handled-error";
 
 import { REQUEST_TIMEOUT_MS, uiCallCommand } from "../call";
 

@@ -15,6 +15,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./langwatch-handled-error": {
+      "types": "./dist/langwatch-handled-error.d.ts",
+      "default": "./src/langwatch-handled-error.ts"
+    },
     "./is-server-unreachable": {
       "types": "./dist/is-server-unreachable.d.ts",
       "default": "./src/is-server-unreachable.ts"

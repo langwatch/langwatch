@@ -2,9 +2,8 @@ import { defineConfig } from "tsup";
 
 import packageJson from "./package.json";
 
-// The card/domain-error contract is a source-only workspace devDependency,
-// inlined because the published tarball could never resolve it. Covers every
-// subpath the CLI takes (`/cards`, `/cards/handled-error`), not just one.
+// The handled-error package is a source-only workspace devDependency, inlined
+// because the published tarball could never resolve it. Covers every subpath.
 
 // zod is bundled, not external -- load-bearing, not a size tradeoff. The SDK
 // validates responses with zod 4 APIs (`.loose()`, `z.core`); left external, a
@@ -14,7 +13,7 @@ import packageJson from "./package.json";
 // Safe because zod never crosses the public API as a VALUE: every schema is
 // internal to validation, so no caller-owned schema needs an instanceof
 // against the SDK's copy.
-const noExternal = [/^@langwatch\/langy(\/|$)/, /^zod(\/|$)/];
+const noExternal = [/^@langwatch\/(langy|handled-error)(\/|$)/, /^zod(\/|$)/];
 
 // `__CLI_VERSION__` is a bare identifier in src/cli/program.ts.
 const define = {

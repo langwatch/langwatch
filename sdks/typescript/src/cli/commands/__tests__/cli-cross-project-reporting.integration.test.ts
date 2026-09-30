@@ -6,7 +6,7 @@
 import {
   type LangWatchHandledErrorShape,
   readCliErrorDocument,
-} from "@langwatch/langy-contract/cards/handled-error";
+} from "@langwatch/handled-error/langwatch-handled-error";
 import { describe, expect, it } from "vitest";
 
 import {

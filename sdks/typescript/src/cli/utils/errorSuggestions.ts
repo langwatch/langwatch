@@ -1,5 +1,5 @@
 /** Error suggestions by code, filling the gap until backend sends them. */
-import type { LangWatchHandledErrorShape } from "@langwatch/langy-contract/cards/handled-error";
+import type { LangWatchHandledErrorShape } from "@langwatch/handled-error/langwatch-handled-error";
 
 /** The fallback advice for one code. */
 export interface ErrorExplanation {

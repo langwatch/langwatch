@@ -1,7 +1,7 @@
 import {
   type LangWatchHandledErrorShape,
   readCliErrorDocument,
-} from "@langwatch/langy-contract/cards/handled-error";
+} from "@langwatch/handled-error/langwatch-handled-error";
 import chalk from "chalk";
 
 /** The CLI error document stdout carried; these cases all expect one. */

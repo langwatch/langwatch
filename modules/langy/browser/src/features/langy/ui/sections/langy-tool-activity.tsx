@@ -4,13 +4,9 @@
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { readCliErrorDocument } from "@langwatch/handled-error/langwatch-handled-error";
 import { useLangyStore, useReducedMotion } from "@langwatch/langy-browser-kit";
-import {
-  cliToolResultPayload,
-  cliToolResultSchema,
-  parseCliJson,
-  readCliErrorDocument,
-} from "@langwatch/langy-contract";
+import { cliToolResultPayload, cliToolResultSchema, parseCliJson } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { AlertCircle, Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";

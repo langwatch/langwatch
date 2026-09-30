@@ -22,7 +22,7 @@ export {
 export type {
   LangWatchHandledErrorShape,
   LangWatchHandledErrorReason,
-} from "@langwatch/langy-contract/cards/handled-error";
+} from "@langwatch/handled-error/langwatch-handled-error";
 
 // Experiments API exports
 export {

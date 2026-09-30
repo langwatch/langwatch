@@ -17,10 +17,6 @@
     "./cards": {
       "types": "./dist/cards/index.d.ts",
       "default": "./src/cards/index.ts"
-    },
-    "./cards/handled-error": {
-      "types": "./dist/cards/handled-error.d.ts",
-      "default": "./src/cards/handled-error.ts"
     }
   },
   "scripts": {

@@ -11,10 +11,3 @@ export * from "./digest.ts";
 export * from "./tool-result.ts";
 export * from "./capability-catalog.ts";
 export * from "./capability-progress.ts";
-
-/**
- * The handled-error reading is zod-free and importable on its own
- * (`@langwatch/langy-contract/cards/handled-error`), so the CLI's hot path
- * skips zod (~28ms). This module re-exports it since the app has zod loaded already.
- */
-export * from "./handled-error.ts";
