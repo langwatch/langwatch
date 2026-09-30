@@ -49,11 +49,7 @@ func ReadSharedStack(ctx context.Context, slug string) (SharedStack, error) {
 		return SharedStack{}, fmt.Errorf("stack %s reports no app URL", slug)
 	}
 	mail, _ := stack.ServiceURL("mail")
-	origin := app
-	if !stack.IsMonolith() && stack.APIPort != 0 {
-		origin = fmt.Sprintf("http://127.0.0.1:%d", stack.APIPort)
-	}
-	return SharedStack{Slug: slug, AppURL: app, MailURL: mail, APIOrigin: origin}, nil
+	return SharedStack{Slug: slug, AppURL: app, MailURL: mail, APIOrigin: app}, nil
 }
 
 // The sides diffsuite hands every tool it starts, in DIFFSUITE_<side>_STACK,

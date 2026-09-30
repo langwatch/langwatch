@@ -82,9 +82,9 @@ func suiteTools(names, specs []string) ([]*tool, error) {
 }
 
 // build compiles the binaries the default commands run, so a suite never runs a stale one.
-func (suite *suite) build(ctx context.Context) error {
+func (suite *suite) build(ctx context.Context, tools []*tool) error {
 	built := map[string]bool{}
-	for _, tool := range suite.tools {
+	for _, tool := range tools {
 		if tool.binary == "" || built[tool.binary] {
 			continue
 		}

@@ -21,7 +21,7 @@ var (
 	apiStepLine       = regexp.MustCompile(`^\s+first failing step: .+$`)
 	visualVerdictLine = regexp.MustCompile(`^(?:\[[0-9:]+\] )?(FAIL|UNPROVEN|ROUTE)\s+(\S+)`)
 	countPair         = regexp.MustCompile(`(?i)(\d+) (pass|fail(?:-\w+)?|err(?:or)?)\b`)
-	apiCountLine      = regexp.MustCompile(`^(?:\[[0-9:]+\] )?scenarios(?::| )\s*\d+`)
+	apiCountLine      = regexp.MustCompile(`^(?:\[[0-9:]+\] )?scenarios(?: \d+/\d+|: \d+ run:)`)
 	versionSegment    = regexp.MustCompile(`^v\d+$`)
 )
 
@@ -33,6 +33,7 @@ type toolResults struct {
 	pass, fail, errs int
 	failing          []item
 	findings         []item
+	latency          int // latency findings, counted apart: load makes them noise
 	seen             map[string]bool
 	dir              string // the fuzz run directory whose findings.jsonl is followed
 	offset           int64
@@ -147,12 +148,17 @@ func (r *toolResults) absorb(chunk []byte) []string {
 			continue
 		}
 		where := strings.TrimSpace(record.Method + " " + record.Route)
+		latency := record.Oracle == "latency"
 		status := ""
 		if record.Status != 0 {
 			status = fmt.Sprintf(" status %d", record.Status)
 		}
-		line := fmt.Sprintf("FINDING #%d %s %s%s: %s", len(r.findings)+1, record.Oracle, where, status, oneLine(record.Message))
-		r.findings = append(r.findings, item{fmt.Sprintf("%s %s%s", record.Oracle, where, status), family(record.Route)})
+		line := fmt.Sprintf("FINDING #%d %s %s%s: %s", len(r.findings)+r.latency+1, record.Oracle, where, status, oneLine(record.Message))
+		if latency {
+			r.latency++
+		} else {
+			r.findings = append(r.findings, item{fmt.Sprintf("%s %s%s", record.Oracle, where, status), family(record.Route)})
+		}
 		lines = append(lines, line)
 	}
 	return lines
@@ -222,7 +228,7 @@ func summaryReport(tools []*tool) string {
 	var out strings.Builder
 	for _, tool := range tools {
 		r := &tool.results
-		fmt.Fprintf(&out, "\n[%s] pass %d fail %d error %d distinct findings %d\n", tool.name, r.pass, r.fail, r.errs, len(r.findings))
+		fmt.Fprintf(&out, "\n[%s] pass %d fail %d error %d distinct findings %d latency %d\n", tool.name, r.pass, r.fail, r.errs, len(r.findings), r.latency)
 		budget := reportLines
 		budget = groupLines(&out, "failing", r.failing, budget, tool.name+".log")
 		groupLines(&out, "finding", r.findings, budget, filepath.Join(r.dir, "findings.jsonl"))

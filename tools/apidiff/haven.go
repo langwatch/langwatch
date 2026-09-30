@@ -132,21 +132,19 @@ const havenBackendLane = havenrun.BackendLane
 
 // havenStackReady reports the base URL to probe once the named stack's
 // required lane is up (haven's own answer, never a guess from elapsed time).
-// A modular stack's address is the backend lane's own loopback port, where
-// the API serves /api; a monolith stack has no separate one, so its address
-// is the routed app hostname visualdiff also uses (StackStatus.IsMonolith).
+// The address is the routed app hostname (never a port); a modular stack serves /api there too.
 func havenStackReady(report havenStatus, slug string) (string, bool) {
 	stack, ready := havenrun.StackReady(report, slug, havenBackendLane)
 	if !ready {
 		return "", false
 	}
-	if stack.IsMonolith() {
-		return stack.ServiceURL(havenrun.AppService)
-	}
-	if stack.APIPort == 0 {
+	if !stack.IsMonolith() && stack.APIPort == 0 {
 		return "", false
 	}
-	return fmt.Sprintf("http://127.0.0.1:%d", stack.APIPort), true
+	if address, ok := stack.ServiceURL(havenrun.AppService); ok {
+		return address, true
+	}
+	return havenrun.AppOrigin(slug), true
 }
 
 // havenMailService is the routed mail sink haven runs beside the stack.
@@ -310,6 +308,7 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 						rememberAppOrigin(baseURL, stack)
 					}
 				}
+				havenrun.TrustLocalRoute()
 				instance.URL = baseURL
 				instance.MailURL = havenMailURL(report, plan.slug)
 				state.logf("haven %s: %s ready at %s", instance.Name, plan.slug, baseURL)

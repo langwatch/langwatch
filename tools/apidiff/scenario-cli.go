@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/diffkit"
+	"github.com/langwatch/langwatch/tools/havenrun"
 )
 
 // defaultScenarioGlob skips the files whose name starts with an underscore
@@ -101,11 +102,12 @@ func runScenariosSubcommand(ctx context.Context, args []string, out streams) int
 // fromSuite fills the sides diffsuite handed this run that no flag named
 // (tools/diffsuite/README.md): -a from its branch stack, -b from its main one.
 func fromSuite(probe *probeFlags, scenarios *scenarioFlags) {
+	havenrun.TrustLocalRoute()
 	if branch, ok := diffkit.SuiteStack(diffkit.SuiteBranch); ok && probe.a == "" {
-		probe.a, scenarios.mailA = branch.APIOrigin, cmp.Or(scenarios.mailA, branch.MailURL)
+		probe.a, scenarios.mailA = branch.AppURL, cmp.Or(scenarios.mailA, branch.MailURL)
 	}
 	if main, ok := diffkit.SuiteStack(diffkit.SuiteMain); ok && probe.b == "" {
-		probe.b, scenarios.mailB = main.APIOrigin, cmp.Or(scenarios.mailB, main.MailURL)
+		probe.b, scenarios.mailB = main.AppURL, cmp.Or(scenarios.mailB, main.MailURL)
 	}
 }
 

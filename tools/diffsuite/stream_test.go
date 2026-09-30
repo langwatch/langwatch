@@ -107,3 +107,22 @@ func writeFile(t *testing.T, path string, body []byte) {
 		t.Fatal(err)
 	}
 }
+
+func TestApidiffSummaryLineCountsPassFailAndError(t *testing.T) {
+	api := &tool{name: "api"}
+	api.result("[08:14:58] scenarios 2692/2693 · 2659 pass 33 fail · 10.2/s · ~0s left")
+	api.result("[08:15:02] scenarios: 2693 run: 2660 PASS, 33 FAIL, 0 ERROR")
+	api.result("[08:15:02] scenarios: 188 deferred: self-hosted pass (instance-admin key unusable under SaaS): a, b")
+	if got := api.results; got.pass != 2660 || got.fail != 33 || got.errs != 0 {
+		t.Fatalf("api %+v", got)
+	}
+}
+
+func TestLatencyFindingsAreCountedApart(t *testing.T) {
+	fuzz := &tool{name: "fuzzapi"}
+	fuzz.results.absorb([]byte(`{"finding":true,"oracle":"latency","signature":"a","route":"/api/x"}` + "\n" +
+		`{"finding":true,"oracle":"status","signature":"b","route":"/api/y"}` + "\n"))
+	if got := fuzz.results; got.latency != 1 || len(got.findings) != 1 {
+		t.Fatalf("fuzz %+v", got)
+	}
+}

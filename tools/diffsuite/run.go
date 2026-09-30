@@ -6,16 +6,19 @@ import (
 	"bufio"
 	"cmp"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -41,6 +44,7 @@ type stop struct {
 type tool struct {
 	name, command string
 	binary        string // the .bin/<binary> a default command runs, built before the suite starts
+	dir           string // where continuous mode puts this run's log; empty means the suite's out
 	cmd           *exec.Cmd
 	stopLine      string
 	progress      string // the latest line matching the tool's progress pattern
@@ -68,6 +72,7 @@ type suite struct {
 	mu          sync.Mutex
 	tools       []*tool
 	stopped     string
+	appendLog   bool // continuous mode keeps one events.log across restarts
 }
 
 // Run is the command: it returns the process exit code.
@@ -85,11 +90,18 @@ func Run(args []string, stderr io.Writer) int {
 	flags.BoolVar(&stackChoice.main, "main", false, "start pinned main as a stack of its own, and destroy it at the end")
 	flags.BoolVar(&stackChoice.langevals, "langevals", false, "run langevals in the branch stack -up starts (haven up +langevals)")
 	flags.StringVar(&stackChoice.deployment, "deployment", saas, "saas | self-hosted: self-hosted adopts "+selfHostedSlug+" (or -up starts one with IS_SAAS=false) and runs only api by default")
+	continuous := flags.Bool("continuous", false, "loop against -stack until interrupted: api and fuzzapi back to back, visual and fuzzui every -visual-every")
+	visualEvery := flags.Duration("visual-every", 30*time.Minute, "with -continuous: how often visual and fuzzui start, when the load allows")
+	loadMax := flags.Float64("load-max", 0, "with -continuous: visual and fuzzui wait while the 1m load average is at or above this (default: the CPU count)")
 	deferred := flags.String("deferred", "", "a SaaS run's apidiff deferred.txt: api runs only the scenarios it lists")
 	if flags.Parse(args) != nil {
 		return 2
 	}
 	names, specs := splitNames(*chosen), flags.Args()
+	if *continuous && (stackChoice.up || stackChoice.main) {
+		fmt.Fprintln(stderr, "diffsuite: -continuous never starts a stack: adopt one with -stack")
+		return 2
+	}
 	if stackChoice.deployment == selfHosted && !flagSet(flags, "tools") {
 		names = []string{"api"}
 	}
@@ -103,7 +115,7 @@ func Run(args []string, stderr io.Writer) int {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	suite := &suite{out: *out, policy: *policy, stderr: stderr, root: repoRoot()}
+	suite := &suite{out: *out, policy: *policy, stderr: stderr, root: repoRoot(), appendLog: *continuous}
 	if err := suite.setup(names, specs); err != nil {
 		fmt.Fprintln(stderr, "diffsuite:", err)
 		return 2
@@ -119,11 +131,14 @@ func Run(args []string, stderr io.Writer) int {
 	suite.stacks = stacks
 	fmt.Fprintf(stderr, "diffsuite: branch %s at %s; main %s\n", stacks.branch.Slug, stacks.branch.AppURL, cmp.Or(stacks.main.AppURL, "none (baselines)"))
 	*health = cmp.Or(*health, stacks.branch.AppURL+"/api/health")
+	if *continuous {
+		return suite.continuous(ctx, continuousOptions{health: *health, visualEvery: *visualEvery, loadMax: *loadMax})
+	}
 	if !healthy(*health) {
 		fmt.Fprintln(stderr, "diffsuite: refusing to start: not healthy:", *health)
 		return 2
 	}
-	if err := suite.build(ctx); err != nil {
+	if err := suite.build(ctx, suite.tools); err != nil {
 		fmt.Fprintln(stderr, "diffsuite:", err)
 		return 2
 	}
@@ -189,7 +204,11 @@ func (suite *suite) setup(names, specs []string) error {
 	if err := os.MkdirAll(suite.out, 0o755); err != nil {
 		return err
 	}
-	events, err := os.Create(filepath.Join(suite.out, "events.log"))
+	mode := os.O_CREATE | os.O_WRONLY | os.O_TRUNC
+	if suite.appendLog {
+		mode = os.O_CREATE | os.O_WRONLY | os.O_APPEND
+	}
+	events, err := os.OpenFile(filepath.Join(suite.out, "events.log"), mode, 0o644) // #nosec G304 -- the operator's own -out.
 	suite.events = events
 	return err
 }
@@ -202,7 +221,8 @@ func (suite *suite) line(format string, args ...any) {
 }
 
 func (suite *suite) start(tool *tool) error {
-	logFile, err := os.Create(filepath.Join(suite.out, tool.name+".log"))
+	logDir := cmp.Or(tool.dir, suite.out)
+	logFile, err := os.Create(filepath.Join(logDir, tool.name+".log"))
 	if err != nil {
 		return err
 	}
@@ -210,6 +230,9 @@ func (suite *suite) start(tool *tool) error {
 	tool.output, tool.scanned = pipeOut, make(chan struct{})
 	tool.cmd = exec.Command("bash", "-c", tool.command) // #nosec G204 -- the operator's own suite.
 	tool.cmd.Dir, tool.cmd.Env = suite.root, suite.env
+	if tool.dir != "" {
+		tool.cmd.Env = append(slices.Clone(suite.env), "DIFFSUITE_OUT="+tool.dir)
+	}
 	tool.cmd.Stdout, tool.cmd.Stderr = pipeOut, pipeOut
 	tool.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	tool.cmd.WaitDelay = 2 * time.Second
@@ -313,8 +336,17 @@ func (suite *suite) signal(signal syscall.Signal) {
 	}
 }
 
-func healthy(url string) bool {
-	response, err := (&http.Client{Timeout: 10 * time.Second}).Get(url)
+// healthClient skips TLS verification for the haven route (*.langwatch.localhost) only.
+func healthClient(address string) *http.Client {
+	client := &http.Client{Timeout: 10 * time.Second}
+	if parsed, err := url.Parse(address); err == nil && strings.HasSuffix(parsed.Hostname(), ".langwatch.localhost") {
+		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // #nosec G402 -- the local haven certificate.
+	}
+	return client
+}
+
+func healthy(address string) bool {
+	response, err := healthClient(address).Get(address)
 	if err != nil {
 		return false
 	}
@@ -324,7 +356,7 @@ func healthy(url string) bool {
 
 // watch polls the health URL until finished closes; three failures in a row
 // stop every tool.
-func (suite *suite) watch(url string, finished <-chan struct{}) {
+func (suite *suite) watch(address string, finished <-chan struct{}) {
 	ticker := time.NewTicker(healthEvery)
 	defer ticker.Stop()
 	failures := 0
@@ -334,7 +366,7 @@ func (suite *suite) watch(url string, finished <-chan struct{}) {
 			return
 		case <-ticker.C:
 		}
-		if healthy(url) {
+		if healthy(address) {
 			failures = 0
 		} else if failures++; failures >= healthLimit {
 			suite.mu.Lock()

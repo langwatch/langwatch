@@ -349,10 +349,10 @@ func TestTheInstanceURLIsTheStacksAPIAddress(t *testing.T) {
 			t.Fatalf("bootThroughHaven: %v", err)
 		}
 
-		t.Run("when the instance is addressed, it is the API address haven allocated", func(t *testing.T) {
+		t.Run("when the instance is addressed, it is the haven route, never a port", func(t *testing.T) {
 			cases := []struct{ name, got, want string }{
-				{"branch", booted.A.URL, "http://127.0.0.1:6560"},
-				{"main", booted.B.URL, "http://127.0.0.1:6660"},
+				{"branch", booted.A.URL, "https://app.apidiff-20260909t2230-branch.langwatch.localhost"},
+				{"main", booted.B.URL, "https://app.apidiff-20260909t2230-main.langwatch.localhost"},
 			}
 			for _, testCase := range cases {
 				if testCase.got != testCase.want {

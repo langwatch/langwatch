@@ -117,6 +117,35 @@ or adds another (run from the repository root, with the environment above).
   ("stack unhealthy").
 - Exit: 0 all passed; 2 could not start; 3 stopped by policy, health or cancel; else the highest tool exit code.
 
+## Continuous mode
+
+```bash
+.bin/diffsuite/diffsuite -continuous -stack visualdiff-check -out .claude/tmp/runs/live
+cat .claude/tmp/runs/live/api/latest.json    # newest iteration, with new and fixed ids
+```
+
+Loops until SIGINT against the adopted `-stack` (`-up` and `-main` are refused: it never starts or
+resets a stack; `-main-stack` still adopts one). `-policy` does not apply.
+
+- **api and fuzzapi** start again the moment their previous iteration ends. **visual and fuzzui** (and any
+  other name) start every `-visual-every` (default 30m, start to start) once the 1m load average is below
+  `-load-max` (default: the CPU count); until then `[name] WAITING for load below N` prints once.
+  No tool starts twice within 30 s, so one that fails at once cannot spin.
+- **Before each iteration:** the tool's binary is rebuilt if HEAD moved since it was built, and the health URL
+  (default `<branch app>/api/health`; TLS is not verified for `*.langwatch.localhost` only) must answer. An
+  unhealthy stack is waited on, polling every 30 s; after 2 min `[suite] STACK DOWN` prints once, and
+  `[suite] STACK UP` when it answers. An iteration that ends with the stack gone counts as stopped.
+- **Output:** `<out>/<tool>/<NNNN>/` per iteration (its log, and for api its `apidiff/` run dir), numbering
+  continues across restarts; only the newest 2 per tool stay. One `<out>/events.log` (appended) for the
+  session, the 15 s `RUNNING` lines, and per iteration
+  `[api] #12 DONE 2432 pass 21 fail (Δ -3 fail vs #11) at <sha>`, then `#12 new (n): ids` and
+  `#12 fixed (n): ids`. A stopped, cancelled or stack-lost iteration prints `STOPPED (<reason>)` and is
+  not a baseline, so it cannot make the next one look like a fix.
+- **`<out>/<tool>/latest.json`** (replaced atomically): tool, iteration, commit, startedAt, durationMs, dir,
+  exit, `stopped`, pass, fail, errors, `failing` (ids), `baseline` (the iteration compared with, 0 for
+  none), `baselineFail`, `new` and `fixed`. Ids are the tool's failing lines (`FAIL <scenario>`,
+  `FAIL <flow>`) and, for fuzz, its distinct findings (`<oracle> <method> <route> status <code>`).
+
 ## Publishing to the pull request
 
 ```bash

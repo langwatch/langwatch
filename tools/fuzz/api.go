@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/diffkit"
+	"github.com/langwatch/langwatch/tools/havenrun"
 )
 
 // DefaultAPIMaxErrors is how many transport errors in a row stop an API run.
@@ -275,6 +276,7 @@ func keepAliveClient(workers int) *http.Client {
 		MaxIdleConns:        workers * 2,
 		MaxIdleConnsPerHost: workers * 2,
 		IdleConnTimeout:     90 * time.Second,
+		TLSClientConfig:     havenrun.LocalTLSConfig(),
 	}
 	return &http.Client{Timeout: 30 * time.Second, Transport: transport,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}

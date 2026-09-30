@@ -136,7 +136,7 @@ func (stacks *stacks) resolve(ctx context.Context, flags stackFlags, root, out s
 	}
 	if isSelfHosted {
 		for _, stack := range []diffkit.SharedStack{stacks.branch, stacks.main} {
-			if stack.APIOrigin != "" && answersAsSaaS(stack.APIOrigin) {
+			if stack.AppURL != "" && answersAsSaaS(stack.AppURL) {
 				return fmt.Errorf("-deployment self-hosted: %s hides the instance-admin routes (GET /api/organizations is 404): it runs as SaaS or has no LANGWATCH_INSTANCE_ADMIN_API_KEY; start it with IS_SAAS=false", stack.Slug)
 			}
 		}
@@ -147,7 +147,7 @@ func (stacks *stacks) resolve(ctx context.Context, flags stackFlags, root, out s
 // answersAsSaaS is true when the instance-admin door answers 404: SaaS does before reading
 // any credential, as does a stack with no admin key; a keyed self-hosted one answers 401.
 func answersAsSaaS(apiOrigin string) bool {
-	response, err := (&http.Client{Timeout: 10 * time.Second}).Get(apiOrigin + "/api/organizations")
+	response, err := (&http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{TLSClientConfig: havenrun.LocalTLSConfig()}}).Get(apiOrigin + "/api/organizations")
 	if err != nil {
 		return false
 	}
