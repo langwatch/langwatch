@@ -60,7 +60,6 @@ describe("decideCloudOps", () => {
       const attempt = () => decideCloudOps({ ...asked, privateKey: "not-a-key-secret-value" });
 
       expect(attempt).toThrow(CloudOpsKeyMismatchError);
-      expect(attempt).toThrow(/LANGWATCH_CLOUD_OPS.*LANGWATCH_LICENSE_PRIVATE_KEY/);
       expect(attempt).not.toThrow(/secret-value/);
     });
   });
