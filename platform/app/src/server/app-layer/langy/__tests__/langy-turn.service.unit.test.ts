@@ -393,7 +393,7 @@ describe("LangyTurnService.startConversationTurn", () => {
       const probeArgs = mocks.probe.mock.calls[0]![0] as {
         disabledSkillIds?: string[];
       };
-      const dispatched = mocks.dispatch.mock.calls[0]![0] as unknown as {
+      const dispatched = (mocks.dispatch.mock.calls[0] as unknown[])[0] as {
         credentials: { disabledSkillIds?: string[] };
       };
       expect(probeArgs.disabledSkillIds).toContain("dashboard-widgets");
