@@ -23562,7 +23562,7 @@ export interface operations {
                         members: {
                             userId: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             disabled: boolean;
                             disabledAt: string | null;
                             createdAt: string;
@@ -23599,7 +23599,7 @@ export interface operations {
                     "application/json": {
                         userId: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                         disabled: boolean;
                         disabledAt: string | null;
                         createdAt: string;
@@ -23660,7 +23660,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    role?: "ADMIN" | "MEMBER" | "EXTERNAL";
+                    role?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                     disabled?: boolean;
                 };
             };
@@ -23675,7 +23675,7 @@ export interface operations {
                     "application/json": {
                         userId: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                         disabled: boolean;
                         disabledAt: string | null;
                         createdAt: string;
@@ -23770,7 +23770,7 @@ export interface operations {
                             id: string;
                             email: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             status: string;
                             expiration: string | null;
                             inviteCode: string;
@@ -23801,7 +23801,7 @@ export interface operations {
                         /** Format: email */
                         email: string;
                         /** @enum {string} */
-                        role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                        role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                         teams: {
                             teamId: string;
                             /** @enum {string} */
@@ -23824,7 +23824,7 @@ export interface operations {
                             id: string;
                             email: string;
                             /** @enum {string} */
-                            role: "ADMIN" | "MEMBER" | "EXTERNAL";
+                            role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
                             status: string;
                             expiration: string | null;
                             inviteCode: string;
