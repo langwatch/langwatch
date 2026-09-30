@@ -204,6 +204,7 @@ describe("NurturingDeliveryService", () => {
   describe("when a scenario of an organization in the onboarding experiment is delivered", () => {
     /** @scenario "A scenario in an onboarding experiment carries its variant to PostHog" */
     /** @scenario "scenario_created carries the experiment property" */
+    /** @scenario "scenario_created carries the onboarding variant of the organization" */
     it("carries the variant and the experiment property", async () => {
       const { posthog, delivery } = deliveryOverBothSinks();
 
