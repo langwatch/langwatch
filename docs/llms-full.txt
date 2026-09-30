@@ -39264,13 +39264,13 @@ LangWatch stores the trace, the question and the answer for each verdict, and no
 
 ## Where the judged text goes
 
-When a run starts, LangWatch sends the judge the text of each row: the inputs, outputs and metadata of the traces in that row, your questions and the name of the model. LangWatch adds no account or organization identifier and none of your keys. Trace content can carry your project id and may contain personal data.
+When a run starts, LangWatch sends the judge the text of each row: the inputs, outputs and metadata of the traces in that row, your questions and the name of the model. On the hosted service, and through Connect, LangWatch adds no account or organization identifier and none of your keys. Trace content can carry your project id and may contain personal data.
 
 The judge is run by a third-party provider under a data processing agreement. It processes the text on LangWatch's instructions, answers the questions, and does not use it to train its models. The provider is listed as a sub-processor in the [privacy policy](https://langwatch.ai/legal/privacy-policy) and the [trust center](https://langwatch.ai/trust-center).
 
 LangWatch sends judged text only after someone in your organization starts a run or a judged query. Judging is off for a self-serve organization until a member with organization management rights switches it on from the search bar; a member without those rights reads the same explanation there and is asked to turn to an organization admin. An enterprise organization is switched on by LangWatch once it asks.
 
-A self-hosted install with its own `JEV_API_KEY` sends the text to the provider directly, under its own agreement. Through [Connect](/self-hosting/connect) it goes to LangWatch, which passes it on as above.
+A self-hosted install with its own `JEV_API_KEY` sends the text to the provider directly, signed in with that key, under its own agreement. Through [Connect](/self-hosting/connect) it goes to LangWatch, which passes it on as above.
 
 ---
 
@@ -61298,7 +61298,7 @@ Each service states what it sends before you switch it on. Your traces, datasets
 
 | What is on | What this install sends to LangWatch |
 |---|---|
-| Instant Evals | The judged text and the questions asked about it. LangWatch passes them to the judge and does not keep them. See [where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes). |
+| Instant Evals | The judged text and the questions asked about it. LangWatch passes them to the judge. See [where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes). |
 | Managed models | The prompts and completions of calls that name a `langwatch/` model. No other call reaches the LangWatch slot. |
 | License sync, on a license naming a hosted service | A license token derived from the signed license key (a hash, not the key), the instance id, the app version, and two counts: members and lite members. No organization name. |
 
