@@ -318,6 +318,14 @@
       "types": "./dist/format-milliseconds.d.ts",
       "default": "./src/format-milliseconds.ts"
     },
+    "./stat-tile": {
+      "types": "./dist/components/stat-tile.d.ts",
+      "default": "./src/components/stat-tile.tsx"
+    },
+    "./settings-section": {
+      "types": "./dist/components/settings-section.d.ts",
+      "default": "./src/components/settings-section.tsx"
+    },
     "./settings-card": {
       "types": "./dist/components/settings-card.d.ts",
       "default": "./src/components/settings-card.tsx"
