@@ -1122,6 +1122,15 @@ export class InviteService {
    * of `applyInvite` rather than an omission here: it marks the invite
    * ACCEPTED in the same transaction that creates the membership, before it
    * emits a single grant. A revocable invite has granted nothing.
+   *
+   * The revoke and the acceptance claim in `applyInvite` are the two
+   * conditional writes that meet on one row, and both are SQL with their
+   * conditions against the table. Through `updateMany` the conditions sit in
+   * a subquery, and a statement that waited on the row lock re-checks only
+   * the outer id predicate against the committed row, so an acceptance that
+   * waited on a revoke would land over it and the admin's revocation would be
+   * lost, or a revoke would mark an accepted invite REVOKED while the
+   * membership stands.
    */
   async revokeInvite({
     organizationId,
@@ -1130,15 +1139,15 @@ export class InviteService {
     organizationId: string;
     inviteId: string;
   }): Promise<{ success: true }> {
-    const revoked = await this.prisma.organizationInvite.updateMany({
-      where: {
-        id: inviteId,
-        organizationId,
-        status: { in: ["PENDING", "PAYMENT_PENDING"] },
-      },
-      data: { status: "REVOKED" },
-    });
-    if (revoked.count === 0) {
+    const revoked = await this.prisma.$executeRaw`
+      UPDATE "OrganizationInvite"
+         SET "status" = 'REVOKED',
+             "updatedAt" = now()
+       WHERE "id" = ${inviteId}
+         AND "organizationId" = ${organizationId}
+         AND "status" IN ('PENDING', 'PAYMENT_PENDING')
+    `;
+    if (revoked === 0) {
       throw new InviteNotFoundError("Invitation not found");
     }
     return { success: true };
@@ -1482,24 +1491,23 @@ export class InviteService {
     // expected (status, inviteCode) pair, inside the same transaction as the
     // membership write. Two racers on one PENDING invite cannot both win —
     // the loser's update matches nothing, the transaction rolls back, and
-    // no membership row is written for them.
+    // no membership row is written for them. SQL with the conditions against
+    // the table, for the reason given on `revokeInvite`.
     const prisma = this.requireRootClient();
     const claimed = await prisma.$transaction(async (tx) => {
-      const claim = await tx.organizationInvite.updateMany({
-        where: {
-          id: invite.id,
-          organizationId: invite.organizationId,
-          inviteCode: invite.inviteCode,
-          status: "PENDING",
-          OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
-        },
-        data: {
-          status: "ACCEPTED",
-          acceptedByUserId: userId,
-          acceptedViaIdentifierId: viaIdentifierId ?? null,
-        },
-      });
-      if (claim.count === 0) return false;
+      const claim = await tx.$executeRaw`
+        UPDATE "OrganizationInvite"
+           SET "status" = 'ACCEPTED',
+               "acceptedByUserId" = ${userId},
+               "acceptedViaIdentifierId" = ${viaIdentifierId ?? null},
+               "updatedAt" = now()
+         WHERE "id" = ${invite.id}
+           AND "organizationId" = ${invite.organizationId}
+           AND "inviteCode" = ${invite.inviteCode}
+           AND "status" = 'PENDING'
+           AND ("expiration" IS NULL OR "expiration" > now())
+      `;
+      if (claim === 0) return false;
       await tx.organizationUser.createMany({
         data: [
           {

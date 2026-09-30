@@ -49,6 +49,18 @@ export type TurnSettlement =
     }
   | { succeeded: false; outcome: "failed"; text: null; error: string };
 
+/**
+ * The turn is not over but is waiting on the user (a question or permission
+ * card). Only returned to a caller that opted in with `shouldSettleOnUserWait`.
+ * `text` is the question prose, empty for a permission card.
+ */
+export type AwaitingUserSettlement = {
+  succeeded: true;
+  outcome: "awaiting_user";
+  text: string;
+  error: null;
+};
+
 /** Fold poll cadence while follow() is armed — the buffer owns promptness. */
 const BUFFERED_POLL_MS = 5_000;
 /** Fold poll cadence with no Redis — polling is all we have. */
@@ -138,12 +150,37 @@ export function settlementFromEvents(
   return null;
 }
 
+function userWaitFromEvents(
+  events: ConversationTurnEvents["events"],
+  turnId: string,
+): AwaitingUserSettlement | null {
+  for (const event of events) {
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED &&
+      event.data.turnId === turnId
+    ) {
+      return {
+        succeeded: true,
+        outcome: "awaiting_user",
+        text: (event.data.questions ?? [])
+          .map((question) => question.question)
+          .join("\n"),
+        error: null,
+      };
+    }
+  }
+  return null;
+}
+
 /**
  * One full pass over the fold from the zero cursor. Truncated pages are read
  * through within the pass (the cursor advances every page, so this terminates);
  * `LangyConversationNotFoundError` is projection lag — the accepted turn's row
  * has not landed yet — so it means "not settled yet", not "gone". Every other
  * error propagates.
+ *
+ * With `shouldSettleOnUserWait`, a user wait for the turn is returned only after the
+ * whole pass found no terminal event, so a real reply always wins.
  */
 async function readSettlementFromFold({
   projectId,
@@ -151,14 +188,17 @@ async function readSettlementFromFold({
   turnId,
   userId,
   signal,
+  shouldSettleOnUserWait,
 }: {
   projectId: string;
   conversationId: string;
   turnId: string;
   userId: string;
   signal: AbortSignal;
-}): Promise<TurnSettlement | null> {
+  shouldSettleOnUserWait: boolean;
+}): Promise<TurnSettlement | AwaitingUserSettlement | null> {
   let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
+  let userWait: AwaitingUserSettlement | null = null;
   while (!signal.aborted) {
     const events = await getApp()
       .langy.conversations.getEventsAfter({
@@ -174,21 +214,15 @@ async function readSettlementFromFold({
     if (!events) return null;
     const settlement = settlementFromEvents(events.events, turnId);
     if (settlement) return settlement;
-    if (!events.truncated) return null;
+    if (shouldSettleOnUserWait) {
+      userWait ??= userWaitFromEvents(events.events, turnId);
+    }
+    if (!events.truncated) return userWait;
     cursor = events.cursor;
   }
   return null;
 }
 
-/**
- * Hold until THIS turn settles on the fold, the signal aborts, or — nothing
- * else: there is no internal deadline. Callers own the deadline by composing it
- * into the signal (`AbortSignal.any([clientSignal, AbortSignal.timeout(...)])`).
- * Returns null when the signal aborted before settlement.
- *
- * `pollIntervalMs` overrides the no-Redis fallback cadence — a test seam, so
- * suites never sleep real wall-clock time.
- */
 /**
  * A promise that never settles — used so an aborted/ended buffer follow can
  * never win the settlement race below.
@@ -288,6 +322,34 @@ async function waitForNextPoll(
   ]);
 }
 
+interface AwaitTurnSettlementOptions {
+  projectId: string;
+  conversationId: string;
+  turnId: string;
+  userId: string;
+  signal: AbortSignal;
+  pollIntervalMs?: number;
+  shouldSettleOnUserWait?: boolean;
+}
+
+/**
+ * Hold until THIS turn settles on the fold, the signal aborts, or — nothing
+ * else: there is no internal deadline. Callers own the deadline by composing it
+ * into the signal (`AbortSignal.any([clientSignal, AbortSignal.timeout(...)])`).
+ * Returns null when the signal aborted before settlement.
+ *
+ * `shouldSettleOnUserWait` also settles once the turn waits on the user (a question
+ * or permission card), which otherwise keeps it open until the wait expires.
+ *
+ * `pollIntervalMs` overrides the no-Redis fallback cadence — a test seam, so
+ * suites never sleep real wall-clock time.
+ */
+export async function awaitTurnSettlement(
+  options: AwaitTurnSettlementOptions & { shouldSettleOnUserWait: true },
+): Promise<TurnSettlement | AwaitingUserSettlement | null>;
+export async function awaitTurnSettlement(
+  options: AwaitTurnSettlementOptions & { shouldSettleOnUserWait?: false },
+): Promise<TurnSettlement | null>;
 export async function awaitTurnSettlement({
   projectId,
   conversationId,
@@ -295,14 +357,10 @@ export async function awaitTurnSettlement({
   userId,
   signal,
   pollIntervalMs = FALLBACK_POLL_MS,
-}: {
-  projectId: string;
-  conversationId: string;
-  turnId: string;
-  userId: string;
-  signal: AbortSignal;
-  pollIntervalMs?: number;
-}): Promise<TurnSettlement | null> {
+  shouldSettleOnUserWait = false,
+}: AwaitTurnSettlementOptions): Promise<
+  TurnSettlement | AwaitingUserSettlement | null
+> {
   const armed = armBufferWatch({ conversationId, turnId, signal });
   let terminalSeen = armed.terminalSeen;
 
@@ -315,6 +373,7 @@ export async function awaitTurnSettlement({
         turnId,
         userId,
         signal,
+        shouldSettleOnUserWait,
       });
       if (settlement) return settlement;
 

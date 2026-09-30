@@ -448,6 +448,16 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       (action === "findMany" && isCliLoginKeySweep(clause)),
   },
   RoutingPolicy: {},
+  // How a connected self-hosted customer is invoiced (ADR-141, section 7).
+  // One row per organization, so organizationId or the row id covers the
+  // operator surfaces. The two provider ids are the other way in: the webhook
+  // knows the customer an event names, and roll-forward knows the subscription
+  // an invoice rode on. Each names exactly one organization.
+  ConnectedBillingAccount: {
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "stripeCustomerId") === "string" ||
+      typeof clauseField(clause, "usageSubscriptionId") === "string",
+  },
   // Governance identity (ADR-128 §11). Every read and write names its
   // organization: these are admin-curated rows about people a provider put on a
   // cost row, and there is no query shape that wants more than one tenant's.
@@ -668,6 +678,29 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // ownership rule is made of. It holds no customer content: ids, domains,
   // enums and credential references.
   "SsoConnection",
+  // The license registry (ADR-141). Org-bearing, and deliberately not
+  // org-CONSTRAINED: a presented license token is resolved by `tokenHash`
+  // before any organization is known, which is what identifies the customer in
+  // the first place, and LangWatch operators list it across customers in the
+  // backoffice. A guard demanding organizationId would refuse both. It holds
+  // no customer content: ids, a token hash, seat counts, terms and amounts.
+  "IssuedLicense",
+  // Activation codes (ADR-141, section 5). Org-bearing, and deliberately not
+  // org-CONSTRAINED for the same reason `IssuedLicense` is not: a presented
+  // code is resolved by `codeHash` before any organization is known, which is
+  // what identifies the customer, and LangWatch operators list codes across
+  // customers in the backoffice. It holds no customer content: a hash, the
+  // last four characters of a code, seat counts and dates.
+  "ActivationCode",
+  // The registry of self-hosted installs (ADR-141, section 10). Org-bearing,
+  // and deliberately not org-CONSTRAINED: a report is addressed by the
+  // instance id the install minted, before any organization is known, and the
+  // organization on the row is filled in afterwards from the license bound to
+  // that instance. LangWatch operators also list it across customers in the
+  // backoffice. A guard demanding organizationId would refuse both. It holds
+  // no customer content: an instance id, a release, counts, dates and
+  // aggregated email domains.
+  "SelfHostedInstance",
   // The engine's provider table (D09), org-bearing and deliberately not
   // org-CONSTRAINED for the same reason `SsoConnection` is not: better-auth's
   // single sign-on plugin addresses a provider by its globally-unique

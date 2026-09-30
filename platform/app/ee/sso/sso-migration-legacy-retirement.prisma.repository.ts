@@ -3,11 +3,15 @@ import { isLiveIdentifierState } from "@langwatch/identity";
 import type { IdentityService } from "@langwatch/identity-server";
 import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { identifierBelongsToMigrationConnection } from "./sso-migration.rules";
+import {
+  identifierBelongsToMigrationConnection,
+  strandedUserIdsOf,
+} from "./sso-migration.rules";
 import {
   type SsoLegacyIdentityRetirementPort,
   SsoMigrationFinalizationBlockedError,
 } from "./sso-migration-finalization.service";
+import { findOtherOrganizationIds } from "./sso-migration-user-lookups.prisma";
 
 /** Retires connection-scoped Auth0 identities through their ordinary ceremonies. */
 export class PrismaSsoLegacyIdentityRetirement
@@ -19,16 +23,24 @@ export class PrismaSsoLegacyIdentityRetirement
       identity: IdentityService;
       accounts: IdentityAccountCeremonies;
       directories: {
-        revokeForConnection(args: {
+        moveToConnection(args: {
           organizationId: string;
-          connectionId: string;
-        }): Promise<{ revoked: number }>;
+          fromConnectionId: string;
+          toConnectionId: string;
+        }): Promise<{ moved: number }>;
       };
       now: () => number;
       newCommandId: () => string;
     },
   ) {}
 
+  /**
+   * Takes every member's identity on the previous provider away, except from
+   * people for whom it is the only way in: the identity guards refuse to
+   * leave anybody with none, so theirs stays, stops working when the previous
+   * connection is torn down, and the replacement matches them by address at
+   * their next sign-in.
+   */
   async retire({
     organizationId,
     legacyConnectionId,
@@ -64,46 +76,65 @@ export class PrismaSsoLegacyIdentityRetirement
         userId: true,
         accountId: true,
         state: true,
+        provider: true,
         connectionId: true,
         providerId: true,
         providerAccountId: true,
       },
     });
-    const identifiers = candidates.filter((identifier) =>
-      identifierBelongsToMigrationConnection({
-        identifier,
-        connection: {
-          connectionId: legacyConnectionId,
-          source: legacy.source,
-          idpMetadata: { providerId: legacyProviderId },
-        },
-      }),
+    const legacyIdentifierIds = new Set(
+      candidates
+        .filter((identifier) =>
+          identifierBelongsToMigrationConnection({
+            identifier,
+            connection: {
+              connectionId: legacyConnectionId,
+              source: legacy.source,
+              idpMetadata: { providerId: legacyProviderId },
+            },
+          }),
+        )
+        .map(({ id }) => id),
     );
-    for (const identifier of identifiers) {
+    const stranded = strandedUserIdsOf({
+      identifiers: candidates,
+      legacyIdentifierIds,
+    });
+    for (const identifier of candidates) {
+      if (!legacyIdentifierIds.has(identifier.id)) continue;
+      if (stranded.has(identifier.userId)) continue;
       await this.retireIdentifier({
         organizationId,
         legacyProviderId,
-        replacementConnectionId,
         actorUserId,
         identifier,
+        successor: successorOf({
+          identifiers: candidates.filter(
+            ({ userId }) => userId === identifier.userId,
+          ),
+          legacyIdentifierIds,
+          replacementConnectionId,
+        }),
       });
     }
-    await this.deps.directories.revokeForConnection({
+    // The directory sync LangWatch set up moves across rather than ending:
+    // the customer never held its token, so there is nobody to repoint it.
+    await this.deps.directories.moveToConnection({
       organizationId,
-      connectionId: legacyConnectionId,
+      fromConnectionId: legacyConnectionId,
+      toConnectionId: replacementConnectionId,
     });
   }
 
   private async retireIdentifier({
     organizationId,
     legacyProviderId,
-    replacementConnectionId,
     actorUserId,
     identifier,
+    successor,
   }: {
     organizationId: string;
     legacyProviderId: string;
-    replacementConnectionId: string;
     actorUserId: string;
     identifier: {
       id: string;
@@ -111,79 +142,36 @@ export class PrismaSsoLegacyIdentityRetirement
       accountId: string | null;
       state: string;
     };
+    successor: { id: string; state: string } | undefined;
   }): Promise<void> {
     await this.assertExclusiveToOrganization({
       organizationId,
       userId: identifier.userId,
       legacyProviderId,
     });
-    const live = isLiveIdentifierState(identifier.state);
-    if (live) {
-      await this.ensureReplacementIsWayIn({
+    // A primary identity is demoted by promoting the way in that stays.
+    if (identifier.state === "PRIMARY" && successor?.state === "VERIFIED") {
+      await this.deps.identity.markPrimary({
+        tenantId: identifier.userId,
         userId: identifier.userId,
-        replacementConnectionId,
-        legacyIsPrimary: identifier.state === "PRIMARY",
-        actorUserId,
+        commandId: this.deps.newCommandId(),
+        identifierId: successor.id,
+        occurredAtMs: this.deps.now(),
+        actor: { type: "user", id: actorUserId },
       });
     }
-
     if (identifier.accountId) {
       await this.retireAccount({
         accountId: identifier.accountId,
         userId: identifier.userId,
       });
     }
-    if (live) {
+    if (isLiveIdentifierState(identifier.state)) {
       await this.deps.identity.detachIdentifier({
         tenantId: identifier.userId,
         userId: identifier.userId,
         commandId: this.deps.newCommandId(),
         identifierId: identifier.id,
-        occurredAtMs: this.deps.now(),
-        actor: { type: "user", id: actorUserId },
-      });
-    }
-  }
-
-  private async ensureReplacementIsWayIn({
-    userId,
-    replacementConnectionId,
-    legacyIsPrimary,
-    actorUserId,
-  }: {
-    userId: string;
-    replacementConnectionId: string;
-    legacyIsPrimary: boolean;
-    actorUserId: string;
-  }): Promise<void> {
-    const replacement = await this.deps.prisma.identifier.findFirst({
-      where: {
-        userId,
-        OR: [
-          { connectionId: replacementConnectionId },
-          {
-            connectionId: null,
-            providerId: replacementConnectionId,
-            providerAccountId: { not: "" },
-          },
-        ],
-        state: { in: ["VERIFIED", "PRIMARY"] },
-      },
-      orderBy: [{ verifiedAt: "desc" }, { id: "asc" }],
-      select: { id: true, state: true },
-    });
-    if (!replacement) {
-      throw blocked(
-        "members-not-verified-on-replacement",
-        `User ${userId} has no verified replacement identifier.`,
-      );
-    }
-    if (legacyIsPrimary && replacement.state !== "PRIMARY") {
-      await this.deps.identity.markPrimary({
-        tenantId: userId,
-        userId,
-        commandId: this.deps.newCommandId(),
-        identifierId: replacement.id,
         occurredAtMs: this.deps.now(),
         actor: { type: "user", id: actorUserId },
       });
@@ -232,16 +220,15 @@ export class PrismaSsoLegacyIdentityRetirement
     userId: string;
     legacyProviderId: string;
   }): Promise<void> {
-    const memberships = await this.deps.prisma.organizationUser.findMany({
-      where: { userId, organizationId: { not: organizationId } },
-      select: { organizationId: true },
+    const otherOrganizationIds = await findOtherOrganizationIds({
+      prisma: this.deps.prisma,
+      organizationId,
+      userIds: [userId],
     });
-    if (memberships.length === 0) return;
+    if (otherOrganizationIds.length === 0) return;
     const connections = await this.deps.prisma.ssoConnection.findMany({
       where: {
-        organizationId: {
-          in: memberships.map(({ organizationId: id }) => id),
-        },
+        organizationId: { in: otherOrganizationIds },
         source: "legacy-grandfathered",
         state: { notIn: ["DISCARDED", "TORN_DOWN"] },
       },
@@ -258,6 +245,38 @@ export class PrismaSsoLegacyIdentityRetirement
       );
     }
   }
+}
+
+/** The way in that takes over as primary: the replacement's, else the person's address. */
+function successorOf({
+  identifiers,
+  legacyIdentifierIds,
+  replacementConnectionId,
+}: {
+  identifiers: readonly {
+    id: string;
+    state: string;
+    provider: string;
+    connectionId: string | null;
+    providerId: string | null;
+  }[];
+  legacyIdentifierIds: ReadonlySet<string>;
+  replacementConnectionId: string;
+}) {
+  const others = identifiers.filter(
+    ({ id, state, provider }) =>
+      (state === "VERIFIED" || state === "PRIMARY") &&
+      !legacyIdentifierIds.has(id) &&
+      provider !== "passkey",
+  );
+  return (
+    others.find(
+      ({ connectionId, providerId }) =>
+        (connectionId ?? providerId) === replacementConnectionId,
+    ) ??
+    others.find(({ provider }) => provider === "email") ??
+    others[0]
+  );
 }
 
 function providerIdFrom(value: unknown): string | null {

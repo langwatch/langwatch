@@ -552,10 +552,16 @@ function emptyModelResponseRule(): ClassificationRule {
     build: (text) => {
       const agentName = AGENT_NAME_PREFIX.exec(text)?.[1] ?? "";
       const subject = EMPTY_MODEL_RESPONSE_SUBJECTS[agentName] ?? "The model";
+      // The simulated user is asked again twice before the runner gives up;
+      // the judge is not, since an empty judge answer is a normal answer.
+      const retried =
+        agentName === "UserSimulatorAgent"
+          ? "The simulation asked it again twice before giving up. "
+          : "";
       return {
         code: ScenarioInfraErrorCode.ModelEmptyResponse,
         message: `${subject} answered with no text, so the simulation could not go on. The provider accepted the request and answered; the answer held no words.`,
-        hint: "A reasoning model can spend its whole answer on reasoning and write nothing. Select a different model in Settings > Model Providers, or give the scenario a clear end condition so the model always has something to say.",
+        hint: `${retried}A reasoning model can spend its whole answer on reasoning and write nothing. Select a different model in Settings > Model Providers, or give the scenario a clear end condition so the model always has something to say.`,
       };
     },
   };

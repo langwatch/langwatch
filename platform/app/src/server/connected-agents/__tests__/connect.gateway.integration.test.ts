@@ -443,6 +443,7 @@ describe("register", () => {
           environment: "production",
           url: expect.stringContaining(agentId),
           parameterNotes: [],
+          scope: { kind: "shared" },
         }),
       ]);
       sdk.close();
@@ -1032,8 +1033,9 @@ describe("given a socket at the connect endpoint", () => {
   });
 
   describe("when the key is personal and the agent is a development one", () => {
-    it("accepts it and scopes the agent to its owner", async () => {
-      const { sdk, agentId } = await connectAndRegister({
+    /** @scenario "The registered frame reports the scope" */
+    it("accepts it, scopes the agent to its owner and says so in the registered frame", async () => {
+      const { sdk, registered, agentId } = await connectAndRegister({
         pod: podA,
         token: personalToken,
         overrides: {
@@ -1050,6 +1052,9 @@ describe("given a socket at the connect endpoint", () => {
         ownerUserId: userId,
         identityKey: `dev-agent@development/user:${userId}`,
       });
+      expect(registered.agents).toEqual([
+        expect.objectContaining({ id: agentId, scope: { kind: "owner" } }),
+      ]);
       sdk.close();
       await sdk.closed();
     });

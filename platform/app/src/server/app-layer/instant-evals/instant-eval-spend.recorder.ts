@@ -29,6 +29,8 @@ export interface InstantEvalSpendRecord {
    * cost" be a query rather than a guess from timestamps.
    */
   readonly runId?: string;
+  /** The gateway key a hosted call was made under. Absent everywhere else. */
+  readonly virtualKeyId?: string;
   /** Input tokens the classifier billed for. */
   readonly inputTokens: number;
   /** Classifications made, which is one per judged text. */

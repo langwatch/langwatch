@@ -1,5 +1,5 @@
 import type { IdentityUsersRepository } from "@langwatch/identity-server";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import type { LegacySignInAccount } from "../signin-account-lookup";
 
 /** One `User` row, as the sign-in and account-linking decisions read it. */
@@ -21,12 +21,20 @@ export interface IdentityUserRow {
  * creation, by another backfill pass — is never overwritten. Rewriting it
  * would orphan every identifier hash already computed with the old key.
  *
+ * The guard is SQL with the condition against the table. Through
+ * `updateMany` it sits in a subquery, and a statement that waited on the row
+ * lock re-checks only the outer id predicate against the committed row, so
+ * two mints meeting on one user would both land and the later key would
+ * overwrite the one hashes were already emitted under.
+ *
  * `User` is an identity table under the multitenancy middleware's
  * Identifier/Account exemption, so these queries carry no `projectId` — the
  * model has none, and a user is not scoped to a project.
  */
 export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient,
+  ) {}
 
   async storeUserHashKeyIfMissing({
     userId,
@@ -35,10 +43,14 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     userId: string;
     userHashKey: string;
   }): Promise<void> {
-    await this.prisma.user.updateMany({
-      where: { id: userId, userHashKey: null },
-      data: { userHashKey },
-    });
+    await this.prisma.$executeRaw`
+      -- @tenancy: User is an identity table, addressed by its own id.
+      UPDATE "User"
+         SET "userHashKey" = ${userHashKey},
+             "updatedAt" = now()
+       WHERE "id" = ${userId}
+         AND "userHashKey" IS NULL
+    `;
   }
 
   async findEmail({ userId }: { userId: string }): Promise<string | null> {

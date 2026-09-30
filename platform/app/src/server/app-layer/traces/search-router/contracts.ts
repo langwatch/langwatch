@@ -30,15 +30,31 @@ export const SEARCH_ROUTE_KINDS = [
 
 export type SearchRouteKind = (typeof SEARCH_ROUTE_KINDS)[number];
 
+/** Who made the call: the classifier, the FAST model, or a fallback rule. */
+export type SearchRouteDecidedBy = "classifier" | "model" | "fallback";
+
 /**
- * Who made the call: the classifier, the FAST model, a fallback rule, or the
- * caller when it already knew the route.
+ * The model this route needed was missing or did not answer.
+ *
+ * Two values because they are two different things to fix: `no_model` means
+ * none is configured for the project, `model_failed` means the one configured
+ * refused or produced nothing usable. Both are the reader's to act on, and
+ * the strip under the bar carries the way to.
  */
-export type SearchRouteDecidedBy =
-  | "classifier"
-  | "model"
-  | "fallback"
-  | "caller";
+export type ModelTrouble = "no_model" | "model_failed";
+
+/**
+ * Which model problem this was, and the code it carried.
+ *
+ * The code is a handled one or nothing. Handled codes are written to be read
+ * by a customer, so it is the one part of a provider failure the strip under
+ * the bar can name. It is absent on `no_model`, where it would only restate
+ * the sentence beside it, and on a failure that carried no code.
+ */
+export interface ModelFailure {
+  modelTrouble: ModelTrouble;
+  modelErrorCode?: string;
+}
 
 export interface RouteSearchInput {
   projectId: string;
@@ -51,13 +67,6 @@ export interface RouteSearchInput {
   lensId?: string;
   /** Whether the Langy route is open to this user. Defaults to true. */
   isLangyAvailable?: boolean;
-  /**
-   * The route the caller already knows, which skips the classifier. Set when
-   * the text comes from a search that was routed once already, so re-running
-   * it cannot land somewhere else: the Explorer re-judges an `eval` chip this
-   * way.
-   */
-  forceKind?: SearchRouteKind;
 }
 
 /** Which of the optional routes this submit may be given. */
@@ -80,8 +89,11 @@ export type RouteSearchResult =
       kind: "instant_eval";
       question: {
         instructions: string;
-        /** What counts as yes, and what counts as no, in that order. */
-        criteria: [string, string];
+        /**
+         * What counts as yes, and what counts as no, in that order. Absent
+         * when no model wrote the question, which `modelTrouble` says.
+         */
+        criteria?: [string, string];
       };
       target: InstantEvalSearchTarget;
       /** The explicit terms typed alongside the sentence, applied as-is. */
@@ -89,16 +101,30 @@ export type RouteSearchResult =
       /** The phrase search to run instead when the eval does not start. */
       fallbackQuery: string;
       decidedBy: SearchRouteDecidedBy;
+      /**
+       * Set when the question is the sentence exactly as typed, because no
+       * model rewrote it. The judgement still runs, the way a chip typed by
+       * hand does.
+       */
+      modelTrouble?: ModelTrouble;
+      /** {@link ModelFailure}. */
+      modelErrorCode?: string;
     }
   | {
       kind: "free_text";
       /** The sentence as one phrase, merged with the explicit terms. */
       query: string;
       decidedBy: SearchRouteDecidedBy;
-      /** No classifier and no model: the client offers to configure one. */
-      isModelUnavailable: boolean;
       /** Set when another route was chosen first and could not be built. */
       fellBackFrom?: SearchRouteKind | "routing";
+      /**
+       * Set when a model is what was missing. Absent on a phrase the
+       * classifier picked, and on a route closed for another reason, so the
+       * strip offers model settings only where they are the fix.
+       */
+      modelTrouble?: ModelTrouble;
+      /** {@link ModelFailure}. */
+      modelErrorCode?: string;
     }
   | {
       kind: "langy";

@@ -64,6 +64,24 @@ export class NoAddressToConfirmError extends HandledError {
 }
 
 /**
+ * The installation has no email provider configured, so no confirmation link
+ * can be sent. An operator can configure one; until then the address stays
+ * unconfirmed (ADR-117, revision 2026-09-25).
+ */
+export class EmailSendingUnavailableError extends HandledError {
+  declare readonly code: "auth_email_sending_unavailable";
+
+  constructor() {
+    super(
+      "auth_email_sending_unavailable",
+      "This installation cannot send email, so the address cannot be confirmed.",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "EmailSendingUnavailableError";
+  }
+}
+
+/**
  * An impersonating operator asked to set or change the subject's password.
  *
  * Refused outright: how an account signs in belongs to its owner, and

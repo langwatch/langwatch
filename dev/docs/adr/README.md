@@ -66,9 +66,11 @@ Document **important technical and architectural decisions** — context, trade-
 | [092](./092-unified-authorization-engine.md)                      | Unified authorization engine — one registry, one resolver, every principal                  | Proposed                                          |
 | [094](./094-simulation-execution-on-process-manager-substrate.md) | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs | Accepted |
 | [098](./098-post-event-work-subscribers-and-process-managers.md) | Post-event work is subscribers and process managers — the reactor vocabulary is retired | Accepted |
-| [101](./101-lwql-clickhouse-access-model-ownership.md) | The ClickHouse server owner owns the LangWatchQL access model — rendered config vs. app self-provisioning | Accepted |
+| [101](./101-lwql-clickhouse-access-model-ownership.md) | The ClickHouse server owner owns the LangWatchQL access model — rendered config vs. app self-provisioning | Superseded by [142](./142-the-app-owns-the-lwql-access-model.md) |
 | [110](./110-grant-aggregates-are-grants.md)                       | A grant aggregate is a grant, not an organization                                           | Proposed (supersedes ADR-092 §13's aggregate choice) |
 | [131](./131-better-auth-is-a-boundary-over-identity-services.md) | better-auth is a boundary tier of classes over identity services, not a place that queries Prisma | Accepted |
+| [136](./136-lwql-postgres-catalog-derived-opt-out.md) | The PostgreSQL half of the LangWatchQL catalog is derived from the Prisma manifest, opt-out | Accepted |
+| [142](./142-the-app-owns-the-lwql-access-model.md) | The app owns the LangWatchQL access model — one definition, two emitters, delivered to every pod | Accepted |
 
 ## When to Write an ADR
 

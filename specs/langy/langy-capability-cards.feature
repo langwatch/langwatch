@@ -474,6 +474,32 @@ Feature: Langy renders domain-capability cards for tool calls
       When Langy shows a card for one named scenario
       Then the card's link opens that scenario in the library
 
+  # The card that says "Created and ready to use" was the end of the road:
+  # running the scenario meant leaving the panel for Simulations. The card now
+  # offers the run in words, through the composer, so Langy resolves the
+  # target and asks what it has to ask, exactly as it does for a typed request.
+  Rule: A created scenario offers its first run
+
+    @integration
+    Scenario: A created scenario offers to run against the connected agent
+      Given Langy created a scenario in a live conversation
+      When the card renders
+      Then it offers "Run against my agent" beside the deep link
+      And the offer waits while Langy is still answering
+
+    @integration
+    Scenario: Choosing the run offer asks Langy in words, through the composer
+      Given a created-scenario card with the run offer
+      When the reader chooses the offer
+      Then the composer sends "Run scenario "<name>" against my connected agent" as the reader's message
+      And the card itself schedules nothing
+
+    @integration
+    Scenario: A created scenario in a replayed conversation offers no run
+      Given a created-scenario card rendered while the reader replays an earlier turn
+      When the card renders
+      Then no run offer is drawn, since the replay can route no request
+
   # WHICH card a result renders in is decided once, at the command boundary,
   # from the command's name and the result's own shape together (ADR-079). The
   # panel then re-derived the card from the NAME alone and dropped any result

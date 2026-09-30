@@ -18,40 +18,27 @@
  * @see specs/lwql/api.feature
  */
 
-export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./accessModel";
-export {
-  type LangWatchQLAppFunctionConflict,
-  type LangWatchQLServerFunctionRow,
-  lwqlAppFunctionConflicts,
-  lwqlAppFunctionCreateQuery,
-  lwqlAppFunctionReconciliationQuery,
-} from "./appFunctionStatements";
 export {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
-export { postgresReaderStatementsFor } from "./postgresReaderProvisioning";
 export {
-  type LwqlKeyMapBackfillPlan,
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,
-  lwqlPostgresSchemaFromDatabaseUrl,
-  planLwqlKeyMapBackfill,
-  productionClickHouseObjectStatements,
   productionLangWatchQLNames,
-  productionPostgresApprovedViewStatements,
-  productionPostgresReaderGrantStatements,
-  withTenancyOptOut,
 } from "./productionProvisioning";
 export {
+  type LwqlReconvergenceWatch,
+  startLwqlReconvergenceWatch,
+} from "./reconvergence";
+export {
+  lwqlAccessModelOwner,
+  lwqlSelfProvisionInputs,
+  selfProvisionAll,
+} from "./selfProvisionEntry";
+export {
   canProvisionAppFunctions,
-  type LwqlPostgresReaderMode,
-  type LwqlSelfProvisionEnv,
-  lwqlPostgresEndpointFromDatabaseUrl,
-  lwqlPostgresReaderModeFromEnv,
+  lwqlAccessModelMode,
   lwqlSelfProvisionFromEnv,
   probeAppFunctionStore,
-  selfHostedClickHouseProvisioningStatements,
-  selfHostedPostgresReaderStatements,
 } from "./selfProvisioning";
-export { withLwqlSelfProvisionLock } from "./selfProvisionLock";

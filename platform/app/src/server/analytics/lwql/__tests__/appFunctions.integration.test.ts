@@ -100,11 +100,7 @@ describe("given the LangWatchQL app functions provisioned on a real server", () 
       // start, so "idempotent" has to mean the whole list, not the function
       // statements on their own.
       await harness.applyAsAdmin(
-        lwqlClickHouseSetupStatements({
-          names: harness.names,
-          password: harness.restrictedConnection().password,
-          lwqlTables: harness.lwqlTables,
-        }),
+        lwqlClickHouseSetupStatements({ names: harness.names }),
       );
 
       expect(

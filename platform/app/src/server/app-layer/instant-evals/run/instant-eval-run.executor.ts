@@ -27,7 +27,10 @@ import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
 import { instantEvalCostUsd, instantEvalPriceUsd } from "../classifier/pricing";
 import type { InstantEvalSpendRecorder } from "../instant-eval-spend.recorder";
-import { InstantEvalRunNotFoundError } from "./errors";
+import {
+  InstantEvalNotEnabledError,
+  InstantEvalRunNotFoundError,
+} from "./errors";
 import type { InstantEvalJudgmentsRepository } from "./instant-eval-judgments.repository";
 import { judgeRunPage } from "./instant-eval-run.judge-page";
 import { forgetPageProfile } from "./instant-eval-run.page-record";
@@ -95,8 +98,11 @@ export async function loadRun({
 }) {
   const row = await deps.runs.findById({ projectId, runId });
   if (!row) throw new InstantEvalRunNotFoundError({ runId });
+  // A run the project holds, on a deployment that provisions no LangWatchQL
+  // identity to run statements as. The run exists, so saying it does not sends
+  // the reader after a missing row instead of the missing configuration.
   const lwqlKey = await deps.projectKey(projectId);
-  if (!lwqlKey) throw new InstantEvalRunNotFoundError({ runId });
+  if (!lwqlKey) throw new InstantEvalNotEnabledError();
   return {
     row,
     caller: { id: projectId, lwqlKey },

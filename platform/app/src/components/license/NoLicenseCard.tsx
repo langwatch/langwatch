@@ -3,6 +3,7 @@ import {
   Button,
   Field,
   HStack,
+  Input,
   Text,
   Textarea,
   VStack,
@@ -19,13 +20,16 @@ import {
 } from "../../../ee/licensing/constants";
 import { formatFileSize } from "./licenseStatusUtils";
 
-type ActivationMethod = "file" | "key";
+type ActivationMethod = "code" | "file" | "key";
 
 interface NoLicenseCardProps {
   licenseKey: string;
   onLicenseKeyChange: (value: string) => void;
   onActivate: () => void;
   onFileActivate?: (fileContent: string) => void;
+  activationCode: string;
+  onActivationCodeChange: (value: string) => void;
+  onCodeActivate: () => void;
   isActivating: boolean;
 }
 
@@ -34,6 +38,9 @@ export function NoLicenseCard({
   onLicenseKeyChange,
   onActivate,
   onFileActivate,
+  activationCode,
+  onActivationCodeChange,
+  onCodeActivate,
   isActivating,
 }: NoLicenseCardProps) {
   const publicEnv = usePublicEnv();
@@ -41,8 +48,11 @@ export function NoLicenseCard({
     publicEnv.data?.STRIPE_LICENSE_PAYMENT_LINK_URL ??
     DEFAULT_LICENSE_PURCHASE_URL;
 
+  // The code is first because it is the shortest path for a new customer: a
+  // line typed off an email, with no file to find and no blob to paste. The
+  // other two stay for a customer whose install cannot reach the internet.
   const [activationMethod, setActivationMethod] =
-    useState<ActivationMethod>("file");
+    useState<ActivationMethod>("code");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,7 +107,9 @@ export function NoLicenseCard({
   }, []);
 
   const handleActivate = useCallback(() => {
-    if (activationMethod === "file" && uploadedFile) {
+    if (activationMethod === "code") {
+      onCodeActivate();
+    } else if (activationMethod === "file" && uploadedFile) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const content = e.target?.result as string;
@@ -109,10 +121,17 @@ export function NoLicenseCard({
     } else if (activationMethod === "key") {
       onActivate();
     }
-  }, [activationMethod, uploadedFile, onFileActivate, onActivate]);
+  }, [
+    activationMethod,
+    uploadedFile,
+    onFileActivate,
+    onActivate,
+    onCodeActivate,
+  ]);
 
   const isActivateDisabled =
     isActivating ||
+    (activationMethod === "code" && !activationCode.trim()) ||
     (activationMethod === "file" && !uploadedFile) ||
     (activationMethod === "key" && !licenseKey.trim());
 
@@ -139,10 +158,30 @@ export function NoLicenseCard({
             disabled={isActivating}
           >
             <HStack gap={4}>
+              <Radio value="code">Enter activation code</Radio>
               <Radio value="file">Upload license file</Radio>
               <Radio value="key">Enter license key</Radio>
             </HStack>
           </RadioGroup>
+
+          {activationMethod === "code" && (
+            <Field.Root width="full">
+              <Field.Label srOnly>Activation code</Field.Label>
+              <Input
+                value={activationCode}
+                onChange={(e) => onActivationCodeChange(e.target.value)}
+                placeholder="LW-XXXX-XXXX-XXXX-XXXX"
+                fontFamily="mono"
+                maxWidth="360px"
+                disabled={isActivating}
+              />
+              <Field.HelperText>
+                Your code was sent with your order. This install asks LangWatch
+                for the license it covers, so it needs to reach the internet. If
+                it cannot, upload the license file instead.
+              </Field.HelperText>
+            </Field.Root>
+          )}
 
           {activationMethod === "file" && (
             <Box width="full">

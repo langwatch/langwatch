@@ -29,7 +29,9 @@ function parseStatus(raw: string): TenantMigrationStatus {
 export class PrismaSystemMigrationStateRepository
   implements SystemMigrationStateRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient | Prisma.TransactionClient,
+  ) {}
 
   async findRecord({
     migrationName,
@@ -94,6 +96,13 @@ export class PrismaSystemMigrationStateRepository
    * writer that creates nothing-to-rolled_back transitions is nobody (the
    * operator can only pin an EXISTING record), so the collision is read as
    * the pin standing and answered `false`.
+   *
+   * The guarded update is SQL with the guard against the table. Through
+   * `updateMany` the guard sits in a subquery, and a statement that waited on
+   * the row lock re-checks only the outer key predicate against the committed
+   * row, so a pin committed while the runner's write was waiting would be
+   * overwritten by the very status it exists to refuse. The no-report case is
+   * written as SQL NULL, the same value `upsertRecord` stores for it.
    */
   async upsertRecordUnlessRolledBack(
     record: TenantMigrationRecord,
@@ -102,16 +111,19 @@ export class PrismaSystemMigrationStateRepository
       record.report == null
         ? Prisma.DbNull
         : (record.report as Prisma.InputJsonValue);
+    const reportJson = record.report == null ? null : JSON.stringify(report);
     const occurredAt = new Date();
-    const updated = await this.prisma.systemMigrationTenantState.updateMany({
-      where: {
-        migrationName: record.migrationName,
-        tenantId: record.tenantId,
-        NOT: { status: "rolled_back" },
-      },
-      data: { status: record.status, report, occurredAt },
-    });
-    if (updated.count > 0) return true;
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "SystemMigrationTenantState"
+         SET "status" = ${record.status},
+             "report" = ${reportJson}::jsonb,
+             "occurredAt" = ${occurredAt},
+             "updatedAt" = now()
+       WHERE "migrationName" = ${record.migrationName}
+         AND "tenantId" = ${record.tenantId}
+         AND "status" <> 'rolled_back'
+    `;
+    if (updated > 0) return true;
     try {
       await this.prisma.systemMigrationTenantState.create({
         data: {

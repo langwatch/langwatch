@@ -66,12 +66,6 @@ const mockGetSuiteById = vi.hoisted(() =>
   })),
 );
 
-// SuiteRail and RunsSidebar mount the simulations welcome card, which reads
-// whether a guided onboarding path is active; no path is in these tests.
-vi.mock("~/features/guided-onboarding/guidedPathActive", () => ({
-  useGuidedPathActive: () => false,
-}));
-
 vi.mock("~/utils/api", () => ({
   api: {
     // The run dialog reads the saved evaluators for the ones a run carries.

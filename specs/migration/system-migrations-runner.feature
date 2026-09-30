@@ -83,6 +83,16 @@ Feature: Running system migrations across organizations
     When a pass runs
     Then it is not visited at all
 
+  @integration
+  Scenario: An operator's pin written during a pass stands
+    Given "org_acme" is migrated and a pass is about to finalize it
+    When an operator pins it rolled back in the same moment
+    Then the pass's write is refused
+    And "org_acme" stays rolled back with the operator's report
+    # The pin is the only brake the design has. The pass's write waits on the
+    # pin's row lock and re-reads the status as the pin left it, rather than
+    # deciding on the row as it read it before the wait.
+
   @unit
   Scenario: A pass with no migrations to drive visits nobody
     Given an installation that runs none of the registered migrations

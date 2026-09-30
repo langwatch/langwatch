@@ -194,12 +194,16 @@ const IDENTIFIER_SHAPE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
  * while processing query: ...` with single quotes, so both delimiters are
  * accepted and the shape check below decides what is usable.
  *
+ * A name used as a function argument (`arrayJoin(Labels)`) gets a longer
+ * sentence, `Unknown expression or function identifier `Labels``, since the
+ * analyzer cannot tell which of the two the name was meant to be.
+ *
  * Either delimiter opens and closes, rather than a matched pair: an identifier
  * can contain neither, so a mismatched pair cannot smuggle anything past
  * {@link IDENTIFIER_SHAPE}.
  */
 const IDENTIFIER_PATTERNS: readonly RegExp[] = [
-  /Unknown (?:expression |table |column )?identifier [`'"]([^`'"]{1,128})[`'"]/,
+  /Unknown (?:expression or function |expression |table |column )?identifier [`'"]([^`'"]{1,128})[`'"]/,
   /Missing columns: [`'"]([^`'"]{1,128})[`'"]/,
 ];
 

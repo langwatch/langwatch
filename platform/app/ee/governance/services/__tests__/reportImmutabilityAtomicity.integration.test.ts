@@ -26,15 +26,15 @@
  * before the fix let a report change through on a source that had already
  * started pulling, double-counting the spend it reports.
  *
- * What this file still does NOT prove: serialisation under genuine
- * concurrency. The interleaving is staged deterministically at the boundary
- * (below) rather than by racing two connections, because a real race is
- * timing-dependent and would buy a flaky test in exchange for evidence this
- * already gives. It proves the pin refuses a moved cursor; it does not prove
- * Postgres orders two simultaneous writers.
+ * The last block is the same defect under genuine concurrency: the pull run's
+ * cursor write is held open in its own transaction until the pin is parked on
+ * its row lock, and only then commits. That is the interleaving a pin whose
+ * condition sits in a subquery passes anyway, on its own older snapshot.
  *
  * Spec: platform/app/specs/governance/edit-pull-source-config.feature
- *       (Rule: The report kind is fixed once a source has pulled)
+ *       (Rule: The report kind is fixed once a source has pulled), and
+ *       specs/ai-gateway/governance/ingestion-sources.feature for the
+ *       interleaving, which is bound from there.
  */
 
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
@@ -43,6 +43,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 
 const ns = `rpt-atomic-${nanoid(8)}`;
 const slug = `--rpt-atomic-${ns}`;
@@ -259,6 +260,44 @@ describe("the report-immutability pin against Postgres", () => {
         /while the change was being saved/i,
       );
 
+      expect(await storedReport(id)).toBe("usage");
+    });
+  });
+
+  describe("given a pull run commits its cursor while the pinned write is waiting on the row", () => {
+    /** @scenario "A report change that waited on a pull run's cursor is refused" */
+    it("refuses the write, because the pin re-reads the row it waited for", async () => {
+      const id = await seedSource({ pollerCursor: undefined });
+
+      const answers = await raceOnOneRow<string>({
+        prisma,
+        table: "IngestionSource",
+        // The projection repository's write, as it lands at the end of a
+        // pull run: the cursor the source has now.
+        first: async (tx) => {
+          await tx.ingestionSource.updateMany({
+            where: { id, organizationId },
+            data: { pollerCursor: '{"startingAt":"2026-08-01T00:00:00Z"}' },
+          });
+          return "pulled";
+        },
+        // On the root client: the service opens the pinned transaction
+        // itself. Its read of the source lands before the cursor commits, so
+        // the guard clears the change, and the pin is what has to refuse it.
+        second: () =>
+          IngestionSourceService.create(prisma)
+            .updateSource({
+              id,
+              organizationId,
+              parserConfig: changeReportTo("cost"),
+            })
+            .then(
+              () => "saved",
+              (error: Error) => error.message,
+            ),
+      });
+
+      expect(answers.second).toMatch(/while the change was being saved/i);
       expect(await storedReport(id)).toBe("usage");
     });
   });

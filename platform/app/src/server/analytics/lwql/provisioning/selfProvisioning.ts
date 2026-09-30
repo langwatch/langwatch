@@ -1,33 +1,35 @@
 /**
- * LangWatchQL self-provisioning — the deployment mode where the application
- * itself owns the whole access model (issue #6635).
+ * LangWatchQL self-provisioning — the application owns the whole access model
+ * on every distribution (issue #8258).
  *
- * The SaaS cloud provisions the restricted identity, profile, grants, row
- * policies, named collection and reader role out of band (terraform,
- * langwatch-saas#1126), so the app there only ever *uses* the five `LWQL_*`
- * values. A self-hosted install has no terraform: it holds admin credentials
- * for both stores by construction (`CLICKHOUSE_URL`, `DATABASE_URL`), and this
- * module is what turns those into a working LangWatchQL deployment on every
- * boot — `LWQL_SELF_PROVISION=true` plus two generated passwords in, the five
- * `LWQL_*` values derived, every access-model object converged idempotently.
+ * The app holds admin credentials for both stores by construction
+ * (`CLICKHOUSE_URL`, `DATABASE_URL`), so it does not wait on any out-of-band
+ * job to provision the restricted identity, profile, grants, row policies,
+ * named collection or reader role: this module turns those admin credentials
+ * into a working LangWatchQL deployment on every boot — the two generated
+ * passwords in, the `LWQL_*` connection values derived, every access-model
+ * object converged idempotently. Where the ClickHouse server instead owns an
+ * entity in its own config store, provisioning yields to it and provisions the
+ * rest (see `clickhouseStatementRunner.ts`).
  *
  * Two halves, matching the split the rest of the module keeps:
  *
  *  - **Env derivation** ({@link lwqlSelfProvisionFromEnv}) — builds the
  *    restricted connection the executor serves with, from the admin URLs and
- *    SaaS-convention default names. Pure over its `env` argument.
+ *    the shared default names. Pure over its `env` argument.
  *  - **Statement composition** ({@link selfHostedClickHouseProvisioningStatements},
  *    {@link selfHostedPostgresReaderStatements}) — sequences the reference
  *    builders (`accessModel.ts`, `postgresMapping.ts`, `catalogStatements.ts`) in the
  *    order the integration harness proves works: access model, bridge,
- *    views. Pure; `src/tasks/provisionLwql.ts` is the only caller with I/O.
+ *    views. Pure; `selfProvisionEntry.ts` is the only caller with I/O.
  *
- * The names default to the SaaS ones on purpose — one convention across every
- * distribution, so a self-hosted operator reading the docs and a cloud
- * operator reading terraform see the same objects.
+ * The names are one convention across every distribution, so every operator
+ * reading the docs sees the same objects.
  *
  * @see specs/lwql/api.feature
  */
+
+import { createHash } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
 
@@ -44,15 +46,20 @@ import {
   qualified,
 } from "./accessModel";
 import {
+  renderLwqlAccessModelDdl,
+  renderLwqlNamedCollectionDdl,
+} from "./accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "./accessModelDefinition";
+import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresEngineTableStatements,
   lwqlPostgresReaderConnectionLimit,
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
+import { clickHouseErrorSummary } from "./clickhouseStatementRunner";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
-  postgresNamedCollectionStatements,
   postgresReaderRoleStatements,
 } from "./postgresMapping";
 import { LWQL_POSTGRES_READER_ROLE } from "./productionProvisioning";
@@ -72,6 +79,27 @@ export const LWQL_SELF_PROVISION_DEFAULTS = {
   postgresReaderRole: LWQL_POSTGRES_READER_ROLE,
   namedCollection: "lwql_postgres",
 } as const;
+
+/** How this deployment delivers the LangWatchQL access model (#8258). */
+export type LwqlAccessModelMode = "rendered" | "sql";
+
+/**
+ * How this deployment delivers the LangWatchQL access model (#8258), read in
+ * one place so the converge and the server's reconvergence watch agree.
+ *
+ * `rendered` (the default when unset) ships the access model as per-pod
+ * `users.d` / `config.d` config the chart mounts on every replica, so the
+ * converge provisions only the structural objects (database, key-map table, app
+ * functions, views, postgres-engine tables) and skips every access statement,
+ * and the server does not arm the reconvergence watch. `sql` provisions the
+ * access model as DDL on the one server behind the service (BYO), the pre-#8258
+ * behaviour plus the AC9 cluster guard.
+ */
+export function lwqlAccessModelMode(
+  env: NodeJS.ProcessEnv = process.env,
+): LwqlAccessModelMode {
+  return env.LWQL_ACCESS_MODEL_MODE === "sql" ? "sql" : "rendered";
+}
 
 /** Everything the provisioning task needs beyond the serving connection. */
 export interface LwqlSelfProvisionEnv {
@@ -95,44 +123,12 @@ export function lwqlSelfProvisionFromEnv(
   const postgresReaderPassword = env.LWQL_POSTGRES_READER_PASSWORD;
   if (!postgresReaderPassword) {
     logger.warn(
-      "LWQL_SELF_PROVISION is true but LWQL_POSTGRES_READER_PASSWORD is not set — the access model will not be provisioned this boot",
+      "LangWatchQL: LWQL_CLICKHOUSE_PASSWORD is set but LWQL_POSTGRES_READER_PASSWORD is not — the access model will not be provisioned this boot",
     );
     return null;
   }
 
   return { connection, postgresReaderPassword };
-}
-
-/**
- * On the NON-self-provision path (chart-managed ClickHouse, or SaaS/terraform),
- * whether THIS deployment owns the PostgreSQL reader role (`lwql_ro`) — creating
- * it, setting its password, and locking down its grants — or only re-grants an
- * externally-owned role SELECT on the approved views.
- *
- *  - `"manage-role"`: chart-managed ClickHouse PAIRED WITH chart-managed
- *    PostgreSQL — the one deployment where nothing else provisions the reader,
- *    so the chart signals it with `LWQL_MANAGE_POSTGRES_READER=true` (see
- *    `charts/langwatch/templates/_helpers.tpl`, `langwatch.sharedEnv`) and the
- *    app converges `lwql_ro` from `LWQL_POSTGRES_READER_PASSWORD`.
- *  - `"grants-only"`: everything else — SaaS/terraform, or an operator-owned
- *    external PostgreSQL — owns the role out of band. The app must NEVER run
- *    `CREATE ROLE` / `ALTER ROLE … PASSWORD` against it as the `DATABASE_URL`
- *    user: that either throws (a non-superuser connection) and crashloops a
- *    default-on feature, or silently rotates the operator's reader password.
- *
- * Keyed on an EXPLICIT flag, never on "a reader password happens to be present":
- * SaaS/terraform may also set `LWQL_POSTGRES_READER_PASSWORD`, and implicit-mode
- * detection is exactly what `provisionLwql`'s mode selection forbids. A password
- * present without the flag stays `"grants-only"`.
- */
-export type LwqlPostgresReaderMode = "manage-role" | "grants-only";
-
-export function lwqlPostgresReaderModeFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): LwqlPostgresReaderMode {
-  return env.LWQL_MANAGE_POSTGRES_READER === "true"
-    ? "manage-role"
-    : "grants-only";
 }
 
 /** The PostgreSQL endpoint the named collection dials, from `DATABASE_URL`. */
@@ -172,11 +168,28 @@ export function lwqlPostgresEndpointFromDatabaseUrl(
 }
 
 /**
- * Every ClickHouse statement a self-provisioning boot runs, in the order the
- * integration harness proves: access model first (`CREATE USER OR REPLACE`
- * mints a new access-entity id, so everything pointing at the user follows
- * it), then the PostgreSQL bridge, then the views with their grants and row
- * policies.
+ * Every ClickHouse statement a self-provisioning boot runs.
+ *
+ * The whole access model is single-sourced from one
+ * {@link buildLwqlAccessModelDefinition} object (AC6): in `sql` mode the access
+ * DDL is emitted by {@link renderLwqlAccessModelDdl} /
+ * {@link renderLwqlNamedCollectionDdl} — the very same definition the chart's
+ * `users.d` / `config.d` YAML renders from — so the two delivery paths cannot
+ * drift. Nothing here reaches for the individual statement builders.
+ *
+ * Order is the order the integration harness proves. The named collection comes
+ * before the postgres-engine tables that reference it; those tables and the
+ * views are created next; then, in `sql` mode, the rest of the access model
+ * (profile, restricted user, every row policy, every grant) lands last, once
+ * every object it names exists. `CREATE USER OR REPLACE` mints a new
+ * access-entity id, so it precedes every grant and policy naming it, and every
+ * policy precedes every grant (a partial run then refuses reads rather than
+ * leaking across tenants).
+ *
+ * In `rendered` mode the access model ships as per-pod `users.d` / `config.d`
+ * config the chart mounts, so the converge provisions only the structural
+ * objects — the database, the app functions, the key-map table, the
+ * postgres-engine tables and the views — and emits no access DDL at all.
  *
  * The engine tables are dropped and recreated rather than left to
  * `IF NOT EXISTS`: they are metadata only (no rows live in ClickHouse), and a
@@ -189,6 +202,7 @@ export function selfHostedClickHouseProvisioningStatements({
   sourceDatabase,
   postgres,
   includeAppFunctions = true,
+  mode = "sql",
 }: {
   names: LangWatchQLNames;
   restrictedPassword: string;
@@ -199,6 +213,13 @@ export function selfHostedClickHouseProvisioningStatements({
   };
   /** See {@link canProvisionAppFunctions}. */
   includeAppFunctions?: boolean;
+  /**
+   * How the access model is delivered ({@link lwqlAccessModelMode}). `sql`
+   * (the default) emits the whole model as DDL from the shared definition;
+   * `rendered` ships it as per-pod `users.d` / `config.d` config and provisions
+   * only the structural objects.
+   */
+  mode?: LwqlAccessModelMode;
 }): string[] {
   if (names.database !== sourceDatabase) {
     throw new Error(
@@ -206,35 +227,52 @@ export function selfHostedClickHouseProvisioningStatements({
     );
   }
   const collection = LWQL_SELF_PROVISION_DEFAULTS.namedCollection;
-  return [
-    // Fact tables come from migrations and their grants/policies from
-    // lwqlViewSetupStatements below, so the setup list provisions only the
-    // identity, the profile, and the key map's grant + policy.
-    ...lwqlClickHouseSetupStatements({
-      names,
-      password: restrictedPassword,
-      lwqlTables: [],
-      includeAppFunctions,
-    }),
-    ...postgresNamedCollectionStatements({
-      connection: {
-        collection,
-        host: postgres.endpoint.host,
-        port: postgres.endpoint.port,
-        database: postgres.endpoint.database,
-        user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
-        password: postgres.readerPassword,
-      },
-    }),
+  // The one definition both delivery paths read (AC6). The plaintext never
+  // enters it — only the sha256 hex the user statement identifies with (AC5).
+  const definition = buildLwqlAccessModelDefinition({
+    names,
+    passwordSha256Hex: createHash("sha256")
+      .update(restrictedPassword)
+      .digest("hex"),
+    namedCollection: {
+      collection,
+      host: postgres.endpoint.host,
+      port: postgres.endpoint.port,
+      database: postgres.endpoint.database,
+      user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
+      password: postgres.readerPassword,
+    },
+    sourceDatabase,
+  });
+
+  // The structural objects only — the setup builder emits no access DDL here
+  // (that is single-sourced from the definition below or shipped as config).
+  const structural = lwqlClickHouseSetupStatements({
+    names,
+    includeAppFunctions,
+    sourceDatabase,
+  });
+  const engineTables = [
     ...lwqlPostgresViews(LWQL_VIEW_CATALOG).map(
       (view) => `DROP TABLE IF EXISTS ${qualified(names, view.sourceTable)}`,
     ),
     ...lwqlPostgresEngineTableStatements({ names, collection }),
-    ...lwqlViewSetupStatements({
-      names,
-      sourceDatabase,
-      dedup: SHIPPED_LWQL_DEDUP,
-    }),
+  ];
+  const views = lwqlViewSetupStatements({
+    names,
+    sourceDatabase,
+    dedup: SHIPPED_LWQL_DEDUP,
+  });
+
+  if (mode === "rendered") {
+    return [...structural, ...engineTables, ...views];
+  }
+  return [
+    ...structural,
+    ...renderLwqlNamedCollectionDdl(definition),
+    ...engineTables,
+    ...views,
+    ...renderLwqlAccessModelDdl(definition),
   ];
 }
 
@@ -320,7 +358,9 @@ export async function probeAppFunctionStore({
     };
   } catch (error) {
     logger.error(
-      { error },
+      // AC5: summarise to code/type only — a raw ClickHouse error carries the
+      // statement text.
+      { error: clickHouseErrorSummary(error) },
       "lwql self-provisioning could not read the replica layout from system.replicas and system.server_settings; the app functions are left out until it can",
     );
     return null;

@@ -1108,7 +1108,7 @@ Manage them at **Settings > Model Providers**. The table lists each configuratio
 | Bedrock | AWS access key id, secret access key and region |
 | Vertex AI | Service account JSON, project and location |
 | DeepSeek, xAI, Cerebras, Groq, Voyage AI | API key |
-| ElevenLabs | API key, optional webhook secret. See [Voice Agents in the App](/agent-testing/voice-agents-in-app) for the key permissions it needs |
+| ElevenLabs | API key, optional webhook secret. See [Voice Agents](/agent-testing/voice-agents#before-you-start) for the key permissions it needs |
 | Azure Safety | Content Safety endpoint and key, for the Azure safety evaluators |
 | Custom (OpenAI-compatible) | Base URL and optional API key, for a LiteLLM proxy, vLLM or any endpoint that serves `/chat/completions` |
 
@@ -1851,6 +1851,278 @@ Authorization: Bearer {{ secrets.ACME_API_KEY }}
 ## API
 
 The [Secrets API](/api-reference/secrets/overview) lists, creates, updates and deletes secrets with a project API key. The list response never includes values.
+
+---
+
+# FILE: ./platform/sso-update.mdx
+
+---
+title: "Move to your own identity provider"
+description: "Replace the single sign-on LangWatch set up for your organization with a connection you run yourself, without interrupting anybody's sign-in."
+sidebarTitle: Move to your own identity provider
+keywords: sso, single sign-on, identity provider, update, migrate, okta, entra, google workspace, saml, oidc, langwatch
+---
+
+<Note>
+  This page is for organizations whose single sign-on LangWatch set up on their
+  behalf, usually after a request to support. If you connected your identity
+  provider yourself in **Settings > Authentication**, you already run it and
+  this guide does not apply to you. Single sign-on is an Enterprise feature.
+</Note>
+
+Until now, changing anything about that sign-in meant asking us. You can now
+connect your organization's own identity provider from **Settings**, test it,
+move everybody across at your own pace, and retire the provider LangWatch set
+up when you are ready. Nobody is signed out along the way.
+
+## What changes, and what does not
+
+- **Sign-in stays the same until you switch over.** Registering your identity provider
+  puts it beside the sign-in you have today. Everyone keeps signing in the way
+  they do now until an administrator switches sign-in over.
+- **You can switch back.** After switching over, one action returns everybody
+  to the previous provider. That stays available until you start finishing the
+  update.
+- **Finishing is the only one-way step.** Finishing takes access through the
+  previous provider away. LangWatch refuses to finish while any condition on
+  the page is still outstanding, so your organization always keeps a way in.
+  It never waits for members: each one moves across at their next sign-in.
+- **Data, roles and teams are untouched.** Members keep their accounts, role
+  assignments and history. The update changes how they sign in, not who they
+  are.
+
+## Before you start
+
+- You need to be an organization administrator, or hold the `sso:manage`
+  permission. Someone who can only view single sign-on sees the status of the
+  update, but no form.
+- Your organization must be on an Enterprise plan. Otherwise the page tells
+  you the plan is what refuses, not a generic error.
+- You need access to your identity provider's admin console to create an
+  application for LangWatch. The page tells you which addresses to give it.
+- Pick a colleague who has set a password on their LangWatch account. Before
+  the update can finish, at least one person must be able to sign in without
+  your identity provider.
+- If directory sync (SCIM) provisions your people today, it keeps working for
+  you. It moves to the new connection when you finish. See [Directory
+  sync](#directory-sync).
+
+## 1. Open the Authentication overview
+
+Open **Settings > Authentication**. When LangWatch set your single sign-on up,
+the **Single sign-on** card says so and offers **Update single sign-on**.
+Nobody else in your organization sees this action.
+
+<Frame>
+  <img src="/images/access/sso-update-overview-light.png" alt="The Authentication overview. The single sign-on card says LangWatch set it up and offers Update single sign-on." className="block dark:hidden" />
+  <img src="/images/access/sso-update-overview-dark.png" alt="The Authentication overview. The single sign-on card says LangWatch set it up and offers Update single sign-on." className="hidden dark:block" />
+</Frame>
+
+Select the action, or open **Settings > Authentication > Identity provider**
+directly.
+
+## 2. Register your identity provider
+
+The **Single sign-on** page confirms that single sign-on is active and shows
+which provider signs your people in today. Below it, **Update single sign-on**
+repeats the promises above, then asks for the same details as a first-time
+setup.
+
+<Frame>
+  <img src="/images/access/sso-update-start-light.png" alt="The Single sign-on page for an organization whose sign-in LangWatch set up. Single sign-on is active and Update single sign-on is the next step." className="block dark:hidden" />
+  <img src="/images/access/sso-update-start-dark.png" alt="The Single sign-on page for an organization whose sign-in LangWatch set up. Single sign-on is active and Update single sign-on is the next step." className="hidden dark:block" />
+</Frame>
+
+<Frame>
+  <img src="/images/access/sso-update-register-light.png" alt="The Update single sign-on form with Okta selected, showing the redirect address to give the identity provider." className="block dark:hidden" />
+  <img src="/images/access/sso-update-register-dark.png" alt="The Update single sign-on form with Okta selected, showing the redirect address to give the identity provider." className="hidden dark:block" />
+</Frame>
+
+1. Under **Who signs your team in?**, pick your provider. If it is not listed,
+   pick **OpenID Connect** or **SAML** by protocol.
+2. **Give it our addresses.** Create an application for LangWatch in your
+   identity provider and paste the addresses the page shows when it asks for
+   them. The table below says where that screen lives in the common providers.
+3. **Then bring back what it gives you.** Choose how you will connect: a
+   client id and secret (OpenID Connect), or a metadata file, sign-in address
+   and signing certificate (SAML). Either works. Fill the fields in with the
+   values your provider's application shows.
+4. Give the connection a name your administrators will recognize, for example
+   the provider's name, and select **Register**.
+
+If your provider refuses the details, the reason is shown with the fields you
+filled in. Correct them and register again.
+
+Once registered, the page confirms **Replacement registered** and reminds you
+that your current sign-in keeps working until you switch everyone over.
+
+### Where to find the equivalent screens
+
+| Provider | Create the application under | What to bring back |
+| --- | --- | --- |
+| Okta | Applications → Create App Integration (OIDC - Web Application, or SAML 2.0) | Issuer address (your Okta domain), client id, client secret; or the SAML metadata |
+| Microsoft Entra ID | Enterprise applications → New application → Create your own application | Issuer address (`https://login.microsoftonline.com/<tenant-id>/v2.0`), application (client) id, client secret from **Certificates & secrets**; or the federation metadata |
+| Google Workspace | Admin console → Apps → Web and mobile apps → Add app | For OpenID Connect, a client id and secret from Google Cloud **Credentials**; for SAML, the metadata download |
+| OneLogin | Applications → Add App | Issuer address, client id, client secret; or the SAML metadata |
+| JumpCloud | SSO Applications → Add New Application | Issuer address, client id, client secret; or the SAML metadata |
+| Keycloak | Clients → Create client | Issuer address (`https://<host>/realms/<realm>`), client id, client secret |
+
+Any other provider that speaks OpenID Connect or SAML works with the protocol
+tiles.
+
+## 3. Set the new connection up
+
+The page now shows the setup steps for the new connection and, above them, an
+**Update** status. It reads **Setting up** until the connection is ready to
+test, and the **Signing people in** row still names your previous provider.
+
+<Frame>
+  <img src="/images/access/sso-update-setting-up-light.png" alt="The update status reads Setting up. The previous provider still signs people in, and the outstanding conditions are listed." className="block dark:hidden" />
+  <img src="/images/access/sso-update-setting-up-dark.png" alt="The update status reads Setting up. The previous provider still signs people in, and the outstanding conditions are listed." className="hidden dark:block" />
+</Frame>
+
+Work through the steps the same way as a first-time setup, described in
+[Single sign-on and provisioning](/platform/sso#set-up-the-identity-provider):
+
+1. **Prove a domain is yours.** Add the domain your people sign in with and
+   complete the DNS or file check.
+2. **Sign in through it once.** Complete a test sign-in through the new
+   connection. This replaces your current browser session on purpose; the
+   completion screen explains how to get back.
+3. **Name someone who can still get in.** Choose the administrator who keeps a
+   password route if the provider is unavailable.
+4. **Say who it lets in.** Choose the arrival policy for the new connection and
+   confirm it.
+5. **Turn it on.** Select **Go live**. This makes the new connection available
+   to switch to. It does not move anybody yet.
+
+<Frame>
+  <img src="/images/access/sso-update-ready-to-go-live-light.png" alt="The setup steps for the new connection are complete and Go live is offered." className="block dark:hidden" />
+  <img src="/images/access/sso-update-ready-to-go-live-dark.png" alt="The setup steps for the new connection are complete and Go live is offered." className="hidden dark:block" />
+</Frame>
+
+## 4. Switch sign-in over
+
+When the new connection is on and a test sign-in through it has worked, the
+update offers **Switch sign-in over**. Select it. From that moment every
+sign-in from your verified domains goes through your identity provider, and
+the status reads **Switched over**.
+
+<Frame>
+  <img src="/images/access/sso-update-switched-over-light.png" alt="The update status reads Switched over. The new connection signs people in, and Switch back is offered next to Finish the update." className="block dark:hidden" />
+  <img src="/images/access/sso-update-switched-over-dark.png" alt="The update status reads Switched over. The new connection signs people in, and Switch back is offered next to Finish the update." className="hidden dark:block" />
+</Frame>
+
+The **Authentication** overview reflects the switch too: its single sign-on
+card shows where the update stands and offers **Test sign-in** through the new
+connection.
+
+<Frame>
+  <img src="/images/access/sso-update-overview-switched-light.png" alt="The Authentication overview after switching over, with the update status on the single sign-on card." className="block dark:hidden" />
+  <img src="/images/access/sso-update-overview-switched-dark.png" alt="The Authentication overview after switching over, with the update status on the single sign-on card." className="hidden dark:block" />
+</Frame>
+
+Members do not need to do anything, and you do not need to wait for them.
+The next time each person signs in, they arrive through the new connection and
+are matched to their existing account by their email address, on any domain
+you proved, whether or not they ever confirmed that address. That works before
+and after you finish, including for someone who only ever signed in through
+the previous provider.
+
+The **Members moved across** row counts who has signed in through the new connection, and how many
+more will be moved across at their next sign-in.
+
+Under **Not moved across yet**, each remaining member is listed with whether
+the new connection will recognize them. None of these stops you finishing:
+
+| Beside a member | What to do |
+| --- | --- |
+| Moves across at their next sign-in | No action needed. |
+| Will not be recognized: their account has no email address | Contact support if they still need access. |
+| Will not be recognized: another account has the same address | Contact support if they still need access. |
+| Will not be recognized: their address is not on a domain you proved | Prove that domain on the new connection, or they will need support to sign in after the update. |
+
+If something is wrong, **Switch back to _your previous provider_** returns
+everybody to it immediately. You can switch back and forth until you start
+finishing.
+
+## 5. Clear what is outstanding
+
+Finishing the update is refused until every condition below is true. Under
+**Before you can finish**, the page lists only the ones still outstanding,
+each with what to do about it. Once they are all met it reads **Every check
+has passed**.
+
+<Frame>
+  <img src="/images/access/sso-update-ready-to-finish-light.png" alt="Every check has passed, and Finish the update is available." className="block dark:hidden" />
+  <img src="/images/access/sso-update-ready-to-finish-dark.png" alt="Every check has passed, and Finish the update is available." className="hidden dark:block" />
+</Frame>
+
+| Condition | What to do |
+| --- | --- |
+| Your people sign in through the new connection | Switch sign-in over, as above. |
+| A sign-in through the new connection has worked | Complete the test sign-in step, or sign in through it yourself once. |
+| The new connection is on | Turn it on in the setup steps. |
+| The new connection holds a current proof of your domain | Prove the domain again if the proof lapsed. |
+| Somebody can still sign in without your identity provider, with a password set | Name a recovery administrator who has set a password. A password can only be set while somebody is still signed in, so do this before finishing. |
+| Two days have passed since switching over, and seven since anybody last signed in through the previous provider | Wait. The page shows the time you can finish from. A sign-in through the previous provider after the switch moves that to seven days after the sign-in, and switching back starts the two days again. |
+| No account is shared with another organization, and no account is covered by another organization's provider | Contact support. These are cases LangWatch cannot resolve safely on its own. |
+
+### Directory sync
+
+If your identity provider pushes people into LangWatch through SCIM today,
+that sync was set up together with your sign-in, and you never held its token.
+So the update does not ask you to touch it. The **Directory sync** row reads
+**Moves across when you finish** while the update is in progress, and
+**Ready** once it has finished.
+
+Finishing moves the sync to the new connection: the token your identity
+provider already presents keeps working, the people and groups it provisioned
+stay provisioned, and the next push lands on the new connection. Nobody is
+deprovisioned by the switch.
+
+People the sync provisioned who have never signed in do not hold the update
+either. The new connection recognizes them by their address like everyone
+else, and the page lists each of them the same way it lists any other
+member.
+
+If you had already issued a token for the new connection yourself under
+**Settings > Authentication > Connectors**, both tokens work after finishing.
+You can revoke the one you no longer use there.
+
+## 6. Finish the update
+
+When every check has passed, select **Finish the update**. The status reads
+**Finishing** while access through the previous provider is taken away, then
+**Complete**: your new connection is the only way your people sign in.
+
+<Frame>
+  <img src="/images/access/sso-update-finished-light.png" alt="The update status reads Complete. Everyone signs in through the new connection and the previous provider signs nobody in." className="block dark:hidden" />
+  <img src="/images/access/sso-update-finished-dark.png" alt="The update status reads Complete. Everyone signs in through the new connection and the previous provider signs nobody in." className="hidden dark:block" />
+</Frame>
+
+Finishing is not reversible. Switching back is no longer offered once it
+starts. If a check fails part-way, the page says which one and offers **Try
+finishing again**.
+
+After it completes you can remove the LangWatch application from your previous
+identity provider's console if one existed there. Keep the recovery
+administrator's password route available; it remains the way back in if your
+provider is ever unavailable.
+
+## If you get stuck
+
+- **You see the status but no form.** You hold `sso:view` but not `sso:manage`.
+  Ask an organization administrator to do the update.
+- **Registering is refused because of the plan.** The organization is not on
+  an Enterprise plan. Contact us to change plan.
+- **A member is asked to sign in through single sign-on and cannot.** Until the
+  update finishes they can still sign in the way they did before. Once it has
+  finished, they sign in through your identity provider; if they have been
+  removed from it, they need to be added there first.
+- **Finishing is refused for a reason you cannot resolve.** Shared accounts and
+  accounts covered by another organization's provider need a hand from us.
+  Contact support with your organization name.
 
 ---
 
@@ -19763,6 +20035,10 @@ keywords: litellm, instrumentation, autotrack, langwatch, python, tracing
 
 LangWatch integrates with LiteLLM to capture detailed information about your LLM calls across multiple providers through a unified interface.
 
+<Info>
+This page covers the LiteLLM Python SDK inside your own code. To trace everything that goes through a LiteLLM Proxy (gateway) instead, see [LiteLLM Proxy](/integration/litellm-proxy).
+</Info>
+
 ## Installation
 
 <CodeGroup>
@@ -32762,6 +33038,12 @@ In TypeScript the handler receives one object, `{ messages, newMessages, threadI
 
 The function returns a string, one message, a list of messages, or a reply with a session value: `langwatch.AgentReply(output, session=...)` in Python, `{ output, session }` in TypeScript.
 
+### Attachments
+
+A connected agent column in the experiments workbench has an optional **attachment** input beside **input**. Map a dataset `image` or `file` column to it. See [Images and files in datasets](/datasets/dataset-images).
+
+The last user message then carries content parts instead of plain text. It holds the text of the turn, plus an `image_url` part for a picture, an `input_audio` part for a recording, or a `file` part with the file name and the file data in base64.
+
 ## Run parameters
 
 A run parameter is a value a run supplies, so one scenario covers several conditions: a model, a plan, a tenant, a fixture. The agent declares the parameters it accepts, and the platform offers them in the run dialog, in `--param` and in the API.
@@ -35741,301 +36023,109 @@ Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenar
 
 ---
 
-# FILE: ./agent-testing/voice-agents-in-app.mdx
-
----
-title: Voice Agents in the App
-sidebarTitle: Voice Agents (App)
-keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, conversational ai, feature flag
-description: "Test an ElevenLabs Conversational AI agent from the LangWatch app: talk to it, call it from a run, or run scenarios with a simulated caller."
----
-
-<Note>
-  Testing another transport (Pipecat, OpenAI Realtime, Gemini Live, Twilio) from code? See [Voice Agent Testing](/agent-testing/voice-agents).
-</Note>
-
-## What it is
-
-A **Voice** agent type in **Agents** points at an ElevenLabs Conversational AI agent by its agent id. Three ways to test it:
-
-| Way | Where | Caller |
-|---|---|---|
-| **Talk to it** | The agent drawer | You, from the browser |
-| **Call it myself** | The Run dialog, on a scenario against a voice target | You, from the browser |
-| **Run a scenario** | Normal scenario run | A simulated caller, speaking the scenario with a caller voice |
-
-<Note>
-  **Talk to it** works before the agent is saved, as soon as the agent id and the ElevenLabs key exist. The agent is saved on hang-up. The panel then shows the transcript and, when the recording is ready, a Play control. The call is not stored as a run; instead each exchange is recorded as a trace, so the conversation stays queryable in the Trace Explorer without a run.
-
-  To score a call against a scenario, use **Call it myself**. That writes a run under the scenario, scored the same way a simulated run is.
-</Note>
-
-**Call it myself** opens the same panel from the Run dialog of a scenario, in scenario mode. The run is named after the scenario.
-
-A normal scenario run needs no manual call: the simulated caller speaks the scenario using the caller voice configured on it.
-
-**Phone number targets** dial the agent over the phone. A scenario run places an outbound call to the target number through your Twilio account, and the simulated caller speaks to whoever answers.
-
-The Phone number option appears in the agent drawer once your project has a Twilio provider in **Settings > Model Providers** (account SID, auth token and from-number); until then the drawer points you there. A phone target supports **Run a scenario** only. **Talk to it** and **Call it myself** are not available for it, because a phone call has no browser leg. See [issue #8014](https://github.com/langwatch/langwatch/issues/8014).
-
-On a self-hosted deployment, set `VOICE_PUBLIC_BASE_URL` only when the voice worker has its own hostname; when it is unset the app's own public base host is used. Set `VOICE_WS_PORT` to pin the port the phone transport listens on, so your public origin can route to it; it defaults to an ephemeral port.
-
-## Turn it on
-
-In-app voice agents are in private beta. The feature sits behind the product flag `release_voice_agents_enabled`, off by default. To request access, reach out to support at support@langwatch.ai.
-
-
-  ### Self-hosted
-
-    Set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app.
-
-  ### Cloud
-
-    Ask LangWatch to enable it for your organization.
-
-
-
-<Warning>
-  With the flag off, the Voice agent type, **Talk to it**, **Call it myself** and the Caller voice controls are hidden, and the server refuses voice agents and voice runs.
-</Warning>
-
-## Credentials
-
-Add both under **Settings > Model Providers**. Never from environment variables.
-
-<Steps>
-  <Step title="ElevenLabs key">
-    The key needs `convai_read` to read the agent, `convai_write` to mint the browser conversation token and signed URL, and conversation read to fetch the transcript and recording after the call.
-
-    <Warning>
-      Without `convai_write`, every call fails at start with "ElevenLabs rejected the connection: The API key you used is missing the permission convai_write to execute this operation."
-    </Warning>
-
-    The agent must live in the same ElevenLabs workspace as the key. A wrong workspace shows as agent not found.
-  </Step>
-  <Step title="OpenAI key">
-    Required only for a simulated scenario run. The simulated caller's speech is synthesized with OpenAI text-to-speech (`gpt-4o-mini-tts`), and the agent's audio is transcribed with OpenAI for the judge. **Talk to it** and **Call it myself** use ElevenLabs only and need no OpenAI key.
-
-    Without it a simulated run fails with "The caller voice needs an OpenAI key. Add one in Settings > Model Providers."
-  </Step>
-</Steps>
-
-See [Model Providers](/platform/model-providers) for how to add and scope a provider.
-
-## Caller voice
-
-Set the caller voice on the scenario, under **Customize scenario**, or in the **Caller voice** block of the Agent Testing case editor. It is stored on the scenario, so every run of it uses the same caller.
-
-| Field | Values |
-|---|---|
-| **Voice** | An OpenAI text-to-speech voice: `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`. Default `nova`. |
-| **Interrupts** | Probability from 0 to 1 that the caller talks over the agent. |
-| **Effects** | None, phone line, or background noise. |
-
-## Limits
-
-Set these as app environment variables.
-
-| Variable | Default | Effect |
-|---|---|---|
-| `VOICE_CALL_MAX_SECONDS` | 300 | A call is cut at the limit. The run is marked "Cut at the call limit" and the judge still scores what was said. |
-| `VOICE_RUNS_MAX_CONCURRENT` | 2 | Per execution process, per project. More voice runs queue instead of failing. Text runs are unaffected. Enforcement is local to each process and not shared across processes or pods, so the effective ceiling on a multi-process deployment is higher than this number. |
-
-`VOICE_CALL_MAX_SECONDS` is enforced by the server and governs a scenario run: the simulated caller, the judge and the recorded transcript all stop at that limit. A **Talk to it** or **Call it myself** call in the browser is bounded by the browser tab instead, up to ElevenLabs' own maximum call length: closing or reloading the tab, or losing the connection, ends the call at whatever point that happens, not at `VOICE_CALL_MAX_SECONDS`.
-
-<Note>
-  **Security**: projects in one organization that share a single ElevenLabs key share that workspace's agents and conversations, since ElevenLabs checks the key, not the project. A project-scoped key is the way to isolate a project's voice agents from the rest of the organization.
-</Note>
-
-## Traps
-
-- The ElevenLabs key needs `convai_read`, `convai_write` and conversation read. A key missing any of these fails at a different step, so check all three when a call breaks.
-- The agent must be in the same ElevenLabs workspace as the key.
-- An agent marked public in ElevenLabs still needs a token here; public access does not skip the credential check.
-- LangWatch never sends prompt overrides. Enabling overrides on the agent has no effect on these calls: the agent's own ElevenLabs prompt is what gets tested.
-- The recording can be unavailable for a short while after hang-up while ElevenLabs processes it. The run shows "Recording unavailable"; reload later.
-- The browser needs HTTPS or localhost and microphone permission. Autoplay policy can keep the agent silent until the page has been clicked.
-- Every call, whether **Talk to it**, **Call it myself** or simulated, consumes ElevenLabs conversation minutes on your account. A simulated run also consumes OpenAI audio tokens.
-- Only one browser call per tab.
-- Self-hosted: voice turns carry audio, and audio is written to stored objects. If the stored-objects path is not writable (or no S3 bucket is configured), every voice message fails to ingest and the run shows "No response" even though the call happened. Check the api log for `EACCES` on the stored-objects directory.
-
-## Troubleshooting
-
-| Message | Cause | Fix |
-|---|---|---|
-| "...missing the permission convai_write..." | The ElevenLabs key lacks `convai_write` | Regenerate the key with `convai_write` |
-| "ElevenLabs rejected the connection: Status code: 401" | Wrong or revoked key | Check the key in Settings > Model Providers |
-| Agent not found | Wrong agent id, or the agent is in a different ElevenLabs workspace than the key | Confirm the agent id and workspace |
-| "The caller voice needs an OpenAI key..." | No OpenAI provider configured | Add an OpenAI provider in Settings > Model Providers |
-| "Recording unavailable" | ElevenLabs is still processing the recording | Reload the run after a short wait |
-| Run marked "Cut at the call limit" | The call reached `VOICE_CALL_MAX_SECONDS` | Raise the limit, or shorten the scenario |
-| Runs sit in queue | `VOICE_RUNS_MAX_CONCURRENT` is reached | Wait for a slot, or raise the limit |
-| "No response" after a call that clearly happened (self-hosted) | Audio could not be written to stored objects, so the voice messages were dropped | Make the stored-objects directory writable by the app user, or configure the S3 bucket |
-
----
-
 # FILE: ./agent-testing/voice-agents.mdx
 
 ---
-title: Voice Agent Testing
+title: Voice Agents
 sidebarTitle: Voice Agents
-keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, openai realtime, twilio, pipecat, audio testing
-description: Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
+keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, twilio, phone, openai realtime, pipecat, gemini live, audio testing, caller voice
+description: Test a voice agent over real audio. A simulated caller talks to your agent, and a judge scores the call against your criteria.
 ---
 
-<Tip>
-  **Fastest path:** run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](https://langwatch.ai/docs/skills/directory). It detects your transport, picks the matching adapter, and wires it to your deployed agent. To do it by hand, follow the steps below.
-</Tip>
+A voice test is a [scenario](/agent-testing/scenarios) played out over audio. A simulated caller speaks to your agent, listens to each reply and answers, turn by turn. A judge then scores the call against your criteria. You write the scenario the same way as for a text agent.
+
+<img src="/images/scenario-voice.webp" alt="A voice scenario: a simulated caller, the agent under test and the judge" width="100%" />
+
+This page gets one voice test running from the platform, against an ElevenLabs agent or a phone number. To test another transport, or to run voice tests in CI, see [Test from code](#test-from-code).
+
+## Before you start
 
 <Note>
-  Prefer no code? You can register an ElevenLabs agent and test it from the app, see [Voice Agents in the App](/agent-testing/voice-agents-in-app).
+  Voice agents are in private beta. On cloud, write to support@langwatch.ai to enable them for your organization. Self-hosted, set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app.
 </Note>
 
-## How a voice test runs
+Add the providers under **Settings > Model Providers**. See [Model Providers](/platform/model-providers).
 
-The user simulator synthesizes a caller, speaks to your agent through its real transport, and reacts to the replies turn after turn. The judge scores the conversation against your criteria, and the run records the audio and a per-segment transcript.
+- **OpenAI**, for every voice test. The simulated caller speaks with OpenAI text-to-speech, and the judge reads an OpenAI transcript of the call.
+- **ElevenLabs**, to test an ElevenLabs agent. The key must be in the same ElevenLabs workspace as the agent, with `convai_read`, `convai_write` and conversation read.
+- **Twilio**, to test a phone number. The call is placed from your Twilio number.
 
-<img src="/images/scenario-voice.webp" alt="Voice Agent Testing" width="100%" />
+## Add your voice agent
 
-## What you can test
+1. Open **Agents** in the sidebar and press **New Agent**.
+2. Pick **Voice Agent** and give it a **Name**.
+3. Under **Reached via**, pick **ElevenLabs agent** and paste the **Agent id** from ElevenLabs. For a phone number, pick **Phone number** and enter it in international format, for example `+14155550123`.
+4. Press **Create Agent**.
+
+LangWatch tests the agent as ElevenLabs has it configured. It does not send prompt overrides.
+
+For an ElevenLabs agent, press **Talk to it** to hear the agent from your browser before you write a scenario. This call is not scored.
+
+## Run a scenario against it
+
+Open **Agent Testing**, create a scenario the way you would for a text agent, and press **Run**. In the run dialog, pick your voice agent as the **Agent to be tested**. See [Test from the platform](/agent-testing/test-from-the-platform) for writing scenarios and the run dialog.
+
+A voice run takes one to two minutes per scenario, because every turn is spoken, then transcribed.
+
+## Read the result
+
+The run shows the same verdict as a text run: each criterion passed or failed, with the judge's reasoning. The conversation drawer adds the recording of the call, with the transcript per turn. See [Results](/agent-testing/results).
+
+## Test from code
+
+The [Scenario](https://langwatch.ai/scenario/) SDK runs voice tests from your own test runner, in Python or TypeScript. It has adapters for ElevenLabs, OpenAI Realtime, Gemini Live, Pipecat and Twilio, and can add background noise and interruptions. With `LANGWATCH_API_KEY` set, each run appears in **Agent Testing** with its recording and transcript.
 
 <CardGroup cols={2}>
-  <Card title="Real-audio, multi-turn calls" icon="phone">
-    A synthesized user actually speaks to your agent and reacts to its replies, turn after turn.
+  <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started/">
+    Install, set up keys and run your first voice scenario.
   </Card>
-  <Card title="Audio effects" icon="waveform-lines">
-    Inject background noise, phone-quality codec degradation, or custom WAV clips to test how the agent handles degraded audio.
+  <Card title="Choose an adapter" icon="plug" href="https://langwatch.ai/scenario/voice/choosing-an-adapter/">
+    Pick the adapter for your transport.
   </Card>
-  <Card title="Interruptions" icon="hand">
-    Script the user barging in mid-reply, with native barge-in or a VAD-driven fallback per adapter.
+  <Card title="Voice recipes" icon="sliders" href="https://langwatch.ai/scenario/voice/recipes/">
+    Audio effects, interruptions, multi-turn calls and observability.
   </Card>
-  <Card title="Latency metrics" icon="gauge-high">
-    Time-to-first-byte and p50/p95 per turn, so you catch a slow agent before a release.
+  <Card title="Troubleshooting" icon="wrench" href="https://langwatch.ai/scenario/voice/troubleshooting/">
+    The failures that come up most often in voice scenarios.
   </Card>
 </CardGroup>
 
-## Adapters per transport
+## Reference
 
-Pick the adapter that matches the transport you deployed:
+<AccordionGroup>
+  <Accordion title="Caller voice">
+    The caller voice is part of the scenario, so every run of it uses the same caller. In the scenario editor, open **Customize scenario**, then **Caller voice**.
 
-| Transport | Adapter |
-| --- | --- |
-| Pipecat / Twilio Media Streams | `PipecatAgentAdapter` |
-| ElevenLabs hosted ConvAI | `ElevenLabsAgentAdapter` |
-| OpenAI Realtime | `OpenAIRealtimeAgentAdapter` |
-| Gemini Live | `GeminiLiveAgentAdapter` |
-| Twilio phone number (PSTN) | `TwilioAgentAdapter` |
-| Text-only agent (no transport yet) | `ComposableVoiceAgent` |
+    | Field | Values |
+    |---|---|
+    | **Voice** | An OpenAI text-to-speech voice. Default `nova`. |
+    | **Interrupts** | How often the caller talks over the agent, from 0% to 100%. |
+    | **Effects** | None, phone line, or background noise. |
+  </Accordion>
+  <Accordion title="Score a call you make yourself">
+    Run a single scenario and, in the run dialog, pick **Call it myself** to talk to an ElevenLabs agent from your browser. The call is saved as a run of the scenario, and the judge scores it like a simulated call.
 
-<Note>
-  Full constructors, the per-adapter [capability matrix](https://langwatch.ai/scenario/voice/capability-matrix), and guidance on [choosing an adapter](https://langwatch.ai/scenario/voice/choosing-an-adapter) are in the Scenario docs.
-</Note>
+    The browser needs HTTPS or localhost and microphone permission.
+  </Accordion>
+  <Accordion title="Limits and cost">
+    A call is cut after 5 minutes. The run is marked "Cut at the call limit", and the judge scores what was said. Each project runs 2 voice calls at a time per worker process, and more voice runs wait in the queue. Self-hosted, change these limits with the voice variables in [Environment Variables](/self-hosting/configuration/environment-variables#voice-agents).
 
-## Get it running
+    Every call uses ElevenLabs conversation minutes, or Twilio minutes for a phone number. A simulated call also uses OpenAI audio tokens.
 
-If you have not used Scenario, start with [Getting Started](/agent-testing/scenarios-in-code) for the basics (API key, your agent's `call()` adapter), then come back for the voice specifics.
-
-<Steps>
-  <Step title="Install Scenario">
-
-      ### Python
-
-        ```bash
-        pip install langwatch-scenario
-        ```
-
-      ### TypeScript
-
-        ```bash
-        npm install @langwatch/scenario
-        ```
-
-
-  </Step>
-  <Step title="Point at your agent, add a voice user and a judge">
-    Swap `BOT_WS_URL` for your running bot (or use the adapter for your transport from the table above). The user simulator speaks with a real voice; the judge scores the call against your criteria.
-
-
-      ### Python
-
-        ```python
-        import scenario
-
-        scenario.configure(default_model="openai/gpt-5-mini")
-
-        BOT_WS_URL = "ws://localhost:8765/stream"  # your deployed bot
-
-        result = await scenario.run(
-            name="billing inquiry",
-            description="An upset customer calls about a duplicate charge.",
-            agents=[
-                scenario.PipecatAgentAdapter(url=BOT_WS_URL),
-                scenario.UserSimulatorAgent(
-                    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",
-                    audio_effects=[scenario.effects.phone_quality()],
-                ),
-                scenario.JudgeAgent(criteria=[
-                    "Acknowledged the frustration before logistics",
-                    "Verified identity before any account action",
-                ]),
-            ],
-            script=[scenario.agent(), scenario.user(), scenario.proceed(turns=5), scenario.judge()],
-        )
-        assert result.success
-        ```
-
-      ### TypeScript
-
-        ```typescript
-        import scenario, { voice } from "@langwatch/scenario";
-
-        const BOT_WS_URL = "ws://localhost:8765/stream"; // your deployed bot
-
-        const result = await scenario.run({
-          name: "billing inquiry",
-          description: "An upset customer calls about a duplicate charge.",
-          agents: [
-            scenario.pipecatAgent({ url: BOT_WS_URL }),
-            scenario.userSimulatorAgent({
-              voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
-              audioEffects: [voice.effects.phoneQuality()],
-            }),
-            scenario.judgeAgent({
-              criteria: [
-                "Acknowledged the frustration before logistics",
-                "Verified identity before any account action",
-              ],
-            }),
-          ],
-          script: [scenario.agent(), scenario.user(), scenario.proceed(5), scenario.judge()],
-        });
-        ```
-
-
-  </Step>
-  <Step title="Run it">
-    Run your usual test command (`pytest` or `vitest`). With `LANGWATCH_API_KEY` set, the run appears under **Agent Testing > Results** with full audio playback and per-segment transcripts, and writes a `recordings/<scenario>/full.wav` to listen back.
-
-    <Tip>Voice scenarios are slower than text: TTS + transport + multi-turn means 30 to 120 seconds per run, so give your test runner a generous timeout.</Tip>
-  </Step>
-</Steps>
-
-## Full documentation
-
-<CardGroup cols={2}>
-  <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started">
-    The complete five-minute walkthrough with a worked example per adapter.
-  </Card>
-  <Card title="Audio effects & interruptions" icon="sliders" href="https://langwatch.ai/scenario/voice/recipes">
-    Background noise, codec degradation, custom WAVs, and barge-in recipes.
-  </Card>
-  <Card title="Capability matrix" icon="table-list" href="https://langwatch.ai/scenario/voice/capability-matrix">
-    Exactly which features each adapter supports.
-  </Card>
-  <Card title="Runnable examples" icon="github" href="https://github.com/langwatch/scenario/tree/main/python/examples/voice">
-    Demos per adapter and use case on GitHub.
-  </Card>
-</CardGroup>
+    Projects that share one ElevenLabs key share that workspace's agents and calls, because ElevenLabs checks the key, not the project. Give each project its own key to keep them apart.
+  </Accordion>
+  <Accordion title="Troubleshooting">
+    | Message | Fix |
+    |---|---|
+    | "...missing the permission convai_write..." | Create an ElevenLabs key with `convai_read`, `convai_write` and conversation read. |
+    | "ElevenLabs rejected the connection" with status 401 | The key is wrong or revoked. Check it in **Settings > Model Providers**. |
+    | Agent not found | Check the agent id, and that the agent is in the same ElevenLabs workspace as the key. |
+    | "The caller voice needs an OpenAI key..." | Add an OpenAI provider in **Settings > Model Providers**. |
+    | "Recording not ready yet" | ElevenLabs is still processing the call. Reload the run after a short wait. |
+    | The agent is silent in the browser | Click the page once, allow the microphone, and use HTTPS or localhost. |
+    | "Cut at the call limit" | Shorten the scenario, or raise the call limit if you self-host. |
+  </Accordion>
+</AccordionGroup>
 
 ---
 
@@ -36083,29 +36173,117 @@ An automation with the **Add to dataset** action appends a row for every trace t
 # FILE: ./datasets/dataset-images.mdx
 
 ---
-title: Images in datasets
-description: Store image URLs in a dataset column of type image (URL), see them as thumbnails in the grid, and pass them to a vision model in an experiment.
+title: Images and files in datasets
+description: Upload a picture or a document into a dataset cell, or enter a URL, and send it to a prompt or an agent in an experiment.
 ---
 
-Set a column's type to `image (URL)` and put the URL of an image in each cell. The grid renders the image as a thumbnail; click it to see it full size. The cell value stays the URL, so editing the cell edits the URL.
+A dataset column of type `image` holds a picture. A column of type `file` holds any other document, for example a PDF, an audio clip, a CSV or a text file. Both column types accept an uploaded file, a public URL or a data URL.
 
-The grid shows a thumbnail when the value is a `data:image/...;base64,` string, a markdown image (`![alt](url)`), or a URL that ends in `.jpeg`, `.jpg`, `.gif`, `.png`, `.webp`, `.svg` or `.bmp`. A URL without an image extension shows a thumbnail only when its path is longer than 30 characters and contains a word such as `image`, `img`, `photo`, `media` or `upload`. Any other value is shown as text, and the experiment still fetches it as an image.
+Set the type in the **New Dataset** drawer, in **Edit columns** on an existing dataset, or in the columns step of a file upload.
+
+## Upload a file into a cell
+
+The dataset editor and the experiments workbench render these two column types the same way. An empty cell shows an **Upload** button and an **or enter URL** link.
+
+Click **Upload** and pick one file. An `image` column offers image files only. A `file` column offers every file type, except the types a browser can run: HTML, SVG and JavaScript. LangWatch refuses those types because it serves the file back from its own address.
+
+A filled `image` cell shows the picture. A filled `file` cell shows a chip with the file name; click the chip to open the file. Hold the pointer over a filled cell to get **Replace** and **Clear**.
 
 <Frame>
-<img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image (URL) column rendered as thumbnails" />
+<img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image column rendered as thumbnails" />
 </Frame>
 
-You set the type in the **New Dataset** drawer, in **Edit columns** on an existing dataset, or in the columns step of a file upload.
+After an upload the cell holds a LangWatch reference:
 
-## How the image reaches the model
+```
+/api/files/{projectId}/{objectId}/{fileName}
+```
 
-A prompt or agent column in the Experiments Workbench fetches the URL on the server and sends the image bytes to the model as image content, so the model sees the picture and not the link. This works for every model provider, whether or not the provider fetches URLs itself. The type of the file comes from the response, so a signed S3 or CDN URL without an extension works too.
+The reference is a plain string, so the SDKs, the CLI and the REST API read and write it like any other cell value.
 
-Audio and PDF URLs in a prompt are delivered the same way: an audio file reaches the model as audio, a PDF as a document.
+## Enter a URL instead
 
-The fetch times out after 30 seconds and a file is limited to 20 MB. A URL that resolves to a private or internal address is refused. When a field is declared as an image and its URL cannot be loaded as an image, the run fails with a message naming the URL and the reason. A link written inside prose is left as text and never fails the run.
+Click **or enter URL**, or double-click the cell, to get the text editor. Type a public URL or a `data:` URL. This is also what an API client writes, so datasets that used image URLs before continue to work with no change.
 
-An evaluator that takes an image passes the URL to its model provider as an `image_url` part without fetching it, so the URL has to be reachable by the provider.
+The grid shows a thumbnail when the value is a `data:image/...;base64,` string, a markdown image (`![alt](url)`), or a URL that ends in `.jpeg`, `.jpg`, `.gif`, `.png`, `.webp`, `.svg` or `.bmp`. A URL without an image extension shows a thumbnail only when its path is longer than 30 characters and contains a word such as `image`, `img`, `photo`, `media` or `upload`. Other values show as text, and the experiment still reads them as an address.
+
+## Limits and permissions
+
+| Limit | Value |
+|---|---|
+| Files per upload | 1 |
+| File size | 20 MB |
+| Fetch timeout for an external URL | 30 seconds |
+| Refused media types | `text/html`, `application/xhtml+xml`, `image/svg+xml`, `application/javascript`, `text/javascript` |
+
+An upload needs the `datasets:manage` permission, the same permission that a dataset row change needs. Reading a stored file needs `datasets:view`. A URL that resolves to a private or internal address is refused.
+
+## What the model receives
+
+A prompt input has one of these types: **Text**, **Image**, **Number**, **Boolean** or **File**. Map an `image` column to an **Image** input, and a `file` column to a **File** input.
+
+LangWatch delivers the file to the model by its media type:
+
+| Media type | What the model gets |
+|---|---|
+| Image | An `image_url` content part |
+| Audio | An `input_audio` content part |
+| Plain text and JSON | The text of the file, with the file name as a heading |
+| Everything else, for example PDF | A `file` content part with the file name and the file data in base64 |
+
+A **File** input that holds an `http(s)` URL is read by LangWatch first, under the same 20 MB and 30-second limits, and is then delivered by its content type. An **Image** input keeps the behavior it had before: LangWatch reads the address and sends the picture bytes, so the model provider does not have to open the link.
+
+Provider support for file content parts is not the same everywhere. A provider that refuses the part fails the cell, and the cell shows the message of the provider.
+
+An evaluator reads an uploaded file as base64 data. An external URL goes to the evaluator's model provider as it is, so that address must be reachable by the provider.
+
+## What agents receive
+
+An agent runs outside LangWatch, so it cannot open a LangWatch reference. When an `image` or a `file` column is mapped to an HTTP agent input, to a connected agent parameter, to a code agent input or to a workflow input, LangWatch reads the file first and sends a base64 data URL:
+
+```
+data:<mediaType>;name=<urlencoded file name>;base64,<data>
+```
+
+An image data URL carries no `name` parameter. A cell that holds an external URL is read the same way, so the agent always gets the bytes and never an address it cannot open.
+
+A connected agent column also has an optional **attachment** input. See [Connect your agent](/agent-testing/connect-your-agent) for how the agent reads it.
+
+## Upload from the REST API
+
+`POST /api/dataset/attachments` stores one file and returns the reference a cell holds. Name the project in the `projectId` query parameter, and send the file as multipart form data in the `file` field. The `datasetId` field is optional and records which dataset owns the file. Authenticate with a project API key or with a session. The route accepts 30 uploads a minute per project.
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/dataset/attachments?projectId=$PROJECT_ID" \
+  -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+  -F "file=@./report.pdf" \
+  -F "datasetId=$DATASET_ID"
+```
+
+The response holds the value to write into the cell:
+
+```json
+{
+  "url": "/api/files/project_abc/obj_123/report.pdf",
+  "name": "report.pdf",
+  "mediaType": "application/pdf",
+  "sizeBytes": 184320
+}
+```
+
+Write the `url` string into the cell, not the whole object. `name`, `mediaType`
+and `sizeBytes` are there for your own bookkeeping; a cell that holds the object
+does not resolve as an attachment.
+
+See [Create Attachments](/api-reference/datasets/create-attachments) for the full reference, and [Programmatic access](/datasets/programmatic-access) to write the value into a row.
+
+## Error codes
+
+| Code | Status | Cause |
+|---|---|---|
+| `dataset_attachment_too_large` | 413 | The file is over 20 MB. Pick a smaller file. |
+| `dataset_attachment_type_refused` | 415 | The media type is one a browser can run. Convert the file or pick another one. |
+| `dataset_attachment_unavailable` | 400 | A run could not read a file the row points at. The message names the file. Upload the file again. |
 
 **Also check:** [Multimodal evaluation](/evaluations/experiments/multimodal-evaluation) for an experiment that scores image outputs.
 
@@ -36187,7 +36365,7 @@ The menu has two entries:
 
 ### Create an empty dataset
 
-In the **New Dataset** drawer, type a **Name**; the slug under it is what the SDKs and the CLI use. Then define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**. The type select on each column offers `string`, `number`, `boolean`, `date`, `list`, `json`, `image (URL)`, `json chat messages (OpenAI format)` and `json spans`.
+In the **New Dataset** drawer, type a **Name**; the slug under it is what the SDKs and the CLI use. Then define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**. The type select on each column offers `string`, `number`, `boolean`, `date`, `list`, `json`, `image`, `file`, `json chat messages (OpenAI format)` and `json spans`.
 
 <Frame>
 <img src="/images/datasets/dataset-new-drawer.png" alt="The New Dataset drawer with the name, its slug, and the default columns with their types" />
@@ -36203,7 +36381,8 @@ Column names must be unique and cannot be `id` or `selected`. Each column has on
 | `date` | A timestamp. |
 | `list` | A list of strings, for example retrieved contexts. |
 | `json` | Any JSON value. |
-| `image (URL)` | The URL of an image. The grid renders it as a thumbnail. See [Images in datasets](/datasets/dataset-images). |
+| `image` | A picture. The cell takes an uploaded file, a URL or a data URL, and the grid renders it as a thumbnail. See [Images and files in datasets](/datasets/dataset-images). |
+| `file` | Any other document, for example a PDF, an audio clip or a CSV. The cell takes an uploaded file, a URL or a data URL. See [Images and files in datasets](/datasets/dataset-images). |
 | `json chat messages (OpenAI format)` | A list of chat messages with `role` and `content`. |
 | `json spans` | The spans of a trace, as JSON. |
 
@@ -42132,7 +42311,7 @@ This covers common multimodal use cases:
 - **Category**: classification evaluation (e.g. "Classify the image as: excellent, good, poor")
 
 **See also:**
-- [Dataset Images](/datasets/dataset-images): Setting up image columns in datasets
+- [Images and files in datasets](/datasets/dataset-images): Setting up image and file columns in datasets
 - [Saved Evaluators](/evaluations/evaluators/saved-evaluators): Reuse evaluators via API
 </Info>
 
@@ -42144,9 +42323,12 @@ Images can be provided in any of these formats:
 |--------|---------|
 | **Image URL** | `https://example.com/photo.png` |
 | **Base64 data URI** | `data:image/png;base64,iVBORw0KGgo...` |
+| **Uploaded file** | `/api/files/{projectId}/{objectId}/{fileName}` |
 | **Markdown image** | `![alt text](https://example.com/photo.png)` |
 
-Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg`, `.bmp`, `.tiff`
+Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.tiff`
+
+SVG is not accepted for an uploaded file: an SVG runs script in the browser, so the upload refuses `image/svg+xml`. A legacy `svg` URL a row already holds is still read as an image address.
 
 <Note>
 Image detection is strict by design, a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
@@ -42158,8 +42340,8 @@ Image detection is strict by design, a field is treated as an image only when th
 
 1. Go to **Experiments**, click **New Experiment**, then **Create Experiment**
 2. Under **Datasets**, click **Add**, then **Create new**
-3. Add columns and set their type to **image (URL)** in the column type select
-4. Paste image URLs or base64 data URIs into the cells. The grid renders them as thumbnails you can click to expand.
+3. Add columns and set their type to **image** in the column type select
+4. Click **Upload** in a cell to send a picture from disk, or click **or enter URL** to type an image URL or a base64 data URI. The grid renders them as thumbnails you can click to expand.
 
 <Frame caption="A dataset with an image column rendered as thumbnails">
   <img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image column showing thumbnails" />
@@ -42465,6 +42647,12 @@ An experiment is a table. Each row is a dataset entry, and each column is a prom
 | Evaluator | An evaluator run directly on the dataset, to test the evaluator against rows with known answers. |
 
 The workbench autosaves. **History** lists the saved versions, and **Restore** writes an old setup forward as a new version.
+
+## Map image and file columns
+
+A dataset column of type `image` or `file` maps to a prompt input of type **Image** or **File**, and to an agent input. A connected agent column also has an optional **attachment** input for the same columns.
+
+A prompt gets the file as an image, an audio or a document content part. A plain text or JSON file is different: LangWatch reads it and sends its text inline, under the file name, rather than as a file content part. An agent gets the file as a base64 data URL, so it never has to open a LangWatch address. See [Images and files in datasets](/datasets/dataset-images).
 
 ## Map evaluator inputs
 
@@ -50526,7 +50714,7 @@ The UI calls the two surfaces **Agent Testing > Scenarios** (the test suites and
 
 ### The flow
 
-Steps 2 and 4 are questions **for the user**. Ask, wait for the answer, and do not guess.
+Steps 2 and 4 are questions **for the user**. Ask them in the same reply that reports the created scenario (its name, its id and, when the target rule below gives you one, the proposed target), so one answer starts the run. Wait for the answer and do not guess.
 
 #### 1. Create the scenario
 
@@ -50545,6 +50733,7 @@ langwatch scenario create "Angry refund request" \
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 - `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
+- When the scenario reproduces a trace or a conversation the user pasted, `--situation` names the identifiers the run needs, the colleague, the order, the ticket, the account, as invented test data rather than the customer's. A situation that leaves a role unnamed ("a colleague") lets the simulated user make an address up, a different one on every run, and the run stops being reproducible. A `[REDACTED]` value is the same case: invent a stand-in instead of asking for the original. An identifier the agent looks up needs a record it can find, so read the agent's fixtures or test data first and add the record in the same change when it is missing; a lookup that always misses proves the miss rather than the behaviour under test. Run parameters still travel in `--param`, never in the situation.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -50593,7 +50782,7 @@ One agent name with two environments is two rows, and they compare the same way:
 
 Show the names (with each agent's type) and let the user choose (**multiple choice**). Every scenario in the run executes against each target, so two targets double the conversations.
 
-Never invent a target and never quietly default to the first row.
+Never invent a target and never quietly default to the first row. When the scenario reproduces a trace and that trace's agent is connected and online, name it as the proposed target in the same reply that reports the created scenario; the user still confirms.
 
 #### 5. Run one scenario
 
@@ -53750,7 +53939,7 @@ The UI calls the two surfaces **Agent Testing > Scenarios** (the test suites and
 
 ### The flow
 
-Steps 2 and 4 are questions **for the user**. Ask, wait for the answer, and do not guess.
+Steps 2 and 4 are questions **for the user**. Ask them in the same reply that reports the created scenario (its name, its id and, when the target rule below gives you one, the proposed target), so one answer starts the run. Wait for the answer and do not guess.
 
 #### 1. Create the scenario
 
@@ -53769,6 +53958,7 @@ langwatch scenario create "Angry refund request" \
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 - `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
+- When the scenario reproduces a trace or a conversation the user pasted, `--situation` names the identifiers the run needs, the colleague, the order, the ticket, the account, as invented test data rather than the customer's. A situation that leaves a role unnamed ("a colleague") lets the simulated user make an address up, a different one on every run, and the run stops being reproducible. A `[REDACTED]` value is the same case: invent a stand-in instead of asking for the original. An identifier the agent looks up needs a record it can find, so read the agent's fixtures or test data first and add the record in the same change when it is missing; a lookup that always misses proves the miss rather than the behaviour under test. Run parameters still travel in `--param`, never in the situation.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -53817,7 +54007,7 @@ One agent name with two environments is two rows, and they compare the same way:
 
 Show the names (with each agent's type) and let the user choose (**multiple choice**). Every scenario in the run executes against each target, so two targets double the conversations.
 
-Never invent a target and never quietly default to the first row.
+Never invent a target and never quietly default to the first row. When the scenario reproduces a trace and that trace's agent is connected and online, name it as the proposed target in the same reply that reports the created scenario; the user still confirms.
 
 #### 5. Run one scenario
 
@@ -54188,9 +54378,13 @@ Each hypothesis becomes real artifacts. Pick the right tool per case:
 
 ### Reproduce failures as scenario tests
 
-Turn real failing traces into scenario tests that fail today and pass once fixed. Fetch the exact inputs with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. Real production inputs beat invented ones.
+Turn real failing traces into scenario tests that fail today and pass once fixed. Read what happened with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. The trace tells you what the conversation did; the scenario reproduces it with test data of your own.
 
-Sanitize before you commit: production traces can carry names, emails, account data, or secrets. Reproduce the STRUCTURE of the failing input (length, language, format, the property that triggers the failure) with the sensitive values replaced by realistic stand-ins, and reference the original as a trace link in the test's comment instead of pasting it. Never commit raw customer content into tests, fixtures, or PR descriptions.
+A scenario is a simulation, so its inputs are test data and never the customer's. Invent every identifier it needs, the names, emails, order, ticket and account ids, and keep only the shape of the original: its length, language, format and the property that triggers the failure. A `[REDACTED]` value is the same case with nothing to recover, so invent a stand-in rather than asking anyone for the original. The real conversation stays in the trace, linked from the test or the scenario description, and raw customer content never reaches a scenario, a test, a fixture or a PR.
+
+Write the invented identifier into the situation instead of leaving a role unnamed. A situation that says "a colleague" leaves the simulated user to make an address up, and it makes up a different one every run, so the run stops being reproducible. Naming the colleague and the address the customer would have typed pins it for every run.
+
+Then make the lookup resolve. When the agent looks one of those identifiers up, its fixtures or test data need a record to find: use an identifier the data already carries, or add the record in the same change. A scenario whose lookup always misses proves the miss rather than the behaviour you are chasing, and it can never go green.
 
 ### Change prompts and code as a reviewable PR
 
@@ -54247,7 +54441,7 @@ After executing:
 - Do NOT propose changes without production evidence behind them; "best practice says so" is not a hypothesis
 - Do NOT skip the explanation; if the user cannot restate why the hypothesis is plausible, you explained it badly
 - Do NOT build all hypotheses at once; execute the agreed ones, show results, then continue
-- Do NOT invent test inputs when real failing traces exist; reproduce their structure, with sensitive values swapped for stand-ins
+- Do NOT copy a customer's identifiers out of a trace into a scenario, a test or a PR; invent stand-ins, name them in the situation, and seed the record the agent looks up
 - Do NOT paste raw customer content from traces into committed tests or PR text; link the trace instead
 - Do NOT merge or push anything yourself; changes ship as PRs the user reviews
 - Do NOT create evaluators or monitors for signals no one will act on; every artifact needs an owner and a purpose
@@ -57460,7 +57654,7 @@ The UI calls the two surfaces **Agent Testing > Scenarios** (the test suites and
 
 ### The flow
 
-Steps 2 and 4 are questions **for the user**. Ask, wait for the answer, and do not guess.
+Steps 2 and 4 are questions **for the user**. Ask them in the same reply that reports the created scenario (its name, its id and, when the target rule below gives you one, the proposed target), so one answer starts the run. Wait for the answer and do not guess.
 
 #### 1. Create the scenario
 
@@ -57479,6 +57673,7 @@ langwatch scenario create "Angry refund request" \
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 - `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
+- When the scenario reproduces a trace or a conversation the user pasted, `--situation` names the identifiers the run needs, the colleague, the order, the ticket, the account, as invented test data rather than the customer's. A situation that leaves a role unnamed ("a colleague") lets the simulated user make an address up, a different one on every run, and the run stops being reproducible. A `[REDACTED]` value is the same case: invent a stand-in instead of asking for the original. An identifier the agent looks up needs a record it can find, so read the agent's fixtures or test data first and add the record in the same change when it is missing; a lookup that always misses proves the miss rather than the behaviour under test. Run parameters still travel in `--param`, never in the situation.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -57527,7 +57722,7 @@ One agent name with two environments is two rows, and they compare the same way:
 
 Show the names (with each agent's type) and let the user choose (**multiple choice**). Every scenario in the run executes against each target, so two targets double the conversations.
 
-Never invent a target and never quietly default to the first row.
+Never invent a target and never quietly default to the first row. When the scenario reproduces a trace and that trace's agent is connected and online, name it as the proposed target in the same reply that reports the created scenario; the user still confirms.
 
 #### 5. Run one scenario
 
@@ -59209,6 +59404,51 @@ Langy excludes its own turns from your production-traffic views by default. Its 
 
 ---
 
+# FILE: ./self-hosting/checkup.mdx
+
+---
+title: Checkup
+description: "Check that a self-hosted install is wired correctly, and see what it sends to LangWatch"
+---
+
+## What the Checkup Page Shows
+
+**Settings > Checkup** lists one row per part of the install. Each row reads **Pass**, **Fail** or **Not checked**. A failed row names the fix and links the page that explains it. Not checked means the check did not run or could not run; it is never counted as a pass.
+
+Organization members can read the page. Running the checks behind the buttons needs permission to manage the organization.
+
+## Sections
+
+| Section | What it checks | When it runs |
+|---------|----------------|--------------|
+| Install | The release, Postgres, ClickHouse, their migrations, Redis and the AI Gateway | When the page opens |
+| LangWatch | The license, the connect host, the daily usage report, and whether the gateway reports this install as its control plane | **Run connection checks** |
+| Integrations | Object storage, email and model providers, plus a write to storage, an SMTP connection and a call to each model provider | Basic rows when the page opens, the rest with **Run integration checks** |
+| Pipelines | Canaries that send one real trace, evaluation, scenario run or Langy turn through the install | **Run canaries** |
+
+Checks that open outbound connections or spend money run only when you press the button for their section.
+
+The scenario canary needs a run plan: enter its id or slug next to **Run canaries**. The Langy canary sends its turn as the administrator who runs the checkup.
+
+The collector and processor canaries send real traces into the organization's first project, so they appear in its trace list and analytics.
+
+## What This Install Sends
+
+The last section shows the exact usage report the install sends to LangWatch once a day, with the switches that shrink it. See [Data and telemetry](/self-hosting/data-and-telemetry) for the full contract and [Usage report dictionary](/self-hosting/usage-report-dictionary) for every field.
+
+## Common Results
+
+| Row | Result | What to do |
+|-----|--------|------------|
+| Reach the connect host | Fail | The install cannot open `connect.langwatch.ai:443`. It needs that only with a license that names hosted services. See [Connect](/self-hosting/connect). |
+| AI Gateway control plane | Fail | The gateway reports a control plane that is not this install. Point `GATEWAY_CONTROL_PLANE_URL` on the gateway at this app and restart it. |
+| Model provider connection | Not checked | No stored key could be tested. The row names the reason for each provider. |
+| Scenarios | Not checked | Enter a run plan id or slug and run the canaries again. |
+
+For errors outside the checkup, see [Troubleshooting](/self-hosting/troubleshooting).
+
+---
+
 # FILE: ./self-hosting/compliance.mdx
 
 ---
@@ -59861,6 +60101,7 @@ When using the Helm chart, you rarely need to set environment variables directly
 |----------|-------------|----------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | Yes | - |
 | `CLICKHOUSE_URL` | ClickHouse HTTP connection string (e.g. `http://user:pass@host:8123/langwatch`) | Yes | - |
+| `CLICKHOUSE_MIGRATE_WAIT_SECONDS` | Seconds the boot migrations wait for ClickHouse to accept connections before failing. `0` fails on the first refused connection | No | `180` |
 | `REDIS_URL` | Redis connection string | Yes | - |
 | `NODE_ENV` | Environment (`production`, `development`) | No | `production` |
 | `BASE_HOST` | Internal base URL for the application | Yes | - |
@@ -59885,6 +60126,7 @@ Never commit secrets to version control. In production, use a secrets manager (A
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
+| `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
 
 ### SSO Provider Variables
 
@@ -60150,6 +60392,18 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 | `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
 | `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | - |
 
+## Voice Agents
+
+`VOICE_CALL_MAX_SECONDS` and `VOICE_RUNS_MAX_CONCURRENT` shape [voice agent](/agent-testing/voice-agents) runs, which need `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled`. The other three act on every worker boot, with the flag on or off: each worker listens on `VOICE_WS_PORT` and, unless `VOICE_PUBLIC_BASE_URL` is set or `VOICE_TUNNEL=false`, opens a cloudflared quick tunnel.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VOICE_CALL_MAX_SECONDS` | Longest a voice call can last, in seconds. A scenario call is cut at this limit and marked "Cut at the call limit". Browser calls (**Talk to it**, **Call it myself**) are cut at the same limit. | `300` |
+| `VOICE_RUNS_MAX_CONCURRENT` | Voice runs at a time, per project, per worker process. More voice runs wait in the queue. Text runs are not affected. | `2` |
+| `VOICE_PUBLIC_BASE_URL` | Public https origin of the voice worker, for Twilio phone calls to reach it. When set, it always wins over the tunnel. | - |
+| `VOICE_TUNNEL` | With `VOICE_PUBLIC_BASE_URL` unset, the worker opens a cloudflared quick tunnel at boot and uses its URL. Set to `false` to turn the tunnel off. With both off, phone runs fail. | on |
+| `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
+
 ## Feature Flags
 
 | Variable | Description | Default |
@@ -60161,12 +60415,12 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DISABLE_USAGE_STATS` | Disable anonymous usage analytics | `false` |
+| `DISABLE_USAGE_STATS` | Stop the daily usage report. See [Data and telemetry](/self-hosting/data-and-telemetry) for what it carries and the two smaller switches | `false` |
 | `METRICS_API_KEY` | API key for metrics collection | - |
 
 ## Langy (optional)
 
-Langy, the automated AI engineer, runs as a separate agent pod that is off by default. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
+Langy, the automated AI engineer, runs as a separate agent pod that the chart deploys by default (`langyagent.chartManaged: true`). It uses a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
 
 <Note>
 See [Langy environment variables](/self-hosting/langy/environment-variables) for the full `LANGY_*` and `GITHUB_LANGY_*` reference, and [Setup](/self-hosting/langy/setup) for the `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
@@ -60979,7 +61233,7 @@ For on-premises deployments with SSO, map email domains to organizations:
 -- Connect to PostgreSQL and run:
 UPDATE "Organization"
 SET "ssoProvider" = 'okta',
-    "ssoEmailDomain" = 'yourcompany.com'
+    "ssoDomain" = 'yourcompany.com'
 WHERE "id" = 'your-org-id';
 ```
 
@@ -60987,16 +61241,13 @@ This ensures users with `@yourcompany.com` emails are automatically associated w
 
 ## Migrating from Email/Password to SSO
 
-1. Enable SSO by setting the provider configuration above
-2. Flag existing email/password users for SSO migration:
+An SSO sign-in joins an existing email/password account only when that account's address is confirmed. Otherwise the sign-in is refused with "Account already exists", because an unconfirmed account may have been registered by somebody else.
 
-```sql
-UPDATE "User"
-SET "pendingSsoSetup" = true
-WHERE "email" LIKE '%@yourcompany.com';
-```
+1. Before you switch the provider, have each email/password user confirm their address: **Settings > Security**, **Send the link again** next to their address, then open the link in the same browser. This needs [outbound email](/self-hosting/configuration/email).
+2. Enable SSO by setting the provider configuration above.
+3. Each confirmed user signs in through SSO and lands on their existing account, with the same data, projects and permissions.
 
-3. When flagged users next sign in via SSO, their accounts are automatically linked
+Setting `"pendingSsoSetup"` on a user only shows them a banner asking them to sign in through SSO. It does not link the account.
 
 <Note>
 Users keep their existing data, projects, and permissions after the SSO migration. The migration only changes their authentication method.
@@ -61097,6 +61348,279 @@ Used for dataset storage and ClickHouse cold storage/backups. See:
 
 ---
 
+# FILE: ./self-hosting/connect.mdx
+
+---
+title: "Connect: hosted services for a self-hosted install"
+description: "Let a licensed install call LangWatch-hosted services over two outbound hosts, metered against your contract and capped from Settings"
+sidebarTitle: Connect
+keywords: connect, hosted services, self-hosted, license sync, activation code, seats, instant evals judge, managed models, metered usage
+---
+
+Connect lets a licensed self-hosted install call two LangWatch-hosted services, the Instant Evals judge and managed models, over outbound connections to two hosts. Everything else keeps running on your own infrastructure.
+
+Your license decides what this install may call. A license that names a hosted service can reach it; a license that names none reaches no hosted service at all, and there is no setting that changes that. An install on an offline license opens no connection to LangWatch, and you can check that against the license itself rather than against a configuration file.
+
+A service your license names is on. An organization admin switches off the ones they do not want in **Settings, Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
+
+<Info>
+**Also check:** [Editions and licensing](/self-hosting/licensing), [Data and telemetry](/self-hosting/data-and-telemetry), [Instant Evals](/features/instant-evals/overview), [Environment variables](/self-hosting/configuration/environment-variables).
+</Info>
+
+## The two hosts
+
+Connect talks to two hosts, split by what the data is, so a network rule can allow one without the other and prove from the firewall that no content leaves.
+
+| Host | What travels | Who sends it |
+|---|---|---|
+| `connect.langwatch.ai` | Metadata only: the license token, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
+| `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
+
+The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
+
+## What leaves the install
+
+Each service states what it sends before you switch it on. Your traces, datasets, saved prompts and your own model provider keys stay on your infrastructure whichever services are on.
+
+| What is on | What this install sends to LangWatch |
+|---|---|
+| Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
+| Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
+| License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
+
+## Activate with a code
+
+A fresh install starts on the open source baseline with no account and no license. To license it, LangWatch issues you an activation code, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default.
+
+1. Open **Settings, License**.
+2. Choose **Enter activation code**, paste the code, and confirm.
+3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names are on at once.
+
+The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+
+The paste and the file upload stay on the License page for an air-gapped install, which receives its license blob from LangWatch and never opens a connection.
+
+## Endpoints and variables
+
+The endpoints default to LangWatch's own hosts, so you name them only when LangWatch gave you different ones. A default install sets none of these.
+
+```yaml
+app:
+  connect:
+    # Every value here is optional. Set none of them and the license decides.
+    gatewayEndpoint: "https://gateway.langwatch.ai"
+    licenseEndpoint: "https://connect.langwatch.ai"
+    # Set this only when you have a reason to name the identity yourself. The
+    # default is minted once into this install's own database and never
+    # rewritten, so it survives restarts, backups and hostname changes.
+    instanceId: ""
+    # The auditor's switch: with it on, the install opens no connection to
+    # LangWatch for any reason, whatever its license says.
+    disabled: false
+```
+
+The chart writes these as environment variables on the app and the workers. Set them directly on any other deployment method:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `LANGWATCH_CONNECT_DISABLED` | off | Switches hosted services, the license sync and the usage report off entirely. With it on, the install builds no client and opens no connection to LangWatch, whatever its license says. It only ever refuses. |
+| `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `https://gateway.langwatch.ai` | Where hosted services are called. |
+| `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `https://connect.langwatch.ai` | Where the activation, the daily license sync and the usage report of a connected install go. |
+| `LANGWATCH_CONNECT_INSTANCE_ID` | a UUID minted into this install's own database | The identity this install presents on both hosts. |
+| `DISABLE_USAGE_STATS` | `false` | Stops the daily usage report and that alone. See [Data and telemetry](/self-hosting/data-and-telemetry). |
+| `SERVICE_VERSION` | the app image tag | The release this install reports. The chart sets it for you. |
+
+Both endpoints must be `https`; plain `http` is accepted for a loopback host only, for a developer running both sides on one machine. Restart the app and the workers after changing any of them.
+
+### Outbound rules
+
+Connect needs two destinations open, both on port 443:
+
+```
+gateway.langwatch.ai:443
+connect.langwatch.ai:443
+```
+
+Behind a forward proxy, set `HTTPS_PROXY` (and `NO_PROXY` for the hosts that skip it) on the app and the worker pods. The install sends its hosted calls and its license sync through the proxy when any of `HTTPS_PROXY`, `HTTP_PROXY` or `NO_PROXY` is set.
+
+**Settings, Checkup** has a button that reaches both hosts from the install and, when one is blocked, names the host and port the rule has to allow.
+
+### The instance id
+
+The instance id is a UUID the install mints into its own database the first time it needs one and never rewrites, so it survives restarts, backups and hostname changes. It carries no organization name. LangWatch binds your license to the first install that presents it.
+
+A second install running a copy of the database presents another id and is refused with `connect_wrong_instance`. If you rebuilt or moved an install on purpose, ask LangWatch to reset the binding, or set `LANGWATCH_CONNECT_INSTANCE_ID` to the old id before the first boot of the new install.
+
+## What an admin sees in Settings, Connect
+
+**Settings, Connect** is on a self-hosted install only, next to **License** and **Checkup**. Every member of the organization can open it; changing a service or the cap needs organization management rights.
+
+| Section | What it shows |
+|---|---|
+| Hosted services | One row per service your license names, switched on, with the sentences naming what leaves the install. A service your license does not include cannot be switched on. |
+| Spend | Spent, cap and remaining, and the day the current period started. A figure reads "Not available" while the spend ledger cannot be read. |
+| Spending cap in USD | The cap you set yourself, between zero and the maximum your contract allows. A higher number is refused and the message names the maximum. |
+| License sync | The last successful sync and any sync failure, from the first one. |
+
+Switching a service on or off takes effect within a minute, with no restart.
+
+## What does the license sync send
+
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its license token, its instance id, the app version it runs, and two seat counts, members and lite members.
+
+LangWatch answers with the current license for this install, signed by the same key pair that signed the one you activated. A renewed or changed license reaches the install this way, and the install applies it through the same validation a pasted key gets.
+
+## Seats
+
+The licensed seat count is a hard cap: the seat past it is refused, on a connected license as on an offline one. To add seats, ask LangWatch. LangWatch changes the seats on your license, invoices the added seats prorated to the end of the term, and the install picks the new license up on the next sync or when an admin presses **Refresh license** on the License page.
+
+Existing members are never locked out by a seat change; only the next invitation past the cap is refused.
+
+## License renewal
+
+A renewed or reissued license reaches the install in the sync answer. There is no key to receive by email and paste, and **Refresh license** fetches it now.
+
+A delivered license that does not verify is not applied. The install keeps the license it has and shows the failure in Settings, Connect.
+
+## Instant Evals through Connect
+
+An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
+
+Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+
+Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
+
+## Managed models
+
+With **Managed models** on, the LangWatch AI Gateway in your install can call a model LangWatch runs by spelling the model with a `langwatch/` prefix:
+
+```bash
+curl https://<your-gateway>/v1/chat/completions \
+  -H "Authorization: Bearer <your virtual key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "langwatch/gpt-5-mini", "messages": [{"role": "user", "content": "hi"}]}'
+```
+
+Your own providers are untouched: a model spelled without the prefix goes to your own credentials as before. Calls to a `langwatch/` model are metered against the same cap as every other hosted service.
+
+## Air-gapped installs and existing licenses
+
+An install whose license names no hosted service opens no connection to LangWatch: no activation, no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
+
+The license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
+
+For an install that must prove the absence rather than derive it, set `app.connect.disabled: true` (or `LANGWATCH_CONNECT_DISABLED=true`). It refuses every hosted call, the license sync and the usage report, whatever the license says.
+
+## Check the wiring
+
+**Settings, Checkup** reports whether the install is correctly wired: the data stores, the license, the last sync, the last usage report, and a button that reaches both LangWatch hosts and names the host and port a rule has to allow. `langwatch doctor` prints the same rows from a terminal.
+
+## Errors an admin can meet
+
+| Code | What it means | What to do |
+|---|---|---|
+| `connect_disabled` | An operator switched Connect off in the deployment configuration. | Remove `app.connect.disabled` (or `LANGWATCH_CONNECT_DISABLED`) and restart. |
+| `connect_unreachable` | The install could not reach LangWatch. | The message names the host and port an outbound rule has to allow. |
+| `connect_license_not_registered` | LangWatch has no record of this license for hosted services. | Contact LangWatch to have hosted services set up for your license. |
+| `connect_license_revoked` | The license is no longer active. | Contact LangWatch for a new license. |
+| `connect_license_expired` | The term has ended. | Renew the license. |
+| `connect_wrong_instance` | The license is bound to another install. | Ask LangWatch to reset the binding if you rebuilt or moved this install. |
+| `connect_service_not_entitled` | The service is not part of your license. | Contact LangWatch to add it. |
+| `connect_budget_exhausted` | The cap has been reached and hosted calls stop. | An organization admin raises the cap in Settings, Connect, up to the contract maximum. |
+| `license_sync_failed` | The daily sync did not complete. | It runs again in a day, or press Refresh license. Your seats and services are unchanged meanwhile. |
+| `rate_limited` | The license synced as often as LangWatch allows in a day. | Wait and refresh later; the daily sync is unaffected. |
+| `hosted_service_unavailable` | LangWatch did not answer. | No text was judged and no charge was made. Try again in a moment. |
+| `activation_code_*` | The code was refused: unknown, expired, already used, or bound to another install. | The message names which. Ask LangWatch for a new code. |
+
+## How hosted usage is billed
+
+You prepay a usage commit for the term. It is charged at list rates as a line on the annual invoice, next to the seats, and hosted usage draws it down. What is left of the commit expires with the term.
+
+When the commit is spent, hosted calls stop. They keep running past it only when your contract enables overage, which carries a maximum you agreed, prefilled at a quarter of the commit and changeable by LangWatch. The cap you set in Settings, Connect can be anywhere between zero and that maximum.
+
+Overage is invoiced quarterly in arrears. Seats added mid-term are invoiced when LangWatch changes them, prorated to the end of the term.
+
+For a month with hosted usage, LangWatch emails a statement to your billing contact.
+
+---
+
+# FILE: ./self-hosting/data-and-telemetry.mdx
+
+---
+title: "Data and telemetry: what a self-hosted install sends to LangWatch"
+description: "The two channels a self-hosted install can open to LangWatch, what each one carries, where to read your own copy of the report, and the three switches that stop parts of it or all of it"
+sidebarTitle: Data and telemetry
+keywords: telemetry, usage report, usage statistics, self-hosted, privacy, opt out, DISABLE_USAGE_STATS, license sync, checkup
+---
+
+A self-hosted install sends LangWatch one usage report a day, and a licensed install with hosted services also syncs its license once a day. Both carry counts and metadata. Neither carries a trace, a prompt, a dataset row, an evaluation input or output, a project name, a user name, an email address, an IP address or a key.
+
+You can read the exact report your install sends on **Settings, Checkup**, copy it, and switch parts of it off from the same page. This page says what the two channels are, what each carries, and which switch stops what.
+
+<Info>
+**Also check:** [Usage report dictionary](/self-hosting/usage-report-dictionary), [Connect](/self-hosting/connect), [Environment variables](/self-hosting/configuration/environment-variables).
+</Info>
+
+## The two channels
+
+| Channel | Who sends it | Where it goes | What it carries | How to stop it |
+|---|---|---|---|---|
+| Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
+| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | The license token, the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
+
+The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that. Keeping them apart is what lets both sentences stay true.
+
+Both go out over HTTPS on port 443. Behind a forward proxy, set `HTTPS_PROXY` on the app and the workers and the install sends both through it.
+
+## What the usage report is for
+
+The report tells LangWatch that your install exists, which release it runs, how far it got in setting up, and how much it is used. That is what decides which installation path gets attention, which release an upgrade notice reaches, and who to contact when a version you run has a problem.
+
+The company running the install is reported as email domains with counts, for example `acme.com: 14`. Never an address, never a name. The domain is the one field that says who you are, and it is the first one to switch off if you would rather it did not.
+
+## Read your own copy
+
+Open **Settings, Checkup** and scroll to **What this install sends to LangWatch**. The section shows the report your install would send right now, pretty printed, with a copy button and the host it goes to. What you read there is what leaves the install, not a description of it.
+
+From a terminal, `langwatch doctor` prints the same report after the checkup rows:
+
+```bash
+langwatch doctor
+langwatch doctor --format json
+```
+
+The CLI needs a project API key of the install, either from `langwatch login` or in `LANGWATCH_API_KEY`, with `LANGWATCH_ENDPOINT` pointing at your install.
+
+## The three switches
+
+| Switch | Where | What it stops |
+|---|---|---|
+| `DISABLE_USAGE_STATS=true` | Environment, or `app.telemetry.usage.enabled: false` in the chart | The usage report as a whole. No report leaves the install |
+| Usage counts and onboarding dates | **Settings, Checkup** | The optional category: usage counts, onboarding dates, email domains, model provider names. The report keeps the release, the counts of organizations and projects, and the sign-in method |
+| Hostname | **Settings, Checkup** | The `hostname` field alone. It names your own network, so it has a switch of its own |
+
+`LANGWATCH_CONNECT_DISABLED=true` is a fourth switch, for an audit that has to prove absence rather than derive it from the license. With it set the install builds no client and opens no connection to LangWatch for any reason: no hosted service, no license sync, no usage report.
+
+The switches on the Checkup page are stored in the install's own database, so they hold across restarts, upgrades and every browser. Organization management rights are needed to change them; every member can read the report.
+
+## When the report starts
+
+The first report goes out at the next 12:00 UTC after boot, and one a day after that.
+
+## What is never collected
+
+The dictionary page keeps the exact list. In short: no trace or span content, no prompts, no dataset contents, no evaluation inputs or outputs, no project names, no user names, no email addresses, no IP addresses, no keys of any kind.
+
+## Where it lands
+
+The report lands in a database at LangWatch, one row per install and one per report, where the LangWatch team reads it. LangWatch also sends the report to PostHog for analysis and updates the account's traits in Customer.io, both under a data processing agreement. No other party receives it.
+
+## Existing installs
+
+An install on an offline license, upgraded to a release with this page, behaves as before: the same seat cap, the same screens, the same license check with no network on the path, and the usage report going where it always went. The report gains fields with the release, and the switches above are how to trim it.
+
+---
+
 # FILE: ./self-hosting/deployment/argocd.mdx
 
 ---
@@ -61159,7 +61683,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.17.0
+    targetRevision: 3.18.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -61208,7 +61732,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.17.0
+      targetRevision: 3.18.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -61573,7 +62097,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.17.0
+VERSION=3.18.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -61589,13 +62113,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.17.0"
+    tag: "3.18.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.17.0"
+    tag: "3.18.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.17.0"
+    tag: "3.18.0" # x-release-please-version
 
 imagePullSecrets:
   - name: registry-credentials
@@ -61654,19 +62178,36 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 `autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
 </Warning>
 
+### Operator access and feature flags
+
+The Ops pages (`/ops`) are open only to the operators listed in `ADMIN_EMAILS`. No account has them on a new install. Add your email and upgrade:
+
+```yaml
+app:
+  extraEnvs:
+    - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
+workers:
+  extraEnvs:
+    - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
+```
+
+Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Custom LangWatchQL charts on dashboards need both `release_lwql_workbench` and `release_custom_chart_playground`. The Query API (`POST /api/v1/query`) works without either.
+
 ## Low-Resources Deployment
 
 The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
 
 ```bash
-curl -sLO https://raw.githubusercontent.com/langwatch/langwatch/main/charts/langwatch/examples/overlays/size-dev.yaml
+helm pull langwatch/langwatch --untar
 
-helm install langwatch langwatch/langwatch \
+helm install langwatch ./langwatch \
   --namespace langwatch --create-namespace \
   --set autogen.enabled=true \
-  -f size-dev.yaml \
+  -f langwatch/examples/overlays/size-dev.yaml \
   --wait --timeout 10m
 ```
+
+The overlay comes from the chart you pulled, so it always matches the chart version you install.
 
 This configures smaller resource limits, single replicas, and disables evaluator preloading to reduce memory usage. Suitable for development, demos, and small teams.
 
@@ -61922,10 +62463,10 @@ The chart ships with composable overlay files in `examples/overlays/`. Combine t
 
 | Overlay | Use Case | Approx Resources (requests) |
 |---------|----------|-----------------|
-| _(default, no overlay)_ | Quick start, small production | ~6 CPU, ~18 Gi |
-| `size-dev.yaml` | Local dev, small teams | ~2 CPU, ~4 Gi |
-| `size-prod.yaml` | Production, single-node CH | ~12 CPU, ~28 Gi |
-| `size-ha.yaml` | HA production, replicated CH | ~25 CPU, ~70 Gi |
+| _(default, no overlay)_ | Quick start, small production | ~5 CPU, ~17 Gi |
+| `size-dev.yaml` | Local dev, small teams | ~2.6 CPU, ~6.7 Gi |
+| `size-prod.yaml` | Production, single-node CH | ~8.7 CPU, ~23 Gi |
+| `size-ha.yaml` | HA production, replicated CH | ~23 CPU, ~85 Gi |
 
 ### Access Overlays
 
@@ -62008,20 +62549,20 @@ clickhouse:
 
 You only need to set these two values, the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
-### AI Gateway sub-chart (optional)
+### AI Gateway sub-chart
 
-The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
+The umbrella chart bundles the AI Gateway as a sub-chart that runs alongside the core LangWatch app, and installs it by default. It gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching, all governed by the same control plane.
 
-Minimum viable opt-in:
+To run without it:
 
 ```yaml
 gateway:
-  enabled: true
+  chartManaged: false
 ```
 
-That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
-Three things to know before flipping it on:
+Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
@@ -62071,6 +62612,18 @@ cronjobs:
     annotations:
       sidecar.istio.io/inject: "false"
 ```
+
+### Two installs in one cluster
+
+The bundled Prometheus creates a cluster-scoped ClusterRole named `<release>-prometheus-server`. A second install with the same release name in another namespace, for example a staging `langwatch` beside a production `langwatch`, fails with `ClusterRole "langwatch-prometheus-server" ... exists and cannot be imported into the current release`. Give the second install its own ClusterRole name, or use a different release name:
+
+```yaml
+prometheus:
+  server:
+    clusterRoleNameOverride: langwatch-staging-prometheus-server
+```
+
+Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
 
 ### Custom StorageClass
 
@@ -63043,7 +63596,7 @@ If your threat model requires that a compromised worker cannot reach an arbitrar
 
 ---
 title: Self-Hosting Langy
-description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
+description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the optional gVisor sandbox.
 sidebarTitle: Overview
 keywords:
   - self-host langy
@@ -63054,11 +63607,11 @@ keywords:
 
 Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, and ships **enabled**: a plain `helm install` deploys it, materialises the shared secret, wires the app and workers to it, and opens Langy to everyone in the install.
 
-The default pins the pod to a `gvisor` RuntimeClass. On a cluster without one, only the agent pod waits (Pending) while the rest of the install runs; provide a sandboxed runtime or accept running without one. See [Setup](/self-hosting/langy/setup).
+By default the pod runs on the node's normal container runtime, so it starts on any cluster. To isolate it from the host, pin it to a sandboxed RuntimeClass such as `gvisor`. See [Setup](/self-hosting/langy/setup).
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
-The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [agent worker](/langy/how-langy-works) per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
+The `langyagent` pod is a single Go "manager" process that spawns one [agent worker](/langy/how-langy-works) per conversation. Workers run on the node's normal runtime by default; set a sandboxed `runtimeClassName` to harden them. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables), [Networking and egress](/self-hosting/langy/networking-and-egress), [The sandbox](/langy/security/sandbox).
@@ -63077,7 +63630,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 | Access | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
 | Replicas | 1 (render-time guard blocks more until conversation-sticky routing exists) |
 | Update strategy | `Recreate`, no HPA. Scale vertically. |
-| Sandbox | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true` |
+| Sandbox | None by default (`runtimeClassName: ""`, `acceptUnsandboxedRuntime: true`); set `runtimeClassName` and `acceptUnsandboxedRuntime: false` to require one |
 | Sizing | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi |
 | Shared secret | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
 | GitHub App | Optional, for bot-authored pull requests |
@@ -63085,10 +63638,10 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 
 ## Hard requirements
 
-- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime, for hardening.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`). The default runs it on the node's normal runtime so the install works on any cluster; for production, pin the pod to a sandboxed RuntimeClass and set `acceptUnsandboxedRuntime: false`. On a cluster without that RuntimeClass, the pod then waits with a `RuntimeClass not found` event. See [The sandbox](/langy/security/sandbox).
   - GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly).
   - On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works.
-  - EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`.
+  - EKS has no managed option: install gVisor on a node group ([Setup](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group)).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -63104,7 +63657,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 graph LR
     Browser["Browser<br/>(event-sourced UI)"] -->|"HTTPS"| App["LangWatch App<br/>(control plane)"]
     App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
-    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>agent worker"]
+    Agent -->|"one per conversation"| Worker["agent worker"]
     Worker -->|"langwatch CLI<br/>(per-session key)"| App
     Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
     Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
@@ -63440,7 +63993,8 @@ langyagent:
 
 Langy then stays hidden until you enable `release_langy_enabled`, or add targeting
 rules for specific projects and organizations, from `/ops/feature-flags` in your
-install.
+install. That page is open to the operators listed in `ADMIN_EMAILS`; see
+[operator access](/self-hosting/deployment/kubernetes-helm#operator-access-and-feature-flags).
 
 ## Bringing your own secrets
 
@@ -63510,7 +64064,7 @@ Seats come in two kinds, and which one a person occupies follows from what they 
 </Note>
 
 <Note>
-Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch.
+Volume is bounded by your own hardware, not by us. A self-hosted deployment is not metered and sends no usage back to LangWatch unless its license names a hosted service, in which case [Connect](/self-hosting/connect) meters what that service judges or serves.
 </Note>
 
 ## What an Enterprise license adds
@@ -63525,6 +64079,8 @@ Volume is bounded by your own hardware, not by us. Self-hosted deployments are n
 | **AI Governance** | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode). |
 | **Extended retention** | Multi-class retention policies configured per category. |
 | **Support and SLA** | Named contact, response targets, upgrade guidance. |
+
+A licensed install can also call LangWatch-hosted services, the Instant Evals judge and managed models, over one outbound connection. The license decides which of them this install may call, an organization admin can switch off the ones they do not want, and what you spend is metered and capped on the LangWatch side against your contract. See [Connect](/self-hosting/connect).
 
 The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
@@ -63606,7 +64162,7 @@ The SSO gate is deployment-wide: one genuinely licensed organization enables SSO
 </Accordion>
 
 <Accordion title="Does self-hosted send usage data to LangWatch?">
-No. Self-hosted deployments are not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
+No, unless the license names a hosted service: [Connect](/self-hosting/connect) then meters what that service judges or serves, and the daily license sync reports your seat counts. A license that names none reaches no hosted service and the deployment is not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
 </Accordion>
 </AccordionGroup>
 
@@ -64311,7 +64867,7 @@ Reach the UI with `kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 
 `examples/values-local.yaml` is a different thing and is not the one to start with: it pins every image to a `local` tag with `pullPolicy: Never`, which only resolves on a Kind cluster you have loaded those images into with `make images-local`. On any other cluster the pods sit in `ErrImageNeverPull`. See [Local Kubernetes](/self-hosting/deployment/kubernetes-local) if that is what you want.
 
-Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
+Langy, the AI assistant, is part of this install and runs on the node's normal container runtime. To harden it with a sandboxed runtime on EKS, see [installing gVisor on EKS](/self-hosting/langy/setup#eks-install-gvisor-on-a-node-group).
 </Tip>
 
 <Note>
@@ -64340,7 +64896,7 @@ graph LR
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
 <Note>
-Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional, gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting Langy](/self-hosting/langy/overview).
+Running [Langy](/langy/overview), the automated AI engineer? It ships as an agent pod in the same umbrella chart, on by default; set `langyagent.chartManaged: false` to leave it out. See [Self-hosting Langy](/self-hosting/langy/overview).
 </Note>
 
 ## Deployment Models
@@ -64422,7 +64978,7 @@ Choose the deployment method that fits your environment.
 - **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
 - **Composable Helm chart overlays** let you customize deployments without forking the chart.
 - **Deep OpenTelemetry integration**: ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
-- **AI Gateway sub-chart** (optional), terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
+- **AI Gateway sub-chart**, terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, on by default; turn it off with `gateway.chartManaged=false`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
 
 ## Enterprise
 
@@ -65399,7 +65955,6 @@ helm repo update
 
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.17.0 \
   -f values-production.yaml \
   --wait --timeout 10m
 ```
@@ -65843,10 +66398,12 @@ helm upgrade langwatch langwatch/langwatch \
 helm search repo langwatch/langwatch --versions
 
 # Install a specific chart version
+# x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.17.0 \
+  --version 3.18.0 \
   -f values-production.yaml
+# x-release-please-end
 ```
 
 ## Database Migrations
@@ -65898,6 +66455,24 @@ docker compose up -d
 
 ## Breaking Changes
 
+### 3.16 or 3.17 to 3.18: Sign-in and SSO
+
+The upgrade keeps existing accounts working with no manual step, apart from the cases below. A Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO was tested end to end; the Azure AD account move is covered by tests only:
+
+- Password users sign in with their existing password on the new email-first sign-in page.
+- SSO users land on their existing user and organization. The callback URL stays `/api/auth/callback/<provider>`, so the identity provider registration does not change.
+- Azure AD accounts move to the key the new sign-in looks them up by on each user's first sign-in after the upgrade. There is no SQL to run.
+- Browser sessions and API keys keep working.
+- The identity migrations run on first start. Check **Ops > Migrations** afterwards; see [Check the migration results](#check-the-migration-results).
+
+The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
+
+**Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
+
+**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Migrating from Email/Password to SSO](/self-hosting/configuration/sso) on the SSO page.
+
+**Okta and Auth0.** The id token is now verified: its `iss` must equal the `issuer` in the provider's discovery document. A provider behind a proxy that rewrites one but not the other stops signing people in until the two agree.
+
 ### Dataset Object Storage (Helm)
 
 Datasets moved from PostgreSQL to object storage, with a one-time automatic migration on upgrade. Helm deployments running more than one worker replica with the default local storage must either scale workers to 1 or configure S3-compatible storage before upgrading.
@@ -65943,6 +66518,179 @@ If you encounter issues during an upgrade:
 - Check the [Troubleshooting guide](/self-hosting/troubleshooting)
 - Open an issue at [github.com/langwatch/langwatch/issues](https://github.com/langwatch/langwatch/issues)
 - Contact [support](https://langwatch.ai/support)
+
+---
+
+# FILE: ./self-hosting/usage-report-dictionary.mdx
+
+---
+title: "Usage report dictionary: every field a self-hosted install sends"
+description: "The fields of the daily usage report, their category, their window, why each is collected, and what is never collected. Generated from the dictionary the install reports from."
+sidebarTitle: Usage report dictionary
+keywords: usage report, telemetry, self-hosted, dictionary, fields, opt out, privacy
+---
+
+{/* Generated by `bash docs/scripts/generate-usage-report-dictionary.sh` from */}
+{/* platform/app/src/server/usage-report/dictionary.ts. Do not edit by hand. */}
+
+This page is schema version 3 of the report, and the report carries that number in `report_schema_version`. The dictionary in the code renders this page, so a field on this page is a field the report can carry and a field the report carries is on this page.
+
+Each field has a category, and the category decides what switches it off. The report is one JSON document a day; see [Data and telemetry](/self-hosting/data-and-telemetry) for where it goes and how to read your own copy of it.
+
+<Info>
+**Also check:** [Data and telemetry](/self-hosting/data-and-telemetry), [Connect](/self-hosting/connect), [Environment variables](/self-hosting/configuration/environment-variables).
+</Info>
+
+## Standard fields
+
+The identifiers that travel with every report: which install this is, which release it runs, and when the report was taken.
+
+Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
+
+| Field | Window | Why it is collected | Read from |
+|---|---|---|---|
+| `instance_id` | at the time of the report | Tells one install apart from another, so two reports can be read as one install changing over time rather than two installs. | InstanceIdentity.instanceId |
+| `report_schema_version` | at the time of the report | Says which version of this dictionary produced the report, so a stored report is read back against the list that made it. | USAGE_REPORT_SCHEMA_VERSION |
+| `version` | at the time of the report | The release this install runs, so a bug report can be matched to a build and an upgrade notice can reach the installs that need it. | SERVICE_VERSION |
+| `install_method` | at the time of the report | How this install was deployed, so the installation instructions that are actually used get the attention. | INSTALL_METHOD |
+| `chart_version` | at the time of the report | The Helm chart release, which moves separately from the app and is the other half of a deployment problem. | LANGWATCH_CHART_VERSION |
+| `environment` | at the time of the report | Whether this is a production install or somebody trying it out, so the two are not counted together. | NODE_ENV |
+| `first_seen_at` | at the time of the report | When this install first minted its identity, which is how long it has been running. | InstanceIdentity.createdAt |
+| `timestamp` | at the time of the report | When the report was taken, so a late arrival is not read as current. | the clock at collection |
+
+## Operational fields
+
+What it takes to support this install: how it is divided up, how people sign in, and whether the license names a hosted service.
+
+Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
+
+| Field | Window | Why it is collected | Read from |
+|---|---|---|---|
+| `organizations` | at the time of the report | How many organizations share this install, which decides whether an install is one customer or a platform. | Organization |
+| `teams` | at the time of the report | How the install is divided up, which is what team-level features have to work against. | Team |
+| `projects` | at the time of the report | How many projects the install carries, which is the unit limits and screens are scoped to. | Project |
+| `users` | at the time of the report | How many people use the install, which is what support and seat questions start from. | OrganizationUser |
+| `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER, else the deprecated NEXTAUTH_PROVIDER |
+| `sso_provider` | at the time of the report | The name of the identity provider in use, never its configuration or its secrets, so an SSO problem names the product it is about. | Organization.ssoProvider |
+| `connected` | at the time of the report | Whether this install's license names a hosted service, which decides what it may call and which host answers it. | the signed license |
+
+## Subscription fields
+
+License compliance. These travel on the license channel only, from an install whose license names a hosted service, and never in the usage report.
+
+Not part of the usage report.
+
+No field of this category is in the usage report at this schema version.
+
+## Optional fields
+
+Who runs the install, how far they got, what they do with it and how they run it. This is the part you can switch off on the Checkup page without touching the rest.
+
+Switched off as a whole from **Settings, Checkup**. `hostname` has a switch of its own on the same page.
+
+| Field | Window | Why it is collected | Read from |
+|---|---|---|---|
+| `user_email_domains` | at the time of the report | The company running the install, as domains with counts (acme.com: 14). Never an address, and never a name. It is how we know who to support and who to talk to, and it is the field to switch off first if you would rather we did not. | User.email, the part after the @, counted |
+| `hostname` (own switch) | at the time of the report | The address this install answers on, which tells a support conversation apart from a test. It names your own network, so it has a switch of its own. | BASE_HOST |
+| `first_project_at` | at the time of the report | When the install got its first project, the first rung of getting started. | min(Project.createdAt) |
+| `first_member_at` | at the time of the report | When a second person joined, which is when an install stops being one person trying it out. | the second OrganizationUser.createdAt |
+| `first_dataset_at` | at the time of the report | When the install got its first dataset, which is the rung installs stall on more than any other. | min(Dataset.createdAt) |
+| `first_evaluation_at` | at the time of the report | When the install first ran an evaluation, which is what people come for. | min(BatchEvaluation.createdAt) |
+| `first_monitor_at` | at the time of the report | When the install first set up a monitor, which is when evaluation became continuous rather than a one-off. | min(Monitor.createdAt) |
+| `first_prompt_at` | at the time of the report | When the install first saved a prompt. | min(LlmPromptConfig.createdAt) |
+| `first_workflow_at` | at the time of the report | When the install first built a workflow in the optimization studio. | min(Workflow.createdAt) |
+| `first_model_provider_at` | at the time of the report | When a model provider was first configured, which every evaluation, studio run and Langy turn needs before it can call a model. | min(ModelProvider.createdAt) |
+| `first_annotation_at` | at the time of the report | When somebody first reviewed a trace by hand. | min(Annotation.createdAt) |
+| `first_trigger_at` | at the time of the report | When the install first set up an alert. | min(Trigger.createdAt) |
+| `first_experiment_at` | at the time of the report | When the install first ran an experiment. | min(Experiment.createdAt) |
+| `first_gateway_request_at` | at the time of the report | When the first model call went through the AI gateway, which is when model traffic started being routed rather than only observed. | min(gateway_spend.OccurredAt) |
+| `first_instant_eval_run_at` | at the time of the report | When the install first ran an Instant Eval over its own traces. | min(instant_eval_runs.CreatedAt) |
+| `first_langy_turn_at` | at the time of the report | When somebody first asked Langy a question. | min(LangyConversationTurnProjection.createdAt) |
+| `first_coding_agent_session_at` | at the time of the report | When the first coding agent session was recorded, which is when the install started watching agents rather than only applications. | min(coding_agent_sessions.StartedAt) |
+| `totalTraces` | lifetime | How much the install ingests, which is the one number that says whether it is in production. | trace_summaries, counted per organization and added up |
+| `traces_7d` | last 7 days | How much the install ingests, which is the one number that says whether it is in production. Over the last seven days. | trace_summaries, counted per organization and added up |
+| `traces_28d` | last 28 days | How much the install ingests, which is the one number that says whether it is in production. Over the last twenty-eight days. | trace_summaries, counted per organization and added up |
+| `totalScenarioEvents` | lifetime | How much simulation testing the install does. | simulation_runs, deduplicated by run |
+| `scenario_runs_7d` | last 7 days | How much simulation testing the install does. Over the last seven days. | simulation_runs, deduplicated by run |
+| `scenario_runs_28d` | last 28 days | How much simulation testing the install does. Over the last twenty-eight days. | simulation_runs, deduplicated by run |
+| `annotations` | lifetime | How much reviewing by hand happens, which is the signal that a team is reading its own traces. | Annotation |
+| `annotations_7d` | last 7 days | How much reviewing by hand happens, which is the signal that a team is reading its own traces. Over the last seven days. | Annotation |
+| `annotations_28d` | last 28 days | How much reviewing by hand happens, which is the signal that a team is reading its own traces. Over the last twenty-eight days. | Annotation |
+| `batchEvaluations` | lifetime | How many evaluation runs the install has done. | BatchEvaluation |
+| `batch_evaluations_7d` | last 7 days | How many evaluation runs the install has done. Over the last seven days. | BatchEvaluation |
+| `batch_evaluations_28d` | last 28 days | How many evaluation runs the install has done. Over the last twenty-eight days. | BatchEvaluation |
+| `datasets` | lifetime | How many datasets the install holds. | Dataset |
+| `datasets_7d` | last 7 days | How many datasets the install holds. Over the last seven days. | Dataset |
+| `datasets_28d` | last 28 days | How many datasets the install holds. Over the last twenty-eight days. | Dataset |
+| `datasetRecords` | lifetime | How big those datasets are, which is what dataset performance work is sized against. | DatasetRecord |
+| `dataset_records_7d` | last 7 days | How big those datasets are, which is what dataset performance work is sized against. Over the last seven days. | DatasetRecord |
+| `dataset_records_28d` | last 28 days | How big those datasets are, which is what dataset performance work is sized against. Over the last twenty-eight days. | DatasetRecord |
+| `experiments` | lifetime | How many experiments the install has run. | Experiment |
+| `experiments_7d` | last 7 days | How many experiments the install has run. Over the last seven days. | Experiment |
+| `experiments_28d` | last 28 days | How many experiments the install has run. Over the last twenty-eight days. | Experiment |
+| `prompts` | lifetime | How many prompts the install manages here rather than in its own code. | LlmPromptConfig |
+| `prompts_7d` | last 7 days | How many prompts the install manages here rather than in its own code. Over the last seven days. | LlmPromptConfig |
+| `prompts_28d` | last 28 days | How many prompts the install manages here rather than in its own code. Over the last twenty-eight days. | LlmPromptConfig |
+| `monitors` | lifetime | How many continuous evaluations are configured. | Monitor |
+| `monitors_7d` | last 7 days | How many continuous evaluations are configured. Over the last seven days. | Monitor |
+| `monitors_28d` | last 28 days | How many continuous evaluations are configured. Over the last twenty-eight days. | Monitor |
+| `workflows` | lifetime | How many optimization studio workflows exist. | Workflow |
+| `workflows_7d` | last 7 days | How many optimization studio workflows exist. Over the last seven days. | Workflow |
+| `workflows_28d` | last 28 days | How many optimization studio workflows exist. Over the last twenty-eight days. | Workflow |
+| `triggers` | lifetime | How many alerts are configured. | Trigger |
+| `triggers_7d` | last 7 days | How many alerts are configured. Over the last seven days. | Trigger |
+| `triggers_28d` | last 28 days | How many alerts are configured. Over the last twenty-eight days. | Trigger |
+| `spans` | lifetime | How much telemetry the install holds, in spans, which is what storage and query performance are sized against. Counted as written, so a span re-ingested before its parts merged counts twice. | stored_spans, rows counted per organization and added up |
+| `spans_7d` | last 7 days | How much telemetry the install holds, in spans, which is what storage and query performance are sized against. Counted as written, so a span re-ingested before its parts merged counts twice. Over the last seven days. | stored_spans, rows counted per organization and added up |
+| `spans_28d` | last 28 days | How much telemetry the install holds, in spans, which is what storage and query performance are sized against. Counted as written, so a span re-ingested before its parts merged counts twice. Over the last twenty-eight days. | stored_spans, rows counted per organization and added up |
+| `gateway_requests` | lifetime | How many model calls go through the AI gateway. Counted from the spend ledger, which keeps one row per request for thirteen months, so the lifetime figure covers the last thirteen months. | gateway_spend, rows counted per organization and added up |
+| `gateway_requests_7d` | last 7 days | How many model calls go through the AI gateway. Counted from the spend ledger, which keeps one row per request for thirteen months, so the lifetime figure covers the last thirteen months. Over the last seven days. | gateway_spend, rows counted per organization and added up |
+| `gateway_requests_28d` | last 28 days | How many model calls go through the AI gateway. Counted from the spend ledger, which keeps one row per request for thirteen months, so the lifetime figure covers the last thirteen months. Over the last twenty-eight days. | gateway_spend, rows counted per organization and added up |
+| `gateway_spend_usd` | lifetime | What those model calls cost, in USD, which is the number a budget conversation starts from. Same ledger, same thirteen months. | gateway_spend, CostNanoUSD summed per organization and added up |
+| `gateway_spend_usd_7d` | last 7 days | What those model calls cost, in USD, which is the number a budget conversation starts from. Same ledger, same thirteen months. Over the last seven days. | gateway_spend, CostNanoUSD summed per organization and added up |
+| `gateway_spend_usd_28d` | last 28 days | What those model calls cost, in USD, which is the number a budget conversation starts from. Same ledger, same thirteen months. Over the last twenty-eight days. | gateway_spend, CostNanoUSD summed per organization and added up |
+| `instant_eval_runs` | lifetime | How many Instant Evals the install has run over its own traces. | instant_eval_runs, counted per organization and added up |
+| `instant_eval_runs_7d` | last 7 days | How many Instant Evals the install has run over its own traces. Over the last seven days. | instant_eval_runs, counted per organization and added up |
+| `instant_eval_runs_28d` | last 28 days | How many Instant Evals the install has run over its own traces. Over the last twenty-eight days. | instant_eval_runs, counted per organization and added up |
+| `instant_eval_judgments` | lifetime | How many judgments those runs produced, which is how much of the install's traffic has been judged. | instant_eval_judgments, counted per organization and added up |
+| `instant_eval_judgments_7d` | last 7 days | How many judgments those runs produced, which is how much of the install's traffic has been judged. Over the last seven days. | instant_eval_judgments, counted per organization and added up |
+| `instant_eval_judgments_28d` | last 28 days | How many judgments those runs produced, which is how much of the install's traffic has been judged. Over the last twenty-eight days. | instant_eval_judgments, counted per organization and added up |
+| `langy_turns` | lifetime | How many questions Langy has answered, which says whether the assistant is used or only present. | LangyConversationTurnProjection |
+| `langy_turns_7d` | last 7 days | How many questions Langy has answered, which says whether the assistant is used or only present. Over the last seven days. | LangyConversationTurnProjection |
+| `langy_turns_28d` | last 28 days | How many questions Langy has answered, which says whether the assistant is used or only present. Over the last twenty-eight days. | LangyConversationTurnProjection |
+| `langy_users` | lifetime | How many different people talked to Langy, counted by user so one person with twenty conversations is one person. | LangyConversationProjection.userId, distinct, by last activity |
+| `langy_active_users_7d` | last 7 days | How many different people talked to Langy, counted by user so one person with twenty conversations is one person. Over the last seven days. | LangyConversationProjection.userId, distinct, by last activity |
+| `langy_active_users_28d` | last 28 days | How many different people talked to Langy, counted by user so one person with twenty conversations is one person. Over the last twenty-eight days. | LangyConversationProjection.userId, distinct, by last activity |
+| `coding_agent_sessions` | lifetime | How many coding agent sessions the install has recorded, counted by session so a session folded twice counts once. | coding_agent_sessions, distinct SessionId per organization and added up |
+| `coding_agent_sessions_7d` | last 7 days | How many coding agent sessions the install has recorded, counted by session so a session folded twice counts once. Over the last seven days. | coding_agent_sessions, distinct SessionId per organization and added up |
+| `coding_agent_sessions_28d` | last 28 days | How many coding agent sessions the install has recorded, counted by session so a session folded twice counts once. Over the last twenty-eight days. | coding_agent_sessions, distinct SessionId per organization and added up |
+| `pull_requests` | lifetime | How many pull requests were linked to coding agent sessions, which is the one number that says whether agent work shipped. | GithubPullRequest, by the day the pull request was opened |
+| `pull_requests_7d` | last 7 days | How many pull requests were linked to coding agent sessions, which is the one number that says whether agent work shipped. Over the last seven days. | GithubPullRequest, by the day the pull request was opened |
+| `pull_requests_28d` | last 28 days | How many pull requests were linked to coding agent sessions, which is the one number that says whether agent work shipped. Over the last twenty-eight days. | GithubPullRequest, by the day the pull request was opened |
+| `annotationQueues` | lifetime | How many review queues exist, which says whether reviewing is a workflow or an occasional thing. | AnnotationQueue |
+| `annotationQueueItems` | lifetime | How much has gone through those queues. | AnnotationQueueItem |
+| `annotationScores` | lifetime | How many scores reviewers recorded. | AnnotationScore |
+| `customGraphs` | lifetime | How many charts were built, which says whether the analytics surface is used. | CustomGraph, builder charts only |
+| `active_users_28d` | last 28 days | How many people signed in over four weeks, which is the difference between an install that is running and one that is used. | Session.expires, counted distinct by user |
+| `active_projects_28d` | last 28 days | How many projects saw activity over four weeks, which separates a live project from a folder no one opened. | Project.updatedAt |
+| `model_providers` | at the time of the report | Which model providers are configured, by name only. Never a key, never an endpoint, never a deployment name. | ModelProvider.provider, distinct |
+| `storage_backend` | at the time of the report | Where stored objects go, so a storage problem names the backend it is about. | the resolved storage configuration |
+| `email_configured` | at the time of the report | Whether the install can send email, because an install that cannot send email cannot invite anyone and will look abandoned. | EMAIL_PROVIDER |
+| `gateway_configured` | at the time of the report | Whether the AI gateway is set up, which decides whether model traffic is routed or only observed. | LW_GATEWAY_BASE_URL |
+
+## Never collected
+
+The report carries counts and metadata. It never carries any of these, at any schema version:
+
+- Trace or span content, in any form
+- Prompts, whether saved here or sent through the gateway
+- Dataset contents
+- Evaluation inputs and outputs
+- Project names
+- User names
+- Email addresses (only the domain after the @, counted)
+- IP addresses
+- API keys, model provider keys, or any other credential
 
 ---
 
@@ -66717,6 +67465,15 @@ openapi: "POST /api/dataset/direct-upload/{datasetId}/retry"
 ---
 title: "Upload a file"
 openapi: "POST /api/dataset/{slugOrId}/upload"
+---
+
+---
+
+# FILE: ./api-reference/datasets/create-attachments.mdx
+
+---
+title: "Create Attachments"
+openapi: "POST /api/dataset/attachments"
 ---
 
 ---
@@ -69357,9 +70114,9 @@ Two column families are gated rather than freely selectable: free-text carriers 
 | `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
 | `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
 | `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
-| `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries. | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
-| `metric_series_definitions` | Metric series definitions from OpenTelemetry: name, unit, attributes, kind. | `output` | one row per SeriesId | `LastSeenAt` |
-| `metric_ingestion_usage` | Per-tenant metric ingestion usage estimates. | None | one row per (OrganizationId, PointId), latest version only | `AcceptedAt` |
+| `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
+| `metric_series_definitions` | Metric series definitions from OpenTelemetry: name, unit, attributes, kind | `output` | one row per SeriesId | `LastSeenAt` |
+| `metric_ingestion_usage` | Per-tenant metric ingestion usage estimates | None | one row per (OrganizationId, PointId), latest version only | `AcceptedAt` |
 | `objects` | Stored file objects: what was captured, its size and hash. | None | one row per id | `created_at` |
 | `annotations` | One row per human annotation of a trace, with the reviewer's thumbs verdict. | None | one row per AnnotationId | `CreatedAt` |
 | `langy_conversation_messages` | Langy conversation turns, one row per message. | `output` | one row per (TenantId, ConversationId, MessageId) | `CreatedAt` |
@@ -69391,13 +70148,13 @@ LIMIT 20
 |------|-------------|-------|-------|-------------|
 | `evaluations` | One row per evaluation run, with its score and outcome. | `input`, `output` | one row per (TenantId, EvaluationId), latest version only | `ScheduledAt` |
 | `simulations` | One row per simulation run, with its verdict and criteria. | `input`, `output` | one row per (TenantId, ScenarioRunId), latest version only | `StartedAt` |
-| `simulation_trace_metrics` | Cost and latency metrics per simulated trace. | `costs` | one row per (ScenarioRunId, TraceId) | `OccurredAt` |
+| `simulation_trace_metrics` | Cost and latency metrics per simulated trace | `costs` | one row per (ScenarioRunId, TraceId) | `OccurredAt` |
 | `experiments` | One row per experiment, with its display name and kind. | None | one row per ExperimentId | `CreatedAt` |
-| `experiment_items` | Individual item results within an experiment run with evaluations. | `input`, `output`, `costs` | one row per (RunId, ProjectionId) | `OccurredAt` |
-| `experiment_run_results` | Experiment run results: completion counts, cost, and aggregate scores. | `output`, `costs` | one row per (RunId, ExperimentId) | `StartedAt` |
-| `dspy_optimizer_steps` | DSPy optimizer steps with prompts, examples, and LLM call details. | `output`, `costs` | one row per (ExperimentId, RunId, StepIndex) | `CreatedAt` |
+| `experiment_items` | Individual item results within an experiment run with evaluations | `input`, `output`, `costs` | one row per (RunId, ProjectionId) | `OccurredAt` |
+| `experiment_run_results` | Experiment run results: completion counts, cost, and aggregate scores | `output`, `costs` | one row per (RunId, ExperimentId) | `StartedAt` |
+| `dspy_optimizer_steps` | DSPy optimizer steps with prompts, examples, and LLM call details | `output`, `costs` | one row per (ExperimentId, RunId, StepIndex) | `CreatedAt` |
 | `batch_evaluations` | One row per offline batch evaluation of a dataset row, with its score, outcome and cost. | `costs` | one row per BatchEvaluationId | `CreatedAt` |
-| `test_suite_runs` | Test suite execution results with completion and pass counts. | None | one row per (ScenarioSetId, BatchRunId) | `StartedAt` |
+| `test_suite_runs` | Test suite execution results with completion and pass counts | None | one row per (ScenarioSetId, BatchRunId) | `StartedAt` |
 
 Note: "dataset" above refers to an evaluation dataset (rows a batch evaluation runs over). Everything else queryable through LangWatchQL is a view.
 
@@ -69407,23 +70164,23 @@ Rollup views (`_by_minute`, `_rollups`) return **finalised values only**: figure
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
-| `trace_metrics` | One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with `uniqExact(TraceId)`. | `costs` | one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still | `OccurredAt` |
+| `trace_metrics` | One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with uniqExact(TraceId). | `costs` | one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still | `OccurredAt` |
 | `trace_metrics_by_minute` | Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average. | `costs` | one row per (TenantId, BucketStart), every measure summed | `BucketStart` |
 | `model_usage_by_minute` | Span metrics summed per minute, per model and span type: span counts, costs and tokens. | `costs` | one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed | `BucketStart` |
 | `evaluation_metrics` | One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. | `costs` | one row per (TenantId, EvaluationId), latest version only | `OccurredAt` |
 | `evaluation_metrics_by_minute` | Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount. | `costs` | one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed | `BucketStart` |
 | `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | None | one row per (SeriesId, BucketStart) | `BucketStart` |
-| `session_metrics` | Per-session time-series metrics with aggregate statistics. | None | one row per (SessionId, SeriesId) | `AsOf` |
+| `session_metrics` | Per-session time-series metrics with aggregate statistics | None | one row per (SessionId, SeriesId) | `AsOf` |
 | `simulation_metric_rollups` | Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps. | `costs` | one row per (TenantId, ScenarioRunId, TraceId), latest version only | `OccurredAt` |
 
 #### Gateway & billing
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
-| `gateway_budget_ledger` | Budget ledger entries per request with token counts and spend. | `costs` | one row per (BudgetId, GatewayRequestId) | `OccurredAt` |
+| `gateway_budget_ledger` | Budget ledger entries per request with token counts and spend | `costs` | one row per (BudgetId, GatewayRequestId) | `OccurredAt` |
 | `gateway_budget_totals` | Per-scope budget totals, merged from the aggregating rollup: spend, token counts and request count per budget window. | `costs` | one row per (TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId), latest version only | `PeriodStart` |
-| `gateway_request_spend` | Individual API request spend and reconciliation details. | `costs`, `output` | one row per GatewayRequestId | `OccurredAt` |
-| `billing_events` | Billing events for customer invoice generation. | None | one row per DeduplicationKeyHash | `EventTimestamp` |
+| `gateway_request_spend` | Individual API request spend and reconciliation details | `costs`, `output` | one row per GatewayRequestId | `OccurredAt` |
+| `billing_events` | Billing events for customer invoice generation | None | one row per DeduplicationKeyHash | `EventTimestamp` |
 
 #### Governance & audit
 
@@ -69435,7 +70192,7 @@ Governance views are keyed by the organization's hidden `internal_governance` pr
 | `governance_daily_cost_rollup` | Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs`, `output` | one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId) | `Day` |
 | `governance_hourly_kpis` | Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, SourceId, HourBucket, TraceId) | `HourBucket` |
 | `governance_security_events` | Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `output` | one row per (TenantId, EventId) | `EventTime` |
-| `automation_events` | Audit log of automation trigger executions and actions. | None | one row per EventId | `OccurredAt` |
+| `automation_events` | Audit log of automation trigger executions and actions | None | one row per EventId | `OccurredAt` |
 
 #### Legacy
 
@@ -69443,9 +70200,9 @@ Superseded by the canonical views above; kept for rolling-deployment reads and d
 
 | View | Description | Gates | Grain | Time column |
 |------|-------------|-------|-------|-------------|
-| `legacy_event_log` | Legacy append-only event log, superseded by the canonical fact tables. | `output` | one row per (AggregateType, AggregateId, IdempotencyKey) | `EventOccurredAt` |
-| `legacy_log_records` | Pre-canonical OpenTelemetry log record storage, superseded by `logs`; retained for rolling-deployment reads and draining under its own TTL. | `output` | one row per (TraceId, SpanId, ProjectionId), latest version only | `TimeUnixMs` |
-| `legacy_metric_records` | Pre-canonical OpenTelemetry metric record storage, superseded by the `metric_points` family; retained for rolling-deployment reads and draining under its own TTL. | None | one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only | `TimeUnixMs` |
+| `legacy_event_log` | Legacy append-only event log, superseded by the canonical fact tables | `output` | one row per (AggregateType, AggregateId, IdempotencyKey) | `EventOccurredAt` |
+| `legacy_log_records` | Pre-canonical OpenTelemetry log record storage, superseded by log_records; retained for rolling-deployment reads and draining under its own TTL. | `output` | one row per (TraceId, SpanId, ProjectionId), latest version only | `TimeUnixMs` |
+| `legacy_metric_records` | Pre-canonical OpenTelemetry metric record storage, superseded by the metric_data_points family; retained for rolling-deployment reads and draining under its own TTL. | None | one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only | `TimeUnixMs` |
 
 #### Entities & reference data
 
@@ -69454,6 +70211,94 @@ Superseded by the canonical views above; kept for rolling-deployment reads and d
 | `projects` | The caller's project, with its display name and slug. | None | one row per TenantId | `CreatedAt` |
 | `prompts` | One row per prompt configuration, with the name its versions are known by. | None | one row per PromptId | `CreatedAt` |
 | `prompt_versions` | One row per version of a prompt, carrying the version number a trace records. | None | one row per PromptVersionId | `CreatedAt` |
+
+#### Application tables (PostgreSQL)
+
+Every tenant-scoped table of the application database, derived from the schema. Organization- and team-scoped tables appear once per project the caller can reach. Secret material and person identifiers are never exposed; free-text and JSON bodies are gated on the content permissions.
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `agents` | Rows of the Agent table, one row per AgentId. | `output` | one row per AgentId | `CreatedAt` |
+| `ai_tool_entries` | Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog. | `output` | one row per (TenantId, AiToolEntryId); an organization-scoped row appears once per project | `CreatedAt` |
+| `ai_tool_entry_departments` | Per-department scope binding for AiToolEntry. | None | one row per (TenantId, AiToolEntryDepartmentId); a row reached through its parent appears once per project | None |
+| `ai_tool_entry_teams` | Per-team scope binding for AiToolEntry. | None | one row per (TenantId, AiToolEntryTeamId); a team-scoped row appears once per project | None |
+| `analytics` | Rows of the Analytics table, one row per AnalyticsId. | `output` | one row per AnalyticsId | `CreatedAt` |
+| `annotation_queue_items` | Rows of the AnnotationQueueItem table, one row per AnnotationQueueItemId. | None | one row per AnnotationQueueItemId | `CreatedAt` |
+| `annotation_queue_scores` | Rows of the AnnotationQueueScores table, one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project. | None | one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project | None |
+| `annotation_queues` | Rows of the AnnotationQueue table, one row per AnnotationQueueId. | `output` | one row per AnnotationQueueId | `CreatedAt` |
+| `annotation_scores` | Rows of the AnnotationScore table, one row per AnnotationScoreId. | `output` | one row per AnnotationScoreId | `CreatedAt` |
+| `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project | `TriggerWindowStart` |
+| `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project | `CreatedAt` |
+| `costs` | Rows of the Cost table, one row per CostId. | `costs`, `output` | one row per CostId | `CreatedAt` |
+| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. | `output` | one row per CustomGraphId | `CreatedAt` |
+| `custom_llm_model_costs` | Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId. | `costs`, `output` | one row per CustomLLMModelCostId | `CreatedAt` |
+| `dashboards` | Rows of the Dashboard table, one row per DashboardId. | None | one row per DashboardId | `CreatedAt` |
+| `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `dataset_records` | Rows of the DatasetRecord table, one row per DatasetRecordId. | `output` | one row per DatasetRecordId | `CreatedAt` |
+| `datasets` | Rows of the Dataset table, one row per DatasetId. | `output` | one row per DatasetId | `CreatedAt` |
+| `department_membership_histories` | One dated person → department link. | None | one row per (TenantId, DepartmentMembershipHistoryId); an organization-scoped row appears once per project | `CreatedAt` |
+| `departments` | A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing,...). | None | one row per (TenantId, DepartmentId); an organization-scoped row appears once per project | `CreatedAt` |
+| `discovered_agents` | A non-human actor (a bot, agent or automation) discovered from a connected source, with the provider-native metadata the source published. | `output` | one row per (TenantId, DiscoveredAgentId); an organization-scoped row appears once per project | `CreatedAt` |
+| `discovered_persons` | A name-text seen on a provider's cost or audit rows: "the provider told us someone called m.silva exists". | `output`, `costs` | one row per (TenantId, DiscoveredPersonId); an organization-scoped row appears once per project | `CreatedAt` |
+| `email_suppressions` | Rows of the EmailSuppression table, one row per EmailSuppressionId. | `output` | one row per EmailSuppressionId | `CreatedAt` |
+| `erased_identifier_suppressions` | Hashes of erased identifiers - the do-not-reimport list. | None | one row per (TenantId, ErasedIdentifierSuppressionId); an organization-scoped row appears once per project | `ErasedAt` |
+| `evaluators` | Rows of the Evaluator table, one row per EvaluatorId. | `output` | one row per EvaluatorId | `CreatedAt` |
+| `experiment_versions` | Rows of the ExperimentVersion table, one row per ExperimentVersionId. | `output` | one row per ExperimentVersionId | `CreatedAt` |
+| `gateway_budget_bucket_boundaries` | Rows of the GatewayBudgetBucketBoundary table, one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project. | None | one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project | `CreatedAt` |
+| `gateway_budget_ledgers` | Rows of the GatewayBudgetLedger table, one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project. | `costs` | one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project | `OccurredAt` |
+| `gateway_budgets` | Rows of the GatewayBudget table, one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project. | `output`, `costs` | one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project | `CreatedAt` |
+| `gateway_cache_rules` | Rows of the GatewayCacheRule table, one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project | `CreatedAt` |
+| `gateway_change_events` | Rows of the GatewayChangeEvent table, one row per Revision. | `output` | one row per Revision | `CreatedAt` |
+| `gateway_guardrails` | Rows of the GatewayGuardrail table, one row per GatewayGuardrailId. | `output` | one row per GatewayGuardrailId | `CreatedAt` |
+| `gateway_realtime_sessions` | Rows of the GatewayRealtimeSession table, one row per GatewayRealtimeSessionId. | `output`, `costs` | one row per GatewayRealtimeSessionId | `CreatedAt` |
+| `github_branch_pull_request_checks` | The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again. | `output` | one row per (TenantId, GithubBranchPullRequestCheckId); an organization-scoped row appears once per project | `CreatedAt` |
+| `github_installations` | The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization. | `output`, `costs` | one row per (TenantId, GithubInstallationId); an organization-scoped row appears once per project | `CreatedAt` |
+| `github_pull_requests` | A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced. | `output`, `input` | one row per (TenantId, GithubPullRequestId); an organization-scoped row appears once per project | `CreatedAt` |
+| `governance_tenant_histories` | Every tenant id this organization has ever written governance rows under, appended on first use and never pruned. | None | one row per (TenantId, GovernanceTenantHistoryId); an organization-scoped row appears once per project | `FirstUsedAt` |
+| `identity_match_suggestions` | Match candidates a background job computed and a human has yet to confirm. | None | one row per (TenantId, IdentityMatchSuggestionId); an organization-scoped row appears once per project | `ComputedAt` |
+| `identity_matches` | A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true. | None | one row per (TenantId, IdentityMatchId); an organization-scoped row appears once per project | `CreatedAt` |
+| `ingestion_pull_run_projections` | Rebuildable per-source pull checkpoint and operator-facing run status. | `output` | one row per IngestionPullRunProjectionId | `CreatedAt` |
+| `ingestion_sources` | Per-platform fleet configuration that connects a closed SaaS product's audit / OTel / S3 stream to LangWatch's Activity Monitor. | `output`, `costs` | one row per (TenantId, IngestionSourceId); a team-scoped row appears once per project | `CreatedAt` |
+| `ingestion_templates` | Admin/platform-curated catalog row for upstream OTLP normalization. | `output` | one row per (TenantId, IngestionTemplateId); an organization-scoped row appears once per project | `CreatedAt` |
+| `langy_active_turns` | Postgres-authoritative one-turn admission for a conversation. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyActiveTurnId | `CreatedAt` |
+| `langy_conversation_projections` | Rebuildable operational state folded from Langy's canonical event stream. Shared Langy conversations only; a member's private conversations are not queryable. | `input`, `output` | one row per LangyConversationProjectionId | `CreatedAt` |
+| `langy_conversation_turn_projections` | Rebuildable per-turn operational render document. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyConversationTurnProjectionId | `CreatedAt` |
+| `langy_message_projections` | Rebuildable operational message fact. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyMessageProjectionId | `CreatedAt` |
+| `langy_turn_requests` | Durable idempotency receipt for one logical Langy send. Shared Langy conversations only; a member's private conversations are not queryable. | `output` | one row per LangyTurnRequestId | `CreatedAt` |
+| `model_default_config_scopes` | Rows of the ModelDefaultConfigScope table, one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `model_default_configs` | Rows of the ModelDefaultConfig table, one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project | `CreatedAt` |
+| `model_provider_scopes` | Rows of the ModelProviderScope table, one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `model_providers` | Rows of the ModelProvider table, one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project | `CreatedAt` |
+| `monitors` | Rows of the Monitor table, one row per MonitorId. | `output` | one row per MonitorId | `CreatedAt` |
+| `notifications` | Rows of the Notification table, one row per NotificationId. | `output` | one row per NotificationId | `CreatedAt` |
+| `pinned_traces` | Rows of the PinnedTrace table, one row per PinnedTraceId. | `output` | one row per PinnedTraceId | `CreatedAt` |
+| `process_manager_inboxes` | Idempotency marker for a source event consumed by a process definition. | None | one row per ProcessManagerInboxId | `ConsumedAt` |
+| `process_manager_instances` | Durable state for a long-running event-sourced process. | `output` | one row per ProcessManagerInstanceId | `NextWakeAt` |
+| `process_manager_outbox_attempts` | One row per failed outbox delivery attempt, so the table grows with delivery trouble rather than with traffic. | `output` | one row per ProcessManagerOutboxAttemptId | `OccurredAt` |
+| `process_manager_outboxes` | Transactional intents emitted by a durable process transition. | `output` | one row per ProcessManagerOutboxId | `CreatedAt` |
+| `prompt_tag_assignments` | Rows of the PromptTagAssignment table, one row per PromptTagAssignmentId. | None | one row per PromptTagAssignmentId | `CreatedAt` |
+| `prompt_tags` | Rows of the PromptTag table, one row per (TenantId, PromptTagId); an organization-scoped row appears once per project. | None | one row per (TenantId, PromptTagId); an organization-scoped row appears once per project | `CreatedAt` |
+| `retention_policies` | Rows of the RetentionPolicy table, one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `routing_policies` | Rows of the RoutingPolicy table, one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `routing_policy_scopes` | Rows of the RoutingPolicyScope table, one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `saved_views` | Rows of the SavedView table, one row per SavedViewId. | `output` | one row per SavedViewId | `CreatedAt` |
+| `scenario_versions` | Rows of the ScenarioVersion table, one row per ScenarioVersionId. | `output` | one row per ScenarioVersionId | `CreatedAt` |
+| `scenarios` | Rows of the Scenario table, one row per ScenarioId. | `output` | one row per ScenarioId | `CreatedAt` |
+| `scheduled_jobs` | Rows of the ScheduledJob table, one row per ScheduledJobId. | `output` | one row per ScheduledJobId | `CreatedAt` |
+| `share_links` | Rows of the ShareLink table, one row per ShareLinkId. | None | one row per ShareLinkId | `CreatedAt` |
+| `simulation_suites` | Rows of the SimulationSuite table, one row per SimulationSuiteId. | `output` | one row per SimulationSuiteId | `CreatedAt` |
+| `topic_clustering_run_history_projections` | Per-project topic clustering run history (audit read model). | `output` | one row per TopicClusteringRunHistoryProjectionId | `CreatedAt` |
+| `topic_clustering_run_projections` | Per-project topic clustering run status: the rebuildable operational read model behind the settings page. | `output` | one row per TopicClusteringRunProjectionId | `CreatedAt` |
+| `topic_model_projections` | Cursor row for the topic-model projection. | None | one row per TopicModelProjectionId | `CreatedAt` |
+| `topics` | One row per topic, with the name a trace's TopicId resolves to. | None | one row per TopicId | `CreatedAt` |
+| `trace_edit_overlays` | Rows of the TraceEditOverlay table, one row per TraceEditOverlayId. | `output` | one row per TraceEditOverlayId | `CreatedAt` |
+| `trigger_sents` | Rows of the TriggerSent table, one row per TriggerSentId. | None | one row per TriggerSentId | `CreatedAt` |
+| `triggers` | Rows of the Trigger table, one row per TriggerId. | `output` | one row per TriggerId | `CreatedAt` |
+| `virtual_key_scopes` | Rows of the VirtualKeyScope table, one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project. | None | one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project | `CreatedAt` |
+| `virtual_keys` | Rows of the VirtualKey table, one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project | `CreatedAt` |
+| `webhook_endpoint_deliveries` | The per-ATTEMPT delivery log for BOTH webhook channels: the endpoints platform's batches and the automations channel's trigger fires. | `output` | one row per WebhookEndpointDeliveryId | `CreatedAt` |
+| `workflow_versions` | Rows of the WorkflowVersion table, one row per WorkflowVersionId. | `output` | one row per WorkflowVersionId | `CreatedAt` |
+| `workflows` | Rows of the Workflow table, one row per WorkflowId. | `output` | one row per WorkflowId | `CreatedAt` |
 
 {/* lwql-views-end */}
 

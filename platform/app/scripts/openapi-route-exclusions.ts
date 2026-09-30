@@ -81,6 +81,11 @@ export const UNPUBLISHED = [
     why: "control-plane calls from the gateway and langy workers, authenticated by an internal shared secret",
   },
   {
+    match: "/api/connect/v1",
+    category: "internal",
+    why: "the connect host a self-hosted install syncs its license and its anonymous statistics to; the caller is the install's own worker and the contract is ADR-141, not something a customer writes by hand",
+  },
+  {
     match: "/api/admin",
     category: "internal",
     why: "LangWatch staff back-office, including impersonation; publishing it would advertise a surface no customer may call",

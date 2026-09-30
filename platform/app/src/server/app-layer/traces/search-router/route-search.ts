@@ -45,11 +45,12 @@ import type {
 import {
   buildFilterRoute,
   buildInstantEvalRoute,
+  describeCause,
   finishFilter,
   freeText,
   instantEval,
-  isModelUnavailableError,
   langy,
+  modelFailureOf,
   type RouteContext,
 } from "./routes";
 
@@ -136,17 +137,17 @@ async function routeWithModel(
       ...context.available,
     });
   } catch (error) {
-    const isModelUnavailable = isModelUnavailableError(error);
-    if (!isModelUnavailable) {
+    const failure = modelFailureOf(error);
+    if (failure.modelTrouble === "model_failed") {
       logger.warn(
         { projectId: input.projectId, err: error },
-        "Model could not route the search; searching the phrase instead",
+        `Model could not route the search; searching the phrase instead (${describeCause(error)})`,
       );
     }
     return freeText({
       context,
       decidedBy: "fallback",
-      isModelUnavailable,
+      failure,
       fellBackFrom: "routing",
     });
   }
@@ -156,6 +157,12 @@ async function routeWithModel(
       return finishFilter({ context, generated: decision.query, decidedBy });
     case "instant_eval":
       if (!context.available.isInstantEvalAvailable) {
+        // A guard, not a path: the model is told the route is closed and the
+        // decision reader downgrades an answer naming it anyway, so this only
+        // catches a `routeWithModel` that does neither. The phrase is what
+        // the model settled on once the closed route is taken off the table,
+        // and nothing about the project's models is wrong, so no strip and
+        // no model trouble.
         return freeText({ context, decidedBy });
       }
       return instantEval({
@@ -241,13 +248,6 @@ async function routeSearch({
       isInstantEvalAvailable,
     },
   };
-  if (input.forceKind) {
-    return applyClassified({
-      context,
-      classified: input.forceKind,
-      decidedBy: "caller",
-    });
-  }
   const classified = await classify(context);
   if (classified) {
     return applyClassified({ context, classified, decidedBy: "classifier" });

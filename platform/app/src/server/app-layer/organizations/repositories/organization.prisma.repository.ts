@@ -582,6 +582,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         id: true,
         pricingModel: true,
         stripeCustomerId: true,
+        selfHostedCustomer: true,
         subscriptions: {
           where: {
             status: "ACTIVE",
@@ -595,12 +596,58 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
 
     if (!organization) return { outcome: "not_found" };
+
     if (organization.pricingModel !== PricingModel.SEAT_EVENT) {
+      // A connected self-hosted customer buys no Cloud plan, so it never
+      // reaches SEAT_EVENT pricing. Its hosted usage is still invoiced, on the
+      // quarterly subscription its billing account names (ADR-141, section 7).
+      // The second read runs only for an organization an operator marked as a
+      // self-hosted customer, which is a handful of rows.
+      if (organization.selfHostedCustomer) {
+        return await this.connectedOrganizationForBilling(organizationId);
+      }
       return { outcome: "not_usage_billed" };
     }
 
-    const { pricingModel: _pricingModel, ...forBilling } = organization;
-    return { outcome: "usage_billed", organization: forBilling };
+    const {
+      pricingModel: _pricingModel,
+      selfHostedCustomer: _selfHostedCustomer,
+      ...forBilling
+    } = organization;
+    return {
+      outcome: "usage_billed",
+      organization: { ...forBilling, contract: "cloud" },
+    };
+  }
+
+  /**
+   * The billing identity of a connected self-hosted customer: the invoice
+   * customer and the usage subscription live on its `ConnectedBillingAccount`,
+   * not on the organization row, because it holds neither a Cloud customer nor
+   * a Cloud subscription.
+   */
+  private async connectedOrganizationForBilling(
+    organizationId: string,
+  ): Promise<BillingOrganizationLookup> {
+    const account = await this.prisma.connectedBillingAccount.findUnique({
+      where: { organizationId },
+      select: { stripeCustomerId: true, usageSubscriptionId: true },
+    });
+    if (!account) return { outcome: "not_usage_billed" };
+
+    return {
+      outcome: "usage_billed",
+      organization: {
+        id: organizationId,
+        stripeCustomerId: account.stripeCustomerId,
+        // Onboarding that stopped before the subscription existed leaves this
+        // empty, and the caller skips the organization until it does.
+        subscriptions: account.usageSubscriptionId
+          ? [{ id: account.usageSubscriptionId }]
+          : [],
+        contract: "connected",
+      },
+    };
   }
 
   async createAndAssign(

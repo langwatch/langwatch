@@ -1,4 +1,8 @@
-import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
+import {
+  extractEmailDomain,
+  isSsoProviderMatch,
+  matchesConfiguredSsoProvider,
+} from "@ee/sso/matching";
 import { isNativeSocialProvider } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { APIError } from "better-auth/api";
@@ -831,9 +835,12 @@ export class BetterAuthDatabaseHooks {
     account: { providerId: string; accountId: string };
     domain: string;
   }): Promise<boolean> {
-    const org = await this.deps.organizations.findByDomain({ domain });
-    if (!org) return false;
-    if (!isSsoProviderMatch(org, account)) return false;
+    const matched = await matchesConfiguredSsoProvider({
+      organizations: this.deps.organizations,
+      domain,
+      accounts: [account],
+    });
+    if (!matched) return false;
 
     await this.deps.users.updatePendingSsoSetup({
       userId: user.id,

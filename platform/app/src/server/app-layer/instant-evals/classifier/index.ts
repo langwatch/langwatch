@@ -6,6 +6,12 @@
  * query. A self-hosted install that never sets `JEV_API_KEY` therefore sees the
  * eval functions published as unavailable rather than seeing them break.
  *
+ * Three in order, and the order is the rule that the install's own key always
+ * wins: an install that configured a judge of its own keeps judging with it
+ * and sends nothing to LangWatch, whatever else is switched on. Connect comes
+ * next, for an install with a license and no key of its own. The null
+ * classifier is what is left.
+ *
  * One instance per process because the transport is a keep-alive pool and the
  * rate limiter holds permits drawn from a shared bucket; building a second
  * would double both.
@@ -13,10 +19,12 @@
  * @see ./classifier.ts
  */
 
+import { ConnectInstantEvalClassifier } from "@ee/licensing/connect/install/connectClassifier";
+import { readConnectConfig } from "@ee/licensing/connect/install/connectConfig";
 import { createLogger } from "@langwatch/observability";
-
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
 import type { InstantEvalClassifier } from "./classifier";
 import { RedisInstantEvalRateLimiter } from "./globalRateLimiter";
 import { JevInstantEvalClassifier } from "./jev.client";
@@ -56,7 +64,29 @@ let cached: InstantEvalClassifier | undefined;
 /** Whether this deployment can judge anything at all. */
 export function isInstantEvalClassifierConfigured(): boolean {
   if (env.INSTANT_EVAL_CLASSIFIER === "null") return false;
-  return Boolean(env.JEV_API_KEY);
+  if (env.JEV_API_KEY) return true;
+  // The Connect classifier answers per organization, and an organization
+  // whose license names no hosted judging skips every question. Whether it can
+  // judge for anyone is decided there, not here.
+  return readConnectConfig().permitted;
+}
+
+/**
+ * Whether the deployment's classifier can judge for one organization.
+ *
+ * Yes for a deployment-wide key, which every organization on the install
+ * shares. The Connect classifier is the one that answers otherwise: hosted
+ * judging is switched on per organization, and one that has not switched it on
+ * publishes the eval functions as unavailable instead of running queries whose
+ * judged columns all come back null.
+ */
+export async function isInstantEvalClassifierAvailableForOrganization(
+  organizationId: string,
+): Promise<boolean> {
+  const classifier = getInstantEvalClassifier();
+  return (
+    (await classifier.isAvailableForOrganization?.(organizationId)) ?? true
+  );
 }
 
 /**
@@ -70,13 +100,22 @@ export function getInstantEvalClassifier(): InstantEvalClassifier {
 }
 
 function createInstantEvalClassifier(): InstantEvalClassifier {
+  if (env.INSTANT_EVAL_CLASSIFIER === "null") {
+    return new NullInstantEvalClassifier();
+  }
+
   const apiKey = env.JEV_API_KEY;
-  if (!isInstantEvalClassifierConfigured() || !apiKey) {
+  if (!apiKey) {
+    const config = readConnectConfig();
+    if (config.permitted) {
+      return new ConnectInstantEvalClassifier({ prisma, config });
+    }
     logger.info(
       "No Instant Evals classifier is configured; judged columns will be skipped",
     );
     return new NullInstantEvalClassifier();
   }
+
   return new JevInstantEvalClassifier({
     apiKey,
     ...(env.JEV_BASE_URL ? { baseUrl: env.JEV_BASE_URL } : {}),

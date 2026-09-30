@@ -450,6 +450,33 @@ from inside the app (`UnconfirmedAddressBanner`) and never demanded. This is
 the distinction the earlier "confirmation follows you in" experiment
 flattened, and flattening it is what made sign-up feel unguarded.
 
+### Revision (2026-09-25): an installation that cannot send email
+
+An installation with no email provider configured cannot prove an address, so
+the 2026-09-07 order would leave it with no way to create any account.
+
+On such an installation `auth.requestSignUpVerification` keeps every guard
+(caller and address rate limits, organization-managed domain refusal,
+confirmed-address refusal) and then mints an UNCONFIRMED address proof instead
+of mailing a link. The proof lives in its own token namespace, is single-use,
+bound to the normalized address and lives as long as a confirmed proof.
+
+- An address that already has an account is sent to log in, confirmed or not:
+  there is no link to wait for, so no account is mid-sign-up.
+- `user.register` claims a confirmed proof first. It accepts an unconfirmed
+  proof only while no email provider is configured, and the account is created
+  with `emailVerified` false.
+- A confirmed-proof check never accepts an unconfirmed proof, and the reverse.
+  Passkey sign-up requires a confirmed proof, so the screen offers a password
+  only; a passkey can be added from settings afterwards.
+- Features gated on a confirmed address stay closed for that account: domain
+  join requests and OAuth account linking.
+- `auth.sendMyAddressConfirmation` refuses with `auth_email_sending_unavailable`
+  and the settings screen offers no resend while no provider is configured.
+
+Once a provider is configured, outstanding unconfirmed proofs are refused and
+sign-up returns to the emailed link.
+
 ### 7. One flag, shadow-first, and the cutover
 
 - **`IDENTITY_ROUTER_V2`** covers D03 + D13 together: the router is the

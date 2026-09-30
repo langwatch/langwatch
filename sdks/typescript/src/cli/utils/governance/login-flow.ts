@@ -342,10 +342,58 @@ export async function runDeviceFlowLogin(
 	return runUnifiedLoginFlow({ ...opts, kind: "device_session" });
 }
 
+/**
+ * Whose login is being replaced, when it is not the same one. Undefined when
+ * there is nothing to say: no login here yet, or the same organization again.
+ *
+ * A login overwrites the session on this machine in place, so logging in as a
+ * second account left every command answering from the first one's
+ * organization with nothing on screen saying the account had changed. That is
+ * how a CLI sat on a throwaway test organization for a morning while the real
+ * organization's projects looked like they did not exist.
+ *
+ * Told rather than refused because the new identity is only known AFTER the
+ * browser approval: refusing there would reject an approval the person has
+ * already given, and the point is that they can see what happened.
+ */
+export function replacedSessionNotice({
+	previous,
+	next,
+}: {
+	previous: Pick<GovernanceConfig, "user" | "organization">;
+	next: {
+		user: { email?: string };
+		organization: { id: string; name?: string; slug?: string };
+	};
+}): string | undefined {
+	const hadOrg = previous.organization?.id;
+	if (!hadOrg || hadOrg === next.organization.id) return undefined;
+
+	// The id is the last fallback rather than no name at all: a session stored
+	// before the name was recorded, or one the server sent without either, would
+	// otherwise read as an empty identity being signed out.
+	const orgName = (org?: { id?: string; name?: string; slug?: string }) =>
+		org?.name ?? org?.slug ?? org?.id;
+
+	const was = [previous.user?.email, orgName(previous.organization)]
+		.filter(Boolean)
+		.join(" in ");
+	const now = [next.user.email, orgName(next.organization)]
+		.filter(Boolean)
+		.join(" in ");
+
+	return `This replaces the login on this machine: ${was} is signed out, and every command now runs as ${now}.`;
+}
+
 function persistDeviceSession(
 	cfg: GovernanceConfig,
 	result: ExchangeDeviceSessionResult,
 ): void {
+	const replaced = replacedSessionNotice({ previous: cfg, next: result });
+	if (replaced) {
+		console.log();
+		console.log(chalk.yellow(replaced));
+	}
 	cfg.access_token = result.access_token;
 	cfg.refresh_token = result.refresh_token;
 	cfg.expires_at = Math.floor(Date.now() / 1000) + result.expires_in;

@@ -57,3 +57,26 @@ describe("given a deployment with a classifier configured", () => {
     });
   });
 });
+
+/** A Prisma that answers the one read the gate makes, with an organization. */
+const QUIET_PRISMA = {
+  project: {
+    findUnique: async () => ({ team: { organizationId: "organization" } }),
+  },
+} as unknown as PrismaClient;
+
+describe("given a classifier that judges for some organizations only", () => {
+  describe("when a project of an organization it does not judge for asks", () => {
+    /** @scenario "An install with the service off publishes eval functions as unavailable" */
+    it("answers no without resolving the flag", async () => {
+      await expect(
+        instantEvalsEnabled({
+          prisma: QUIET_PRISMA,
+          projectId: "project-of-an-organization-that-did-not-opt-in",
+          isClassifierConfigured: () => true,
+          isClassifierAvailableForOrganization: async () => false,
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+});

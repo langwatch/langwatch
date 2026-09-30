@@ -236,6 +236,13 @@ const registry = {
       "To judge the whole selection rather than a sample, run the same statement as a job instead of on this endpoint",
     ],
   },
+  instant_eval_classifier_not_configured: {
+    tips: [
+      "Instant Evals are on for this project, but the installation has no judge configured for its organization",
+      "Set JEV_API_KEY on the app and workers to judge with your own key, or connect the installation with a license that includes Instant Evals and keep hosted judging switched on for the organization",
+    ],
+    docsPath: "/self-hosting/connect",
+  },
   instant_eval_classifier_unavailable: {
     tips: [
       "The query itself was accepted and ran; judging the text it projected is what failed",
@@ -532,6 +539,7 @@ const registry = {
     tips: [
       "connected:<name> runs the agent in development, or in the one other environment it is online in; when more than one is online, name it as connected:<name>@<environment>",
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "An agent started in development with a personal key is visible only to its owner, so other keys never find it online; set LANGWATCH_AGENT_ENVIRONMENT to a shared name such as dev-shared and start it again",
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
@@ -551,6 +559,7 @@ const registry = {
   },
   agent_owner_only: {
     tips: [
+      "Run it with the same key that connected the agent; a project or service key names no person, so it never reaches a personal agent, even the caller's own",
       "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
       "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
     ],

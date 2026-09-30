@@ -16,6 +16,12 @@
  */
 
 import { Command, Option } from "commander";
+import { setRequestedProject } from "../internal/credentialContext";
+import {
+  applyProjectOption,
+  PROJECT_FLAG_HELP,
+  projectSelectorOf,
+} from "./utils/projectOption";
 import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import {
   REDACTION_AUDIT_URL,
@@ -361,6 +367,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const requested = resolveActionOutputOptions(actionCommand);
     const effective = await assertFormatIsSupported(actionCommand, requested);
     await applyOutputContext(effective);
+    // The project the command line pointed this request at, published before
+    // the action runs so `resolveCredentials` reads it without the action
+    // having to accept the value and pass it on.
+    setRequestedProject(projectSelectorOf(actionCommand));
   });
 
   // Top-level commands
@@ -1420,6 +1430,29 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     await impl(command.optsWithGlobals());
   });
 
+  // Doctor: the checkup of a self-hosted install, the same rows and the same
+  // usage report the Settings page shows, printed from a terminal.
+  emitsResult(
+    program
+      .command("doctor")
+      .description(
+        "Check whether a self-hosted install is correctly wired, and print what it sends to LangWatch",
+      )
+      .option(
+        "--run",
+        "Also run the checks that open a connection or spend money (reach the LangWatch hosts, storage write, SMTP, model provider, canaries)",
+      )
+      .option(
+        "--scenario-run-plan-id <id>",
+        "The run plan the scenario canary launches, with --run",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { run?: boolean; scenarioRunPlanId?: string }) => {
+      const { doctorCommand: impl } = await import("./commands/doctor.js");
+      return impl(options);
+    },
+  );
+
   // Discoverability — the machine-readable catalog + compact help tree agents
   // use to learn the CLI without human docs (gcx `commands` / `help-tree`).
   emitsResult(
@@ -1998,12 +2031,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "How long --wait-online waits before failing",
         "120",
       )
+      .option(
+        "--all",
+        "List every row, including offline rows of a name and environment that a newer row replaced",
+      )
       // No positional argument here, so a stray word is a name with a space
       // passed bare after --wait-online: the refusal says to quote it.
       .configureOutput({
         outputError: (message, write) => write(withQuotedNameHint(message)),
       }),
-    async (options: { waitOnline?: string; timeout?: string }) => {
+    async (options: { waitOnline?: string; timeout?: string; all?: boolean }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
       return impl(options);
     },
@@ -3114,14 +3151,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("trace")
     .description("Search and inspect traces");
 
-  /**
-   * Help for `--project`, shared by every command that reads across projects.
-   * The default is the personal project, which is where these commands pointed
-   * before the flag existed, so an existing script keeps its meaning.
-   */
-  const PROJECT_FLAG_HELP =
-    "Project to read from, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
-
   rendersOwnResult(
     traceCmd
       .command("search")
@@ -3362,8 +3391,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     scenarioCmd
-      .command("get <id>")
-      .description("Get scenario details by ID")
+      .command("get <reference>")
+      .description("Get scenario details by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { getScenarioCommand: impl } = await import("./commands/scenarios/get.js");
@@ -3388,8 +3417,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   const scenarioUpdateCmd = scenarioCmd
-    .command("update <id>")
-    .description("Update an existing scenario")
+    .command("update <reference>")
+    .description("Update an existing scenario, named by ID or name")
     .option("--name <name>", "New scenario name")
     .option("--situation <situation>", "New situation/context")
     .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
@@ -3420,8 +3449,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   rendersOwnResult(
     scenarioCmd
-      .command("run <id>")
-      .description("Run one scenario against one or more targets")
+      .command("run <reference>")
+      .description("Run one scenario, named by ID or name, against one or more targets")
       .option("--target <target>", TARGET_FLAG_HELP, collectParam)
       .option("--name <name>", RUN_NAME_FLAG_HELP)
       .option("--repeat <n>", REPEAT_FLAG_HELP)
@@ -3471,8 +3500,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     scenarioCmd
-      .command("delete <id>")
-      .description("Archive (soft-delete) a scenario")
+      .command("delete <reference>")
+      .description("Archive (soft-delete) a scenario, named by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");
@@ -5492,6 +5521,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // command. Registered on the built tree so buildProgram() stays a pure
   // factory: no module-level state, nothing leaks between daemon requests.
   registerOutputOptions(program);
+
+  // `--project` on every command that runs inside a project, added the same
+  // way and for the same reason: a family that adopts it one at a time is a
+  // family that forgets it, which is how the whole instant-eval family shipped
+  // with no way to name a project. The two exemption lists live with the
+  // helper (utils/projectOption.ts).
+  applyProjectOption(program);
 
   return program;
 }

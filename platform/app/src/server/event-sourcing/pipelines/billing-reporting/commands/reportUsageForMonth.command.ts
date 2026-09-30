@@ -5,15 +5,22 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "../../../../../../ee/billing/services/billableEventsQuery";
+import {
+  billingMonthDateRange,
+  type queryBillableEventsTotal as QueryBillableEventsTotalFn,
+} from "../../../../../../ee/billing/services/billableEventsQuery";
 import {
   instantEvalMeterUnitsToUsd,
   type queryInstantEvalSpendTotal as QueryInstantEvalSpendTotalFn,
 } from "../../../../../../ee/billing/services/instantEvalSpendQuery";
+import { meterEventTimestampSeconds } from "../../../../../../ee/billing/services/meterEventTimestamp";
 import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
 import type { BillingCheckpointService } from "../../../../app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "../../../../app-layer/organizations/organization.service";
-import type { BillingOrganizationLookup } from "../../../../app-layer/organizations/repositories/organization.repository";
+import type {
+  BillingOrganizationLookup,
+  UsageBillingContract,
+} from "../../../../app-layer/organizations/repositories/organization.repository";
 import type { Command, CommandHandler } from "../../../";
 import { defineCommandSchema } from "../../../";
 import type { Event } from "../../../domain/types";
@@ -70,6 +77,23 @@ export interface ReportUsageForMonthCommandDeps {
    * first tick after the mapping lands reports it whole.
    */
   isInstantEvalMeterProvisioned: () => boolean;
+  /**
+   * The most hosted usage a connected customer's month may report, in meter
+   * units, or null when nothing caps it (a Cloud customer, or a contract that
+   * could not be read).
+   *
+   * The gateway stops a connected customer at its budget on a 60 second
+   * refresh, so the spend ledger can run a few cents past the prepaid commit
+   * before it does. That overshoot must never reach the quarterly invoice as
+   * an amount due: the credit grant covers exactly the commit, and with
+   * overage off there is nothing agreed beyond it. What is reported is
+   * clamped at the commit, or at the commit plus the overage maximum when
+   * overage is on, less what the term's earlier months already reported.
+   */
+  connectedUsageCeiling: (input: {
+    organizationId: string;
+    billingMonth: string;
+  }) => Promise<number | null>;
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
 }
 
@@ -91,6 +115,12 @@ interface BillingMeter {
   readonly eventName: string;
   /** Whether Stripe holds a meter under this name, so an event sent is aggregated. */
   readonly isProvisioned: () => boolean;
+  /** The most the month may report for a capped contract, or null for no cap. */
+  ceiling: (args: {
+    organizationId: string;
+    billingMonth: string;
+    contract: UsageBillingContract | undefined;
+  }) => Promise<number | null>;
   /** The month's running total in the meter's own integer unit. */
   readonly queryTotal: (args: {
     organizationId: string;
@@ -124,6 +154,38 @@ function billableEventsIdentifier({
   targetTotal: number;
 }): string {
   return `${organizationId}:${billingMonth}:from:${lastReportedTotal}:to:${targetTotal}`;
+}
+
+/** When the billing month ended, in epoch milliseconds. */
+function billingMonthEndMs(billingMonth: string): number {
+  const [, end] = billingMonthDateRange(billingMonth);
+  return Date.parse(`${end.replace(" ", "T")}Z`);
+}
+
+/**
+ * The timestamp the month's meter event carries.
+ *
+ * A Cloud customer is invoiced monthly, so dating an event inside a month
+ * whose invoice may already be finalized would put the amount behind a closed
+ * period. Its events therefore stay at the time of reporting, which is what
+ * they have always done. A connected customer is invoiced quarterly (ADR-141,
+ * section 7), so the month it belongs to is still open and the event is dated
+ * there, subject to the meter's own 35-day floor.
+ */
+function meterTimestampFor({
+  contract,
+  billingMonth,
+  nowMs,
+}: {
+  contract: UsageBillingContract;
+  billingMonth: string;
+  nowMs: number;
+}): number {
+  return meterEventTimestampSeconds({
+    periodEndMs:
+      contract === "connected" ? billingMonthEndMs(billingMonth) : nowMs,
+    nowMs,
+  });
 }
 
 function instantEvalIdentifier({
@@ -167,6 +229,7 @@ export class ReportUsageForMonthCommand
         eventName: BILLABLE_EVENTS_EVENT_NAME,
         // The events meter predates the catalog check and every mode maps it.
         isProvisioned: () => true,
+        ceiling: async () => null,
         queryTotal: (args) => deps.queryBillableEventsTotal(args),
         toValue: (delta) => delta,
         identifier: billableEventsIdentifier,
@@ -174,6 +237,10 @@ export class ReportUsageForMonthCommand
       {
         eventName: INSTANT_EVAL_USD_EVENT_NAME,
         isProvisioned: deps.isInstantEvalMeterProvisioned,
+        ceiling: ({ contract, ...args }) =>
+          contract === "connected"
+            ? deps.connectedUsageCeiling(args)
+            : Promise.resolve(null),
         queryTotal: (args) => deps.queryInstantEvalSpendTotal(args),
         toValue: instantEvalMeterUnitsToUsd,
         identifier: instantEvalIdentifier,
@@ -262,6 +329,7 @@ export class ReportUsageForMonthCommand
             organizationId,
             billingMonth,
             stripeCustomerId: org.stripeCustomerId,
+            contract: org.contract,
           })) || shouldSelfDispatch;
       }
     } catch (error) {
@@ -306,11 +374,13 @@ export class ReportUsageForMonthCommand
     organizationId,
     billingMonth,
     stripeCustomerId,
+    contract,
   }: {
     meter: BillingMeter;
     organizationId: string;
     billingMonth: string;
     stripeCustomerId: string;
+    contract: UsageBillingContract;
   }): Promise<boolean> {
     try {
       return await this.reportForBillingMonth({
@@ -318,6 +388,7 @@ export class ReportUsageForMonthCommand
         organizationId,
         billingMonth,
         stripeCustomerId,
+        contract,
       });
     } catch (error) {
       logger.error(
@@ -347,11 +418,13 @@ export class ReportUsageForMonthCommand
     organizationId,
     billingMonth,
     stripeCustomerId,
+    contract,
   }: {
     meter: BillingMeter;
     organizationId: string;
     billingMonth: string;
     stripeCustomerId: string;
+    contract: UsageBillingContract;
   }): Promise<boolean> {
     if (!meter.isProvisioned()) {
       // Nothing is read or written: the checkpoint stays where it is, so the
@@ -400,14 +473,34 @@ export class ReportUsageForMonthCommand
       );
     } else {
       // Normal path: query ClickHouse for the month's total.
-      const currentTotal = await meter.queryTotal({
+      const measured = await meter.queryTotal({
         organizationId,
         billingMonth,
       });
 
-      if (currentTotal === null) {
+      if (measured === null) {
         // ClickHouse not available
         return false;
+      }
+
+      const ceiling = await meter.ceiling({
+        organizationId,
+        billingMonth,
+        contract,
+      });
+      const currentTotal =
+        ceiling !== null && measured > ceiling ? ceiling : measured;
+      if (currentTotal !== measured) {
+        logger.info(
+          {
+            organizationId,
+            billingMonth,
+            meter: meter.eventName,
+            measured,
+            ceiling,
+          },
+          "hosted usage ran past the contract ceiling; reporting the ceiling",
+        );
       }
 
       if (currentTotal <= lastReportedTotal) {
@@ -474,7 +567,11 @@ export class ReportUsageForMonthCommand
           {
             eventName: meter.eventName,
             identifier,
-            timestamp: Math.floor(Date.now() / 1000),
+            timestamp: meterTimestampFor({
+              contract,
+              billingMonth,
+              nowMs: Date.now(),
+            }),
             value: meter.toValue(delta),
           },
         ],

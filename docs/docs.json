@@ -148,7 +148,6 @@
                 ]
               },
               "agent-testing/voice-agents",
-              "agent-testing/voice-agents-in-app",
               "agent-testing/red-teaming"
             ]
           },
@@ -294,6 +293,7 @@
                   "platform/members-and-teams",
                   "platform/rbac",
                   "platform/sso",
+                  "platform/sso-update",
                   "platform/api-keys",
                   "platform/audit-log",
                   "platform/data-privacy",
@@ -492,7 +492,6 @@
                 ]
               },
               "integration/typescript/integrations/vercel-ai-sdk",
-              "integration/python/integrations/lite-llm",
               "integration/python/integrations/open-ai-agents",
               "integration/python/integrations/pydantic-ai",
               "integration/typescript/integrations/mastra",
@@ -566,7 +565,14 @@
               "integration/go/integrations/groq",
               "integration/go/integrations/grok",
               "integration/go/integrations/ollama",
-              "integration/go/integrations/openrouter"
+              "integration/go/integrations/openrouter",
+              {
+                "group": "LiteLLM",
+                "pages": [
+                  "integration/litellm-proxy",
+                  "integration/python/integrations/lite-llm"
+                ]
+              }
             ]
           },
           {
@@ -977,7 +983,11 @@
             "pages": [
               "self-hosting/overview",
               "self-hosting/licensing",
+              "self-hosting/connect",
+              "self-hosting/data-and-telemetry",
+              "self-hosting/usage-report-dictionary",
               "hybrid-setup/overview",
+              "self-hosting/checkup",
               "self-hosting/troubleshooting"
             ]
           },
@@ -1074,6 +1084,7 @@
               "api-reference/datasets/overview",
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
+              "api-reference/datasets/create-attachments",
               "api-reference/datasets/create-direct-upload",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",
@@ -2036,6 +2047,10 @@
     },
     {
       "source": "/agent-simulations/voice-agents",
+      "destination": "/agent-testing/voice-agents"
+    },
+    {
+      "source": "/agent-testing/voice-agents-in-app",
       "destination": "/agent-testing/voice-agents"
     },
     {

@@ -1,13 +1,12 @@
 /**
- * The router with no classifier, and with a route the caller already knows:
- * the model decides and builds, a model that cannot be reached searches the
- * phrase and says so, and a named route skips the classifier.
+ * The router with no classifier: the model decides and builds, and a model
+ * that cannot be reached searches the phrase and says so.
  *
  * Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
  */
 import { describe, expect, it, vi } from "vitest";
 import { createSearchRouter } from "../route-search";
-import { answering, deps, input, NoModel, RANGE } from "./harness";
+import { deps, input, NoModel, RANGE } from "./harness";
 
 describe("given no classifier", () => {
   describe("when the model routes", () => {
@@ -87,15 +86,15 @@ describe("given no classifier", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        isModelUnavailable: true,
         fellBackFrom: "routing",
+        modelTrouble: "no_model",
       });
     });
   });
 
   describe("when the model fails", () => {
     /** @scenario "A model failure is a phrase search, not an error" */
-    it("searches the phrase without flagging a missing model", async () => {
+    it("searches the phrase and names the model as the failure", async () => {
       const d = deps({
         routeWithModel: vi.fn(async () => {
           throw new Error("502 from the provider");
@@ -106,8 +105,8 @@ describe("given no classifier", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        isModelUnavailable: false,
         fellBackFrom: "routing",
+        modelTrouble: "model_failed",
       });
     });
   });
@@ -124,25 +123,6 @@ describe("given no classifier", () => {
       expect(d.routeWithModel).toHaveBeenCalledWith(
         expect.objectContaining({ known: { evaluators: [], events: [] } }),
       );
-    });
-  });
-});
-
-describe("given the caller names the route", () => {
-  describe("when the text is submitted again", () => {
-    /** @scenario "A search the page routed once is not classified again" */
-    it("builds that route without asking the classifier", async () => {
-      const classifier = answering("filter");
-      const d = deps({ classifier });
-      const result = await createSearchRouter(d).route(
-        input({ text: "annoyed users", forceKind: "instant_eval" }),
-      );
-      expect(classifier.classify).not.toHaveBeenCalled();
-      expect(d.routeWithModel).not.toHaveBeenCalled();
-      expect(result).toMatchObject({
-        kind: "instant_eval",
-        decidedBy: "caller",
-      });
     });
   });
 });

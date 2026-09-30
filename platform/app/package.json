@@ -1,6 +1,6 @@
 {
 	"name": "@langwatch/web",
-	"version": "3.17.0",
+	"version": "3.18.0",
 	"private": true,
 	"engines": {
 		"node": "24.x || 25.x || 26.x",
@@ -79,6 +79,7 @@
 		"licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\"",
 		"generate:langy-skills": "tsx scripts/generate-langy-skills.ts",
 		"generate:lwql-columns-manifest": "tsx scripts/generate-lwql-columns-manifest.ts",
+		"generate:lwql-prisma-manifest": "tsx scripts/generate-lwql-prisma-manifest.ts",
 		"generate:setup-skill-bodies": "tsx scripts/generate-setup-skill-bodies.ts",
 		"generate:vega-validator": "tsx scripts/generate-vega-lite-validator.ts"
 	},
@@ -122,7 +123,7 @@
 		"@langwatch/react-rum": "workspace:*",
 		"@langwatch/redaction": "workspace:*",
 		"@langwatch/redis-client": "workspace:*",
-		"@langwatch/scenario": "file:vendor/langwatch-scenario-1.7.0-dev.voice9.tgz",
+		"@langwatch/scenario": "file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz",
 		"@langwatch/ssrf": "workspace:*",
 		"@langwatch/system-migrations": "workspace:*",
 		"@modelcontextprotocol/sdk": "^1.29.0",

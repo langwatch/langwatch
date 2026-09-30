@@ -38,6 +38,11 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
 function mockPrisma(name: string): PrismaClient {
   const reached = vi.fn().mockRejectedValue(new Error(REACHED_ADMIN_CHECK));
   return {
+    // The revoke path's fenced write; the read-back is `findUniqueOrThrow`.
+    $executeRaw: vi.fn().mockImplementation(async (...args: unknown[]) => {
+      await reached(...args);
+      return 1;
+    }),
     apiKey: {
       findUnique: vi.fn().mockResolvedValue({
         id: KEY_ID,
@@ -49,11 +54,6 @@ function mockPrisma(name: string): PrismaClient {
       }),
       create: reached,
       update: reached,
-      // The revoke path's two calls: the fenced write, then the read-back.
-      updateMany: vi.fn().mockImplementation(async (...args: unknown[]) => {
-        await reached(...args);
-        return { count: 1 };
-      }),
       findUniqueOrThrow: vi.fn().mockResolvedValue({
         id: KEY_ID,
         name,

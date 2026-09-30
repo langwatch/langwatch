@@ -30,6 +30,10 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: project.current }),
 }));
 
+const toast = vi.hoisted(() => vi.fn());
+vi.mock("~/components/ui/toaster", () => ({ toaster: { create: toast } }));
+
+import { instantEvalRunKey } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { useExplorerStore } from "../../../stores/explorerStore";
 import { useSubmitSearch } from "../useSubmitSearch";
 
@@ -37,7 +41,6 @@ const handlers = {
   onLangy: vi.fn(),
   onInstantEval: vi.fn(),
   onSupersede: vi.fn(),
-  onModelUnavailable: vi.fn(),
 };
 
 function renderSubmit(
@@ -47,6 +50,7 @@ function renderSubmit(
     useSubmitSearch({
       isLangyAvailable: true,
       isSamplePreview: false,
+      isInstantEvalAvailable: true,
       ...handlers,
       ...overrides,
     }),
@@ -68,9 +72,10 @@ beforeEach(() => {
   handlers.onLangy.mockClear();
   handlers.onInstantEval.mockClear();
   handlers.onSupersede.mockClear();
-  handlers.onModelUnavailable.mockClear();
+  toast.mockClear();
   project.current = { id: "project-1" };
   useExplorerStore.getState().clearAll();
+  useExplorerStore.setState({ searchNotice: null });
   useExplorerStore.setState({ activeLensId: "all-traces" });
 });
 
@@ -161,17 +166,17 @@ describe("given the text has bare words", () => {
           kind: "free_text",
           query: '"cannot connect to database"',
           decidedBy: "classifier",
-          isModelUnavailable: false,
         }),
       );
       expect(useExplorerStore.getState().queryText).toBe(
         '"cannot connect to database"',
       );
-      expect(handlers.onModelUnavailable).not.toHaveBeenCalled();
+      // The classifier's own answer, so there is nothing to explain.
+      expect(useExplorerStore.getState().searchNotice).toBeNull();
     });
 
     /** @scenario "Without a classifier or a model the words are searched as a phrase" */
-    it("applies the phrase and reports the missing model when flagged", () => {
+    it("applies the phrase and says why it is one", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("annoyed users"));
       act(() =>
@@ -179,12 +184,17 @@ describe("given the text has bare words", () => {
           kind: "free_text",
           query: '"annoyed users"',
           decidedBy: "fallback",
-          isModelUnavailable: true,
           fellBackFrom: "routing",
+          modelTrouble: "no_model",
         }),
       );
       expect(useExplorerStore.getState().queryText).toBe('"annoyed users"');
-      expect(handlers.onModelUnavailable).toHaveBeenCalledTimes(1);
+      expect(useExplorerStore.getState().searchNotice).toEqual({
+        projectId: "project-1",
+        query: '"annoyed users"',
+        interpretedAs: "free_text",
+        modelTrouble: "no_model",
+      });
     });
   });
 
@@ -244,7 +254,8 @@ describe("given the text has bare words", () => {
 
   describe("when the router call fails", () => {
     /** @scenario "A model failure is a phrase search, not an error" */
-    it("searches the words as one phrase", () => {
+    /** @scenario "A router call that fails says the words were searched instead" */
+    it("searches the words as one phrase and says so", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("annoyed users status:error"));
       act(() => lastCall().options.onError?.(new Error("network")));
@@ -252,6 +263,14 @@ describe("given the text has bare words", () => {
         'status:error AND "annoyed users"',
       );
       expect(useExplorerStore.getState().parseError).toBeNull();
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "warning",
+          description: expect.stringContaining(
+            "The words were searched as a phrase instead.",
+          ),
+        }),
+      );
     });
   });
 
@@ -282,6 +301,140 @@ describe("given the text has bare words", () => {
   });
 });
 
+describe("given the text is an eval chip typed by hand", () => {
+  describe("when no run has answered it", () => {
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("applies the chip and hands the question, as written, to the Instant Eval handler", () => {
+      useExplorerStore
+        .getState()
+        .setTimeRange({ from: 1000, to: 2000, label: "Custom" });
+      const { result } = renderSubmit();
+      act(() =>
+        result.current.submitSearch(
+          'status:error AND eval:"the user is annoyed"',
+        ),
+      );
+      // The chip is on screen while the run is arranged, so the reader sees
+      // what they typed rather than an empty bar.
+      expect(useExplorerStore.getState().queryText).toBe(
+        'status:error AND eval:"the user is annoyed"',
+      );
+      // No router and no model between Enter and the estimate: the reader
+      // wrote the question, and the fallback keeps the chip where it is.
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).toHaveBeenCalledWith({
+        projectId: "project-1",
+        sentence: "the user is annoyed",
+        question: { instructions: "the user is annoyed" },
+        target: "traces",
+        otherQuery: "status:error",
+        fallbackQuery: 'status:error AND eval:"the user is annoyed"',
+        timeRange: { from: 1000, to: 2000 },
+      });
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("judges the unit a target spelling asked for, whatever the lens shows", () => {
+      const { result } = renderSubmit();
+      act(() =>
+        result.current.submitSearch('eval.conversation:"the user is annoyed"'),
+      );
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({ target: "threads", otherQuery: "" }),
+      );
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("keeps the other eval chips beside the filter the run judges", () => {
+      const { result } = renderSubmit();
+      act(() =>
+        result.current.submitSearch('eval.llm:"wrong tool" AND eval:"annoyed"'),
+      );
+      // The llm chip is pending too, so it is the first one started; the
+      // annoyed chip stays in the other terms and is started on the next Enter.
+      expect(handlers.onInstantEval).toHaveBeenCalledTimes(1);
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question: { instructions: "wrong tool" },
+          otherQuery: 'eval:"annoyed"',
+        }),
+      );
+    });
+
+    it("keeps the run out of the sample preview, which has nothing to judge", () => {
+      const { result } = renderSubmit({ isSamplePreview: true });
+      act(() => result.current.submitSearch('eval:"the user is annoyed"'));
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a run already answered it", () => {
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("applies the chip and calls nothing", () => {
+      const { timeRange } = useExplorerStore.getState();
+      useExplorerStore.getState().registerEvalRun({
+        key: instantEvalRunKey({
+          question: "the user is annoyed",
+          target: "traces",
+          otherQuery: "",
+          window: {
+            from: timeRange.from,
+            to: timeRange.to,
+            ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
+          },
+        }),
+        runId: "run-1",
+      });
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('eval:"the user is annoyed"'));
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(useExplorerStore.getState().queryText).toBe(
+        'eval:"the user is annoyed"',
+      );
+    });
+  });
+
+  describe("given the Instant Evals flag is off for the project", () => {
+    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    it("hands the question to the Instant Eval handler and leaves the typed query unsearched", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() => result.current.submitSearch('eval:"the user is annoyed"'));
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question: { instructions: "the user is annoyed" },
+        }),
+      );
+      // Nothing is searched: the popover the handler opens explains why,
+      // and the typed chip stays exactly where the reader left it.
+      expect(useExplorerStore.getState().queryText).toBe("");
+    });
+
+    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    it("refuses a chip typed alongside a bare word the same way, before any request", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() =>
+        result.current.submitSearch('eval:"the user is annoyed" urgent'),
+      );
+      // A bare word beside the chip is what makes this a sentence to
+      // `splitBareWords` — the router route a plain sentence would otherwise
+      // take is never reached: the unreleased chip is caught first.
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).toHaveBeenCalledTimes(1);
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question: { instructions: "the user is annoyed" },
+          otherQuery: "urgent",
+        }),
+      );
+      // Nothing applied over the typed text either.
+      expect(useExplorerStore.getState().queryText).toBe("");
+    });
+  });
+});
+
 describe("given an Instant Eval estimate is still in flight", () => {
   describe("when the next submit is not a judgement", () => {
     /** @scenario "A new search supersedes a pending Instant Eval" */
@@ -301,7 +454,6 @@ describe("given an Instant Eval estimate is still in flight", () => {
           kind: "free_text",
           query: '"annoyed users"',
           decidedBy: "classifier",
-          isModelUnavailable: false,
         }),
       );
       expect(handlers.onInstantEval).not.toHaveBeenCalled();

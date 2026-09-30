@@ -17,6 +17,7 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { explainAnyError } from "~/features/errors";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
@@ -33,10 +34,6 @@ import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import { useSearchSubmitRequestStore } from "../../stores/searchSubmitRequestStore";
 import { AskAiButton } from "../ai/AskAiButton";
-import {
-  ProviderPrimerPopover,
-  SMARTER_SEARCH_PRIMER_COPY,
-} from "../ai/ProviderPrimerPopover";
 import { InstantEvalConfirmDialog } from "../TracesPage/InstantEvalConfirmDialog";
 import { InstantEvalRefusalPopover } from "../TracesPage/InstantEvalRefusalPopover";
 import { registerInstantEvalRoute } from "../TracesPage/instantEvalRouteBridge";
@@ -56,6 +53,7 @@ import {
   statusBorderColor,
 } from "./SearchBarIndicators";
 import { SearchedAsNotice } from "./SearchedAsNotice";
+import { SearchFallbackNotice } from "./SearchFallbackNotice";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
 import { searchSubmitProgress } from "./searchSubmitProgress";
 import {
@@ -67,13 +65,6 @@ import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
 import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
 import { useSubmitSearch } from "./useSubmitSearch";
-
-/**
- * The "connect a model for smarter search" primer shows once per page
- * session: the phrase search still ran, and a popover on every Enter would
- * be a nag rather than a pointer.
- */
-let smarterSearchPrimerShown = false;
 
 const MAX_DYNAMIC_ITEMS = 10;
 
@@ -178,7 +169,7 @@ export const SearchBar: React.FC = () => {
   // popover pointing the user at /settings/model-providers. Langy needs
   // none of this — the panel walks the user through model setup itself —
   // so when Langy owns the affordance the primer never blocks the way in.
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } =
     useModelProvidersSettings({ projectId: project?.id });
   const askAiNeedsProviderPrimer =
@@ -299,10 +290,22 @@ export const SearchBar: React.FC = () => {
 
   // Enter on a sentence. The router answers with what the sentence is; a
   // `langy` answer takes the same door as the button, with the view
-  // attached, and a `free_text` answer with no model behind it opens the
-  // primer once so the reader knows what a model would add.
-  const [smarterSearchPrimerOpen, setSmarterSearchPrimerOpen] = useState(false);
-  const instantEval = useInstantEvalRoute();
+  // attached. A search that ran without the model that shapes it says so in
+  // the strip under the bar (`SearchFallbackNotice`), which is where the
+  // model settings are offered.
+  // While the flag read is in flight the submit is treated as available, so
+  // the estimate goes out; if the server refuses it, the user gets the model
+  // popover and the phrase search fallback, so a slow flag read never hides a
+  // feature the project actually has.
+  const { enabled: instantEvalsReleased, isLoading: instantEvalsFlagLoading } =
+    useFeatureFlag("release_instant_evals", {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project?.id && !!organization?.id,
+    });
+  const isInstantEvalAvailable =
+    instantEvalsReleased || instantEvalsFlagLoading;
+  const instantEval = useInstantEvalRoute({ isInstantEvalAvailable });
   const { onInstantEvalRoute } = instantEval;
   // The route's dialog and popover are anchored here, so a caller outside the
   // bar (a Langy action) reaches this same route rather than one of its own.
@@ -310,18 +313,13 @@ export const SearchBar: React.FC = () => {
     () => registerInstantEvalRoute(onInstantEvalRoute),
     [onInstantEvalRoute],
   );
-  const handleModelUnavailable = useCallback(() => {
-    if (smarterSearchPrimerShown) return;
-    smarterSearchPrimerShown = true;
-    setSmarterSearchPrimerOpen(true);
-  }, []);
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
+    isInstantEvalAvailable,
     isSamplePreview,
     onLangy: askLangyFromSearch,
     onInstantEval: onInstantEvalRoute,
     onSupersede: instantEval.abandonPendingRun,
-    onModelUnavailable: handleModelUnavailable,
   });
   // A text handed over by another part of the page (the empty state's "Judge
   // these results") is submitted the way a typed one is.
@@ -330,11 +328,7 @@ export const SearchBar: React.FC = () => {
   useEffect(() => {
     if (!submitRequest) return;
     clearSubmitRequest();
-    submitSearch(submitRequest.text, {
-      ...(submitRequest.forceKind
-        ? { forceKind: submitRequest.forceKind }
-        : {}),
-    });
+    submitSearch(submitRequest.text);
   }, [submitRequest, clearSubmitRequest, submitSearch]);
   const submitProgress = searchSubmitProgress({
     isRouting,
@@ -470,114 +464,107 @@ export const SearchBar: React.FC = () => {
       </AnimatePresence>
       {!aiMode && !langyAskMode && (
         <>
-          <ProviderPrimerPopover
-            mode="anchor"
-            open={smarterSearchPrimerOpen}
-            onOpenChange={setSmarterSearchPrimerOpen}
-            copy={SMARTER_SEARCH_PRIMER_COPY}
+          <Flex
+            align="center"
+            width="full"
+            gap={2}
+            paddingX={3}
+            paddingY={1.5}
+            borderBottomWidth={status.kind === "error" ? "0" : "1px"}
+            borderColor={statusBorderColor(status)}
+            minHeight="38px"
+            bg={statusBackgroundColor(status)}
+            transition="background 120ms ease, border-color 120ms ease"
+            position="relative"
+            zIndex={1}
           >
-            <Flex
-              align="center"
-              width="full"
-              gap={2}
-              paddingX={3}
-              paddingY={1.5}
-              borderBottomWidth={status.kind === "error" ? "0" : "1px"}
-              borderColor={statusBorderColor(status)}
-              minHeight="38px"
-              bg={statusBackgroundColor(status)}
-              transition="background 120ms ease, border-color 120ms ease"
-              position="relative"
-              zIndex={1}
-            >
-              <AskAiButton
-                quiet={instantEvalBusy}
-                label={askLabel}
-                ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
-                tooltip={
-                  langyRoutesAsk ? "Ask Langy about these traces" : undefined
-                }
-                onClick={langyRoutesAsk ? openLangyAsk : () => setAiMode(true)}
-                needsProviderPrimer={askAiNeedsProviderPrimer}
-                disabledReason={askAiSampleDisabledReason}
-              />
-              {/* The standalone search glyph is only an at-rest hint — the
+            <AskAiButton
+              quiet={instantEvalBusy}
+              label={askLabel}
+              ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
+              tooltip={
+                langyRoutesAsk ? "Ask Langy about these traces" : undefined
+              }
+              onClick={langyRoutesAsk ? openLangyAsk : () => setAiMode(true)}
+              needsProviderPrimer={askAiNeedsProviderPrimer}
+              disabledReason={askAiSampleDisabledReason}
+            />
+            {/* The standalone search glyph is only an at-rest hint — the
                 placeholder already says what the field is. Once focused or
                 non-empty it reads as clutter wedged between the ask button
                 and the text, so it drops out and the editor sits directly
                 beside the ask button. */}
-              {!editorFocused && !hasContent && (
-                <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
-                  <Search />
-                </Icon>
+            {!editorFocused && !hasContent && (
+              <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
+                <Search />
+              </Icon>
+            )}
+
+            <Box
+              flex={1}
+              minWidth={0}
+              position="relative"
+              css={editorStyles}
+              data-instant-eval-busy={instantEvalBusy ? "" : undefined}
+            >
+              {editorMounted ? (
+                <ActiveSearchEditor
+                  queryText={queryText}
+                  applyQueryText={applyQueryText}
+                  submitQueryText={submitSearch}
+                  autoFocus
+                  onHasContentChange={setEditorHasContent}
+                  valueResolver={valueResolver}
+                  onTokenClick={setTokenAnchor}
+                  onSuggestionOpenChange={setSuggestionOpen}
+                  onCursorAnchorChange={setCursorAnchorX}
+                  onFocusChange={setEditorFocused}
+                  clearNonce={clearNonce}
+                />
+              ) : (
+                <PlaceholderEditor
+                  queryText={queryText}
+                  onActivate={requestEditor}
+                  onApplyQueryText={applyQueryText}
+                  onTokenClick={setTokenAnchor}
+                />
               )}
+              {hasContent && editorFocused && !suggestionOpen && (
+                <SearchSubmitHint anchorX={cursorAnchorX} />
+              )}
+            </Box>
 
-              <Box
-                flex={1}
-                minWidth={0}
-                position="relative"
-                css={editorStyles}
-                data-instant-eval-busy={instantEvalBusy ? "" : undefined}
-              >
-                {editorMounted ? (
-                  <ActiveSearchEditor
-                    queryText={queryText}
-                    applyQueryText={applyQueryText}
-                    submitQueryText={submitSearch}
-                    autoFocus
-                    onHasContentChange={setEditorHasContent}
-                    valueResolver={valueResolver}
-                    onTokenClick={setTokenAnchor}
-                    onSuggestionOpenChange={setSuggestionOpen}
-                    onCursorAnchorChange={setCursorAnchorX}
-                    onFocusChange={setEditorFocused}
-                    clearNonce={clearNonce}
-                  />
-                ) : (
-                  <PlaceholderEditor
-                    queryText={queryText}
-                    onActivate={requestEditor}
-                    onApplyQueryText={applyQueryText}
-                    onTokenClick={setTokenAnchor}
-                  />
-                )}
-                {hasContent && editorFocused && !suggestionOpen && (
-                  <SearchSubmitHint anchorX={cursorAnchorX} />
-                )}
-              </Box>
-
-              {/* Only render the badge for non-error statuses — parse errors
+            {/* Only render the badge for non-error statuses — parse errors
                 get the full inline banner below, which is far more visible
                 and positioned right under the input where the user is
                 looking. Showing the badge *and* the banner would be
                 redundant and noisy. */}
-              {status.kind !== "error" && <StatusBadge status={status} />}
-              {submitProgress && (
-                <HStack
-                  gap={1.5}
-                  flexShrink={0}
-                  color="fg.subtle"
-                  role="status"
-                  data-testid="search-submit-progress"
-                >
-                  <Spinner size="xs" />
-                  <Text textStyle="xs">{submitProgress}</Text>
-                </HStack>
-              )}
-              {hasContent ? (
-                <ClearButton onClear={handleClear} />
-              ) : (
-                <Kbd>{"/"}</Kbd>
-              )}
-              <TokenValuePicker
-                anchor={tokenAnchor}
-                onClose={() => setTokenAnchor(null)}
-              />
-            </Flex>
-          </ProviderPrimerPopover>
+            {status.kind !== "error" && <StatusBadge status={status} />}
+            {submitProgress && (
+              <HStack
+                gap={1.5}
+                flexShrink={0}
+                color="fg.subtle"
+                role="status"
+                data-testid="search-submit-progress"
+              >
+                <Spinner size="xs" />
+                <Text textStyle="xs">{submitProgress}</Text>
+              </HStack>
+            )}
+            {hasContent ? (
+              <ClearButton onClear={handleClear} />
+            ) : (
+              <Kbd>{"/"}</Kbd>
+            )}
+            <TokenValuePicker
+              anchor={tokenAnchor}
+              onClose={() => setTokenAnchor(null)}
+            />
+          </Flex>
           {/* Anchored to a point at the bar's bottom-left rather than to the
-              bar itself: the bar already anchors the primer popover, and a
-              second anchor nested around the editor would remount it. */}
+              bar itself: an anchor nested around the editor would remount the
+              popover on every keystroke. */}
           <InstantEvalRefusalPopover
             refusal={instantEval.refusal}
             onClose={instantEval.dismissRefusal}
@@ -599,6 +586,7 @@ export const SearchBar: React.FC = () => {
             onClose={instantEval.searchWordsInstead}
           />
           <SearchedAsNotice />
+          <SearchFallbackNotice />
           {/* Unified error banner — handles both parse errors and AI errors.
               AI error takes priority when both are present (AI mode is the
               active flow). Rendered outside the Flex row so it spans the

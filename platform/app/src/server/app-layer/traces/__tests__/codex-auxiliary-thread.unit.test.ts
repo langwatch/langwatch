@@ -347,6 +347,58 @@ describe("TraceRequestCollectionService and codex helper threads", () => {
     });
   });
 
+  describe("given the helper turn exported under the app-server scope", () => {
+    const appServerScope = { name: "codex-app-server" };
+
+    describe("when the batch is ingested", () => {
+      /** @scenario "A codex app-server helper request is stored with its thread id" */
+      it("stores the request span stamped with the helper's thread id and filters the rest", async () => {
+        const { service, recordSpan } = makeService();
+
+        await service.handleOtlpTraceRequest(
+          tenantId,
+          batchOf([
+            {
+              scope: appServerScope,
+              spans: spansOf(
+                HELPER_TURN_TRACE,
+                "turn/start",
+                "app_server.serialized_request_queue",
+              ),
+            },
+          ]),
+          piiRedactionLevel,
+        );
+
+        const stored = recordedSpans(recordSpan);
+        expect(stored.map((s) => s.name)).toEqual(["turn/start"]);
+        expect(stored[0]!.attributes[HELPER_THREAD_ID_ATTR]).toBe(
+          HELPER_THREAD_ID,
+        );
+        expect(
+          codexAuxiliarySessionFacts({
+            scopeName: appServerScope.name,
+            attributes: stored[0]!.attributes,
+          }),
+        ).toEqual({ [AUXILIARY_SESSION_FACT]: true });
+      });
+
+      it("filters the user's own request span and stores the turn span unstamped", async () => {
+        const { service, recordSpan } = makeService();
+
+        await service.handleOtlpTraceRequest(
+          tenantId,
+          batchOf([{ scope: appServerScope, spans: spansOf(USER_TURN_TRACE) }]),
+          piiRedactionLevel,
+        );
+
+        const stored = recordedSpans(recordSpan);
+        expect(stored.map((s) => s.name)).toEqual(["session_task.turn"]);
+        expect(stored[0]!.attributes[HELPER_THREAD_ID_ATTR]).toBeUndefined();
+      });
+    });
+  });
+
   describe("given the user's own turn", () => {
     describe("when its spans are ingested", () => {
       /** @scenario "A codex turn of the user's own is not marked" */

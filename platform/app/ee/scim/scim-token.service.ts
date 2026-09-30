@@ -357,6 +357,129 @@ export class ScimTokenService {
   }
 
   /**
+   * Re-homes one connection's directory sync onto another.
+   *
+   * A sign-in LangWatch set up came with a directory sync LangWatch set up,
+   * so the update cannot ask the customer to point it anywhere: when the
+   * update finishes, the tokens the identity provider already presents move
+   * to the replacement, along with the people and external ids they
+   * provisioned, and whatever pushes today keeps pushing. Each moved token
+   * starts the replacement's sync history the way minting it would have, and
+   * the previous connection's history ends.
+   *
+   * A person or external id the replacement already provisioned itself is
+   * kept as the replacement's own; the previous connection's claim on them is
+   * dropped rather than duplicated.
+   *
+   * Safe to run again after a crash at any point: the replacement's history
+   * is started before anything moves (starting it twice states nothing), only
+   * the tokens it was started for are moved, and the rows are re-read inside
+   * the transaction that moves them.
+   */
+  async moveToConnection({
+    organizationId,
+    fromConnectionId,
+    toConnectionId,
+  }: {
+    organizationId: string;
+    fromConnectionId: string;
+    toConnectionId: string;
+  }): Promise<{ moved: number }> {
+    const replacement = await this.prisma.ssoConnection.findFirst({
+      where: { id: toConnectionId, organizationId },
+      select: { id: true },
+    });
+    if (!replacement) {
+      throw new ScimConnectionNotFoundError(toConnectionId);
+    }
+    const tokens = await this.prisma.scimToken.findMany({
+      where: { organizationId, connectionId: fromConnectionId },
+      select: { id: true },
+    });
+    for (const token of tokens) {
+      await this.syncLifecycle.tokenIssued({
+        organizationId,
+        connectionId: toConnectionId,
+        tokenId: token.id,
+      });
+    }
+    await this.moveDirectoryRows({
+      organizationId,
+      fromConnectionId,
+      toConnectionId,
+      tokenIds: tokens.map(({ id }) => id),
+    });
+    await this.syncLifecycle.revoked({
+      organizationId,
+      connectionId: fromConnectionId,
+      tokenId: null,
+      cause: "teardown",
+    });
+    return { moved: tokens.length };
+  }
+
+  /**
+   * Moves the tokens, people and external ids in one transaction, reading the
+   * replacement's own rows inside it so a push landing mid-move cannot collide.
+   */
+  private async moveDirectoryRows({
+    organizationId,
+    fromConnectionId,
+    toConnectionId,
+    tokenIds,
+  }: {
+    organizationId: string;
+    fromConnectionId: string;
+    toConnectionId: string;
+    tokenIds: string[];
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const [ownPeople, ownExternalIds] = await Promise.all([
+        tx.scimDirectoryUser.findMany({
+          where: { organizationId, connectionId: toConnectionId },
+          select: { userId: true },
+        }),
+        tx.scimExternalId.findMany({
+          where: { organizationId, connectionId: toConnectionId },
+          select: { externalId: true },
+        }),
+      ]);
+      await tx.scimToken.updateMany({
+        where: {
+          organizationId,
+          connectionId: fromConnectionId,
+          id: { in: tokenIds },
+        },
+        data: { connectionId: toConnectionId },
+      });
+      await tx.scimDirectoryUser.deleteMany({
+        where: {
+          organizationId,
+          connectionId: fromConnectionId,
+          userId: { in: ownPeople.map(({ userId }) => userId) },
+        },
+      });
+      await tx.scimDirectoryUser.updateMany({
+        where: { organizationId, connectionId: fromConnectionId },
+        data: { connectionId: toConnectionId },
+      });
+      await tx.scimExternalId.deleteMany({
+        where: {
+          organizationId,
+          connectionId: fromConnectionId,
+          externalId: {
+            in: ownExternalIds.map(({ externalId }) => externalId),
+          },
+        },
+      });
+      await tx.scimExternalId.updateMany({
+        where: { organizationId, connectionId: fromConnectionId },
+        data: { connectionId: toConnectionId },
+      });
+    });
+  }
+
+  /**
    * Verifies a bearer token and returns the associated organization ID.
    * Updates lastUsedAt on successful verification.
    */

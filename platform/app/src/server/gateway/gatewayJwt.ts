@@ -35,6 +35,13 @@ export type GatewayJwtClaims = {
    *  this instant, so a key that runs out stops serving on schedule even while
    *  the control plane is unreachable. */
   vk_expires_at: number | null;
+  /** The hosted services the license behind this credential is entitled to
+   *  (ADR-141). Present only when a license token was resolved, which is what
+   *  lets the gateway tell a connected install's traffic from an ordinary
+   *  key's: a license entitled to nothing sends an empty array, a virtual key
+   *  sends the claim not at all. Omitted rather than null, because null would
+   *  decode the same way an empty array does. */
+  connect_services?: string[];
 };
 
 /** What a caller hands the signer: the identity claims, plus the key's own
@@ -102,5 +109,8 @@ export function verifyGatewayJwt(token: string): GatewayJwtClaims {
     principal_id: payload.principal_id,
     revision: payload.revision,
     vk_expires_at: payload.vk_expires_at ?? null,
+    ...(payload.connect_services
+      ? { connect_services: payload.connect_services }
+      : {}),
   };
 }

@@ -309,6 +309,34 @@ async function bootUsageStatsWorker(
   }
 }
 
+// The daily license sync of a connected install (no-op unless an operator
+// switched Connect on).
+async function bootLicenseSyncWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startLicenseSyncWorker } = await import("~/server/licenseSyncWorker");
+  const licenseSyncWorker = startLicenseSyncWorker();
+  if (licenseSyncWorker) {
+    shutdownHandles.push(() => licenseSyncWorker.stop());
+    logger.info("license sync worker ready");
+  }
+}
+
+// The daily billing tick of a connected self-hosted customer (no-op off
+// LangWatch Cloud).
+async function bootConnectedBillingWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startConnectedBillingWorker } = await import(
+    "~/server/connectedBillingWorker"
+  );
+  const connectedBillingWorker = startConnectedBillingWorker();
+  if (connectedBillingWorker) {
+    shutdownHandles.push(() => connectedBillingWorker.stop());
+    logger.info("connected billing worker ready");
+  }
+}
+
 /**
  * The worker's liveness path. Deliberately UNAUTHENTICATED and deliberately
  * not `/metrics`.
@@ -625,8 +653,9 @@ async function respondToLivenessThread(
  * Boots the background worker stack: ingestion pullers, topic clustering,
  * ClickHouse storage-stats collection, the scenario executor pool (plus its
  * NLP fetch dispatcher cleanup), the enqueue-rate anomaly detector, the
- * governance spend-spike detector, the self-hosted usage-stats telemetry,
- * and (optionally) the Prometheus metrics HTTP server.
+ * governance spend-spike detector, the self-hosted usage-stats telemetry, the
+ * daily license sync of a connected install, and (optionally) the Prometheus
+ * metrics HTTP server.
  *
  * Assumes the App has ALREADY been initialized by the caller with a
  * worker-capable role — `initializeWorkerApp()` for the standalone deployment,
@@ -723,6 +752,12 @@ export async function startWorkers(
           break;
         case "usage-stats":
           await bootUsageStatsWorker(shutdownHandles);
+          break;
+        case "license-sync":
+          await bootLicenseSyncWorker(shutdownHandles);
+          break;
+        case "connected-billing":
+          await bootConnectedBillingWorker(shutdownHandles);
           break;
         case "realtime-session-poller":
           await bootRealtimeSessionPoller(shutdownHandles);

@@ -494,9 +494,17 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:unit --run --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-              --dangerouslyIgnoreUnhandledErrors
+            # `vitest --changed` over an empty change set crashes natively on
+            # Linux, so skip it when vitest would select nothing anyway. If the
+            # helper itself fails, vitest runs as before.
+            CHANGED=$(bash ../../.github/scripts/vitest-changed-files.sh origin/main) || CHANGED="(git failed)"
+            if [ -z "$CHANGED" ]; then
+              echo "No files changed since origin/main, no unit tests selected."
+            else
+              pnpm test:unit --run --changed origin/main --passWithNoTests \
+                --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+                --dangerouslyIgnoreUnhandledErrors
+            fi
           else
             # shellcheck disable=SC2086
             pnpm test:unit --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }} $COV $DUR \
@@ -629,9 +637,15 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:component --run --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
-              --dangerouslyIgnoreUnhandledErrors
+            # Same empty change set guard as test-unit.
+            CHANGED=$(bash ../../.github/scripts/vitest-changed-files.sh origin/main) || CHANGED="(git failed)"
+            if [ -z "$CHANGED" ]; then
+              echo "No files changed since origin/main, no component tests selected."
+            else
+              pnpm test:component --run --changed origin/main --passWithNoTests \
+                --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
+                --dangerouslyIgnoreUnhandledErrors
+            fi
           else
             # shellcheck disable=SC2086
             pnpm test:component --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.component-shard-count }} $COV $DUR \
@@ -888,9 +902,15 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-            pnpm test:integration --changed origin/main --passWithNoTests \
-              --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
-              --outputFile=test-results.json
+            # Same empty change set guard as test-unit.
+            CHANGED=$(bash ../../.github/scripts/vitest-changed-files.sh origin/main) || CHANGED="(git failed)"
+            if [ -z "$CHANGED" ]; then
+              echo "No files changed since origin/main, no integration tests selected."
+            else
+              pnpm test:integration --changed origin/main --passWithNoTests \
+                --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
+                --outputFile=test-results.json
+            fi
           else
             # shellcheck disable=SC2086
             pnpm test:integration --shard=${{ matrix.shard }}/${{ matrix.count }} $COV $DUR \
@@ -1431,6 +1451,9 @@ jobs:
 
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
+
+      - name: Test vitest-changed-files.sh
+        run: bash .github/scripts/__tests__/vitest-changed-files.test.sh
 
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh

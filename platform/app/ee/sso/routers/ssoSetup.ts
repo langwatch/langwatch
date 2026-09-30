@@ -5,10 +5,12 @@ import {
   ssoArrivalPolicySchema,
   ssoMigrationRouteSchema,
 } from "@langwatch/identity";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
+  EnterprisePlanRequiredError,
 } from "~/server/api/enterprise";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
@@ -204,12 +206,41 @@ const enterpriseSsoProcedure = protectedProcedure
   .input(orgInput)
   .permission("sso:manage")
   .use(async ({ input, next }) => {
-    await assertEnterprisePlan({
-      organizationId: input.organizationId,
-      errorMessage: ENTERPRISE_FEATURE_ERRORS.SSO,
-    });
+    await requireEnterpriseSso({ organizationId: input.organizationId });
     return next();
   });
+
+/**
+ * The plan refusal, as a named failure rather than a sentence.
+ *
+ * The cause is knowable and the customer can act on it, so the refusal
+ * carries the code the client registry keys its copy off
+ * (`enterprise_plan_required`) and the 402 that says "buy the plan" rather
+ * than "fix the request" (ADR-045). A bare `FORBIDDEN` carrying prose can only
+ * render under the generic unknown title.
+ *
+ * Only the plan's own refusal is translated. Anything else the plan read
+ * throws is a platform failure and keeps its own way out: dressing an
+ * infrastructure error up as a handled one promises the caller an action they
+ * do not have.
+ */
+async function requireEnterpriseSso({
+  organizationId,
+}: {
+  organizationId: string;
+}): Promise<void> {
+  try {
+    await assertEnterprisePlan({
+      organizationId,
+      errorMessage: ENTERPRISE_FEATURE_ERRORS.SSO,
+    });
+  } catch (error) {
+    if (error instanceof TRPCError && error.code === "FORBIDDEN") {
+      throw new EnterprisePlanRequiredError("SSO");
+    }
+    throw error;
+  }
+}
 
 export const ssoSetupRouter = createTRPCRouter({
   /**
@@ -372,10 +403,7 @@ export const ssoSetupRouter = createTRPCRouter({
     .permission("sso:manage")
     .mutation(async ({ ctx, input }) => {
       if (input.route === "direct") {
-        await assertEnterprisePlan({
-          organizationId: input.organizationId,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.SSO,
-        });
+        await requireEnterpriseSso({ organizationId: input.organizationId });
       }
       const actor = await audited({
         ctx,

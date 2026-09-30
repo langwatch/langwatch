@@ -4,6 +4,7 @@ import { createIdentityMigrationFixture } from "~/server/app-layer/system-migrat
 // The routine-versus-incident split below is a LOG LEVEL, so the logger is
 // the seam it has to be observed at.
 const log = vi.hoisted(() => ({
+  debug: vi.fn(),
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
@@ -308,6 +309,119 @@ describe("given an account that is not a connection at all", () => {
       });
 
       expect(parts.findConnectionForSignIn).not.toHaveBeenCalled();
+    });
+  });
+});
+
+/**
+ * A member who later lacks access is nothing to go on unless the arrival
+ * that admitted or declined them left a trace. `arrivalDecisionFor` returns
+ * `null` silently on several distinct conditions; each one now logs once,
+ * with a stable machine-readable `reason` so a later "why doesn't this
+ * member have access" search has something to grep for. NO behaviour
+ * change: every case below still asserts the decision stays declined.
+ */
+describe("given an arrival this connection was never going to admit", () => {
+  const REASON_MESSAGE =
+    "a single sign-on arrival was not considered for admission";
+
+  describe("when the account id is not connection-shaped at all", () => {
+    it("logs once at debug with reason not_a_connection_id and admits nobody", async () => {
+      const parts = serviceOver({ row: null });
+
+      await parts.service.admit({
+        user: USER,
+        connectionId: "google",
+        domain: "acme.com",
+      });
+
+      // The ordinary sign-in path: a line per arrival at info would be noise.
+      expect(log.info).not.toHaveBeenCalled();
+      expect(log.debug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: "not_a_connection_id",
+          connectionId: "google",
+        }),
+        REASON_MESSAGE,
+      );
+      expect(parts.createMembership).not.toHaveBeenCalled();
+      expect(parts.requestFromSsoArrival).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the connection id looks right but does not resolve", () => {
+    it("logs once with reason connection_not_found", async () => {
+      const parts = serviceOver({ row: null });
+
+      await admit(parts);
+
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: "connection_not_found",
+          connectionId: CONNECTION_ID,
+        }),
+        REASON_MESSAGE,
+      );
+      expect(parts.createMembership).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the connection is not live yet", () => {
+    it("logs once with reason domain_not_live", async () => {
+      const parts = serviceOver({ row: connection({ state: "VERIFIED" }) });
+
+      await admit(parts);
+
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: "domain_not_live",
+          connectionId: CONNECTION_ID,
+          organizationId: ORG.id,
+        }),
+        REASON_MESSAGE,
+      );
+    });
+  });
+
+  describe("when the address is on a domain the connection never proved", () => {
+    it("logs once with reason domain_not_proved", async () => {
+      const parts = serviceOver({ row: connection() });
+
+      await admit(parts, "elsewhere.com");
+
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: "domain_not_proved",
+          connectionId: CONNECTION_ID,
+          organizationId: ORG.id,
+        }),
+        REASON_MESSAGE,
+      );
+    });
+  });
+
+  describe("when the domain's published record has lapsed", () => {
+    it("logs once with reason domain_proof_lapsed", async () => {
+      // `proved` and `lapsed` are checked in order, and a LAPSED proof state
+      // fails `proved` first (see qualifySsoDomainOwnership) — so reaching
+      // THIS reason needs the proof itself still VERIFIED while the
+      // connection's separately-derived `lapsedDomains` set already lists
+      // the domain, the state ADR-123 calls "still routes, stops
+      // provisioning".
+      const parts = serviceOver({
+        row: connection({ lapsedDomains: ["acme.com"] }),
+      });
+
+      await admit(parts);
+
+      expect(log.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: "domain_proof_lapsed",
+          connectionId: CONNECTION_ID,
+          organizationId: ORG.id,
+        }),
+        REASON_MESSAGE,
+      );
     });
   });
 });

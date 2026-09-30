@@ -172,6 +172,39 @@ export function alignDevAuthUrlsToPort(processEnv = process.env) {
 /** @type {any} */
 let _env = null;
 
+/**
+ * ADR-139: a Connect endpoint carries the license token in an Authorization
+ * header, so it must be https. The one exception is a loopback host, where a
+ * developer runs both sides on one machine; the gateway's langwatch provider
+ * lane applies the same rule.
+ */
+const CONNECT_LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** @param {string} value */
+export const isAcceptableConnectEndpoint = (value) => {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol === "https:") return true;
+  return (
+    parsed.protocol === "http:" &&
+    CONNECT_LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())
+  );
+};
+
+/** @param {string} name the variable, named in the refusal */
+export const connectEndpointSchema = (name) =>
+  z
+    .string()
+    .url()
+    .refine(isAcceptableConnectEndpoint, {
+      message: `${name} must use https (http is accepted for a loopback host only)`,
+    })
+    .optional();
+
 export function createEnvConfig() {
   if (_env) return _env;
 
@@ -389,6 +422,24 @@ export function createEnvConfig() {
       // ADR-027: instance-level license, bootstraps + recovers SSO on
       // self-hosted deployments without requiring an in-DB org license.
       LANGWATCH_LICENSE_KEY: z.string().optional(),
+      // ADR-139: the escape hatch that switches LangWatch-hosted services and
+      // usage telemetry off for this install. What a deployment may call is
+      // otherwise decided by the license it holds, not by a variable: a
+      // license naming no hosted service reaches nothing. Set this and nothing
+      // below is read and no outbound call is made at all.
+      LANGWATCH_CONNECT_DISABLED: z.boolean().optional(),
+      // Both endpoints are origins, and both have a default in
+      // `ee/licensing/connect/install/connectConfig.ts`.
+      LANGWATCH_CONNECT_GATEWAY_ENDPOINT: connectEndpointSchema(
+        "LANGWATCH_CONNECT_GATEWAY_ENDPOINT",
+      ),
+      LANGWATCH_CONNECT_LICENSE_ENDPOINT: connectEndpointSchema(
+        "LANGWATCH_CONNECT_LICENSE_ENDPOINT",
+      ),
+      // Overrides the identity this install presents. The default is minted
+      // once and kept in this install's own database, so it survives restarts,
+      // backups and hostname changes.
+      LANGWATCH_CONNECT_INSTANCE_ID: z.string().optional(),
       // ADR-117 §7: the one flag covering the identifier-first router (D03)
       // and the screens that render its decisions (D13). Three-valued and
       // shipped `off`, because the front door is the highest-risk flip in the
@@ -733,6 +784,10 @@ export function createEnvConfig() {
       STRIPE_WEBHOOK_SECRET: z.string().optional(),
       STRIPE_LICENSE_PAYMENT_LINK_ID: z.string().optional(),
       STRIPE_LICENSE_PAYMENT_LINK_URL: z.string().optional(),
+      /// Bank details printed on the invoices of a customer that wires the
+      /// money instead of paying into a virtual bank account. Empty means the
+      /// invoice carries no footer.
+      LANGWATCH_BILLING_BANK_DETAILS: z.string().optional(),
       ADMIN_EMAILS: z.string().optional(),
       HUBSPOT_PORTAL_ID: z.string().optional(),
       HUBSPOT_REACHED_LIMIT_FORM_ID: z.string().optional(),
@@ -746,6 +801,9 @@ export function createEnvConfig() {
       SLACK_PLAN_LIMIT_CHANNEL: z.string().optional(),
       SLACK_CHANNEL_SIGNUPS: z.string().optional(),
       SLACK_CHANNEL_SUBSCRIPTIONS: z.string().optional(),
+      // Where self-hosted lead signals go (ADR-139). Falls back to
+      // SLACK_CHANNEL_SIGNUPS when unset, so a signal is never posted nowhere.
+      SLACK_CHANNEL_SELF_HOSTED: z.string().optional(),
       // Agent issue-report alerts (bot token of the LangWatch Agents Slack
       // app; alerts are skipped entirely when unset)
       SLACK_BUG_REPORTS_BOT_TOKEN: z.string().optional(),
@@ -818,6 +876,17 @@ export function createEnvConfig() {
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
+      LANGWATCH_CONNECT_DISABLED:
+        process.env.LANGWATCH_CONNECT_DISABLED === "1" ||
+        process.env.LANGWATCH_CONNECT_DISABLED?.toLowerCase() === "true",
+      // Blank means unset, so a templated deployment line with no value keeps
+      // the default rather than failing the URL check.
+      LANGWATCH_CONNECT_GATEWAY_ENDPOINT:
+        process.env.LANGWATCH_CONNECT_GATEWAY_ENDPOINT || undefined,
+      LANGWATCH_CONNECT_LICENSE_ENDPOINT:
+        process.env.LANGWATCH_CONNECT_LICENSE_ENDPOINT || undefined,
+      LANGWATCH_CONNECT_INSTANCE_ID:
+        process.env.LANGWATCH_CONNECT_INSTANCE_ID || undefined,
       MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
       LOCAL_PASSWORDS_ENABLED: process.env.LOCAL_PASSWORDS_ENABLED,
       SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
@@ -941,6 +1010,8 @@ export function createEnvConfig() {
         process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       STRIPE_LICENSE_PAYMENT_LINK_URL:
         process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
+      LANGWATCH_BILLING_BANK_DETAILS:
+        process.env.LANGWATCH_BILLING_BANK_DETAILS,
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
       HUBSPOT_PORTAL_ID: process.env.HUBSPOT_PORTAL_ID,
       HUBSPOT_REACHED_LIMIT_FORM_ID: process.env.HUBSPOT_REACHED_LIMIT_FORM_ID,
@@ -952,6 +1023,7 @@ export function createEnvConfig() {
       SLACK_BUG_REPORTS_CHANNEL: process.env.SLACK_BUG_REPORTS_CHANNEL,
       SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
       SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
+      SLACK_CHANNEL_SELF_HOSTED: process.env.SLACK_CHANNEL_SELF_HOSTED,
       AUTH0_SCIM_WEBHOOK_SECRET: process.env.AUTH0_SCIM_WEBHOOK_SECRET,
     },
     /**

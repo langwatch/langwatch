@@ -12,6 +12,7 @@ import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.cl
 import type { RedisConnection } from "@langwatch/redis-client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
@@ -132,6 +133,8 @@ export function installClickHouseTestApp({
       required,
       requiredOrg,
     ),
+    // Real: the REST project routes read and write projects through it.
+    projects: new ProjectService(new PrismaProjectRepository(prisma)),
     _eventSourcing: eventSourcing,
   });
 }

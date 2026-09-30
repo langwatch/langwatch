@@ -144,6 +144,7 @@ vi.mock(
     // exhaustive on this Record too. Nothing in this suite reaches either.
     secondaryStorage: () => ({ configured: false, connection: () => null }),
     betterAuthInstance: () => ({ provide: () => undefined }),
+    microsoftAccountRekey: () => async () => undefined,
     // ADR-129 slice 21b: the three satellite roots folded into the runtime.
     identityLookup: () => ({}),
     linkProposals: () => ({}),

@@ -7,19 +7,13 @@ import {
 import { AuthRateLimitedError } from "~/server/auth/errors";
 import { rateLimit } from "~/server/rateLimit";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { codeChallengeSchema } from "./identity.schemas";
 
 /** How long "not now" lasts, in whole seconds, so a countdown can say a
  *  number rather than "later". */
 function secondsUntil(resetAt: number): number {
   return Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
 }
-
-/**
- * RFC 7636 §4.2: the S256 challenge, base64url of a SHA-256 digest — 43
- * characters from the unreserved set. Checked here rather than trusted,
- * because an unbounded string would be stored and compared as one.
- */
-const codeChallengeSchema = z.string().regex(/^[A-Za-z0-9._~-]{43}$/);
 
 /**
  * The identity surface the app itself calls (D01).

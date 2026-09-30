@@ -89,6 +89,20 @@ function buildPrisma() {
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
     },
+    // A revoke writes through the fenced SQL statement and reads the row
+    // back. The statement binds the cause, then the key id.
+    $executeRaw: vi
+      .fn()
+      .mockImplementation(
+        (_sql: TemplateStringsArray, ...values: unknown[]) => {
+          txState.updatedApiKey = {
+            ...txState.createdApiKey,
+            revokedAt: new Date(),
+            revocationCause: values[0],
+          };
+          return Promise.resolve(1);
+        },
+      ),
     apiKey: {
       findFirst: vi.fn(),
       create: vi.fn().mockImplementation((args: any) => {
@@ -108,11 +122,6 @@ function buildPrisma() {
       update: vi.fn().mockImplementation((args: any) => {
         txState.updatedApiKey = { ...txState.createdApiKey, ...args.data };
         return txState.updatedApiKey;
-      }),
-      // A revoke writes through the fenced updateMany and reads the row back.
-      updateMany: vi.fn().mockImplementation((args: any) => {
-        txState.updatedApiKey = { ...txState.createdApiKey, ...args.data };
-        return { count: 1 };
       }),
       findUniqueOrThrow: vi
         .fn()

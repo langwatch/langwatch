@@ -162,12 +162,6 @@ Feature: Instant Evals inside the Trace Explorer
       And "Judge these results" submits the question through the search bar, with the other chips kept
 
     @unit
-    Scenario: A search the page routed once is not classified again
-      Given a submit that names the route it already took
-      When the router receives it
-      Then the classifier is not asked and that route is built
-
-    @unit
     Scenario: An eval chip is green, whatever its target
       Given the search bar holds `eval:"the user is annoyed"`, `eval.trace:"a"`, `eval.conversation:"b"` and `eval.llm:"c"`
       When the chips are drawn
@@ -185,6 +179,30 @@ Feature: Instant Evals inside the Trace Explorer
       Given a chip `eval:"the user is annoyed"` and no run under its key
       When the chips are resolved
       Then the chip is reported as pending and no evalRuns entry is sent for it
+
+    @integration
+    Scenario: A chip typed by hand starts its run on Enter
+      Given the reader types `status:error AND eval:"the user is annoyed"` and no run has answered that chip
+      When Enter is pressed
+      Then the chip is applied so the reader sees what they typed
+      And the run is estimated and started on the question as written, with the other terms as its filter
+      And no model rewrites the question on the way, since the reader wrote it
+      And a chip spelled `eval.conversation:` keeps judging conversations, whatever the lens shows
+      And the same question under another target is another chip, kept in the filter of the run that starts
+      And a chip a run already answered is applied with no call at all
+      And a refusal leaves the typed chip where it is rather than replacing it with a phrase search
+      And "Judge these results" under an empty table starts the same run the same way
+
+    @unit
+    Scenario: A space belongs to the question being typed
+      Given the reader has typed `eval:annoyed` with no quotes
+      When they press space
+      Then the value is quoted and the caret stays inside the quotes, so the next words join the question
+      And picking `eval` from the field list opens the quotes for them in the same way
+      And a space inside a value already quoted is typed as a space
+      And a space after an ordinary field's value still ends the term
+      And while the caret is inside the quotes no field list opens on a word of the question
+      And Arrow Right, End or a click leaves the quotes, Enter searches from inside them, and a quote typed against the closing quote steps over it rather than opening a second pair
 
   # ---------------------------------------------------------------------------
   # Starting a run
@@ -355,10 +373,27 @@ Feature: Instant Evals inside the Trace Explorer
 
     @integration
     Scenario: A missing classifier opens the model popover and the phrase search runs
-      Given the deployment has no classifier
+      Given the deployment has no classifier, or the server refuses the run as not enabled for a released project
       When the Explorer receives an Instant Eval payload
       Then a closable popover says to configure a model
       And closing it applies the phrase search
+
+    @integration
+    Scenario: Instant Evals switched off open the contact-us popover and nothing is searched
+      Given the Instant Evals flag is off for the project
+      When the reader submits an eval chip
+      Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
+      And no estimate is requested and the typed query stays in the bar
+      And closing it, by Escape or a click outside, keeps the typed query and searches nothing
+      And a chip typed alongside other words is refused the same way, before any request
+
+    @integration
+    Scenario: A flag read still in flight lets the submit reach the estimate
+      Given the flag read has not answered yet
+      When the user submits an eval chip
+      Then the estimate is requested
+      And no popover opens before the estimate responds
+      And a server refusal of not_enabled then opens the model popover, never the contact-us one
 
     @integration
     Scenario: Any other refusal falls back to the phrase search

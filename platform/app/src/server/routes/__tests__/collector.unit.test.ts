@@ -331,6 +331,48 @@ describe("POST /api/collector", () => {
     });
   });
 
+  // The REST door applies the same storage predicate as the OTLP one, so a
+  // span it accepts can always be written. A zero start walks past the 13-digit
+  // check above and would otherwise be filed in 1970.
+  describe("given a span whose time cannot be stored", () => {
+    describe("when its start time is zero and a valid sibling arrives with it", () => {
+      /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+      it("drops only that span, names the field, and still dispatches the sibling", async () => {
+        const res = await postCollector({
+          trace_id: "trace-1",
+          spans: [
+            makeSpan(1, { timestamps: { started_at: 0, finished_at: NOW } }),
+            makeSpan(2),
+          ],
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.partialSuccess.rejectedSpans).toBe(1);
+        expect(body.partialSuccess.errorMessage).toContain("started_at");
+        expect(mockIngestNormalizedSpan).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when its end time is zero", () => {
+      /** @scenario "A span whose start time cannot be stored is rejected at ingestion" */
+      it("drops it, since the end time is written to the same kind of column", async () => {
+        const res = await postCollector({
+          trace_id: "trace-1",
+          spans: [
+            makeSpan(1, { timestamps: { started_at: NOW, finished_at: 0 } }),
+          ],
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.partialSuccess.rejectedSpans).toBe(1);
+        expect(body.partialSuccess.errorMessage).toContain("finished_at");
+        expect(mockIngestNormalizedSpan).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given a body that is valid json but not an object", () => {
     // `typeof null` is "object" and so is an array, so both walk past a bare
     // typeof check and reach `"metadata" in body`, which throws on null. That

@@ -43,8 +43,12 @@ export function sendsIngestKeyInClear(endpoint: string | undefined): boolean {
  * `.localhost` names the local dev proxy hands out, which RFC 6761 reserves for
  * loopback, and the IPv4-mapped IPv6 spelling of a loopback address, which is
  * what `new URL()` normalises `[::ffff:127.0.0.1]` into.
+ *
+ * Exported because the same question decides more than the key's exposure: a
+ * command pointed at loopback is pointed at a local instance, which is what
+ * `global-config-isolation.ts` warns about.
  */
-function isLoopbackHost(hostname: string): boolean {
+export function isLoopbackHost(hostname: string): boolean {
 	const host = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
 	if (host === "localhost" || host.endsWith(".localhost")) return true;
 	if (LOOPBACK_V6.has(host)) return true;

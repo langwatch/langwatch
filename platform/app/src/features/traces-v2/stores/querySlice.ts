@@ -21,6 +21,7 @@ import {
   serialize,
 } from "~/server/app-layer/traces/query-language/parse";
 import { validateAst } from "~/server/app-layer/traces/query-language/queries";
+import type { ModelTrouble } from "~/server/app-layer/traces/search-router/contracts";
 import {
   excludedFacetQuery,
   toggledFacetQuery,
@@ -113,6 +114,18 @@ export interface QuerySlice {
     prompt: string;
     query: string;
   } | null;
+
+  /**
+   * What the strip under the bar says about the search that just ran, when a
+   * model was missing from the way it was shaped.
+   *
+   * Scoped to the query it is about rather than cleared by every mutation:
+   * the strip shows while `query` is still what the bar holds, so the next
+   * edit retires it without this slice having to hear about the edit. The
+   * `projectId` guard is `lastAiTranslation`'s, for the same reason: the
+   * store outlives a workspace switch.
+   */
+  searchNotice: SearchNotice | null;
 
   /** Apply a query string from the search bar (parses → AST) */
   applyQueryText: (text: string) => void;
@@ -218,6 +231,29 @@ export interface QuerySlice {
     prompt: string;
     query: string;
   }) => void;
+
+  /** Say what the search that just landed was read as, and what is missing. */
+  recordSearchNotice: (notice: SearchNotice) => void;
+}
+
+/**
+ * The strip's content: what the sentence was read as, and which of the two
+ * model problems is behind it.
+ *
+ * A sentence normally becomes chips, a judgement or a phrase with a model
+ * reading it first. With no model, or one that does not answer, the search
+ * still runs (a judgement of the words as typed, or a phrase) and this is
+ * what the reader is told about it.
+ */
+export interface SearchNotice {
+  projectId: string;
+  /** The query text this is about. The strip hides once the bar moves on. */
+  query: string;
+  /** What the sentence was read as. */
+  interpretedAs: "instant_eval" | "free_text";
+  modelTrouble: ModelTrouble;
+  /** The handled code of the failure, when it carried one. */
+  modelErrorCode?: string;
 }
 
 const EMPTY_AST: LiqeQuery = {
@@ -300,6 +336,7 @@ export const createQuerySlice: StateCreator<
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
   lastAiTranslation: null,
+  searchNotice: null,
   evalRuns: {},
 
   registerEvalRun: ({ key, runId }) =>
@@ -310,6 +347,8 @@ export const createQuerySlice: StateCreator<
   dismissParseError: () => set({ parseError: null }),
 
   recordAiTranslation: (translation) => set({ lastAiTranslation: translation }),
+
+  recordSearchNotice: (notice) => set({ searchNotice: notice }),
 
   applyQueryText: (text) =>
     set((state) => {
@@ -494,6 +533,7 @@ export const createQuerySlice: StateCreator<
       page: 1,
       pageCursors: { 1: null },
       lastAiTranslation: null,
+      searchNotice: null,
       evalRuns: {},
     }),
 

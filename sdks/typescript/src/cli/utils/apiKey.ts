@@ -1,6 +1,9 @@
 import chalk from "chalk";
 import { config } from "dotenv";
+import { isUserScopedApiKey } from "@/internal/api/auth";
 import {
+  claimProjectEnvIgnoredWarning,
+  requestedProject,
   setResolvedApiKey,
   setResolvedProjectId,
 } from "@/internal/credentialContext";
@@ -19,7 +22,9 @@ import {
   SessionApiError,
 } from "./governance/session-api";
 import {
+  type BoundKeySource,
   projectScopeErrorLines,
+  projectScopeNotSupported,
   ProjectScopeError,
   resolveProjectSelector,
 } from "./projectScope";
@@ -138,7 +143,11 @@ export const resolveCredentials = async (
   const flagKey = opts.apiKey?.trim();
   if (flagKey) {
     setResolvedApiKey(flagKey);
-    const projectId = await applyProjectScope({ project: opts.project });
+    const projectId = await applyProjectScope({
+      project: opts.project,
+      apiKey: flagKey,
+      keySource: "flag-key",
+    });
     setResolvedProjectId(projectId);
     await maybePrintIdentityNotice({
       mode: "api-key",
@@ -154,7 +163,11 @@ export const resolveCredentials = async (
   const envKey = process.env.LANGWATCH_API_KEY?.trim();
   if (envKey) {
     setResolvedApiKey(envKey);
-    const projectId = await applyProjectScope({ project: opts.project });
+    const projectId = await applyProjectScope({
+      project: opts.project,
+      apiKey: envKey,
+      keySource: "env-key",
+    });
     setResolvedProjectId(projectId);
     await maybePrintIdentityNotice({
       mode: "api-key",
@@ -327,13 +340,24 @@ async function resolveFromSession({
   // personal project is the default only when no flag says otherwise,
   // and a flag that does not resolve must leave no target behind at all.
   const projectId =
-    (await applyProjectScope({ project, cfg })) ?? session.projectId;
+    (await applyProjectScope({
+      project,
+      cfg,
+      apiKey: session.apiKey,
+      keySource: "personal-project-login",
+    })) ?? session.projectId;
   setResolvedProjectId(projectId);
-  // An explicit --project names the identity on the command line, so
-  // there is nothing implicit left to warn about. A command that acts as
-  // the person reads no project either way, so the notice about which
-  // project it reads would be wrong; that command names its own login.
-  if (project === undefined && !isLoginKeyRequired) {
+  // A NAMED project puts the identity on the command line, so there is
+  // nothing implicit left to warn about. `LANGWATCH_PROJECT_ID` does not: it
+  // is ambient, and this path does not even read it (the personal project
+  // answers), so suppressing the notice for it would leave nothing on screen
+  // saying which project replied. A command that acts as the person reads no
+  // project either way, so the notice about which project it reads would be
+  // wrong; that command names its own login.
+  if (
+    currentProjectSelector(project)?.source !== "named" &&
+    !isLoginKeyRequired
+  ) {
     await maybePrintIdentityNotice({
       mode: session.isLoginKey ? "device-login-key" : "device",
       apiKey: session.apiKey,
@@ -343,25 +367,99 @@ async function resolveFromSession({
   return { apiKey: session.apiKey, source: "session", endpoint, projectId };
 }
 
+/** A project the command line or the environment asked this request to run against. */
+interface ProjectSelector {
+  value: string;
+  /**
+   * `named` is `--project`, on this command or any that inherited it: the user
+   * said it here and now, so a key that cannot honour it is an error. `env` is
+   * `LANGWATCH_PROJECT_ID`, which is ambient and outlives the shell it was set
+   * in, so the same key answers it with a warning instead of a failure.
+   */
+  source: "named" | "env";
+}
+
 /**
- * Resolve `--project` into the request's target project and publish it.
+ * The project this request was pointed at, whoever pointed it.
  *
- * Returns undefined when no flag was given, which leaves whatever the session
- * path already published in place. A value that does not resolve ends the
- * command: there is no safe fallback, since silently running against the
+ * `--project` wins over `LANGWATCH_PROJECT_ID` because it is the narrower
+ * statement. Either way the value is a selector, not an id: an id and a slug
+ * are both accepted and only the resolver can tell them apart.
+ *
+ * The variable used to reach `buildAuthHeaders` unresolved, where a
+ * user-scoped key put it in the Basic header and a project key dropped it
+ * without a word. Reading it HERE gives it one meaning on every path: it names
+ * a project, that name is looked up, and a name that resolves to nothing stops
+ * the command instead of quietly answering from somewhere else.
+ */
+const currentProjectSelector = (
+  explicit: string | undefined,
+): ProjectSelector | undefined => {
+  const named = (explicit ?? requestedProject())?.trim();
+  if (named) return { value: named, source: "named" };
+  const fromEnv = process.env.LANGWATCH_PROJECT_ID?.trim();
+  if (fromEnv) return { value: fromEnv, source: "env" };
+  return undefined;
+};
+
+/**
+ * Resolve the named project into the request's target project and publish it.
+ *
+ * Returns undefined when nothing named a project, which leaves whatever the
+ * session path already published in place. A value that does not resolve ends
+ * the command: there is no safe fallback, since silently running against the
  * personal project would answer a question the user did not ask.
  */
 async function applyProjectScope({
   project,
   cfg,
+  apiKey,
+  keySource,
 }: {
   project?: string;
   cfg?: GovernanceConfig;
+  /** The key the request will authenticate with, which decides what it can honour. */
+  apiKey?: string;
+  /** Where that key came from, which decides what the refusal tells the user. */
+  keySource: BoundKeySource;
 }): Promise<string | undefined> {
-  if (project === undefined) return undefined;
+  const selector = currentProjectSelector(project);
+  if (!selector) return undefined;
+
+  // A legacy project key encodes its project in the token, so the server reads
+  // the project off the key and ignores the one the request names. There is no
+  // way to honour the selector, only a way to say so.
+  if (apiKey && !isUserScopedApiKey(apiKey)) {
+    const refusal = projectScopeNotSupported({
+      selector: selector.value,
+      keySource,
+    });
+    if (selector.source === "named") reportProjectScopeError(refusal);
+    // Once per request, not once per process: the daemon runs every command
+    // of a session in one process, and a warning said once there is one the
+    // next caller never sees.
+    if (claimProjectEnvIgnoredWarning()) {
+      console.error(
+        chalk.yellow(
+          `Warning: ${refusal.message} LANGWATCH_PROJECT_ID was ignored, and this command ran against the key's own project.`,
+        ),
+      );
+    }
+    return undefined;
+  }
+
+  // Only a NAMED project is resolved through the project listing.
+  // LANGWATCH_PROJECT_ID is an id by contract (it is what a personal access
+  // token is documented to need), and it reaches the auth header unresolved
+  // exactly as it always has: looking it up would put a project listing in
+  // front of every command, and would refuse a key that is allowed to read its
+  // own project but not to list the organization's. An id that matches nothing
+  // is answered by the platform, which is a refusal the caller can see.
+  if (selector.source === "env") return undefined;
+
   try {
     const projectId = await resolveProjectSelector({
-      selector: project,
+      selector: selector.value,
       cfg,
     });
     return projectId;
