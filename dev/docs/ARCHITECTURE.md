@@ -1282,6 +1282,9 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
 - A request that cannot be parsed (broken JSON, wrong format) is the 400 `malformed_request`; one that parses but fails its
   schema is the 422 `validation_error`. Query parameters (gateway `?limit`, the spend window), bodiless
   POSTs, saas usage-report and the prompt routes follow the same split (Alex, 2026-09-29).
+- The REST framework maps what no feature can know in advance, once, in `canonicalErrorFor`: an escaped ZodError
+  is the 422, a Postgres data exception (SQLSTATE 22, such as a NUL byte) is the 422, and an unchecked unique
+  violation is the 409 `conflict`. A failure a feature can know is still its own HandledError (Alex, 2026-09-30).
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).

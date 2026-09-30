@@ -131,3 +131,17 @@ Feature: The REST runtime renders what a transport may not hand-roll
       Given a service that parses its input with a schema and throws the bare schema failure
       When the REST boundary renders the error
       Then it is the 422 validation error naming the failing field, and nothing is logged as a 500
+
+  Rule: A value the store refuses is the caller's fault
+
+    @integration
+    Scenario: A value the store cannot hold is a 422, never a 500
+      Given a service that writes a string holding a NUL byte and the store refuses it as a data exception
+      When the REST boundary renders the error
+      Then it is the 422 validation error, and a database outage stays a 500
+
+    @integration
+    Scenario: A unique constraint a service did not check is a 409, never a 500
+      Given a service that writes a row whose unique key another writer took first
+      When the REST boundary renders the error
+      Then it is the 409 conflict
