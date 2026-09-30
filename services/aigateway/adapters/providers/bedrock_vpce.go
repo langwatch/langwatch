@@ -421,7 +421,7 @@ func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
 	}
 	if !bfschemas.IsAnthropicModel(m.model) {
 		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
-			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: the Bedrock Converse lane enforces json_schema for Anthropic and OpenAI GPT models only. Remove it, or use one of those models", m.model),
+			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: this model does not enforce a json_schema on Bedrock (Anthropic models and OpenAI GPT-5 and later do; gpt-oss does not). Remove it, or use one of those models", m.model),
 			"fault":   "customer",
 		})
 	}

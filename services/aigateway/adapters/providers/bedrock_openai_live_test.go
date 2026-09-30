@@ -158,6 +158,9 @@ func TestBedrockOpenAILive_JSONSchemaStream(t *testing.T) {
 	for it.Next(context.Background()) {
 		sb.WriteString(gjson.GetBytes(it.Chunk(), "choices.0.delta.content").String())
 	}
+	if err := it.Err(); err != nil && err != io.EOF {
+		t.Fatalf("stream error: %v", err)
+	}
 	t.Logf("streamed text=%q", sb.String())
 	if gjson.Get(sb.String(), "city").String() == "" {
 		t.Fatalf("want the streamed answer under the schema's city key")
