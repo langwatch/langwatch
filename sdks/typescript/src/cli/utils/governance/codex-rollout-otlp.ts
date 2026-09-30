@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * Emit codex turn input/output as OTLP spans on codex's own per-turn
  * trace_ids, so they join the native token-spans with no receiver change.
@@ -179,6 +180,7 @@ async function drainCodexSpool(args: {
         const response = await doFetch(logsEndpoint, {
           method: "POST",
           headers: {
+            ...buildSdkIdentityHeaders({ surface: "cli" }),
             "content-type": "application/json",
             authorization: `Bearer ${token}`,
           },
@@ -336,6 +338,7 @@ async function postCodexTurns(args: {
     response = await doFetch(endpoint, {
       method: "POST",
       headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },
@@ -427,6 +430,7 @@ export async function postCodexSessionContext(args: {
     response = await doFetch(logsEndpoint, {
       method: "POST",
       headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
       },

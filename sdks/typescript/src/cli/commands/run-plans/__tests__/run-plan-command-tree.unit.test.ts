@@ -12,7 +12,7 @@ vi.mock("@/internal/api/client", () => ({
 }));
 
 import { buildProgram } from "../../../program.ts";
-import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../../../utils/governance/surface.ts";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
 import { createCliTestSuitesService } from "../../test-suites/cli-test-suites-service.ts";
 import { createCliRunPlansService } from "../cli-run-plans-service.ts";
 

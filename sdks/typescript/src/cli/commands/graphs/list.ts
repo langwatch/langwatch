@@ -1,7 +1,7 @@
 import chalk from "chalk";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -32,7 +32,7 @@ export const listGraphsCommand = async (options: {
     const qs = params.toString() ? `?${params}` : "";
 
     const response = await langwatchFetch(`${endpoint}/api/v1/graphs${qs}`, {
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {

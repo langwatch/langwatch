@@ -23,11 +23,13 @@ export const MAX_SESSIONS_PER_KEY = 20;
 
 /**
  * One open session. `userId` is the OAuth-flowing person when the bearer was minted by the
- * authorize flow; governance tools attribute audit rows and enforce RBAC with it.
+ * authorize flow; governance tools attribute audit rows and enforce RBAC with it. `projectId`
+ * is the tenant its access log lines carry.
  */
 export type McpOpenSession<T> = {
   transport: T;
   apiKey: string;
+  projectId: string | undefined;
   userId: string | undefined;
   lastActivityAt: number;
 };
@@ -35,9 +37,9 @@ export type McpOpenSession<T> = {
 export type McpStreamableSession = McpOpenSession<StreamableHTTPServerTransport>;
 export type McpSseSession = McpOpenSession<SSEServerTransport>;
 
-/** A record read: the key the session was opened with, or nothing any replica can serve. */
+/** A record read: the key and project the session was opened with, or nothing to serve. */
 export type McpSessionKeyLookup =
-  | Readonly<{ kind: "found"; apiKey: string }>
+  | Readonly<{ kind: "found"; apiKey: string; projectId: string | undefined }>
   | Readonly<{ kind: "missing" }>;
 
 type McpSessionCollaborators = Readonly<{
@@ -68,6 +70,7 @@ export class McpSessionService {
   openSession<T>(input: {
     transport: T;
     apiKey: string;
+    projectId: string | undefined;
     userId: string | undefined;
   }): McpOpenSession<T> {
     return { ...input, lastActivityAt: nowInstant().epochMilliseconds };
@@ -106,6 +109,7 @@ export class McpSessionService {
     transport: McpSessionTransport;
     sessionId: string;
     apiKey: string;
+    projectId: string;
   }): Promise<void> {
     await this.#collaborators.records.store({
       ...input,
@@ -114,8 +118,8 @@ export class McpSessionService {
   }
 
   /** Streamable records are written in the background; a failure is logged, never raised. */
-  storeStreamableRecord(sessionId: string, apiKey: string): void {
-    this.storeRecord({ transport: "streamable", sessionId, apiKey }).catch((err: unknown) => {
+  storeStreamableRecord(input: { sessionId: string; apiKey: string; projectId: string }): void {
+    this.storeRecord({ transport: "streamable", ...input }).catch((err: unknown) => {
       logger.error({ error: err }, "Failed to store session in Redis");
     });
   }
@@ -136,6 +140,23 @@ export class McpSessionService {
     return this.#collaborators.records.remove(input).catch(() => undefined);
   }
 
+  /** Older replicas wrote no project: the first reader that resolves one writes it back. */
+  async backfillRecordProject(input: {
+    transport: McpSessionTransport;
+    sessionId: string;
+    record: Readonly<{ apiKey: string; projectId: string | undefined }>;
+    projectId: string | undefined;
+  }): Promise<void> {
+    const { record, projectId } = input;
+    if (record.projectId || !projectId) return;
+    await this.storeRecord({
+      transport: input.transport,
+      sessionId: input.sessionId,
+      apiKey: record.apiKey,
+      projectId,
+    }).catch(() => undefined);
+  }
+
   /** A record that cannot be read or decrypted reads as missing, and is logged. */
   async getRecordKey(input: {
     transport: McpSessionTransport;
@@ -144,7 +165,11 @@ export class McpSessionService {
     try {
       const record = await this.#collaborators.records.getRecord(input);
       if (record.kind === "missing") return record;
-      return { kind: "found", apiKey: this.#collaborators.cipher.decrypt(record.encryptedApiKey) };
+      return {
+        kind: "found",
+        apiKey: this.#collaborators.cipher.decrypt(record.encryptedApiKey),
+        projectId: record.projectId,
+      };
     } catch (err) {
       logger.error({ error: err, transport: input.transport }, "Redis session lookup failed");
       return { kind: "missing" };

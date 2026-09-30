@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { type LangwatchApiClient } from "@/internal/api/client";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -406,7 +406,7 @@ export class DatasetService {
 
     const response = await langwatchFetch(url, {
       method: "POST",
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
       body: formData,
     });
 

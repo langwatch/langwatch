@@ -1,7 +1,16 @@
 import type { HandledErrorFault, SerializedReason } from "@langwatch/handled-error";
 
+import packageJson from "../package.json" with { type: "json" };
 import { getConfig, requireApiKey } from "./config.ts";
 import type { EvaluationSummary } from "./utils/format-evaluations.ts";
+
+/** Every request names itself so the platform attributes it (specs/observability/traffic-attribution.feature). */
+export const MCP_IDENTITY_HEADERS: Record<string, string> = {
+  "User-Agent": `langwatch-mcp/${packageJson.version}`,
+  "X-LangWatch-SDK-Name": "langwatch-mcp",
+  "X-LangWatch-SDK-Language": "typescript",
+  "X-LangWatch-SDK-Version": packageJson.version,
+};
 
 // --- Response types ---
 
@@ -259,6 +268,7 @@ export async function makeRequest(
   const config = getConfig();
   const url = config.endpoint + path;
   const headers: Record<string, string> = {
+    ...MCP_IDENTITY_HEADERS,
     "X-Auth-Token": requireApiKey(),
   };
   if (config.projectId) {

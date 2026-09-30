@@ -10,6 +10,7 @@ import * as path from "node:path";
 
 import chalk from "chalk";
 
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { normalizeEndpoint } from "../../internal/endpoint";
@@ -96,6 +97,7 @@ async function fetchProjectName(
   try {
     const res = await fetchImpl(`${normalizeEndpoint(endpoint)}/api/v1/me/project`, {
       headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         Authorization: `Bearer ${apiKey}`,
         Accept: "application/json",
       },

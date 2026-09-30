@@ -3,17 +3,10 @@ import openApiCreateClient, { type Middleware } from "openapi-fetch";
 import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 
-import { version } from "../../../package.json";
-import {
-  LANGWATCH_SDK_LANGUAGE,
-  LANGWATCH_SDK_NAME_OBSERVABILITY,
-  LANGWATCH_SDK_RUNTIME,
-  LANGWATCH_SDK_VERSION,
-} from "../constants";
 import type { paths } from "../generated/openapi/api-client";
 import { langwatchFetch } from "../http/langwatchFetch";
-import { buildAuthHeaders } from "./auth";
 import { handledErrorFrom } from "./errors";
+import { buildRequestHeaders } from "./request-headers";
 
 /**
  * Turns a NAMED failure into a typed throw, once, for every call that goes through this
@@ -73,13 +66,8 @@ export const createLangWatchApiClient = (
     baseUrl: resolveEndpoint(endpoint),
     fetch: langwatchFetch,
     headers: {
-      ...buildAuthHeaders({ apiKey, projectId }),
+      ...buildRequestHeaders({ apiKey, projectId }),
       "content-type": "application/json",
-      "user-agent": `langwatch-sdk-node/${version}`,
-      "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,
-      "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
-      "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
-      "x-langwatch-sdk-platform": LANGWATCH_SDK_RUNTIME(),
     },
   });
 

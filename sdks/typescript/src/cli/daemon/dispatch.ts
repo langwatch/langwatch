@@ -4,7 +4,7 @@
  * path, not an error path -- with no daemon it's exactly the pre-daemon code.
  */
 
-import { runWithCredentialHolder } from "@/internal/credentialContext";
+import { runWithCliCredentialHolder } from "@/internal/credentialContext";
 
 import { execViaDaemon, requestStop } from "./client";
 import {
@@ -128,6 +128,7 @@ async function runInProcess(argv: string[]): Promise<void> {
   // rejection — a clean exit — not an unhandled rejection with a raw stack.
 
   // Wrapped in a credential holder so the resolved key lands in a
-  // request-scoped store rather than the global env, matching the daemon path.
-  await runWithCredentialHolder(() => buildProgram().parseAsync(argv));
+  // request-scoped store rather than the global env, matching the daemon path;
+  // the "Cli" variant also marks it so requests carry the CLI surface header.
+  await runWithCliCredentialHolder({ fn: () => buildProgram().parseAsync(argv) });
 }

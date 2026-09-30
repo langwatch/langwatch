@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { registerRoutePolicy } from "@langwatch/api/rest";
 import { initConfig, tryGetConfig } from "@langwatch/mcp-server/config";
-import { createLogger } from "@langwatch/observability";
+import { classifyClient, createLogger, endpointClassOf } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type {
@@ -263,6 +263,14 @@ export class McpEndpointService implements McpHandler {
     const { req, res } = input;
     try {
       const startedAt = nowInstant().epochMilliseconds;
+      const userAgent = req.headers["user-agent"] ?? null;
+      const attribution = {
+        endpointClass: endpointClassOf(input.pathname),
+        ...classifyClient((name) => {
+          const value = req.headers[name];
+          return Array.isArray(value) ? value[0] : value;
+        }),
+      };
       res.once("close", () => {
         try {
           logger.info(
@@ -271,6 +279,8 @@ export class McpEndpointService implements McpHandler {
               path: input.pathname,
               status: res.statusCode,
               durationMs: nowInstant().epochMilliseconds - startedAt,
+              userAgent,
+              ...attribution,
               ...this.#http.logFieldsOf(res),
             },
             "MCP request",

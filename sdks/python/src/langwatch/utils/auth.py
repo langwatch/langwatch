@@ -29,6 +29,9 @@ import os
 import re
 from typing import Dict, Optional
 
+from langwatch.__version__ import __version__
+from langwatch.utils.sdk_identity import build_sdk_identity_headers
+
 PAT_PREFIX = "pat-lw-"
 API_KEY_PREFIX = "sk-lw-"
 INGEST_KEY_PREFIX = "ik-lw-"
@@ -114,3 +117,14 @@ def build_auth_headers(
         headers["X-Project-Id"] = resolved_project_id
 
     return headers
+
+
+def build_request_headers(
+    api_key: str,
+    project_id: str | None = None,
+) -> dict[str, str]:
+    """Authenticate and identify every SDK request to the LangWatch API."""
+    return {
+        **build_auth_headers(api_key, project_id),
+        **build_sdk_identity_headers(str(__version__)),
+    }

@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * Pre-exec budget probe + Screen-8 ASCII renderer for the langwatch wrappers.
  * Per `specs/ai-gateway/governance/budget-exceeded.feature`: on a 402 from
@@ -38,6 +39,7 @@ export async function checkBudget(
     res = await f(url, {
       method: "GET",
       headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         Authorization: `Bearer ${cfg.access_token}`,
         Accept: "application/json",
       },

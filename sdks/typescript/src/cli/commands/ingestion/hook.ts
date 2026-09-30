@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 /**
  * `langwatch ingest hook <tool>`: runs at session start/end, posting one OTLP
  * log to join the session's traces to its repo/branch. NOTHING ON STDOUT EVER
@@ -642,6 +643,7 @@ export async function postSessionContext({
       method: "POST",
       headers: {
         ...target.headers,
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         // Last, so a headers variable carrying its own content-type cannot
         // mislabel a body we know the encoding of.
         "content-type": "application/json",

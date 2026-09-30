@@ -33,9 +33,9 @@ export type McpCallerLookup =
   | Readonly<{ kind: "resolved"; apiKey: string; userId: string | undefined }>
   | Readonly<{ kind: "refused" }>;
 
-/** An authenticated request's key, or a 401 already sent to the caller. */
+/** An authenticated request's key and the project it belongs to, or a 401 already sent. */
 export type McpAuthentication =
-  | Readonly<{ kind: "authenticated"; apiKey: string }>
+  | Readonly<{ kind: "authenticated"; apiKey: string; projectId: string }>
   | Readonly<{ kind: "answered" }>;
 
 type McpCallerAuthCollaborators = Readonly<{
@@ -125,7 +125,15 @@ export class McpCallerAuthService {
       return { kind: "answered" };
     }
 
-    return { kind: "authenticated", apiKey: caller.apiKey };
+    // MCP runs outside the app's request context, so the access log carries the tenant instead.
+    http.noteLogFields(res, { projectId: lookup.project.id });
+    return { kind: "authenticated", apiKey: caller.apiKey, projectId: lookup.project.id };
+  }
+
+  /** The project a key belongs to, for a session record written before records carried one. */
+  async projectIdOf(apiKey: string): Promise<string | undefined> {
+    const lookup = await this.#validateApiKey(apiKey);
+    return lookup.kind === "live" ? lookup.project.id : undefined;
   }
 
   sweep(now: number): void {

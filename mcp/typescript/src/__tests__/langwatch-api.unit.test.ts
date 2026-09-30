@@ -638,4 +638,24 @@ describe("langwatch-api", () => {
       expect(error.message).toBe(`LangWatch API error 500: ${body}`);
     });
   });
+
+  describe("when the MCP server calls the LangWatch API", () => {
+    /** @scenario The MCP server identifies itself on every request */
+    it("names itself and its version on the request", async () => {
+      const { searchTraces } = await import("../langwatch-api.ts");
+      mockJsonResponse({ traces: [] });
+
+      await searchTraces({ startDate: 1000, endDate: 2000 });
+
+      const [, calledOptions] = mockFetch.mock.calls[0]!;
+      expect(calledOptions.headers["X-LangWatch-SDK-Name"]).toBe(
+        "langwatch-mcp"
+      );
+      expect(calledOptions.headers["X-LangWatch-SDK-Language"]).toBe("typescript");
+      expect(calledOptions.headers["X-LangWatch-SDK-Version"]).toMatch(
+        /^\d+\.\d+\.\d+/
+      );
+      expect(calledOptions.headers["User-Agent"]).toMatch(/^langwatch-mcp\//);
+    });
+  });
 });
