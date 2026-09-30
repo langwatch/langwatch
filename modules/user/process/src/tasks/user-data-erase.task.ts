@@ -130,7 +130,7 @@ export async function runGdprUserDataErase({
     throw new Error("Deletion verification failed: user still exists");
   }
 
-  logger.info({ userId, email }, "GDPR erase complete");
+  logger.info({ userId }, "GDPR erase complete");
   return outcome;
 }
 
