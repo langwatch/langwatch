@@ -120,7 +120,11 @@ function disabled(env) {
 
 async function main(argv, env, { buildBundle } = {}) {
   if (argv[0] === SENTINEL_FLAG) return await runSentinel(argv.slice(1), env);
-  if (argv[0] === WATCH_FLAG) return await runWatchSupervisor(argv.slice(1), env, buildBundle);
+  if (argv[0] === WATCH_FLAG) {
+    if (resolveWatchConfig(env).enabled)
+      return await runWatchSupervisor(argv.slice(1), env, buildBundle);
+    argv = argv.slice(argv[1] === "--" ? 2 : 1);
+  }
   if (argv.length === 0) {
     stderr(`${PREFIX} usage: dev-supervisor.mjs <command> [args...]\n`);
     return 64;
@@ -155,7 +159,11 @@ export function resolveWatchConfig(env) {
           .split(",")
           .map((d) => d.trim())
           .filter(Boolean);
+  // LANGWATCH_DEV_WATCH=0 runs `--watch` one-shot: a stack diff tools measure
+  // must not restart on another session's edits (havenrun.Env sets it).
+  const watch = (env.LANGWATCH_DEV_WATCH ?? "").trim().toLowerCase();
   return {
+    enabled: !["0", "false", "off"].includes(watch),
     dirs,
     debounceMs: positiveInt(env.LANGWATCH_DEV_WATCH_DEBOUNCE_MS, DEFAULT_WATCH_DEBOUNCE_MS),
   };

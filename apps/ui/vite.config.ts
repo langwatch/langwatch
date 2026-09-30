@@ -355,6 +355,8 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           ? {}
           : { usePolling: true, interval: 250 }),
       },
+      // A diff stack (havenrun sets LANGWATCH_DEV_WATCH=0) never reloads on checkout edits.
+      ...(process.env.LANGWATCH_DEV_WATCH === "0" ? { watch: null, hmr: false } : {}),
       // Frontend port (default 5560, configurable via PORT env var)
       host: true,
       allowedHosts: true,

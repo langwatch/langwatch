@@ -73,6 +73,9 @@ func TestEnvStripsManagedKeysAndAppendsTheSlug(t *testing.T) {
 	if !strings.Contains(joined, "LANGWATCH_SLUG=apidiff-20260909t2230-branch") {
 		t.Errorf("the slug was not set:\n%s", joined)
 	}
+	if !strings.Contains(joined, "LANGWATCH_DEV_WATCH=0") {
+		t.Errorf("a measured stack must not restart on checkout edits:\n%s", joined)
+	}
 }
 
 func TestEnvHonoursExtraManagedKeysAndExtras(t *testing.T) {

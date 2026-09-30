@@ -152,6 +152,13 @@ void describe("resolveWatchConfig", () => {
     assert.equal(config.debounceMs, 150);
   });
 
+  void it("watches unless LANGWATCH_DEV_WATCH turns it off", () => {
+    assert.equal(resolveWatchConfig({}).enabled, true);
+    for (const off of ["0", "false", "OFF"]) {
+      assert.equal(resolveWatchConfig({ LANGWATCH_DEV_WATCH: off }).enabled, false);
+    }
+  });
+
   void it("falls back to the default debounce for a non-numeric override", () => {
     const config = resolveWatchConfig({ LANGWATCH_DEV_WATCH_DEBOUNCE_MS: "not-a-number" });
     assert.equal(config.debounceMs, 750);
