@@ -27,7 +27,7 @@ type monolithPlan struct {
 // monolithScript runs one of the monolith package's own scripts from the
 // workspace root, so the lane never depends on a path staying where it is.
 func monolithScript(name string) string {
-	return "pnpm -s --filter " + domain.MonolithPackage + " run " + name
+	return "pnpm --silent --filter " + domain.MonolithPackage + " run " + name
 }
 
 // appChild is the single Node lane: `dev:app`, which starts the browser

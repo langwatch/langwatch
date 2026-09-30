@@ -16,8 +16,8 @@
     }
   },
   "scripts": {
-    "start:prepare:db": "cd ../tasks && pnpm -s task prisma-migrate clickhouse-migrate lwql-provision system-migrations-pass",
-    "start": "pnpm -s run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
+    "start:prepare:db": "cd ../tasks && pnpm --silent task prisma-migrate clickhouse-migrate lwql-provision system-migrations-pass",
+    "start": "pnpm --silent run start:prepare:db && node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "predev": "bash ../../dev/scripts/devscripts.sh ensure-built",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
     "typecheck": "tsc -b tsconfig.test.json",

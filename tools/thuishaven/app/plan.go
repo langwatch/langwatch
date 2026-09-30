@@ -129,7 +129,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	} else {
 		out = append(out, Child{
 			Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
-			Shell: "pnpm -s --filter " + UIPackage + " dev",
+			Shell: "pnpm --silent --filter " + UIPackage + " dev",
 			Env:   nodeEnv("ui"),
 			// No readiness probe: the browser application holds the reader on its
 			// own waiting screen until the API answers, so serving it first is the
@@ -222,7 +222,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	if opts.Selection.DesignSystem {
 		out = append(out, Child{
 			Name: domain.DesignSystemService, Dir: repoDir, Color: palette[8], LogPath: logPath(domain.DesignSystemService),
-			Shell: fmt.Sprintf("pnpm -s --filter %s storybook --port %d --ci",
+			Shell: fmt.Sprintf("pnpm --silent --filter %s storybook --port %d --ci",
 				DesignSystemPackage, port(domain.DesignSystemService)),
 			Env: nodeEnv(domain.DesignSystemService),
 		})
@@ -234,7 +234,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			// which would leave mail-room.<slug> routed to nothing at all.
 			// --host 127.0.0.1: vite's default "localhost" binds only ::1 on
 			// this machine, and the proxy and the port probe both dial IPv4.
-			Shell: fmt.Sprintf("pnpm -s --filter %s dev --host 127.0.0.1 --port %d --strictPort",
+			Shell: fmt.Sprintf("pnpm --silent --filter %s dev --host 127.0.0.1 --port %d --strictPort",
 				MailPackage, port(domain.MailRoomService)),
 			Env: nodeEnv(domain.MailRoomService),
 		})
@@ -260,7 +260,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
 		// separately.
 		Name: APILane, Dir: repoDir, Color: palette[0], LogPath: logPath(APILane),
-		Shell: "pnpm -s --filter " + BackendPackage + " dev",
+		Shell: "pnpm --silent --filter " + BackendPackage + " dev",
 		Env:   nodeEnv(APILane),
 	})
 	return out

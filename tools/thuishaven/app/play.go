@@ -1135,7 +1135,7 @@ func (o *Orchestrator) preparePlaySandbox(ctx context.Context, pl PlaySandbox, s
 		return err
 	}
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
-	if err := o.sup.RunOnce(ctx, "codegen", pl.Checkout, "pnpm -s run start:prepare:files", env); err != nil {
+	if err := o.sup.RunOnce(ctx, "codegen", pl.Checkout, "pnpm --silent run start:prepare:files", env); err != nil {
 		o.log.Warn("play codegen failed (continuing)", zap.Error(err))
 	}
 	if err := o.sup.RunOnce(ctx, "prepare", pl.Checkout, prepareDBShell, env); err != nil {
@@ -1144,7 +1144,7 @@ func (o *Orchestrator) preparePlaySandbox(ctx context.Context, pl PlaySandbox, s
 	// The preset's switches belong to the seed alone — codegen and migrations
 	// are the same run whatever data was asked for.
 	seedEnv := append(append([]string{}, env...), pl.pre.env...)
-	if err := o.sup.RunOnce(ctx, "seed", pl.Checkout, seedShell("pnpm -s run prisma:seed", seedEnv), seedEnv); err != nil {
+	if err := o.sup.RunOnce(ctx, "seed", pl.Checkout, seedShell("pnpm --silent run prisma:seed", seedEnv), seedEnv); err != nil {
 		o.log.Warn("play seed failed (continuing)", zap.Error(err))
 	}
 	return nil

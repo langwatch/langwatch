@@ -240,7 +240,7 @@ fi
 # under an advisory lock, so two stacks starting at once serialise rather than
 # rebuilding a schema underneath one another.
 echo "  → preparing the databases (once for this stack)"
-pnpm -s -C "$REPO_ROOT" run start:prepare:db
+pnpm --silent -C "$REPO_ROOT" run start:prepare:db
 
 # --- the lanes -------------------------------------------------------------
 
@@ -266,7 +266,7 @@ add_lane() {
   COMMANDS+=("bash $(shell_quote "$HERE/lane.sh") $1 $(shell_quote "$2")")
 }
 
-add_lane ui "$RUNTIME_ENV pnpm -s --filter @langwatch/ui dev"
+add_lane ui "$RUNTIME_ENV pnpm --silent --filter @langwatch/ui dev"
 
 if [ -n "$GO_LANE_COMMAND" ]; then
   add_lane go "$GO_LANE_COMMAND"
@@ -279,7 +279,7 @@ fi
 # process. It boots the worker first, so the queue consumers are attached
 # before anything can enqueue. It does not migrate: the step above did, once,
 # and this lane restarts.
-add_lane backend "$RUNTIME_ENV pnpm -s --filter @langwatch/dev-runtime dev"
+add_lane backend "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev"
 
 NAMES_STR=$(
   IFS=,
@@ -289,7 +289,7 @@ NAMES_STR=$(
 # thing printed. Restarting it (`--restart-tries -1`) turned a config refusal
 # into an endless reboot loop that scrolled the cause off the screen; the
 # lanes that reload on file changes (vite, node --watch, air) do that themselves.
-exec pnpm -s exec concurrently \
+exec pnpm --silent exec concurrently \
   --kill-others-on-fail \
   --names "$NAMES_STR" \
   --prefix none \

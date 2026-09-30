@@ -139,7 +139,7 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, preset string) e
 	if err := o.sup.RunOnce(ctx, "prepare", p.WorktreeDir, prepareDBShell, env); err != nil {
 		return fmt.Errorf("migrations failed on the fresh database: %w", err)
 	}
-	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", env), env); err != nil {
 		return fmt.Errorf("seed failed: %w", err)
 	}
 	fmt.Printf("stack %q databases reset — migrated and seeded fresh\n", slug)
@@ -225,7 +225,7 @@ func (o *Orchestrator) DBSeed(ctx context.Context, p UpParams, preset string) er
 		return err
 	}
 	env := append(o.seedEnv(p), pre.env...)
-	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm --silent run prisma:seed", env), env); err != nil {
 		return fmt.Errorf("seed failed: %w", err)
 	}
 	return o.runSeedIngest(ctx, p, pre, "haven db seed "+preset)

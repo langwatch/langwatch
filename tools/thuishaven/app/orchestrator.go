@@ -614,9 +614,9 @@ type prepShells struct{ Codegen, Prepare, Seed string }
 // running it twice is minutes of a boot for nothing.
 func prepShellsFor(layout domain.Layout) prepShells {
 	jobs := prepShells{
-		Codegen: "pnpm -s run start:prepare:files",
+		Codegen: "pnpm --silent run start:prepare:files",
 		Prepare: prepareDBShell,
-		Seed:    "pnpm -s run prisma:seed",
+		Seed:    "pnpm --silent run prisma:seed",
 	}
 	if layout.IsMonolith() {
 		jobs.Codegen = ""
@@ -642,7 +642,7 @@ type seedRun struct {
 // same script is what dev/scripts/dev-stack.sh runs, and the lanes this
 // orchestrator supervises no longer migrate on their own — a restarted lane
 // would otherwise migrate again on every crash.
-const prepareDBShell = "pnpm -s run start:prepare:db"
+const prepareDBShell = "pnpm --silent run start:prepare:db"
 
 // runSeed always seeds. The seed is idempotent (a no-op once the stable local
 // project + API key exist), so every `up` guarantees the same migrations AND

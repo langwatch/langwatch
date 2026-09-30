@@ -43,9 +43,9 @@ func (o *Orchestrator) ensureDeps(ctx context.Context, dir string, withLifecycle
 	if !depsStale(rootDir) {
 		return nil
 	}
-	install := "pnpm -s install"
+	install := "pnpm --silent install"
 	if !withLifecycleScripts {
-		install = "pnpm -s install --ignore-scripts"
+		install = "pnpm --silent install --ignore-scripts"
 		fmt.Println("  dependencies: installing with --ignore-scripts (untrusted checkout: its lifecycle scripts will not run)…")
 	} else {
 		fmt.Println("  dependencies: lockfile changed since the last install — running pnpm install…")

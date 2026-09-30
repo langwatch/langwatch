@@ -269,7 +269,7 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-# The boot chain lives in apps/api, not here: `pnpm -s run start` is
+# The boot chain lives in apps/api, not here: `pnpm --silent run start` is
 # `start:prepare:db && node src/main.ts`, and start:prepare:db runs
 # the three tasks from apps/tasks in order — prisma-migrate (packages/prisma-
 # client's history), clickhouse-migrate (the goose runner, TTL reconciler and
@@ -286,4 +286,4 @@ SHELL ["/bin/bash", "-c"]
 # it finds at /app/apps/ui/dist/client, so this one container is the whole
 # interactive tier. The worker deployment runs the same image from
 # /app/apps/worker, whose own start script migrates nothing.
-CMD cd /app/apps/api && pnpm -s run start
+CMD cd /app/apps/api && pnpm --silent run start
