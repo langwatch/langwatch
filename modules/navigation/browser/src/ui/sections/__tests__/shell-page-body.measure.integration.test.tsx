@@ -32,13 +32,12 @@ function measureAt({ pathname }: { pathname: string }): string {
       </WithStubNavigationHost>
     </ChakraProvider>,
   );
-  const frame = screen.getByText("Page content").parentElement;
-  return frame ? getComputedStyle(frame).maxWidth : "";
+  return screen.getByText("Page content").parentElement?.dataset.pageMeasure ?? "";
 }
 
 describe("given a settings page", () => {
   describe("when it is a form page", () => {
-    it.each(["/settings", "/settings/profile", "/settings/security"])(
+    it.each(["/settings", "/settings/profile", "/settings/security", "/settings/checkup"])(
       "frames %s at the form measure",
       (pathname) => {
         expect(measureAt({ pathname })).toBe("820px");
@@ -53,5 +52,11 @@ describe("given a settings page", () => {
         expect(measureAt({ pathname })).toBe("1280px");
       },
     );
+  });
+
+  describe("when it is the authentication family", () => {
+    it("fills the card", () => {
+      expect(measureAt({ pathname: "/settings/authentication/provider" })).toBe("100%");
+    });
   });
 });

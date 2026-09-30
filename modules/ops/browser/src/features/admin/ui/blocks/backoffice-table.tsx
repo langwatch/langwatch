@@ -44,12 +44,12 @@ export function BackofficeTable({
 }: BackofficeTableProps) {
   return (
     <>
-      <PageLayout.Header withBorder={false}>
+      <PageLayout.Header>
         <PageLayout.Heading>{title}</PageLayout.Heading>
         <Spacer />
         {createAction}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start">
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
         {searchInput ?? (
           <Input
             value={searchValue}
