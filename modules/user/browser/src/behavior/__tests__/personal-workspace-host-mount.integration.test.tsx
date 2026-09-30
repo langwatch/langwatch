@@ -65,6 +65,7 @@ function harness(scope: UiActiveScope) {
       hasNlpService: true,
       hasLangevals: true,
       hasEmailProvider: false,
+      hasCloudOps: false,
     },
   };
 

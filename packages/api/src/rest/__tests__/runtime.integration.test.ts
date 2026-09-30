@@ -569,21 +569,18 @@ describe("a family the declaration marked superseded", () => {
   });
 
   /** @scenario "Deprecation reaches the document and the wire" */
-  it("marks every dated mount of the operation deprecated, with the notice", async () => {
+  it("marks the documented mount of the operation deprecated, with the notice", async () => {
     const published = await generateSpecs(legacyReportsApp().app, SPEC_OPTIONS);
 
-    for (const path of [
-      "/api/legacy-reports/{id}",
-      `/api/legacy-reports/${VERSION}/{id}`,
-      "/api/legacy-reports/latest/{id}",
-    ]) {
-      const item = published.paths?.[path] as
-        | { get?: { deprecated?: boolean; description?: string } }
-        | undefined;
+    const item = published.paths?.["/api/legacy-reports/{id}"] as
+      | { get?: { deprecated?: boolean; description?: string } }
+      | undefined;
 
-      expect(item?.get?.deprecated).toBe(true);
-      expect(item?.get?.description).toContain("Use /api/v1/reports instead");
-    }
+    expect(item?.get?.deprecated).toBe(true);
+    expect(item?.get?.description).toContain("Use /api/v1/reports instead");
+    expect(Object.keys(published.paths ?? {})).not.toContainEqual(
+      expect.stringMatching(/\/(latest|\d{4}-\d{2}-\d{2})(\/|$)/),
+    );
   });
 
   /** @scenario "Deprecation headers ride errors too" */
@@ -1115,15 +1112,11 @@ describe("a dated family that declares no /api/v1 twin", () => {
   });
 
   /** @scenario "A family whose paths were never aliased declares no twin" */
-  it("publishes exactly the addresses it serves, and no twin among them", async () => {
+  it("publishes the bare addresses only, with no dated, latest or twin address", async () => {
     const published = await generateSpecs(projectsApp().app, SPEC_OPTIONS);
 
     expect(Object.keys(published.paths ?? {}).toSorted()).toEqual([
       "/api/projects",
-      `/api/projects/${VERSION}`,
-      `/api/projects/${VERSION}/{projectId}`,
-      "/api/projects/latest",
-      "/api/projects/latest/{projectId}",
       "/api/projects/{projectId}",
     ]);
   });
