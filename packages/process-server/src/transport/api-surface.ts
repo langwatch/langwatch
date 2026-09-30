@@ -500,6 +500,14 @@ export function bearerDoor(options: { name: string; token: string | undefined })
   };
 }
 
+/** Main's instance-admin family: absent (404, before any credential) with no key set or on SaaS. */
+export function instanceAdminDoor(options: {
+  token: string | undefined;
+  isSaas: boolean;
+}): RestIdentity {
+  return bearerDoor({ name: "instance-admin", token: options.isSaas ? void 0 : options.token });
+}
+
 /** Every key door's one actor: the key's owning user, or none for a key no person owns (§8). */
 function keyOwner(userId: string | null): Actor | null {
   return userId ? { type: "user", id: userId } : null;

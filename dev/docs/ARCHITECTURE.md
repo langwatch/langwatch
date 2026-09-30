@@ -1285,6 +1285,8 @@ SQL naming a table, a Prisma delegate over one, the table named as a literal, or
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
+- The exception is a hidden family, whose 404 comes before the credential or the body: instance-admin with no key
+  set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - `GET /api/checkup` keeps the branch's `organization:view` guard; main answers any project key. The drift is
   accepted, since the checkup reads organisation-wide state (Alex, 2026-09-30).
 - tRPC is the browser's transport and REST is the API key's (Alex, 2026-09-30): a REST route the UI also reaches by

@@ -4,13 +4,14 @@ import type { TransportPeers, ExposedSurface } from "@langwatch/kernel";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import type { ScopedSecrets } from "@langwatch/secrets";
 
-import { apiSurface, bearerDoor } from "./api-surface.ts";
+import { apiSurface, bearerDoor, instanceAdminDoor } from "./api-surface.ts";
 import { resolveUiBundle } from "./bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./config-owner.ts";
 
 export async function processSurface({
   config,
   production,
+  isSaas,
   executionProxyBaseUrl,
   publicBaseUrl,
   members,
@@ -22,6 +23,7 @@ export async function processSurface({
 }: {
   config: ApiHostConfig;
   production: boolean;
+  isSaas: boolean;
   executionProxyBaseUrl: string | undefined;
   publicBaseUrl: string | undefined;
   members: ProcessMemberSource;
@@ -40,7 +42,7 @@ export async function processSurface({
     bearerDoor({ name: "cron", token }),
   );
   const instanceAdmin = await secrets.into(apiOwner.secrets.instanceAdmin, (token) =>
-    bearerDoor({ name: "instance-admin", token }),
+    instanceAdminDoor({ token, isSaas }),
   );
   return apiSurface({
     members,

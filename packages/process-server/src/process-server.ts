@@ -155,6 +155,7 @@ export class ProcessServer implements ProcessBoot {
         surface = await processSurface({
           config: this.config.http as ApiHostConfig,
           production: this.production,
+          isSaas: this.settings.isSaas ?? false,
           executionProxyBaseUrl: this.settings.nlpServiceUrl,
           publicBaseUrl: this.settings.baseHost,
           members,
