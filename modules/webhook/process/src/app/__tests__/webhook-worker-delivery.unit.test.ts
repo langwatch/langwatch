@@ -81,6 +81,7 @@ describe("given a memory-tier worker with one active HTTP endpoint", () => {
       const runtime = await worker().boot();
 
       try {
+        await runtime.start();
         const webhooks = runtime.service(WebhookApi);
         const { endpoint } = await webhooks.create({
           organizationId: ORGANIZATION_ID,
@@ -123,6 +124,7 @@ describe("given a memory-tier worker with one active HTTP endpoint and an emitte
       const runtime = await worker().boot();
 
       try {
+        await runtime.start();
         const webhooks = runtime.service(WebhookApi);
         const { endpoint } = await webhooks.create({
           organizationId: ORGANIZATION_ID,
@@ -168,6 +170,7 @@ describe("given a memory-tier worker with an endpoint that holds envelopes for a
       const runtime = await worker().boot();
 
       try {
+        await runtime.start();
         const webhooks = runtime.service(WebhookApi);
         const { endpoint } = await webhooks.create({
           organizationId: ORGANIZATION_ID,
