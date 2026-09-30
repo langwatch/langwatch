@@ -255,6 +255,17 @@ describe("reading the settings when the host refuses", () => {
   });
 });
 
+describe("reading the settings of an organization with no license", () => {
+  /** @scenario An install without a license cannot use Connect */
+  it("says it is unlicensed and offers no usage", async () => {
+    const { service } = install({ license: null });
+
+    const status = await service.getStatus(ORGANIZATION);
+
+    expect(status).toMatchObject({ licensed: false, usage: null });
+  });
+});
+
 describe("whether the install as a whole is connected", () => {
   /** @scenario "Product statistics go to the connect host, not the app host" */
   it("is connected once any license on it names a hosted service", async () => {

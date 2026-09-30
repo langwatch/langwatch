@@ -36,6 +36,7 @@ describe("licensing server configuration", () => {
     });
 
     describe("given a plain http endpoint on a public host", () => {
+      /** @scenario A Connect endpoint must be https unless it is a loopback host */
       it("refuses it naming the variable", () => {
         expect(() =>
           read({ LANGWATCH_CONNECT_GATEWAY_ENDPOINT: "http://gateway.example.com" }),
@@ -44,6 +45,7 @@ describe("licensing server configuration", () => {
     });
 
     describe("given a plain http endpoint on a loopback host", () => {
+      /** @scenario A Connect endpoint must be https unless it is a loopback host */
       it("accepts localhost and 127.0.0.1 with a port", () => {
         expect(
           read({ LANGWATCH_CONNECT_LICENSE_ENDPOINT: "http://localhost:5643" })

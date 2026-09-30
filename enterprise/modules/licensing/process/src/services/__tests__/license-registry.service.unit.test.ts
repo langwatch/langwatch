@@ -85,9 +85,11 @@ class RecordingBudgets {
   }
 }
 
-function harness({ signingKey = TEST_PRIVATE_KEY }: { signingKey?: string } = {}) {
+function harness({
+  signingKey = TEST_PRIVATE_KEY,
+  organizations = new RecordingCustomers(),
+}: { signingKey?: string; organizations?: RecordingCustomers } = {}) {
   const repository = MemoryIssuedLicenseRepository.create();
-  const organizations = new RecordingCustomers();
   const managedKeys = new RecordingManagedKeys();
   const contractBudgets = new RecordingBudgets();
   const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
@@ -128,6 +130,8 @@ function issueInput(overrides: Partial<IssueInput> = {}): IssueInput {
 
 describe("the license registry", () => {
   /** @scenario "A license issued from the backoffice is recorded" */
+  /** @scenario A customer organization is marked as a self-hosted customer */
+  /** @scenario Issuing a license never asks the operator for the private key */
   it("records the license it signs, active, linked and unbound", async () => {
     const { registry, organizations, contractBudgets } = harness();
 
@@ -141,6 +145,28 @@ describe("the license registry", () => {
     expect(license.instanceId).toBeNull();
     expect(organizations.marked).toEqual(["org-acme"]);
     expect(contractBudgets.synced).toEqual(["org-acme"]);
+  });
+
+  /** @scenario A license is written only once its customer is marked */
+  it("writes no row when marking the customer fails, so issuing again is not a duplicate", async () => {
+    class FailingCustomers extends RecordingCustomers {
+      failing = true;
+
+      override async markSelfHostedCustomer(id: string): Promise<void> {
+        if (this.failing) throw new Error("the organization store is down");
+        await super.markSelfHostedCustomer(id);
+      }
+    }
+    const organizations = new FailingCustomers();
+    const { registry, repository } = harness({ organizations });
+
+    await expect(registry.issue(issueInput())).rejects.toThrow("the organization store is down");
+    expect(await repository.findAllByOrganization("org-acme")).toEqual([]);
+
+    organizations.failing = false;
+    await expect(registry.issue(issueInput())).resolves.toMatchObject({
+      license: { organizationId: "org-acme" },
+    });
   });
 
   /** @scenario "The registry stores a hash of the token, not the token" */
@@ -176,6 +202,7 @@ describe("the license registry", () => {
   });
 
   /** @scenario "Revoking a license" */
+  /** @scenario Revoking a license revokes its managed key */
   it("revokes the row and ends its managed key first", async () => {
     const { registry, repository, managedKeys } = harness();
     const { license } = await registry.issue(issueInput());
