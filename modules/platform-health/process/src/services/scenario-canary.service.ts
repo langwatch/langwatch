@@ -16,6 +16,7 @@ import {
   SCENARIO_CANARY_POLL_INTERVAL_MS,
   SCENARIO_CANARY_TOTAL_BUDGET_MS,
 } from "../rules/scenario-canary.rules.ts";
+import { probeCauseOf } from "../rules/probe-cause.rules.ts";
 
 const logger = createLogger("langwatch:scenario-canary");
 
@@ -178,9 +179,10 @@ export class ScenarioCanaryService {
         { error, scenarioRunId },
         "Scenario canary attempt failed to launch or read the run",
       );
+      const cause = probeCauseOf(error);
       return {
         ...(scenarioRunId ? { scenarioRunId } : {}),
-        verdict: { healthy: false, reason: "run_failed" },
+        verdict: { healthy: false, reason: "run_failed", ...(cause && { cause }) },
       };
     }
   }

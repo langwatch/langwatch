@@ -239,6 +239,7 @@ type TurnStreamHandlers = {
 class TurnStreamSink {
   private openTextId: string | null = null;
   private sawOutput = false;
+  private sawReadinessStatus = false;
   closed = false;
 
   constructor(
@@ -275,8 +276,11 @@ class TurnStreamSink {
     this.handlers.onSignal(signal);
   }
 
+  /** Only the stream's first status before output is the placeholder; a later one (a retry line) is real. */
   status(entry: Extract<LangyStreamWireEntry, { type: "status" }>): void {
-    this.handlers.onSignal({ ...entry, readiness: !this.sawOutput });
+    const readiness = !this.sawOutput && !this.sawReadinessStatus;
+    this.sawReadinessStatus = true;
+    this.handlers.onSignal({ ...entry, readiness });
   }
 
   error(errorText: string): void {

@@ -856,3 +856,17 @@ Feature: AI Gateway — Budgets
     When I read the template row
     Then spent_usd and spent_nano_usd are both null
     And the seats it is watching are reported as end_users_seen and end_users_over
+
+  # The config endpoint reads live spend from ClickHouse for every budget the
+  # key is bound by. A replica busy with a backup once held that read for 40s,
+  # past the gateway's 10s config fetch timeout, and the gateway answered 503
+  # for a key it was serving. The read is bounded; the stored spend ships
+  # instead of the key's whole config going missing.
+  @integration @regression
+  Scenario: A slow spend read does not hold up the key's config
+    Given a virtual key bound by a budget whose stored spend is 12.34 USD
+    And the ClickHouse spend read does not answer
+    When the gateway fetches the key's config
+    Then the config is returned within the spend read deadline plus overhead
+    And the budget ships its stored spend
+    And the abandoned spend read is cancelled

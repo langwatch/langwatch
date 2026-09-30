@@ -585,11 +585,30 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     budgets: GatewayBudgetResource[] | BudgetSpendTarget[],
     now: Instant = nowInstant(),
   ): Promise<ScopeSpend[]> {
-    return this.getSpendForTargetsAcrossTenants(
+    return this.readTargetSpend({
       tenantIds,
-      GatewayBudgetClickHouseRepository.toSpendTargets(budgets, now),
+      targets: GatewayBudgetClickHouseRepository.toSpendTargets(budgets, now),
       now,
-    );
+    });
+  }
+
+  /** The same read as `getSpendForBudgetsAcrossTenants`, abandoned (retries included) when `signal` aborts. */
+  async getSpendForBudgetsAcrossTenantsUntil({
+    tenantIds,
+    budgets,
+    signal,
+  }: {
+    tenantIds: string[];
+    budgets: GatewayBudgetResource[] | BudgetSpendTarget[];
+    signal: AbortSignal;
+  }): Promise<ScopeSpend[]> {
+    const now = nowInstant();
+    return this.readTargetSpend({
+      tenantIds,
+      targets: GatewayBudgetClickHouseRepository.toSpendTargets(budgets, now),
+      now,
+      signal,
+    });
   }
 
   /**
@@ -601,13 +620,27 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     targets: BudgetSpendTarget[],
     now: Instant = nowInstant(),
   ): Promise<ScopeSpend[]> {
+    return this.readTargetSpend({ tenantIds, targets, now });
+  }
+
+  private async readTargetSpend({
+    tenantIds,
+    targets,
+    now,
+    signal,
+  }: {
+    tenantIds: string[];
+    targets: BudgetSpendTarget[];
+    now: Instant;
+    signal?: AbortSignal;
+  }): Promise<ScopeSpend[]> {
     if (targets.length === 0 || tenantIds.length === 0) return [];
 
     // Two reads, because a target whose boundary has moved cannot be
     // answered from the rollup: the rollup's buckets are keyed by calendar
     // PeriodStart and pre-aggregate the whole bucket, so a floor sitting
     // inside one is unanswerable there.
-    const spends = await this.readFlooredTargetSpend(tenantIds, targets);
+    const spends = await this.readFlooredTargetSpend({ tenantIds, targets, signal });
     for (const [window, targetsForWindow] of GatewayBudgetClickHouseRepository.targetsByWindow(
       targets,
     )) {
@@ -617,6 +650,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
           window,
           targets: targetsForWindow,
           now,
+          signal,
         })),
       );
     }
@@ -639,10 +673,15 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
    * mid-period): the rollup's calendar bucket can't answer it, so the total is summed straight
    * off the ledger. An anchored budget lives here permanently.
    */
-  private async readFlooredTargetSpend(
-    tenantIds: string[],
-    targets: BudgetSpendTarget[],
-  ): Promise<ScopeSpend[]> {
+  private async readFlooredTargetSpend({
+    tenantIds,
+    targets,
+    signal,
+  }: {
+    tenantIds: string[];
+    targets: BudgetSpendTarget[];
+    signal?: AbortSignal;
+  }): Promise<ScopeSpend[]> {
     const floored = targets.filter((t) => t.periodFloorMs !== undefined);
     if (floored.length === 0) return [];
 
@@ -671,6 +710,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
         },
         format: "JSONEachRow",
         tenantIds,
+        ...(signal && { signal }),
       });
       const rows = (await result.json()) as Record<string, string>[];
       const row = rows[0] ?? {};
@@ -699,8 +739,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     window: GatewayBudgetWindow;
     targets: BudgetSpendTarget[];
     now: Instant;
+    signal?: AbortSignal;
   }): Promise<ScopeSpend[]> {
-    const { tenantIds, window, targets, now } = args;
+    const { tenantIds, window, targets, now, signal } = args;
     const scopeFilter = GatewayBudgetClickHouseRepository.rollupScopeFilter(targets);
     try {
       // Any tenant resolves the client: the query hits
@@ -729,6 +770,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
         },
         format: "JSONEachRow",
         tenantIds,
+        ...(signal && { signal }),
       });
       const rows = (await result.json()) as RollupScopeRow[];
       return targets.map((t) => ({

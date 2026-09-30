@@ -18,6 +18,7 @@ import {
   ModelProviderNotFoundError,
   PLATFORM_PROVIDER_ID_PREFIX,
 } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
@@ -42,6 +43,15 @@ import {
 import { GatewayConnectUpstreamService } from "./gateway-connect-upstream.service.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import type { GatewayService } from "./gateway.service.ts";
+
+const logger = createLogger("langwatch:gateway:config-materialiser");
+
+/**
+ * How long the config endpoint waits for the ClickHouse spend read before it ships the stored
+ * spend instead. Well under the gateway's 10s config fetch timeout, so a slow replica costs
+ * budget freshness, not the key's config.
+ */
+export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
 
 /** The one model-provider read the bundle needs. */
 export type GatewayCustomKeys = Pick<ModelProviderApi, "getCustomKeys">;
@@ -283,9 +293,9 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * ClickHouse spend rollup, best-effort: it falls back to the Postgres column when ClickHouse is
-   * not wired. The tenant set is every project under the key's org, so org, team and principal
-   * budgets see ledger rows under whichever project emitted the trace.
+   * ClickHouse spend, falling back to the Postgres column when ClickHouse is not wired or slower
+   * than CONFIG_SPEND_READ_TIMEOUT_MS. Tenants are every project in the key's org, so org, team
+   * and principal budgets see rows under whichever project emitted the trace.
    */
   private async loadCurrentSpend(
     vk: VirtualKeyWithScopes,
@@ -306,9 +316,10 @@ export class GatewayConfigMaterialiserService {
       // bucket's own: a GROUP budget read from the raw row would prefix-sum
       // every member's bucket, and the gateway would then cap each member
       // at what the whole group spent together.
-      const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+      const deadline = AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS);
+      const read = this.chRepo.getSpendForBudgetsAcrossTenantsUntil({
         tenantIds,
-        budgets
+        budgets: budgets
           // Templates have no single bucket to read; their per-user spend
           // is fetched request-side through the bucket-spend endpoint.
           .filter((r) => r.budget.scopeType !== "ATTRIBUTED_USER")
@@ -320,14 +331,20 @@ export class GatewayConfigMaterialiserService {
             match: "exact" as const,
             periodFloorMs: computeBudgetPeriodFloorMs(r.budget),
           })),
-      );
+        signal: deadline,
+      });
+      const spends = await settleBefore({ work: read, signal: deadline });
       const out = new Map<string, string>();
       for (const s of spends) {
         out.set(s.budgetId, s.spentUsd);
       }
 
       return out;
-    } catch {
+    } catch (error) {
+      logger.warn(
+        { virtualKeyId: vk.id, error },
+        "gateway config spend read failed; shipping the stored spend instead",
+      );
       return new Map();
     }
   }
@@ -356,3 +373,17 @@ export class GatewayConfigMaterialiserService {
 // config keys are stripped post bug-7 step (iv), so the fallback is always
 // empty and the RP read becomes source of truth once routingPolicyId is set.
 // Empty-rules normalize to the wire-contracted shape regardless of DB content.
+
+/** Resolves with `work`, or rejects with the signal's reason once it aborts. */
+function settleBefore<T>({ work, signal }: { work: Promise<T>; signal: AbortSignal }): Promise<T> {
+  // A late rejection from abandoned work has nobody waiting for it.
+  work.catch(() => undefined);
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    if (signal.aborted) return onAbort();
+    signal.addEventListener("abort", onAbort, { once: true });
+    work.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", onAbort);
+    });
+  });
+}

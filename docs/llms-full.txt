@@ -9893,6 +9893,8 @@ These apply to the base URLs customers configure on their own provider credentia
 
 The gateway caches each resolved virtual key in process. When a cached entry passes its JWT expiry and the refresh fails for a transport reason (network error, timeout, 5xx, unparseable response), the entry keeps serving: its soft expiry is extended by `SOFT_BUMP_SECONDS` per failed refresh, up to the JWT expiry plus `HARD_GRACE_SECONDS`. A `401`, `403` or `404` from the control plane evicts the entry at once.
 
+A change-feed event (a budget debit, a provider or routing edit) also evicts the entry so the next request reads fresh config. If that refetch fails for a transport reason, the gateway serves the evicted entry again, for up to one hour after its config was last confirmed. Revoking, disabling or rotating a key leaves no such fallback.
+
 | Var                                        | Default | Purpose                                                                                                                                                                   |
 | ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh during a control plane outage. `0` takes the default                                                                                 |
@@ -11274,6 +11276,8 @@ Every dropped record is spend that is never billed and never enforced against, s
 The gateway cannot reach the control plane and has no cached bundle for the key.
 
 **What still works.** A key a pod has already resolved keeps serving. When its token expires while the control plane is unreachable, the pod extends the entry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` (default 300) on each failed refresh, up to `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` past the token expiry (default 21600, six hours). Past that cap the entry is evicted and the key answers 503.
+
+A key evicted by a change-feed event, such as the budget update every debit emits, keeps serving its last known config if the refetch fails for a transport reason (timeout, 5xx, network error). The fallback lasts up to one hour after the config was last confirmed by the control plane. Revoked, disabled, rotated, deleted and expired keys get no fallback.
 
 A key the pod has never seen has no cached bundle and fails at once. There is no cache warm-up on boot, so a pod added during an outage starts cold, and so does every pod after a rolling deploy.
 
@@ -63103,7 +63107,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.18.0 # x-release-please-version
+    targetRevision: 3.18.1 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -63152,7 +63156,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.18.0 # x-release-please-version
+      targetRevision: 3.18.1 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -63521,7 +63525,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.18.0 # x-release-please-version
+VERSION=3.18.1 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -63537,13 +63541,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.18.0" # x-release-please-version
+    tag: "3.18.1" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.18.0" # x-release-please-version
+    tag: "3.18.1" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.18.0" # x-release-please-version
+    tag: "3.18.1" # x-release-please-version
 
 imagePullSecrets:
   - name: registry-credentials
@@ -64926,7 +64930,7 @@ The [Langy API surface flag](/self-hosting/langy/setup#staged-rollout) must be o
 | Status | Body | Meaning |
 | --- | --- | --- |
 | `200` | `{ "status": "ok", "conversationId", "turnId", "durationMs" }` | Langy answered with text. |
-| `503` | `{ "status": "unhealthy", "reason", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. |
+| `503` | `{ "status": "unhealthy", "reason", "cause", ... }` | `timeout`: no answer within 55 seconds, which includes a worker that never managed to start. `turn_failed`: the turn failed or stopped. `empty_reply`: the turn completed with no text. `cause` is the underlying error code, such as `insufficient_quota` or `budget_exceeded`, or `turn_stopped` for a stopped turn. It is left out when no code can be read. |
 | `429` | `{ "status": "busy" }` | A check for the same key is still running, or its last one timed out less than 55 seconds ago. Poll less often. |
 | `401` / `403` | `{ "message" }` | The key is missing, unknown, lacks `langy:create`, or its owner has no Langy access. |
 
@@ -67938,7 +67942,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.18.0 \
+  --version 3.18.1 \
   -f values-production.yaml
 # x-release-please-end
 ```

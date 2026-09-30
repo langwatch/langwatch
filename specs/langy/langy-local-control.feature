@@ -419,6 +419,11 @@ Feature: Langy works in a folder shared from the developer's machine
 
   Rule: The app gets its LangWatch key from the developer's login, never from Langy
 
+    # The project's base key is handed out only to a person's device session
+    # (POST /api/auth/cli/project-key, gated on project:manage). The organization
+    # API key the command line also holds is refused by GET /api/projects/:id/api-key
+    # for every caller, so the write never goes through that route.
+
     @unit
     Scenario: The app gets the project's key through the developer's own login
       Given a folder shared by a developer whose login may update the project
@@ -428,11 +433,26 @@ Feature: Langy works in a folder shared from the developer's machine
       And the key appears in no frame, no result and no terminal line
 
     @unit
+    Scenario: The project's key comes from the device session, not from the organization key
+      Given a folder shared by a developer signed in with a device session
+      When Langy asks for the project's credentials
+      Then the command line looks the project up by its id to learn its slug
+      And trades the device session for that project's key
+      And never asks the project routes to reveal the base key
+
+    @unit
     Scenario: The key is refused when the login lacks the permission
       Given a folder shared by a developer whose login may not update the project
       When Langy asks for the project's credentials
       Then the answer is the refusal code, naming the permission, the project and the file
       And the env file is left as it was
+
+    @unit
+    Scenario: A failed credentials write offers another try, never a manual paste
+      Given the credentials write failed for a reason the person can fix or retry
+      When Langy reads the failure
+      Then it says what failed and offers to try the write again
+      And it never tells the person to copy LANGWATCH_API_KEY or LANGWATCH_ENDPOINT into the file by hand
 
     @unit
     Scenario: The credentials are not written when the terminal has no endpoint

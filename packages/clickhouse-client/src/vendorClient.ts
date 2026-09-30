@@ -4,6 +4,7 @@
  * {@link ClickHouseQueryClient}: retry, outcome metrics, in-band exceptions.
  */
 
+import type { AbortSignalLike } from "./query.ts";
 import { runWithRetry } from "./retry.ts";
 import {
   StatementReporter,
@@ -144,6 +145,7 @@ export class VendorClientResilience {
       const result = await this.withTransientRetry({
         run: () => client.query(params),
         operation: "query",
+        signal: abortSignalOf(params),
       });
       const durationMs = now() - start;
       this.report.success({ operation: "query", durationMs, params });
@@ -182,11 +184,14 @@ export class VendorClientResilience {
   private withTransientRetry<R>({
     run,
     operation,
+    signal,
   }: {
     run: () => Promise<R>;
     operation: StatementOperation;
+    signal?: AbortSignalLike | undefined;
   }): Promise<R> {
     return runWithRetry(run, {
+      isAborted: () => signal?.aborted === true,
       // maxRetries counts retries after the first try; runWithRetry counts
       // tries.
       maxAttempts: this.maxRetries + 1,
@@ -267,4 +272,20 @@ function isJsonResult(value: unknown): value is JsonResult {
 function tableOf(params: unknown): string {
   if (params === null || typeof params !== "object" || !("table" in params)) return "unknown";
   return typeof params.table === "string" ? params.table : "unknown";
+}
+
+/** The caller's `abort_signal`, so an abandoned statement is not retried. */
+function abortSignalOf(params: unknown): AbortSignalLike | undefined {
+  if (params === null || typeof params !== "object" || !("abort_signal" in params)) return undefined;
+  const signal = params.abort_signal;
+  return isAbortSignalLike(signal) ? signal : undefined;
+}
+
+function isAbortSignalLike(value: unknown): value is AbortSignalLike {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "aborted" in value &&
+    typeof value.aborted === "boolean"
+  );
 }

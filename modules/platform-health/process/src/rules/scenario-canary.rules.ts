@@ -10,6 +10,8 @@ import {
 } from "@langwatch/scenario-contract";
 import type { Suite } from "@langwatch/suite-contract";
 
+import { probeCauseOf } from "./probe-cause.rules.ts";
+
 /** Total wall-time budget for the probe, inclusive of the one retry. */
 export const SCENARIO_CANARY_TOTAL_BUDGET_MS = 120_000;
 
@@ -24,7 +26,9 @@ export const MAX_CANARY_QUERY_PARAM_LENGTH = 128;
 
 export type CanaryReason = "timeout" | "run_failed" | "judge_failed";
 
-export type CanaryVerdict = { healthy: true } | { healthy: false; reason: CanaryReason };
+export type CanaryVerdict =
+  | { healthy: true }
+  | { healthy: false; reason: CanaryReason; cause?: string };
 
 export type CanaryOutcome = CanaryVerdict & { scenarioRunId?: string; durationMs: number };
 
@@ -42,15 +46,17 @@ export type CanaryConfig = Readonly<{
 
 /** A terminal failure status is `run_failed`; a success is judged by its verdict. */
 export function classifyCanaryOutcome({ status, results }: ScenarioRunSnapshot): CanaryVerdict {
+  const cause = probeCauseOf(results?.error);
+  const withCause = cause ? { cause } : {};
   if (isTerminalStatus(status) && status !== ScenarioRunStatus.SUCCESS) {
-    return { healthy: false, reason: "run_failed" };
+    return { healthy: false, reason: "run_failed", ...withCause };
   }
   if (!results || results.error || !results.verdict) {
-    return { healthy: false, reason: "judge_failed" };
+    return { healthy: false, reason: "judge_failed", ...withCause };
   }
   if (results.verdict === Verdict.SUCCESS) return { healthy: true };
 
-  return { healthy: false, reason: "run_failed" };
+  return { healthy: false, reason: "run_failed", ...withCause };
 }
 
 /** A live run plan naming exactly one scenario and one target, or how it is not. */
@@ -89,6 +95,12 @@ export function canaryAnswer(result: CanaryResult): { status: number; body: unkn
 
   return {
     status: 503,
-    body: { status: "unhealthy", reason: result.reason, scenarioRunId, durationMs },
+    body: {
+      status: "unhealthy",
+      reason: result.reason,
+      ...(result.cause && { cause: result.cause }),
+      scenarioRunId,
+      durationMs,
+    },
   };
 }

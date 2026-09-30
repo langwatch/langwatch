@@ -160,6 +160,33 @@ describe("VendorClientResilience", () => {
       });
     });
 
+    describe("when the caller's abort signal has fired", () => {
+      it("stops after the failing attempt instead of retrying", async () => {
+        const query = vi
+          .fn()
+          .mockRejectedValue(
+            new Error(
+              "Code: 202. DB::Exception: Too many simultaneous queries.",
+            ),
+          );
+        const controller = new AbortController();
+        controller.abort();
+
+        const client = new VendorClientResilience({
+          maxRetries: 3,
+          baseDelayMs: 1,
+          maxDelayMs: 1,
+          transientMessageFragments: ["Too many simultaneous queries"],
+        }).wrap({ query, insert: vi.fn() });
+
+        await expect(
+          client.query({ query: "SELECT 1", abort_signal: controller.signal }),
+        ).rejects.toThrow(/Too many simultaneous queries/);
+
+        expect(query).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe("when an insert fails with it", () => {
       /** @scenario Insert failures are not retried by the client */
       it("does not retry and raises the error untranslated", async () => {

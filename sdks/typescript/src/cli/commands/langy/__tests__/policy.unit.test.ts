@@ -762,6 +762,72 @@ describe("given a folder shared with a Langy conversation", () => {
       }
     });
 
+    /** @scenario "A redirect into /dev/null is not a path outside the folder" */
+    it("lets a redirect into /dev/null through and keeps every other escape refused", () => {
+      for (const command of [
+        "git status --porcelain 2>/dev/null",
+        "git branch --show-current 2> /dev/null && git remote -v",
+        "npm ls langwatch >/dev/null",
+        "node -e \"require('langwatch')\" &>/dev/null",
+        "cat agent.mjs >> /dev/null",
+        "node agent.mjs </dev/null",
+      ]) {
+        expect(bash(command).kind, command).not.toBe("refuse");
+      }
+      for (const command of [
+        "cat agent.mjs > /etc/hosts",
+        "git status 2>/tmp/langy.log",
+        "node agent.mjs < /etc/passwd",
+        "cat agent.mjs > /dev/null/../../etc/hosts",
+        "cat /dev/null",
+      ]) {
+        const decision = bash(command);
+        expect(decision.kind, command).toBe("refuse");
+        if (decision.kind === "refuse") expect(decision.code).toBe("path_refused");
+      }
+    });
+
+    /** @scenario "The script of sed or awk and the pattern of grep are not judged paths" */
+    it("reads the script or pattern as the command's own words and still checks every file", () => {
+      for (const command of [
+        "git remote show origin | sed -n '/HEAD branch/s/.*: //p'",
+        "sed -e '/^#/d' agent.mjs",
+        "awk '/^import/ {print $2}' agent.mjs",
+        "grep -n '/api/' agent.mjs",
+        "rg '/v1/chat' src",
+        "sed -e 's/a/b/' -e '/^#/d' agent.mjs",
+        "sed -ne '/HEAD/p' agent.mjs",
+        "grep -A 2 -n '/api/' agent.mjs",
+        "grep --regexp=/api/ agent.mjs",
+        "sed --expression='/^#/d' agent.mjs",
+      ]) {
+        expect(bash(command).kind, command).not.toBe("refuse");
+      }
+      for (const command of [
+        "sed -n '/HEAD branch/p' /etc/passwd",
+        "sed -e 's/a/b/' ../other/notes.txt",
+        "sed -f /etc/evil.sed agent.mjs",
+        "awk '{print}' /etc/passwd",
+        "grep -n root /etc/passwd",
+        "grep -e root -- /etc/passwd",
+        "grep --regexp=KEY /etc/passwd",
+        "grep --regexp KEY /etc/passwd",
+        "grep -eroot /etc/passwd",
+        "grep -ie root /etc/passwd",
+        "grep -f/etc/patterns agent.mjs",
+        "grep --file=/etc/patterns agent.mjs",
+        "grep -e > /etc/passwd",
+        "rg --files /etc",
+        "rg --ignore-file /etc/ignore KEY",
+        "grep --ignore-case root /etc/passwd",
+        "sed --in-place 's/a/b/' /etc/hosts",
+      ]) {
+        const decision = bash(command);
+        expect(decision.kind, command).toBe("refuse");
+        if (decision.kind === "refuse") expect(decision.code).toBe("path_refused");
+      }
+    });
+
     it("allows a home path that lands inside the folder", () => {
       const decision = decide({
         call: { tool: "local_read", params: { path: "~/acme/src/app.py" } },
