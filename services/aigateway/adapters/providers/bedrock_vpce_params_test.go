@@ -8,6 +8,8 @@ import (
 	"github.com/bytedance/sonic"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // docJSON marshals an AWS document.Interface back to JSON for assertions.
@@ -157,5 +159,32 @@ func TestConverse_MapsJSONSchemaToTextFormatForOpenAIModels(t *testing.T) {
 	// schema is refused rather than silently unenforced.
 	if _, err := mapBedrockAdditionalFields(context.Background(), params, "openai.gpt-oss-120b-1:0"); err == nil {
 		t.Fatal("gpt-oss: want the json_schema refused")
+	}
+}
+
+// A deployment alias of an OpenAI model maps its json_schema like the model
+// itself: the family check reads the resolved id the request routed on.
+// @scenario "Structured output on an OpenAI model on Bedrock is enforced through Converse"
+func TestConverse_JSONSchemaFollowsTheDeploymentMap(t *testing.T) {
+	cred := domain.Credential{
+		ProviderID:    domain.ProviderBedrock,
+		Extra:         map[string]string{"region": "eu-central-1"},
+		DeploymentMap: map[string]string{"helpdesk": "global.openai.gpt-5.5"},
+	}
+	req := &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: "helpdesk",
+		Body:  []byte(`{"messages":[{"role":"user","content":"hi"}],"response_format":{"type":"json_schema","json_schema":{"name":"city","schema":{"type":"object"}}}}`),
+	}
+	router := &BifrostRouter{}
+	input, _, err := router.buildConverseInput(context.Background(), req, mapProvider(cred), "helpdesk", cred)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := *input.ModelId; got != "global.openai.gpt-5.5" {
+		t.Fatalf("model id = %q, want the mapped inference profile", got)
+	}
+	if j := docJSON(t, input.AdditionalModelRequestFields); gjson.GetBytes(j, "text.format.name").String() != "city" {
+		t.Fatalf("want the schema under text.format, got %s", j)
 	}
 }

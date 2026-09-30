@@ -267,7 +267,10 @@ func (r *BifrostRouter) buildConverseInput(
 		return nil, nil, err
 	}
 
-	additional, err := mapBedrockAdditionalFields(ctx, bfReq.Params, model)
+	// The family checks read the id the request is dispatched as, the same
+	// one bedrockConverseEndpoint routed on, so a deployment alias of an
+	// OpenAI model maps like the model itself.
+	additional, err := mapBedrockAdditionalFields(ctx, bfReq.Params, bedrockModelID(model, cred))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -429,14 +432,7 @@ func bedrockOpenAIStructuredOutputModel(model string) bool {
 
 // jsonSchemaStrict reads json_schema.strict when the caller set it.
 func jsonSchemaStrict(rf *interface{}) (bool, bool) {
-	if rf == nil {
-		return false, false
-	}
-	m, isMap := (*rf).(map[string]interface{})
-	if !isMap {
-		return false, false
-	}
-	js, isMap := m["json_schema"].(map[string]interface{})
+	js, isMap := responseFormatJSONSchema(rf)
 	if !isMap {
 		return false, false
 	}
@@ -471,14 +467,7 @@ func setOutputConfig(fields map[string]any, key string, value any) {
 // absent response_format or other types (json_object never reaches this
 // mapper: the parameter policy refuses it on the bedrock lane).
 func jsonSchemaFromResponseFormat(rf *interface{}) (schema any, name string, ok bool) {
-	if rf == nil {
-		return nil, "", false
-	}
-	m, isMap := (*rf).(map[string]interface{})
-	if !isMap || m["type"] != "json_schema" {
-		return nil, "", false
-	}
-	js, isMap := m["json_schema"].(map[string]interface{})
+	js, isMap := responseFormatJSONSchema(rf)
 	if !isMap {
 		return nil, "", false
 	}
@@ -488,6 +477,20 @@ func jsonSchemaFromResponseFormat(rf *interface{}) (schema any, name string, ok 
 		return nil, "", false
 	}
 	return schema, name, true
+}
+
+// responseFormatJSONSchema returns the json_schema object of a json_schema
+// response format.
+func responseFormatJSONSchema(rf *interface{}) (map[string]interface{}, bool) {
+	if rf == nil {
+		return nil, false
+	}
+	m, isMap := (*rf).(map[string]interface{})
+	if !isMap || m["type"] != "json_schema" {
+		return nil, false
+	}
+	js, isMap := m["json_schema"].(map[string]interface{})
+	return js, isMap
 }
 
 // mapBedrockMessages splits the neutral Bifrost message list into Bedrock's
