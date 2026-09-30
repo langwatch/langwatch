@@ -25,6 +25,10 @@ describe("consoleLinks", () => {
         { label: "App", href: "https://app.feat-x.langwatch.localhost:1355" },
         { label: "Mail", href: "https://mail.feat-x.langwatch.localhost:1355", current: true },
         { label: "IdP", href: "https://idp.feat-x.langwatch.localhost:1355" },
+        { label: "Storage", href: "https://storage.feat-x.langwatch.localhost:1355" },
+        { label: "Voice", href: "https://voice.feat-x.langwatch.localhost:1355" },
+        { label: "LLM", href: "https://llm.feat-x.langwatch.localhost:1355" },
+        { label: "Analytics", href: "https://analytics.feat-x.langwatch.localhost:1355" },
         {
           label: "Design system",
           href: "https://design-system.feat-x.langwatch.localhost:1355",

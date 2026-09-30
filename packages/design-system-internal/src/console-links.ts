@@ -13,6 +13,10 @@ const CONSOLES: { label: string; service: string | null }[] = [
   { label: "App", service: "app" },
   { label: "Mail", service: "mail" },
   { label: "IdP", service: "idp" },
+  { label: "Storage", service: "storage" },
+  { label: "Voice", service: "voice" },
+  { label: "LLM", service: "llm" },
+  { label: "Analytics", service: "analytics" },
   { label: "Design system", service: "design-system" },
   { label: "Mail room", service: "mail-room" },
 ];

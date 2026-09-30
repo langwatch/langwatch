@@ -34,6 +34,9 @@ describe("<HavenTopBar/>", () => {
         ["App", null],
         ["Mail", null],
         ["IdP", null],
+        ["Storage", null],
+        ["LLM", null],
+        ["Analytics", null],
         ["Logs", null],
         ["Grafana", null],
       ]);

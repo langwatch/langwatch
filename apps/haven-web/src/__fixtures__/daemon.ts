@@ -51,6 +51,10 @@ const LIVE_SEEDS: SurfaceSeed[] = [
   { name: "langyagent", role: "Langy agent", status: "not-selected", hint: "haven up +langy" },
   { name: "idp", role: "IdP simulator", status: "live", port: 7562 },
   { name: "mail", role: "Mail sink", status: "live", port: 7563 },
+  { name: "storage", role: "Object storage (storagesim)", status: "live", port: 7564 },
+  { name: "voice", role: "Voice providers (voicesim)", status: "not-selected", hint: "haven up +voice" },
+  { name: "llm", role: "LLM providers (llmsim)", status: "live", port: 7566 },
+  { name: "analytics", role: "Product analytics (analyticssim)", status: "live", port: 7567 },
   {
     name: "design-system",
     role: "Design system Storybook",
