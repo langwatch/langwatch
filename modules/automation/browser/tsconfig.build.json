@@ -21,6 +21,9 @@
   ],
   "references": [
     {
+      "path": "../../analytics/filters/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {

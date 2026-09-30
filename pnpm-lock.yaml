@@ -6122,6 +6122,9 @@ importers:
 
   modules/automation/browser:
     dependencies:
+      '@langwatch/analytics-filters':
+        specifier: workspace:*
+        version: link:../../analytics/filters
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -9646,6 +9649,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../automation/contract
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host

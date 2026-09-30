@@ -135,7 +135,12 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
       `${base}?drawer.open=scenarioEditor&drawer.scenarioId=${encodeURIComponent(resourceId)}`,
   },
   agents: { path: "agents" },
-  automations: { path: "automations" },
+  // One automation opens in its view drawer, the one a saved edit lands on.
+  automations: {
+    path: "automations",
+    resourceHref: (base, resourceId) =>
+      `${base}?drawer.open=viewAutomation&drawer.automationId=${encodeURIComponent(resourceId)}`,
+  },
   workflows: { path: "workflows" },
   annotations: { path: "annotations" },
   secrets: { path: "settings", deepLink: false },

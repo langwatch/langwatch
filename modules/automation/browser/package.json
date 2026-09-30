@@ -19,6 +19,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/analytics-filters": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
