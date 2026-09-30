@@ -17,7 +17,7 @@
 # the worker reports as `socket hang up`.
 #
 # The suite asserts both halves of the pair: the pod's grace period, and the
-# SHUTDOWN_DRAIN_TIMEOUT_MS the process is given. Both come from one value, and
+# PROCESS_SHUTDOWN_DEADLINE_MS the process is given. Both come from one value, and
 # a process running a budget its pod was not sized for is the whole failure.
 # See specs/background/worker-graceful-shutdown.feature.
 #
@@ -33,11 +33,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# The default drain budget (workers.shutdownDrainSeconds) and the fixed margin
-# above it: 5s for the close backstop, 15s for process teardown, 10s of kubelet
-# slack. Mirrors apps/worker/src/platform/config/worker.config.ts and
-# apps/api/src/platform/config/api.config.ts, which derive the same numbers.
+# The default drain budget (shutdownDrainSeconds), the process deadline above it
+# (drain + 20s, read by packages/process-server/src/config.ts) and the grace
+# period above that (deadline + 10s of kubelet slack).
 readonly DRAIN_SECONDS=25
+readonly DEADLINE_MARGIN_SECONDS=20
 readonly REQUIRED_MARGIN_SECONDS=30
 
 # Secret autogen, so the chart's own secret validation lets a bare render
@@ -122,10 +122,8 @@ test_app_grace_period_covers_the_drain() {
   expect_covers_drain "app grace period" "app"
 }
 
-# The two processes read the drain budget under different names: the worker
-# drains its queue (SHUTDOWN_DRAIN_TIMEOUT_MS), the API drains live HTTP
-# requests (API_HTTP_DRAIN_GRACE_MS). Asserting one name against both pods would
-# pass on whichever pod happened to carry it and prove nothing about the other.
+# Both processes read the same variable, so each component's Deployment is
+# rendered on its own: a value from one pod can never satisfy the other.
 drain_env_of() {
   printf '%s' "$1" | awk -v var="$2" '
     $0 ~ ("name: " var "$") { want=1; next }
@@ -133,12 +131,7 @@ drain_env_of() {
   ' | head -n 1
 }
 
-drain_var_of() {
-  case "$1" in
-    app) echo "API_HTTP_DRAIN_GRACE_MS" ;;
-    *) echo "SHUTDOWN_DRAIN_TIMEOUT_MS" ;;
-  esac
-}
+readonly DEADLINE_VAR="PROCESS_SHUTDOWN_DEADLINE_MS"
 
 # The pod is sized for a drain the process must be told about. A process
 # running a budget its pod was not sized for is the drift this pair exists to
@@ -147,7 +140,7 @@ drain_var_of() {
 # present.
 expect_drain_env_matches() {
   local label="$1" component="$2" flags="$3" want="$4" block got var
-  var=$(drain_var_of "$component")
+  var="$DEADLINE_VAR"
   block=$(render_component "$component" "$BASE $flags")
   got=$(drain_env_of "$block" "$var")
   if [ "$got" != "$want" ]; then
@@ -159,11 +152,13 @@ expect_drain_env_matches() {
 
 # @scenario "The process is told the same drain budget the pod is sized for"
 test_drain_env_matches_the_pod() {
-  expect_drain_env_matches "workers drain env" "workers" "" "$((DRAIN_SECONDS * 1000))"
-  expect_drain_env_matches "app drain env" "app" "" "$((DRAIN_SECONDS * 1000))"
-  expect_drain_env_matches "raised drain env" "workers" \
+  expect_drain_env_matches "workers deadline env" "workers" "" \
+    "$(((DRAIN_SECONDS + DEADLINE_MARGIN_SECONDS) * 1000))"
+  expect_drain_env_matches "app deadline env" "app" "" \
+    "$(((DRAIN_SECONDS + DEADLINE_MARGIN_SECONDS) * 1000))"
+  expect_drain_env_matches "raised deadline env" "workers" \
     "--set workers.shutdownDrainSeconds=60 --set workers.terminationGracePeriodSeconds=90" \
-    "60000"
+    "80000"
 }
 
 # @scenario "Operators can raise the grace period for a slower drain"
@@ -214,7 +209,7 @@ test_junk_drain_refuses_to_render() {
 # @scenario "The drain budget cannot be overridden behind the pod's back"
 test_extra_envs_cannot_override_the_drain() {
   expect_render_refused "extraEnvs override" \
-    "--set workers.extraEnvs[0].name=SHUTDOWN_DRAIN_TIMEOUT_MS --set-string workers.extraEnvs[0].value=120000" \
+    "--set workers.extraEnvs[0].name=PROCESS_SHUTDOWN_DEADLINE_MS --set-string workers.extraEnvs[0].value=120000" \
     "must not be set through extraEnvs"
 }
 

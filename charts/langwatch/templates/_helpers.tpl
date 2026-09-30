@@ -1718,45 +1718,38 @@ here, once, by name, so both consuming templates agree.
 {{- end -}}
 
 {{/* Renders terminationGracePeriodSeconds for a Node component, refusing the
-     render when it cannot cover that component's shutdown drain.
+     render when it cannot cover that component's shutdown budget.
 
-     The Node processes run four nested shutdown clocks — the drain
-     (SHUTDOWN_DRAIN_TIMEOUT_MS on the worker, API_HTTP_DRAIN_GRACE_MS on the
-     API), the close backstop, the entrypoint watchdog, and this one. They are
-     derived from a single number; the two processes state the derivation in
-     apps/worker/src/platform/config/worker.config.ts and
-     apps/api/src/platform/config/api.config.ts:
+     Two clocks are derived from one number, shutdownDrainSeconds (D):
 
-       processDeadlineMs = drain + 5s (close) + 15s (process teardown)
-       required grace    = processDeadlineMs + 10s of kubelet slack
+       PROCESS_SHUTDOWN_DEADLINE_MS = D + 20s   the process force-exits here
+                                                (packages/process-server/src/config.ts)
+       required grace               = D + 30s   the kubelet SIGKILLs here
 
-     So a drain of D seconds needs a grace period of at least D + 30. The
-     workers Deployment had no grace period at all and ran on the k8s default
-     of 30s, which a 20s drain plus teardown does not fit inside; the kubelet
-     answered with SIGKILL mid-drain, severing in-flight ClickHouse statements
-     and producing `Broken pipe ... ParallelFormattingOutputFormat` on the
-     server. See specs/background/worker-graceful-shutdown.feature.
+     The 10s between them covers the signal-to-handler gap and lets the
+     overrun log line ship before the process dies. The workers Deployment
+     once ran on the k8s default of 30s, which a 25s drain plus teardown does
+     not fit inside; the kubelet answered with SIGKILL mid-drain, severing
+     in-flight ClickHouse statements and producing `Broken pipe ...
+     ParallelFormattingOutputFormat` on the server. See
+     specs/background/worker-graceful-shutdown.feature.
 
      Validated rather than derived, matching the gateway subchart: an operator
      draining behind a slow load balancer wants a wider margin than a formula
-     would pick, so the number stays theirs to set — the chart only refuses to
-     install a release the kubelet would kill mid-drain.
-
-     Set shutdownDrainSeconds and the app's SHUTDOWN_DRAIN_TIMEOUT_MS together;
-     this helper validates the pod against what the process will actually do. */}}
+     would pick, so the number stays theirs to set. The chart only refuses to
+     install a release the kubelet would kill mid-drain. */}}
 {{/* The process side of the same number the pod is sized for.
 
      Emitted per component rather than in sharedEnv because app and workers
-     each carry their own shutdownDrainSeconds, and a process told a budget its
-     pod was not sized for is exactly the drift this pair exists to prevent:
-     the kubelet SIGKILLs a drain the process still believes it has time for.
-     One value in values.yaml now drives both. */}}
+     each carry their own shutdownDrainSeconds, and a process told a deadline
+     its pod was not sized for is exactly the drift this pair exists to
+     prevent: the kubelet SIGKILLs a drain the process still believes it has
+     time for. One value in values.yaml drives both. */}}
 {{/* Reads a whole-second count, refusing anything that is not one.
 
      `int` is the trap this exists for: it silently yields 0 for a value Helm
      kept as a string, which `--set-string x=abc` and `--set x=25.9` both
-     produce. A zero drain then renders SHUTDOWN_DRAIN_TIMEOUT_MS="0" — which
-     the app rejects at boot, crashlooping every pod — while ALSO collapsing
+     produce. A zero drain then renders a deadline of bare slack while ALSO collapsing
      the required grace period to the bare margin, so the guard below happily
      passes and the release installs looking correct. A silent 0 is the worst
      of both: the render says fine and the fleet does not come up. */}}
@@ -1780,27 +1773,16 @@ here, once, by name, so both consuming templates agree.
 
 {{- define "langwatch.shutdownEnv" -}}
 {{- $drain := include "langwatch.positiveSeconds" (dict "name" (printf "%s.shutdownDrainSeconds" .name) "value" .component.shutdownDrainSeconds "fallback" 25) -}}
-{{/* The two processes read the drain budget under DIFFERENT names, because
-     they drain different things: apps/worker's SHUTDOWN_DRAIN_TIMEOUT_MS is the
-     GroupQueue drain, and apps/api's API_HTTP_DRAIN_GRACE_MS is how long live
-     HTTP requests get after the listener stops accepting. Emitting one name for
-     both would leave whichever process does not read it on its code default —
-     5 seconds for the API — while its pod was sized for twenty-five, so a
-     rollout would cut requests short and the grace period would still look
-     right. */}}
-{{- $var := ternary "API_HTTP_DRAIN_GRACE_MS" "SHUTDOWN_DRAIN_TIMEOUT_MS" (eq .name "app") -}}
 {{/* extraEnvs renders after this block, and the kubelet takes the LAST
-     duplicate — so setting the variable there silently wins over the value the
-     pod was sized for, which is the exact drift the pair exists to prevent, and
-     invisible because the grace period still looks right. Set
-     shutdownDrainSeconds instead; it moves both. */}}
+     duplicate, so setting the variable there silently wins over the value the
+     pod was sized for. Set shutdownDrainSeconds instead; it moves both. */}}
 {{- range (default (list) .component.extraEnvs) -}}
-{{- if or (eq .name "SHUTDOWN_DRAIN_TIMEOUT_MS") (eq .name "API_HTTP_DRAIN_GRACE_MS") -}}
-{{- fail (printf "%s must not be set through extraEnvs — it would override the drain budget the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both." .name) -}}
+{{- if eq .name "PROCESS_SHUTDOWN_DEADLINE_MS" -}}
+{{- fail (printf "%s must not be set through extraEnvs. It would override the shutdown deadline the pod's terminationGracePeriodSeconds was sized for, and the kubelet would SIGKILL a drain the process still thinks it has time for. Set shutdownDrainSeconds instead, which moves both." .name) -}}
 {{- end -}}
 {{- end -}}
-- name: {{ $var }}
-  value: {{ mul (int $drain) 1000 | quote }}
+- name: PROCESS_SHUTDOWN_DEADLINE_MS
+  value: {{ mul (add (int $drain) 20) 1000 | quote }}
 {{- end -}}
 
 {{- define "langwatch.terminationGracePeriod" -}}

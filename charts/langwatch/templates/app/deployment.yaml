@@ -84,8 +84,8 @@ spec:
       # The app runs the same shutdown budget as the workers. It no longer hosts
       # the worker stack — apps/api and apps/worker are separate processes and
       # separate Deployments — but its drain is the same kind of clock: the
-      # listener stops accepting, live requests get API_HTTP_DRAIN_GRACE_MS, and
-      # the process deadline sits above that. The API drains in well under this;
+      # listener stops accepting, live requests drain, and the process deadline
+      # (PROCESS_SHUTDOWN_DEADLINE_MS) sits above that. The API drains in well under this;
       # the grace period is a ceiling, not a wait.
       terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.app "name" "app") }}
       # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
