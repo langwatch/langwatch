@@ -407,13 +407,21 @@ const readRegistered = (frame: Record<string, unknown>): LocalRegisteredFrame | 
   };
 };
 
-/** A `local_edit` call's replacements, or null when one is malformed. */
+/** One entry of a `local_edit` call: text to append, or a replacement; null when malformed. */
+const readEdit = (entry: unknown): LocalEditReplace | null => {
+  if (!isRecord(entry)) return null;
+  if (isString(entry.append)) return { append: entry.append };
+  if (!isString(entry.oldText)) return null;
+  return { oldText: entry.oldText, newText: readString(entry.newText, "") };
+};
+
+/** A `local_edit` call's entries, or null when one is malformed. */
 const readEdits = (entries: unknown[]): LocalEditReplace[] | null => {
   const edits: LocalEditReplace[] = [];
   for (const entry of entries) {
-    if (!isRecord(entry)) return null;
-    if (!isString(entry.oldText)) return null;
-    edits.push({ oldText: entry.oldText, newText: readString(entry.newText, "") });
+    const edit = readEdit(entry);
+    if (edit === null) return null;
+    edits.push(edit);
   }
   return edits;
 };
