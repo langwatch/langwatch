@@ -5,7 +5,8 @@
  * (specs/identity/sso-link-unconfirmed-local-account.feature).
  *
  * What is real here: Postgres, the composed identity storage adapter, the
- * app's own plugin list, the production assertion gate (`ssoAssertion()`) and
+ * app's own plugin list and database hooks, the production assertion gate
+ * (`ssoAssertion()`) and
  * the production user resolver (`ssoProvisionedUsers()`), and the plugin's
  * whole OIDC callback. Only the identity provider stands in, as a stubbed
  * `fetch` answering discovery, token and JWKS with a signed id token.
@@ -19,10 +20,17 @@ import { z } from "zod";
 import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
 import { identityStorageTransactions } from "~/server/app-layer/identity/identity-storage-transaction.adapter";
 import {
+  databaseHooks as composeDatabaseHooks,
+  credentialSessions,
+  identityBridgeCeremonies,
+  identityCeremonies,
   identityStorageAdapter,
+  sessionCallbackEvidence,
+  sessionClaims,
   ssoAssertion,
   ssoProvisionedUsers,
 } from "~/server/app-layer/identity/runtime";
+import { databaseHooks } from "~/server/better-auth/config/database-hooks";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
@@ -109,6 +117,12 @@ const cloudUsers = PrismaScimSsoUsers.create(identityStorageTransactions, {
   isHosted: () => true,
 });
 
+/**
+ * better-auth with the production plugins, models and database hooks, wired
+ * from the same runtime collaborators `server/better-auth/index.ts` uses. The
+ * hooks matter: the account-create hook re-checks the link's evidence, and a
+ * harness without them passed while production refused every link.
+ */
 const auth = ({ cloud = false }: { cloud?: boolean } = {}) =>
   betterAuth({
     baseURL: BASE_URL,
@@ -120,8 +134,16 @@ const auth = ({ cloud = false }: { cloud?: boolean } = {}) =>
       passkeySignUp: () => ({}) as PasskeySignUpRegistration,
       confirmSignUpAddress: async () => undefined,
       ssoAssertion,
-      ssoCallbackEvidence: () => ({ recordAuthenticatedSsoAccount: () => {} }),
+      ssoCallbackEvidence: sessionCallbackEvidence,
       ssoProvisionedUsers: cloud ? () => cloudUsers : ssoProvisionedUsers,
+    }),
+    databaseHooks: databaseHooks({
+      hooks: composeDatabaseHooks,
+      userErasure: identityCeremonies,
+      accountCeremonies: identityBridgeCeremonies,
+      sessionClaims,
+      providerAssertions: sessionCallbackEvidence,
+      credentialSessions,
     }),
     ...models(),
   });

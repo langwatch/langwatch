@@ -295,7 +295,10 @@ export {
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
-const ssoAccountFacts = new PrismaSsoAccountFactsRepository(prisma);
+const ssoAccountFacts = new PrismaSsoAccountFactsRepository(
+  prisma,
+  identityStorageTransactions,
+);
 const organizationJoinProcessStore = new PrismaProcessStore(prisma);
 let organizationJoinNotifier: EmailJoinRequestNotifier | null = null;
 let organizationJoinMembership: PrismaJoinMembership | null = null;
