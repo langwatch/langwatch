@@ -58,6 +58,9 @@ export type GrantUpdate = z.infer<typeof grantUpdateSchema>;
 /** `<createdAt ms>.<base64url id>`: opaque to callers, a position in the list to the service. */
 export const GRANT_CURSOR_PATTERN = /^\d{1,16}\.[A-Za-z0-9_-]{1,256}$/;
 
+export const grantListOrderSchema = z.enum(["newest", "oldest"]);
+export type GrantListOrder = z.infer<typeof grantListOrderSchema>;
+
 export const grantListQuerySchema = z.object({
   principalType: grantPrincipalTypeSchema.optional(),
   principalId: idSchema.optional(),
@@ -68,6 +71,8 @@ export const grantListQuerySchema = z.object({
   status: grantStatusSchema.optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   cursor: z.string().regex(GRANT_CURSOR_PATTERN).optional(),
+  /** By creation time; omitted is "oldest". A cursor continues the order that issued it. */
+  order: grantListOrderSchema.optional(),
 });
 export type GrantListQuery = z.infer<typeof grantListQuerySchema>;
 

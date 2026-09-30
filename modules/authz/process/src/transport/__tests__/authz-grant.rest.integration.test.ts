@@ -376,6 +376,65 @@ describe("given the /api/grants family", () => {
     });
   });
 
+  describe("when grants are listed in either order", () => {
+    /** @scenario Listing grants newest first, with oldest first as the default */
+    it("lists oldest first by default, newest first on request, paging in either order", async () => {
+      const at = (day: number) => new Date(Date.UTC(2026, 8, day));
+      const { send } = world({
+        rows: [
+          row({ id: "g1", userId: "user-1", createdAt: at(1) }),
+          row({ id: "g2", userId: "user-1", createdAt: at(2) }),
+          row({ id: "g3", userId: "user-1", createdAt: at(3) }),
+        ],
+      });
+
+      const byDefault = pageJson.parse(await (await send("/api/grants")).json());
+      const oldest = pageJson.parse(await (await send("/api/grants?order=oldest")).json());
+      const newest = pageJson.parse(await (await send("/api/grants?order=newest")).json());
+      const first = pageJson.parse(await (await send("/api/grants?order=newest&limit=2")).json());
+      const second = pageJson.parse(
+        await (
+          await send(`/api/grants?order=newest&limit=2&cursor=${first.nextCursor ?? ""}`)
+        ).json(),
+      );
+      const invalid = await send("/api/grants?order=sideways");
+
+      expect(byDefault.grants.map((grant) => grant.id)).toEqual(["g1", "g2", "g3"]);
+      expect(oldest.grants.map((grant) => grant.id)).toEqual(["g1", "g2", "g3"]);
+      expect(newest.grants.map((grant) => grant.id)).toEqual(["g3", "g2", "g1"]);
+      expect(first.grants.map((grant) => grant.id)).toEqual(["g3", "g2"]);
+      expect(second.grants.map((grant) => grant.id)).toEqual(["g1"]);
+      expect(second.nextCursor).toBeNull();
+      expect(invalid.status).toBe(422);
+    });
+  });
+
+  describe("when an organization below Enterprise grants and changes a role", () => {
+    /** @scenario Any plan grants and changes roles, with or without an end date */
+    it("grants with an end date and changes the role, keeping the end date", async () => {
+      const { send } = world();
+      const endsAt = "2099-01-01T00:00:00.000Z";
+
+      const created = await send("/api/grants", {
+        method: "POST",
+        body: grantBody({ expiresAt: endsAt }),
+      });
+      const grant = grantJson.parse(await created.json());
+      const changed = await send(`/api/grants/${grant.id}`, {
+        method: "PATCH",
+        body: { roleId: "viewer" },
+      });
+
+      expect(created.status).toBe(201);
+      expect(changed.status).toBe(200);
+      expect(grantJson.parse(await changed.json())).toMatchObject({
+        id: grant.id,
+        role: { id: "viewer" },
+        expiresAt: endsAt,
+      });
+    });
+  });
+
   describe("when a grant's role is changed", () => {
     /** @scenario Changing a grant's role keeps its principal and scope */
     it("keeps the id, principal and scope", async () => {

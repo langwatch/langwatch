@@ -51,7 +51,7 @@ export const authzGrantRest: Readonly<{
     tags: TAGS,
     summary: "List grants",
     description:
-      "List the organization's grants, oldest first, each naming its principal (user, group or API key), role and scope. Filter by principal, role, scope or status; `status` is derived from `expiresAt`. Pages by cursor: pass `nextCursor` back as `cursor` until it is null.",
+      "List the organization's grants, oldest first unless `order=newest`, each naming its principal (user, group or API key), role and scope. Filter by principal, role, scope or status; `status` is derived from `expiresAt`. Pages by cursor: pass `nextCursor` back as `cursor` until it is null.",
   })
   .withMiddleware(grantRestFacts)
   .handle(async ({ app, input }, facts) =>

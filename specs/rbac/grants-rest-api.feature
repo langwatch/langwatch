@@ -50,6 +50,14 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
     And filtering by status "expired" returns only grants past their end date
 
   @integration
+  Scenario: Listing grants newest first, with oldest first as the default
+    Given three grants created one after another
+    When I list grants without an order, with order "oldest", and with order "newest"
+    Then the first two lists return the oldest grant first and the last returns the newest first
+    And paging with order "newest" continues from the cursor in the same order
+    And an order other than "newest" or "oldest" is refused with 422
+
+  @integration
   Scenario: Changing a grant's role keeps its principal and scope
     Given a user holds role "viewer" on a project
     When I change that grant's role to "member"

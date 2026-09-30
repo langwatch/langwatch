@@ -17,6 +17,7 @@ export function useGrantList({ organizationId }: { organizationId: string }) {
     organizationId,
     query: {
       limit: PAGE_SIZE,
+      order: "newest",
       ...(scopeType ? { scopeType } : {}),
       ...(status ? { status } : {}),
       ...(cursors.length > 0 ? { cursor: cursors[cursors.length - 1] } : {}),
