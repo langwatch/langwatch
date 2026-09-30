@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.19.3](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.2...langwatch@v3.19.3) (2026-09-30)
+
+
+### Bug Fixes
+
+* **sso:** let the link evidence hook see the resolver's confirmation ([#8389](https://github.com/langwatch/langwatch/issues/8389)) ([2008a34](https://github.com/langwatch/langwatch/commit/2008a34f2414ebea03206b182d73e90ac53f5799))
+
 ## [3.19.2](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.1...langwatch@v3.19.2) (2026-09-30)
 
 

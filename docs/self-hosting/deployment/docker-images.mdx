@@ -112,7 +112,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.19.2 # x-release-please-version
+VERSION=3.19.3 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -128,13 +128,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.19.2" # x-release-please-version
+    tag: "3.19.3" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.19.2" # x-release-please-version
+    tag: "3.19.3" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.19.2" # x-release-please-version
+    tag: "3.19.3" # x-release-please-version
 
 imagePullSecrets:
   - name: registry-credentials
