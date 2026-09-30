@@ -613,6 +613,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups", "query": {"limit": 1000}}
   expect: {"status": 200, "contains": "vd-{uid}", "path": "data"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-list-pagination-limit-one"
   endpoint: "GET /api/groups"
@@ -623,6 +626,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups", "query": {"limit": 1}}
   expect: {"status": 200, "path": "data", "length": 1}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-list-page-past-the-end-is-empty"
   endpoint: "GET /api/groups"
@@ -677,6 +683,9 @@
       expect: {"status": 200, "body": {"name": "vd-{uid}"}}
     - request: "GET /api/groups?limit=1000"
       expect: {"status": 200, "contains": "vd-{uid}"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-create-with-binding"
   endpoint: "POST /api/groups"
@@ -700,13 +709,13 @@
             - role: "VIEWER"
               scopeType: "PROJECT"
               scopeId: "{projectId}"
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-create-with-members"
   endpoint: "POST /api/groups"
   auth: "org"
-  setup:
-    - request: "GET /api/organization/members"
-      capture: {"userId": "members.0.userId"}
   request:
     path: "/api/groups"
     body: {"name": "vd-{uid}", "memberIds": ["{userId}"]}
@@ -715,6 +724,9 @@
   verify:
     - request: "GET /api/groups/{groupId}/members"
       expect: {"status": 200, "contains": "{userId}"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-create-rejects-missing-name"
   endpoint: "POST /api/groups"
@@ -786,6 +798,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups", "body": {"name": "vd-{uid}"}}
   expect: {"status": [201, 409]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-create-refuses-no-key"
   endpoint: "POST /api/groups"
@@ -820,6 +835,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups/{groupId}"}
   expect: {"status": 200, "body": {"id": "{groupId}", "name": "vd-{uid}"}}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-get-not-found"
   endpoint: "GET /api/groups/{groupId}"
@@ -865,6 +883,9 @@
   verify:
     - request: "GET /api/groups/{groupId}"
       expect: {"status": 200, "body": {"name": "vd-renamed-{uid}"}}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-rename-rejects-missing-name"
   endpoint: "PATCH /api/groups/{groupId}"
@@ -875,6 +896,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups/{groupId}", "body": {}}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-rename-rejects-blank-name"
   endpoint: "PATCH /api/groups/{groupId}"
@@ -888,6 +912,9 @@
   verify:
     - request: "GET /api/groups/{groupId}"
       expect: {"status": 200, "body": {"name": "vd-{uid}"}}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-rename-not-found"
   endpoint: "PATCH /api/groups/{groupId}"
@@ -933,6 +960,9 @@
       expect: {"status": 404}
     - request: "GET /api/groups?limit=1000"
       expect: {"status": 200, "notContains": "vd-{uid}"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-delete-not-found"
   endpoint: "DELETE /api/groups/{groupId}"
@@ -950,6 +980,9 @@
     - request: "DELETE /api/groups/{groupId}"
   request: {"path": "/api/groups/{groupId}"}
   expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-delete-refuses-no-key"
   endpoint: "DELETE /api/groups/{groupId}"
@@ -984,6 +1017,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups/{groupId}/members"}
   expect: {"status": 200, "path": "data", "length": 0}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-members-list-not-found"
   endpoint: "GET /api/groups/{groupId}/members"
@@ -1022,8 +1058,6 @@
     - request: "POST /api/groups"
       body: {"name": "vd-{uid}"}
       capture: {"groupId": "id"}
-    - request: "GET /api/organization/members"
-      capture: {"userId": "members.0.userId"}
   request:
     path: "/api/groups/{groupId}/members"
     body: {"userId": "{userId}"}
@@ -1031,6 +1065,9 @@
   verify:
     - request: "GET /api/groups/{groupId}/members"
       expect: {"status": 200, "contains": "{userId}", "path": "data", "length": 1}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-member-add-rejects-missing-user"
   endpoint: "POST /api/groups/{groupId}/members"
@@ -1041,6 +1078,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups/{groupId}/members", "body": {}}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-member-add-unknown-user"
   endpoint: "POST /api/groups/{groupId}/members"
@@ -1056,13 +1096,14 @@
   verify:
     - request: "GET /api/groups/{groupId}/members"
       expect: {"status": 200, "path": "data", "length": 0}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-member-add-group-not-found"
   endpoint: "POST /api/groups/{groupId}/members"
   auth: "org"
   setup:
-    - request: "GET /api/organization/members"
-      capture: {"userId": "members.0.userId"}
   request:
     path: "/api/groups/nope-{uid}/members"
     body: {"userId": "{userId}"}
@@ -1075,14 +1116,15 @@
     - request: "POST /api/groups"
       body: {"name": "vd-{uid}"}
       capture: {"groupId": "id"}
-    - request: "GET /api/organization/members"
-      capture: {"userId": "members.0.userId"}
     - request: "POST /api/groups/{groupId}/members"
       body: {"userId": "{userId}"}
   request:
     path: "/api/groups/{groupId}/members"
     body: {"userId": "{userId}"}
   expect: {"status": [201, 409]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-member-add-refuses-no-key"
   endpoint: "POST /api/groups/{groupId}/members"
@@ -1115,8 +1157,6 @@
     - request: "POST /api/groups"
       body: {"name": "vd-{uid}"}
       capture: {"groupId": "id"}
-    - request: "GET /api/organization/members"
-      capture: {"userId": "members.0.userId"}
     - request: "POST /api/groups/{groupId}/members"
       body: {"userId": "{userId}"}
   request: {"path": "/api/groups/{groupId}/members/{userId}"}
@@ -1124,6 +1164,9 @@
   verify:
     - request: "GET /api/groups/{groupId}/members"
       expect: {"status": 200, "path": "data", "length": 0}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-member-remove-not-a-member"
   endpoint: "DELETE /api/groups/{groupId}/members/{userId}"
@@ -1132,17 +1175,16 @@
     - request: "POST /api/groups"
       body: {"name": "vd-{uid}"}
       capture: {"groupId": "id"}
-    - request: "GET /api/organization/members"
-      capture: {"userId": "members.0.userId"}
   request: {"path": "/api/groups/{groupId}/members/{userId}"}
   expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-member-remove-group-not-found"
   endpoint: "DELETE /api/groups/{groupId}/members/{userId}"
   auth: "org"
   setup:
-    - request: "GET /api/organization/members"
-      capture: {"userId": "members.0.userId"}
   request: {"path": "/api/groups/nope-{uid}/members/{userId}"}
   expect: {"status": 404}
 
@@ -1179,6 +1221,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups/{groupId}/bindings"}
   expect: {"status": 200, "path": "data", "length": 0}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-bindings-list-not-found"
   endpoint: "GET /api/groups/{groupId}/bindings"
@@ -1229,6 +1274,9 @@
         body: {"data": [{"role": "VIEWER", "scopeType": "PROJECT"}]}
         path: "data"
         length: 1
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-add-organization-scope"
   endpoint: "POST /api/groups/{groupId}/bindings"
@@ -1244,6 +1292,9 @@
   verify:
     - request: "GET /api/groups/{groupId}/bindings"
       expect: {"status": 200, "path": "data", "length": 1}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-add-rejects-invalid-role"
   endpoint: "POST /api/groups/{groupId}/bindings"
@@ -1256,6 +1307,9 @@
     path: "/api/groups/{groupId}/bindings"
     body: {"role": "OWNER", "scopeType": "PROJECT", "scopeId": "{projectId}"}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-add-rejects-invalid-scope-type"
   endpoint: "POST /api/groups/{groupId}/bindings"
@@ -1268,6 +1322,9 @@
     path: "/api/groups/{groupId}/bindings"
     body: {"role": "VIEWER", "scopeType": "GLOBAL", "scopeId": "{projectId}"}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-add-rejects-missing-scope"
   endpoint: "POST /api/groups/{groupId}/bindings"
@@ -1280,6 +1337,9 @@
     path: "/api/groups/{groupId}/bindings"
     body: {"role": "VIEWER", "scopeType": "PROJECT"}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-add-rejects-custom-without-role-id"
   endpoint: "POST /api/groups/{groupId}/bindings"
@@ -1292,6 +1352,9 @@
     path: "/api/groups/{groupId}/bindings"
     body: {"role": "CUSTOM", "scopeType": "PROJECT", "scopeId": "{projectId}"}
   expect: {"status": [400, 404, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-add-scope-outside-org"
   endpoint: "POST /api/groups/{groupId}/bindings"
@@ -1307,6 +1370,9 @@
   verify:
     - request: "GET /api/groups/{groupId}/bindings"
       expect: {"status": 200, "path": "data", "length": 0}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-add-group-not-found"
   endpoint: "POST /api/groups/{groupId}/bindings"
@@ -1329,6 +1395,9 @@
     path: "/api/groups/{groupId}/bindings"
     body: {"role": "VIEWER", "scopeType": "PROJECT", "scopeId": "{projectId}"}
   expect: {"status": [201, 409]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-add-refuses-no-key"
   endpoint: "POST /api/groups/{groupId}/bindings"
@@ -1377,6 +1446,9 @@
   verify:
     - request: "GET /api/groups/{groupId}/bindings"
       expect: {"status": 200, "path": "data", "length": 0}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-remove-not-found"
   endpoint: "DELETE /api/groups/{groupId}/bindings/{bindingId}"
@@ -1387,6 +1459,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups/{groupId}/bindings/nope-{uid}"}
   expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "group-binding-remove-group-not-found"
   endpoint: "DELETE /api/groups/{groupId}/bindings/{bindingId}"
@@ -1873,6 +1948,9 @@
   request: {"path": "/api/roles/{roleId}"}
   expect: {"status": 409, "contains": "custom_role_in_use"}
   verify: [{"request": "GET /api/roles/{roleId}", "expect": {"status": 200}}]
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-delete-refuses-no-key"
   endpoint: "DELETE /api/roles/{id}"
@@ -1923,6 +2001,9 @@
     body: {"totalCount": 1}
     path: "bindings"
     length: 1
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-list-filter-by-group-none"
   endpoint: "GET /api/role-bindings"
@@ -1937,6 +2018,9 @@
     body: {"totalCount": 0}
     path: "bindings"
     length: 0
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-list-filter-by-user"
   endpoint: "GET /api/role-bindings"
@@ -1970,6 +2054,9 @@
         scopeId: "{projectId}"
   request: {"path": "/api/role-bindings", "query": {"limit": 1, "offset": 0}}
   expect: {"status": 200, "path": "bindings", "length": 1}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-list-offset-past-end"
   endpoint: "GET /api/role-bindings"
@@ -2054,6 +2141,9 @@
               principal: {"type": "group", "id": "{groupId}"}
         path: "bindings"
         length: 1
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-with-custom-role"
   endpoint: "POST /api/role-bindings"
@@ -2077,6 +2167,9 @@
   verify:
     - request: "GET /api/role-bindings?groupId={groupId}"
       expect: {"status": 200, "contains": "vd-{uid}"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-with-expiry"
   endpoint: "POST /api/role-bindings"
@@ -2097,6 +2190,9 @@
   verify:
     - request: "GET /api/role-bindings?groupId={groupId}"
       expect: {"status": 200, "contains": "2099-01-01"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-for-team-scope"
   endpoint: "POST /api/role-bindings"
@@ -2119,6 +2215,9 @@
   verify:
     - request: "GET /api/role-bindings?groupId={groupId}"
       expect: {"status": 200, "path": "bindings", "length": 1}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-rejects-no-principal"
   endpoint: "POST /api/role-bindings"
@@ -2149,6 +2248,9 @@
   verify:
     - request: "GET /api/role-bindings?groupId={groupId}"
       expect: {"status": 200, "path": "bindings", "length": 0}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-rejects-invalid-role"
   endpoint: "POST /api/role-bindings"
@@ -2165,6 +2267,9 @@
       scopeType: "PROJECT"
       scopeId: "{projectId}"
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-rejects-invalid-scope-type"
   endpoint: "POST /api/role-bindings"
@@ -2181,6 +2286,9 @@
       scopeType: "GLOBAL"
       scopeId: "{projectId}"
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-rejects-missing-scope"
   endpoint: "POST /api/role-bindings"
@@ -2193,6 +2301,9 @@
     path: "/api/role-bindings"
     body: {"groupId": "{groupId}", "role": "VIEWER", "scopeType": "PROJECT"}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-rejects-custom-without-role-id"
   endpoint: "POST /api/role-bindings"
@@ -2209,6 +2320,9 @@
       scopeType: "PROJECT"
       scopeId: "{projectId}"
   expect: {"status": [400, 404, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-rejects-bad-expiry"
   endpoint: "POST /api/role-bindings"
@@ -2226,6 +2340,9 @@
       scopeId: "{projectId}"
       expiresAt: "tomorrow-ish"
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-unknown-group"
   endpoint: "POST /api/role-bindings"
@@ -2278,6 +2395,9 @@
       scopeType: "PROJECT"
       scopeId: "nope-{uid}"
   expect: {"status": [400, 404, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-unknown-custom-role"
   endpoint: "POST /api/role-bindings"
@@ -2295,6 +2415,9 @@
       scopeId: "{projectId}"
       customRoleId: "nope-{uid}"
   expect: {"status": [400, 404, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-identical-conflicts"
   endpoint: "POST /api/role-bindings"
@@ -2317,6 +2440,9 @@
       scopeType: "PROJECT"
       scopeId: "{projectId}"
   expect: {"status": 409, "contains": "role_binding_already_exists"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-refuses-no-key"
   endpoint: "POST /api/role-bindings"
@@ -2358,6 +2484,9 @@
       scopeType: "PROJECT"
       scopeId: "{projectId}"
   expect: {"status": [401, 403]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-create-refuses-read-only-key"
   endpoint: "POST /api/role-bindings"
@@ -2394,6 +2523,9 @@
       expect:
         status: 200
         body: {"bindings": [{"id": "{bindingId}", "role": "MEMBER"}]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-update-to-custom-role"
   endpoint: "PATCH /api/role-bindings/{id}"
@@ -2419,6 +2551,9 @@
   verify:
     - request: "GET /api/role-bindings?groupId={groupId}"
       expect: {"status": 200, "contains": "vd-{uid}"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-update-rejects-missing-role"
   endpoint: "PATCH /api/role-bindings/{id}"
@@ -2436,6 +2571,9 @@
       capture: {"bindingId": "id"}
   request: {"path": "/api/role-bindings/{bindingId}", "body": {}}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-update-rejects-invalid-role"
   endpoint: "PATCH /api/role-bindings/{id}"
@@ -2453,6 +2591,9 @@
       capture: {"bindingId": "id"}
   request: {"path": "/api/role-bindings/{bindingId}", "body": {"role": "OWNER"}}
   expect: {"status": [400, 422]}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-update-rejects-custom-without-role-id"
   endpoint: "PATCH /api/role-bindings/{id}"
@@ -2475,6 +2616,9 @@
   verify:
     - request: "GET /api/role-bindings?groupId={groupId}"
       expect: {"status": 200, "body": {"bindings": [{"role": "VIEWER"}]}}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-update-not-found"
   endpoint: "PATCH /api/role-bindings/{id}"
@@ -2529,6 +2673,9 @@
         body: {"totalCount": 0}
         path: "bindings"
         length: 0
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-delete-not-found"
   endpoint: "DELETE /api/role-bindings/{id}"
@@ -2553,6 +2700,9 @@
     - request: "DELETE /api/role-bindings/{bindingId}"
   request: {"path": "/api/role-bindings/{bindingId}"}
   expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "role-binding-delete-refuses-no-key"
   endpoint: "DELETE /api/role-bindings/{id}"
@@ -6311,6 +6461,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/scim/v2/Groups", "query": {"count": 100}}
   expect: {"status": 200, "notContains": "vd-{uid}"}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "scim-groups-list-refuses-no-key"
   endpoint: "GET /api/scim/v2/Groups"
@@ -6469,6 +6622,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/scim/v2/Groups/{groupId}"}
   expect: {"status": 200}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "scim-groups-get-refuses-no-key"
   endpoint: "GET /api/scim/v2/Groups/{id}"
@@ -7784,6 +7940,9 @@
       capture: {"groupId": "id"}
   request: {"path": "/api/groups/latest/{groupId}"}
   expect: {"status": 200, "body": {"id": "{groupId}"}}
+  teardown:
+    - request: "DELETE /api/groups/{groupId}"
+      auth: "org"
 
 - id: "twin-role-latest-get"
   endpoint: "GET /api/roles/{id}"
