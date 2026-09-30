@@ -99,7 +99,10 @@ describe("the seat-type choice", () => {
       const user = userEvent.setup();
       renderInviteForm();
 
-      const checkbox = () => screen.getByRole("checkbox") as HTMLInputElement;
+      // The first box is the Lite Member one; the Developer seat (ADR-143)
+      // sits beside it with its own box.
+      const checkbox = () =>
+        screen.getAllByRole("checkbox")[0] as HTMLInputElement;
       const before = checkbox().checked;
       await user.click(screen.getByTestId("lite-member-info"));
 

@@ -27,6 +27,8 @@ import { api } from "~/utils/api";
 import { getDefaultTeamRoleForOrganizationRole } from "~/utils/memberRoleConstraints";
 import { InfoWithoutSelecting } from "./settings/InfoWithoutSelecting";
 import {
+  DEVELOPER_EXPLANATION,
+  DEVELOPER_SHORT_DESCRIPTION,
   LITE_MEMBER_EXPLANATION,
   LITE_MEMBER_NEEDS_TEAM_WARNING,
   LITE_MEMBER_SHORT_DESCRIPTION,
@@ -153,7 +155,10 @@ export function AddMembersForm({
       selectedTeams.forEach(
         (team: TeamAssignment | undefined, teamIndex: number) => {
           if (!team) return;
-          if (orgRole === OrganizationUserRole.EXTERNAL) {
+          if (orgRole === OrganizationUserRole.DEVELOPER) {
+            // A Developer seat (ADR-143) is invited onto no team.
+            setValue("teams", []);
+          } else if (orgRole === OrganizationUserRole.EXTERNAL) {
             if (team.role !== TeamUserRole.VIEWER) {
               setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
               setValue(`teams.${teamIndex}.customRoleId`, undefined);
@@ -198,8 +203,11 @@ export function AddMembersForm({
       .map((e) => e.trim())
       .filter(Boolean);
 
-    // Normalize team roles to match org role constraints
-    const normalizedTeams = data.teams.map((team) => {
+    // Normalize team roles to match org role constraints. A Developer seat
+    // (ADR-143) is invited onto no team, whatever the form still holds.
+    const teamsForSeat =
+      data.orgRole === OrganizationUserRole.DEVELOPER ? [] : data.teams;
+    const normalizedTeams = teamsForSeat.map((team) => {
       if (data.orgRole === OrganizationUserRole.EXTERNAL) {
         return {
           teamId: team.teamId,
@@ -295,10 +303,59 @@ export function AddMembersForm({
                 </Checkbox>
               )}
             />
+            <Controller
+              control={control}
+              name="orgRole"
+              render={({ field }) => (
+                <Checkbox
+                  checked={field.value === OrganizationUserRole.DEVELOPER}
+                  onChange={(e) =>
+                    field.onChange(
+                      e.target.checked
+                        ? OrganizationUserRole.DEVELOPER
+                        : OrganizationUserRole.MEMBER,
+                    )
+                  }
+                  alignItems="flex-start"
+                  marginTop={3}
+                  data-testid="invite-developer-seat"
+                >
+                  <VStack align="start" gap={0}>
+                    <HStack gap={0}>
+                      <Text
+                        fontSize="sm"
+                        fontWeight="medium"
+                        lineHeight="short"
+                      >
+                        Developer
+                      </Text>
+                      <InfoWithoutSelecting>
+                        <FieldInfoTooltip
+                          description={DEVELOPER_EXPLANATION}
+                          docHref={SEAT_TYPES_DOC_PATH}
+                          docLabel="How seats are counted"
+                          testId="developer-info"
+                        />
+                      </InfoWithoutSelecting>
+                    </HStack>
+                    <Text fontSize="xs" color="fg.muted">
+                      {DEVELOPER_SHORT_DESCRIPTION}
+                    </Text>
+                  </VStack>
+                </Checkbox>
+              )}
+            />
           </Box>
         </HStack>
 
-        {teamFields.length > 0 && (
+        {orgRole === OrganizationUserRole.DEVELOPER && (
+          <Text fontSize="xs" color="fg.muted" data-testid="developer-no-team">
+            A Developer gets a project of their own and joins no team. You can
+            move them to a Member seat later from the members list.
+          </Text>
+        )}
+
+        {orgRole !== OrganizationUserRole.DEVELOPER && teamFields.length > 0 && (
           <VStack align="start" gap={2} width="100%">
             <HStack justify="space-between" width="100%">
               <Text fontSize="sm" fontWeight="medium" color="fg">
@@ -378,7 +435,7 @@ export function AddMembersForm({
           </VStack>
         )}
 
-        {teamFields.length === 0 && (
+        {orgRole !== OrganizationUserRole.DEVELOPER && teamFields.length === 0 && (
           <VStack align="start" gap={2} width="100%">
             {orgRole === OrganizationUserRole.EXTERNAL && (
               <LiteMemberNeedsTeamWarning />
@@ -483,6 +540,7 @@ function getFilteredTeamRoles(
     customRoleId: role.id,
   }));
 
+  if (orgRole === OrganizationUserRole.DEVELOPER) return [];
   if (orgRole === OrganizationUserRole.EXTERNAL)
     return [teamRolesOptions.VIEWER];
   if (orgRole === OrganizationUserRole.MEMBER) {

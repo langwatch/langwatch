@@ -5,6 +5,8 @@ import { FieldInfoTooltip } from "../ui/FieldInfoTooltip";
 import { Select } from "../ui/select";
 import { InfoWithoutSelecting } from "./InfoWithoutSelecting";
 import {
+  DEVELOPER_EXPLANATION,
+  DEVELOPER_SHORT_DESCRIPTION,
   LITE_MEMBER_EXPLANATION,
   LITE_MEMBER_SHORT_DESCRIPTION,
   SEAT_TYPES_DOC_PATH,
@@ -32,7 +34,26 @@ export const orgRoleOptions: OrgRoleOption[] = [
     value: OrganizationUserRole.EXTERNAL,
     description: LITE_MEMBER_SHORT_DESCRIPTION,
   },
+  {
+    label: "Developer",
+    value: OrganizationUserRole.DEVELOPER,
+    description: DEVELOPER_SHORT_DESCRIPTION,
+  },
 ];
+
+/** The seats whose boundary is explained behind the (i) in the picker. */
+const SEAT_EXPLANATIONS: Partial<
+  Record<OrganizationUserRole, { description: string; testId: string }>
+> = {
+  [OrganizationUserRole.EXTERNAL]: {
+    description: LITE_MEMBER_EXPLANATION,
+    testId: "lite-member-info",
+  },
+  [OrganizationUserRole.DEVELOPER]: {
+    description: DEVELOPER_EXPLANATION,
+    testId: "developer-info",
+  },
+};
 
 /**
  * OrganizationUserRoleField
@@ -72,13 +93,15 @@ export function OrganizationUserRoleField({
                 <VStack align="start" gap={0} flex={1}>
                   <HStack gap={0}>
                     <Text>{option.label}</Text>
-                    {option.value === OrganizationUserRole.EXTERNAL && (
+                    {SEAT_EXPLANATIONS[option.value] && (
                       <InfoWithoutSelecting>
                         <FieldInfoTooltip
-                          description={LITE_MEMBER_EXPLANATION}
+                          description={
+                            SEAT_EXPLANATIONS[option.value]!.description
+                          }
                           docHref={SEAT_TYPES_DOC_PATH}
                           docLabel="How seats are counted"
-                          testId="lite-member-info"
+                          testId={SEAT_EXPLANATIONS[option.value]!.testId}
                         />
                       </InfoWithoutSelecting>
                     )}

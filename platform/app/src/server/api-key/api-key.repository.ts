@@ -578,7 +578,11 @@ export class ApiKeyRepository {
       where: { userId, organizationId, disabledAt: null },
       select: { userId: true, role: true },
     });
-    if (!member || member.role === "EXTERNAL") return null;
+    // Neither a Lite Member nor a Developer (ADR-143) ever holds an
+    // organization-scoped binding, admin least of all.
+    if (!member || member.role === "EXTERNAL" || member.role === "DEVELOPER") {
+      return null;
+    }
     const binding = await liveGrants(this.prisma).findFirst({
       where: {
         principalType: "USER",
